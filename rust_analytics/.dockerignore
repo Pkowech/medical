@@ -1,0 +1,14 @@
+# Git version control files
+.git
+.gitignore
+
+# Build artifacts and cache
+target/
+.vs/
+
+# Documentation
+*.md
+
+# Tests
+test/
+tests/

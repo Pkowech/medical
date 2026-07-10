@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT learning_path_id\n        FROM learning_path_progress\n        WHERE user_id = $1 AND status = 'completed'\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "learning_path_id",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "9d3c2ef6af661254ba9239eca49f8a335fbaddde64cfbec6d9e7121dbf3b0e5b"
+}

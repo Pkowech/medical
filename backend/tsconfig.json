@@ -1,0 +1,32 @@
+{
+  "compilerOptions": {
+    "module": "es2022",
+    "baseUrl": "./",
+    "moduleResolution": "bundler",
+    "declaration": true,
+    "removeComments": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true,
+    "target": "ES2021",
+    "sourceMap": true,
+    "outDir": "./dist",
+    "rootDir": "src",
+    "incremental": true,
+    "skipLibCheck": true,
+    "noEmit": false,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "noFallthroughCasesInSwitch": true,
+    "esModuleInterop": true,
+    "typeRoots": ["./node_modules/@types", "./src/common/types"]
+    ,
+    "paths": {
+      "#common/*": ["./src/common/*"],
+      "#infrastructure/*": ["./src/infrastructure/*"],
+      "#modules/*": ["./src/modules/*"]
+    }
+  },
+  "include": ["src/**/*", "test/ai-analytics/tests"],
+  "exclude": ["node_modules", "dist"]
+}

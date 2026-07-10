@@ -1,0 +1,110 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, user_id, course_id, status, time_spent, progress_percentage, \n                completed_units, total_units, started_at, completed_at, last_accessed_at, \n                created_at, updated_at \n         FROM course_progress \n         WHERE user_id = $1 AND course_id = $2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "user_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "course_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "status",
+        "type_info": {
+          "Custom": {
+            "name": "\"ProgressStatus\"",
+            "kind": {
+              "Enum": [
+                "not_started",
+                "in_progress",
+                "completed",
+                "active",
+                "skipped",
+                "dropped",
+                "reviewed"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "time_spent",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 5,
+        "name": "progress_percentage",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 6,
+        "name": "completed_units",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 7,
+        "name": "total_units",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 8,
+        "name": "started_at",
+        "type_info": "Timestamp"
+      },
+      {
+        "ordinal": 9,
+        "name": "completed_at",
+        "type_info": "Timestamp"
+      },
+      {
+        "ordinal": 10,
+        "name": "last_accessed_at",
+        "type_info": "Timestamp"
+      },
+      {
+        "ordinal": 11,
+        "name": "created_at",
+        "type_info": "Timestamp"
+      },
+      {
+        "ordinal": 12,
+        "name": "updated_at",
+        "type_info": "Timestamp"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "01701054675caaee133ed855a95fbc55c3c0e5e996927c1f14b9fd1545c98492"
+}

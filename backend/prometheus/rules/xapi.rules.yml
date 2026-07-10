@@ -1,0 +1,20 @@
+groups:
+  - name: xapi.rules
+    rules:
+      - alert: XAPIDuplicateRateHigh
+        expr: xapi_duplicate_rate_percent > 10
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'High xAPI duplicate rate ({{ $value }}%)'
+          description: 'Duplicate detection rate for xAPI statements is above 10% for 5 minutes.'
+
+      - alert: XAPIProcessingFailuresHigh
+        expr: (xapi_processing_failures_total / xapi_statements_total) * 100 > 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'High xAPI processing failure rate ({{ $value }}%)'
+          description: 'Processing failures for xAPI statements exceed 0.5% for 5 minutes.'

@@ -1,0 +1,24 @@
+# Runtime image that uses the host-built binary (assumes target/release/rust_analytics exists)
+FROM debian:bookworm-slim
+
+# Install minimal runtime deps
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates wget && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy the binary built on the host
+COPY target/release/rust_analytics /usr/local/bin/rust_analytics
+
+# Create non-root user
+RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser \
+    && chown appuser:appgroup /usr/local/bin/rust_analytics
+
+USER appuser
+
+EXPOSE 8000 50051
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+  CMD wget -qO- http://127.0.0.1:8000/health || exit 1
+
+ENTRYPOINT ["/usr/local/bin/rust_analytics"]

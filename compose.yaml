@@ -1,0 +1,235 @@
+services:
+  postgres:
+    image: postgres:18
+    container_name: medtrack_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "${POSTGRES_PORT}:5432"
+    # For PostgreSQL 18+ images we mount the volume at /var/lib/postgresql so
+    # the server can create a major-version specific subdirectory under it.
+    # See: https://github.com/docker-library/postgres/issues/1259
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - medtrack_net
+
+  redis:
+    image: redis:7-alpine
+    container_name: medtrack_redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD}"]
+    # Redis port binding is controlled via the root `.env` file (REDIS_PORT)
+    # — make the root `.env` the source of truth for runtime host mapping.
+    # By default the project ships with REDIS_PORT=6379 in the root .env so
+    # host-based tools can reach the container on 127.0.0.1:6379. Change the
+    # value in `.env` if you need a different host port (for example to avoid
+    # collision with an existing Redis instance).
+    ports:
+      - "${REDIS_PORT}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - medtrack_net
+
+  backend:
+    build:
+      # build context set to repository root so the backend Dockerfile can access
+      # the root-level pnpm-lock.yaml and workspace files when needed
+      context: .
+      dockerfile: backend/Dockerfile
+      target: production
+    container_name: medtrack_backend_prod
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: ${BACKEND_PORT}
+      POSTGRES_HOST: postgres
+      REDIS_HOST: ${REDIS_HOST}
+      # DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: ${REDIS_URL}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      JWT_SECRET: qF+4oB5BjGI5a6DKt7OK7jt16P3G1HDx5wAseOVre38=
+      NEXTAUTH_SECRET: qF+4oB5BjGI5a6DKt7OK7jt16P3G1HDx5wAseOVre38=
+      RUST_ANALYTICS_GRPC_URL: http://rust-analytics:50051
+    command: >
+      sh -c "pnpm prisma migrate deploy && pnpm start"
+    ports:
+      - "${BACKEND_PORT}:${BACKEND_PORT}"
+    # Updated healthcheck to use Node.js (no curl dependency)
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:${BACKEND_PORT}/api/health', (res) => { if (res.statusCode === 200) process.exit(0); process.exit(1); })\" || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - medtrack_net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  rust-analytics:
+    build:
+      context: ./rust_analytics
+      dockerfile: Dockerfile
+    container_name: medtrack_rust_analytics_prod
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      RUST_ANALYTICS_GRPC_HOST: 0.0.0.0
+      RUST_ANALYTICS_GRPC_PORT: 50051
+      RUST_ANALYTICS_HOST: 0.0.0.0
+      RUST_ANALYTICS_PORT: 8000
+      DATABASE_URL: ${DATABASE_URL}
+      RUST_API_KEY: a-secret-key
+    ports:
+      - "50051:50051"
+      - "8000:8000"
+    networks:
+      - medtrack_net
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "/usr/local/bin/rust_analytics --health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: final
+    container_name: medtrack_frontend_prod
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT}:3000"
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: http://backend:${BACKEND_PORT}
+      NEXTAUTH_URL: http://localhost:${FRONTEND_PORT} # Update with actual production domain if deployed
+      NEXT_TELEMETRY_DISABLED: 1
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - medtrack_net
+    secrets:
+      - nextauth_secret
+    command: pnpm start
+
+
+  prometheus:
+    image: prom/prometheus:v2.47.0
+    container_name: medtrack_prometheus
+    restart: unless-stopped
+    ports:
+      - "${PROMETHEUS_PORT}:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./monitoring/alert_rules.yml:/etc/prometheus/alert_rules.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    networks:
+      - medtrack_net
+    depends_on:
+      - backend
+      - frontend
+
+  alertmanager:
+    image: prom/alertmanager:v0.26.0
+    container_name: medtrack_alertmanager
+    restart: unless-stopped
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--web.external-url=http://localhost:9093'
+    networks:
+      - medtrack_net
+    depends_on:
+      - prometheus
+
+  grafana:
+    image: grafana/grafana:10.1.5
+    container_name: medtrack_grafana
+    restart: unless-stopped
+    ports:
+      - "${GRAFANA_PORT}:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+      - ./monitoring/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
+      GF_SERVER_ROOT_URL: http://localhost:${GRAFANA_PORT}
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+    networks:
+      - medtrack_net
+    depends_on:
+      - prometheus
+
+  nginx:
+    image: nginx:1.25.3
+    container_name: medtrack_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443" # For HTTPS, even if commented out in config
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro # For SSL certificates
+    networks:
+      - medtrack_net
+    depends_on:
+      frontend:
+        condition: service_started
+      backend:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  redis_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  medtrack_net:
+    driver: bridge
+
+secrets:
+  nextauth_secret:
+    file: ./secrets/nextauth_secret.txt

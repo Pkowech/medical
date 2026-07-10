@@ -1,0 +1,20 @@
+# Test Dependencies
+pytest==7.4.2
+pytest-asyncio==0.24.0
+pytest-cov==4.1.0
+pytest-xdist==3.5.0
+faker==24.0.0
+requests==2.31.0
+
+# AnyIO/pytest-anyio provides the `anyio_backend` pytest option used in some CI runs
+pytest-anyio>=3.0.0
+
+# gRPC Dependencies
+grpcio==1.64.0
+grpcio-tools==1.64.0
+protobuf==5.28.0
+
+# Additional Testing Utilities
+httpx==0.26.0
+asyncio-contextmanager==1.0.0
+python-dotenv==1.0.0

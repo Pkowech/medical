@@ -1,0 +1,4 @@
+
+> medtrackhub@1.0.0 lint C:\Users\user\medical\frontend
+> eslint .
+

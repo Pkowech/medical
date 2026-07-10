@@ -1,0 +1,19 @@
+pub mod cache;
+#[cfg(feature = "ml")]
+pub mod core;
+#[cfg(feature = "ml")]
+pub mod data;
+#[cfg(feature = "ml")]
+pub mod engagement;
+pub mod events;
+pub mod learning;
+#[cfg(feature = "ml")]
+pub mod models;
+#[cfg(feature = "ml")]
+pub mod patterns;
+#[cfg(feature = "ml")]
+pub mod performance;
+pub mod recommendations;
+pub mod reports;
+pub mod spaced_repetition;
+pub mod system; // New module for detailed learning analytics logic

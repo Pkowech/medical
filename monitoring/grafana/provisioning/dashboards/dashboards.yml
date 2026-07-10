@@ -1,0 +1,15 @@
+apiVersion: 1
+
+# Dashboard provisioning for Grafana
+# Automatically loads dashboards from the dashboards folder
+
+providers:
+  - name: 'MedTrack Dashboards'
+    orgId: 1
+    folder: 'MedTrack'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards

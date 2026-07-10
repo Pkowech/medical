@@ -1,0 +1,67 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT lp.id, lp.title, lp.description, lpp.status, lpp.progress_percentage, lpp.started_at\n         FROM learning_paths lp\n         LEFT JOIN learning_path_progress lpp ON lp.id = lpp.learning_path_id AND lpp.user_id = $1\n         WHERE lpp.user_id = $1 OR lpp.id IS NULL\n         ORDER BY lpp.started_at DESC NULLS LAST",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "title",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "description",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "status",
+        "type_info": {
+          "Custom": {
+            "name": "\"ProgressStatus\"",
+            "kind": {
+              "Enum": [
+                "not_started",
+                "in_progress",
+                "completed",
+                "active",
+                "skipped",
+                "dropped",
+                "reviewed"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "progress_percentage",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 5,
+        "name": "started_at",
+        "type_info": "Timestamp"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "61fa7f77b8c41b28649b4fcccd9491ebd046bc5753d3a7fdedc8300e855881ee"
+}

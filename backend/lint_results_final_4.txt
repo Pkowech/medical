@@ -1,0 +1,951 @@
+
+> medtrack-hub-backend@1.0.0 lint C:\Users\user\medical\backend
+> eslint "{src,apps,libs,test}/**/*.ts" --fix
+
+
+C:\Users\user\medical\backend\src\app.controller.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\app.module.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\app.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\constants\app.constants.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\constants\auth.constants.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\constants\cache-keys.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\constants\error-messages.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\constants\redis-ttl.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\decorators\action.decorator.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\decorators\api-operation.decorator.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\decorators\api-paginated-response.decorator.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\decorators\api-response-with-data.decorator.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\decorators\auth.decorator.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\decorators\current-user.decorator.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver     import/no-cycle
+  5:4  error    'data' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\Users\user\medical\backend\src\common\decorators\get-user.decorator.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\decorators\public.decorator.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\decorators\require-role.decorator.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\decorators\resource.decorator.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\decorators\roles.decorator.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\decorators\user.decorator.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\decorators\validation.decorators.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\dto\admin-dashboard.dto.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\dto\analytics.dto.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\dto\api-response.dto.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\dto\assessment-progress.dto.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\dto\assessment.dto.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\dto\auth.dto.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\dto\base-response.dto.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\dto\chat.dto.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\dto\clinical-case.dto.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\dto\course.dto.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\dto\cpd.dto.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\dto\discussion.dto.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\dto\engagement.dto.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\dto\feedback.dto.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\dto\file.dto.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\dto\flashcard.dto.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\dto\forum.dto.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\dto\gamification.dto.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\dto\guest-session-response.dto.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\dto\guest-session.dto.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\dto\index.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\dto\learning-goals.dto.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\dto\learning-paths.dto.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\dto\learning.dto.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\dto\material.dto.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\dto\message.dto.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\dto\module.dto.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\dto\notification.dto.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\dto\onboarding.dto.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\dto\paginated-result.dto.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\dto\pagination.dto.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\dto\prerequisites.dto.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\dto\prisma.dto.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\dto\progress.dto.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\dto\question-bank.dto.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\dto\recommendation.dto.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\dto\rewards.dto.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\dto\roles.dto.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\dto\search.dto.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\dto\security.dto.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\dto\send-message.dto.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\dto\spaced-repetition-stats-response.dto.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\dto\spaced-repetition.dto.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\dto\study-groups.dto.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\dto\study-session.dto.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\dto\unit-quiz.dto.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\dto\unit.dto.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\dto\user-stats.dto.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\dto\user.dto.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\dto\weekly-digest.dto.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\enums\analytics.enum.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\enums\difficulty-level.enum.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\enums\index.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\enums\learning-goals.enum.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\enums\learning.enum.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\enums\progress.enum.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\enums\role.enum.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\enums\user-activity-type.enum.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\exceptions\assessment.exceptions.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\exceptions\base.exception.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\exceptions\business.exception.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\exceptions\conflict.exception.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\exceptions\index.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\exceptions\not-found.exception.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\exceptions\quiz.exception.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\exceptions\validation.exception.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\filters\all-exceptions.filter.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\filters\http-exception.filter.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\guards\email-verification.guard.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\guards\jwt-auth.guard.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\guards\roles.guard.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\guards\throttle.guard.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\index.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\interceptors\logging.interceptor.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\interceptors\snake-case.interceptor.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\interceptors\transform.interceptor.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\jwt.strategy.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\services\base-analytics.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\services\base.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\services\error.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\services\logger.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\types\argon2.d.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\types\assessment.types.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\types\aws-sdk.d.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\types\express.d.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\utils\date.utils.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\utils\error.utils.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\utils\file.utils.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\utils\index.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\utils\password.utils.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\utils\preparation.utils.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\utils\quiz.utils.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\utils\role.util.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\common\utils\security.utils.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\config\assessment.config.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\config\cache.config.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\config\cors.config.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\config\multer.config.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\config\rate-limit.config.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\config\redis.config.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\config\swagger.config.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\config\throttler.config.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\config\validation.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\generated\grpc\analytics.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\generated\grpc\google\protobuf\struct.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\generated\grpc\google\protobuf\timestamp.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\infrastructure\audit\audit.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\infrastructure\grpc\analytics.client.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\infrastructure\grpc\grpc.module.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\infrastructure\health\health.controller.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\infrastructure\health\health.module.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\infrastructure\health\prisma.health.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\infrastructure\health\redis.health.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\infrastructure\integrations\controllers\integrations.controller.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\infrastructure\integrations\integrations.module.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\infrastructure\metrics\metrics.controller.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\infrastructure\metrics\metrics.module.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\infrastructure\metrics\metrics.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\infrastructure\middleware\request-id.middleware.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\infrastructure\monitoring\analytics.interceptor.ts
+   1:1   warning  Resolve error: typescript with invalid interface loaded as resolver                                import/no-cycle
+  40:14  error    'request.id' may use Object's default stringification format ('[object Object]') when stringified  @typescript-eslint/no-base-to-string
+
+C:\Users\user\medical\backend\src\infrastructure\monitoring\distributed-tracing.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\infrastructure\monitoring\monitoring.module.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\infrastructure\monitoring\performance-metrics.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\infrastructure\monitoring\progressive-rollout.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\infrastructure\prisma\prisma.module.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\infrastructure\prisma\prisma.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\infrastructure\redis\redis.helper.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\infrastructure\redis\redis.module.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\infrastructure\redis\redis.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\infrastructure\search\controllers\search.controller.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\infrastructure\search\search.module.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\infrastructure\search\services\search-cache.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\infrastructure\search\services\search.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\infrastructure\storage\storage.module.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\infrastructure\storage\storage.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\infrastructure\swagger\swagger.setup.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\main.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\admin\admin.module.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\admin\controllers\admin-analytics.controller.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\admin\controllers\admin.controller.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\admin\services\admin-analytics.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\admin\services\admin.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\ai-analytics\ai-analytics.module.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\ai-analytics\analytics-services.module.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\ai-analytics\services\adaptive-quiz-analytics.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\ai-analytics\services\ai-analytics.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\ai-analytics\services\ai-features.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\ai-analytics\services\analytics-cache.constants.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\ai-analytics\services\assessment-analytics.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\ai-analytics\services\course-analytics.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\ai-analytics\services\learning-analytics.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\ai-analytics\services\learning-path-recommendations.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\ai-analytics\services\request-deduplication.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\ai-analytics\services\study-analytics.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\ai-analytics\services\user-analytics.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\auth\auth.module.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\auth\controllers\audit.controller.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\auth\controllers\auth.controller.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\auth\controllers\roles.controller.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\auth\controllers\security-settings.controller.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\auth\controllers\security.controller.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\auth\controllers\sessions.controller.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\auth\controllers\user-features.controller.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\auth\controllers\users.controller.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\auth\index.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\auth\middleware\role.middleware.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\auth\pipes\parse-uuid.pipe.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\auth\pipes\password-validation.pipe.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\auth\pipes\validation.pipe.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\auth\roles.module.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\auth\services\audit-log.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\auth\services\auth.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\auth\services\password.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\auth\services\permission-calculation.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\auth\services\refresh-token.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\auth\services\role-initialization.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\auth\services\role-limiting.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\auth\services\roles-cache.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\auth\services\roles.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\auth\services\security-audit.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\auth\services\security.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\auth\services\session-tracking.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\auth\services\token-blacklist.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\auth\services\user-features.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\auth\services\users.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\auth\users.module.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\assessment\assessment.module.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\assessment\constants\assessment.constants.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\assessment\controllers\assessment-progress.controller.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\assessment\controllers\blueprint.controller.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\assessment\controllers\feedback.controller.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\assessment\controllers\flashcards.controller.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\assessment\controllers\quiz.controller.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\assessment\index.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\assessment\services\adaptive-quiz.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\assessment\services\assessment-progress.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\assessment\services\assessments.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\assessment\services\blueprint.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\assessment\services\feedback.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\assessment\services\flashcards.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\assessment\services\question-bank.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\assessment\services\quiz.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\assessment\services\sm2-algorithm.service.spec.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\assessment\services\sm2-algorithm.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\assessment\services\unit-quiz.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\courses\controllers\admin.controller.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\courses\controllers\clinical-cases.controller.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\courses\controllers\course-categories.controller.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\courses\controllers\courses.controller.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\courses\controllers\cpd.controller.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\courses\controllers\learning-paths.controller.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\courses\controllers\learning.controller.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\courses\controllers\materials.controller.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\courses\controllers\progress.controller.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\courses\controllers\study-groups.controller.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\courses\controllers\study-sessions.controller.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\courses\controllers\study.controller.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\courses\controllers\unit-progress.controller.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\courses\controllers\units.controller.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\courses\controllers\xapi.controller.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\courses\controllers\xapi.health.controller.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\courses\dto\create-xapi-statement.dto.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\courses\index.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\courses\listeners\material.listeners.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\courses\listeners\progress.listeners.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\courses\listeners\xapi.listeners.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\courses\modules\clinical-cases.module.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\courses\modules\course-categories.module.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\courses\modules\courses.module.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\courses\modules\learning.module.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\courses\modules\materials.module.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\courses\modules\units.module.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\courses\services\clinical-cases.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\courses\services\course-categories.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\courses\services\course-progress.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\courses\services\courses.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\courses\services\cpd.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\courses\services\learning-goals.service.ts
+    1:1  warning  Resolve error: typescript with invalid interface loaded as resolver                                                                                                 import/no-cycle
+  571:7  warning  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+  761:7  warning  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+  857:5  error    'goalData' is defined but never used. Allowed unused args must match /^_/u                                                                                          @typescript-eslint/no-unused-vars
+
+C:\Users\user\medical\backend\src\modules\education\courses\services\learning-path-events.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\courses\services\learning-path-integration.service.ts
+     1:1   warning  Resolve error: typescript with invalid interface loaded as resolver               import/no-cycle
+    37:3   error    'PeerProgress' is defined but never used. Allowed unused vars must match /^_/u    @typescript-eslint/no-unused-vars
+    38:3   error    'PhaseProgress' is defined but never used. Allowed unused vars must match /^_/u   @typescript-eslint/no-unused-vars
+   948:14  error    'error' is defined but never used. Allowed unused caught errors must match /^_/u  @typescript-eslint/no-unused-vars
+  1003:14  error    'any' overrides all other types in this union type                                @typescript-eslint/no-redundant-type-constituents
+  1409:38  error    'userId' is defined but never used. Allowed unused args must match /^_/u          @typescript-eslint/no-unused-vars
+
+C:\Users\user\medical\backend\src\modules\education\courses\services\learning-path-progress.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\courses\services\learning-paths.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\courses\services\learning.service.ts
+    1:1  warning  Resolve error: typescript with invalid interface loaded as resolver       import/no-cycle
+  539:5  error    'userId' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\Users\user\medical\backend\src\modules\education\courses\services\mastery-gate.service.ts
+    1:1   warning  Resolve error: typescript with invalid interface loaded as resolver                         import/no-cycle
+    6:10  error    'ErrorMessages' is defined but never used. Allowed unused vars must match /^_/u             @typescript-eslint/no-unused-vars
+    7:10  error    'Progress' is defined but never used. Allowed unused vars must match /^_/u                  @typescript-eslint/no-unused-vars
+  100:13  error    'previousMastery' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\Users\user\medical\backend\src\modules\education\courses\services\materials.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\courses\services\progress.service.ts
+    1:1  warning  Resolve error: typescript with invalid interface loaded as resolver       import/no-cycle
+  793:5  error    'client' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\Users\user\medical\backend\src\modules\education\courses\services\study-groups.service.ts
+    1:1   warning  Resolve error: typescript with invalid interface loaded as resolver                    import/no-cycle
+   57:11  error    'inviteCode' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+   98:15  error    'err' is defined but never used. Allowed unused args must match /^_/u                  @typescript-eslint/no-unused-vars
+  530:15  error    'err' is defined but never used. Allowed unused args must match /^_/u                  @typescript-eslint/no-unused-vars
+
+C:\Users\user\medical\backend\src\modules\education\courses\services\study-sessions.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\courses\services\study.service.ts
+    1:1   warning  Resolve error: typescript with invalid interface loaded as resolver               import/no-cycle
+    3:47  error    'Prisma' is defined but never used. Allowed unused vars must match /^_/u          @typescript-eslint/no-unused-vars
+  111:14  error    'error' is defined but never used. Allowed unused caught errors must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\Users\user\medical\backend\src\modules\education\courses\services\unit-progress.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\courses\services\units.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\courses\services\xapi.service.spec.ts
+    1:1   warning  Resolve error: typescript with invalid interface loaded as resolver                                                                                                                                                                                                                                                                         import/no-cycle
+   10:7   error    'progressService' is assigned a value but never used. Allowed unused vars must match /^_/u                                                                                                                                                                                                                                                  @typescript-eslint/no-unused-vars
+   81:14  error    A method that is not declared with `this: void` may cause unintentional scoping of `this` when separated from its object.
+Consider using an arrow function or explicitly `.bind()`ing the method to avoid calling the method with an unintended `this` value. 
+If a function does not access `this`, it can be annotated with `this: void`  @typescript-eslint/unbound-method
+   84:14  error    A method that is not declared with `this: void` may cause unintentional scoping of `this` when separated from its object.
+Consider using an arrow function or explicitly `.bind()`ing the method to avoid calling the method with an unintended `this` value. 
+If a function does not access `this`, it can be annotated with `this: void`  @typescript-eslint/unbound-method
+  110:14  error    A method that is not declared with `this: void` may cause unintentional scoping of `this` when separated from its object.
+Consider using an arrow function or explicitly `.bind()`ing the method to avoid calling the method with an unintended `this` value. 
+If a function does not access `this`, it can be annotated with `this: void`  @typescript-eslint/unbound-method
+  146:14  error    A method that is not declared with `this: void` may cause unintentional scoping of `this` when separated from its object.
+Consider using an arrow function or explicitly `.bind()`ing the method to avoid calling the method with an unintended `this` value. 
+If a function does not access `this`, it can be annotated with `this: void`  @typescript-eslint/unbound-method
+  177:14  error    A method that is not declared with `this: void` may cause unintentional scoping of `this` when separated from its object.
+Consider using an arrow function or explicitly `.bind()`ing the method to avoid calling the method with an unintended `this` value. 
+If a function does not access `this`, it can be annotated with `this: void`  @typescript-eslint/unbound-method
+  178:14  error    A method that is not declared with `this: void` may cause unintentional scoping of `this` when separated from its object.
+Consider using an arrow function or explicitly `.bind()`ing the method to avoid calling the method with an unintended `this` value. 
+If a function does not access `this`, it can be annotated with `this: void`  @typescript-eslint/unbound-method
+  223:14  error    A method that is not declared with `this: void` may cause unintentional scoping of `this` when separated from its object.
+Consider using an arrow function or explicitly `.bind()`ing the method to avoid calling the method with an unintended `this` value. 
+If a function does not access `this`, it can be annotated with `this: void`  @typescript-eslint/unbound-method
+  248:14  error    A method that is not declared with `this: void` may cause unintentional scoping of `this` when separated from its object.
+Consider using an arrow function or explicitly `.bind()`ing the method to avoid calling the method with an unintended `this` value. 
+If a function does not access `this`, it can be annotated with `this: void`  @typescript-eslint/unbound-method
+
+C:\Users\user\medical\backend\src\modules\education\courses\services\xapi.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\courses\types\mastery.types.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\events\controllers\events.controller.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\events\dto\create-event.dto.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver       import/no-cycle
+  7:3  error    'IsJSON' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+C:\Users\user\medical\backend\src\modules\education\events\events.module.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\education\events\services\events.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\engagement-communication\controllers\chat.controller.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\engagement-communication\controllers\engagement.controller.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\engagement-communication\controllers\forum.controller.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\engagement-communication\controllers\gamification.controller.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\engagement-communication\controllers\notifications.controller.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\engagement-communication\controllers\onboarding.controller.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\engagement-communication\controllers\rewards.controller.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\engagement-communication\controllers\weekly-digest.controller.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\engagement-communication\engagement-communication.module.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\engagement-communication\services\chat.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\engagement-communication\services\forum.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\engagement-communication\services\gamification.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\engagement-communication\services\notifications.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\engagement-communication\services\onboarding.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\engagement-communication\services\peer-benchmarking.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\engagement-communication\services\rewards.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\engagement-communication\services\weekly-digest.service.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\queue\analytics-queue.module.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\modules\shared.module.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+C:\Users\user\medical\backend\src\scripts\test-file-upload.ts
+  1:1  warning  Resolve error: typescript with invalid interface loaded as resolver  import/no-cycle
+
+Γ£û 329 problems (28 errors, 301 warnings)
+
+ΓÇëELIFECYCLEΓÇë Command failed with exit code 1.

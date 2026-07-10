@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            learning_path_id as \"path_id!\",\n            COUNT(*) as \"enrollments!\"\n        FROM learning_path_progress\n        WHERE\n            started_at >= $1\n        GROUP BY\n            learning_path_id\n        ORDER BY\n            \"enrollments!\" DESC\n        LIMIT $2\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "path_id!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "enrollments!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Timestamp",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      null
+    ]
+  },
+  "hash": "1e96f987d400dd0af43bfa0939d5ba6ca2ecc4c97defae2c5d42845a8a17f4a2"
+}

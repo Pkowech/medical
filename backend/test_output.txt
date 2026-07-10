@@ -1,0 +1,529 @@
+[1m============================= test session starts =============================[0m
+platform win32 -- Python 3.13.2, pytest-9.0.2, pluggy-1.6.0
+rootdir: C:\Users\user\medical\backend\tests
+configfile: pytest.ini
+plugins: anyio-4.9.0, Faker-37.11.0, asyncio-1.3.0, cov-4.1.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 30 items
+
+tests\test_analytics.py [32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[31mE[0m[31mE[0m[31mE[0m[31mE[0m[31mE[0m[31mE[0m[31mE[0m[31mE[0m[31mE[0m[31mE[0m[31mE[0m[31mE[0m[31mE[0m[31mE[0m[31mE[0m[31mE[0m[31mE[0m[31mE[0m[31mE[0m[31m                   [100%][0m
+
+=================================== ERRORS ====================================
+[31m[1m_ ERROR at setup of TestGrpcAnalyticsEvents.test_grpc_batch_submission[trio] __[0m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\pytest_asyncio\plugin.py[0m:728: in pytest_fixture_setup
+    [0m[94mreturn[39;49;00m ([94myield[39;49;00m)[90m[39;49;00m
+            ^^^^^[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\anyio\pytest_plugin.py[0m:98: in wrapper
+    [0m[94myield from[39;49;00m runner.run_asyncgen_fixture(local_func, kwargs)[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\anyio\_backends\_trio.py[0m:948: in run_asyncgen_fixture
+    [0mfixturevalue: T_Retval = [96mself[39;49;00m._call_in_runner_task(asyncgen.asend, [94mNone[39;49;00m)[90m[39;49;00m
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\anyio\_backends\_trio.py[0m:940: in _call_in_runner_task
+    [0m[94mreturn[39;49;00m outcome_holder[[94m0[39;49;00m].unwrap()[90m[39;49;00m
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\outcome\_impl.py[0m:213: in unwrap
+    [0m[94mraise[39;49;00m captured_error[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\anyio\_backends\_trio.py[0m:910: in _run_tests_and_fixtures
+    [0mretval = [94mawait[39;49;00m coro[90m[39;49;00m
+             ^^^^^^^^^^[90m[39;49;00m
+[1m[31mtests\conftest.py[0m:183: in grpc_analytics_channel_insecure
+    [0mchannel = grpc.aio.insecure_channel([33mf[39;49;00m[33m"[39;49;00m[33m{[39;49;00mGRPC_ANALYTICS_HOST[33m}[39;49;00m[33m:[39;49;00m[33m{[39;49;00mGRPC_ANALYTICS_PORT[33m}[39;49;00m[33m"[39;49;00m)[90m[39;49;00m
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\grpc\aio\_channel.py[0m:591: in insecure_channel
+    [0m[94mreturn[39;49;00m Channel([90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\grpc\aio\_channel.py[0m:369: in __init__
+    [0m[96mself[39;49;00m._loop = cygrpc.get_working_loop()[90m[39;49;00m
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^[90m[39;49;00m
+[1m[31msrc/python/grpcio/grpc/_cython/_cygrpc/aio/common.pyx.pxi[0m:259: in grpc._cython.cygrpc.get_working_loop
+    [0m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[90m[39;49;00m
+[1m[31msrc/python/grpcio/grpc/_cython/_cygrpc/aio/common.pyx.pxi[0m:232: in grpc._cython.cygrpc._get_or_create_default_loop
+    [0m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[90m[39;49;00m
+[1m[31msrc/python/grpcio/grpc/_cython/_cygrpc/aio/common.pyx.pxi[0m:179: in grpc._cython.cygrpc._loop_policy_try_to_get_default_loop
+    [0m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[90m[39;49;00m
+[1m[31msrc/python/grpcio/grpc/_cython/_cygrpc/aio/common.pyx.pxi[0m:196: in grpc._cython.cygrpc._loop_policy_try_to_get_default_loop
+    [0m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[90m[39;49;00m
+[1m[31msrc/python/grpcio/grpc/_cython/_cygrpc/aio/common.pyx.pxi[0m:183: in grpc._cython.cygrpc._loop_policy_try_to_get_default_loop
+    [0m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[90m[39;49;00m
+[1m[31mC:\Python313\Lib\asyncio\events.py[0m:716: in get_event_loop
+    [0m[94mraise[39;49;00m [96mRuntimeError[39;49;00m([33m'[39;49;00m[33mThere is no current event loop in thread [39;49;00m[33m%r[39;49;00m[33m.[39;49;00m[33m'[39;49;00m[90m[39;49;00m
+[1m[31mE   RuntimeError: There is no current event loop in thread 'MainThread'.[0m
+[31m[1m_ ERROR at setup of TestGrpcAnalyticsEvents.test_grpc_empty_batch_submission[trio] _[0m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\pytest_asyncio\plugin.py[0m:728: in pytest_fixture_setup
+    [0m[94mreturn[39;49;00m ([94myield[39;49;00m)[90m[39;49;00m
+            ^^^^^[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\anyio\pytest_plugin.py[0m:98: in wrapper
+    [0m[94myield from[39;49;00m runner.run_asyncgen_fixture(local_func, kwargs)[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\anyio\_backends\_trio.py[0m:948: in run_asyncgen_fixture
+    [0mfixturevalue: T_Retval = [96mself[39;49;00m._call_in_runner_task(asyncgen.asend, [94mNone[39;49;00m)[90m[39;49;00m
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\anyio\_backends\_trio.py[0m:940: in _call_in_runner_task
+    [0m[94mreturn[39;49;00m outcome_holder[[94m0[39;49;00m].unwrap()[90m[39;49;00m
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\outcome\_impl.py[0m:213: in unwrap
+    [0m[94mraise[39;49;00m captured_error[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\anyio\_backends\_trio.py[0m:910: in _run_tests_and_fixtures
+    [0mretval = [94mawait[39;49;00m coro[90m[39;49;00m
+             ^^^^^^^^^^[90m[39;49;00m
+[1m[31mtests\conftest.py[0m:183: in grpc_analytics_channel_insecure
+    [0mchannel = grpc.aio.insecure_channel([33mf[39;49;00m[33m"[39;49;00m[33m{[39;49;00mGRPC_ANALYTICS_HOST[33m}[39;49;00m[33m:[39;49;00m[33m{[39;49;00mGRPC_ANALYTICS_PORT[33m}[39;49;00m[33m"[39;49;00m)[90m[39;49;00m
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\grpc\aio\_channel.py[0m:591: in insecure_channel
+    [0m[94mreturn[39;49;00m Channel([90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\grpc\aio\_channel.py[0m:369: in __init__
+    [0m[96mself[39;49;00m._loop = cygrpc.get_working_loop()[90m[39;49;00m
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^[90m[39;49;00m
+[1m[31msrc/python/grpcio/grpc/_cython/_cygrpc/aio/common.pyx.pxi[0m:259: in grpc._cython.cygrpc.get_working_loop
+    [0m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[90m[39;49;00m
+[1m[31msrc/python/grpcio/grpc/_cython/_cygrpc/aio/common.pyx.pxi[0m:232: in grpc._cython.cygrpc._get_or_create_default_loop
+    [0m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[90m[39;49;00m
+[1m[31msrc/python/grpcio/grpc/_cython/_cygrpc/aio/common.pyx.pxi[0m:179: in grpc._cython.cygrpc._loop_policy_try_to_get_default_loop
+    [0m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[90m[39;49;00m
+[1m[31msrc/python/grpcio/grpc/_cython/_cygrpc/aio/common.pyx.pxi[0m:196: in grpc._cython.cygrpc._loop_policy_try_to_get_default_loop
+    [0m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[90m[39;49;00m
+[1m[31msrc/python/grpcio/grpc/_cython/_cygrpc/aio/common.pyx.pxi[0m:183: in grpc._cython.cygrpc._loop_policy_try_to_get_default_loop
+    [0m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[90m[39;49;00m
+[1m[31mC:\Python313\Lib\asyncio\events.py[0m:716: in get_event_loop
+    [0m[94mraise[39;49;00m [96mRuntimeError[39;49;00m([33m'[39;49;00m[33mThere is no current event loop in thread [39;49;00m[33m%r[39;49;00m[33m.[39;49;00m[33m'[39;49;00m[90m[39;49;00m
+[1m[31mE   RuntimeError: There is no current event loop in thread 'MainThread'.[0m
+[31m[1m_ ERROR at setup of TestGrpcAnalyticsEvents.test_grpc_batch_with_various_event_types[trio] _[0m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\pytest_asyncio\plugin.py[0m:728: in pytest_fixture_setup
+    [0m[94mreturn[39;49;00m ([94myield[39;49;00m)[90m[39;49;00m
+            ^^^^^[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\anyio\pytest_plugin.py[0m:98: in wrapper
+    [0m[94myield from[39;49;00m runner.run_asyncgen_fixture(local_func, kwargs)[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\anyio\_backends\_trio.py[0m:948: in run_asyncgen_fixture
+    [0mfixturevalue: T_Retval = [96mself[39;49;00m._call_in_runner_task(asyncgen.asend, [94mNone[39;49;00m)[90m[39;49;00m
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\anyio\_backends\_trio.py[0m:940: in _call_in_runner_task
+    [0m[94mreturn[39;49;00m outcome_holder[[94m0[39;49;00m].unwrap()[90m[39;49;00m
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\outcome\_impl.py[0m:213: in unwrap
+    [0m[94mraise[39;49;00m captured_error[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\anyio\_backends\_trio.py[0m:910: in _run_tests_and_fixtures
+    [0mretval = [94mawait[39;49;00m coro[90m[39;49;00m
+             ^^^^^^^^^^[90m[39;49;00m
+[1m[31mtests\conftest.py[0m:183: in grpc_analytics_channel_insecure
+    [0mchannel = grpc.aio.insecure_channel([33mf[39;49;00m[33m"[39;49;00m[33m{[39;49;00mGRPC_ANALYTICS_HOST[33m}[39;49;00m[33m:[39;49;00m[33m{[39;49;00mGRPC_ANALYTICS_PORT[33m}[39;49;00m[33m"[39;49;00m)[90m[39;49;00m
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\grpc\aio\_channel.py[0m:591: in insecure_channel
+    [0m[94mreturn[39;49;00m Channel([90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\grpc\aio\_channel.py[0m:369: in __init__
+    [0m[96mself[39;49;00m._loop = cygrpc.get_working_loop()[90m[39;49;00m
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^[90m[39;49;00m
+[1m[31msrc/python/grpcio/grpc/_cython/_cygrpc/aio/common.pyx.pxi[0m:259: in grpc._cython.cygrpc.get_working_loop
+    [0m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[90m[39;49;00m
+[1m[31msrc/python/grpcio/grpc/_cython/_cygrpc/aio/common.pyx.pxi[0m:232: in grpc._cython.cygrpc._get_or_create_default_loop
+    [0m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[90m[39;49;00m
+[1m[31msrc/python/grpcio/grpc/_cython/_cygrpc/aio/common.pyx.pxi[0m:179: in grpc._cython.cygrpc._loop_policy_try_to_get_default_loop
+    [0m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[90m[39;49;00m
+[1m[31msrc/python/grpcio/grpc/_cython/_cygrpc/aio/common.pyx.pxi[0m:196: in grpc._cython.cygrpc._loop_policy_try_to_get_default_loop
+    [0m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[90m[39;49;00m
+[1m[31msrc/python/grpcio/grpc/_cython/_cygrpc/aio/common.pyx.pxi[0m:183: in grpc._cython.cygrpc._loop_policy_try_to_get_default_loop
+    [0m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[90m[39;49;00m
+[1m[31mC:\Python313\Lib\asyncio\events.py[0m:716: in get_event_loop
+    [0m[94mraise[39;49;00m [96mRuntimeError[39;49;00m([33m'[39;49;00m[33mThere is no current event loop in thread [39;49;00m[33m%r[39;49;00m[33m.[39;49;00m[33m'[39;49;00m[90m[39;49;00m
+[1m[31mE   RuntimeError: There is no current event loop in thread 'MainThread'.[0m
+[31m[1m______ ERROR at setup of TestGrpcBKTModel.test_grpc_bkt_prediction[trio] ______[0m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\pytest_asyncio\plugin.py[0m:728: in pytest_fixture_setup
+    [0m[94mreturn[39;49;00m ([94myield[39;49;00m)[90m[39;49;00m
+            ^^^^^[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\anyio\pytest_plugin.py[0m:98: in wrapper
+    [0m[94myield from[39;49;00m runner.run_asyncgen_fixture(local_func, kwargs)[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\anyio\_backends\_trio.py[0m:948: in run_asyncgen_fixture
+    [0mfixturevalue: T_Retval = [96mself[39;49;00m._call_in_runner_task(asyncgen.asend, [94mNone[39;49;00m)[90m[39;49;00m
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\anyio\_backends\_trio.py[0m:940: in _call_in_runner_task
+    [0m[94mreturn[39;49;00m outcome_holder[[94m0[39;49;00m].unwrap()[90m[39;49;00m
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\outcome\_impl.py[0m:213: in unwrap
+    [0m[94mraise[39;49;00m captured_error[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\anyio\_backends\_trio.py[0m:910: in _run_tests_and_fixtures
+    [0mretval = [94mawait[39;49;00m coro[90m[39;49;00m
+             ^^^^^^^^^^[90m[39;49;00m
+[1m[31mtests\conftest.py[0m:183: in grpc_analytics_channel_insecure
+    [0mchannel = grpc.aio.insecure_channel([33mf[39;49;00m[33m"[39;49;00m[33m{[39;49;00mGRPC_ANALYTICS_HOST[33m}[39;49;00m[33m:[39;49;00m[33m{[39;49;00mGRPC_ANALYTICS_PORT[33m}[39;49;00m[33m"[39;49;00m)[90m[39;49;00m
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\grpc\aio\_channel.py[0m:591: in insecure_channel
+    [0m[94mreturn[39;49;00m Channel([90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\grpc\aio\_channel.py[0m:369: in __init__
+    [0m[96mself[39;49;00m._loop = cygrpc.get_working_loop()[90m[39;49;00m
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^[90m[39;49;00m
+[1m[31msrc/python/grpcio/grpc/_cython/_cygrpc/aio/common.pyx.pxi[0m:259: in grpc._cython.cygrpc.get_working_loop
+    [0m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[90m[39;49;00m
+[1m[31msrc/python/grpcio/grpc/_cython/_cygrpc/aio/common.pyx.pxi[0m:232: in grpc._cython.cygrpc._get_or_create_default_loop
+    [0m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[90m[39;49;00m
+[1m[31msrc/python/grpcio/grpc/_cython/_cygrpc/aio/common.pyx.pxi[0m:179: in grpc._cython.cygrpc._loop_policy_try_to_get_default_loop
+    [0m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[90m[39;49;00m
+[1m[31msrc/python/grpcio/grpc/_cython/_cygrpc/aio/common.pyx.pxi[0m:196: in grpc._cython.cygrpc._loop_policy_try_to_get_default_loop
+    [0m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[90m[39;49;00m
+[1m[31msrc/python/grpcio/grpc/_cython/_cygrpc/aio/common.pyx.pxi[0m:183: in grpc._cython.cygrpc._loop_policy_try_to_get_default_loop
+    [0m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[90m[39;49;00m
+[1m[31mC:\Python313\Lib\asyncio\events.py[0m:716: in get_event_loop
+    [0m[94mraise[39;49;00m [96mRuntimeError[39;49;00m([33m'[39;49;00m[33mThere is no current event loop in thread [39;49;00m[33m%r[39;49;00m[33m.[39;49;00m[33m'[39;49;00m[90m[39;49;00m
+[1m[31mE   RuntimeError: There is no current event loop in thread 'MainThread'.[0m
+[31m[1m_____ ERROR at setup of TestGrpcBKTModel.test_grpc_get_user_ability[trio] _____[0m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\pytest_asyncio\plugin.py[0m:728: in pytest_fixture_setup
+    [0m[94mreturn[39;49;00m ([94myield[39;49;00m)[90m[39;49;00m
+            ^^^^^[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\anyio\pytest_plugin.py[0m:98: in wrapper
+    [0m[94myield from[39;49;00m runner.run_asyncgen_fixture(local_func, kwargs)[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\anyio\_backends\_trio.py[0m:948: in run_asyncgen_fixture
+    [0mfixturevalue: T_Retval = [96mself[39;49;00m._call_in_runner_task(asyncgen.asend, [94mNone[39;49;00m)[90m[39;49;00m
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\anyio\_backends\_trio.py[0m:940: in _call_in_runner_task
+    [0m[94mreturn[39;49;00m outcome_holder[[94m0[39;49;00m].unwrap()[90m[39;49;00m
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\outcome\_impl.py[0m:213: in unwrap
+    [0m[94mraise[39;49;00m captured_error[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\anyio\_backends\_trio.py[0m:910: in _run_tests_and_fixtures
+    [0mretval = [94mawait[39;49;00m coro[90m[39;49;00m
+             ^^^^^^^^^^[90m[39;49;00m
+[1m[31mtests\conftest.py[0m:183: in grpc_analytics_channel_insecure
+    [0mchannel = grpc.aio.insecure_channel([33mf[39;49;00m[33m"[39;49;00m[33m{[39;49;00mGRPC_ANALYTICS_HOST[33m}[39;49;00m[33m:[39;49;00m[33m{[39;49;00mGRPC_ANALYTICS_PORT[33m}[39;49;00m[33m"[39;49;00m)[90m[39;49;00m
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\grpc\aio\_channel.py[0m:591: in insecure_channel
+    [0m[94mreturn[39;49;00m Channel([90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\grpc\aio\_channel.py[0m:369: in __init__
+    [0m[96mself[39;49;00m._loop = cygrpc.get_working_loop()[90m[39;49;00m
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^[90m[39;49;00m
+[1m[31msrc/python/grpcio/grpc/_cython/_cygrpc/aio/common.pyx.pxi[0m:259: in grpc._cython.cygrpc.get_working_loop
+    [0m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[90m[39;49;00m
+[1m[31msrc/python/grpcio/grpc/_cython/_cygrpc/aio/common.pyx.pxi[0m:232: in grpc._cython.cygrpc._get_or_create_default_loop
+    [0m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[90m[39;49;00m
+[1m[31msrc/python/grpcio/grpc/_cython/_cygrpc/aio/common.pyx.pxi[0m:179: in grpc._cython.cygrpc._loop_policy_try_to_get_default_loop
+    [0m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[90m[39;49;00m
+[1m[31msrc/python/grpcio/grpc/_cython/_cygrpc/aio/common.pyx.pxi[0m:196: in grpc._cython.cygrpc._loop_policy_try_to_get_default_loop
+    [0m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[90m[39;49;00m
+[1m[31msrc/python/grpcio/grpc/_cython/_cygrpc/aio/common.pyx.pxi[0m:183: in grpc._cython.cygrpc._loop_policy_try_to_get_default_loop
+    [0m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[90m[39;49;00m
+[1m[31mC:\Python313\Lib\asyncio\events.py[0m:716: in get_event_loop
+    [0m[94mraise[39;49;00m [96mRuntimeError[39;49;00m([33m'[39;49;00m[33mThere is no current event loop in thread [39;49;00m[33m%r[39;49;00m[33m.[39;49;00m[33m'[39;49;00m[90m[39;49;00m
+[1m[31mE   RuntimeError: There is no current event loop in thread 'MainThread'.[0m
+[31m[1m_ ERROR at setup of TestGrpcCacheInvalidation.test_grpc_cache_invalidation_after_event[trio] _[0m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\pytest_asyncio\plugin.py[0m:728: in pytest_fixture_setup
+    [0m[94mreturn[39;49;00m ([94myield[39;49;00m)[90m[39;49;00m
+            ^^^^^[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\anyio\pytest_plugin.py[0m:98: in wrapper
+    [0m[94myield from[39;49;00m runner.run_asyncgen_fixture(local_func, kwargs)[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\anyio\_backends\_trio.py[0m:948: in run_asyncgen_fixture
+    [0mfixturevalue: T_Retval = [96mself[39;49;00m._call_in_runner_task(asyncgen.asend, [94mNone[39;49;00m)[90m[39;49;00m
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\anyio\_backends\_trio.py[0m:940: in _call_in_runner_task
+    [0m[94mreturn[39;49;00m outcome_holder[[94m0[39;49;00m].unwrap()[90m[39;49;00m
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\outcome\_impl.py[0m:213: in unwrap
+    [0m[94mraise[39;49;00m captured_error[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\anyio\_backends\_trio.py[0m:910: in _run_tests_and_fixtures
+    [0mretval = [94mawait[39;49;00m coro[90m[39;49;00m
+             ^^^^^^^^^^[90m[39;49;00m
+[1m[31mtests\conftest.py[0m:183: in grpc_analytics_channel_insecure
+    [0mchannel = grpc.aio.insecure_channel([33mf[39;49;00m[33m"[39;49;00m[33m{[39;49;00mGRPC_ANALYTICS_HOST[33m}[39;49;00m[33m:[39;49;00m[33m{[39;49;00mGRPC_ANALYTICS_PORT[33m}[39;49;00m[33m"[39;49;00m)[90m[39;49;00m
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\grpc\aio\_channel.py[0m:591: in insecure_channel
+    [0m[94mreturn[39;49;00m Channel([90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\grpc\aio\_channel.py[0m:369: in __init__
+    [0m[96mself[39;49;00m._loop = cygrpc.get_working_loop()[90m[39;49;00m
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^[90m[39;49;00m
+[1m[31msrc/python/grpcio/grpc/_cython/_cygrpc/aio/common.pyx.pxi[0m:259: in grpc._cython.cygrpc.get_working_loop
+    [0m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[90m[39;49;00m
+[1m[31msrc/python/grpcio/grpc/_cython/_cygrpc/aio/common.pyx.pxi[0m:232: in grpc._cython.cygrpc._get_or_create_default_loop
+    [0m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[90m[39;49;00m
+[1m[31msrc/python/grpcio/grpc/_cython/_cygrpc/aio/common.pyx.pxi[0m:179: in grpc._cython.cygrpc._loop_policy_try_to_get_default_loop
+    [0m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[90m[39;49;00m
+[1m[31msrc/python/grpcio/grpc/_cython/_cygrpc/aio/common.pyx.pxi[0m:196: in grpc._cython.cygrpc._loop_policy_try_to_get_default_loop
+    [0m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[90m[39;49;00m
+[1m[31msrc/python/grpcio/grpc/_cython/_cygrpc/aio/common.pyx.pxi[0m:183: in grpc._cython.cygrpc._loop_policy_try_to_get_default_loop
+    [0m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[90m[39;49;00m
+[1m[31mC:\Python313\Lib\asyncio\events.py[0m:716: in get_event_loop
+    [0m[94mraise[39;49;00m [96mRuntimeError[39;49;00m([33m'[39;49;00m[33mThere is no current event loop in thread [39;49;00m[33m%r[39;49;00m[33m.[39;49;00m[33m'[39;49;00m[90m[39;49;00m
+[1m[31mE   RuntimeError: There is no current event loop in thread 'MainThread'.[0m
+[31m[1m_ ERROR at setup of TestGrpcRequestDeduplication.test_grpc_concurrent_requests[trio] _[0m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\pytest_asyncio\plugin.py[0m:728: in pytest_fixture_setup
+    [0m[94mreturn[39;49;00m ([94myield[39;49;00m)[90m[39;49;00m
+            ^^^^^[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\anyio\pytest_plugin.py[0m:98: in wrapper
+    [0m[94myield from[39;49;00m runner.run_asyncgen_fixture(local_func, kwargs)[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\anyio\_backends\_trio.py[0m:948: in run_asyncgen_fixture
+    [0mfixturevalue: T_Retval = [96mself[39;49;00m._call_in_runner_task(asyncgen.asend, [94mNone[39;49;00m)[90m[39;49;00m
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\anyio\_backends\_trio.py[0m:940: in _call_in_runner_task
+    [0m[94mreturn[39;49;00m outcome_holder[[94m0[39;49;00m].unwrap()[90m[39;49;00m
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\outcome\_impl.py[0m:213: in unwrap
+    [0m[94mraise[39;49;00m captured_error[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\anyio\_backends\_trio.py[0m:910: in _run_tests_and_fixtures
+    [0mretval = [94mawait[39;49;00m coro[90m[39;49;00m
+             ^^^^^^^^^^[90m[39;49;00m
+[1m[31mtests\conftest.py[0m:183: in grpc_analytics_channel_insecure
+    [0mchannel = grpc.aio.insecure_channel([33mf[39;49;00m[33m"[39;49;00m[33m{[39;49;00mGRPC_ANALYTICS_HOST[33m}[39;49;00m[33m:[39;49;00m[33m{[39;49;00mGRPC_ANALYTICS_PORT[33m}[39;49;00m[33m"[39;49;00m)[90m[39;49;00m
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\grpc\aio\_channel.py[0m:591: in insecure_channel
+    [0m[94mreturn[39;49;00m Channel([90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\grpc\aio\_channel.py[0m:369: in __init__
+    [0m[96mself[39;49;00m._loop = cygrpc.get_working_loop()[90m[39;49;00m
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^[90m[39;49;00m
+[1m[31msrc/python/grpcio/grpc/_cython/_cygrpc/aio/common.pyx.pxi[0m:259: in grpc._cython.cygrpc.get_working_loop
+    [0m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[90m[39;49;00m
+[1m[31msrc/python/grpcio/grpc/_cython/_cygrpc/aio/common.pyx.pxi[0m:232: in grpc._cython.cygrpc._get_or_create_default_loop
+    [0m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[90m[39;49;00m
+[1m[31msrc/python/grpcio/grpc/_cython/_cygrpc/aio/common.pyx.pxi[0m:179: in grpc._cython.cygrpc._loop_policy_try_to_get_default_loop
+    [0m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[90m[39;49;00m
+[1m[31msrc/python/grpcio/grpc/_cython/_cygrpc/aio/common.pyx.pxi[0m:196: in grpc._cython.cygrpc._loop_policy_try_to_get_default_loop
+    [0m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[90m[39;49;00m
+[1m[31msrc/python/grpcio/grpc/_cython/_cygrpc/aio/common.pyx.pxi[0m:183: in grpc._cython.cygrpc._loop_policy_try_to_get_default_loop
+    [0m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[90m[39;49;00m
+[1m[31mC:\Python313\Lib\asyncio\events.py[0m:716: in get_event_loop
+    [0m[94mraise[39;49;00m [96mRuntimeError[39;49;00m([33m'[39;49;00m[33mThere is no current event loop in thread [39;49;00m[33m%r[39;49;00m[33m.[39;49;00m[33m'[39;49;00m[90m[39;49;00m
+[1m[31mE   RuntimeError: There is no current event loop in thread 'MainThread'.[0m
+[31m[1m_ ERROR at setup of TestGrpcUserAnalytics.test_grpc_get_engagement_metrics[trio] _[0m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\pytest_asyncio\plugin.py[0m:728: in pytest_fixture_setup
+    [0m[94mreturn[39;49;00m ([94myield[39;49;00m)[90m[39;49;00m
+            ^^^^^[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\anyio\pytest_plugin.py[0m:98: in wrapper
+    [0m[94myield from[39;49;00m runner.run_asyncgen_fixture(local_func, kwargs)[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\anyio\_backends\_trio.py[0m:948: in run_asyncgen_fixture
+    [0mfixturevalue: T_Retval = [96mself[39;49;00m._call_in_runner_task(asyncgen.asend, [94mNone[39;49;00m)[90m[39;49;00m
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\anyio\_backends\_trio.py[0m:940: in _call_in_runner_task
+    [0m[94mreturn[39;49;00m outcome_holder[[94m0[39;49;00m].unwrap()[90m[39;49;00m
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\outcome\_impl.py[0m:213: in unwrap
+    [0m[94mraise[39;49;00m captured_error[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\anyio\_backends\_trio.py[0m:910: in _run_tests_and_fixtures
+    [0mretval = [94mawait[39;49;00m coro[90m[39;49;00m
+             ^^^^^^^^^^[90m[39;49;00m
+[1m[31mtests\conftest.py[0m:183: in grpc_analytics_channel_insecure
+    [0mchannel = grpc.aio.insecure_channel([33mf[39;49;00m[33m"[39;49;00m[33m{[39;49;00mGRPC_ANALYTICS_HOST[33m}[39;49;00m[33m:[39;49;00m[33m{[39;49;00mGRPC_ANALYTICS_PORT[33m}[39;49;00m[33m"[39;49;00m)[90m[39;49;00m
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\grpc\aio\_channel.py[0m:591: in insecure_channel
+    [0m[94mreturn[39;49;00m Channel([90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\grpc\aio\_channel.py[0m:369: in __init__
+    [0m[96mself[39;49;00m._loop = cygrpc.get_working_loop()[90m[39;49;00m
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^[90m[39;49;00m
+[1m[31msrc/python/grpcio/grpc/_cython/_cygrpc/aio/common.pyx.pxi[0m:259: in grpc._cython.cygrpc.get_working_loop
+    [0m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[90m[39;49;00m
+[1m[31msrc/python/grpcio/grpc/_cython/_cygrpc/aio/common.pyx.pxi[0m:232: in grpc._cython.cygrpc._get_or_create_default_loop
+    [0m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[90m[39;49;00m
+[1m[31msrc/python/grpcio/grpc/_cython/_cygrpc/aio/common.pyx.pxi[0m:179: in grpc._cython.cygrpc._loop_policy_try_to_get_default_loop
+    [0m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[90m[39;49;00m
+[1m[31msrc/python/grpcio/grpc/_cython/_cygrpc/aio/common.pyx.pxi[0m:196: in grpc._cython.cygrpc._loop_policy_try_to_get_default_loop
+    [0m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[90m[39;49;00m
+[1m[31msrc/python/grpcio/grpc/_cython/_cygrpc/aio/common.pyx.pxi[0m:183: in grpc._cython.cygrpc._loop_policy_try_to_get_default_loop
+    [0m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[90m[39;49;00m
+[1m[31mC:\Python313\Lib\asyncio\events.py[0m:716: in get_event_loop
+    [0m[94mraise[39;49;00m [96mRuntimeError[39;49;00m([33m'[39;49;00m[33mThere is no current event loop in thread [39;49;00m[33m%r[39;49;00m[33m.[39;49;00m[33m'[39;49;00m[90m[39;49;00m
+[1m[31mE   RuntimeError: There is no current event loop in thread 'MainThread'.[0m
+[31m[1m_ ERROR at setup of TestGrpcUserAnalytics.test_grpc_predict_performance[trio] _[0m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\pytest_asyncio\plugin.py[0m:728: in pytest_fixture_setup
+    [0m[94mreturn[39;49;00m ([94myield[39;49;00m)[90m[39;49;00m
+            ^^^^^[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\anyio\pytest_plugin.py[0m:98: in wrapper
+    [0m[94myield from[39;49;00m runner.run_asyncgen_fixture(local_func, kwargs)[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\anyio\_backends\_trio.py[0m:948: in run_asyncgen_fixture
+    [0mfixturevalue: T_Retval = [96mself[39;49;00m._call_in_runner_task(asyncgen.asend, [94mNone[39;49;00m)[90m[39;49;00m
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\anyio\_backends\_trio.py[0m:940: in _call_in_runner_task
+    [0m[94mreturn[39;49;00m outcome_holder[[94m0[39;49;00m].unwrap()[90m[39;49;00m
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\outcome\_impl.py[0m:213: in unwrap
+    [0m[94mraise[39;49;00m captured_error[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\anyio\_backends\_trio.py[0m:910: in _run_tests_and_fixtures
+    [0mretval = [94mawait[39;49;00m coro[90m[39;49;00m
+             ^^^^^^^^^^[90m[39;49;00m
+[1m[31mtests\conftest.py[0m:183: in grpc_analytics_channel_insecure
+    [0mchannel = grpc.aio.insecure_channel([33mf[39;49;00m[33m"[39;49;00m[33m{[39;49;00mGRPC_ANALYTICS_HOST[33m}[39;49;00m[33m:[39;49;00m[33m{[39;49;00mGRPC_ANALYTICS_PORT[33m}[39;49;00m[33m"[39;49;00m)[90m[39;49;00m
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\grpc\aio\_channel.py[0m:591: in insecure_channel
+    [0m[94mreturn[39;49;00m Channel([90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\grpc\aio\_channel.py[0m:369: in __init__
+    [0m[96mself[39;49;00m._loop = cygrpc.get_working_loop()[90m[39;49;00m
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^[90m[39;49;00m
+[1m[31msrc/python/grpcio/grpc/_cython/_cygrpc/aio/common.pyx.pxi[0m:259: in grpc._cython.cygrpc.get_working_loop
+    [0m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[90m[39;49;00m
+[1m[31msrc/python/grpcio/grpc/_cython/_cygrpc/aio/common.pyx.pxi[0m:232: in grpc._cython.cygrpc._get_or_create_default_loop
+    [0m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[90m[39;49;00m
+[1m[31msrc/python/grpcio/grpc/_cython/_cygrpc/aio/common.pyx.pxi[0m:179: in grpc._cython.cygrpc._loop_policy_try_to_get_default_loop
+    [0m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[90m[39;49;00m
+[1m[31msrc/python/grpcio/grpc/_cython/_cygrpc/aio/common.pyx.pxi[0m:196: in grpc._cython.cygrpc._loop_policy_try_to_get_default_loop
+    [0m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[90m[39;49;00m
+[1m[31msrc/python/grpcio/grpc/_cython/_cygrpc/aio/common.pyx.pxi[0m:183: in grpc._cython.cygrpc._loop_policy_try_to_get_default_loop
+    [0m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[90m[39;49;00m
+[1m[31mC:\Python313\Lib\asyncio\events.py[0m:716: in get_event_loop
+    [0m[94mraise[39;49;00m [96mRuntimeError[39;49;00m([33m'[39;49;00m[33mThere is no current event loop in thread [39;49;00m[33m%r[39;49;00m[33m.[39;49;00m[33m'[39;49;00m[90m[39;49;00m
+[1m[31mE   RuntimeError: There is no current event loop in thread 'MainThread'.[0m
+[31m[1m_ ERROR at setup of TestGrpcUserAnalytics.test_grpc_get_quiz_attempt_history[trio] _[0m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\pytest_asyncio\plugin.py[0m:728: in pytest_fixture_setup
+    [0m[94mreturn[39;49;00m ([94myield[39;49;00m)[90m[39;49;00m
+            ^^^^^[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\anyio\pytest_plugin.py[0m:98: in wrapper
+    [0m[94myield from[39;49;00m runner.run_asyncgen_fixture(local_func, kwargs)[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\anyio\_backends\_trio.py[0m:948: in run_asyncgen_fixture
+    [0mfixturevalue: T_Retval = [96mself[39;49;00m._call_in_runner_task(asyncgen.asend, [94mNone[39;49;00m)[90m[39;49;00m
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\anyio\_backends\_trio.py[0m:940: in _call_in_runner_task
+    [0m[94mreturn[39;49;00m outcome_holder[[94m0[39;49;00m].unwrap()[90m[39;49;00m
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\outcome\_impl.py[0m:213: in unwrap
+    [0m[94mraise[39;49;00m captured_error[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\anyio\_backends\_trio.py[0m:910: in _run_tests_and_fixtures
+    [0mretval = [94mawait[39;49;00m coro[90m[39;49;00m
+             ^^^^^^^^^^[90m[39;49;00m
+[1m[31mtests\conftest.py[0m:183: in grpc_analytics_channel_insecure
+    [0mchannel = grpc.aio.insecure_channel([33mf[39;49;00m[33m"[39;49;00m[33m{[39;49;00mGRPC_ANALYTICS_HOST[33m}[39;49;00m[33m:[39;49;00m[33m{[39;49;00mGRPC_ANALYTICS_PORT[33m}[39;49;00m[33m"[39;49;00m)[90m[39;49;00m
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\grpc\aio\_channel.py[0m:591: in insecure_channel
+    [0m[94mreturn[39;49;00m Channel([90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\grpc\aio\_channel.py[0m:369: in __init__
+    [0m[96mself[39;49;00m._loop = cygrpc.get_working_loop()[90m[39;49;00m
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^[90m[39;49;00m
+[1m[31msrc/python/grpcio/grpc/_cython/_cygrpc/aio/common.pyx.pxi[0m:259: in grpc._cython.cygrpc.get_working_loop
+    [0m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[90m[39;49;00m
+[1m[31msrc/python/grpcio/grpc/_cython/_cygrpc/aio/common.pyx.pxi[0m:232: in grpc._cython.cygrpc._get_or_create_default_loop
+    [0m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[90m[39;49;00m
+[1m[31msrc/python/grpcio/grpc/_cython/_cygrpc/aio/common.pyx.pxi[0m:179: in grpc._cython.cygrpc._loop_policy_try_to_get_default_loop
+    [0m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[90m[39;49;00m
+[1m[31msrc/python/grpcio/grpc/_cython/_cygrpc/aio/common.pyx.pxi[0m:196: in grpc._cython.cygrpc._loop_policy_try_to_get_default_loop
+    [0m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[90m[39;49;00m
+[1m[31msrc/python/grpcio/grpc/_cython/_cygrpc/aio/common.pyx.pxi[0m:183: in grpc._cython.cygrpc._loop_policy_try_to_get_default_loop
+    [0m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[90m[39;49;00m
+[1m[31mC:\Python313\Lib\asyncio\events.py[0m:716: in get_event_loop
+    [0m[94mraise[39;49;00m [96mRuntimeError[39;49;00m([33m'[39;49;00m[33mThere is no current event loop in thread [39;49;00m[33m%r[39;49;00m[33m.[39;49;00m[33m'[39;49;00m[90m[39;49;00m
+[1m[31mE   RuntimeError: There is no current event loop in thread 'MainThread'.[0m
+[31m[1m_ ERROR at setup of TestGrpcServerBindings.test_server_rpc_bindings_and_basic_calls[trio] _[0m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\pytest_asyncio\plugin.py[0m:728: in pytest_fixture_setup
+    [0m[94mreturn[39;49;00m ([94myield[39;49;00m)[90m[39;49;00m
+            ^^^^^[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\anyio\pytest_plugin.py[0m:98: in wrapper
+    [0m[94myield from[39;49;00m runner.run_asyncgen_fixture(local_func, kwargs)[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\anyio\_backends\_trio.py[0m:948: in run_asyncgen_fixture
+    [0mfixturevalue: T_Retval = [96mself[39;49;00m._call_in_runner_task(asyncgen.asend, [94mNone[39;49;00m)[90m[39;49;00m
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\anyio\_backends\_trio.py[0m:940: in _call_in_runner_task
+    [0m[94mreturn[39;49;00m outcome_holder[[94m0[39;49;00m].unwrap()[90m[39;49;00m
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\outcome\_impl.py[0m:213: in unwrap
+    [0m[94mraise[39;49;00m captured_error[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\anyio\_backends\_trio.py[0m:910: in _run_tests_and_fixtures
+    [0mretval = [94mawait[39;49;00m coro[90m[39;49;00m
+             ^^^^^^^^^^[90m[39;49;00m
+[1m[31mtests\conftest.py[0m:183: in grpc_analytics_channel_insecure
+    [0mchannel = grpc.aio.insecure_channel([33mf[39;49;00m[33m"[39;49;00m[33m{[39;49;00mGRPC_ANALYTICS_HOST[33m}[39;49;00m[33m:[39;49;00m[33m{[39;49;00mGRPC_ANALYTICS_PORT[33m}[39;49;00m[33m"[39;49;00m)[90m[39;49;00m
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\grpc\aio\_channel.py[0m:591: in insecure_channel
+    [0m[94mreturn[39;49;00m Channel([90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\grpc\aio\_channel.py[0m:369: in __init__
+    [0m[96mself[39;49;00m._loop = cygrpc.get_working_loop()[90m[39;49;00m
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^[90m[39;49;00m
+[1m[31msrc/python/grpcio/grpc/_cython/_cygrpc/aio/common.pyx.pxi[0m:259: in grpc._cython.cygrpc.get_working_loop
+    [0m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[90m[39;49;00m
+[1m[31msrc/python/grpcio/grpc/_cython/_cygrpc/aio/common.pyx.pxi[0m:232: in grpc._cython.cygrpc._get_or_create_default_loop
+    [0m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[90m[39;49;00m
+[1m[31msrc/python/grpcio/grpc/_cython/_cygrpc/aio/common.pyx.pxi[0m:179: in grpc._cython.cygrpc._loop_policy_try_to_get_default_loop
+    [0m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[90m[39;49;00m
+[1m[31msrc/python/grpcio/grpc/_cython/_cygrpc/aio/common.pyx.pxi[0m:196: in grpc._cython.cygrpc._loop_policy_try_to_get_default_loop
+    [0m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[90m[39;49;00m
+[1m[31msrc/python/grpcio/grpc/_cython/_cygrpc/aio/common.pyx.pxi[0m:183: in grpc._cython.cygrpc._loop_policy_try_to_get_default_loop
+    [0m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[04m[91m?[39;49;00m[90m[39;49;00m
+[1m[31mC:\Python313\Lib\asyncio\events.py[0m:716: in get_event_loop
+    [0m[94mraise[39;49;00m [96mRuntimeError[39;49;00m([33m'[39;49;00m[33mThere is no current event loop in thread [39;49;00m[33m%r[39;49;00m[33m.[39;49;00m[33m'[39;49;00m[90m[39;49;00m
+[1m[31mE   RuntimeError: There is no current event loop in thread 'MainThread'.[0m
+[31m[1m___ ERROR at setup of TestGrpcRecommendations.test_grpc_get_recommendations ___[0m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\pytest_asyncio\plugin.py[0m:458: in setup
+    [0m[94mreturn[39;49;00m [96msuper[39;49;00m().setup()[90m[39;49;00m
+           ^^^^^^^^^^^^^^^[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\pytest_asyncio\plugin.py[0m:728: in pytest_fixture_setup
+    [0m[94mreturn[39;49;00m ([94myield[39;49;00m)[90m[39;49;00m
+            ^^^^^[90m[39;49;00m
+[1m[31mE   pytest.PytestRemovedIn9Warning: 'test_grpc_get_recommendations' requested an async fixture 'grpc_analytics_channel_insecure', with no plugin or hook that handled it. This is usually an error, as pytest does not natively support it. This will turn into an error in pytest 9.[0m
+[1m[31mE   See: https://docs.pytest.org/en/stable/deprecations.html#sync-test-depending-on-async-fixture[0m
+[31m[1m___ ERROR at setup of TestGrpcRecommendations.test_grpc_generate_next_steps ___[0m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\pytest_asyncio\plugin.py[0m:458: in setup
+    [0m[94mreturn[39;49;00m [96msuper[39;49;00m().setup()[90m[39;49;00m
+           ^^^^^^^^^^^^^^^[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\pytest_asyncio\plugin.py[0m:728: in pytest_fixture_setup
+    [0m[94mreturn[39;49;00m ([94myield[39;49;00m)[90m[39;49;00m
+            ^^^^^[90m[39;49;00m
+[1m[31mE   pytest.PytestRemovedIn9Warning: 'test_grpc_generate_next_steps' requested an async fixture 'grpc_analytics_channel_insecure', with no plugin or hook that handled it. This is usually an error, as pytest does not natively support it. This will turn into an error in pytest 9.[0m
+[1m[31mE   See: https://docs.pytest.org/en/stable/deprecations.html#sync-test-depending-on-async-fixture[0m
+[31m[1m_ ERROR at setup of TestGrpcRecommendations.test_grpc_generate_study_recommendations _[0m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\pytest_asyncio\plugin.py[0m:458: in setup
+    [0m[94mreturn[39;49;00m [96msuper[39;49;00m().setup()[90m[39;49;00m
+           ^^^^^^^^^^^^^^^[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\pytest_asyncio\plugin.py[0m:728: in pytest_fixture_setup
+    [0m[94mreturn[39;49;00m ([94myield[39;49;00m)[90m[39;49;00m
+            ^^^^^[90m[39;49;00m
+[1m[31mE   pytest.PytestRemovedIn9Warning: 'test_grpc_generate_study_recommendations' requested an async fixture 'grpc_analytics_channel_insecure', with no plugin or hook that handled it. This is usually an error, as pytest does not natively support it. This will turn into an error in pytest 9.[0m
+[1m[31mE   See: https://docs.pytest.org/en/stable/deprecations.html#sync-test-depending-on-async-fixture[0m
+[31m[1m_ ERROR at setup of TestGrpcAdaptiveQuestions.test_grpc_get_next_adaptive_question _[0m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\pytest_asyncio\plugin.py[0m:458: in setup
+    [0m[94mreturn[39;49;00m [96msuper[39;49;00m().setup()[90m[39;49;00m
+           ^^^^^^^^^^^^^^^[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\pytest_asyncio\plugin.py[0m:728: in pytest_fixture_setup
+    [0m[94mreturn[39;49;00m ([94myield[39;49;00m)[90m[39;49;00m
+            ^^^^^[90m[39;49;00m
+[1m[31mE   pytest.PytestRemovedIn9Warning: 'test_grpc_get_next_adaptive_question' requested an async fixture 'grpc_analytics_channel_insecure', with no plugin or hook that handled it. This is usually an error, as pytest does not natively support it. This will turn into an error in pytest 9.[0m
+[1m[31mE   See: https://docs.pytest.org/en/stable/deprecations.html#sync-test-depending-on-async-fixture[0m
+[31m[1m__ ERROR at setup of TestGrpcAttemptMetrics.test_grpc_update_attempt_metrics __[0m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\pytest_asyncio\plugin.py[0m:458: in setup
+    [0m[94mreturn[39;49;00m [96msuper[39;49;00m().setup()[90m[39;49;00m
+           ^^^^^^^^^^^^^^^[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\pytest_asyncio\plugin.py[0m:728: in pytest_fixture_setup
+    [0m[94mreturn[39;49;00m ([94myield[39;49;00m)[90m[39;49;00m
+            ^^^^^[90m[39;49;00m
+[1m[31mE   pytest.PytestRemovedIn9Warning: 'test_grpc_update_attempt_metrics' requested an async fixture 'grpc_analytics_channel_insecure', with no plugin or hook that handled it. This is usually an error, as pytest does not natively support it. This will turn into an error in pytest 9.[0m
+[1m[31mE   See: https://docs.pytest.org/en/stable/deprecations.html#sync-test-depending-on-async-fixture[0m
+[31m[1m________ ERROR at setup of TestGrpcHealthCheck.test_grpc_health_check _________[0m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\pytest_asyncio\plugin.py[0m:458: in setup
+    [0m[94mreturn[39;49;00m [96msuper[39;49;00m().setup()[90m[39;49;00m
+           ^^^^^^^^^^^^^^^[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\pytest_asyncio\plugin.py[0m:728: in pytest_fixture_setup
+    [0m[94mreturn[39;49;00m ([94myield[39;49;00m)[90m[39;49;00m
+            ^^^^^[90m[39;49;00m
+[1m[31mE   pytest.PytestRemovedIn9Warning: 'test_grpc_health_check' requested an async fixture 'grpc_analytics_channel_insecure', with no plugin or hook that handled it. This is usually an error, as pytest does not natively support it. This will turn into an error in pytest 9.[0m
+[1m[31mE   See: https://docs.pytest.org/en/stable/deprecations.html#sync-test-depending-on-async-fixture[0m
+[31m[1m_____ ERROR at setup of TestGrpcVsHttpParity.test_event_submission_parity _____[0m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\pytest_asyncio\plugin.py[0m:458: in setup
+    [0m[94mreturn[39;49;00m [96msuper[39;49;00m().setup()[90m[39;49;00m
+           ^^^^^^^^^^^^^^^[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\pytest_asyncio\plugin.py[0m:728: in pytest_fixture_setup
+    [0m[94mreturn[39;49;00m ([94myield[39;49;00m)[90m[39;49;00m
+            ^^^^^[90m[39;49;00m
+[1m[31mE   pytest.PytestRemovedIn9Warning: 'test_event_submission_parity' requested an async fixture 'grpc_analytics_channel_insecure', with no plugin or hook that handled it. This is usually an error, as pytest does not natively support it. This will turn into an error in pytest 9.[0m
+[1m[31mE   See: https://docs.pytest.org/en/stable/deprecations.html#sync-test-depending-on-async-fixture[0m
+[31m[1m_____ ERROR at setup of TestGrpcVsHttpParity.test_recommendations_parity ______[0m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\pytest_asyncio\plugin.py[0m:458: in setup
+    [0m[94mreturn[39;49;00m [96msuper[39;49;00m().setup()[90m[39;49;00m
+           ^^^^^^^^^^^^^^^[90m[39;49;00m
+[1m[31m..\..\AppData\Roaming\Python\Python313\site-packages\pytest_asyncio\plugin.py[0m:728: in pytest_fixture_setup
+    [0m[94mreturn[39;49;00m ([94myield[39;49;00m)[90m[39;49;00m
+            ^^^^^[90m[39;49;00m
+[1m[31mE   pytest.PytestRemovedIn9Warning: 'test_recommendations_parity' requested an async fixture 'grpc_analytics_channel_insecure', with no plugin or hook that handled it. This is usually an error, as pytest does not natively support it. This will turn into an error in pytest 9.[0m
+[1m[31mE   See: https://docs.pytest.org/en/stable/deprecations.html#sync-test-depending-on-async-fixture[0m
+[33m============================== warnings summary ===============================[0m
+..\..\AppData\Roaming\Python\Python313\site-packages\_pytest\config\__init__.py:1428
+  C:\Users\user\AppData\Roaming\Python\Python313\site-packages\_pytest\config\__init__.py:1428: PytestConfigWarning: Unknown config option: anyio_backend
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+[36m[1m=========================== short test summary info ===========================[0m
+[31mERROR[0m tests\test_analytics.py::[1mTestGrpcAnalyticsEvents::test_grpc_batch_submission[trio][0m - RuntimeError: There is no current event loop in thread 'MainThread'.
+[31mERROR[0m tests\test_analytics.py::[1mTestGrpcAnalyticsEvents::test_grpc_empty_batch_submission[trio][0m - RuntimeError: There is no current event loop in thread 'MainThread'.
+[31mERROR[0m tests\test_analytics.py::[1mTestGrpcAnalyticsEvents::test_grpc_batch_with_various_event_types[trio][0m - RuntimeError: There is no current event loop in thread 'MainThread'.
+[31mERROR[0m tests\test_analytics.py::[1mTestGrpcBKTModel::test_grpc_bkt_prediction[trio][0m - RuntimeError: There is no current event loop in thread 'MainThread'.
+[31mERROR[0m tests\test_analytics.py::[1mTestGrpcBKTModel::test_grpc_get_user_ability[trio][0m - RuntimeError: There is no current event loop in thread 'MainThread'.
+[31mERROR[0m tests\test_analytics.py::[1mTestGrpcCacheInvalidation::test_grpc_cache_invalidation_after_event[trio][0m - RuntimeError: There is no current event loop in thread 'MainThread'.
+[31mERROR[0m tests\test_analytics.py::[1mTestGrpcRequestDeduplication::test_grpc_concurrent_requests[trio][0m - RuntimeError: There is no current event loop in thread 'MainThread'.
+[31mERROR[0m tests\test_analytics.py::[1mTestGrpcUserAnalytics::test_grpc_get_engagement_metrics[trio][0m - RuntimeError: There is no current event loop in thread 'MainThread'.
+[31mERROR[0m tests\test_analytics.py::[1mTestGrpcUserAnalytics::test_grpc_predict_performance[trio][0m - RuntimeError: There is no current event loop in thread 'MainThread'.
+[31mERROR[0m tests\test_analytics.py::[1mTestGrpcUserAnalytics::test_grpc_get_quiz_attempt_history[trio][0m - RuntimeError: There is no current event loop in thread 'MainThread'.
+[31mERROR[0m tests\test_analytics.py::[1mTestGrpcServerBindings::test_server_rpc_bindings_and_basic_calls[trio][0m - RuntimeError: There is no current event loop in thread 'MainThread'.
+[31mERROR[0m tests\test_analytics.py::[1mTestGrpcRecommendations::test_grpc_get_recommendations[0m - pytest.PytestRemovedIn9Warning: 'test_grpc_get_recommendations' requested a...
+[31mERROR[0m tests\test_analytics.py::[1mTestGrpcRecommendations::test_grpc_generate_next_steps[0m - pytest.PytestRemovedIn9Warning: 'test_grpc_generate_next_steps' requested a...
+[31mERROR[0m tests\test_analytics.py::[1mTestGrpcRecommendations::test_grpc_generate_study_recommendations[0m - pytest.PytestRemovedIn9Warning: 'test_grpc_generate_study_recommendations' ...
+[31mERROR[0m tests\test_analytics.py::[1mTestGrpcAdaptiveQuestions::test_grpc_get_next_adaptive_question[0m - pytest.PytestRemovedIn9Warning: 'test_grpc_get_next_adaptive_question' requ...
+[31mERROR[0m tests\test_analytics.py::[1mTestGrpcAttemptMetrics::test_grpc_update_attempt_metrics[0m - pytest.PytestRemovedIn9Warning: 'test_grpc_update_attempt_metrics' requeste...
+[31mERROR[0m tests\test_analytics.py::[1mTestGrpcHealthCheck::test_grpc_health_check[0m - pytest.PytestRemovedIn9Warning: 'test_grpc_health_check' requested an async...
+[31mERROR[0m tests\test_analytics.py::[1mTestGrpcVsHttpParity::test_event_submission_parity[0m - pytest.PytestRemovedIn9Warning: 'test_event_submission_parity' requested an...
+[31mERROR[0m tests\test_analytics.py::[1mTestGrpcVsHttpParity::test_recommendations_parity[0m - pytest.PytestRemovedIn9Warning: 'test_recommendations_parity' requested an ...
+[31m================== [32m11 passed[0m, [33m1 warning[0m, [31m[1m19 errors[0m[31m in 9.93s[0m[31m ===================[0m

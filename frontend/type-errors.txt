@@ -1,0 +1,30 @@
+src/app/(app)/layout.tsx(53,65): error TS2322: Type '(User & { name?: string | null | undefined; email?: string | null | undefined; image?: string | null | undefined; }) | undefined' is not assignable to type 'User | null'.
+  Type 'undefined' is not assignable to type 'User | null'.
+src/app/(app)/profile/edit/page.tsx(93,32): error TS2339: Property 'phone' does not exist on type 'User'.
+src/app/(app)/profile/page.tsx(64,32): error TS2339: Property 'phone' does not exist on type 'User'.
+src/app/(app)/upload/page.tsx(29,9): error TS2322: Type '(material: Material) => void' is not assignable to type '(material: unknown) => void'.
+  Types of parameters 'material' and 'material' are incompatible.
+    Type 'unknown' is not assignable to type 'Material'.
+src/features/admin/services/auditLogService.ts(74,7): error TS2322: Type 'ResponseType' is not assignable to type 'ResponseType | undefined'.
+  Type '"error"' is not assignable to type 'ResponseType | undefined'.
+src/features/assessment/components/clinical-cases/DecisionTreeLogic.tsx(75,3): error TS2339: Property '_caseId' does not exist on type 'DecisionTreeLogicProps'.
+src/features/assessment/components/clinical-cases/DecisionTreeLogic.tsx(136,9): error TS2304: Cannot find name 'setVisitedNodes'.
+src/features/assessment/components/clinical-cases/DecisionTreeLogic.tsx(136,25): error TS7006: Parameter 'prev' implicitly has an 'any' type.
+src/features/assessment/components/PerformanceAnalytics.tsx(208,12): error TS2552: Cannot find name 'Progress'. Did you mean 'onprogress'?
+src/features/assessment/components/PerformanceAnalytics.tsx(273,18): error TS2552: Cannot find name 'Progress'. Did you mean 'onprogress'?
+src/features/clinical-cases/components/ClinicalCasesDashboard.tsx(80,41): error TS2339: Property 'percentage' does not exist on type '{}'.
+src/features/clinical-cases/components/ClinicalCasesDashboard.tsx(85,65): error TS18046: 'a' is of type 'unknown'.
+src/features/clinical-cases/components/ClinicalCasesDashboard.tsx(88,11): error TS18046: 'current' is of type 'unknown'.
+src/features/clinical-cases/components/ClinicalCasesDashboard.tsx(88,32): error TS18046: 'best' is of type 'unknown'.
+src/features/clinical-cases/components/ClinicalCasesDashboard.tsx(92,21): error TS18046: 'bestAttempt' is of type 'unknown'.
+src/features/community/notificationService.ts(20,7): error TS2578: Unused '@ts-expect-error' directive.
+src/features/courses/components/materials/MaterialsDashboard.tsx(79,11): error TS2367: This comparison appears to be unintentional because the types '"all" | "enrolled" | "for_you"' and '"favorites"' have no overlap.
+src/features/courses/components/materials/MaterialsDashboard.tsx(92,45): error TS2367: This comparison appears to be unintentional because the types '"all" | "enrolled"' and '"local"' have no overlap.
+src/features/courses/components/materials/MaterialsDashboard.tsx(176,43): error TS2367: This comparison appears to be unintentional because the types '"all" | "enrolled"' and '"local"' have no overlap.
+src/shared/hooks/useRapidReview.ts(38,22): error TS2345: Argument of type 'unknown[]' is not assignable to parameter of type 'SetStateAction<Question[]>'.
+  Type 'unknown[]' is not assignable to type 'Question[]'.
+    Type 'unknown' is not assignable to type 'Question'.
+src/shared/types/userInterface.ts(114,18): error TS2430: Interface 'UserProfile' incorrectly extends interface 'User'.
+  Types of property 'permissions' are incompatible.
+    Type 'string[]' is not assignable to type 'Permission[]'.
+      Type 'string' is not assignable to type 'Permission'.

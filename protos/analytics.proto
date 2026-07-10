@@ -1,0 +1,644 @@
+syntax = "proto3";
+
+package analytics;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
+
+// --- ENUMS ---
+
+enum ProgressStatus {
+  PROGRESS_STATUS_UNSPECIFIED = 0;
+  PROGRESS_STATUS_NOT_STARTED = 1;
+  PROGRESS_STATUS_IN_PROGRESS = 2;
+  PROGRESS_STATUS_COMPLETED = 3;
+  PROGRESS_STATUS_ACTIVE = 4;
+  PROGRESS_STATUS_SKIPPED = 5;
+  PROGRESS_STATUS_DROPPED = 6;
+  PROGRESS_STATUS_REVIEWED = 7;
+}
+
+// --- MESSAGES FOR PROFILE BUILDING ---
+
+message ProtoCourse {
+  string title = 1;
+}
+
+message ProtoCourseEnrollment {
+  string status = 1;
+  ProtoCourse course = 2;
+}
+
+message ProtoQuizAttempt {
+  double score = 1;
+}
+
+message ProtoCaseAttempt {
+  double score = 1;
+}
+
+message ProtoLearningGoal {
+  string title = 1;
+}
+
+message ProtoLearningPath {
+  string title = 1;
+  string difficulty = 2;
+  int32 estimated_duration_weeks = 3;
+}
+
+message ProtoLearningPathProgress {
+  string status = 1;
+  double overall_progress_percentage = 2;
+  google.protobuf.Timestamp started_at = 3;
+  google.protobuf.Timestamp completed_at = 4;
+  ProtoLearningPath learning_path = 5;
+}
+
+message GetUserDataForProfileRequest {
+  string user_id = 1;
+}
+
+message GetUserDataForProfileResponse {
+  repeated ProtoCourseEnrollment enrollments = 1;
+  repeated ProtoQuizAttempt quiz_attempts = 2;
+  repeated ProtoCaseAttempt case_attempts = 3;
+  repeated ProtoLearningGoal learning_goals = 4;
+  repeated ProtoLearningPathProgress path_progress = 5;
+  // The 'user' object itself is needed for some fields
+  string specialization = 6;
+}
+
+
+// --- EXISTING MESSAGES ---
+
+message CourseProgress {
+  string id = 1;
+  string user_id = 2;
+  string course_id = 3;
+  ProgressStatus status = 4;
+  int32 time_spent = 5;
+  int32 progress_percentage = 6;
+  int32 completed_units = 7;
+  google.protobuf.Timestamp started_at = 8;
+  google.protobuf.Timestamp completed_at = 9;
+  google.protobuf.Timestamp last_accessed_at = 10;
+  google.protobuf.Timestamp created_at = 11;
+  google.protobuf.Timestamp updated_at = 12;
+  int32 total_units = 13;
+}
+
+message CalculateCourseProgressRequest {
+  string user_id = 1;
+  string course_id = 2;
+}
+
+message GetDetailedLearningAnalyticsRequest {
+  string user_id = 1;
+}
+
+message Goal {
+  string id = 1;
+  string user_id = 2;
+  string title = 3;
+  string status = 4; // Enum: Active, Completed, Cancelled
+  string category = 5;
+  string priority = 6;
+  string target_date = 7; // NaiveDate
+  string completed_at = 8; // NaiveDateTime
+  string created_at = 9; // NaiveDateTime
+  string start_date = 10; // NaiveDateTime
+  int32 streak_count = 11;
+}
+
+message LearningGoalAnalytics {
+  string user_id = 1;
+  int32 total_goals = 2;
+  int32 active_goals = 3;
+  int32 completed_goals = 4;
+  int32 overdue_goals = 5;
+  float completion_rate = 6;
+  float average_completion_time_days = 7;
+  map<string, int32> goals_by_category = 8;
+  map<string, int32> goals_by_priority = 9;
+  int32 current_streak = 10;
+  int32 longest_streak = 11;
+  repeated string streak_goal_ids = 12;
+  repeated UpcomingDeadline upcoming_deadlines = 13;
+}
+
+message UpcomingDeadline {
+  string goal_id = 1;
+  string title = 2;
+  string target_date = 3; // NaiveDate
+  int32 days_remaining = 4;
+}
+
+message EngagementMetrics {
+  string user_id = 1;
+  int32 daily_active_streak = 2;
+  int32 weekly_active_streak = 3;
+  string last_activity_date = 4; // NaiveDateTime
+  int32 session_count = 5;
+  int32 average_session_duration = 6;
+  string most_active_time_of_day = 7;
+  string most_active_day_of_week = 8;
+}
+
+message PerformanceMetrics {
+  float average_assessment_score = 1;
+  float pass_rate = 2;
+  repeated string weakness_areas = 3;
+  repeated string strength_areas = 4;
+  float improvement_rate = 5;
+}
+
+message ProgressTrend {
+  string date = 1;
+  double value = 2;
+  string type = 3;
+  string metadata = 4;
+}
+
+message UserLearningSummary {
+  int32 total_study_time = 1;
+  float average_session_length = 2;
+  float average_score = 3;
+  int32 current_streak = 4;
+  int32 longest_streak = 5;
+  repeated string strongest_subjects = 6;
+  repeated string weakest_subjects = 7;
+}
+
+message CourseStatsResult {
+  int32 total_courses = 1;
+  int32 completed_courses = 2;
+  int32 total_study_time_minutes = 3;
+  float average_course_progress = 4;
+}
+
+message LearningPathStatsResult {
+  int32 total_learning_paths = 1;
+  int32 completed_learning_paths = 2;
+  int32 total_study_time_minutes = 3;
+  float average_path_progress = 4;
+}
+
+message GetDetailedLearningAnalyticsResponse {
+  string user_id = 1;
+  UserLearningSummary user_learning_summary = 2;
+  LearningGoalAnalytics goal_analytics = 3;
+  CourseStatsResult course_stats = 4;
+  LearningPathStatsResult path_stats = 5;
+  EngagementMetrics engagement_metrics = 6;
+  PerformanceMetrics performance_metrics = 7;
+  repeated ProgressTrend progress_trends = 8;
+}
+
+service AnalyticsService {
+  rpc GetHealth (HealthRequest) returns (HealthResponse);
+  rpc PredictPerformance(PredictPerformanceRequest) returns (PredictPerformanceResponse);
+  rpc GetEngagementMetrics(GetEngagementMetricsRequest) returns (GetEngagementMetricsResponse);
+  rpc GetRecommendations(GetRecommendationsRequest) returns (GetRecommendationsResponse);
+  rpc UpdateAttemptMetrics (AttemptMetricsRequest) returns (UpdateAttemptMetricsResponse);
+  rpc GetUserAbility (GetUserAbilityRequest) returns (GetUserAbilityResponse);
+  rpc GetNextAdaptiveQuestion (GetNextAdaptiveQuestionRequest) returns (GetNextAdaptiveQuestionResponse);
+  rpc UpdateBkt(UpdateBktRequest) returns (UpdateBktResponse);
+  rpc GetUserLearningSummary(GetUserLearningSummaryRequest) returns (UserLearningSummaryResponse);
+  rpc GetGoalAnalytics(GetGoalAnalyticsRequest) returns (LearningGoalAnalyticsResponse);
+  rpc GetCourseStatistics(GetCourseStatisticsRequest) returns (CourseStatsResultResponse);
+  rpc GetLearningPathStatistics(GetLearningPathStatisticsRequest) returns (LearningPathStatsResultResponse);
+  rpc GetDetailedLearningAnalytics (GetDetailedLearningAnalyticsRequest) returns (GetDetailedLearningAnalyticsResponse);
+  rpc CalculateCourseProgress (CalculateCourseProgressRequest) returns (CourseProgress);
+  rpc GetUserDataForProfile(GetUserDataForProfileRequest) returns (GetUserDataForProfileResponse);
+  rpc GetFilteredRecommendations(GetFilteredRecommendationsRequest) returns (GetFilteredRecommendationsResponse);
+  rpc GetUserFeatureVector(GetUserFeatureVectorRequest) returns (GetUserFeatureVectorResponse);
+  rpc UpdateBktSkillMetrics (UpdateBktSkillMetricsRequest) returns (UpdateBktSkillMetricsResponse);
+  rpc BatchTrackEvents (BatchEventRequest) returns (BatchEventResponse);
+  rpc GetCollaborativeRecommendations (CollaborativeRecommendationRequest) returns (CollaborativeRecommendationResponse);
+  rpc GetTrendingPaths (TrendingPathsRequest) returns (TrendingPathsResponse);
+  rpc GetPathAnalytics (PathAnalyticsRequest) returns (PathAnalyticsResponse);
+  rpc GetCohortAnalytics (GetCohortAnalyticsRequest) returns (CohortAnalyticsResponse);
+  rpc GetQuizAttemptHistory (QuizAttemptHistoryRequest) returns (QuizAttemptHistoryResponse);
+  rpc GetRelatedResources (RelatedResourcesRequest) returns (RelatedResourcesResponse);
+  rpc GenerateStudyRecommendations (StudyRecommendationsRequest) returns (StudyRecommendationsResponse);
+  rpc GenerateNextSteps (NextStepsRequest) returns (NextStepsResponse);
+  rpc PredictBKT (PredictBKTRequest) returns (PredictBKTResponse);
+  rpc PredictBurnModel (PredictBurnRequest) returns (PredictBurnResponse);
+  rpc GetFocusRecommendations (GetFocusRecommendationsRequest) returns (GetFocusRecommendationsResponse);
+  rpc GetDueCards (GetDueCardsRequest) returns (GetDueCardsResponse);
+  rpc GetSpacedRepetitionStats (GetSpacedRepetitionStatsRequest) returns (GetSpacedRepetitionStatsResponse);
+  rpc GetFocusCorrelation (GetFocusCorrelationRequest) returns (GetFocusCorrelationResponse);
+}
+
+message GetCohortAnalyticsRequest {
+  string cohort_id = 1;
+}
+
+message CohortMetric {
+  string name = 1;
+  double value = 2;
+}
+
+message CohortAnalyticsResponse {
+  string cohort_id = 1;
+  int32 total_users = 2;
+  repeated CohortMetric metrics = 3;
+  repeated ProgressTrend progress_trends = 4;
+  repeated string top_user_ids = 5;
+  repeated string insights = 6;
+}
+
+message GetFilteredRecommendationsRequest {
+  string user_id = 1;
+  repeated string completed_material_ids = 2;
+}
+
+message GetFilteredRecommendationsResponse {
+  repeated RecommendationItem items = 1;
+}
+
+// --- FEATURE VECTOR EXTRACTION ---
+
+message GetUserFeatureVectorRequest {
+  string user_id = 1;
+}
+
+message GetUserFeatureVectorResponse {
+  string user_id = 1;
+  repeated double features = 2;
+  map<string, double> feature_map = 3; // Named features for debugging
+}
+
+message UpdateBktSkillMetricsRequest {
+  // optional: empty
+}
+
+message UpdateBktSkillMetricsResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message GetUserLearningSummaryRequest {
+  string user_id = 1;
+  repeated StudySession study_sessions = 2;
+  repeated QuizAttempt quiz_attempts = 3;
+}
+
+message StudySession {
+  string user_id = 1;
+  int32 duration = 2;
+  string topic = 3;
+  float score = 4;
+}
+
+message QuizAttempt {
+  string user_id = 1;
+  float percentage = 2;
+  string category = 3;
+}
+
+message UserLearningSummaryResponse {
+  UserLearningSummary summary = 1;
+}
+
+message GetGoalAnalyticsRequest {
+  string user_id = 1;
+  repeated Goal goals = 2;
+}
+
+message LearningGoalAnalyticsResponse {
+  LearningGoalAnalytics goal_analytics = 1;
+}
+
+message GetCourseStatisticsRequest {
+  string user_id = 1;
+}
+
+message CourseStatsResultResponse {
+  CourseStatsResult course_stats = 1;
+}
+
+message GetLearningPathStatisticsRequest {
+  string user_id = 1;
+}
+
+message LearningPathProgress {
+  string user_id = 1;
+  string path_id = 2;
+  string status = 3; // Enum: InProgress, Completed, Dropped
+  int32 total_time_spent_minutes = 4;
+  float overall_progress_percentage = 5;
+  string last_activity_date = 6; // NaiveDateTime
+  string category_id = 7;
+  PhaseProgress phase_progress = 8;
+}
+
+message PhaseProgress {
+  string phase_id = 1;
+  string title = 2;
+}
+
+message LearningPathStatsResultResponse {
+  LearningPathStatsResult path_stats = 1;
+}
+
+message UpdateBktRequest {
+  string user_id = 1;
+  string skill_id = 2;
+  bool is_correct = 3;
+}
+
+message UpdateBktResponse {
+  string user_id = 1;
+  string skill_id = 2;
+  double p_known = 3;
+}
+
+message HealthRequest {
+  string message = 1;
+}
+
+message HealthResponse {
+  string status = 1;
+  string timestamp = 2;
+}
+
+message PredictPerformanceRequest {
+  string user_id = 1;
+  string skill_id = 2;
+}
+
+message PredictPerformanceResponse {
+  float score = 1;
+}
+
+message GetEngagementMetricsRequest {
+  string user_id = 1;
+}
+
+message GetEngagementMetricsResponse {
+  float time_spent = 1;
+  float completion_rate = 2;
+  int32 activity_frequency = 3;
+  int32 daily_streak = 4;
+  int32 weekly_streak = 5;
+}
+
+message GetRecommendationsRequest {
+  string user_id = 1;
+}
+
+message RecommendationItem {
+  string id = 1;
+  string title = 2;
+  string description = 3;
+  string type = 4;
+  float score = 5;
+  string reason = 6;
+}
+
+message GetRecommendationsResponse {
+  repeated RecommendationItem items = 1;
+}
+
+// --- ADDED MESSAGES FOR NEW RPCS ---
+message EventPayload {
+  string event_type = 1;
+  google.protobuf.Value data = 2;
+  string timestamp = 3;
+  string session_id = 4;
+  int32 duration = 5;
+}
+
+message BatchEventRequest {
+  string user_id = 1;
+  repeated EventPayload events = 2;
+}
+
+message BatchEventResponse {
+  bool success = 1;
+  int32 processed = 2;
+  int32 failed = 3;
+  string message = 4;
+}
+
+message CollaborativeRecommendationRequest {
+  string user_id = 1;
+  int32 limit = 2;
+}
+
+message CollaborativeRecommendationItem {
+  string item_id = 1;
+  double score = 2;
+  string reason = 3;
+}
+
+message CollaborativeRecommendationResponse {
+  repeated CollaborativeRecommendationItem items = 1;
+}
+
+message TrendingPathsRequest {
+  int32 limit = 1;
+}
+
+message TrendingPath {
+  string path_id = 1;
+  int32 popularity = 2;
+}
+
+message TrendingPathsResponse {
+  repeated TrendingPath paths = 1;
+}
+
+message PathAnalyticsRequest {
+  string path_id = 1;
+}
+
+message PathAnalyticsResponse {
+  string path_id = 1;
+  double average_completion_rate = 2;
+  int64 average_time_to_complete = 3;
+}
+
+message QuizAttemptHistoryRequest {
+  string user_id = 1;
+  int32 limit = 2;
+  int32 offset = 3;
+}
+
+message QuizAttemptHistoryItem {
+  string quiz_id = 1;
+  double score = 2;
+  string date = 3;
+}
+
+message QuizAttemptHistoryResponse {
+  repeated QuizAttemptHistoryItem attempts = 1;
+}
+
+message RelatedResourcesRequest {
+  string resource_id = 1;
+  int32 limit = 2;
+}
+
+message RelatedResource {
+  string id = 1;
+  string title = 2;
+  string type = 3;
+  double score = 4;
+}
+
+message RelatedResourcesResponse {
+  repeated RelatedResource resources = 1;
+}
+
+message StudyRecommendationsRequest {
+  string user_id = 1;
+  repeated string knowledge_gaps = 2;
+}
+
+message StudyRecommendationItem {
+  string recommendation = 1;
+  string priority = 2;
+  int32 estimated_time_hours = 3;
+  string resource_id = 4;
+}
+
+message StudyRecommendationsResponse {
+  repeated StudyRecommendationItem recommendations = 1;
+}
+
+message NextStepsRequest {
+  string user_id = 1;
+}
+
+message NextStepItem {
+  string step = 1;
+  string reason = 2;
+  int32 estimated_duration_minutes = 3;
+}
+
+message NextStepsResponse {
+  repeated NextStepItem steps = 1;
+}
+
+message PredictBKTRequest {
+  string user_id = 1;
+  string skill_id = 2;
+  repeated double feature_vector = 3;
+}
+
+message PredictBKTResponse {
+  double p_known = 1;
+  double p_next_correct = 2;
+}
+
+message PredictBurnRequest {
+  string user_id = 1;
+  repeated double features = 2;
+}
+
+message PredictBurnResponse {
+  double retention_score = 1;
+  string model_version = 2;
+}
+
+message AttemptMetricsRequest {
+  string attempt_id = 1;
+  string user_id = 2;
+  string question_id = 3;
+  repeated string topic_ids = 4;
+  bool correct = 5;
+  int32 response_time_ms = 6;
+  string skill_id = 7;
+  float score = 8;
+}
+
+message UpdateAttemptMetricsResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message GetUserAbilityRequest {
+  string user_id = 1;
+}
+
+message GetUserAbilityResponse {
+  string user_id = 1;
+  double estimated_ability = 2;
+  map<string, double> p_known_by_skill = 3;
+}
+
+message GetNextAdaptiveQuestionRequest {
+  string user_id = 1;
+  string topic_id = 2;
+}
+
+message GetNextAdaptiveQuestionResponse {
+  string question_id = 1;
+  double recommended_difficulty = 2;
+}
+
+message GetFocusRecommendationsRequest {
+  string user_id = 1;
+  int32 limit = 2;
+}
+
+message FocusArea {
+  string topic = 1;
+  int64 card_count = 2;
+  double pass_rate = 3;
+}
+
+message GetFocusRecommendationsResponse {
+  repeated FocusArea areas = 1;
+}
+
+message GetDueCardsRequest {
+  string user_id = 1;
+}
+
+message DueCard {
+  string card_id = 1;
+  string topic_id = 2;
+  string question = 3;
+  string due = 4;
+}
+
+message GetDueCardsResponse {
+  repeated DueCard cards = 1;
+}
+
+message GetSpacedRepetitionStatsRequest {
+  string user_id = 1;
+}
+
+message SpacedRepetitionStatsProto {
+  int64 total_cards = 1;
+  int64 due_today = 2;
+  int64 mastered_cards = 3;
+  int64 learning_cards = 4;
+  int64 relearning_cards = 5;
+  double avg_ease_factor = 6;
+  double avg_interval_days = 7;
+  double recent_pass_rate = 8;
+}
+
+message GetSpacedRepetitionStatsResponse {
+  SpacedRepetitionStatsProto stats = 1;
+}
+
+message GetFocusCorrelationRequest {
+  string user_id = 1;
+}
+
+message FocusCorrelation {
+  double correlation_coefficient = 1;
+  string insight = 2;
+  map<string, double> avg_score_by_focus_bucket = 3;
+}
+
+message GetFocusCorrelationResponse {
+  FocusCorrelation correlation = 1;
+}

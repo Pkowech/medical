@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="180px" height="180px" viewBox="0 0 180 180" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>MedTrack Hub Apple Touch Icon</title>
+    <defs>
+        <linearGradient x1="50%" y1="0%" x2="50%" y2="100%" id="appleIconGradient">
+            <stop stop-color="#4F46E5" offset="0%"></stop>
+            <stop stop-color="#2563EB" offset="100%"></stop>
+        </linearGradient>
+        <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+            <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#000000" flood-opacity="0.1"/>
+        </filter>
+    </defs>
+    <g id="Apple-Touch-Icon" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <rect fill="url(#appleIconGradient)" x="0" y="0" width="180" height="180" rx="40" filter="url(#shadow)"></rect>
+        <g id="Medical-Cross" transform="translate(60.000000, 60.000000)" fill="#FFFFFF">
+            <path d="M20,0 L40,0 L40,20 L60,20 L60,40 L40,40 L40,60 L20,60 L20,40 L0,40 L0,20 L20,20 L20,0 Z" id="Plus"></path>
+        </g>
+        <g id="Stethoscope" transform="translate(30.000000, 120.000000)" stroke="#FFFFFF" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" fill="none">
+            <path d="M20,30 C20,36.627417 14.627417,42 8,42 C1.372583,42 -4,36.627417 -4,30 C-4,23.372583 1.372583,18 8,18" id="Path"></path>
+            <path d="M20,8 L20,30" id="Path"></path>
+            <path d="M8,18 L8,8" id="Path"></path>
+            <path d="M8,8 C8,3.581722 11.581722,0 16,0 C20.418278,0 24,3.581722 24,8 C24,12.418278 20.418278,16 16,16 L16,8" id="Path"></path>
+        </g>
+    </g>
+</svg>

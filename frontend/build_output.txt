@@ -1,0 +1,144 @@
+
+> medtrackhub@1.0.0 build
+> next build
+
+   Γû▓ Next.js 15.5.6
+   - Environments: .env.local
+   - Experiments (use with caution):
+     ┬╖ serverActions
+
+   Creating an optimized production build ...
+> [PWA] Compile server
+> [PWA] Compile server
+> [PWA] Compile client (static)
+> [PWA] Auto register service worker with: C:\Users\user\medical\frontend\node_modules\.pnpm\next-pwa@5.6.0_@babel+core@_5589521b70cf3405efe1b208a301b4da\node_modules\next-pwa\register.js
+> [PWA] Service worker: C:\Users\user\medical\frontend\public\sw.js
+> [PWA]   url: /sw.js
+> [PWA]   scope: /
+ Γ£ô Compiled successfully in 23.8s
+   Linting and checking validity of types ...
+
+ ΓÜá The Next.js plugin was not detected in your ESLint configuration. See https://nextjs.org/docs/app/api-reference/config/eslint#migrating-existing-config
+
+./src/app/(app)/layout.tsx
+34:63  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./src/app/(app)/onboarding/page.tsx
+69:20  Warning: 'setFinished' is assigned a value but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+107:44  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+115:44  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./src/app/admin/materials/upload/page.tsx
+15:43  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./src/core/app/components/dashboard/medical-education-dashboard.tsx
+9:3  Warning: 'BarChart3' is defined but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+31:47  Warning: 'StatCardProps' is defined but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+168:36  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+168:70  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+958:21  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+973:26  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+973:68  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./src/core/app/components/layout/AppHeader.tsx
+3:46  Warning: 'useCallback' is defined but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+19:11  Warning: 'SearchResult' is defined but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+
+./src/core/app/services/dashboardService.ts
+5:49  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+10:41  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./src/features/admin/services/auditLogService.ts
+72:47  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./src/features/assessment/components/adaptiveQuiz/AdaptiveQuiz.tsx
+29:10  Warning: 'QuizQuestion' is defined but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+29:56  Warning: 'QuizAnswer' is defined but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+
+./src/features/assessment/components/clinical-cases/DecisionTreeLogic.tsx
+88:10  Warning: 'visitedNodes' is assigned a value but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+
+./src/features/auth/components/AuthSynchronizer.tsx
+3:10  Warning: 'useEffect' is defined but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+
+./src/features/community/notificationService.ts
+20:36  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./src/features/courses/components/CourseListItem.tsx
+5:10  Warning: 'useRouter' is defined but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+
+./src/features/courses/components/materials/MaterialListItem.tsx
+7:10  Warning: 'useRouter' is defined but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+
+./src/features/courses/services/courseService.ts
+36:43  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./src/features/learning-management/components/goals/goal-creation-wizard.tsx
+100:24  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./src/features/learning-management/components/learning-paths/learning-path-interface.tsx
+84:27  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+85:32  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+86:26  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+111:23  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+114:27  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+272:39  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+292:8  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+301:33  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+316:70  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+319:77  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+321:45  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+322:55  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+324:63  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+325:61  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+326:63  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+327:54  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+327:90  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+333:56  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+333:93  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+382:28  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+408:38  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+427:93  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+477:79  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./src/features/learning-management/components/learning-paths/learning-path-visualization.tsx
+27:3  Warning: 'Milestone' is defined but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+56:45  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+84:52  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+98:91  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+104:48  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+128:45  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+143:63  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+152:65  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+162:73  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./src/features/learning-management/components/schedule/EventEditor.tsx
+224:56  Warning: Unused eslint-disable directive (no problems were reported).
+
+./src/features/learning-management/services/progressService.ts
+732:17  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+750:52  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+756:67  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+768:26  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./src/features/search/hooks/useSearch.ts
+52:21  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+71:19  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./src/shared/components/ui/StatCard.tsx
+4:10  Warning: 'LucideIcon' is defined but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+
+info  - Need to disable some ESLint rules? Learn more here: https://nextjs.org/docs/app/api-reference/config/eslint#disabling-rules
+Failed to compile.
+
+./src/features/learning-management/components/learning-paths/learning-path-analytics.tsx:18:53
+Type error: Module '"@/shared/types/learningInterface"' has no exported member 'UserInsights'.
+
+  16 |   Star,
+  17 | } from 'lucide-react';
+> 18 | import { LearningPathAnalyticsProps, PathAnalytics, UserInsights } from '@/shared/types/learningInterface';
+     |                                                     ^
+  19 |
+  20 | export const LearningPathAnalytics: React.FC<LearningPathAnalyticsProps> = ({
+  21 |   pathId,
+Next.js build worker exited with code: 1 and signal: null

@@ -1,0 +1,16 @@
+{
+  "collection": "@nestjs/schematics",
+  "sourceRoot": "src",
+  "compilerOptions": {
+    "deleteOutDir": false,
+    "builder": "swc",
+    "typeCheck": true,
+    "assets": [
+      {
+        "include": "../protos/*.proto",
+        "outDir": "dist/generated/grpc",
+        "watchAssets": true
+      }
+    ]
+  }
+}

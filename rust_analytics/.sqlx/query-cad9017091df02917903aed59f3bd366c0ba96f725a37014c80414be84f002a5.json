@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT \n            EXTRACT(EPOCH FROM (completed_at - started_at))::float / 3600.0 as \"actual_hours\",\n            estimated_hours\n        FROM learning_path_progress lpp\n        JOIN learning_paths lp ON lpp.learning_path_id = lp.id\n        WHERE lpp.user_id = $1\n        AND lpp.completed_at IS NOT NULL\n        AND lp.estimated_hours IS NOT NULL\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "actual_hours",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 1,
+        "name": "estimated_hours",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      null,
+      true
+    ]
+  },
+  "hash": "cad9017091df02917903aed59f3bd366c0ba96f725a37014c80414be84f002a5"
+}

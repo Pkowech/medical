@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        WITH topic_list AS (\n            SELECT DISTINCT UNNEST(q.tags) as topic, qa.started_at\n            FROM quiz_attempts qa\n            JOIN quizzes qz ON qa.quiz_id = qz.id\n            JOIN quiz_questions qq ON qz.id = qq.quiz_id\n            JOIN questions q ON qq.question_id = q.id\n            WHERE qa.user_id = $1\n            AND array_length(q.tags, 1) > 0\n        )\n        SELECT topic FROM topic_list ORDER BY started_at DESC LIMIT 20\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "topic",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "9cc656b7a4c320e92fed616b800fc1820906a8b9c1a8aad01f393bbdb725a281"
+}

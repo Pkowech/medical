@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT \n            skill_id,\n            p_known\n        FROM user_skill_states\n        WHERE user_id = $1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "skill_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "p_known",
+        "type_info": "Float8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "7f8a2637a4114ef3b62e16d2a4390eac3e73ed04cf6e1f2ab8ccb1437782cfc5"
+}

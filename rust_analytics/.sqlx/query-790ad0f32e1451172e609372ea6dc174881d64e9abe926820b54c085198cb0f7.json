@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT \n            UNNEST(q.tags) as topic,\n            qa.percentage\n        FROM quiz_attempts qa\n        JOIN quizzes qz ON qa.quiz_id = qz.id\n        JOIN quiz_questions qq ON qz.id = qq.quiz_id\n        JOIN questions q ON qq.question_id = q.id\n        WHERE qa.user_id = $1\n        AND qa.completed_at IS NOT NULL\n        AND array_length(q.tags, 1) > 0\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "topic",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "percentage",
+        "type_info": "Float8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      null,
+      false
+    ]
+  },
+  "hash": "790ad0f32e1451172e609372ea6dc174881d64e9abe926820b54c085198cb0f7"
+}

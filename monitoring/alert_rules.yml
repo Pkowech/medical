@@ -1,0 +1,154 @@
+groups:
+  - name: medtrack_alerts
+    rules:
+      # High CPU usage
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage detected"
+          description: "CPU usage is above 80% for more than 5 minutes on {{ $labels.instance }}"
+
+      # High memory usage
+      - alert: HighMemoryUsage
+        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage detected"
+          description: "Memory usage is above 85% for more than 5 minutes on {{ $labels.instance }}"
+
+      # Service down
+      - alert: ServiceDown
+        expr: up{job!~".*ephemeral.*"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Service is down"
+          description: "{{ $labels.job }} service is down on {{ $labels.instance }}"
+
+      # High response time (requires http_request_duration_seconds_bucket metric)
+      - alert: HighResponseTime
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High response time detected"
+          description: "95th percentile response time is above 1 second for {{ $labels.job }}"
+
+      # Database connection issues (requires pg_stat_activity_count metric from postgres_exporter)
+      - alert: DatabaseConnectionHigh
+        expr: pg_stat_activity_count > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High database connections"
+          description: "PostgreSQL has more than 80 active connections"
+
+      # Redis memory usage (requires redis_memory_used_bytes and redis_memory_max_bytes)
+      - alert: RedisHighMemoryUsage
+        expr: (redis_memory_used_bytes / redis_memory_max_bytes * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis high memory usage"
+          description: "Redis memory usage is above 80%"
+
+      # Disk space usage
+      - alert: DiskSpaceUsage
+        expr: (node_filesystem_size_bytes - node_filesystem_free_bytes) / node_filesystem_size_bytes * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High disk usage detected"
+          description: "Disk usage is above 85% on {{ $labels.instance }} for filesystem {{ $labels.mountpoint }}"
+
+      # Container restart
+      - alert: ContainerRestart
+        expr: changes(container_last_seen[1h]) > 3
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container restarting frequently"
+          description: "Container {{ $labels.name }} has restarted more than 3 times in the last hour"
+
+      # HTTP error rate
+      - alert: HighErrorRate
+        expr: (rate(http_requests_total{status=~"5.."}[5m]) / (rate(http_requests_total[5m]) + 0.00001)) * 100 > 5
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High HTTP error rate"
+          description: "HTTP error rate is above 5% for {{ $labels.job }}"
+
+  - name: medtrack_application_alerts
+    rules:
+      # Authentication failures (requires auth_failures_total metric from your app)
+      - alert: HighAuthFailureRate
+        expr: rate(auth_failures_total[5m]) > 10
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High authentication failure rate"
+          description: "Authentication failure rate is above 10 per second"
+
+      # Queue length (requires queue_length metric from your app)
+      - alert: HighQueueLength
+        expr: queue_length > 100
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High queue length"
+          description: "Queue length is above 100 items"
+
+      # Cache hit rate (requires cache_hit_rate metric from your app; 0-1 scale)
+      - alert: LowCacheHitRate
+        expr: cache_hit_rate < 0.8
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low cache hit rate"
+          description: "Cache hit rate is below 80%"
+
+        # Linfa prediction failure spike (more than 3 failures in 5 minutes)
+        - alert: LinfaPredictionFailureSpike
+          expr: increase(linfa_failure_total[5m]) > 3
+          for: 2m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Linfa prediction failures detected"
+            description: "Linfa prediction failures increased by more than 3 in the last 5 minutes"
+
+        # Linfa failure rate (failure ratio greater than 10%)
+        - alert: LinfaPredictionFailureRate
+          expr: (rate(linfa_failure_total[5m]) / (rate(linfa_prediction_total[5m]) + 0.00001)) > 0.10
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High Linfa failure rate"
+            description: "Linfa prediction failure rate exceeded 10% over the last 5 minutes"
+
+        # BKT gap spike - many BKT-derived gaps in a short time
+        - alert: BKTGapSpike
+          expr: increase(bkt_gaps_derived_total[5m]) > 10
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Large number of BKT-derived gaps"
+            description: "Number of recommendations generated from BKT gaps increased by more than 10 in the last 5 minutes"

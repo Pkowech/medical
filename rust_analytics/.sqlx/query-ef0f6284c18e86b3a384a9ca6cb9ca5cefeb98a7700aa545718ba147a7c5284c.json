@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT \n            \"totalStudyTime\" as \"total_study_time!\",\n            \"averageScore\" as \"average_score!\",\n            \"completionRate\" as \"completion_rate!\",\n            \"currentStreak\" as \"current_streak!\"\n        FROM user_learning_analytics\n        WHERE \"userId\" = $1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "total_study_time!",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 1,
+        "name": "average_score!",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 2,
+        "name": "completion_rate!",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 3,
+        "name": "current_streak!",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "ef0f6284c18e86b3a384a9ca6cb9ca5cefeb98a7700aa545718ba147a7c5284c"
+}

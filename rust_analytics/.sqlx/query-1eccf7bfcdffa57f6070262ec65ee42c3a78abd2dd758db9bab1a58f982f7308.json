@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        WITH topic_scores AS (\n            SELECT \n                UNNEST(q.tags) as category,\n                qa.percentage\n            FROM quiz_attempts qa\n            JOIN quizzes qz ON qa.quiz_id = qz.id\n            JOIN quiz_questions qq ON qz.id = qq.quiz_id\n            JOIN questions q ON qq.question_id = q.id\n            WHERE qa.user_id = $1\n            AND qa.completed_at IS NOT NULL\n            AND array_length(q.tags, 1) > 0\n        )\n        SELECT \n            category,\n            AVG(percentage)::float8 as \"avg_score!\"\n        FROM topic_scores\n        GROUP BY category\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "category",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "avg_score!",
+        "type_info": "Float8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      null,
+      null
+    ]
+  },
+  "hash": "1eccf7bfcdffa57f6070262ec65ee42c3a78abd2dd758db9bab1a58f982f7308"
+}

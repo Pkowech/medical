@@ -1,0 +1,154 @@
+[
+  {
+    "controllerRoot": "auth",
+    "backendController": "backend/src/modules/core/auth/controllers/auth.controller.ts",
+    "proxyFiles": [
+      "src/app/api/auth/[...nextauth]/route.ts",
+      "src/app/api/auth/session/route.ts",
+      "src/app/api/auth/register/route.ts",
+      "src/app/api/auth/email/resend/route.ts",
+      "src/app/api/auth/verify-email/[token]/route.ts"
+    ],
+    "callSites": [
+      "src/lib/nextauth.ts",
+      "src/app/(auth)/verify-email/page.tsx",
+      "src/app/(auth)/resend-verification/page.tsx",
+      "src/components/auth/RegisterForm.tsx",
+      "src/components/auth/ForgotPasswordForm.tsx"
+    ]
+  },
+  {
+    "controllerRoot": "users",
+    "backendController": "backend/src/modules/core/users/controllers/users.controller.ts",
+    "proxyFiles": ["src/app/api/users/route.ts", "src/app/api/users/profile/route.ts"],
+    "callSites": [
+      "src/components/profile/ProfileView.tsx",
+      "src/app/(app)/profile/page.tsx",
+      "src/store/useAuthStore.ts"
+    ]
+  },
+  {
+    "controllerRoot": "courses",
+    "backendController": "backend/src/modules/education/courses/controllers/courses.controller.ts",
+    "proxyFiles": [
+      "src/app/api/courses/route.ts",
+      "src/app/api/courses/[courseId]/enroll/route.ts",
+      "src/app/api/courses/[courseId]/prerequisites/route.ts",
+      "src/app/api/courses/featured/route.ts",
+      "src/app/api/courses/my-courses/route.ts"
+    ],
+    "callSites": [
+      "src/components/course/CourseDiscovery.tsx",
+      "src/components/course/PrerequisitesChecker.tsx",
+      "src/app/(app)/courses/[courseId]/modules/page.tsx"
+    ]
+  },
+  {
+    "controllerRoot": "materials",
+    "backendController": "backend/src/modules/education/courses/controllers/materials.controller.ts",
+    "proxyFiles": ["src/app/api/materials/route.ts"],
+    "callSites": [
+      "src/app/upload.tsx",
+      "src/components/ShareMaterial.tsx",
+      "src/components/FileUpload.tsx"
+    ]
+  },
+  {
+    "controllerRoot": "units",
+    "backendController": "backend/src/modules/education/courses/controllers/units.controller.ts",
+    "proxyFiles": ["src/app/api/units/route.ts"],
+    "callSites": [
+      "src/app/(app)/courses/[courseId]/modules/page.tsx",
+      "src/components/course/UnitViewer.tsx"
+    ]
+  },
+  {
+    "controllerRoot": "quiz",
+    "backendController": "backend/src/modules/education/assessment/controllers/quiz.controller.ts",
+    "proxyFiles": ["src/app/api/quiz/route.ts"],
+    "callSites": [
+      "src/hooks/useQuiz.ts",
+      "src/components/assessment/AdaptiveQuiz.tsx",
+      "src/services/quizService.ts",
+      "src/lib/offline/syncManager.ts"
+    ]
+  },
+  {
+    "controllerRoot": "clinical-cases",
+    "backendController": "backend/src/modules/education/courses/controllers/clinical-cases.controller.ts",
+    "proxyFiles": [
+      "src/app/api/clinical-cases/route.ts",
+      "src/app/api/clinical-cases/[caseId]/route.ts",
+      "src/app/api/clinical-cases/attempts/route.ts",
+      "src/app/api/clinical-cases/attempts/[attemptId]/progress/route.ts"
+    ],
+    "callSites": [
+      "src/components/clinical-cases/InteractiveCaseInterface.tsx",
+      "src/components/clinical-cases/DecisionTreeLogic.tsx",
+      "src/components/clinical-cases/CaseLibraryManagement.tsx"
+    ]
+  },
+  {
+    "controllerRoot": "learning-paths",
+    "backendController": "backend/src/modules/education/learning/controllers/learning-paths.controller.ts",
+    "proxyFiles": [
+      "src/app/api/learning-paths/route.ts",
+      "src/app/api/learning-paths/[id]/route.ts",
+      "src/app/api/learning-paths/[id]/enroll/route.ts",
+      "src/app/api/learning-paths/[id]/progress/route.ts",
+      "src/app/api/learning-paths/my-progress/route.ts"
+    ],
+    "callSites": [
+      "src/components/learning-paths/LearningPathInterface.tsx",
+      "src/components/learning-paths/LearningPathVisualization.tsx",
+      "src/components/learning-paths/LearningPathRecommendations.tsx",
+      "src/components/dashboard/LearningPathProgressWidget.tsx"
+    ]
+  },
+  {
+    "controllerRoot": "learning-goals",
+    "backendController": "backend/src/modules/education/learning/controllers/learning-goals.controller.ts",
+    "proxyFiles": [
+      "src/app/api/learning-goals/route.ts",
+      "src/app/api/learning-goals/[id]/progress/route.ts",
+      "src/app/api/learning-goals/analytics/route.ts",
+      "src/app/api/learning-goals/smart-suggestions/route.ts"
+    ],
+    "callSites": [
+      "src/components/goals/GoalCreationWizard.tsx",
+      "src/components/goals/GoalsManagementInterface.tsx",
+      "src/components/dashboard/GoalsProgressWidget.tsx"
+    ]
+  },
+  {
+    "controllerRoot": "chat",
+    "backendController": "backend/src/modules/engagement-communication/communication/controllers/chat.controller.ts",
+    "proxyFiles": [
+      "src/app/api/chat/sessions/route.ts",
+      "src/app/api/chat/sessions/[sessionId]/messages/route.ts",
+      "src/app/api/chat/message/route.ts"
+    ],
+    "callSites": ["src/components/chat/ChatWindow.tsx", "src/components/chat/ChatList.tsx"]
+  },
+  {
+    "controllerRoot": "course-categories",
+    "backendController": "backend/src/modules/education/courses/controllers/course-categories.controller.ts",
+    "proxyFiles": ["src/app/api/course-categories/route.ts"],
+    "callSites": ["src/app/(app)/courses/page.tsx"]
+  },
+  {
+    "controllerRoot": "health",
+    "backendController": "backend/src/infrastructure/health/health.controller.ts",
+    "proxyFiles": ["src/app/api/health/route.ts"],
+    "callSites": ["(internal) health checks / monitoring"]
+  },
+  {
+    "controllerRoot": "analytics",
+    "backendController": "backend/src/modules/ai-analytics/analytics/controllers/analytics.controller.ts",
+    "proxyFiles": ["src/app/api/analytics/route.ts"],
+    "callSites": ["src/components/analytics/*", "src/services/consolidatedAnalyticsService.ts"]
+  },
+  {
+    "notes": "Search/scan output also identified many frontend files that directly call '/api/...' (approx 200 matches). Use this JSON as the canonical export for A. For B, I'll apply canonicalization in small batches (3-5 files) using these callSites as a driver."
+  }
+]

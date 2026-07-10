@@ -1,0 +1,15 @@
+ignoredBuiltDependencies:
+  - '@swc/core'
+  - aws-sdk
+  - unrs-resolver
+
+onlyBuiltDependencies:
+  - '@nestjs/core'
+  - '@prisma/client'
+  - '@prisma/engines'
+  - '@scarf/scarf'
+  - argon2
+  - grpc-tools
+  - msgpackr-extract
+  - prisma
+  - protobufjs

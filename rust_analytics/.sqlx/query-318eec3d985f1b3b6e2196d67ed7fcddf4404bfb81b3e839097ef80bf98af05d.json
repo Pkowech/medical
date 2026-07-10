@@ -1,0 +1,35 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT \n            user_id,\n            COUNT(*)::int as \"common_paths!\",\n            AVG(overall_progress_percentage) as \"avg_progress!\"\n        FROM learning_path_progress\n        WHERE learning_path_id = ANY($1)\n        AND user_id != $2\n        AND status = 'completed'\n        GROUP BY user_id\n        HAVING COUNT(*) >= 2\n        ORDER BY COUNT(*) DESC\n        LIMIT 20\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "user_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "common_paths!",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 2,
+        "name": "avg_progress!",
+        "type_info": "Float8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "TextArray",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      null,
+      null
+    ]
+  },
+  "hash": "318eec3d985f1b3b6e2196d67ed7fcddf4404bfb81b3e839097ef80bf98af05d"
+}

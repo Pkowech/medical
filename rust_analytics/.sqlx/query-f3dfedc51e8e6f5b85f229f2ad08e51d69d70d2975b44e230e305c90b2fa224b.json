@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT DATE(created_at)\n        FROM user_activities\n        WHERE user_id = $1\n        AND created_at >= NOW() - INTERVAL '30 days'\n        GROUP BY DATE(created_at)\n        ORDER BY DATE(created_at)\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "date",
+        "type_info": "Date"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "f3dfedc51e8e6f5b85f229f2ad08e51d69d70d2975b44e230e305c90b2fa224b"
+}

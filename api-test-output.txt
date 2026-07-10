@@ -1,0 +1,47 @@
+At C:\Users\user\medical\test-all-endpoints.ps1:53 char:35
++         $testResult.Status = "âo" Success"
++                                   ~~~~~~~~
+Unexpected token 'Success"
+        $testResult.StatusCode = $response.StatusCode
+        
+        try {
+            $testResult.Response = $response.Content | ConvertFrom-Json
+        } catch {
+            $testResult.Response = $response.Content
+        }
+    }
+    catch {
+        $testResult.Status = "âo-' in expression or statement.
+At C:\Users\user\medical\test-all-endpoints.ps1:72 char:28
++ Write-Host "Testing Health & System Endpoints..." -ForegroundColor Cy ...
++                            ~
+The ampersand (&) character is not allowed. The & operator is reserved for future use; 
+wrap an ampersand in double quotation marks ("&") to pass it as part of a string.
+At C:\Users\user\medical\test-all-endpoints.ps1:95 char:2
++ } else {
++  ~
+The Try statement is missing its Catch or Finally block.
+At C:\Users\user\medical\test-all-endpoints.ps1:186 char:63
++ ... unt = ($results | Where-Object { $_.Status -eq "âo" Success" }).Count
++                                                         ~~~~~~~~~~~~~~~~~
+Unexpected token 'Success" }).Count
+$failureCount = ($results | Where-Object { $_.Status -eq "âo-' in expression or 
+statement.
+At C:\Users\user\medical\test-all-endpoints.ps1:212 char:47
++ Write-Host "`nResults exported to: $exportPath" -ForegroundColor Gray
++                                               ~~~~~~~~~~~~~~~~~~~~~~~
+The string is missing the terminator: ".
+At C:\Users\user\medical\test-all-endpoints.ps1:196 char:74
++ ... lts | Where-Object { $_.Status -eq "âo" Success" } | ForEach-Object {
++                                                                         ~
+Missing closing '}' in statement block or type definition.
+At C:\Users\user\medical\test-all-endpoints.ps1:214 char:1
++ 
+Missing closing ')' in expression.
+At C:\Users\user\medical\test-all-endpoints.ps1:12 char:24
++ function Test-Endpoint {
++                        ~
+Missing closing '}' in statement block or type definition.
+    + CategoryInfo          : ParserError: (:) [], ParentContainsErrorRecordException
+    + FullyQualifiedErrorId : UnexpectedToken
+ 

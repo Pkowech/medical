@@ -1,0 +1,36 @@
+
+> medtrack-hub-backend@1.0.0 build C:\Users\user\medical\backend
+> pnpm run generate:proto && nest build
+
+
+> medtrack-hub-backend@1.0.0 generate:proto C:\Users\user\medical\backend
+> pnpm exec -- grpc_tools_node_protoc --plugin=protoc-gen-ts_proto="C:\\Users\\user\\medical\\backend\\node_modules\\.bin\\protoc-gen-ts_proto.CMD" --ts_proto_out=src/generated/grpc --ts_proto_opt=nestJs=true,outputServices=grpc-js -I ../protos ../protos/*.proto
+
+-  TSC  Initializing type checker...
+
+[96msrc/common/dto/index.ts[0m:[93m109[0m:[93m3[0m - [91merror[0m[90m TS2724: [0m'"./assessment.dto"' has no exported member named 'AssessmentHistoryDto'. Did you mean 'AssessmentHistory'?
+
+[7m109[0m   AssessmentHistoryDto,
+[7m   [0m [91m  ~~~~~~~~~~~~~~~~~~~~[0m
+[96msrc/infrastructure/search/controllers/search.controller.ts[0m:[93m69[0m:[93m65[0m - [91merror[0m[90m TS2554: [0mExpected 1 arguments, but got 2.
+
+[7m69[0m       const results = await this.searchService.search(queryDto, user);
+[7m  [0m [91m                                                                ~~~~[0m
+[96msrc/infrastructure/storage/storage.service.ts[0m:[93m5[0m:[93m3[0m - [91merror[0m[90m TS2300: [0mDuplicate identifier 'PutObjectCommand'.
+
+[7m5[0m   PutObjectCommand,
+[7m [0m [91m  ~~~~~~~~~~~~~~~~[0m
+[96msrc/infrastructure/storage/storage.service.ts[0m:[93m10[0m:[93m10[0m - [91merror[0m[90m TS2300: [0mDuplicate identifier 'PutObjectCommand'.
+
+[7m10[0m import { PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+[7m  [0m [91m         ~~~~~~~~~~~~~~~~[0m
+[96msrc/modules/education/assessment/services/assessments.service.ts[0m:[93m373[0m:[93m13[0m - [91merror[0m[90m TS2561: [0mObject literal may only specify known properties, but 'userId' does not exist in type '{ user_id: string; skill_id: string; is_correct: boolean; }'. Did you mean to write 'user_id'?
+
+[7m373[0m             userId: userId,
+[7m   [0m [91m            ~~~~~~[0m
+[96msrc/modules/education/assessment/services/assessments.service.ts[0m:[93m505[0m:[93m7[0m - [91merror[0m[90m TS2554: [0mExpected 1-2 arguments, but got 3.
+
+[7m505[0m       dateRange,
+[7m   [0m [91m      ~~~~~~~~~[0m
+
+ΓÇëELIFECYCLEΓÇë Command failed with exit code 1.

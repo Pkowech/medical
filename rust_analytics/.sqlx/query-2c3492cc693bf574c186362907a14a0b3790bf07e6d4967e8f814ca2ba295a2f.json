@@ -1,0 +1,35 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT id, title, difficulty::text as \"difficulty!\"\n            FROM learning_paths\n            WHERE status = 'published'\n            AND (\n                title ILIKE $1\n                OR description ILIKE $1\n            )\n            AND NOT EXISTS (\n                SELECT 1 FROM learning_path_progress lpp\n                WHERE lpp.learning_path_id = learning_paths.id\n                AND lpp.user_id = $2\n            )\n            LIMIT 2\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "title",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "difficulty!",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "2c3492cc693bf574c186362907a14a0b3790bf07e6d4967e8f814ca2ba295a2f"
+}

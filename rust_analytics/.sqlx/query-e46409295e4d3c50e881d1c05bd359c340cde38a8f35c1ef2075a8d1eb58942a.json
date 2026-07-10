@@ -1,0 +1,34 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT \n            lp.id,\n            lp.difficulty::text as \"difficulty!\",\n            lp.path_structure\n        FROM learning_paths lp\n        WHERE lp.status = 'published'\n        AND NOT EXISTS (\n            SELECT 1 FROM learning_path_progress lpp\n            WHERE lpp.learning_path_id = lp.id\n            AND lpp.user_id = $1\n        )\n        LIMIT 50\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "difficulty!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "path_structure",
+        "type_info": "Jsonb"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      null,
+      true
+    ]
+  },
+  "hash": "e46409295e4d3c50e881d1c05bd359c340cde38a8f35c1ef2075a8d1eb58942a"
+}

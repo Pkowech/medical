@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT \n            type,\n            COUNT(*)::int as \"count!\"\n        FROM user_activities\n        WHERE user_id = $1\n        GROUP BY type\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "type",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "count!",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      null
+    ]
+  },
+  "hash": "7779eddbe9857fd45b57e075e8732b7d9b9742f7f6a16b914e16cefacb9df8b0"
+}

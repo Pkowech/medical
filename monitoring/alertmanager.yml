@@ -1,0 +1,53 @@
+global:
+  # SMTP configuration — use environment variables in production
+  # Example: export ALERTMANAGER_SMTP_PASSWORD before running
+  # smtp_smarthost: '${ALERTMANAGER_SMTP_HOST:localhost:587}'
+  # smtp_from: '${ALERTMANAGER_SMTP_FROM:alerts@medtrack-hub.com}'
+  # smtp_auth_username: '${ALERTMANAGER_SMTP_USERNAME:}'
+  # smtp_auth_password: '${ALERTMANAGER_SMTP_PASSWORD:}'
+  resolve_timeout: 5m
+
+route:
+  group_by: ['alertname', 'severity']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 1h
+  receiver: 'default-receiver'
+
+receivers:
+  - name: 'default-receiver'
+    
+    # Webhook — update URL to your webhook service (e.g., custom alert handler)
+    webhook_configs:
+      - url: 'http://localhost:5001/webhooks/alerts'
+        send_resolved: true
+    
+    # Email configuration (uncomment and configure for production)
+    # email_configs:
+    #   - to: 'oncall@medtrack-hub.com'
+    #     from: 'alerts@medtrack-hub.com'
+    #     smarthost: 'smtp.gmail.com:587'
+    #     auth_username: 'alerts@medtrack-hub.com'
+    #     auth_password: '${ALERTMANAGER_SMTP_PASSWORD}'
+    #     require_tls: true
+
+    # Slack webhook (uncomment and add your URL for Slack integration)
+    # slack_configs:
+    #   - api_url: '${ALERTMANAGER_SLACK_WEBHOOK}'
+    #     channel: '#alerts'
+    #     title: 'MedTrack Hub Alert'
+    #     text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+
+    # Discord webhook (uncomment and add your URL for Discord integration)
+    # discord_configs:
+    #   - webhook_url: '${ALERTMANAGER_DISCORD_WEBHOOK}'
+    #     title: 'MedTrack Hub Alert'
+    #     message: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+
+inhibit_rules:
+  # Inhibit warning alerts when the same service/job is critical
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'instance', 'job']

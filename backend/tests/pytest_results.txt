@@ -1,0 +1,110 @@
+============================= test session starts =============================
+platform win32 -- Python 3.13.2, pytest-7.4.2, pluggy-1.6.0 -- C:\Python313\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\user\medical\backend
+plugins: anyio-4.9.0, Faker-37.11.0, cov-4.1.0
+collecting ... collected 85 items
+
+tests/test_auth.py::test_successful_login PASSED                         [  1%]
+tests/test_auth.py::test_login_with_incorrect_password PASSED            [  2%]
+tests/test_auth.py::test_logout PASSED                                   [  3%]
+tests/test_registration.py::test_get_own_profile PASSED                  [  4%]
+tests/test_registration.py::test_admin_can_list_all_users PASSED         [  5%]
+tests/test_registration.py::test_student_cannot_list_all_users PASSED    [  7%]
+tests/test_registration.py::test_admin_can_get_user_by_id PASSED         [  8%]
+tests/test_registration.py::test_student_cannot_get_user_by_id PASSED    [  9%]
+tests/test_registration.py::test_unauthorized_access_to_profile PASSED   [ 10%]
+tests/test_registration.py::test_user_can_update_own_profile PASSED      [ 11%]
+tests/test_registration.py::test_user_cannot_update_another_users_profile PASSED [ 12%]
+tests/test_registration.py::test_admin_can_update_any_user_profile PASSED [ 14%]
+tests/test_registration.py::test_admin_can_delete_user PASSED            [ 15%]
+tests/test_registration.py::test_student_cannot_delete_user PASSED       [ 16%]
+tests/test_permissions.py::test_admin_endpoint_access[admin-200] PASSED  [ 17%]
+tests/test_permissions.py::test_admin_endpoint_access[instructor-403] PASSED [ 18%]
+tests/test_permissions.py::test_admin_endpoint_access[student-403] PASSED [ 20%]
+tests/test_permissions.py::test_course_management_endpoint_access[admin-201] PASSED [ 21%]
+tests/test_permissions.py::test_course_management_endpoint_access[instructor-201] PASSED [ 22%]
+tests/test_permissions.py::test_course_management_endpoint_access[student-403] PASSED [ 23%]
+tests/test_permissions.py::test_unauthenticated_access_to_admin_endpoint PASSED [ 24%]
+tests/test_permissions.py::test_course_update_access[admin-200] PASSED   [ 25%]
+tests/test_permissions.py::test_course_update_access[instructor-200] PASSED [ 27%]
+tests/test_permissions.py::test_course_update_access[student-403] PASSED [ 28%]
+tests/test_permissions.py::test_course_delete_access[admin-204] PASSED   [ 29%]
+tests/test_permissions.py::test_course_delete_access[instructor-403] PASSED [ 30%]
+tests/test_permissions.py::test_course_delete_access[student-403] PASSED [ 31%]
+tests/test_permissions.py::test_study_group_management_access[admin-201] PASSED [ 32%]
+tests/test_permissions.py::test_study_group_management_access[instructor-201] PASSED [ 34%]
+tests/test_permissions.py::test_study_group_management_access[student-201] PASSED [ 35%]
+tests/test_permissions.py::test_study_group_management_access[moderator-201] PASSED [ 36%]
+tests/test_analytics.py::TestAnalyticsEvents::test_batch_events_submission PASSED [ 37%]
+tests/test_analytics.py::TestAnalyticsEvents::test_empty_batch_submission PASSED [ 38%]
+tests/test_analytics.py::TestAnalyticsEvents::test_batch_with_various_event_types PASSED [ 40%]
+tests/test_analytics.py::TestBKTModel::test_bkt_prediction_with_attempts PASSED [ 41%]
+tests/test_analytics.py::TestBKTModel::test_bkt_prediction_without_attempts PASSED [ 42%]
+tests/test_analytics.py::TestBKTModel::test_bkt_prediction_for_specific_topic PASSED [ 43%]
+tests/test_analytics.py::TestCacheInvalidation::test_cache_invalidation_after_event_tracking PASSED [ 44%]
+tests/test_analytics.py::TestCacheInvalidation::test_cache_invalidation_after_batch_event_tracking PASSED [ 45%]
+tests/test_analytics.py::TestRequestDeduplication::test_concurrent_recommendation_requests PASSED [ 47%]
+tests/test_analytics.py::TestRequestDeduplication::test_concurrent_performance_requests PASSED [ 48%]
+tests/test_analytics.py::TestUserAnalytics::test_get_user_analytics PASSED [ 49%]
+tests/test_analytics.py::TestUserAnalytics::test_get_user_performance_analytics PASSED [ 50%]
+tests/test_analytics.py::TestUserAnalytics::test_get_user_learning_patterns PASSED [ 51%]
+tests/test_analytics.py::TestUserAnalytics::test_get_user_predictions PASSED [ 52%]
+tests/test_analytics.py::TestUserAnalytics::test_get_user_engagement_metrics PASSED [ 54%]
+tests/test_analytics.py::TestPersonalAnalytics::test_get_own_analytics PASSED [ 55%]
+tests/test_analytics.py::TestPersonalAnalytics::test_get_own_performance PASSED [ 56%]
+tests/test_analytics.py::TestPersonalAnalytics::test_get_own_recommendations PASSED [ 57%]
+tests/test_analytics.py::TestAssessmentAnalytics::test_get_assessment_performance PASSED [ 58%]
+tests/test_analytics.py::TestAssessmentAnalytics::test_get_assessment_profile PASSED [ 60%]
+tests/test_analytics.py::TestAssessmentAnalytics::test_get_assessment_history PASSED [ 61%]
+tests/test_analytics.py::TestAssessmentAnalytics::test_get_category_breakdown PASSED [ 62%]
+tests/test_analytics.py::TestAIPredictions::test_get_assessment_predictions PASSED [ 63%]
+tests/test_analytics.py::TestAIPredictions::test_get_specific_assessment_prediction PASSED [ 64%]
+tests/test_analytics.py::TestRecommendationSystem::test_get_recommendations PASSED [ 65%]
+tests/test_analytics.py::TestRecommendationSystem::test_get_assessment_recommendations PASSED [ 67%]
+tests/test_analytics.py::TestAnalyticsAggregation::test_get_analytics_dashboard PASSED [ 68%]
+tests/test_analytics.py::TestAnalyticsAggregation::test_get_assessment_analytics PASSED [ 69%]
+tests/test_analytics.py::TestStudyResources::test_get_study_materials PASSED [ 70%]
+tests/test_analytics.py::TestStudyResources::test_get_next_steps PASSED  [ 71%]
+tests/test_analytics.py::TestStudyResources::test_get_resources_for_assessment PASSED [ 72%]
+tests/test_analytics.py::TestLearningPathAnalytics::test_get_learning_path_analytics PASSED [ 74%]
+tests/test_analytics.py::TestUserAnalyticsUnauthenticated::test_get_user_data_without_auth PASSED [ 75%]
+tests/test_analytics.py::TestUserAnalyticsUnauthenticated::test_get_personal_analytics_without_auth PASSED [ 76%]
+tests/test_analytics.py::TestUserAnalyticsUnauthenticated::test_batch_events_without_auth PASSED [ 77%]
+tests/test_analytics.py::TestAnalyticsDataIntegrity::test_multiple_batch_submissions PASSED [ 78%]
+tests/test_analytics.py::TestAnalyticsDataIntegrity::test_event_timestamp_validation PASSED [ 80%]
+tests/test_users.py::test_get_own_profile PASSED                         [ 81%]
+tests/test_users.py::test_admin_can_list_all_users PASSED                [ 82%]
+tests/test_users.py::test_student_cannot_list_all_users PASSED           [ 83%]
+tests/test_users.py::test_admin_can_get_user_by_id PASSED                [ 84%]
+tests/test_users.py::test_student_cannot_get_user_by_id PASSED           [ 85%]
+tests/test_users.py::test_unauthorized_access_to_profile PASSED          [ 87%]
+tests/test_users.py::test_user_can_update_own_profile PASSED             [ 88%]
+tests/test_users.py::test_user_cannot_update_another_users_profile PASSED [ 89%]
+tests/test_users.py::test_admin_can_update_any_user_profile PASSED       [ 90%]
+tests/test_users.py::test_admin_can_delete_user PASSED                   [ 91%]
+tests/test_users.py::test_student_cannot_delete_user PASSED              [ 92%]
+tests/tests_courses.py::test_get_all_courses_unauthenticated PASSED      [ 94%]
+tests/tests_courses.py::test_create_course PASSED                        [ 95%]
+tests/tests_courses.py::test_get_course_by_id PASSED                     [ 96%]
+tests/tests_courses.py::test_update_course PASSED                        [ 97%]
+tests/tests_courses.py::test_enroll_in_course FAILED                     [ 98%]
+tests/tests_courses.py::test_get_user_course_stats PASSED                [100%]
+
+================================== FAILURES ===================================
+____________________________ test_enroll_in_course ____________________________
+
+auth_headers = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwMzVlZjM1Zi02NjQ2LTQzNzAtYWVhZS1lZjBhMzg2ZDM...E3NjM5MDc3MDUsImV4cCI6MTc2Mzk5NDEwNX0.He3OeMm1-Rj0_fOCBxcST3nzcE3a49yh43uMEkgy-bM', 'Content-Type': 'application/json'}
+created_course_id = '3908e043-492b-4eb3-a123-386c287ee31f'
+
+    def test_enroll_in_course(auth_headers, created_course_id):
+        """Test enrolling a user in a course."""
+        response = requests.post(f"{BASE_URL}/courses/{created_course_id}/enroll", headers=auth_headers)
+>       assert response.status_code == 201
+E       assert 404 == 201
+E        +  where 404 = <Response [404]>.status_code
+
+tests\tests_courses.py:82: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/tests_courses.py::test_enroll_in_course - assert 404 == 201
+=================== 1 failed, 84 passed in 63.55s (0:01:03) ===================

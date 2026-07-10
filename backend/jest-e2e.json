@@ -1,0 +1,4 @@
+{
+  "extends": "./jest.config.js",
+  "testRegex": ".*\\.e2e-spec\\.ts$"
+}

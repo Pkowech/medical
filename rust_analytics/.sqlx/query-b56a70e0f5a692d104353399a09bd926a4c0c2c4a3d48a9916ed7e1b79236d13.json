@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT COUNT(*)::int as \"count!\"\n            FROM learning_path_progress\n            WHERE user_id = $1 AND status = 'completed'\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count!",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "b56a70e0f5a692d104353399a09bd926a4c0c2c4a3d48a9916ed7e1b79236d13"
+}

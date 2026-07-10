@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Icon Generator - MedTrack Hub</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .icon-preview {
+            display: inline-block;
+            margin: 10px;
+            text-align: center;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .icon-preview img {
+            display: block;
+            margin: 0 auto 10px;
+        }
+        canvas {
+            border: 1px solid #ccc;
+            margin: 5px;
+        }
+        button {
+            background: #4F46E5;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #3730A3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>MedTrack Hub Icon Generator</h1>
+        <p>This tool generates the required icon formats from SVG sources.</p>
+        
+        <div id="icons">
+            <div class="icon-preview">
+                <h3>Favicon 16x16</h3>
+                <canvas id="favicon16" width="16" height="16"></canvas>
+                <button onclick="downloadIcon('favicon16', 'favicon-16x16.png')">Download PNG</button>
+            </div>
+            
+            <div class="icon-preview">
+                <h3>Favicon 32x32</h3>
+                <canvas id="favicon32" width="32" height="32"></canvas>
+                <button onclick="downloadIcon('favicon32', 'favicon-32x32.png')">Download PNG</button>
+            </div>
+            
+            <div class="icon-preview">
+                <h3>Apple Touch Icon 180x180</h3>
+                <canvas id="apple180" width="180" height="180"></canvas>
+                <button onclick="downloadIcon('apple180', 'apple-touch-icon.png')">Download PNG</button>
+            </div>
+            
+            <div class="icon-preview">
+                <h3>OG Image 1200x630</h3>
+                <canvas id="og1200" width="300" height="157" style="width: 300px; height: 157px;"></canvas>
+                <button onclick="downloadIcon('og1200', 'og-image.png')">Download PNG</button>
+            </div>
+        </div>
+        
+        <div style="margin-top: 20px;">
+            <button onclick="generateAllIcons()">Generate All Icons</button>
+            <button onclick="downloadAllIcons()">Download All Icons</button>
+        </div>
+        
+        <div style="margin-top: 20px; padding: 15px; background: #f0f9ff; border-radius: 4px;">
+            <h3>Instructions:</h3>
+            <ol>
+                <li>Click "Generate All Icons" to create all required formats</li>
+                <li>Click individual "Download PNG" buttons to save each icon</li>
+                <li>Or click "Download All Icons" to download everything at once</li>
+                <li>Replace the generated files in your public directory</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        // SVG content for different icons
+        const svgContent = {
+            favicon: `<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                    <linearGradient id="faviconGradient" x1="50%" y1="0%" x2="50%" y2="100%">
+                        <stop stop-color="#4F46E5" offset="0%"></stop>
+                        <stop stop-color="#2563EB" offset="100%"></stop>
+                    </linearGradient>
+                </defs>
+                <rect fill="url(#faviconGradient)" x="0" y="0" width="32" height="32" rx="6"></rect>
+                <path d="M14,8 L18,8 L18,14 L24,14 L24,18 L18,18 L18,24 L14,24 L14,18 L8,18 L8,14 L14,14 L14,8 Z" fill="#FFFFFF"></path>
+            </svg>`,
+            
+            apple: `<svg width="180" height="180" viewBox="0 0 180 180" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                    <linearGradient id="appleGradient" x1="50%" y1="0%" x2="50%" y2="100%">
+                        <stop stop-color="#4F46E5" offset="0%"></stop>
+                        <stop stop-color="#2563EB" offset="100%"></stop>
+                    </linearGradient>
+                </defs>
+                <rect fill="url(#appleGradient)" x="0" y="0" width="180" height="180" rx="40"></rect>
+                <path d="M70,60 L110,60 L110,70 L120,70 L120,110 L110,110 L110,120 L70,120 L70,110 L60,110 L60,70 L70,70 L70,60 Z" fill="#FFFFFF"></path>
+            </svg>`,
+            
+            og: `<svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                    <linearGradient id="ogGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop stop-color="#4F46E5" offset="0%"></stop>
+                        <stop stop-color="#2563EB" offset="50%"></stop>
+                        <stop stop-color="#1E40AF" offset="100%"></stop>
+                    </linearGradient>
+                </defs>
+                <rect fill="url(#ogGradient)" x="0" y="0" width="1200" height="630"></rect>
+                <rect fill="#FFFFFF" x="100" y="150" width="80" height="80" rx="16"></rect>
+                <path d="M135,170 L145,170 L145,185 L160,185 L160,195 L145,195 L145,210 L135,210 L135,195 L120,195 L120,185 L135,185 L135,170 Z" fill="#4F46E5"></path>
+                <text x="220" y="210" font-family="Arial" font-size="72" font-weight="bold" fill="#FFFFFF">MedTrack Hub</text>
+                <text x="220" y="270" font-family="Arial" font-size="36" fill="#E5E7EB">Medical Learning Platform</text>
+                <text x="220" y="320" font-family="Arial" font-size="24" fill="#D1D5DB">Track your medical study progress, assess your readiness, and stay ahead.</text>
+            </svg>`
+        };
+
+        function svgToCanvas(svgString, canvas, callback) {
+            const img = new Image();
+            const svg = new Blob([svgString], {type: 'image/svg+xml'});
+            const url = URL.createObjectURL(svg);
+            
+            img.onload = function() {
+                const ctx = canvas.getContext('2d');
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                URL.revokeObjectURL(url);
+                if (callback) callback();
+            };
+            
+            img.src = url;
+        }
+
+        function downloadIcon(canvasId, filename) {
+            const canvas = document.getElementById(canvasId);
+            const link = document.createElement('a');
+            link.download = filename;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        }
+
+        function generateAllIcons() {
+            // Generate favicon 16x16
+            svgToCanvas(svgContent.favicon, document.getElementById('favicon16'));
+            
+            // Generate favicon 32x32
+            svgToCanvas(svgContent.favicon, document.getElementById('favicon32'));
+            
+            // Generate apple touch icon
+            svgToCanvas(svgContent.apple, document.getElementById('apple180'));
+            
+            // Generate OG image (scaled down for preview)
+            svgToCanvas(svgContent.og, document.getElementById('og1200'));
+        }
+
+        function downloadAllIcons() {
+            setTimeout(() => downloadIcon('favicon16', 'favicon-16x16.png'), 100);
+            setTimeout(() => downloadIcon('favicon32', 'favicon-32x32.png'), 200);
+            setTimeout(() => downloadIcon('apple180', 'apple-touch-icon.png'), 300);
+            setTimeout(() => downloadIcon('og1200', 'og-image.png'), 400);
+        }
+
+        // Generate icons on page load
+        window.onload = function() {
+            generateAllIcons();
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT percentage as \"percentage!\"\n        FROM quiz_attempts\n        WHERE user_id = $1\n        AND completed_at IS NOT NULL\n        ORDER BY completed_at DESC\n        LIMIT 10\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "percentage!",
+        "type_info": "Float8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "17579b492a097b37fa95ecee4c526adb326d4c7cf184c9e395b4ffc5edeb9d30"
+}

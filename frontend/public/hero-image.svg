@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="800px" height="400px" viewBox="0 0 800 400" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>Medical Study Hero</title>
+    <defs>
+        <linearGradient x1="50%" y1="0%" x2="50%" y2="100%" id="linearGradient-1">
+            <stop stop-color="#4F46E5" offset="0%"></stop>
+            <stop stop-color="#2563EB" offset="100%"></stop>
+        </linearGradient>
+    </defs>
+    <g id="Medical-Study-Hero" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <rect fill="#F9FAFB" x="0" y="0" width="800" height="400"></rect>
+        <g id="Background" transform="translate(0.000000, 50.000000)">
+            <path d="M0,0 L800,0 L800,300 C600,350 400,350 200,300 C66.6666667,266.666667 0,250 0,250 L0,0 Z" id="Path" fill="url(#linearGradient-1)" opacity="0.1"></path>
+        </g>
+        <g id="Medical-Icons" transform="translate(100.000000, 100.000000)" fill="#4F46E5" opacity="0.7">
+            <path d="M120,40 L140,40 L140,60 L160,60 L160,80 L140,80 L140,100 L120,100 L120,80 L100,80 L100,60 L120,60 L120,40 Z" id="Plus" opacity="0.2"></path>
+            <circle id="Circle" opacity="0.2" cx="300" cy="70" r="40"></circle>
+            <rect id="Rectangle" opacity="0.2" x="400" y="40" width="80" height="60" rx="8"></rect>
+            <path d="M550,40 L590,40 L590,100 L550,100 C544.477153,100 540,95.5228475 540,90 L540,50 C540,44.4771525 544.477153,40 550,40 Z" id="Rectangle" opacity="0.2"></path>
+            <path d="M200,140 L240,140 L240,200 L200,200 C194.477153,200 190,195.522847 190,190 L190,150 C190,144.477153 194.477153,140 200,140 Z" id="Rectangle" opacity="0.2" transform="translate(215.000000, 170.000000) rotate(-270.000000) translate(-215.000000, -170.000000) "></path>
+            <rect id="Rectangle" opacity="0.2" x="300" y="140" width="80" height="60" rx="8"></rect>
+            <circle id="Circle" opacity="0.2" cx="450" cy="170" r="40"></circle>
+            <path d="M520,140 L540,140 L540,160 L560,160 L560,180 L540,180 L540,200 L520,200 L520,180 L500,180 L500,160 L520,160 L520,140 Z" id="Plus" opacity="0.2"></path>
+        </g>
+        <g id="Stethoscope" transform="translate(600.000000, 150.000000)" stroke="#4F46E5" stroke-linecap="round" stroke-linejoin="round" stroke-width="4">
+            <path d="M40,80 C40,91.045695 31.045695,100 20,100 C8.954305,100 0,91.045695 0,80 C0,68.954305 8.954305,60 20,60" id="Path"></path>
+            <path d="M40,20 L40,80" id="Path"></path>
+            <path d="M20,60 L20,20" id="Path"></path>
+            <path d="M20,20 C20,8.954305 28.954305,0 40,0 C51.045695,0 60,8.954305 60,20 C60,31.045695 51.045695,40 40,40 L40,20" id="Path"></path>
+        </g>
+    </g>
+</svg>

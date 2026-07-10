@@ -1,0 +1,20 @@
+export const ASSESSMENT_CACHE_TTL = 3600; // 1 hour
+export const QUIZ_CACHE_TTL = 1800; // 30 minutes
+export const FLASHCARD_CACHE_TTL = 3600; // 1 hour
+export const ANALYTICS_CACHE_TTL = 1800; // 30 minutes
+export const RECOMMENDATION_CACHE_TTL = 86400; // 24 hours
+
+export const QUIZ_DEFAULT_MAX_ATTEMPTS = 3;
+export const QUIZ_DEFAULT_PASSING_SCORE = 70;
+export const QUIZ_DEFAULT_TIME_LIMIT = 3600; // 1 hour
+
+export const ADAPTIVE_QUIZ_MIN_QUESTIONS = 10;
+export const ADAPTIVE_QUIZ_MAX_QUESTIONS = 30;
+export const ADAPTIVE_QUIZ_TARGET_PRECISION = 0.1;
+
+export const FLASHCARD_INITIAL_EASE = 2.5;
+export const FLASHCARD_MIN_INTERVAL = 1;
+export const FLASHCARD_MAX_INTERVAL = 365;
+
+export const PERFORMANCE_ANALYSIS_RECENT_DAYS = 30;
+export const PERFORMANCE_ANALYSIS_MIN_ATTEMPTS = 5;

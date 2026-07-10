@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT COUNT(DISTINCT DATE(created_at))::int as \"count!\"\n        FROM user_activities\n        WHERE user_id = $1\n        AND created_at >= NOW() - INTERVAL '30 days'\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count!",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "408cbdbd9494dfe72e369c0c028949850b14407cba1f0cee69aa53e178cac7ec"
+}

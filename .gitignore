@@ -1,0 +1,228 @@
+# 🔐 SECURITY: Environment files with secrets
+.env
+.env.*
+!.env.example
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+backend/.env
+backend/.env.*
+backend/python_analytics/.env
+backend/python_analytics/.env.*
+
+# 🔑 Secret and credential files
+secrets/
+credentials/
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+config/secrets.json
+config/credentials.json
+
+# 📊 Logs and temporary files
+logs/
+*.log
+*.log.*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+.vs
+history/
+# 🗃️ Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# 📁 Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+.nyc_output
+
+# 🔧 Dependency directories
+node_modules/
+jspm_packages/
+
+# 🚀 Build outputs
+dist/
+build/
+.next/
+out/
+.nuxt/
+.vuepress/dist/
+.serverless/
+
+# 💾 Cache directories
+.npm
+.eslintcache
+.parcel-cache
+.cache/
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+# 🐍 Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+develop-eggs/
+downloads/
+eggs/
+.eggs/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.hypothesis/
+
+# 🐍 Python virtual environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+backend/python_analytics/venv/
+
+# 💻 IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# 🖥️ OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# 🔄 Version control
+.git/
+.svn/
+.hg/
+
+# 📦 Package manager files
+package-lock.json
+yarn.lock
+# pnpm-lock.yaml - Keep this for reproducible builds
+.pnpm-store/
+
+# 🐳 Docker
+.docker/
+docker-compose.override.yml
+
+# ☁️ Cloud and deployment
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+
+# 📱 Mobile
+*.ipa
+*.apk
+*.aab
+
+# 🧪 Testing
+.jest/
+test-results/
+playwright-report/
+test-results.xml
+
+# 📈 Monitoring and analytics
+.sentry-native/
+newrelic_agent.log
+
+# 🦀 Rust
+rust_analytics/.vs/
+rust_analytics/target/
+
+# 🔧 Tool-specific
+.eslintcache
+.stylelintcache
+.sass-cache/
+.connect.lock
+.typings/
+
+# 📄 Documentation builds
+docs/_build/
+site/
+
+# 🎯 Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+
+# 🔐 Backup files
+*.bak
+*.backup
+*.old
+
+# 📊 Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# 🎨 Media files (if not needed in repo)
+uploads/
+media/
+static/uploads/
+
+# 🏗️ Build tools
+.grunt/
+.gulp/
+.webpack/
+
+# 📱 React Native
+.expo/
+.expo-shared/
+
+# 🎮 Game development
+*.unity
+*.unitypackage
+
+# 📊 Analytics and tracking
+.vercel
+.netlify/
+
+# 🔍 Search indices
+.searchindex
+
+# 🎯 Specific to this project
+DOCKER_SETUP_COMPLETE.md
+backend/dist/
+frontend/.next/
+backend/python_analytics/__pycache__/
+backend/python_analytics/.pytest_cache/
+
+# 📄 PDFs
+# Ignore PDF files across the repository and common seed PDF directories
+*.pdf
+seed-data/pdfs/
+backend/seed-data/pdfs/
+rust_analytics/seed-data/pdfs/

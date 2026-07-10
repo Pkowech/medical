@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT \n            learning_path_id as \"item_id!\",\n            COUNT(*)::int as \"completion_count!\",\n            AVG(overall_progress_percentage)::float8 as \"avg_score!\",\n            AVG(total_time_spent_minutes)::float8 as \"avg_time!\"\n        FROM learning_path_progress\n        WHERE user_id = ANY($1)\n        AND status = 'completed'\n        GROUP BY learning_path_id\n        HAVING COUNT(*) >= 2\n        ORDER BY COUNT(*) DESC\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "item_id!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "completion_count!",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 2,
+        "name": "avg_score!",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 3,
+        "name": "avg_time!",
+        "type_info": "Float8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "TextArray"
+      ]
+    },
+    "nullable": [
+      false,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "9cc16eb7989f64bf27a62a9e3c58bc67ad34dda1f401a2504b8bd14407bd9386"
+}
