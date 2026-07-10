@@ -1,25 +1,7 @@
 import { apiService } from '@/features/auth/services/apiClient';
+import type { CourseUnit } from '@/shared/types/courseInterface';
 
-export interface Topic {
-  id: string;
-  unitId: string;
-  title: string;
-  description?: string;
-  orderIndex: number;
-  isMandatory?: boolean;
-  status?: 'active' | 'inactive';
-}
-
-export interface Unit {
-  id: string;
-  courseId: string;
-  title: string;
-  description?: string;
-  orderIndex: number;
-  status?: 'active' | 'inactive';
-  estimatedHours?: number;
-  topics?: Topic[];
-}
+export type Unit = CourseUnit;
 
 class UnitService {
   private readonly baseUrl = '/units';

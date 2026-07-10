@@ -5,7 +5,7 @@ import { RateLimitInfo } from '@/shared/components/layout/RateLimitInfo';
 import { useRateLimit } from '@/shared/hooks/useRateLimit';
 
 export const LoginForm: React.FC = () => {
-  const { signIn } = useAuth();
+  const { login } = useAuth();
   const { checkLimit } = useRateLimit();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -25,11 +25,7 @@ export const LoginForm: React.FC = () => {
         return;
       }
 
-      const result = await signIn('credentials', {
-        redirect: false,
-        identifier: email,
-        password,
-      });
+      const result = await login(email, password);
 
       if (result?.error) {
         setError(result.error);

@@ -1,9 +1,7 @@
-import { AxiosError } from 'axios';
-import { signIn, signOut } from 'next-auth/react';
+import { signIn, signOut, type SignInResponse } from 'next-auth/react';
 import { apiService } from '@/features/auth/services/apiClient'; // Use the centralized apiClient
 import { useAuthStore } from '@/features/auth/store/useAuthStore'; // Import useAuthStore
 import {
-  LoginResponse,
   LoginDTO,
   RegisterResponse,
   RegisterDTO,
@@ -60,39 +58,22 @@ class AuthService {
   //   // Similar interceptor setup for unauthenticatedAxiosInstance if needed
   // }
 
-  async login(credentials: LoginDTO): Promise<LoginResponse> {
+  async login(credentials: LoginDTO): Promise<SignInResponse | undefined> {
     try {
-      // First, call backend login endpoint directly
-      const response = await apiService.post<LoginResponse>('/auth/login', {
-        ...credentials,
-        identifier: credentials.identifier || credentials.email,
-      });
-
-      if (!response?.data) {
-        throw new Error('Login failed: No response data');
-      }
-
-      // Then establish the NextAuth session
+      const identifier = credentials.identifier || credentials.email;
       const result = await signIn('credentials', {
-        identifier: credentials.identifier || credentials.email,
+        identifier,
         password: credentials.password,
         redirect: false,
       });
 
       if (result?.error) {
         console.error('[AuthService] NextAuth signIn failed:', result.error);
-        throw new Error(result.error);
       }
 
-      // Session will be synced to Zustand by AuthSynchronizer component on mount
-      // No need to verify here
-
-      return response.data;
+      return result;
     } catch (error) {
       console.error('[AuthService] Login error:', error);
-      if (error instanceof AxiosError) {
-        throw new Error(error.response?.data?.message || 'Login failed');
-      }
       throw error;
     }
   }

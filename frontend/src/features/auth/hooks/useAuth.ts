@@ -12,9 +12,9 @@ export const useAuth = () => {
 
   // Wrap authService methods so callers can use a single hook
   const login = async (identifier: string, password: string) => {
-    // Use the signIn function from next-auth/react to trigger the credentials provider flow.
-    return signIn('credentials', {
+    return authService.login({
       identifier,
+      email: identifier,
       password,
     });
   };

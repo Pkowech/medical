@@ -1,8 +1,5 @@
 import { Role } from '@/shared/enums/role.enum'; // Import Role as a type
 import { Permission } from '@/lib/auth/roles'; // Import canonical Permission enum
-import type { Session as NextAuthSession } from 'next-auth';
-import { AppRouterInstance } from 'next/dist/shared/lib/app-router-context.shared-runtime';
-import type { RoleEntity } from '@/shared/types/systemInterface';
 import type { UserEducationProfile, Education, Certification, SocialLink } from './profileInterface';
 
 // Define BaseEntity directly
@@ -42,20 +39,6 @@ export interface AuthFormData {
   specialization?: string;
   yearOfExperience?: number | string;
 }
-
-export interface AuthFormErrors {
-  email?: string;
-  username?: string;
-  firstName?: string;
-  lastName?: string;
-  password?: string;
-  confirmPassword?: string;
-  acceptTerms?: string;
-}
-
-// Keep old names for backwards compatibility (deprecated)
-export type FormData = AuthFormData;
-export type FormErrors = AuthFormErrors;
 
 /**
  * Core User types with inheritance hierarchy
@@ -130,21 +113,6 @@ export interface NotificationPreferences {
   reminders: boolean;
 }
 
-export interface DeviceInfo {
-  name?: string;
-  userAgent: string;
-  platform: string;
-  language: string;
-}
-
-export interface Session extends BaseEntity {
-  userId: string;
-  deviceInfo: DeviceInfo;
-  lastActive: string;
-  location?: string;
-  isCurrentSession: boolean;
-}
-
 export interface PrivacySettings {
   profileVisibility: 'public' | 'private' | 'friends';
   showEmail: boolean;
@@ -191,27 +159,6 @@ export interface RegisterDTO extends AuthRequestBase {
   location?: string;
   specialization?: string;
   yearOfExperience?: number;
-}
-
-// Password management DTOs
-export interface PasswordRequestDTO {
-  email: string;
-}
-
-export interface ResetPasswordDTO {
-  token: string;
-  password: string;
-  confirmPassword: string;
-}
-
-export interface ChangePasswordDTO {
-  currentPassword: string;
-  newPassword: string;
-  confirmPassword: string;
-}
-
-export interface VerifyEmailDTO {
-  token: string;
 }
 
 /**
@@ -261,46 +208,6 @@ export interface RegisterResponse {
   refresh_token?: string;
 }
 
-// Token refresh response
-export interface RefreshTokenResponse {
-  token: string;
-}
-
-/**
- * Auth Context and Hook Types
- */
-
-// Auth context type with all available actions
-export interface AuthContextType {
-  user: User | null;
-  isAuthenticated: boolean;
-  isLoading: boolean;
-  error: string | null;
-
-  // Authentication methods
-  login: (credentials: LoginDTO) => Promise<void>;
-  register: (data: RegisterDTO) => Promise<void>;
-  logout: () => Promise<void>;
-  refreshToken: () => Promise<void>;
-
-  // Profile management
-  updateProfile: (data: Partial<User>) => Promise<void>;
-
-  // Password and verification
-  changePassword: (data: ChangePasswordDTO) => Promise<void>;
-  forgotPassword: (data: PasswordRequestDTO) => Promise<void>;
-  resetPassword: (data: ResetPasswordDTO) => Promise<void>;
-  verifyEmail: (data: VerifyEmailDTO) => Promise<void>;
-
-  clearError: () => void;
-}
-
-// Extended auth hook type with additional helper methods
-export interface UseAuthReturn extends AuthContextType {
-  hasPermission: (permission: Permission) => boolean;
-  hasRole: (role: UserRole) => boolean;
-  isRole: (role: UserRole) => boolean;
-}
 /**
  * RBAC and Roles related interfaces
  */
@@ -356,104 +263,3 @@ export interface UserSessionData {
 }
 
 export type GetSessionsResponse = UserSessionData[];
-
-/**
- * User progress and engagement metrics
- */
-export interface UserProgress {
-  completedCourses: number;
-  totalCourses: number;
-  studyStreak: number;
-}
-
-/**
- * Activity tracking for user engagement
- */
-export interface AuthUserActivity {
-  id: string;
-  date: string;
-  type: string;
-  durationMinutes?: number;
-  score?: number;
-  title?: string;
-  description?: string;
-}
-
-/**
- * ============================================================================
- * Dashboard and UI Component Types
- * ============================================================================
- */
-
-/**
- * Dashboard widget configuration
- */
-export interface Widget {
-  id: string;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  component: string;
-}
-
-// StatCardProps removed - moved to uiInterface.ts
-
-/**
- * Medical education dashboard data structure
- */
-export interface MedicalDashboardData {
-  progressData: { month: string; hours: number; score: number }[];
-  courseData: { name: string; completed: number; total: number }[];
-  upcomingDeadlines: { id: number; title: string; date: string; priority: string }[];
-  recentActivity: AuthUserActivity[];
-  stats: {
-    totalCourses: number;
-    coursesCompleted: number;
-    overallProgress: number;
-    averageScore: number;
-    streak: number;
-    lastActivity: string | null;
-  };
-}
-
-/**
- * Medical education dashboard component props
- */
-export interface MedicalEducationDashboardProps {
-  session: NextAuthSession | null;
-  router: AppRouterInstance;
-}
-
-/**
- * Role response from API
- */
-export interface RoleResponse {
-  data: RoleEntity;
-  success: boolean;
-}
-
-/**
- * Roles list response from API
- */
-export interface RolesListResponse {
-  data: RoleEntity[];
-  success: boolean;
-}
-
-/**
- * User permissions with role context
- */
-export interface UserPermissions {
-  role: RoleEntity;
-  permissions: string[];
-}
-
-/**
- * Permission object for API responses
- */
-export interface PermissionObject {
-  id: string;
-  action: string;
-  subject: string;
-}

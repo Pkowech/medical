@@ -24,6 +24,16 @@ function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
+  // Guards against submitting the raw HTML form (native GET, which would put
+  // the password in the URL/history/server logs) before React has hydrated
+  // and attached the real onSubmit handler. Next.js dev-mode compiles can
+  // take tens of seconds on first hit, leaving a window where the form is
+  // visible but not yet interactive-safe.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated) {
@@ -231,7 +241,16 @@ function LoginContent() {
           </div>
         )}
 
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+        {/*
+          method="post" is a deliberate safeguard: if this form is ever
+          submitted natively (e.g. before React hydration completes, or if
+          JS fails to load), credentials go out as a POST body instead of a
+          GET query string. That keeps them out of the URL bar, browser
+          history, Referer headers, and server access logs. The real submit
+          path is still the onSubmit handler below, which preventDefaults
+          and hands off to NextAuth's signIn().
+        */}
+        <form className="mt-8 space-y-6" method="post" onSubmit={handleSubmit}>
           <div className="rounded-md shadow-sm space-y-4">
             <div>
               <label htmlFor="identifier" className="block text-sm font-medium text-gray-700 mb-1">
@@ -350,14 +369,17 @@ function LoginContent() {
           <div>
             <button
               type="submit"
-              disabled={loading}
+              // Disabled until hydration completes so a pre-hydration click
+              // can't fall through to a native form submission.
+              disabled={loading || !mounted}
+              title={!mounted ? 'Page is still loading…' : undefined}
               className={`group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
-                loading ? 'opacity-50 cursor-not-allowed' : ''
+                loading || !mounted ? 'opacity-50 cursor-not-allowed' : ''
               }`}
             >
               <>
-                {loading && <FaSpinner className="animate-spin mr-2" />}
-                Sign in
+                {(loading || !mounted) && <FaSpinner className="animate-spin mr-2" />}
+                {mounted ? 'Sign in' : 'Loading…'}
               </>
             </button>
           </div>

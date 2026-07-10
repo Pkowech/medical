@@ -19,9 +19,6 @@ export type {
   AuthFormData,
   Permission,
   UserMinimal,
-  UseAuthReturn,
-  AuthContextType,
-  // Authentication DTOs
   LoginDTO,
   RegisterDTO,
   // Authentication Responses
@@ -32,23 +29,9 @@ export type {
   UsersListResponse,
   UserSessionData,
   GetSessionsResponse,
-  // Dashboard types
-  Widget,
-  MedicalDashboardData,
-  MedicalEducationDashboardProps,
-  // RBAC types
-  RoleResponse,
-  RolesListResponse,
-  UserPermissions,
-  PermissionObject,
-  // Tracking
-  AuthUserActivity,
-  UserProgress,
 } from './authInterface';
 
 // Backward compatibility aliases
-export type { FormData } from './authInterface'; // Deprecated: use AuthFormData
-
 // --- User & Profile Types (Consolidated in profileInterface.ts) ---
 export type {
   // Profile Statistics & Activity

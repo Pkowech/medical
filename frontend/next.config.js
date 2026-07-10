@@ -117,7 +117,7 @@ const withPWA = initializePWA();
  */
 const setupWebpackAliases = config => {
   config.resolve.alias['@'] = path.join(__dirname, 'src');
-  
+
   // Shim canvas for client-side bundling (used by pdf-parse/pdfjs-dist)
   const canvasShim = path.join(__dirname, 'src', 'shims', 'canvas-shim.ts');
   config.resolve.alias['canvas'] = canvasShim;
@@ -238,23 +238,23 @@ const getSecurityHeaders = () => [
 // ============================================================================
 
 /**
- * Configure API rewrites to backend
- * Keeps NextAuth routes local while proxying other APIs
+ * Configure API rewrites to backend.
+ *
+ * IMPORTANT: NextAuth's routes (app/api/auth/[...nextauth]/route.ts) are a
+ * dynamic catch-all. Next.js only resolves dynamic app routes AFTER
+ * `afterFiles` rewrites have run, so a plain array here (which Next.js
+ * treats as `afterFiles`) can shadow NextAuth entirely if the catch-all
+ * `/api/:path*` -> backend rule matches first. A same-path "no-op" rewrite
+ * (source === destination) does NOT reliably stop evaluation of later rules,
+ * so `/api/auth/session` etc. was falling through to the backend and 404ing.
+ *
+ * Fix: exclude the `auth` segment directly in the catch-all's regex so
+ * there's no dependency on rule ordering.
  */
 const getApiRewrites = () => [
   {
-    // Preserve NextAuth routes on the frontend so /api/auth/session and /api/auth/csrf stay local.
-    source: '/api/auth',
-    destination: '/api/auth',
-  },
-  {
-    // Preserve NextAuth routes on the frontend so /api/auth/session and /api/auth/csrf stay local.
-    source: '/api/auth/:path*',
-    destination: '/api/auth/:path*',
-  },
-  {
-    // Proxy all other API requests to backend (legacy /api prefix)
-    source: '/api/:path*',
+    // Proxy all /api requests EXCEPT /api/auth/* (NextAuth stays local)
+    source: '/api/:path((?!auth).*)',
     destination: `${BACKEND_URL}/v1/:path*`,
   },
   {

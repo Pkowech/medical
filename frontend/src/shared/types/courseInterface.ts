@@ -75,33 +75,31 @@ export interface Prerequisites {
   prerequisiteCourses: PrerequisiteCourse[];
 }
 
-export interface CourseModule extends BaseEntity {
-  title: string;
-  description: string;
-  order: number;
-  duration: number;
-  isCompleted?: boolean;
-  lessons: Lesson[];
-}
-
 export interface Topic {
   id: string;
-  name: string;
+  unitId?: string;
+  courseId?: string;
+  title: string;
+  name?: string;
   description?: string;
-  order: number;
+  order?: number;
+  orderIndex?: number;
   estimatedMinutes?: number;
   isMandatory?: boolean;
+  status?: 'active' | 'inactive';
   isCompleted?: boolean;
   materials?: Material[];
   quizzes?: any[];
 }
 
-export interface CourseUnit {
+export interface CourseUnit extends BaseEntity {
   id: string;
+  courseId?: string;
   title: string;
   name?: string;
   description?: string;
-  order: number;
+  order?: number;
+  orderIndex?: number;
   estimatedMinutes?: number;
   duration?: number;
   isCompleted?: boolean;
@@ -110,6 +108,17 @@ export interface CourseUnit {
   materials?: Material[];
   topics?: Topic[];
   learningObjectives?: string[];
+  status?: 'active' | 'inactive';
+  estimatedHours?: number;
+}
+
+export interface CourseModule extends BaseEntity {
+  title: string;
+  description: string;
+  order: number;
+  duration: number;
+  isCompleted?: boolean;
+  lessons: Lesson[];
 }
 
 export interface Lesson extends BaseEntity {

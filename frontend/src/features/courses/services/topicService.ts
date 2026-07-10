@@ -1,22 +1,10 @@
 import { apiService } from '@/features/auth/services/apiClient';
+import type { Topic as SharedTopic } from '@/shared/types/courseInterface';
+import type { Material as SharedMaterial } from '@/shared/types/materialInterface';
 
-export interface Topic {
-  id: string;
-  unitId: string;
-  courseId?: string;
-  title: string;
-  description?: string;
-  orderIndex: number;
-  isMandatory?: boolean;
-  status?: 'active' | 'inactive';
-  materials?: Material[];
-}
-
-export interface Material {
-  id: string;
+export type Topic = SharedTopic;
+export interface Material extends SharedMaterial {
   topicId?: string;
-  title: string;
-  type?: string;
 }
 
 class TopicService {

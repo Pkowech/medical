@@ -1,7 +1,7 @@
 'use client';
 
-import ClinicalCasesDashboard from '@/features/clinical-cases/components/clinical-cases-dashboard';
+import { InteractiveCaseInterface } from '@/features/assessment/components/clinical-cases/InteractiveCaseInterface';
 
 export default function ClinicalCasesPage() {
-  return <ClinicalCasesDashboard />;
+  return <InteractiveCaseInterface caseId="demo" />;
 }

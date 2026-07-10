@@ -13,7 +13,7 @@ const origLogger = nestCommon.Logger;
 });
 
 try {
-  require('./dist/main');
+  require('./dist/src/main');
 } catch (e) {
   // Ensure any synchronous errors are visible
   // eslint-disable-next-line no-console
