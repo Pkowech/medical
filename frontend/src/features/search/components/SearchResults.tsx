@@ -46,7 +46,7 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
     }
   };
 
-  const handleListKeyDown = (e: React.KeyboardEvent<HTMLUListElement>) => {
+  const handleListKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       const next = focusedIndex === null ? 0 : Math.min(results.length - 1, focusedIndex + 1);

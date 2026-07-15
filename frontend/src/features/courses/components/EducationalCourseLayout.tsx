@@ -217,7 +217,7 @@ export const EducationalCourseLayout = ({ courseId: propCourseId }: EducationalC
           sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         )}>
           <CourseSidebar
-            chapters={courseData.chapters}
+            chapters={courseData.chapters || []}
             resources={sidebarResources}
             currentChapterIndex={currentChapterIndex}
             currentLessonIndex={currentLessonIndex}

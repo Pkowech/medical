@@ -70,6 +70,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
     }
 
     const isCoursePage = pathname?.startsWith('/courses/') && pathname !== '/courses';
+    const isMaterialViewPage = pathname?.startsWith('/study-planner/materials/');
+    const isFullHeightPage = isCoursePage || isMaterialViewPage;
 
     return (
         <>
@@ -83,7 +85,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
             )}
 
             <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
-                {!isCoursePage && <Sidebar theme={colorScheme} user={user} navigationItems={navigationItems} />}
+                {!isFullHeightPage && <Sidebar theme={colorScheme} user={user} navigationItems={navigationItems} />}
 
                 {/* Main app column (center) */}
                 <div className="flex-1 flex flex-col overflow-hidden">
@@ -103,17 +105,17 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                     />
 
                     {/* content area */}
-                    <div className={cn("flex-1", !isCoursePage && "overflow-auto")}>
+                    <div className={cn("flex-1", !isFullHeightPage && "overflow-auto")}>
                         <div
                             className={cn(
                                 `w-full transition-all duration-300 pt-0`,
-                                !isCoursePage && "px-3 sm:px-4 md:px-6 lg:px-8 py-4 lg:py-6",
-                                isCoursePage && "h-full flex flex-col",
-                                sidebarOpen && !isCoursePage && 'lg:pl-0'
+                                !isFullHeightPage && "px-3 sm:px-4 md:px-6 lg:px-8 py-4 lg:py-6",
+                                isFullHeightPage && "h-full flex flex-col",
+                                sidebarOpen && !isFullHeightPage && 'lg:pl-0'
                             )}
                         >
-                            <main className={cn('flex-1 py-2 transition-all duration-300 min-w-0', isCoursePage && 'py-0 h-full')}>
-                                <div className={cn("space-y-6", isCoursePage && "space-y-0 h-full")}>
+                            <main className={cn('flex-1 py-2 transition-all duration-300 min-w-0', isFullHeightPage && 'py-0 h-full')}>
+                                <div className={cn("space-y-6", isFullHeightPage && "space-y-0 h-full")}>
                                     <Suspense fallback={<LoadingSpinner />}>{children}</Suspense>
                                 </div>
                             </main>

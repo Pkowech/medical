@@ -82,3 +82,18 @@ export interface AdaptiveQuizProps {
   unitId?: string;
   onComplete?: (session: QuizSession) => void;
 }
+
+export interface QuizCompletionEvent {
+  userId: string;
+  topicId: string;
+  unitId: string;
+  courseId: string;
+  score: number;
+  timestamp: number;
+}
+
+export interface IntegrationEventEmitter {
+  on(event: string, listener: (...args: unknown[]) => void): void;
+  emit(event: string, ...args: unknown[]): void;
+  off(event: string, listener: (...args: unknown[]) => void): void;
+}

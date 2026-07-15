@@ -179,10 +179,16 @@ export class MaterialsService {
 
     try {
       // Security check: ensure the file is within the allowed storage path
-      const resolvedPath = path.resolve(this.localStoragePath, filePath);
       const resolvedStoragePath = path.resolve(this.localStoragePath);
+      const resolvedPath = path.resolve(resolvedStoragePath, filePath);
+      const relativeToStorage = path.relative(resolvedStoragePath, resolvedPath);
 
-      if (!resolvedPath.startsWith(resolvedStoragePath)) {
+      if (
+        !(
+          relativeToStorage === '' ||
+          (!relativeToStorage.startsWith('..') && !path.isAbsolute(relativeToStorage))
+        )
+      ) {
         throw new ForbiddenException(
           'Access to file outside storage directory is not allowed',
         );
@@ -260,11 +266,17 @@ export class MaterialsService {
     try {
       const dirPath = path.join(this.localStoragePath, relativePath);
 
-      // Security check
-      const resolvedPath = path.resolve(dirPath);
+      // Security check: ensure requested directory is inside storage path
       const resolvedStoragePath = path.resolve(this.localStoragePath);
+      const resolvedPath = path.resolve(dirPath);
+      const relativeToStorage = path.relative(resolvedStoragePath, resolvedPath);
 
-      if (!resolvedPath.startsWith(resolvedStoragePath)) {
+      if (
+        !(
+          relativeToStorage === '' ||
+          (!relativeToStorage.startsWith('..') && !path.isAbsolute(relativeToStorage))
+        )
+      ) {
         throw new ForbiddenException(
           'Access outside storage directory is not allowed',
         );
@@ -607,6 +619,10 @@ export class MaterialsService {
 
       const allowedMimeTypes = [
         'application/pdf',
+        'application/msword', // doc
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // docx
+        'application/vnd.ms-powerpoint', // ppt
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation', // pptx
         'video/mp4',
         'video/mpeg',
         'video/quicktime',
@@ -616,7 +632,7 @@ export class MaterialsService {
 
       if (!allowedMimeTypes.includes(file.mimetype)) {
         throw new BadRequestException(
-          `Invalid file type. Allowed: PDF and Video files.`,
+          `Invalid file type. Allowed: PDF, Office Documents, and Video files.`,
         );
       }
 
@@ -716,12 +732,83 @@ export class MaterialsService {
         });
       }
 
+      let previewFileRecord = null;
+      // Convert Office documents to PDF via Gotenberg
+      const officeMimeTypes = [
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.ms-powerpoint',
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+      ];
+      
+      if (officeMimeTypes.includes(file.mimetype)) {
+        this.logger.log('Sending document to Gotenberg for PDF conversion...');
+        try {
+          const formData = new FormData();
+          formData.append('files', new Blob([uploadBuffer as any]), file.originalname);
+          
+          const gotenbergUrl = process.env.GOTENBERG_URL || 'http://localhost:3010';
+          const response = await fetch(`${gotenbergUrl}/forms/libreoffice/convert`, {
+            method: 'POST',
+            body: formData,
+          });
+
+          if (!response.ok) {
+            this.logger.error(`Gotenberg conversion failed: ${response.status} ${response.statusText}`);
+          } else {
+            const pdfArrayBuffer = await response.arrayBuffer();
+            const pdfBuffer = Buffer.from(pdfArrayBuffer);
+            const pdfHash = await hashBuffer(pdfBuffer);
+            
+            // Check if preview already exists
+            const existingPreview = await this.prisma.file.findFirst({
+              where: { hash: pdfHash },
+            });
+            
+            if (existingPreview) {
+              previewFileRecord = existingPreview;
+            } else {
+              const previewFilename = file.originalname.replace(/\.[^/.]+$/, "") + ".pdf";
+              const sanitizedPreviewName = previewFilename.replace(/[^\w\s.-]/g, '');
+              const previewKey = `materials/previews/${pdfHash}-${sanitizedPreviewName}`;
+              
+              await this.fileStorage.uploadBuffer(
+                previewKey,
+                pdfBuffer,
+                'application/pdf',
+                {
+                  'original-filename': sanitizedPreviewName,
+                  'upload-date': new Date().toISOString(),
+                  'user-id': userId,
+                  hash: pdfHash,
+                },
+              );
+              
+              previewFileRecord = await this.prisma.file.create({
+                data: {
+                  filename: previewFilename,
+                  mimetype: 'application/pdf',
+                  size: pdfBuffer.length,
+                  hash: pdfHash,
+                  key: previewKey,
+                  uploadedById: userId,
+                },
+              });
+              this.logger.log('Gotenberg conversion successful, saved preview file.');
+            }
+          }
+        } catch (convertErr) {
+          this.logger.error('Error connecting to Gotenberg', { error: (convertErr as Error).message });
+        }
+      }
+
       const material = await this.prisma.material.create({
         data: {
           title: title || file.originalname,
           description,
           type: type || MaterialType.other,
           fileId: fileRecord.id,
+          previewFileId: previewFileRecord?.id || null,
           courseId: courseId || null,
           unitId: unitId || null, // Allow null if not attached to unit
           topicId: topicId || null,
@@ -732,6 +819,7 @@ export class MaterialsService {
         },
         include: {
           file: true,
+          previewFile: true,
           unit: true,
           user: { select: { id: true, firstName: true, lastName: true } },
         },
@@ -883,6 +971,8 @@ export class MaterialsService {
         items.map(async (material) => {
           let fileUrl: string | undefined;
 
+          let previewFileUrl: string | undefined;
+
           if (material.file) {
             if (material.file.key?.startsWith('local:')) {
               const fileHash = material.file.hash;
@@ -904,9 +994,21 @@ export class MaterialsService {
             }
           }
 
+          if (material.previewFileId) {
+            try {
+              previewFileUrl = await this.getMaterialPreviewUrl(material.id);
+            } catch (err) {
+              this.logger.warn('Failed to generate presigned preview URL for material', {
+                materialId: material.id,
+                error: (err as any)?.message,
+              });
+            }
+          }
+
           return {
             ...material,
             fileUrl,
+            previewFileUrl,
           };
         }),
       );
@@ -1442,12 +1544,49 @@ export class MaterialsService {
     }
   }
 
+  async getMaterialPreviewUrl(materialId: string): Promise<string | undefined> {
+    try {
+      const material = await this.prisma.material.findUnique({
+        where: { id: materialId },
+      });
+
+      if (!material || !material.previewFileId) {
+        return undefined;
+      }
+
+      const file = await this.prisma.file.findUnique({
+        where: { id: material.previewFileId },
+      });
+
+      if (!file || !file.key) {
+        return undefined;
+      }
+
+      if (file.key.startsWith('local:')) {
+        const fileHash = file.hash;
+        if (fileHash) {
+          return `/api/materials/local/serve/${fileHash}`;
+        }
+        return undefined;
+      }
+
+      return await this.fileStorage.getPresignedDownloadUrl(file.key, {
+        filename: file.filename || file.key.split('/').pop(),
+        contentType: file.mimetype || 'application/pdf',
+        inline: true,
+      });
+    } catch (error) {
+      this.logger.warn(`Could not generate preview URL for material ${materialId}`, error);
+      return undefined;
+    }
+  }
+
   /**
    * Get material with file content URL for frontend
    */
   async getMaterialWithFileUrl(
     materialId: string,
-  ): Promise<Material & { fileUrl?: string }> {
+  ): Promise<Material & { fileUrl?: string; previewFileUrl?: string }> {
     try {
       const material = await this.findOne(materialId);
       if (!material) {
@@ -1478,7 +1617,12 @@ export class MaterialsService {
         }
       }
 
-      return { ...material, fileUrl };
+      let previewFileUrl: string | undefined;
+      if (material.previewFileId) {
+        previewFileUrl = await this.getMaterialPreviewUrl(materialId);
+      }
+
+      return { ...material, fileUrl, previewFileUrl };
     } catch (error) {
       handleServiceError(error, this.logger, 'getMaterialWithFileUrl');
     }

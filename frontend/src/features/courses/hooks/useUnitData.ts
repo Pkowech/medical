@@ -62,7 +62,7 @@ const normalizeUnitToChapters = (unit: UnitResponse): CourseData => {
           type: 'text' as const,
           duration: topic.estimatedMinutes ? `${topic.estimatedMinutes}m` : '0m',
           content: {
-            text: topic.description || topic.content || '',
+            text: topic.description || '',
           },
           isCompleted: topic.isCompleted ?? false,
           // Attach topic-level materials directly on the lesson so CourseContent

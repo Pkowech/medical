@@ -338,26 +338,27 @@ export const UnitLayout = ({ unitId: propUnitId }: UnitLayoutProps) => {
   // ── Local state ────────────────────────────────────────────────────────
   const [offlineMode, setOfflineMode] = useState(false);
   const [selectedMaterialId, setSelectedMaterialId] = useState<string | null>(null);
-  const [isAdmin, setIsAdmin] = useState(true); // Placeholder for admin status
+  const [isAdmin, _setIsAdmin] = useState(true); // Placeholder for admin status
 
   const openMaterial = (id: string) => setSelectedMaterialId(id);
   const closeMaterial = () => setSelectedMaterialId(null);
 
   const handleAddTopic = async () => {
-    console.log('Admin wants to add a new topic!');
+    console.warn('Admin wants to add a new topic!');
     // In a real application, you would make an API call here, e.g.:
     // await apiService.createTopic(unitId, { title: 'New Topic', description: '...' });
     // After successful creation, refetch unit data to update the UI
     // Assuming useUnitData provides a refetch method
     // If useUnitData doesn't return refetch, you might need to use a mutation hook (e.g., from react-query)
-    if (unitData && unitData.refetch) {
-      unitData.refetch();
+    // useUnitData returns a `refetch` function; call it if available
+    if (typeof refetchUnit === 'function') {
+      refetchUnit();
     }
   };
 
   // ── Data fetching ──────────────────────────────────────────────────────
   // useUnitData now returns chapters = one chapter per topic.
-  const { data: unitData, isLoading: isUnitLoading, error: unitError } = useUnitData(unitId);
+  const { data: unitData, isLoading: isUnitLoading, error: unitError, refetch: refetchUnit } = useUnitData(unitId);
 
   // ── Navigation (chapter = topic, lesson = topic itself) ────────────────
   const {
@@ -402,8 +403,7 @@ export const UnitLayout = ({ unitId: propUnitId }: UnitLayoutProps) => {
     return chapter ? chapter.lessons[currentLessonIndex] : undefined;
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const typedCurrentTopic = getCurrentTopic() as any;
+  const typedCurrentTopic = getCurrentTopic() as unknown as { id?: string | number; resources?: Material[] };
 
   // ── Materials for the current topic ───────────────────────────────────
   // The lesson carries `resources` (set in normalizeUnitToChapters).

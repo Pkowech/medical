@@ -53,13 +53,14 @@ export const LearningPathRecommendations: React.FC<LearningPathRecommendationsPr
         const personalizedData = await personalizedResponse.json();
         if (Array.isArray(personalizedData)) {
           const enrichedPersonalized = await Promise.all(
-            personalizedData.map(async (raw: any) => {
+            personalizedData.map(async (raw: unknown) => {
+              const item = raw as Record<string, unknown>;
               const rec: RecommendationScore = {
-                pathId: raw.path_id || raw.pathId,
-                score: raw.score,
-                reasons: raw.reasons || [],
-                confidence: raw.confidence,
-                estimatedCompletionTime: raw.estimated_completion_time || raw.estimatedCompletionTime,
+                pathId: String(item.path_id ?? item.pathId ?? ''),
+                score: Number(item.score ?? 0),
+                reasons: Array.isArray(item.reasons) ? item.reasons.map(String) : [],
+                confidence: Number(item.confidence ?? 0),
+                estimatedCompletionTime: Number(item.estimated_completion_time ?? item.estimatedCompletionTime ?? 0),
               };
               try {
                 const pathResponse = await fetch(`/api/learning-paths/${rec.pathId}`);
@@ -87,13 +88,14 @@ export const LearningPathRecommendations: React.FC<LearningPathRecommendationsPr
           const collaborativeData = await collaborativeResponse.json();
           if (Array.isArray(collaborativeData)) {
             const enrichedCollaborative = await Promise.all(
-              collaborativeData.map(async (raw: any) => {
+              collaborativeData.map(async (raw: unknown) => {
+                const item = raw as Record<string, unknown>;
                 const rec: RecommendationScore = {
-                  pathId: raw.path_id || raw.pathId,
-                  score: raw.score,
-                  reasons: raw.reasons || [],
-                  confidence: raw.confidence,
-                  estimatedCompletionTime: raw.estimated_completion_time || raw.estimatedCompletionTime,
+                  pathId: String(item.path_id ?? item.pathId ?? ''),
+                  score: Number(item.score ?? 0),
+                  reasons: Array.isArray(item.reasons) ? item.reasons.map(String) : [],
+                  confidence: Number(item.confidence ?? 0),
+                  estimatedCompletionTime: Number(item.estimated_completion_time ?? item.estimatedCompletionTime ?? 0),
                 };
                 try {
                   const pathResponse = await fetch(`/api/learning-paths/${rec.pathId}`);
@@ -124,25 +126,25 @@ export const LearningPathRecommendations: React.FC<LearningPathRecommendationsPr
           if (Array.isArray(trendingData)) {
             // Normalize backend trending path shape to our TrendingPath type
             const mapped: TrendingPath[] = trendingData.map((p: unknown) => {
-              const rec = p as Record<string, any>;
-              const analyticsRaw = rec.analytics || {};
+              const rec = p as Record<string, unknown>;
+              const analyticsRaw = (rec.analytics as Record<string, unknown>) ?? {};
               return {
-                id: rec.path_id || rec.id,
-                pathId: rec.path_id || rec.id,
-                title: rec.title || '',
-                description: rec.description || '',
-                difficulty: rec.difficulty || '',
-                category: rec.category || '',
+                id: String(rec.path_id ?? rec.id ?? ''),
+                pathId: String(rec.path_id ?? rec.id ?? ''),
+                title: String(rec.title ?? ''),
+                description: String(rec.description ?? ''),
+                difficulty: String(rec.difficulty ?? ''),
+                category: String(rec.category ?? ''),
                 analytics: {
                   userRatings: {
-                    average: analyticsRaw.user_ratings?.average ?? analyticsRaw.userRatings?.average ?? 0,
-                    count: analyticsRaw.user_ratings?.count ?? analyticsRaw.userRatings?.count ?? 0,
+                    average: Number(analyticsRaw.user_ratings?.average ?? analyticsRaw.userRatings?.average ?? 0),
+                    count: Number(analyticsRaw.user_ratings?.count ?? analyticsRaw.userRatings?.count ?? 0),
                   },
-                  totalEnrollments: analyticsRaw.total_enrollments ?? analyticsRaw.totalEnrollments ?? 0,
-                  completionRate: analyticsRaw.completion_rate ?? analyticsRaw.completionRate ?? 0,
+                  totalEnrollments: Number(analyticsRaw.total_enrollments ?? analyticsRaw.totalEnrollments ?? 0),
+                  completionRate: Number(analyticsRaw.completion_rate ?? analyticsRaw.completionRate ?? 0),
                 },
-                estimatedDurationWeeks: Number(rec.estimated_duration_weeks || rec.estimatedDurationWeeks || 0),
-                popularity: rec.popularity || rec.popularity_score,
+                estimatedDurationWeeks: Number(rec.estimated_duration_weeks ?? rec.estimatedDurationWeeks ?? 0),
+                popularity: rec.popularity ?? rec.popularity_score,
               };
             });
             setTrendingPaths(mapped);

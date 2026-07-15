@@ -6,31 +6,16 @@
 import { toast } from 'sonner';
 import progressService from '@/features/learning-management/services/progressService';
 import { learningPathService } from '@/features/learning-management/services/learningPathService';
-import { flashcardsService } from '@/features/assessment/services/flashcardsService';
-
-export interface QuizCompletionEvent {
-  userId: string;
-  topicId: string;
-  unitId: string;
-  courseId: string;
-  score: number;
-  timestamp: number;
-}
-
-export interface IntegrationEventEmitter {
-  on(event: string, listener: (...args: any[]) => void): void;
-  emit(event: string, ...args: any[]): void;
-  off(event: string, listener: (...args: any[]) => void): void;
-}
+import type { QuizCompletionEvent } from '@/shared/types/assessmentInterface';
 
 class QuizProgressIntegrationService {
-  private listeners: Map<string, Set<Function>> = new Map();
+  private listeners: Map<string, Set<(...args: unknown[]) => void>> = new Map();
   private readonly debounceTimers: Map<string, NodeJS.Timeout> = new Map();
 
   /**
    * Register listener for integration events
    */
-  on(event: string, listener: Function) {
+  on(event: string, listener: (...args: unknown[]) => void) {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, new Set());
     }
@@ -40,7 +25,7 @@ class QuizProgressIntegrationService {
   /**
    * Remove listener for integration events
    */
-  off(event: string, listener: Function) {
+  off(event: string, listener: (...args: unknown[]) => void) {
     if (this.listeners.has(event)) {
       this.listeners.get(event)!.delete(listener);
     }
@@ -49,10 +34,14 @@ class QuizProgressIntegrationService {
   /**
    * Emit integration event
    */
-  emit(event: string, ...args: any[]) {
+  emit(event: string, ...args: unknown[]) {
     if (this.listeners.has(event)) {
       this.listeners.get(event)!.forEach((listener) => {
-        listener(...args);
+        try {
+          listener(...args);
+        } catch (err) {
+          console.error('[Integration] listener error for', event, err);
+        }
       });
     }
   }
@@ -73,28 +62,28 @@ class QuizProgressIntegrationService {
       const timer = setTimeout(async () => {
         try {
           // Step 1: Sync quiz completion to backend progress
-          console.log('[Integration] Step 1: Syncing quiz completion to progress service...');
+          console.warn('[Integration] Step 1: Syncing quiz completion to progress service...');
           await this.syncQuizToProgress(quizEvent);
           this.emit('progress-synced', quizEvent);
 
           // Step 2: Update spaced repetition flashcards for weak areas
-          console.log('[Integration] Step 2: Updating spaced repetition scheduling...');
+          console.warn('[Integration] Step 2: Updating spaced repetition scheduling...');
           await this.updateSpacedRepetition(quizEvent);
           this.emit('spaced-repetition-updated', quizEvent);
 
           // Step 3: Refresh recommendations based on new mastery data
-          console.log('[Integration] Step 3: Refreshing recommendations...');
+          console.warn('[Integration] Step 3: Refreshing recommendations...');
           await this.refreshRecommendations(quizEvent.userId);
           this.emit('recommendations-refreshed', quizEvent);
 
           // Step 4: Create flashcards for review if score is below threshold
           if (quizEvent.score < 80) {
-            console.log('[Integration] Step 4: Creating review flashcards for weak areas...');
+            console.warn('[Integration] Step 4: Creating review flashcards for weak areas...');
             await this.createReviewFlashcards(quizEvent);
             this.emit('flashcards-created', quizEvent);
           }
 
-          console.log('[Integration] Quiz completion event chain completed successfully');
+          console.warn('[Integration] Quiz completion event chain completed successfully');
           resolve();
         } catch (error) {
           console.error('[Integration] Error in quiz completion event chain:', error);
@@ -135,15 +124,15 @@ class QuizProgressIntegrationService {
     try {
       // If score is low, mark for immediate review
       if (event.score < 70) {
-        const quality = 1; // Quality score for low performance (1-5 scale)
+        const _quality = 1; // Quality score for low performance (1-5 scale)
         // This would trigger SM-2 algorithm to schedule review soon
-        console.log('[Integration] Low score detected - scheduling urgent review');
+        console.warn('[Integration] Low score detected - scheduling urgent review');
       }
 
       // If score is good, increase interval
       if (event.score >= 80) {
-        const quality = 4; // Quality score for good performance
-        console.log('[Integration] Good score - extending review interval');
+        const _quality = 4; // Quality score for good performance
+        console.warn('[Integration] Good score - extending review interval');
       }
     } catch (error) {
       console.error('Error updating spaced repetition:', error);
@@ -166,7 +155,7 @@ class QuizProgressIntegrationService {
         JSON.stringify(freshRecommendations)
       );
 
-      console.log('[Integration] Recommendations refreshed with fresh data');
+      console.warn('[Integration] Recommendations refreshed with fresh data');
     } catch (error) {
       console.error('Error refreshing recommendations:', error);
       // Don't throw - recommendation update is optional
@@ -181,7 +170,7 @@ class QuizProgressIntegrationService {
       if (event.score < 80) {
         // This would be implemented to create flashcards from weak questions
         // For now, just log that it would happen
-        console.log('[Integration] Would create review flashcards for topic:', event.topicId);
+        console.warn('[Integration] Would create review flashcards for topic:', event.topicId);
       }
     } catch (error) {
       console.error('Error creating review flashcards:', error);

@@ -8,7 +8,7 @@ import {
   DialogTitle,
 } from '@/shared/components/ui/dialog';
 import { Button } from '@/shared/components/ui/button';
-import { ExternalLink, Maximize2, X, FileText, PlayCircle, Download } from 'lucide-react';
+import { ExternalLink, Maximize2, FileText, PlayCircle, Download } from 'lucide-react';
 import { VideoPlayer } from './VideoPlayer';
 import PDFViewer from '@/shared/components/pdf/PDFViewer';
 import materialService from '@/features/courses/services/materialService';
@@ -72,9 +72,9 @@ export const MaterialPreviewModal = ({ materialId, isOpen, onClose }: MaterialPr
     };
   }, [material, startTracking, stopTracking]);
 
-  const accessToken = (session as any)?.accessToken;
+  const accessToken = typeof session === 'object' && session !== null ? (session as Record<string, unknown>)?.accessToken : undefined;
   const pdfHeaders = useMemo(() => {
-    if (!accessToken) return undefined;
+    if (!accessToken || typeof accessToken !== 'string') return undefined;
     return { Authorization: `Bearer ${accessToken}` };
   }, [accessToken]);
 
@@ -91,7 +91,7 @@ export const MaterialPreviewModal = ({ materialId, isOpen, onClose }: MaterialPr
 
     if (!material) return null;
 
-    const effectiveUrl = material.fileUrl || material.url;
+    const effectiveUrl = material.previewFileUrl || material.fileUrl || material.url;
 
     if (isVideo && effectiveUrl) {
       return (
@@ -101,7 +101,9 @@ export const MaterialPreviewModal = ({ materialId, isOpen, onClose }: MaterialPr
       );
     }
 
-    if (material.type === 'pdf' && effectiveUrl) {
+    const isPdfRenderable = material.type === 'pdf' || material.previewFileUrl || material.fileUrl?.endsWith('.pdf');
+
+    if (isPdfRenderable && effectiveUrl) {
       return (
         <div className="h-[70vh] w-full border rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-900">
           <PDFViewer

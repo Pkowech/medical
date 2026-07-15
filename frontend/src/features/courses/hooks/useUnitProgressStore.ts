@@ -8,17 +8,17 @@ export const useUnitProgressStore = create<CourseProgressState>()(
       progress: {},
       bookmarks: [],
       notes: {},
-      markTopicComplete: topicKey =>
+      markLessonComplete: (topicKey: string) =>
         set(state => ({
           progress: { ...state.progress, [topicKey]: true },
         })),
-      toggleBookmark: topicKey => {
+      toggleBookmark: (topicKey: string) => {
         const current = get().bookmarks || [];
         const exists = current.includes(topicKey);
         const newBookmarks = exists ? current.filter(k => k !== topicKey) : [...current, topicKey];
         set({ bookmarks: newBookmarks });
       },
-      saveNote: (topicKey, noteText) =>
+      saveNote: (topicKey: string, noteText: string) =>
         set(state => ({
           notes: {
             ...state.notes,

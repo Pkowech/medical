@@ -138,8 +138,10 @@ export function CourseModulesPageContent() {
         ]);
         setCourseTitle(courseResponse.data.title);
         setModules(modulesResponse.data);
-      } catch (err: any) {
-        setError(err.message || 'Failed to load course modules');
+      } catch (err: unknown) {
+        // Keep message generic for UI; internal logging can capture details
+        console.error('CourseModulesPageContent: fetch error', err);
+        setError('Failed to load course modules');
       } finally {
         setIsLoading(false);
       }

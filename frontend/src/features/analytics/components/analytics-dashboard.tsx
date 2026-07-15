@@ -1,14 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+// useState removed — not required in this component
 import dynamic from 'next/dynamic';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
-import { Progress } from '@/shared/components/ui/progress';
+// Progress component not used
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
 import { BarChart } from '@/shared/components/charts/BarChart';
 import { LineChart } from '@/shared/components/charts/LineChart';
-import { PieChart } from '@/shared/components/charts/PieChart';
+// PieChart not used
 import {
   Lightbulb,
   BookOpen,
@@ -33,7 +33,7 @@ import {
 import { useSession } from 'next-auth/react';
 import { usePermissions } from '@/features/auth/hooks/usePermissions';
 import { Role } from '@/shared/enums/role.enum';
-import { toast } from 'sonner';
+// toast not used in this file
 import {
   UserAnalytics,
   ConsolidatedAnalytics,

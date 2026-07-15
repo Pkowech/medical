@@ -33,6 +33,8 @@ export interface Course extends BaseEntity {
   isEnrolled?: boolean;
   progress?: number;
   progressPercentage?: number;
+  unitId?: string;
+  nextTopicId?: string;
   modules?: CourseModule[];
   units?: CourseUnit[];
   prerequisites?: Course[];

@@ -220,6 +220,14 @@ services:
       backend:
         condition: service_healthy
 
+  gotenberg:
+    image: gotenberg/gotenberg:8
+    container_name: medtrack_gotenberg
+    restart: unless-stopped
+    ports:
+      - "3010:3000"
+    networks:
+      - medtrack_net
 volumes:
   postgres_data:
   redis_data:

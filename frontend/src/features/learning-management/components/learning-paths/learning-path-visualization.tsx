@@ -53,8 +53,9 @@ export const LearningPathVisualization: React.FC<LearningPathVisualizationProps>
 
   const fetchLearningPath = async () => {
     try {
-      const response = await apiService.get<any>(`/learning-paths/${pathId}`);
-      const raw = response?.data || response;
+      const response = await apiService.get<unknown>(`/learning-paths/${pathId}`);
+      const raw = response?.data ?? response;
+      const rawObj = raw as Record<string, unknown>;
       
       const normalized: LearningPath = {
         id: raw.id,
@@ -81,38 +82,57 @@ export const LearningPathVisualization: React.FC<LearningPathVisualizationProps>
           lastName: raw.createdBy?.lastName || raw.created_by?.last_name || ''
         },
         courses: raw.courses || [],
-        milestones: (raw.milestones || []).map((m: any) => ({
-          id: m.id,
-          title: m.title || '',
-          description: m.description || m.desc || '',
-          type: m.type || '',
-          order: m.order || 0,
-          isRequired: m.isRequired || m.is_required || false,
-          rewards: m.rewards ? {
-            points: m.rewards.points,
-            badgeId: m.rewards.badgeId || m.rewards.badge_id,
-            certificate: m.rewards.certificate
-          } : undefined
-        })),
+        milestones: Array.isArray(rawObj.milestones)
+          ? (rawObj.milestones as unknown[]).map(m => {
+              const milestone = m as Record<string, unknown>;
+              const rewards = milestone.rewards as Record<string, unknown> | undefined;
+              return {
+                id: String(milestone.id ?? ''),
+                title: String(milestone.title ?? ''),
+                description: String(milestone.description ?? milestone.desc ?? ''),
+                type: String(milestone.type ?? ''),
+                order: Number(milestone.order ?? 0),
+                isRequired: Boolean(milestone.isRequired ?? milestone.is_required ?? false),
+                rewards: rewards ? {
+                  points: Number(rewards.points ?? 0),
+                  badgeId: String(rewards.badgeId ?? rewards.badge_id ?? ''),
+                  certificate: rewards.certificate as Record<string, unknown> | undefined,
+                } : undefined,
+              } as Milestone;
+            })
+          : [],
         pathStructure: {
-          phases: (raw.pathStructure?.phases || raw.path_structure?.phases || []).map((p: any) => ({
-            id: p.id,
-            title: p.title || '',
-            description: p.description || '',
-            order: p.order || 0,
-            estimatedWeeks: p.estimatedWeeks || p.estimated_weeks || 0,
-            modules: (p.modules || []).map((m: any) => ({
-              id: m.id,
-              title: m.title || '',
-              description: m.description || '',
-              type: m.type || 'course',
-              resourceId: m.resourceId || m.resource_id,
-              estimatedHours: m.estimatedHours || m.estimated_hours || 0,
-              isRequired: m.isRequired || m.is_required || false,
-              unlockConditions: m.unlockConditions || m.unlock_conditions || [],
-              order: m.order || 0
-            }))
-          }))
+          phases: Array.isArray(rawObj.pathStructure?.phases ?? rawObj.path_structure?.phases)
+            ? ((rawObj.pathStructure?.phases ?? rawObj.path_structure?.phases) as unknown[]).map(p => {
+                const phase = p as Record<string, unknown>;
+                const modules = Array.isArray(phase.modules) ? phase.modules as unknown[] : [];
+                return {
+                  id: String(phase.id ?? ''),
+                  title: String(phase.title ?? ''),
+                  description: String(phase.description ?? ''),
+                  order: Number(phase.order ?? 0),
+                  estimatedWeeks: Number(phase.estimatedWeeks ?? phase.estimated_weeks ?? 0),
+                  modules: modules.map(m => {
+                    const moduleItem = m as Record<string, unknown>;
+                    return {
+                      id: String(moduleItem.id ?? ''),
+                      title: String(moduleItem.title ?? ''),
+                      description: String(moduleItem.description ?? ''),
+                      type: String(moduleItem.type ?? 'course'),
+                      resourceId: String(moduleItem.resourceId ?? moduleItem.resource_id ?? ''),
+                      estimatedHours: Number(moduleItem.estimatedHours ?? moduleItem.estimated_hours ?? 0),
+                      isRequired: Boolean(moduleItem.isRequired ?? moduleItem.is_required ?? false),
+                      unlockConditions: Array.isArray(moduleItem.unlockConditions)
+                        ? moduleItem.unlockConditions.map(String)
+                        : Array.isArray(moduleItem.unlock_conditions)
+                        ? moduleItem.unlock_conditions.map(String)
+                        : [],
+                      order: Number(moduleItem.order ?? 0),
+                    } as PathModule;
+                  }),
+                } as PathPhase;
+              })
+            : [],
         }
       };
       
@@ -125,45 +145,69 @@ export const LearningPathVisualization: React.FC<LearningPathVisualizationProps>
 
   const fetchProgress = async () => {
     try {
-      const response = await apiService.get<any>(`/learning-paths/${pathId}/progress`);
-      const raw = response?.data || response;
+      const response = await apiService.get<unknown>(`/learning-paths/${pathId}/progress`);
+      const raw = response?.data ?? response;
+      const rawObj = raw as Record<string, unknown>;
       
-      if (!raw) return;
+      if (!rawObj) return;
+
+      const phaseProgressRaw = Array.isArray(raw.phaseProgress)
+        ? raw.phaseProgress
+        : Array.isArray(raw.phase_progress)
+        ? raw.phase_progress
+        : [];
+      const moduleProgressRaw = Array.isArray(raw.moduleProgress)
+        ? raw.moduleProgress
+        : Array.isArray(raw.module_progress)
+        ? raw.module_progress
+        : [];
+      const milestonesAchievedRaw = Array.isArray(raw.milestonesAchieved)
+        ? raw.milestonesAchieved
+        : Array.isArray(raw.milestones_achieved)
+        ? raw.milestones_achieved
+        : [];
 
       const normalized: LearningPathProgress = {
-        id: raw.id || '',
-        status: raw.status || 'notStarted',
-        startedAt: raw.startedAt || raw.started_at || new Date().toISOString(),
-        lastAccessedAt: raw.lastAccessedAt || raw.last_accessed_at || new Date().toISOString(),
+        id: String(raw.id ?? ''),
+        status: String(raw.status ?? 'notStarted'),
+        startedAt: String(raw.startedAt ?? raw.started_at ?? new Date().toISOString()),
+        lastAccessedAt: String(raw.lastAccessedAt ?? raw.last_accessed_at ?? new Date().toISOString()),
         learningPath: learningPath!, 
-        overallProgressPercentage: raw.overallProgressPercentage || raw.overall_progress_percentage || 0,
-        currentPhaseIndex: raw.currentPhaseIndex ?? raw.current_phase_index ?? 0,
-        currentModuleIndex: raw.currentModuleIndex ?? raw.current_module_index ?? 0,
-        phaseProgress: Array.isArray(raw.phaseProgress || raw.phase_progress) 
-          ? (raw.phaseProgress || raw.phase_progress).map((p: any) => ({
-              phaseId: p.phaseId || p.phase_id,
-              status: p.status || 'notStarted',
-              progressPercentage: p.progressPercentage || p.progress_percentage || 0,
-              modulesCompleted: p.modulesCompleted || p.modules_completed || [],
-              currentModuleId: p.currentModuleId || p.current_module_id
-            }))
-          : [],
-        moduleProgress: Array.isArray(raw.moduleProgress || raw.module_progress)
-          ? (raw.moduleProgress || raw.module_progress).map((m: any) => ({
-              moduleId: m.moduleId || m.module_id,
-              phaseId: m.phaseId || m.phase_id,
-              status: m.status || 'notStarted',
-              progressPercentage: m.progressPercentage || m.progress_percentage || 0,
-              timeSpentMinutes: m.timeSpentMinutes || m.time_spent_minutes || 0,
-              bestScore: m.bestScore || m.best_score
-            }))
-          : [],
-        milestonesAchieved: Array.isArray(raw.milestonesAchieved || raw.milestones_achieved)
-          ? (raw.milestonesAchieved || raw.milestones_achieved).map((m: any) => ({
-              milestoneId: m.milestoneId || m.milestone_id,
-              achievedAt: m.achievedAt || m.achieved_at || new Date().toISOString()
-            }))
-          : []
+        overallProgressPercentage: Number(raw.overallProgressPercentage ?? raw.overall_progress_percentage ?? 0),
+        currentPhaseIndex: Number(raw.currentPhaseIndex ?? raw.current_phase_index ?? 0),
+        currentModuleIndex: Number(raw.currentModuleIndex ?? raw.current_module_index ?? 0),
+        phaseProgress: phaseProgressRaw.map((p: unknown) => {
+          const phase = p as Record<string, unknown>;
+          return {
+            phaseId: String(phase.phaseId ?? phase.phase_id ?? ''),
+            status: String(phase.status ?? 'notStarted'),
+            progressPercentage: Number(phase.progressPercentage ?? phase.progress_percentage ?? 0),
+            modulesCompleted: Array.isArray(phase.modulesCompleted)
+              ? phase.modulesCompleted.map(String)
+              : Array.isArray(phase.modules_completed)
+              ? phase.modules_completed.map(String)
+              : [],
+            currentModuleId: String(phase.currentModuleId ?? phase.current_module_id ?? ''),
+          };
+        }),
+        moduleProgress: moduleProgressRaw.map((m: unknown) => {
+          const moduleItem = m as Record<string, unknown>;
+          return {
+            moduleId: String(moduleItem.moduleId ?? moduleItem.module_id ?? ''),
+            phaseId: String(moduleItem.phaseId ?? moduleItem.phase_id ?? ''),
+            status: String(moduleItem.status ?? 'notStarted'),
+            progressPercentage: Number(moduleItem.progressPercentage ?? moduleItem.progress_percentage ?? 0),
+            timeSpentMinutes: Number(moduleItem.timeSpentMinutes ?? moduleItem.time_spent_minutes ?? 0),
+            bestScore: moduleItem.bestScore ?? moduleItem.best_score,
+          };
+        }),
+        milestonesAchieved: milestonesAchievedRaw.map((m: unknown) => {
+          const milestone = m as Record<string, unknown>;
+          return {
+            milestoneId: String(milestone.milestoneId ?? milestone.milestone_id ?? ''),
+            achievedAt: String(milestone.achievedAt ?? milestone.achieved_at ?? new Date().toISOString()),
+          };
+        }),
       };
       
       setProgress(normalized);

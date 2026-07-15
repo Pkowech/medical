@@ -1,7 +1,6 @@
 {
   "compilerOptions": {
     "module": "es2022",
-    "baseUrl": "./",
     "moduleResolution": "bundler",
     "declaration": true,
     "removeComments": true,
@@ -19,9 +18,9 @@
     "forceConsistentCasingInFileNames": true,
     "noFallthroughCasesInSwitch": true,
     "esModuleInterop": true,
-    "typeRoots": ["./node_modules/@types", "./src/common/types"]
-    ,
+    "typeRoots": ["./node_modules/@types", "./src/common/types"],
     "paths": {
+      "*": ["./*"],
       "#common/*": ["./src/common/*"],
       "#infrastructure/*": ["./src/infrastructure/*"],
       "#modules/*": ["./src/modules/*"]

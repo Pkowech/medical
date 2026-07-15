@@ -5,6 +5,8 @@ import { XApiObject, XApiResult, XApiContext, XApiStatement } from './types';
 
 class XApiService {
   private static instance: XApiService;
+  private statementQueue: XApiStatement[] = [];
+  private isProcessingQueue = false;
 
   private constructor() {}
 
@@ -50,27 +52,52 @@ class XApiService {
         console.warn('XApiService: Invalid object structure in statement', { object, statement });
       }
 
-      console.debug('XApiService: Sending xAPI statement', { 
-        verb: statement.verb?.id, 
-        actor: statement.actor?.name,
-        object: statement.object?.id 
-      });
-
-      await apiService.post('/progress/statements', statement);
+      // Instead of sending immediately, push to queue and process
+      this.statementQueue.push(statement);
+      this.processQueue();
     } catch (error) {
-      // Properly format error for logging
-      let errorMessage = 'Unknown error';
-      if (error instanceof Error) {
-        errorMessage = error.message;
-      } else if (typeof error === 'object' && error !== null) {
-        errorMessage = JSON.stringify(error);
-      } else if (typeof error === 'string') {
-        errorMessage = error;
-      }
-      
-      console.error('XApiService: Failed to send xAPI statement:', errorMessage, error);
-      // Don't re-throw - xAPI statement failures should not break the main application flow
+      console.error('XApiService: Failed to queue xAPI statement:', error);
     }
+  }
+
+  private async processQueue() {
+    if (this.isProcessingQueue || this.statementQueue.length === 0) {
+      return;
+    }
+
+    this.isProcessingQueue = true;
+
+    while (this.statementQueue.length > 0) {
+      // Get the next statement
+      const statement = this.statementQueue.shift();
+      if (!statement) continue;
+
+      try {
+        console.warn('XApiService: Sending queued xAPI statement', { 
+          verb: statement.verb?.id, 
+          actor: statement.actor?.name,
+          object: statement.object?.id 
+        });
+        
+        await apiService.post('/progress/statements', statement);
+      } catch (error) {
+        let errorMessage = 'Unknown error';
+        if (error instanceof Error) {
+          errorMessage = error.message;
+        } else if (typeof error === 'object' && error !== null) {
+          errorMessage = JSON.stringify(error);
+        } else if (typeof error === 'string') {
+          errorMessage = error;
+        }
+        
+        console.error('XApiService: Failed to send xAPI statement:', errorMessage, error);
+      }
+
+      // Wait 1000ms between requests to avoid 429 Too Many Requests
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+
+    this.isProcessingQueue = false;
   }
 }
 

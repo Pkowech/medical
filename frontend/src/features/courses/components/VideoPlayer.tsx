@@ -17,7 +17,7 @@ export const VideoPlayer = ({ url, title, lessonId }: VideoPlayerProps) => {
   const [played, setPlayed] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isReady, setIsReady] = useState(false);
-  const playerRef = useRef<ReactPlayer>(null);
+  const playerRef = useRef<any>(null);
 
   const objectId = `https://medtrackhub.com/units/${lessonId}/video`;
   const object = {
@@ -84,23 +84,21 @@ export const VideoPlayer = ({ url, title, lessonId }: VideoPlayerProps) => {
       )}
       
       <ReactPlayer
-        ref={playerRef}
-        url={url}
-        width="100%"
-        height="100%"
-        playing={playing}
-        controls={true} // Google Classroom style: easy controls
-        onReady={() => setIsReady(true)}
-        onPlay={handlePlay}
-        onPause={handlePause}
-        onProgress={handleProgress}
-        onEnded={handleEnded}
-        onDuration={handleDuration}
-        config={{
-          youtube: {
-            playerVars: { showinfo: 1, modestbranding: 1, rel: 0 }
-          }
-        }}
+        {...({
+          ref: playerRef,
+          url,
+          width: '100%',
+          height: '100%',
+          playing,
+          controls: true,
+          onReady: () => setIsReady(true),
+          onPlay: handlePlay,
+          onPause: handlePause,
+          onProgress: handleProgress as any,
+          onEnded: handleEnded,
+          onDuration: handleDuration,
+          config: ({ youtube: { playerVars: { showinfo: 1, modestbranding: 1, rel: 0 } } } as any),
+        } as any)}
       />
 
       {/* Premium Overlay for Play/Pause when not using native controls (optional) */}

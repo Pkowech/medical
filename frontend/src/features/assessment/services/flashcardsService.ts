@@ -32,7 +32,7 @@ class FlashcardsService {
   private readonly BASE_URL = '/flashcards';
 
   async createFlashcard(userId: string, questionId: string): Promise<Flashcard> {
-    const response = await apiService.post(`${this.BASE_URL}/create`, {
+    const response = await apiService.post<Flashcard>(`${this.BASE_URL}/create`, {
       userId,
       questionId,
     });
@@ -50,7 +50,7 @@ class FlashcardsService {
   }
 
   async updateCard(cardId: string, quality: number): Promise<Flashcard> {
-    const response = await apiService.post(`${this.BASE_URL}/update/${cardId}`, {
+    const response = await apiService.post<Flashcard>(`${this.BASE_URL}/update/${cardId}`, {
       quality,
     });
     return response.data;
@@ -91,7 +91,7 @@ class FlashcardsService {
     }>
   ): Promise<{ success: boolean }> {
     try {
-      const response = await apiService.post(`${this.BASE_URL}/sync/${userId}`, {
+      const response = await apiService.post<{ success: boolean }>(`${this.BASE_URL}/sync/${userId}`, {
         cards,
       });
       return response.data;

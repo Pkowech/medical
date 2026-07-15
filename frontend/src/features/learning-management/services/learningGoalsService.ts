@@ -91,7 +91,7 @@ class LearningGoalsService {
     }
   }
 
-  async getGoals(filters?: any): Promise<LearningGoal[]> {
+  async getGoals(filters?: Record<string, unknown>): Promise<LearningGoal[]> {
     try {
       const response = await apiService.get<ApiResponse<LearningGoal[]>>(
         this.BASE_URL,

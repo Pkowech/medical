@@ -29,11 +29,23 @@ export const useCourseData = (courseId: string) => {
       
       try {
         course = await courseService.getCourseById(courseId);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('Failed to fetch course:', err);
-        const status = err?.status || err?.rawResponse?.statusCode;
-        const message = err?.message || err?.rawResponse?.message || 'Unknown error';
-        
+        let status: number | undefined;
+        let message = 'Unknown error';
+
+        if (typeof err === 'object' && err !== null) {
+          const e = err as Record<string, unknown>;
+          if (typeof e.status === 'number') status = e.status;
+          if (typeof e.message === 'string') message = e.message;
+
+          if (typeof e.rawResponse === 'object' && e.rawResponse !== null) {
+            const raw = e.rawResponse as Record<string, unknown>;
+            if (typeof raw.message === 'string') message = raw.message;
+            if (typeof raw.statusCode === 'number') status = raw.statusCode;
+          }
+        }
+
         if (status === 404) {
           throw new Error(`Course not found (ID: ${courseId}). It may have been removed or the ID is invalid.`);
         } else if (status === 403) {
@@ -131,6 +143,24 @@ export const useCourseData = (courseId: string) => {
           // Map the unit itself to a single lesson (for simple units without sub-lessons)
           const topicId = String(u.id);
           const topicProgress = topicProgressMap[topicId];
+          const unitObj = u as unknown as Record<string, unknown>;
+
+          let contentText = '';
+          if (typeof unitObj.content === 'string') {
+            contentText = unitObj.content;
+          } else if (typeof unitObj.description === 'string') {
+            contentText = unitObj.description;
+          }
+
+          let videoUrl = '';
+          if (typeof unitObj.video === 'string') {
+            videoUrl = unitObj.video;
+          } else if (typeof unitObj.content === 'object' && unitObj.content !== null) {
+            const contentObj = unitObj.content as Record<string, unknown>;
+            if (typeof contentObj.video === 'string') {
+              videoUrl = contentObj.video;
+            }
+          }
 
           lessonArray = [
             {
@@ -139,11 +169,8 @@ export const useCourseData = (courseId: string) => {
               type: 'text',
               duration: u.duration ? `${u.duration}m` : '',
               content: {
-                text:
-                  ((u as unknown as Record<string, unknown>).content as string) ||
-                  u.description ||
-                  '',
-                video: (u as any).video || (u as any).content?.video || '',
+                text: contentText,
+                video: videoUrl,
               },
               isCompleted: topicProgress?.isCompleted ?? false,
               masteryUnlocked: topicProgress?.masteryUnlocked ?? false,
@@ -165,23 +192,26 @@ export const useCourseData = (courseId: string) => {
       // Collect all materials from units and topics as well
       const extraMaterials: CourseMaterial[] = [];
       course.units?.forEach(u => {
+        const unitObj = u as unknown as Record<string, unknown>;
+
         // Add materials linked to the unit
-        if (Array.isArray((u as any).materials)) {
-          (u as any).materials.forEach((m: any) => {
+        if (Array.isArray(unitObj.materials)) {
+          (unitObj.materials as unknown as Array<Record<string, unknown>>).forEach(m => {
             extraMaterials.push({
-              ...m,
-              unitId: u.id
+              ...(m as unknown as CourseMaterial),
+              unitId: u.id,
             });
           });
         }
+
         // Add materials linked to topics within the unit
-        if (Array.isArray((u as any).topics)) {
-          (u as any).topics.forEach((t: any) => {
+        if (Array.isArray(unitObj.topics)) {
+          (unitObj.topics as unknown as Array<Record<string, unknown>>).forEach(t => {
             if (Array.isArray(t.materials)) {
-              t.materials.forEach((m: any) => {
+              (t.materials as unknown as Array<Record<string, unknown>>).forEach(m => {
                 extraMaterials.push({
-                  ...m,
-                  unitId: t.id
+                  ...(m as unknown as CourseMaterial),
+                  unitId: String(t.id),
                 });
               });
             }

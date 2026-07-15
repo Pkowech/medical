@@ -64,10 +64,13 @@ export class StorageService {
     const contentType = options?.contentType || 'application/octet-stream';
     const disposition = options?.inline === false ? 'attachment' : 'inline';
 
+    // Sanitize filename to avoid header injection and problematic characters
+    const safeFilename = String(filename).replace(/["\r\n]/g, '_').slice(0, 200);
+
     const command = new GetObjectCommand({
       Bucket: this.bucketName,
       Key: key,
-      ResponseContentDisposition: `${disposition}; filename="${filename}"`,
+      ResponseContentDisposition: `${disposition}; filename="${safeFilename}"`,
       ResponseContentType: contentType,
     });
 
@@ -89,7 +92,11 @@ export class StorageService {
       Key: key,
       Body: buffer,
       ContentType: contentType,
-      Metadata: metadata,
+      Metadata: metadata
+        ? Object.fromEntries(
+            Object.entries(metadata).map(([k, v]) => [k, String(v)]),
+          )
+        : undefined,
     });
 
     return this.s3Client.send(command);

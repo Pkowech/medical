@@ -2,7 +2,6 @@ import React from 'react';
 import { Course } from '@/shared/types/courseInterface';
 import { BookOpen, Users, Star, CheckCircle } from 'lucide-react';
 import { Button } from '@/shared/components/ui/button';
-import { useRouter } from 'next/navigation';
 import { getInstructorDisplayName } from '@/lib/utils';
 import { Badge } from '@/shared/components/ui/badge';
 

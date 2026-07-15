@@ -141,7 +141,7 @@ class CourseService {
   /**
    * Fetches units the current user is enrolled in (derived from active course enrollments and progress).
    */
-  async getEnrolledUnits(): Promise<any[]> {
+  async getEnrolledUnits(): Promise<Array<Record<string, unknown>>> {
     try {
       const { useAuthStore } = await import('@/features/auth/store/useAuthStore');
       const user = useAuthStore.getState().user;
@@ -153,9 +153,12 @@ class CourseService {
       }
       
       const response = await apiService.get<unknown>(`/progress/dashboard/${userId}`);
-      const data = parseResponse<any>(response.data);
-      return data?.enrolledUnits || [];
-    } catch (error) {
+      const data = parseResponse<Record<string, unknown>>(response.data);
+      if (data && typeof data === 'object' && Array.isArray(data.enrolledUnits)) {
+        return data.enrolledUnits as Array<Record<string, unknown>>;
+      }
+      return [];
+    } catch (error: unknown) {
       console.error('Error fetching enrolled units:', error);
       return [];
     }

@@ -1,14 +1,19 @@
 import { apiService } from '@/features/auth/services/apiClient';
+import type { Deadline } from '@/shared/types/progressInterface';
+
+interface DashboardApiResponse {
+  deadlines?: Deadline[];
+}
 
 // Lightweight service wrapper for dashboard-related API endpoints
 export async function getUserProgress(userId: string) {
-  const response = await apiService.get<{ data: any }>(`/progress/dashboard/${userId}`);
+  const response = await apiService.get<{ data: unknown }>(`/progress/dashboard/${userId}`);
   return response.data;
 }
 
 export async function getDeadlines(userId: string) {
-  const response = await apiService.get<any>(`/progress/dashboard/${userId}`);
-  return response.data?.deadlines || [];
+  const response = await apiService.get<DashboardApiResponse>(`/progress/dashboard/${userId}`);
+  return response.data.deadlines ?? [];
 }
 
 export async function getStudyEvents(userId?: string) {

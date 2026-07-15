@@ -120,21 +120,21 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
         selectedAnswers: answers,
       }));
 
-      const response = await apiService.post(
+      const response = await apiService.post<{ score: number; feedback?: string }>(
         `/quiz/topic/${topicId}/submit`,
         { responses }
       );
 
       const result = response.data;
-      setScore(result.score || 0);
-      setFeedback(result.feedback || '');
+      setScore(result?.score || 0);
+      setFeedback(result?.feedback || '');
       setQuizCompleted(true);
 
       if (onComplete) {
-        onComplete(result.score);
+        onComplete(result?.score || 0);
       }
 
-      toast.success(`Quiz completed! Score: ${result.score}%`);
+      toast.success(`Quiz completed! Score: ${result?.score || 0}%`);
     } catch (error) {
       console.error('Error submitting quiz:', error);
       toast.error('Failed to submit quiz');

@@ -466,8 +466,9 @@ model File {
   uploadedById String?    @map("uploaded_by_id")
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt @map("updated_at")
-  uploadedBy   User?      @relation(fields: [uploadedById], references: [id])
-  materials    Material[]
+  uploadedBy       User?      @relation(fields: [uploadedById], references: [id])
+  materials        Material[] @relation("OriginalFile")
+  previewMaterials Material[] @relation("PreviewFile")
 
   @@index([hash])
   @@index([uploadedById])
@@ -740,6 +741,7 @@ model Material {
   title               String                   @db.VarChar(255)
   type                MaterialType
   fileId              String?                  @map("file_id")
+  previewFileId       String?                  @map("preview_file_id")
   content             String?
   description         String?
   category            String?
@@ -767,7 +769,8 @@ model Material {
   notes               MaterialNote[]
   shares              MaterialShare[]
   course              Course?                  @relation(fields: [courseId], references: [id])
-  file                File?                    @relation(fields: [fileId], references: [id])
+  file                File?                    @relation("OriginalFile", fields: [fileId], references: [id])
+  previewFile         File?                    @relation("PreviewFile", fields: [previewFileId], references: [id])
   topic               Topic?                   @relation(fields: [topicId], references: [id])
   unit                Unit?                    @relation(fields: [unitId], references: [id])
   user                User?                    @relation(fields: [userId], references: [id])

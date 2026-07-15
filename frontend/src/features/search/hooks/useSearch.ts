@@ -55,7 +55,7 @@ export function useSearch() {
     abortRef.current = ctrl;
 
     try {
-      const params: any = {
+      const params: Record<string, string> = {
         query,
         page: String(page),
         limit: String(limit),
@@ -83,22 +83,25 @@ export function useSearch() {
       setExpandedQuery(response.data.expandedQuery);
       setSynonymsMatched(response.data.synonymsMatched || []);
 
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Handle abort signal
-      if (err.name === 'AbortError' || err.code === 'ERR_CANCELED') {
-        return;
-      }
+      if (typeof err === 'object' && err !== null) {
+        const e = err as Record<string, unknown>;
+        if (e.name === 'AbortError' || e.code === 'ERR_CANCELED') return;
 
-      const message = err.message || 'Search failed. Please try again.';
-      setError({
-        message,
-        code: err.code || 'UNKNOWN',
-        statusCode: err.status || 500
-      });
-      setResults([]);
-      setTotal(0);
-      setFacets({});
-      console.error('Search error:', err);
+        const message = typeof e.message === 'string' ? e.message : 'Search failed. Please try again.';
+        setError({
+          message,
+          code: (typeof e.code === 'string' && e.code) || 'UNKNOWN',
+          statusCode: (typeof e.status === 'number' && e.status) || 500,
+        });
+        setResults([]);
+        setTotal(0);
+        setFacets({});
+        console.error('Search error:', e);
+      } else {
+        setError({ message: 'Search failed. Please try again.', code: 'UNKNOWN', statusCode: 500 });
+      }
     } finally {
       setLoading(false);
     }

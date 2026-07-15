@@ -2,9 +2,8 @@ import { apiService } from '@/features/auth/services/apiClient';
 import {
   User,
   UserResponse,
-  RoleResponse,
   UsersListResponse,
-  RolesListResponse,
+  GetRolesResponse,
 } from '@/shared/types/authInterface';
 import { RoleEntity } from '@/shared/types/systemInterface';
 import { SystemAnalytics } from '@/shared/types/analyticsInterface';
@@ -39,35 +38,39 @@ export class AdminService {
   }
 
   async getRoles(page = 1, limit = 10): Promise<RoleEntity[]> {
-    const response = await apiService.get<RolesListResponse>(
+    const response = await apiService.get<GetRolesResponse>(
       `${this.baseUrl}/roles?page=${page}&limit=${limit}`
     );
 
-    const result = response.data as unknown;
-    if (Array.isArray(result)) {
-      return result;
+    const payload = response.data as unknown;
+
+    // Support multiple backend shapes: { roles: [...] } or { data: [...] } or direct array
+    if (Array.isArray(payload)) {
+      return payload as RoleEntity[];
     }
 
-    if (result && typeof result === 'object' && 'data' in result && Array.isArray((result as Record<string, unknown>).data)) {
-      return (result as Record<string, unknown>).data as RoleEntity[];
+    if (payload && typeof payload === 'object') {
+      const p = payload as Record<string, unknown>;
+      if (Array.isArray(p.roles as unknown[])) return p.roles as unknown as RoleEntity[];
+      if (Array.isArray(p.data as unknown[])) return p.data as unknown as RoleEntity[];
     }
 
     return [];
   }
 
   async getRole(id: string): Promise<RoleEntity> {
-    const response = await apiService.get<RoleResponse>(`${this.baseUrl}/roles/${id}`);
-    return response.data.data;
+    const response = await apiService.get<RoleEntity>(`${this.baseUrl}/roles/${id}`);
+    return response.data;
   }
 
   async createRole(roleData: Partial<RoleEntity>): Promise<RoleEntity> {
-    const response = await apiService.post<RoleResponse>(`${this.baseUrl}/roles`, roleData);
-    return response.data.data;
+    const response = await apiService.post<RoleEntity>(`${this.baseUrl}/roles`, roleData);
+    return response.data;
   }
 
   async updateRole(id: string, roleData: Partial<RoleEntity>): Promise<RoleEntity> {
-    const response = await apiService.put<RoleResponse>(`${this.baseUrl}/roles/${id}`, roleData);
-    return response.data.data;
+    const response = await apiService.put<RoleEntity>(`${this.baseUrl}/roles/${id}`, roleData);
+    return response.data;
   }
 
   async deleteRole(id: string): Promise<void> {

@@ -30,6 +30,7 @@ export interface MaterialBase extends BaseEntity {
  */
 export interface Material extends MaterialBase {
   materialId: string;
+  duration?: string;
   // Backwards compatibility: `type` used in older components; prefer `contentType`.
   type?: string;
   unitId?: number;
@@ -40,6 +41,9 @@ export interface Material extends MaterialBase {
   uploadDate?: string;
   size?: string;
   fileUrl?: string;
+  previewFileUrl?: string;
+  file?: AppFile;
+  previewFile?: AppFile;
   unit?: {
     id: number;
     name: string;

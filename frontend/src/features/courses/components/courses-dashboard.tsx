@@ -4,14 +4,13 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   BookOpen,
-  Clock,
-  Users,
   Star,
   TrendingUp,
   CheckCircle,
   AlertCircle,
   Search,
   Award,
+  type LucideIcon,
 } from 'lucide-react';
 import {
   useInfiniteQuery,
@@ -158,7 +157,6 @@ export const CoursesDashboard = () => {
       }
 
       let endpoint = '/courses';
-      const statusParam = '';
 
       if (filters.status === 'enrolled') {
         endpoint = '/courses/my-courses';
@@ -166,53 +164,70 @@ export const CoursesDashboard = () => {
         endpoint = '/courses';
       }
 
-      let raw: any;
+      let raw: unknown;
       if (endpoint === '/courses') {
         raw = await courseService.getCourses({
           page: pageNum,
           limit: pageSize,
-          difficulty: filters.difficulty as any,
+          difficulty: (filters.difficulty as "beginner" | "intermediate" | "advanced" | "expert") || undefined,
           categoryId: filters.category,
         });
       } else {
         raw = await courseService.getEnrolledUnits();
       }
 
-      if (raw && 'items' in raw) {
-        const items = raw.items as any[];
+      if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+        const rawObj = raw as Record<string, unknown>;
+        const items = Array.isArray(rawObj.items) ? (rawObj.items as unknown[]) : [];
         const courses = items.map(item => {
-          if (item.course) {
-            return {
-              ...item.course,
-              isEnrolled: true,
-              progressPercentage: item.progressPercentage,
-            };
+          if (item && typeof item === 'object') {
+            const itemObj = item as Record<string, unknown>;
+            if (itemObj.course && typeof itemObj.course === 'object') {
+              return {
+                ...(itemObj.course as Course),
+                isEnrolled: true,
+                progressPercentage: (typeof itemObj.progressPercentage === 'number' ? itemObj.progressPercentage : 0),
+              };
+            }
           }
-          return item;
+          return item as Course;
         });
-        return { courses, stats: { total: raw.total }, page: raw.page, limit: raw.pageSize };
+        return {
+          courses,
+          stats: { total: typeof rawObj.total === 'number' ? rawObj.total : 0 },
+          page: typeof rawObj.page === 'number' ? rawObj.page : 1,
+          limit: typeof rawObj.pageSize === 'number' ? rawObj.pageSize : pageSize,
+        };
       } else if (Array.isArray(raw)) {
-        const courses = raw.map(unit => ({
-          id: unit.courseId,
-          title: unit.unitTitle,
-          description: `Part of ${unit.courseTitle}`,
-          estimatedHours: Math.round((unit.totalTopics || 0) * 0.5), // Estimate if not available
+        const unitItems = raw as Array<Record<string, unknown>>;
+        const courses: Course[] = unitItems.map(unit => ({
+          id: String(unit.courseId ?? ''),
+          name: String(unit.courseTitle ?? ''),
+          title: String(unit.unitTitle ?? ''),
+          description: `Part of ${unit.courseTitle ?? ''}`,
+          categoryId: '',
+          status: 'published',
+          price: 0,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          estimatedHours: Math.round((Number(unit.totalTopics ?? 0)) * 0.5), // Estimate if not available
           enrollmentCount: 0,
           rating: 0,
           difficulty: 'intermediate',
           isEnrolled: true,
-          progressPercentage: unit.progressPercentage,
-          unitId: unit.unitId,
-          nextTopicId: unit.nextTopicId
-        })) as Course[];
-        return { courses, stats: { total: raw.length }, page: 1, limit: raw.length };
+          progressPercentage: Number(unit.progressPercentage ?? 0),
+          unitId: unit.unitId as string | undefined,
+          nextTopicId: unit.nextTopicId as string | undefined,
+        }));
+        return { courses, stats: { total: unitItems.length }, page: 1, limit: unitItems.length };
       }
 
       return { courses: [], stats: {}, page: pageNum, limit: pageSize };
     },
     staleTime: 5 * 60 * 1000,
     getNextPageParam: (lastPage: CoursesPageData) => {
-      const total = (lastPage.stats as any)?.total ?? 0;
+      const stats = lastPage.stats as Record<string, unknown> | undefined;
+      const total = stats && typeof stats.total === 'number' ? stats.total : 0;
       const loaded = lastPage.page * lastPage.limit;
       return loaded < total ? lastPage.page + 1 : undefined;
     },
@@ -246,9 +261,13 @@ export const CoursesDashboard = () => {
       
       // Optional: Switch to enrolled tab to show the newly enrolled course
       setActiveTab('enrolled');
-    } catch (error: any) {
+    } catch (error: unknown) {
+      let message = 'Failed to enroll';
+      if (typeof error === 'object' && error !== null && 'message' in error) {
+        message = String((error as Record<string, unknown>).message);
+      }
       handleUnknownError(error, `/courses/${courseId}/enroll`);
-      toast.error(error?.message || 'Failed to enroll');
+      toast.error(message);
     }
   };
 
@@ -389,7 +408,14 @@ export const CoursesDashboard = () => {
   );
 };
 
-const TabButton = ({ active, onClick, label, icon: Icon }: any) => (
+interface TabButtonProps {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  icon: LucideIcon;
+}
+
+const TabButton = ({ active, onClick, label, icon: Icon }: TabButtonProps) => (
   <button
     onClick={onClick}
     className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all ${
@@ -403,7 +429,15 @@ const TabButton = ({ active, onClick, label, icon: Icon }: any) => (
   </button>
 );
 
-const StatCard = ({ icon: Icon, title, value, gradient, description }: any) => (
+interface StatCardProps {
+  icon: LucideIcon;
+  title: string;
+  value: string | number;
+  gradient: string;
+  description?: string;
+}
+
+const StatCard = ({ icon: Icon, title, value, gradient, description }: StatCardProps) => (
   <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-sm group hover:shadow-md transition-all">
     <div className={`w-12 h-12 rounded-2xl bg-linear-to-br ${gradient} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
       <Icon className="w-6 h-6 text-white" />
@@ -416,9 +450,16 @@ const StatCard = ({ icon: Icon, title, value, gradient, description }: any) => (
   </div>
 );
 
-const CourseCard = ({ course, onEnroll, router, getResumePoint }: any) => {
+interface CourseCardProps {
+  course: Course;
+  onEnroll: (courseId: string) => Promise<void>;
+  router: ReturnType<typeof useRouter>;
+  getResumePoint: (courseId: string) => unknown;
+}
+
+const CourseCard = ({ course, onEnroll, router, getResumePoint }: CourseCardProps) => {
   const isEnrolled = course.isEnrolled;
-  const progress = course.progressPercentage || 0;
+  const progress = course.progressPercentage ?? 0;
 
   return (
     <div 
@@ -500,7 +541,7 @@ const CourseCard = ({ course, onEnroll, router, getResumePoint }: any) => {
                   router.push(`/courses/${course.id}/units/${course.unitId}`);
                 }
               } else {
-                const resume = await getResumePoint(course.id);
+                const resume = await getResumePoint(course.id) as { type?: string; unitId?: string; id?: string } | null;
                 if (resume && resume.type === 'topic' && resume.unitId) {
                   router.push(`/courses/${course.id}/units/${resume.unitId}/topics/${resume.id}`);
                 } else {

@@ -31,7 +31,7 @@ const AppLayoutContent: React.FC<AppLayoutProps> = ({ children }) => {
     ? ({
         // Ensure permissions are normalized to the canonical Permission[] type
         ...session.user,
-        permissions: (session.user.permissions ?? []).map((p: any) => p as Permission),
+        permissions: (session.user.permissions ?? []).map((p: unknown) => p as Permission),
       } as User)
     : null;
 

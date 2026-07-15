@@ -34,7 +34,7 @@ export const useAuth = () => {
     //     console.error('[useAuth] post-register signIn failed with error:', signInResult.error);
     //   } else if (signInResult?.ok) {
     //     // eslint-disable-next-line no-console
-    //     console.log('[useAuth] post-register signIn successful');
+    //     console.warn('[useAuth] post-register signIn successful');
     //   }
     // } catch (e) {
     //   // non-fatal

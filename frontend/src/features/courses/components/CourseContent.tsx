@@ -1,4 +1,4 @@
-import Link from 'next/link';
+// next/link removed — not used in this component
 import {
   Clock,
   CheckCircle,
@@ -114,11 +114,11 @@ export const CourseContent = ({
           <button
             onClick={() => toggleBookmark(lessonKey)}
             className={`p-2 rounded-lg transition-colors ${
-              bookmarks.includes(lessonKey)
+              bookmarks.has(lessonKey)
                 ? 'bg-yellow-100 dark:bg-yellow-500/20 text-yellow-600 dark:text-yellow-400'
                 : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-600'
             }`}
-            title={bookmarks.includes(lessonKey) ? 'Remove bookmark' : 'Add bookmark'}
+            title={bookmarks.has(lessonKey) ? 'Remove bookmark' : 'Add bookmark'}
           >
             <Bookmark className="w-5 h-5" />
           </button>

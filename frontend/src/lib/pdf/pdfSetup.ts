@@ -38,7 +38,7 @@ export const initPDFWorker = async (): Promise<boolean> => {
     }
 
     isWorkerInitialized = true;
-    console.log('[PDF Setup] PDF worker initialized successfully');
+    console.warn('[PDF Setup] PDF worker initialized successfully');
     return true;
   } catch (error) {
     console.error('[PDF Setup] Failed to initialize PDF worker:', error);
@@ -50,7 +50,7 @@ export const initPDFWorker = async (): Promise<boolean> => {
         // Use a reliable CDN source
         pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.mjs`;
         isWorkerInitialized = true;
-        console.log('[PDF Setup] PDF worker initialized from CDN fallback');
+        console.warn('[PDF Setup] PDF worker initialized from CDN fallback');
         return true;
       }
     } catch (cdnError) {
