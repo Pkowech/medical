@@ -7,6 +7,7 @@ const webpack = require('webpack');
 
 const isDev = process.env.NODE_ENV === 'development';
 const isProd = process.env.NODE_ENV === 'production';
+const projectRoot = path.resolve(__dirname);
 
 const ALLOWED_DEV_ORIGINS = [
   'http://localhost:3000',
@@ -294,7 +295,7 @@ const nextConfig = {
   // ========== DEVELOPER EXPERIENCE ==========
   allowedDevOrigins: ALLOWED_DEV_ORIGINS,
   turbopack: {
-    root: path.join(__dirname),
+    root: projectRoot,
   },
 
   // ========== EXPERIMENTAL FEATURES ==========
