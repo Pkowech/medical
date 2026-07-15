@@ -1,0 +1,158 @@
+name: CI / Build & Deploy to Koyeb
+
+on:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-push:
+    name: Build & Push Docker images (GHCR)
+    runs-on: ubuntu-latest
+    outputs:
+      backend_image: ${{ steps.set-images.outputs.backend_image }}
+      rust_image: ${{ steps.set-images.outputs.rust_image }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login to GHCR
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.CR_PAT }}
+
+      - name: Set image names
+        id: set-images
+        run: |
+          echo "backend_image=ghcr.io/${{ github.repository_owner }}/medtrack-backend:${{ github.sha }}" >> $GITHUB_OUTPUT
+          echo "rust_image=ghcr.io/${{ github.repository_owner }}/medtrack-rust-analytics:${{ github.sha }}" >> $GITHUB_OUTPUT
+
+      - name: Build & push backend image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.set-images.outputs.backend_image }}
+
+      - name: Build & push rust image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./rust_analytics
+          file: ./rust_analytics/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.set-images.outputs.rust_image }}
+
+  deploy-to-koyeb:
+    name: Deploy to Koyeb (optional)
+    runs-on: ubuntu-latest
+    needs: [build-and-push, ensure-koyeb-apps]
+    if: ${{ secrets.KOYEB_API_TOKEN }}
+    steps:
+      - name: Echo images
+        run: |
+          echo "Backend image: ${{ needs.build-and-push.outputs.backend_image }}"
+          echo "Rust image: ${{ needs.build-and-push.outputs.rust_image }}"
+
+      - name: Deploy backend to Koyeb via API
+        env:
+          KOYEB_TOKEN: ${{ secrets.KOYEB_API_TOKEN }}
+          IMAGE: ${{ needs.build-and-push.outputs.backend_image }}
+          APP_ID: ${{ secrets.KOYEB_APP_BACKEND || needs.ensure-koyeb-apps.outputs.backend_app_id }}
+        run: |
+          if [ -z "$APP_ID" ]; then
+            echo "No backend app id available; skipping backend deployment"
+            exit 0
+          fi
+          echo "Triggering Koyeb deployment for backend app $APP_ID"
+          curl -s -X POST "https://api.koyeb.com/v1/apps/${APP_ID}/deployments" \
+            -H "Authorization: Bearer ${KOYEB_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "{\"services\":[{\"image\":\"${IMAGE}\"}]}" | jq .
+
+      - name: Deploy rust to Koyeb via API
+        env:
+          KOYEB_TOKEN: ${{ secrets.KOYEB_API_TOKEN }}
+          IMAGE: ${{ needs.build-and-push.outputs.rust_image }}
+          APP_ID: ${{ secrets.KOYEB_APP_RUST || needs.ensure-koyeb-apps.outputs.rust_app_id }}
+        run: |
+          if [ -z "$APP_ID" ]; then
+            echo "No rust app id available; skipping rust deployment"
+            exit 0
+          fi
+          echo "Triggering Koyeb deployment for rust app $APP_ID"
+          curl -s -X POST "https://api.koyeb.com/v1/apps/${APP_ID}/deployments" \
+            -H "Authorization: Bearer ${KOYEB_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "{\"services\":[{\"image\":\"${IMAGE}\"}]}" | jq .
+
+  ensure-koyeb-apps:
+    name: Ensure Koyeb apps exist (create if missing)
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    outputs:
+      backend_app_id: ${{ steps.set-backend-app.outputs.backend_app_id }}
+      rust_app_id: ${{ steps.set-rust-app.outputs.rust_app_id }}
+    steps:
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Set images env
+        run: |
+          echo "IMAGE_BACKEND=${{ needs.build-and-push.outputs.backend_image }}" >> $GITHUB_ENV
+          echo "IMAGE_RUST=${{ needs.build-and-push.outputs.rust_image }}" >> $GITHUB_ENV
+
+      - name: Create or use backend app
+        id: set-backend-app
+        run: |
+          KOYEB_TOKEN="${{ secrets.KOYEB_API_TOKEN }}"
+          if [ -n "${{ secrets.KOYEB_APP_BACKEND }}" ]; then
+            echo "backend_app_id=${{ secrets.KOYEB_APP_BACKEND }}" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          NAME="medtrack-backend-${GITHUB_SHA:0:8}"
+          echo "Creating Koyeb app $NAME"
+          RESPONSE=$(curl -s -X POST "https://api.koyeb.com/v1/apps" \
+            -H "Authorization: Bearer ${KOYEB_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "{\"name\":\"${NAME}\"}")
+          ID=$(echo "$RESPONSE" | jq -r .id)
+          if [ "$ID" = "null" ] || [ -z "$ID" ]; then
+            echo "Failed to create backend app: $RESPONSE" >&2
+            exit 1
+          fi
+          echo "backend_app_id=$ID" >> $GITHUB_OUTPUT
+
+      - name: Create or use rust app
+        id: set-rust-app
+        run: |
+          KOYEB_TOKEN="${{ secrets.KOYEB_API_TOKEN }}"
+          if [ -n "${{ secrets.KOYEB_APP_RUST }}" ]; then
+            echo "rust_app_id=${{ secrets.KOYEB_APP_RUST }}" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          NAME="medtrack-rust-${GITHUB_SHA:0:8}"
+          echo "Creating Koyeb app $NAME"
+          RESPONSE=$(curl -s -X POST "https://api.koyeb.com/v1/apps" \
+            -H "Authorization: Bearer ${KOYEB_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "{\"name\":\"${NAME}\"}")
+          ID=$(echo "$RESPONSE" | jq -r .id)
+          if [ "$ID" = "null" ] || [ -z "$ID" ]; then
+            echo "Failed to create rust app: $RESPONSE" >&2
+            exit 1
+          fi
+          echo "rust_app_id=$ID" >> $GITHUB_OUTPUT
