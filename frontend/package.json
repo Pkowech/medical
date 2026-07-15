@@ -4,7 +4,7 @@
   "private": true,
   "packageManager": "pnpm@10.28.1",
   "engines": {
-    "node": ">=22.9.0 <23"
+    "node": ">=22.9.0 <25"
   },
   "scripts": {
     "postinstall": "npm run setup:pdfjs",

@@ -7,7 +7,7 @@ const webpack = require('webpack');
 
 const isDev = process.env.NODE_ENV === 'development';
 const isProd = process.env.NODE_ENV === 'production';
-const projectRoot = path.resolve(__dirname);
+const projectRoot = path.resolve(process.cwd() || __dirname);
 
 const ALLOWED_DEV_ORIGINS = [
   'http://localhost:3000',
@@ -282,7 +282,7 @@ const nextConfig = {
   // ========== BUILD & OUTPUT ==========
   output: process.env.DOCKER_BUILD === 'true' ? 'standalone' : undefined,
   productionBrowserSourceMaps: false,
-  outputFileTracingRoot: getOutputTracingRoot(),
+  outputFileTracingRoot: projectRoot,
 
   // ========== COMPILER & LINTING ==========
   compiler: {

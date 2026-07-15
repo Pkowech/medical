@@ -203,11 +203,12 @@ jobs:
           fi
 
           read -r -d '' PAYLOAD <<EOF || true
-{"services":[{"image":"${IMAGE}","envs":${ENVS_JSON}}]}
-EOF
+          {"services":[{"image":"${IMAGE}","envs":${ENVS_JSON}}]}
+          EOF
 
           echo "$PAYLOAD" | jq .
           curl -s -X POST "https://api.koyeb.com/v1/apps/${APP_ID}/deployments" \
+
             -H "Authorization: Bearer ${KOYEB_TOKEN}" \
             -H "Content-Type: application/json" \
             -d "$PAYLOAD" | jq .
@@ -242,8 +243,8 @@ EOF
           fi
 
           read -r -d '' PAYLOAD <<EOF || true
-{"services":[{"image":"${IMAGE}","envs":${ENVS_JSON}}]}
-EOF
+          {"services":[{"image":"${IMAGE}","envs":${ENVS_JSON}}]}
+          EOF
 
           echo "$PAYLOAD" | jq .
           curl -s -X POST "https://api.koyeb.com/v1/apps/${APP_ID}/deployments" \
