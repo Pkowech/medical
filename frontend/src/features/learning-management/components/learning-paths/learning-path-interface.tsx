@@ -24,7 +24,26 @@ import { learningPathService } from '@/features/learning-management/services/lea
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils/cn';
 
+// Safely coerce an unknown value (from API responses) into a display string.
+// Avoids @typescript-eslint/no-base-to-string, which flags String(unknown)
+// because objects would stringify to "[object Object]".
+const toDisplayString = (value: unknown, fallback = ''): string => {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  return fallback;
+};
 
+type PhaseStatus = 'completed' | 'inProgress' | 'notStarted';
+type ModuleStatus = 'completed' | 'inProgress' | 'notStarted' | 'skipped';
+
+const PHASE_STATUSES: readonly PhaseStatus[] = ['completed', 'inProgress', 'notStarted'];
+const MODULE_STATUSES: readonly ModuleStatus[] = ['completed', 'inProgress', 'notStarted', 'skipped'];
+
+const toPhaseStatus = (value: unknown, fallback: PhaseStatus = 'notStarted'): PhaseStatus =>
+  (PHASE_STATUSES as readonly unknown[]).includes(value) ? (value as PhaseStatus) : fallback;
+
+const toModuleStatus = (value: unknown, fallback: ModuleStatus = 'notStarted'): ModuleStatus =>
+  (MODULE_STATUSES as readonly unknown[]).includes(value) ? (value as ModuleStatus) : fallback;
 
 interface InlineStatCardProps {
   icon: React.ElementType;
@@ -71,7 +90,7 @@ const DifficultyBadge: React.FC<{ difficulty: string }> = ({ difficulty }) => {
 const ProgressBar: React.FC<{ value: number; className?: string }> = ({ value, className }) => (
   <div className={cn('h-1 w-full bg-neutral-100 dark:bg-neutral-800 rounded-full overflow-hidden', className)}>
     <div
-      className="h-full bg-gradient-to-r from-indigo-500 to-violet-500 rounded-full transition-all duration-700 dynamic-width"
+      className="h-full bg-linear-to-r from-indigo-500 to-violet-500 rounded-full transition-all duration-700 dynamic-width"
       style={{ '--width': `${Math.min(100, Math.max(0, value))}%` } as React.CSSProperties}
     />
   </div>
@@ -281,12 +300,12 @@ export const LearningPathInterface: React.FC = () => {
     const createdBy = raw.createdBy as Record<string, unknown> | undefined;
 
     return {
-      id: String(raw.id ?? ''),
-      title: String(raw.title ?? raw.name ?? ''),
-      description: String(raw.description ?? raw.desc ?? ''),
-      category: String(raw.category ?? raw.categoryId ?? ''),
-      difficulty: String(raw.difficulty ?? ''),
-      status: String(raw.status ?? ''),
+      id: toDisplayString(raw.id),
+      title: toDisplayString(raw.title ?? raw.name),
+      description: toDisplayString(raw.description ?? raw.desc),
+      category: toDisplayString(raw.category ?? raw.categoryId),
+      difficulty: toDisplayString(raw.difficulty),
+      status: toDisplayString(raw.status),
       estimatedDurationWeeks: Number(raw.estimatedDurationWeeks ?? raw.estimated_duration_weeks ?? 0),
       estimatedHoursPerWeek: Number(raw.estimatedHoursPerWeek ?? raw.estimated_hours_per_week ?? 0),
       tags: Array.isArray(raw.tags) ? raw.tags.map(String) : [],
@@ -304,9 +323,9 @@ export const LearningPathInterface: React.FC = () => {
         },
       },
       createdBy: {
-        id: String(createdBy?.id ?? createdBy?.user_id ?? ''),
-        firstName: String(createdBy?.firstName ?? createdBy?.first_name ?? ''),
-        lastName: String(createdBy?.lastName ?? createdBy?.last_name ?? ''),
+        id: toDisplayString(createdBy?.id ?? createdBy?.user_id),
+        firstName: toDisplayString(createdBy?.firstName ?? createdBy?.first_name),
+        lastName: toDisplayString(createdBy?.lastName ?? createdBy?.last_name),
       },
       courses: Array.isArray(raw.courses) ? (raw.courses as unknown[]) : [],
       milestones: Array.isArray(raw.milestones)
@@ -314,16 +333,16 @@ export const LearningPathInterface: React.FC = () => {
             const milestone = milestoneItem as Record<string, unknown>;
             const rewards = milestone.rewards as Record<string, unknown> | undefined;
             return {
-              id: String(milestone.id ?? ''),
-              title: String(milestone.title ?? ''),
-              description: String(milestone.description ?? milestone.desc ?? ''),
-              type: String(milestone.type ?? ''),
+              id: toDisplayString(milestone.id),
+              title: toDisplayString(milestone.title),
+              description: toDisplayString(milestone.description ?? milestone.desc),
+              type: toDisplayString(milestone.type),
               order: Number(milestone.order ?? 0),
               isRequired: Boolean(milestone.isRequired ?? milestone.is_required ?? false),
               rewards: rewards
                 ? {
                     points: Number(rewards.points ?? 0),
-                    badgeId: String(rewards.badgeId ?? rewards.badge_id ?? ''),
+                    badgeId: toDisplayString(rewards.badgeId ?? rewards.badge_id),
                     certificate: rewards.certificate as { templateId: string; title?: string; description?: string } | undefined,
                   }
                 : undefined,
@@ -359,9 +378,10 @@ export const LearningPathInterface: React.FC = () => {
       const data = await learningPathService.getMyProgress();
       if (Array.isArray(data)) {
         setUserProgress(data.map(p => {
-          const rawPath = (p as Record<string, unknown>).learningPath ?? (p as Record<string, unknown>).learning_path;
+          const rawRecord = p as unknown as Record<string, unknown>;
+          const rawPath = rawRecord.learningPath ?? rawRecord.learning_path;
           const path = normalizeLearningPath(rawPath as Record<string, unknown>);
-          const asRecord = p as Record<string, unknown>;
+          const asRecord = rawRecord;
 
           const phaseProgressRaw = Array.isArray(asRecord.phaseProgress)
             ? asRecord.phaseProgress
@@ -380,17 +400,17 @@ export const LearningPathInterface: React.FC = () => {
             : [];
 
           return {
-            id: String(asRecord.id ?? ''),
+            id: toDisplayString(asRecord.id),
             overallProgressPercentage: Number(asRecord.overallProgressPercentage ?? asRecord.overall_progress_percentage ?? 0),
-            status: String(asRecord.status ?? ''),
-            startedAt: String(asRecord.startedAt ?? asRecord.started_at ?? new Date().toISOString()),
-            lastAccessedAt: String(asRecord.lastAccessedAt ?? asRecord.last_accessed_at ?? new Date().toISOString()),
+            status: toDisplayString(asRecord.status),
+            startedAt: toDisplayString(asRecord.startedAt ?? asRecord.started_at, new Date().toISOString()),
+            lastAccessedAt: toDisplayString(asRecord.lastAccessedAt ?? asRecord.last_accessed_at, new Date().toISOString()),
             learningPath: path,
             milestonesAchieved: milestonesRaw.map((m: unknown) => {
               const milestone = m as Record<string, unknown>;
               return {
-                milestoneId: String(milestone.milestoneId ?? milestone.milestone_id ?? ''),
-                achievedAt: String(milestone.achievedAt ?? milestone.achieved_at ?? new Date().toISOString()),
+                milestoneId: toDisplayString(milestone.milestoneId ?? milestone.milestone_id),
+                achievedAt: toDisplayString(milestone.achievedAt ?? milestone.achieved_at, new Date().toISOString()),
               };
             }),
             currentPhaseIndex: Number(asRecord.currentPhaseIndex ?? asRecord.current_phase_index ?? 0),
@@ -398,23 +418,23 @@ export const LearningPathInterface: React.FC = () => {
             phaseProgress: phaseProgressRaw.map((pp: unknown) => {
               const phase = pp as Record<string, unknown>;
               return {
-                phaseId: String(phase.phaseId ?? phase.phase_id ?? ''),
-                status: String(phase.status ?? 'notStarted'),
+                phaseId: toDisplayString(phase.phaseId ?? phase.phase_id),
+                status: toPhaseStatus(phase.status),
                 progressPercentage: Number(phase.progressPercentage ?? phase.progress_percentage ?? 0),
                 modulesCompleted: Array.isArray(phase.modulesCompleted)
                   ? phase.modulesCompleted.map(String)
                   : Array.isArray(phase.modules_completed)
                   ? phase.modules_completed.map(String)
                   : [],
-                currentModuleId: String(phase.currentModuleId ?? phase.current_module_id ?? ''),
+                currentModuleId: toDisplayString(phase.currentModuleId ?? phase.current_module_id),
               };
             }),
             moduleProgress: moduleProgressRaw.map((mp: unknown) => {
               const mod = mp as Record<string, unknown>;
               return {
-                moduleId: String(mod.moduleId ?? mod.module_id ?? ''),
-                phaseId: String(mod.phaseId ?? mod.phase_id ?? ''),
-                status: String(mod.status ?? 'notStarted'),
+                moduleId: toDisplayString(mod.moduleId ?? mod.module_id),
+                phaseId: toDisplayString(mod.phaseId ?? mod.phase_id),
+                status: toModuleStatus(mod.status),
                 progressPercentage: Number(mod.progressPercentage ?? mod.progress_percentage ?? 0),
                 timeSpentMinutes: Number(mod.timeSpentMinutes ?? mod.time_spent_minutes ?? 0),
                 bestScore: mod.bestScore ?? mod.best_score,

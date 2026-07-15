@@ -23,6 +23,15 @@ interface LearningPathRecommendationsProps {
   showCollaborative?: boolean;
 }
 
+// Safely coerce an unknown value (from API responses) into a display string.
+// Avoids @typescript-eslint/no-base-to-string, which flags String(unknown)
+// because objects would stringify to "[object Object]".
+const toDisplayString = (value: unknown, fallback = ''): string => {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  return fallback;
+};
+
 export const LearningPathRecommendations: React.FC<LearningPathRecommendationsProps> = ({
   userId,
   limit = 6,
@@ -56,7 +65,7 @@ export const LearningPathRecommendations: React.FC<LearningPathRecommendationsPr
             personalizedData.map(async (raw: unknown) => {
               const item = raw as Record<string, unknown>;
               const rec: RecommendationScore = {
-                pathId: String(item.path_id ?? item.pathId ?? ''),
+                pathId: toDisplayString(item.path_id ?? item.pathId),
                 score: Number(item.score ?? 0),
                 reasons: Array.isArray(item.reasons) ? item.reasons.map(String) : [],
                 confidence: Number(item.confidence ?? 0),
@@ -91,7 +100,7 @@ export const LearningPathRecommendations: React.FC<LearningPathRecommendationsPr
               collaborativeData.map(async (raw: unknown) => {
                 const item = raw as Record<string, unknown>;
                 const rec: RecommendationScore = {
-                  pathId: String(item.path_id ?? item.pathId ?? ''),
+                  pathId: toDisplayString(item.path_id ?? item.pathId),
                   score: Number(item.score ?? 0),
                   reasons: Array.isArray(item.reasons) ? item.reasons.map(String) : [],
                   confidence: Number(item.confidence ?? 0),
@@ -127,24 +136,27 @@ export const LearningPathRecommendations: React.FC<LearningPathRecommendationsPr
             // Normalize backend trending path shape to our TrendingPath type
             const mapped: TrendingPath[] = trendingData.map((p: unknown) => {
               const rec = p as Record<string, unknown>;
-              const analyticsRaw = (rec.analytics as Record<string, unknown>) ?? {};
+              const analyticsRaw = (rec.analytics as Record<string, unknown> | undefined) ?? {};
+              const analyticsRatings = (analyticsRaw.user_ratings as Record<string, unknown> | undefined) ??
+                (analyticsRaw.userRatings as Record<string, unknown> | undefined) ?? {};
+
               return {
-                id: String(rec.path_id ?? rec.id ?? ''),
-                pathId: String(rec.path_id ?? rec.id ?? ''),
-                title: String(rec.title ?? ''),
-                description: String(rec.description ?? ''),
-                difficulty: String(rec.difficulty ?? ''),
-                category: String(rec.category ?? ''),
+                id: toDisplayString(rec.path_id ?? rec.id),
+                pathId: toDisplayString(rec.path_id ?? rec.id),
+                title: toDisplayString(rec.title),
+                description: toDisplayString(rec.description),
+                difficulty: toDisplayString(rec.difficulty),
+                category: toDisplayString(rec.category),
                 analytics: {
                   userRatings: {
-                    average: Number(analyticsRaw.user_ratings?.average ?? analyticsRaw.userRatings?.average ?? 0),
-                    count: Number(analyticsRaw.user_ratings?.count ?? analyticsRaw.userRatings?.count ?? 0),
+                    average: Number(analyticsRatings.average ?? analyticsRatings.averag ?? analyticsRatings.avg ?? 0),
+                    count: Number(analyticsRatings.count ?? 0),
                   },
                   totalEnrollments: Number(analyticsRaw.total_enrollments ?? analyticsRaw.totalEnrollments ?? 0),
                   completionRate: Number(analyticsRaw.completion_rate ?? analyticsRaw.completionRate ?? 0),
                 },
                 estimatedDurationWeeks: Number(rec.estimated_duration_weeks ?? rec.estimatedDurationWeeks ?? 0),
-                popularity: rec.popularity ?? rec.popularity_score,
+                popularity: Number(rec.popularity ?? rec.popularity_score ?? 0) || undefined,
               };
             });
             setTrendingPaths(mapped);

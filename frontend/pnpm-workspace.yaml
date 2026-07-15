@@ -1,4 +1,5 @@
 onlyBuiltDependencies:
+  - '@iamjariwala/react-doc-viewer'
   - canvas
   - sharp
   - unrs-resolver
