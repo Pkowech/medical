@@ -199,7 +199,7 @@ export const useCourseData = (courseId: string) => {
           (unitObj.materials as unknown as Array<Record<string, unknown>>).forEach(m => {
             extraMaterials.push({
               ...(m as unknown as CourseMaterial),
-              unitId: u.id,
+              unitId: Number(u.id),
             });
           });
         }
@@ -211,7 +211,7 @@ export const useCourseData = (courseId: string) => {
               (t.materials as unknown as Array<Record<string, unknown>>).forEach(m => {
                 extraMaterials.push({
                   ...(m as unknown as CourseMaterial),
-                  unitId: String(t.id),
+                  unitId: Number(t.id),
                 });
               });
             }

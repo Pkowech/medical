@@ -299,8 +299,8 @@ export const LearningPathInterface: React.FC = () => {
         totalEnrollments: Number(analytics?.totalEnrollments ?? analytics?.total_enrollments ?? 0),
         completionRate: Number(analytics?.completionRate ?? analytics?.completion_rate ?? 0),
         userRatings: {
-          average: Number(analytics?.userRatings?.average ?? analytics?.user_ratings?.average ?? 0),
-          count: Number(analytics?.userRatings?.count ?? analytics?.user_ratings?.count ?? 0),
+          average: Number((analytics?.userRatings as Record<string, unknown>)?.average ?? (analytics?.user_ratings as Record<string, unknown>)?.average ?? 0),
+          count: Number((analytics?.userRatings as Record<string, unknown>)?.count ?? (analytics?.user_ratings as Record<string, unknown>)?.count ?? 0),
         },
       },
       createdBy: {

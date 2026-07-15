@@ -23,6 +23,7 @@ import { ProgressBar } from '@/shared/components/ui/ProgressBar';
 import { CourseSidebar } from '@/features/courses/components/CourseSidebar';
 import { CourseContent } from '@/features/courses/components/CourseContent';
 import { Material } from '@/shared/types/materialInterface';
+import { Lesson } from '@/shared/types/courseInterface';
 import { NotesPanel } from '@/features/courses/components/NotesPanel';
 import { DiscussionPanel } from '@/features/courses/components/DiscussionPanel';
 import { QuizPanel } from '@/features/courses/components/QuizPanel';
@@ -403,7 +404,7 @@ export const UnitLayout = ({ unitId: propUnitId }: UnitLayoutProps) => {
     return chapter ? chapter.lessons[currentLessonIndex] : undefined;
   };
 
-  const typedCurrentTopic = getCurrentTopic() as unknown as { id?: string | number; resources?: Material[] };
+  const typedCurrentTopic = getCurrentTopic() as unknown as Lesson & { resources?: Material[] };
 
   // ── Materials for the current topic ───────────────────────────────────
   // The lesson carries `resources` (set in normalizeUnitToChapters).
