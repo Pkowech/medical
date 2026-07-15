@@ -8,7 +8,7 @@ const webpack = require('webpack');
 const isDev = process.env.NODE_ENV === 'development';
 const isProd = process.env.NODE_ENV === 'production';
 const projectRoot = path.resolve(__dirname);
-const distDir = path.join(projectRoot, '.next');
+const distDir = '.next';
 
 const ALLOWED_DEV_ORIGINS = [
   'http://localhost:3000',
