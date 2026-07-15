@@ -294,7 +294,7 @@ const nextConfig = {
   // ========== DEVELOPER EXPERIENCE ==========
   allowedDevOrigins: ALLOWED_DEV_ORIGINS,
   turbopack: {
-    root: getOutputTracingRoot(),
+    root: path.join(__dirname),
   },
 
   // ========== EXPERIMENTAL FEATURES ==========

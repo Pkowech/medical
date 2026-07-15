@@ -15,6 +15,7 @@ jobs:
     outputs:
       backend_image: ${{ steps.set-images.outputs.backend_image }}
       rust_image: ${{ steps.set-images.outputs.rust_image }}
+      has_koyeb_token: ${{ steps.check-koyeb-token.outputs.has_token }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -38,6 +39,17 @@ jobs:
           echo "backend_image=ghcr.io/${{ github.repository_owner }}/medtrack-backend:${{ github.sha }}" >> $GITHUB_OUTPUT
           echo "rust_image=ghcr.io/${{ github.repository_owner }}/medtrack-rust-analytics:${{ github.sha }}" >> $GITHUB_OUTPUT
 
+      - name: Check Koyeb token
+        id: check-koyeb-token
+        env:
+          KOYEB_TOKEN: ${{ secrets.KOYEB_API_TOKEN }}
+        run: |
+          if [ -n "$KOYEB_TOKEN" ]; then
+            echo "has_token=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_token=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Build & push backend image
         uses: docker/build-push-action@v4
         with:
@@ -46,6 +58,15 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.set-images.outputs.backend_image }}
+
+      - name: Optionally push backend to Docker Hub
+        if: ${{ secrets.DOCKERHUB_USERNAME }}
+        run: |
+          echo "Logging into Docker Hub"
+          echo ${{ secrets.DOCKERHUB_TOKEN }} | docker login --username ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
+          docker pull ${{ steps.set-images.outputs.backend_image }}
+          docker tag ${{ steps.set-images.outputs.backend_image }} ${{ secrets.DOCKERHUB_USERNAME }}/medtrack-backend:${{ github.sha }}
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/medtrack-backend:${{ github.sha }}
 
       - name: Build & push rust image
         uses: docker/build-push-action@v4
@@ -56,48 +77,14 @@ jobs:
           push: true
           tags: ${{ steps.set-images.outputs.rust_image }}
 
-  deploy-to-koyeb:
-    name: Deploy to Koyeb (optional)
-    runs-on: ubuntu-latest
-    needs: [build-and-push, ensure-koyeb-apps]
-    if: ${{ secrets.KOYEB_API_TOKEN }}
-    steps:
-      - name: Echo images
+      - name: Optionally push rust to Docker Hub
+        if: ${{ secrets.DOCKERHUB_USERNAME }}
         run: |
-          echo "Backend image: ${{ needs.build-and-push.outputs.backend_image }}"
-          echo "Rust image: ${{ needs.build-and-push.outputs.rust_image }}"
-
-      - name: Deploy backend to Koyeb via API
-        env:
-          KOYEB_TOKEN: ${{ secrets.KOYEB_API_TOKEN }}
-          IMAGE: ${{ needs.build-and-push.outputs.backend_image }}
-          APP_ID: ${{ secrets.KOYEB_APP_BACKEND || needs.ensure-koyeb-apps.outputs.backend_app_id }}
-        run: |
-          if [ -z "$APP_ID" ]; then
-            echo "No backend app id available; skipping backend deployment"
-            exit 0
-          fi
-          echo "Triggering Koyeb deployment for backend app $APP_ID"
-          curl -s -X POST "https://api.koyeb.com/v1/apps/${APP_ID}/deployments" \
-            -H "Authorization: Bearer ${KOYEB_TOKEN}" \
-            -H "Content-Type: application/json" \
-            -d "{\"services\":[{\"image\":\"${IMAGE}\"}]}" | jq .
-
-      - name: Deploy rust to Koyeb via API
-        env:
-          KOYEB_TOKEN: ${{ secrets.KOYEB_API_TOKEN }}
-          IMAGE: ${{ needs.build-and-push.outputs.rust_image }}
-          APP_ID: ${{ secrets.KOYEB_APP_RUST || needs.ensure-koyeb-apps.outputs.rust_app_id }}
-        run: |
-          if [ -z "$APP_ID" ]; then
-            echo "No rust app id available; skipping rust deployment"
-            exit 0
-          fi
-          echo "Triggering Koyeb deployment for rust app $APP_ID"
-          curl -s -X POST "https://api.koyeb.com/v1/apps/${APP_ID}/deployments" \
-            -H "Authorization: Bearer ${KOYEB_TOKEN}" \
-            -H "Content-Type: application/json" \
-            -d "{\"services\":[{\"image\":\"${IMAGE}\"}]}" | jq .
+          echo "Logging into Docker Hub"
+          echo ${{ secrets.DOCKERHUB_TOKEN }} | docker login --username ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
+          docker pull ${{ steps.set-images.outputs.rust_image }}
+          docker tag ${{ steps.set-images.outputs.rust_image }} ${{ secrets.DOCKERHUB_USERNAME }}/medtrack-rust-analytics:${{ github.sha }}
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/medtrack-rust-analytics:${{ github.sha }}
 
   ensure-koyeb-apps:
     name: Ensure Koyeb apps exist (create if missing)
@@ -156,3 +143,175 @@ jobs:
             exit 1
           fi
           echo "rust_app_id=$ID" >> $GITHUB_OUTPUT
+
+  deploy-to-koyeb:
+    name: Deploy to Koyeb (optional)
+    runs-on: ubuntu-latest
+    needs: [build-and-push, ensure-koyeb-apps]
+    if: needs.build-and-push.outputs.has_koyeb_token == 'true'
+    steps:
+      - name: Echo images
+        run: |
+          echo "Backend image: ${{ needs.build-and-push.outputs.backend_image }}"
+          echo "Rust image: ${{ needs.build-and-push.outputs.rust_image }}"
+
+      - name: Deploy backend to Koyeb via API
+        env:
+          KOYEB_TOKEN: ${{ secrets.KOYEB_API_TOKEN }}
+          IMAGE: ${{ needs.build-and-push.outputs.backend_image }}
+          APP_ID: ${{ secrets.KOYEB_APP_BACKEND || needs.ensure-koyeb-apps.outputs.backend_app_id }}
+          NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
+          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+          CLOUDINARY_URL: ${{ secrets.CLOUDINARY_URL }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+        run: |
+          if [ -z "$APP_ID" ]; then
+            echo "No backend app id available; skipping backend deployment"
+            exit 0
+          fi
+          echo "Building envs JSON"
+          ENVS_ARRAY=()
+          add_env() {
+            NAME=$1
+            VAL=$2
+            if [ -n "$VAL" ]; then
+              # escape quotes in VAL
+              ESCAPED_VAL=$(printf '%s' "$VAL" | sed 's/"/\\"/g')
+              ENVS_ARRAY+=("{\"name\":\"$NAME\",\"value\":\"$ESCAPED_VAL\"}")
+            fi
+          }
+          add_env DATABASE_URL "$NEON_DATABASE_URL"
+          add_env UPSTASH_REDIS_REST_URL "$UPSTASH_REDIS_REST_URL"
+          add_env UPSTASH_REDIS_REST_TOKEN "$UPSTASH_REDIS_REST_TOKEN"
+          add_env CLOUDINARY_URL "$CLOUDINARY_URL"
+          add_env R2_ACCOUNT_ID "$R2_ACCOUNT_ID"
+          add_env R2_ACCESS_KEY_ID "$R2_ACCESS_KEY_ID"
+          add_env R2_SECRET_ACCESS_KEY "$R2_SECRET_ACCESS_KEY"
+          add_env R2_BUCKET "$R2_BUCKET"
+          add_env JWT_SECRET "$JWT_SECRET"
+          add_env NEXTAUTH_SECRET "$NEXTAUTH_SECRET"
+
+          ENVS_JSON="[]"
+          if [ ${#ENVS_ARRAY[@]} -gt 0 ]; then
+            ENVS_JSON=$(IFS=,; echo "[${ENVS_ARRAY[*]}]")
+          fi
+
+          read -r -d '' PAYLOAD <<EOF || true
+{"services":[{"image":"${IMAGE}","envs":${ENVS_JSON}}]}
+EOF
+
+          echo "$PAYLOAD" | jq .
+          curl -s -X POST "https://api.koyeb.com/v1/apps/${APP_ID}/deployments" \
+            -H "Authorization: Bearer ${KOYEB_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD" | jq .
+
+      - name: Deploy rust to Koyeb via API
+        env:
+          KOYEB_TOKEN: ${{ secrets.KOYEB_API_TOKEN }}
+          IMAGE: ${{ needs.build-and-push.outputs.rust_image }}
+          APP_ID: ${{ secrets.KOYEB_APP_RUST || needs.ensure-koyeb-apps.outputs.rust_app_id }}
+          RUST_ENV_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+          RUST_ENV_JWT_SECRET: ${{ secrets.JWT_SECRET }}
+        run: |
+          if [ -z "$APP_ID" ]; then
+            echo "No rust app id available; skipping rust deployment"
+            exit 0
+          fi
+          ENVS_ARRAY=()
+          add_env() {
+            NAME=$1
+            VAL=$2
+            if [ -n "$VAL" ]; then
+              ESCAPED_VAL=$(printf '%s' "$VAL" | sed 's/"/\\"/g')
+              ENVS_ARRAY+=("{\"name\":\"$NAME\",\"value\":\"$ESCAPED_VAL\"}")
+            fi
+          }
+          add_env DATABASE_URL "$RUST_ENV_DATABASE_URL"
+          add_env JWT_SECRET "$RUST_ENV_JWT_SECRET"
+
+          ENVS_JSON="[]"
+          if [ ${#ENVS_ARRAY[@]} -gt 0 ]; then
+            ENVS_JSON=$(IFS=,; echo "[${ENVS_ARRAY[*]}]")
+          fi
+
+          read -r -d '' PAYLOAD <<EOF || true
+{"services":[{"image":"${IMAGE}","envs":${ENVS_JSON}}]}
+EOF
+
+          echo "$PAYLOAD" | jq .
+          curl -s -X POST "https://api.koyeb.com/v1/apps/${APP_ID}/deployments" \
+            -H "Authorization: Bearer ${KOYEB_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD" | jq .
+
+  smoke-tests:
+    name: Smoke tests (optional)
+    runs-on: ubuntu-latest
+    needs: deploy-to-koyeb
+    if: ${{ secrets.BACKEND_HEALTH_URL || secrets.RUST_HEALTH_URL }}
+    steps:
+      - name: Wait for deployments to settle
+        run: sleep 10
+
+      - name: Backend health check
+        if: ${{ secrets.BACKEND_HEALTH_URL }}
+        env:
+          URL: ${{ secrets.BACKEND_HEALTH_URL }}
+        run: |
+          echo "Checking backend health at $URL"
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL")
+          echo "status=$HTTP_STATUS"
+          if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 400 ]; then
+            echo "Backend healthy"
+          else
+            echo "Backend health check failed with status $HTTP_STATUS" >&2
+            exit 1
+          fi
+
+      - name: Rust health check
+        if: ${{ secrets.RUST_HEALTH_URL }}
+        env:
+          URL: ${{ secrets.RUST_HEALTH_URL }}
+        run: |
+          echo "Checking rust service health at $URL"
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL")
+          echo "status=$HTTP_STATUS"
+          if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 400 ]; then
+            echo "Rust service healthy"
+          else
+            echo "Rust service health check failed with status $HTTP_STATUS" >&2
+            exit 1
+          fi
+
+  post-deploy-migrations:
+    name: Run database migrations (optional)
+    runs-on: ubuntu-latest
+    needs: [deploy-to-koyeb, build-and-push]
+    if: ${{ secrets.DATABASE_URL && secrets.RUN_MIGRATIONS == 'true' }}
+    steps:
+      - name: Login to GHCR
+        if: ${{ secrets.CR_PAT }}
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.CR_PAT }}
+
+      - name: Pull backend image
+        run: |
+          IMAGE=${{ needs.build-and-push.outputs.backend_image }}
+          docker pull $IMAGE
+
+      - name: Run Prisma migrate
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          IMAGE=${{ needs.build-and-push.outputs.backend_image }}
+          docker run --rm -e DATABASE_URL="$DATABASE_URL" $IMAGE /bin/sh -c "npx prisma migrate deploy"
