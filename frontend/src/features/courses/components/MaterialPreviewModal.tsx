@@ -72,7 +72,7 @@ export const MaterialPreviewModal = ({ materialId, isOpen, onClose }: MaterialPr
     };
   }, [material, startTracking, stopTracking]);
 
-  const accessToken = typeof session === 'object' && session !== null ? (session as Record<string, unknown>)?.accessToken : undefined;
+  const accessToken = typeof session === 'object' && session !== null ? (session as unknown as Record<string, unknown>)?.accessToken : undefined;
   const pdfHeaders = useMemo(() => {
     if (!accessToken || typeof accessToken !== 'string') return undefined;
     return { Authorization: `Bearer ${accessToken}` };
