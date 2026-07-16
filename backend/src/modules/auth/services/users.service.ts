@@ -512,10 +512,10 @@ export class UsersService {
         ? String((uploadResult as { secure_url?: string }).secure_url)
         : undefined;
 
-    // Persist R2 key in the user row
+    // Persist the public Cloudinary URL in the user row when available.
     await this.prisma.user.update({
       where: { id: userId },
-      data: { profileImage: key },
+      data: { profileImage: cloudinaryUrl || key },
     });
 
     // Clear user cache so subsequent profile fetches get the new image

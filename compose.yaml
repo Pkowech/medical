@@ -59,7 +59,9 @@ services:
       # the relevant COPY lines to the Dockerfile.
       context: ./backend
       dockerfile: Dockerfile
-      target: production
+      target: final
+      args:
+        DATABASE_URL: ${DATABASE_URL:?DATABASE_URL must be set}
     container_name: medtrack_backend_prod
     restart: unless-stopped
     env_file:
@@ -67,6 +69,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: ${BACKEND_PORT}
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL must be set}
       POSTGRES_HOST: postgres
       REDIS_HOST: ${REDIS_HOST}
       # DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
@@ -113,10 +116,11 @@ services:
 
   rust-analytics:
     build:
-      # Kept at repo root: the Dockerfile does `COPY protos ./proto`, pulling
-      # from a root-level shared folder, so this one genuinely needs root context.
-      context: .
-      dockerfile: rust_analytics/Dockerfile
+      # Use the rust_analytics directory as the build context so the
+      # Dockerfile's bind mounts (src, Cargo.toml, Cargo.lock) resolve
+      # relative to the crate directory.
+      context: ./rust_analytics
+      dockerfile: Dockerfile
     container_name: medtrack_rust_analytics_prod
     restart: unless-stopped
     env_file:
@@ -126,8 +130,8 @@ services:
       RUST_ANALYTICS_GRPC_PORT: 50051
       RUST_ANALYTICS_HOST: 0.0.0.0
       RUST_ANALYTICS_PORT: 8000
-      DATABASE_URL: ${DATABASE_URL}
-      RUST_API_KEY: a-secret-key
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL must be set}
+      RUST_API_KEY: ${RUST_API_KEY:?RUST_API_KEY must be set}
     ports:
       - "50051:50051"
       - "8000:8000"

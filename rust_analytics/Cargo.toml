@@ -74,6 +74,3 @@ strip = true
 [build-dependencies]
 tonic-build = "0.14.2"
 tonic-prost-build = "0.14.2"
-
-
-

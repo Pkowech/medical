@@ -250,7 +250,7 @@ export class UsersController {
 
   @Post(':id/profile/image')
   @ApiOperation({
-    summary: 'Upload and optimise a profile image (stored in R2)',
+    summary: 'Upload and optimise a profile image (stored in Cloudinary)',
   })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -262,7 +262,7 @@ export class UsersController {
   })
   @ApiResponse({
     status: HttpStatus.OK,
-    description: 'Returns signed download URL and storage key',
+    description: 'Returns the public Cloudinary URL and storage key',
   })
   @UseInterceptors(
     FileInterceptor('file', { limits: { fileSize: 5 * 1024 * 1024 } }),

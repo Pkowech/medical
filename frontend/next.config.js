@@ -14,7 +14,8 @@ const distDir = '.next';
 
 const ALLOWED_DEV_ORIGINS = [
   'http://localhost:3000',
-  'http://[IP_ADDRESS]'
+  'http://[IP_ADDRESS]',
+  'http://192.168.137.1:3000'
 ];
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';

@@ -14,16 +14,13 @@ export const validationSchema = Joi.object({
   APP_NAME: Joi.string().default('MedTrack Hub'),
   APP_VERSION: Joi.string().default('1.0.0'),
 
-  // Database (Required in production)
-  POSTGRES_HOST: Joi.string().required(),
+  // Database
+  // Support both Neon/managed Postgres URLs and traditional host-based config.
+  POSTGRES_HOST: Joi.string().optional(),
   POSTGRES_PORT: Joi.number().port().default(5432),
-  POSTGRES_USER: Joi.string().required(),
-  POSTGRES_PASSWORD: Joi.string().when('NODE_ENV', {
-    is: 'production',
-    then: Joi.required(),
-    otherwise: Joi.optional(),
-  }),
-  POSTGRES_DB: Joi.string().required(),
+  POSTGRES_USER: Joi.string().optional(),
+  POSTGRES_PASSWORD: Joi.string().optional(),
+  POSTGRES_DB: Joi.string().optional(),
   DATABASE_URL: Joi.string().uri().optional(),
   TYPEORM_SYNC: Joi.boolean().default(false),
   TYPEORM_LOGGING: Joi.boolean().default(false),
@@ -33,9 +30,9 @@ export const validationSchema = Joi.object({
   DATABASE_TIMEOUT: Joi.number().min(1000).default(60000),
 
   // Redis
-  // Default to the Docker service name so containers can resolve the redis host
-  // when running in docker-compose. Developers running the backend locally can
-  // still override this with REDIS_HOST=localhost in their environment.
+  // Support either a direct Redis URL (e.g. Upstash / managed Redis) or
+  // a host-based configuration for Docker/local development.
+  REDIS_URL: Joi.string().uri().optional(),
   REDIS_HOST: Joi.string().default('redis'),
   REDIS_PORT: Joi.number().port().default(6379),
   REDIS_PASSWORD: Joi.string().optional(),
@@ -82,6 +79,14 @@ export const validationSchema = Joi.object({
   AWS_SECRET_ACCESS_KEY: Joi.string().optional(),
   AWS_S3_BUCKET: Joi.string().optional(),
   AWS_S3_REGION: Joi.string().optional(),
+
+  // Cloudinary
+  CLOUDINARY_CLOUD_NAME: Joi.string().optional(),
+  CLOUDINARY_API_KEY: Joi.string().optional(),
+  CLOUDINARY_API_SECRET: Joi.string().optional(),
+  CLOUDINARY_URL: Joi.string().uri().optional(),
+  CLOUDINARY_FOLDER: Joi.string().default('medtrack'),
+  FILE_STORAGE_PROVIDER: Joi.string().valid('cloudinary', 's3', 'local').default('cloudinary'),
 
   // Analytics Service
   ANALYTICS_SERVICE_URL: Joi.string().uri().default('http://localhost:5000'),
@@ -150,6 +155,17 @@ export function validateConfig(config: Record<string, unknown>) {
       `Configuration validation failed:\n${errorMessages.join('\n')}\n\n` +
         'Please check your environment variables and ensure all required values are set.',
     );
+  }
+
+  if (!value.DATABASE_URL) {
+    const hasPgConfig = Boolean(
+      value.POSTGRES_HOST && value.POSTGRES_USER && value.POSTGRES_DB,
+    );
+    if (!hasPgConfig) {
+      throw new Error(
+        'Database configuration is incomplete. Provide DATABASE_URL or POSTGRES_HOST/POSTGRES_USER/POSTGRES_DB.',
+      );
+    }
   }
 
   return value;

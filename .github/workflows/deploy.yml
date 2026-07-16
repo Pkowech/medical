@@ -10,7 +10,7 @@ permissions:
 
 env:
   NODE_VERSION: "22"
-  PNPM_VERSION: "9.12.2"
+  PNPM_VERSION: "10.32.1"
   REGISTRY: ghcr.io
   OWNER: ${{ github.repository_owner }}
 
@@ -33,8 +33,8 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.CR_PAT }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build & push
         uses: docker/build-push-action@v6
@@ -68,8 +68,8 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.CR_PAT }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build & push
         uses: docker/build-push-action@v6

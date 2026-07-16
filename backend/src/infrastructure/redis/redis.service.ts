@@ -13,7 +13,10 @@ export class RedisService {
     new Map();
 
   constructor(private configService: ConfigService) {
-    if (process.env.ENABLE_REDIS === 'true') {
+    const shouldEnableRedis =
+      process.env.ENABLE_REDIS === 'true' || Boolean(process.env.REDIS_URL);
+
+    if (shouldEnableRedis) {
       const redisConn = buildRedisConnection(this.configService);
       if (typeof redisConn === 'string') {
         this.redis = new Redis(redisConn, { lazyConnect: true });

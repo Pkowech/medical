@@ -54,7 +54,9 @@ export default function ProfilePage() {
             location: userProfile.location || '',
             specialization: userProfile.specialization || '',
             yearOfExperience: userProfile.yearOfExperience ?? 0,
-            profileImage: userProfile.profileImage || session.user.image || undefined,
+            profileImage: userProfile.profileImage && userProfile.profileImage.trim() !== ''
+              ? userProfile.profileImage
+              : (session.user.image && session.user.image.trim() !== '' ? session.user.image : undefined),
             coursesEnrolled: userProfile.stats?.coursesEnrolled || 0,
             coursesCompleted: userProfile.stats?.coursesCompleted || 0,
             totalStudyTime: userProfile.stats?.totalStudyTime || 0,

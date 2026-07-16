@@ -8,7 +8,7 @@ on:
 
 env:
   NODE_VERSION: "22"
-  PNPM_VERSION: "9.12.2"
+  PNPM_VERSION: "10.32.1"
 
 jobs:
   test-backend:

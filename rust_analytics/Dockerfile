@@ -1,58 +1,71 @@
-# Builder stage
-FROM rust:1.72-bookworm AS builder
+# syntax=docker/dockerfile:1
 
-# Install build dependencies (minimal)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    protobuf-compiler \
-    build-essential \
-    && rm -rf /var/lib/apt/lists/*
+# Comments are provided throughout this file to help you get started.
+# If you need more help, visit the Dockerfile reference guide at
+# https://docs.docker.com/go/dockerfile-reference/
 
+# Want to help us make this template better? Share your feedback here: https://forms.gle/ybq9Krt8jtBL3iCk7
+
+ARG RUST_VERSION=1.96.1
+ARG APP_NAME=rust_analytics
+
+################################################################################
+# Create a stage for building the application.
+
+FROM rust:${RUST_VERSION}-alpine AS build
+ARG APP_NAME
 WORKDIR /app
 
-# Copy project files (cache Cargo.toml first)
-COPY rust_analytics/Cargo.toml rust_analytics/Cargo.lock ./
-COPY protos ./proto
-COPY rust_analytics/build.rs ./
-COPY rust_analytics/src ./src
+# Install host build dependencies.
+RUN apk add --no-cache clang lld musl-dev git
 
-# Build release binary
-RUN cargo build --release
+# Build the application.
+# Leverage a cache mount to /usr/local/cargo/registry/
+# for downloaded dependencies, a cache mount to /usr/local/cargo/git/db
+# for git repository dependencies, and a cache mount to /app/target/ for
+# compiled dependencies which will speed up subsequent builds.
+# Leverage a bind mount to the src directory to avoid having to copy the
+# source code into the container. Once built, copy the executable to an
+# output directory before the cache mounted /app/target is unmounted.
+RUN --mount=type=bind,source=src,target=src \
+    --mount=type=bind,source=Cargo.toml,target=Cargo.toml \
+    --mount=type=bind,source=Cargo.lock,target=Cargo.lock \
+    --mount=type=cache,target=/app/target/ \
+    --mount=type=cache,target=/usr/local/cargo/git/db \
+    --mount=type=cache,target=/usr/local/cargo/registry/ \
+cargo build --locked --release && \
+cp ./target/release/$APP_NAME /bin/server
 
-# Strip for size
-RUN strip target/release/rust_analytics || true
-
-# Final stage — distroless "cc" image instead of debian:bookworm-slim.
-# distroless/cc ships only glibc + libssl + libstdc++ + ca-certificates —
-# no apt, no shell, no package manager, no wget. This is the single biggest
-# size lever available here: debian:bookworm-slim + your installed packages
-# runs 70-90MB before your binary is even added; distroless/cc starts
-# around 20-25MB. Your binary is glibc-linked (built on Debian bullseye),
-# so it's compatible without any changes to the Rust build itself.
+################################################################################
+# Create a new stage for running the application that contains the minimal
+# runtime dependencies for the application. This often uses a different base
+# image from the build stage where the necessary files are copied from the build
+# stage.
 #
-# Tradeoff: no shell means you can't `docker exec -it ... sh` into this
-# container to debug interactively. If that's something you rely on day to
-# day, tell me and I'll give you the debian:bookworm-slim variant instead
-# (still fixed/optimized, just larger).
-FROM gcr.io/distroless/cc-debian12:nonroot AS final
+# The example below uses the alpine image as the foundation for running the app.
+# By specifying the "3.18" tag, it will use version 3.18 of alpine. If
+# reproducibility is important, consider using a digest
+# (e.g., alpine@sha256:664888ac9cfd28068e062c991ebcff4b4c7307dc8dd4df9e728bedde5c449d91).
+FROM alpine:3.18 AS final
 
-# Copy binary
-COPY --from=builder /app/target/release/rust_analytics /usr/local/bin/rust_analytics
+# Create a non-privileged user that the app will run under.
+# See https://docs.docker.com/go/dockerfile-user-best-practices/
+ARG UID=10001
+RUN adduser \
+    --disabled-password \
+    --gecos "" \
+    --home "/nonexistent" \
+    --shell "/sbin/nologin" \
+    --no-create-home \
+    --uid "${UID}" \
+    appuser
+USER appuser
 
-# distroless ships a built-in non-root user (nonroot:nonroot, uid 65532) —
-# no addgroup/adduser needed (and no shell to run them in anyway). The
-# original Dockerfile used Alpine's `-S` flag for adduser/addgroup on a
-# Debian base, which would have failed the build outright: Debian's
-# adduser/addgroup don't support `-S`.
-USER nonroot:nonroot
+# Copy the executable from the "build" stage.
+COPY --from=build /bin/server /bin/
 
-EXPOSE 8000 50051
+# Expose the port that the application listens on.
+EXPOSE 8000
 
-# Healthcheck now matches what docker-compose.yml actually expects (the
-# binary's own --health flag), and uses exec form so it doesn't need a shell.
-# The previous version installed wget just to hit an HTTP endpoint here,
-# duplicating logic the binary already implements — removed that dependency
-# entirely.
-HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-    CMD ["/usr/local/bin/rust_analytics", "--health"]
-
-ENTRYPOINT ["/usr/local/bin/rust_analytics"]
+# What the container should run when it is started.
+CMD ["/bin/server"]

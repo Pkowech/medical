@@ -48,8 +48,10 @@ import { IntegrationsModule } from '#infrastructure/integrations/integrations.mo
 import { SearchModule } from '#infrastructure/search/search.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 
-const redisModules =
-  process.env.ENABLE_REDIS === 'true'
+const shouldEnableRedis =
+  process.env.ENABLE_REDIS === 'true' || Boolean(process.env.REDIS_URL);
+
+const redisModules = shouldEnableRedis
     ? [
         RedisModule,
         CacheModule.registerAsync({
@@ -153,7 +155,7 @@ const redisModules =
     AiAnalyticsModule,
 
     // Modules requiring Redis - only enable when ENABLE_REDIS=true
-    ...(process.env.ENABLE_REDIS === 'true'
+    ...(shouldEnableRedis
       ? [AnalyticsQueueModule, EngagementCommunicationModule]
       : []),
     AdminModule,

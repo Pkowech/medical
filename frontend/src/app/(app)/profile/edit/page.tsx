@@ -96,11 +96,17 @@ export default function EditProfilePage() {
             yearOfExperience: userProfile.yearOfExperience ?? 0,
             location: userProfile.location || '',
             phoneNumber: userProfile.phoneNumber || '',
-            profileImage: userProfile.profileImage || session.user.image || undefined,
+            profileImage: userProfile.profileImage && userProfile.profileImage.trim() !== ''
+              ? userProfile.profileImage
+              : (session.user.image && session.user.image.trim() !== '' ? session.user.image : undefined),
           };
           
           setProfile(fetchedProfile);
-          setPreviewImage(fetchedProfile.profileImage || session.user.image || null);
+          setPreviewImage(
+            fetchedProfile.profileImage && fetchedProfile.profileImage.trim() !== ''
+              ? fetchedProfile.profileImage
+              : (session.user.image && session.user.image.trim() !== '' ? session.user.image : null)
+          );
           setIsLoadingProfile(false);
         } catch (error: unknown) {
           console.error('Error fetching profile:', error);
@@ -154,7 +160,9 @@ export default function EditProfilePage() {
       return;
     }
 
-    const previousImage = profile.profileImage || session?.user?.image || null;
+    const previousImage = profile.profileImage && profile.profileImage.trim() !== ''
+      ? profile.profileImage
+      : (session?.user?.image && session.user.image.trim() !== '' ? session.user.image : null);
 
     // Show a local preview immediately for responsiveness
     const localUrl = URL.createObjectURL(file);

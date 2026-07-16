@@ -12,7 +12,11 @@ export class CloudinaryStorageAdapter implements IFileStorage {
   private readonly folder: string;
 
   constructor(private readonly configService: ConfigService) {
-    this.cloudName = this.configService.get<string>('CLOUDINARY_CLOUD_NAME') || '';
+    const cloudinaryUrl = this.configService.get<string>('CLOUDINARY_URL') || '';
+    const cloudNameFromUrl = this.extractCloudNameFromUrl(cloudinaryUrl);
+
+    this.cloudName =
+      this.configService.get<string>('CLOUDINARY_CLOUD_NAME') || cloudNameFromUrl || '';
     this.apiKey = this.configService.get<string>('CLOUDINARY_API_KEY') || '';
     this.apiSecret = this.configService.get<string>('CLOUDINARY_API_SECRET') || '';
     this.folder = this.configService.get<string>('CLOUDINARY_FOLDER') || 'medtrack';
@@ -23,6 +27,26 @@ export class CloudinaryStorageAdapter implements IFileStorage {
       api_secret: this.apiSecret,
       secure: true,
     });
+  }
+
+  private extractCloudNameFromUrl(url: string): string {
+    if (!url) {
+      return '';
+    }
+
+    try {
+      const parsed = new URL(url);
+      if (parsed.hostname) {
+        return parsed.hostname.split('.')[0];
+      }
+    } catch {
+      const match = url.match(/cloudinary:\/\/[^:@/]+:[^@/]+@([^/]+)/i);
+      if (match?.[1]) {
+        return match[1];
+      }
+    }
+
+    return '';
   }
 
   private ensureConfigured() {
@@ -40,6 +64,13 @@ export class CloudinaryStorageAdapter implements IFileStorage {
   private getPublicId(key: string) {
     const normalized = this.normalizeKey(key);
     return normalized.replace(/\.[^/.]+$/, '');
+  }
+
+  private buildPublicUrl(publicId: string) {
+    if (!this.cloudName) {
+      return '';
+    }
+    return `https://res.cloudinary.com/${this.cloudName}/${publicId}`;
   }
 
   async uploadBuffer(
@@ -90,7 +121,7 @@ export class CloudinaryStorageAdapter implements IFileStorage {
     const normalizedKey = this.normalizeKey(key);
     const publicId = this.getPublicId(normalizedKey);
     const publicUrl = this.buildPublicUrl(publicId);
-    return Promise.resolve(publicUrl);
+    return Promise.resolve(publicUrl || `https://res.cloudinary.com/${this.cloudName}/${publicId}`);
   }
 
   getPresignedUploadUrl(
@@ -113,10 +144,4 @@ export class CloudinaryStorageAdapter implements IFileStorage {
     throw new Error(`Cloudinary downloadBuffer is not supported for key ${key}`);
   }
 
-  private buildPublicUrl(publicId: string) {
-    if (!this.cloudName) {
-      return `https://res.cloudinary.com/${this.cloudName}/${publicId}`;
-    }
-    return `https://res.cloudinary.com/${this.cloudName}/${publicId}`;
-  }
 }
