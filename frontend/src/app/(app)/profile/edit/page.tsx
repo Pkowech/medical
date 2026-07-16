@@ -154,23 +154,24 @@ export default function EditProfilePage() {
       return;
     }
 
+    const previousImage = profile.profileImage || session?.user?.image || null;
+
     // Show a local preview immediately for responsiveness
     const localUrl = URL.createObjectURL(file);
     setPreviewImage(localUrl);
 
-    // Upload to R2 via backend
+    // Upload to the backend storage provider
     setIsUploadingImage(true);
     try {
       const { url } = await userService.uploadProfileImage(session.user.id, file);
-      // Replace blob URL with the signed R2 URL
       setPreviewImage(url);
       setProfile(prev => ({ ...prev, profileImage: url }));
     } catch {
       setImageError('Image upload failed. Please try again.');
-      setPreviewImage(profile.profileImage || null);
+      setPreviewImage(previousImage);
+      setProfile(prev => ({ ...prev, profileImage: previousImage || prev.profileImage }));
     } finally {
       setIsUploadingImage(false);
-      // Revoke the blob URL to free memory
       URL.revokeObjectURL(localUrl);
     }
   };

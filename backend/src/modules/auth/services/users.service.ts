@@ -502,10 +502,15 @@ export class UsersService {
     const timestamp = Date.now();
     const key = `profiles/${userId}/${timestamp}.webp`;
 
-    await this.fileStorage.uploadBuffer(key, optimised, 'image/webp', {
+    const uploadResult = await this.fileStorage.uploadBuffer(key, optimised, 'image/webp', {
       'user-id': userId,
       'upload-date': new Date().toISOString(),
     });
+
+    const cloudinaryUrl =
+      typeof uploadResult === 'object' && uploadResult && 'secure_url' in uploadResult
+        ? String((uploadResult as { secure_url?: string }).secure_url)
+        : undefined;
 
     // Persist R2 key in the user row
     await this.prisma.user.update({
@@ -522,12 +527,11 @@ export class UsersService {
       await this.clearCache(existing as UserWithRelations);
     }
 
-    // Return a fresh signed URL (1 hour validity)
-    const url = await this.fileStorage.getPresignedDownloadUrl(key, {
+    const url = cloudinaryUrl || (await this.fileStorage.getPresignedDownloadUrl(key, {
       filename: key.split('/').pop(),
       contentType: 'application/octet-stream',
       inline: true,
-    });
+    }));
     this.logger.log(`Profile image uploaded for user ${userId}: ${key}`);
     return { url, key };
   }

@@ -47,10 +47,18 @@ services:
 
   backend:
     build:
-      # build context set to repository root so the backend Dockerfile can access
-      # the root-level pnpm-lock.yaml and workspace files when needed
-      context: .
-      dockerfile: backend/Dockerfile
+      # Build context narrowed to ./backend. The backend Dockerfile only ever
+      # touches files inside backend/ (package.json, pnpm-lock.yaml, src, etc.)
+      # — it does not reference any root-level workspace files. Using the repo
+      # root as context meant every backend build shipped the entire monorepo
+      # (frontend source, monitoring configs, secrets/, etc.) to the Docker
+      # daemon as part of the build context for no reason, which is a large
+      # part of what made backend builds slow. If you later convert this repo
+      # into a real pnpm workspace and the Dockerfile needs root-level
+      # pnpm-workspace.yaml / root lockfile, switch this back to `.` and add
+      # the relevant COPY lines to the Dockerfile.
+      context: ./backend
+      dockerfile: Dockerfile
       target: production
     container_name: medtrack_backend_prod
     restart: unless-stopped
@@ -64,11 +72,23 @@ services:
       # DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       REDIS_URL: ${REDIS_URL}
       REDIS_PASSWORD: ${REDIS_PASSWORD}
-      JWT_SECRET: qF+4oB5BjGI5a6DKt7OK7jt16P3G1HDx5wAseOVre38=
-      NEXTAUTH_SECRET: qF+4oB5BjGI5a6DKt7OK7jt16P3G1HDx5wAseOVre38=
+      # JWT_SECRET and NEXTAUTH_SECRET now come from .env (git-ignored),
+      # like every other secret here. They were previously hardcoded to the
+      # SAME literal value directly in this file — both a leaked-secret risk
+      # (if this file is committed) and a design issue (a leak of one secret
+      # would compromise the other too, since they were identical). Generate
+      # two SEPARATE values, e.g. `openssl rand -base64 32`, and rotate
+      # whatever's currently deployed with the old hardcoded value.
+      JWT_SECRET: ${JWT_SECRET}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
       RUST_ANALYTICS_GRPC_URL: http://rust-analytics:50051
+      FILE_STORAGE_PROVIDER: ${FILE_STORAGE_PROVIDER:-cloudinary}
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
+      CLOUDINARY_FOLDER: ${CLOUDINARY_FOLDER:-medtrack}
     command: >
-      sh -c "pnpm prisma migrate deploy && pnpm start"
+      sh -c "pnpm prisma migrate deploy && node dist/main.js"
     ports:
       - "${BACKEND_PORT}:${BACKEND_PORT}"
     # Updated healthcheck to use Node.js (no curl dependency)
@@ -93,8 +113,10 @@ services:
 
   rust-analytics:
     build:
-      context: ./rust_analytics
-      dockerfile: Dockerfile
+      # Kept at repo root: the Dockerfile does `COPY protos ./proto`, pulling
+      # from a root-level shared folder, so this one genuinely needs root context.
+      context: .
+      dockerfile: rust_analytics/Dockerfile
     container_name: medtrack_rust_analytics_prod
     restart: unless-stopped
     env_file:
@@ -115,7 +137,11 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "/usr/local/bin/rust_analytics --health"]
+      # Switched from CMD-SHELL to exec-form CMD. The rust-analytics image now
+      # runs on a distroless base with NO shell (see rust_analytics/Dockerfile),
+      # so a CMD-SHELL healthcheck (which needs /bin/sh to run) would fail
+      # outright. Exec form calls the binary directly, no shell required.
+      test: ["CMD", "/usr/local/bin/rust_analytics", "--health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -143,7 +169,6 @@ services:
     secrets:
       - nextauth_secret
     command: pnpm start
-
 
   prometheus:
     image: prom/prometheus:v2.47.0
@@ -202,24 +227,6 @@ services:
     depends_on:
       - prometheus
 
-  nginx:
-    image: nginx:1.25.3
-    container_name: medtrack_nginx
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443" # For HTTPS, even if commented out in config
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/ssl:/etc/nginx/ssl:ro # For SSL certificates
-    networks:
-      - medtrack_net
-    depends_on:
-      frontend:
-        condition: service_started
-      backend:
-        condition: service_healthy
-
   gotenberg:
     image: gotenberg/gotenberg:8
     container_name: medtrack_gotenberg
@@ -228,6 +235,7 @@ services:
       - "3010:3000"
     networks:
       - medtrack_net
+
 volumes:
   postgres_data:
   redis_data:
