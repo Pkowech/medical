@@ -96,7 +96,7 @@ where
         // API Key fallback
         if let Some(api_key_header) = headers.get("x-api-key") {
             if let Ok(api_key) = api_key_header.to_str() {
-                let expected_api_key = env::var("RUST_API_KEY").unwrap_or_default();
+                let expected_api_key = env::var("RUST_ANALYTICS_API_KEY").unwrap_or_default();
                 if !expected_api_key.is_empty() && api_key == expected_api_key {
                     let fut = self.service.call(req);
                     return Box::pin(async move { fut.await.map(|res| res.map_into_left_body()) });

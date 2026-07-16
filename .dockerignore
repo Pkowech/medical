@@ -47,6 +47,14 @@ secrets/
 *.tmp
 temp/
 tmp/
+**/seed-data
+app.log
+app_startup.log
+dev_startup.log
+output.log
+*.log
+/.pnpm
+/.pnpm-store
 
 # Ignore Python artifacts
 __pycache__/

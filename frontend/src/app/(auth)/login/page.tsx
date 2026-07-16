@@ -166,10 +166,24 @@ function LoginContent() {
         // The error from NextAuth's signIn will be a string like "CredentialsSignin"
         // We can provide a more user-friendly message.
         throw new Error('Invalid username/email or password.');
-      } else {
+      } else if (result?.ok) {
         setSuccess('Login successful! Redirecting...');
-        // NextAuth.js will handle the redirection based on the configuration in nextauth.ts
-        // No explicit client-side redirection needed here.
+
+        // Respect an optional callbackUrl param (used by some OAuth flows)
+        const callbackUrl = searchParams?.get('callbackUrl') || '/dashboard';
+
+        // Give the UI a moment to show the success state, then replace
+        // the history entry so the user can't go back to the login page.
+        setTimeout(() => {
+          try {
+            router.replace(callbackUrl);
+          } catch (e) {
+            // fallback push
+            // eslint-disable-next-line no-console
+            console.warn('[Login] router.replace failed, using push', e);
+            router.push(callbackUrl);
+          }
+        }, 150);
       }
     } catch (error: unknown) {
       console.error('Login failed:', error); // Log the full error object

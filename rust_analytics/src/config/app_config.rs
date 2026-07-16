@@ -41,7 +41,7 @@ impl AppConfig {
         let http_host = env::var("RUST_ANALYTICS_HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
         let http_port = env::var("RUST_ANALYTICS_PORT").unwrap_or_else(|_| "8000".to_string());
         let jwt_secret = env::var("JWT_SECRET").map_err(|e| format!("JWT_SECRET not set: {}", e))?;
-        let rust_api_key = env::var("RUST_API_KEY").unwrap_or_default();
+        let rust_api_key = env::var("RUST_ANALYTICS_API_KEY").unwrap_or_default();
 
         let bkt_strength_threshold = env::var("BKT_STRENGTH_THRESHOLD")
             .unwrap_or_else(|_| "0.75".to_string())

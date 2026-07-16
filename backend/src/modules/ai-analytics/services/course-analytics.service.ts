@@ -36,7 +36,7 @@ export class CourseAnalyticsService implements OnModuleInit {
   private readonly cacheTtl = 3600;
   private readonly rustAnalyticsUrl =
     process.env.RUST_ANALYTICS_URL || 'http://rust-analytics:8000';
-  private readonly rustApiKey = process.env.RUST_API_KEY || '';
+  private readonly rustApiKey = process.env.RUST_ANALYTICS_API_KEY || '';
   private readonly httpTimeoutMs = Number(
     process.env.RUST_HTTP_TIMEOUT_MS || 5000,
   );

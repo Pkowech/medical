@@ -262,13 +262,13 @@ Write-Host @"
 RUST ANALYTICS:
   DATABASE_URL: postgresql://medical:AU110s%2F6081%2F2021MT@localhost:5432/medical_tracker
   JWT_SECRET: r91t0ofaB1PoLXM5NNGQWOWkie5FDZ1p6aMhLl3an24=
-  RUST_API_KEY: b8a8b8a8-b8a8-48a8-b8a8-b8a8b8a8b8a8
+  RUST_ANALYTICS_API_KEY: b8a8b8a8-b8a8-48a8-b8a8-b8a8b8a8b8a8
 
 BACKEND:
   DATABASE_URL: postgresql://medical:AU110s%2F6081%2F2021MT@localhost:5432/medical_tracker
   REDIS_URL: redis://localhost:6379
   RUST_ANALYTICS_URL: http://localhost:8000
-  RUST_API_KEY: b8a8b8a8-b8a8-48a8-b8a8-b8a8b8a8b8a8
+  RUST_ANALYTICS_API_KEY: b8a8b8a8-b8a8-48a8-b8a8-b8a8b8a8b8a8
 
 FRONTEND:
   NEXT_PUBLIC_API_URL: http://localhost:3002

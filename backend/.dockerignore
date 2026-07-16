@@ -45,6 +45,14 @@ README.md
 # Temporary and Scratch Directories
 **/tmp
 **/scratch
+**/seed-data
+app.log
+app_startup.log
+dev_startup.log
+output.log
+*.log
+/.pnpm
+/.pnpm-store
 
 # Linter and Formatter Configs
 **/.prettierrc*

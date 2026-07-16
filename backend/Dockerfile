@@ -13,6 +13,7 @@ ARG DATABASE_URL
 ################################################################################
 # Use node image for base image for all stages.
 FROM node:${NODE_VERSION}-alpine AS base
+ARG DATABASE_URL
 
 ENV DATABASE_URL=${DATABASE_URL}
 
@@ -51,6 +52,7 @@ RUN --mount=type=bind,source=package.json,target=package.json \
 COPY . .
 RUN pnpm prisma generate
 RUN pnpm run build
+RUN pnpm prune --prod
 
 ################################################################################
 # Create a new stage to run the application with minimal runtime dependencies
@@ -66,9 +68,10 @@ USER node
 # Copy package.json so that package manager commands can be used.
 COPY package.json .
 
-# Copy the production dependencies from the deps stage and also
-# the built application from the build stage into the image.
-COPY --from=deps /usr/src/app/node_modules ./node_modules
+# Copy the production dependencies from the build stage (post-prune)
+# and the built application into the image. Using the build stage's
+# node_modules ensures any pruning done during build is picked up.
+COPY --from=build /usr/src/app/node_modules ./node_modules
 COPY --from=build /usr/src/app/dist ./dist
 
 
