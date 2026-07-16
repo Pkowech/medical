@@ -8,10 +8,9 @@ const webpack = require('webpack');
 const isDev = process.env.NODE_ENV === 'development';
 const isProd = process.env.NODE_ENV === 'production';
 const projectRoot = path.resolve(__dirname);
-// When Vercel builds the monorepo, it expects the `.next` folder at the repository
-// root (`/vercel/path0/.next`). Detect Vercel and emit the build output one
-// level up so the routes manifest is available at the expected path.
-const distDir = process.env.VERCEL ? path.join('..', '.next') : '.next';
+// Use the standard relative `.next` directory. Turbopack rejects output
+// directories that navigate outside the project path, so keep the default here.
+const distDir = '.next';
 
 const ALLOWED_DEV_ORIGINS = [
   'http://localhost:3000',
