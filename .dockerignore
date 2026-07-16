@@ -1,115 +1,72 @@
-# Include any files or directories that you don't want to be copied to your
-# container here (e.g., local build artifacts, temporary files, etc.).
-#
-# For more help, visit the .dockerignore file reference guide at
-# https://docs.docker.com/go/build-context-dockerignore/
-
-**/.classpath
-**/.dockerignore
-**/.env
-**/.git
-**/.gitignore
-**/.project
-**/.settings
-**/.toolstarget
-**/.vs
-**/.vscode
-**/.next
-**/.cache
-**/*.*proj.user
-**/*.dbmdl
-**/*.jfm
-**/charts
-**/docker-compose*
-**/compose.y*ml
-**/Dockerfile*
-**/node_modules
-**/npm-debug.log
-**/obj
-**/secrets.dev.yaml
-**/values.dev.yaml
-**/build
-**/dist
-LICENSE
-README.md
-
-# Rust build artifacts (THE PRIMARY CULPRIT)
-**/target
-Cargo.lock
-
-# Additional common heavy directories to double-check
-**/.pnpm-store
-**/.venv
-**/venv
-**/__pycache__
-**/*.log
-**/*.sql
-**/*.tar.gz
-**/*.tgz
-# Include any files or directories that you don't want to be copied to your
-# container here (e.g., local build artifacts, temporary files, etc.).
-#
-# For more help, visit the .dockerignore file reference guide at
-# https://docs.docker.com/go/build-context-dockerignore/
-
-**/.classpath
-**/.dockerignore
-**/.env
-**/.git
-**/.gitignore
-**/.project
-**/.settings
-**/.toolstarget
-**/.vs
-**/.vscode
-**/.next
-**/.cache
-**/*.*proj.user
-**/*.dbmdl
-**/*.jfm
-**/charts
-**/docker-compose*
-**/compose.y*ml
-**/Dockerfile*
-**/node_modules
-**/npm-debug.log
-**/obj
-**/secrets.dev.yaml
-**/values.dev.yaml
-**/build
-**/dist
-# Added: Rust build output can reach multiple GB locally and was previously
-# getting swept into the rust-analytics build context (which uses repo root).
-**/target
-**/coverage
-LICENSE
-README.md
-
-# Rust build artifacts (THE PRIMARY CULPRIT)
-**/target
-Cargo.lock
-
-# Additional common heavy directories to double-check
-**/.pnpm-store
-**/.venv
-**/venv
-**/__pycache__
-**/*.log
-**/*.sql
-**/*.tar.gz
-**/*.tgz
-
-# Git version control files
+# Ignore version control
 .git
 .gitignore
+.github
 
-# Build artifacts and cache
+# Ignore local development files
+.env
+.env*.local
+.vscode
+.vs
+.vscode-extensions
+
+# Ignore build artifacts
 target/
-.vs/
+dist/
+build/
+.next/
+coverage/
+node_modules/
+.pnpm-store/
 
-# Documentation
-*.md
+# Ignore package manager files and caches
+npm-debug.log
+pnpm-debug.log
+yarn-error.log
+.cache/
 
-# Tests
-test/
+# Ignore testing and documentation
 tests/
+test/
+*.md
+README.md
+
+# Ignore secrets and sensitive data
+secrets/
+*.sql
+.env.*
+
+# Ignore large binary files
+*.tar.gz
+*.tgz
+*.zip
+*.rar
+
+# Ignore temp files
+*.log
+*.tmp
+temp/
+tmp/
+
+# Ignore Python artifacts
+__pycache__/
+*.pyc
+.venv
+venv/
+
+# Ignore Rust specific
+Cargo.lock
+
+# Ignore monitoring/infra configs not needed for builds
+monitoring/
+nginx/
+
+# Large PDFs and media
+*.pdf
+*.mp4
+*.mp3
+*.mov
+
+# misc files
+*.sql
+.DS_Store
