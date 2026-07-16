@@ -63,7 +63,6 @@ jobs:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/medtrack_test
       JWT_SECRET: test-jwt-secret-for-ci-pipeline-only
       JWT_REFRESH_SECRET: test-jwt-refresh-secret-for-ci-pipeline-only
-      REDIS_URL: ${{ env.REDIS_URL }}
     
     services:
       postgres:
@@ -135,7 +134,6 @@ jobs:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/medtrack_test
       JWT_SECRET: test-jwt-secret-for-ci-pipeline-only
       JWT_REFRESH_SECRET: test-jwt-refresh-secret-for-ci-pipeline-only
-      REDIS_URL: ${{ env.REDIS_URL }}
     
     services:
       postgres:

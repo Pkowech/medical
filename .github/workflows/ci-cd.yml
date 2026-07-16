@@ -46,6 +46,8 @@ jobs:
     name: Build & Push Docker images (GHCR)
     runs-on: ubuntu-latest
     needs: frontend-build
+    outputs:
+      has_koyeb_token: ${{ steps.check-koyeb-token.outputs.has_token }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -62,6 +64,17 @@ jobs:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.CR_PAT }}
+
+      - name: Check Koyeb token
+        id: check-koyeb-token
+        env:
+          KOYEB_TOKEN: ${{ secrets.KOYEB_API_TOKEN }}
+        run: |
+          if [ -n "$KOYEB_TOKEN" ]; then
+            echo "has_token=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_token=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: Build & push backend image
         uses: docker/build-push-action@v4
@@ -85,7 +98,7 @@ jobs:
     name: Deploy to Koyeb (optional)
     runs-on: ubuntu-latest
     needs: [build-and-push]
-    if: ${{ secrets.KOYEB_API_TOKEN }}
+    if: needs.build-and-push.outputs.has_koyeb_token == 'true'
     steps:
       - name: Echo images
         run: |
@@ -103,8 +116,8 @@ jobs:
             exit 0
           fi
           read -r -d '' PAYLOAD <<EOF || true
-{"services":[{"image":"${IMAGE}"}]}
-EOF
+          {"services":[{"image":"${IMAGE}"}]}
+          EOF
           echo "$PAYLOAD" | jq .
           curl -s -X POST "https://api.koyeb.com/v1/apps/${APP_ID}/deployments" \
             -H "Authorization: Bearer ${KOYEB_TOKEN}" \

@@ -16,6 +16,9 @@ jobs:
       backend_image: ${{ steps.set-images.outputs.backend_image }}
       rust_image: ${{ steps.set-images.outputs.rust_image }}
       has_koyeb_token: ${{ steps.check-koyeb-token.outputs.has_token }}
+      has_backend_health_url: ${{ steps.check-health-urls.outputs.has_backend }}
+      has_rust_health_url: ${{ steps.check-health-urls.outputs.has_rust }}
+      should_migrate: ${{ steps.check-migrations.outputs.should_migrate }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -50,6 +53,35 @@ jobs:
             echo "has_token=false" >> $GITHUB_OUTPUT
           fi
 
+      - name: Check health check URLs
+        id: check-health-urls
+        env:
+          BACKEND_HEALTH_URL: ${{ secrets.BACKEND_HEALTH_URL }}
+          RUST_HEALTH_URL: ${{ secrets.RUST_HEALTH_URL }}
+        run: |
+          if [ -n "$BACKEND_HEALTH_URL" ]; then
+            echo "has_backend=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_backend=false" >> $GITHUB_OUTPUT
+          fi
+          if [ -n "$RUST_HEALTH_URL" ]; then
+            echo "has_rust=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_rust=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check migration secrets
+        id: check-migrations
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          RUN_MIGRATIONS: ${{ secrets.RUN_MIGRATIONS }}
+        run: |
+          if [ -n "$DATABASE_URL" ] && [ "$RUN_MIGRATIONS" = "true" ]; then
+            echo "should_migrate=true" >> $GITHUB_OUTPUT
+          else
+            echo "should_migrate=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Build & push backend image
         uses: docker/build-push-action@v4
         with:
@@ -60,13 +92,20 @@ jobs:
           tags: ${{ steps.set-images.outputs.backend_image }}
 
       - name: Optionally push backend to Docker Hub
-        if: ${{ secrets.DOCKERHUB_USERNAME }}
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          BACKEND_IMAGE: ${{ steps.set-images.outputs.backend_image }}
         run: |
+          if [ -z "$DOCKERHUB_USERNAME" ]; then
+            echo "No Docker Hub credentials set; skipping"
+            exit 0
+          fi
           echo "Logging into Docker Hub"
-          echo ${{ secrets.DOCKERHUB_TOKEN }} | docker login --username ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
-          docker pull ${{ steps.set-images.outputs.backend_image }}
-          docker tag ${{ steps.set-images.outputs.backend_image }} ${{ secrets.DOCKERHUB_USERNAME }}/medtrack-backend:${{ github.sha }}
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/medtrack-backend:${{ github.sha }}
+          echo "$DOCKERHUB_TOKEN" | docker login --username "$DOCKERHUB_USERNAME" --password-stdin
+          docker pull "$BACKEND_IMAGE"
+          docker tag "$BACKEND_IMAGE" "$DOCKERHUB_USERNAME/medtrack-backend:${{ github.sha }}"
+          docker push "$DOCKERHUB_USERNAME/medtrack-backend:${{ github.sha }}"
 
       - name: Build & push rust image
         uses: docker/build-push-action@v4
@@ -76,6 +115,22 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.set-images.outputs.rust_image }}
+
+      - name: Optionally push rust to Docker Hub
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          RUST_IMAGE: ${{ steps.set-images.outputs.rust_image }}
+        run: |
+          if [ -z "$DOCKERHUB_USERNAME" ]; then
+            echo "No Docker Hub credentials set; skipping"
+            exit 0
+          fi
+          echo "Logging into Docker Hub"
+          echo "$DOCKERHUB_TOKEN" | docker login --username "$DOCKERHUB_USERNAME" --password-stdin
+          docker pull "$RUST_IMAGE"
+          docker tag "$RUST_IMAGE" "$DOCKERHUB_USERNAME/medtrack-rust-analytics:${{ github.sha }}"
+          docker push "$DOCKERHUB_USERNAME/medtrack-rust-analytics:${{ github.sha }}"
 
   build-frontend-artifact:
     name: Build Frontend & Upload Artifact
@@ -111,15 +166,6 @@ jobs:
             frontend/public
             frontend/package.json
             frontend/pnpm-lock.yaml
-
-      - name: Optionally push rust to Docker Hub
-        if: ${{ secrets.DOCKERHUB_USERNAME }}
-        run: |
-          echo "Logging into Docker Hub"
-          echo ${{ secrets.DOCKERHUB_TOKEN }} | docker login --username ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
-          docker pull ${{ steps.set-images.outputs.rust_image }}
-          docker tag ${{ steps.set-images.outputs.rust_image }} ${{ secrets.DOCKERHUB_USERNAME }}/medtrack-rust-analytics:${{ github.sha }}
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/medtrack-rust-analytics:${{ github.sha }}
 
   ensure-koyeb-apps:
     name: Ensure Koyeb apps exist (create if missing)
@@ -243,7 +289,6 @@ jobs:
 
           echo "$PAYLOAD" | jq .
           curl -s -X POST "https://api.koyeb.com/v1/apps/${APP_ID}/deployments" \
-
             -H "Authorization: Bearer ${KOYEB_TOKEN}" \
             -H "Content-Type: application/json" \
             -d "$PAYLOAD" | jq .
@@ -290,14 +335,14 @@ jobs:
   smoke-tests:
     name: Smoke tests (optional)
     runs-on: ubuntu-latest
-    needs: deploy-to-koyeb
-    if: ${{ secrets.BACKEND_HEALTH_URL || secrets.RUST_HEALTH_URL }}
+    needs: [deploy-to-koyeb, build-and-push]
+    if: needs.build-and-push.outputs.has_backend_health_url == 'true' || needs.build-and-push.outputs.has_rust_health_url == 'true'
     steps:
       - name: Wait for deployments to settle
         run: sleep 10
 
       - name: Backend health check
-        if: ${{ secrets.BACKEND_HEALTH_URL }}
+        if: needs.build-and-push.outputs.has_backend_health_url == 'true'
         env:
           URL: ${{ secrets.BACKEND_HEALTH_URL }}
         run: |
@@ -312,7 +357,7 @@ jobs:
           fi
 
       - name: Rust health check
-        if: ${{ secrets.RUST_HEALTH_URL }}
+        if: needs.build-and-push.outputs.has_rust_health_url == 'true'
         env:
           URL: ${{ secrets.RUST_HEALTH_URL }}
         run: |
@@ -330,15 +375,17 @@ jobs:
     name: Run database migrations (optional)
     runs-on: ubuntu-latest
     needs: [deploy-to-koyeb, build-and-push]
-    if: ${{ secrets.DATABASE_URL && secrets.RUN_MIGRATIONS == 'true' }}
+    if: needs.build-and-push.outputs.should_migrate == 'true'
     steps:
       - name: Login to GHCR
-        if: ${{ secrets.CR_PAT }}
-        uses: docker/login-action@v2
-        with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.CR_PAT }}
+        env:
+          CR_PAT: ${{ secrets.CR_PAT }}
+        run: |
+          if [ -z "$CR_PAT" ]; then
+            echo "No CR_PAT set; skipping GHCR login"
+            exit 0
+          fi
+          echo "$CR_PAT" | docker login ghcr.io -u "${{ github.repository_owner }}" --password-stdin
 
       - name: Pull backend image
         run: |
