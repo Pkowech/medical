@@ -2,7 +2,7 @@
 
 ARG NODE_VERSION=22.23.1
 ARG PNPM_VERSION=10.32.1
-ARG DATABASE_URL=postgresql://postgres:postgres@localhost:5432/medtrack
+ARG DATABASE_URL="postgresql://medtrack-db_owner:npg_lj1B2IbncYdz@ep-fancy-star-a69qzo1x-pooler.us-west-2.aws.neon.tech/medtrack-db?uselibpqcompat=true&sslmode=require&channel_binding=require"
 
 ################################################################────────────────
 # Use node image for base image for all stages.
