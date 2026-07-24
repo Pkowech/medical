@@ -12,8 +12,11 @@ export class RedisService {
   private subscriber: Redis | null = null;
   private memoryStore: Map<string, { value: string; expiry?: number }> =
     new Map();
+  private hasLoggedRedisError = false;
+  // Timestamp of last logged error to throttle repetitive logs
   private lastErrorLogAt = 0;
-  private readonly errorLogCooldownMs = 30000; // mute repeated errors for 30s
+  // Minimum interval between logging the same error (ms)
+  private errorLogCooldownMs = 60_000; // 1 minute
 
   constructor(private configService: ConfigService) {
     const shouldEnableRedis =
@@ -50,11 +53,10 @@ export class RedisService {
         // Mark as not connected but do not schedule manual reconnects —
         // ioredis manages reconnection via its built-in retry strategy.
         this.isConnected = false;
-        const now = Date.now();
-        if (now - this.lastErrorLogAt > this.errorLogCooldownMs) {
-          this.lastErrorLogAt = now;
-          this.logger.debug(
-            'Redis connection error (handled by ioredis):',
+        if (!this.hasLoggedRedisError) {
+          this.hasLoggedRedisError = true;
+          this.logger.warn(
+            'Redis connection issue detected; reconnect attempts are managed by ioredis. If Redis is unavailable, the service will continue with the local fallback cache.',
             getErrorMessage(error),
           );
         }

@@ -18,7 +18,7 @@ export async function proxyToAdmin(req: NextRequest, backendPath: string) {
       return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
     }
 
-    const base = process.env.BACKEND_URL || 'http://localhost:3002';
+    const base = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || '';
     const url = `${base}${backendPath}${req.nextUrl.search || ''}`;
 
     const headers: Record<string, string> = {

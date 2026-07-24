@@ -1,7 +1,7 @@
 import { offlineService } from './offlineService';
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
-const API_BASE_URL = `${BACKEND_URL}/v1`;
+const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || '';
+const API_BASE_URL = BACKEND_URL ? `${BACKEND_URL}/v1` : '';
 
 class SyncManager {
   private isOnline: boolean = navigator.onLine;

@@ -49,7 +49,7 @@ export const validationSchema = Joi.object({
   JWT_AUDIENCE: Joi.string().default('medtrack-users'),
 
   // CORS
-  CORS_ORIGIN: Joi.string().default('http://localhost:3000'),
+  CORS_ORIGIN: Joi.string().default(''),
   CORS_CREDENTIALS: Joi.boolean().default(true),
 
   // Rate Limiting
@@ -92,13 +92,13 @@ export const validationSchema = Joi.object({
   RUN_INGESTION: Joi.boolean().default(false),
   INGESTION_ROOT_PATH: Joi.string().default('./data/ingestion'),
   HOSTNAME: Joi.string().default('0.0.0.0'),
-  ALLOWED_ORIGINS: Joi.string().default('http://localhost:3000'),
+  ALLOWED_ORIGINS: Joi.string().default(''),
 
   // Analytics Service
-  ANALYTICS_SERVICE_URL: Joi.string().uri().default('http://localhost:5000'),
+  ANALYTICS_SERVICE_URL: Joi.string().uri().default(''),
   ANALYTICS_GRPC_URL: Joi.string().default('localhost:50051'),
   ENABLE_GRPC: Joi.boolean().default(true),
-  GOTENBERG_URL: Joi.string().uri().default('http://localhost:3010'),
+  GOTENBERG_URL: Joi.string().uri().default(''),
   RUST_ANALYTICS_URL: Joi.string().uri().default('http://rust-analytics:8000'),
   RUST_ANALYTICS_API_KEY: Joi.string().optional(),
   RUST_HTTP_TIMEOUT_MS: Joi.number().min(1000).default(5000),

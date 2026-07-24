@@ -16,6 +16,7 @@ export function buildRedisOptions(
     // Otherwise, parse the URL to handle credentials safely.
     try {
       const parsed = new URL(url);
+      const isTls = parsed.protocol === 'rediss:';
       return {
         host: parsed.hostname,
         port: parsed.port ? parseInt(parsed.port, 10) : 6379,
@@ -28,6 +29,7 @@ export function buildRedisOptions(
         password: parsed.password
           ? decodeURIComponent(parsed.password)
           : undefined,
+        tls: isTls ? {} : undefined,
       };
     } catch (_e) {
       // Fallback for URLs that don't parse, though this is unlikely.

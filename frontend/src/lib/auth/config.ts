@@ -6,8 +6,8 @@
 export const config = {
   // API Configuration
   api: {
-    baseUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002',
-    analyticsUrl: process.env.NEXT_PUBLIC_ANALYTICS_API_URL || 'http://localhost:5000',
+    baseUrl: process.env.NEXT_PUBLIC_API_URL || '',
+    analyticsUrl: process.env.NEXT_PUBLIC_ANALYTICS_API_URL || '',
     timeout: 10000,
   },
 
@@ -16,7 +16,7 @@ export const config = {
     name: 'MedTrack Hub',
     version: process.env.NEXT_PUBLIC_APP_VERSION || '1.0.0',
     environment: process.env.NODE_ENV || 'development',
-    url: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+    url: process.env.NEXT_PUBLIC_APP_URL || '',
   },
 
   // Authentication

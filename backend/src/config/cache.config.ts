@@ -4,7 +4,7 @@ import { ConfigService } from '@nestjs/config';
 
 export const redisCacheModule = CacheModule.registerAsync({
   inject: [ConfigService],
-  useFactory: (configService: ConfigService) => {
+  useFactory: async (configService: ConfigService) => {
     const enableRedis = process.env.ENABLE_REDIS === 'true';
     const ttl = configService.get('REDIS_CACHE_TTL', 3600);
     const max = configService.get('REDIS_CACHE_MAX', 100);
@@ -19,10 +19,13 @@ export const redisCacheModule = CacheModule.registerAsync({
       };
     }
 
-    const redisConfig = configService.get('redis');
+    const redisUrl = process.env.REDIS_URL;
+    const redisConfig = redisUrl
+      ? { url: redisUrl }
+      : configService.get('redis');
+
     return {
-      store: redisStore,
-      ...redisConfig, // Spread the centralized redis config
+      store: await redisStore(redisConfig),
       ttl,
       max,
     };

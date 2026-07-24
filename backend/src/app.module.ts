@@ -61,17 +61,22 @@ const redisModules = shouldEnableRedis
         // async and invoke redisStore(...) with the resolved config so the
         // returned store instance is provided to Nest's cache manager.
         useFactory: async (configService: ConfigService) => {
+          const redisUrl = configService.get<string>('REDIS_URL');
           const host = configService.get<string>('redis.host');
           const port = configService.get<number>('redis.port');
           const password = configService.get<string>('redis.password');
           const db = configService.get<number>('redis.db');
 
-          const store = await (redisStore as any)({
-            host,
-            port,
-            password,
-            db,
-          });
+          const storeConfig: Record<string, any> = redisUrl
+            ? { url: redisUrl }
+            : {
+                host,
+                port,
+                password,
+                db,
+              };
+
+          const store = await (redisStore as any)(storeConfig);
 
           return {
             store,

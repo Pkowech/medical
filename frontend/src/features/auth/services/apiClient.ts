@@ -23,38 +23,51 @@ class ApiService {
   private isSigningOut = false;
 
   private static buildApiBaseUrl(): string {
-    const fallback = 'http://localhost:3002';
     try {
-      const raw = (process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL || fallback).trim();
+      const raw = (process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL || '').trim();
+      
+      if (!raw) {
+        throw new Error('API URL not configured');
+      }
       
       if (raw.startsWith('/')) {
         if (typeof window !== 'undefined' && window.location?.origin) {
           return `${window.location.origin}${raw.replace(/\/+$/, '')}`;
         }
-        return `${fallback}${raw.replace(/\/+$/, '')}`;
+        throw new Error('Relative API URL without window context');
       }
 
       let formatted = raw;
       if (!formatted.startsWith('http://') && !formatted.startsWith('https://')) {
-        const protocol = formatted.includes('localhost') ? 'http://' : 'https://';
-        formatted = `${protocol}${formatted}`;
+        formatted = `https://${formatted}`;
       }
 
       const u = new URL(formatted);
       return `${u.origin}${u.pathname.replace(/\/+$/, '')}`;
-    } catch {
-      return `${fallback}/v1`;
+    } catch (error) {
+      console.error('[ApiClient] Failed to build API base URL:', error);
+      throw new Error('Invalid API configuration');
     }
   }
 
   private constructor() {
-    const baseURL = ApiService.buildApiBaseUrl();
-    this.api = axios.create({
-      baseURL,
-      timeout: 30000,
-      withCredentials: true,
-    });
-    this.setupInterceptors();
+    try {
+      const baseURL = ApiService.buildApiBaseUrl();
+      this.api = axios.create({
+        baseURL,
+        timeout: 30000,
+        withCredentials: true,
+      });
+      this.setupInterceptors();
+    } catch (error) {
+      console.error('[ApiClient] Failed to initialize:', error);
+      // Create a fallback axios instance for error handling
+      this.api = axios.create({
+        timeout: 30000,
+        withCredentials: true,
+      });
+      this.setupInterceptors();
+    }
   }
 
   static getInstance(): ApiService {

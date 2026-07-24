@@ -21,7 +21,7 @@ const DB_NAME = 'medical-education-db';
 const DB_VERSION = 2; // Bumped version for schema migration
 const SYNC_STORE_NAME = 'syncQueue';
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
+const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || '';
 const API_BASE_URL = `${BACKEND_URL}/v1`;
 
 class SyncService {
@@ -153,14 +153,20 @@ class SyncService {
           if (item.url.includes('/v1/quiz/')) {
             item.url = item.url.replace('/v1/quiz/', '/v1/quizzes/');
           }
-          // 2. Correct environment port mismatches (don't hit frontend port 3000 for API)
-          if (item.url.includes('localhost:3000/v1')) {
-            item.url = item.url.replace('localhost:3000/v1', 'localhost:3002/v1');
+          // 2. Correct environment port mismatches (don't hit frontend port for API)
+          // Replace any frontend URL references with the API backend URL
+          if (item.url.includes('localhost:3000/v1') || item.url.includes('127.0.0.1:3000/v1')) {
+            const apiUrl = BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || '';
+            if (apiUrl) {
+              item.url = item.url.replace(/https?:\/\/(localhost|127\.0\.0\.1):3000\/v1/, `${apiUrl}/v1`);
+            }
           }
           // 3. Ensure API_BASE_URL prefix if relative (v1 fallback)
           if (!item.url.startsWith('http')) {
              const cleanPath = item.url.startsWith('/') ? item.url : `/${item.url}`;
-             item.url = `${API_BASE_URL}${cleanPath}`;
+             if (API_BASE_URL) {
+               item.url = `${API_BASE_URL}${cleanPath}`;
+             }
           }
 
           // Prepare headers: STRIP any existing auth headers from previous attempts to ensure clean override

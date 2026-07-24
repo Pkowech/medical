@@ -15,16 +15,19 @@ const getDynamicOrigin = (): string => {
   if (typeof window !== 'undefined' && window.location?.origin) {
     return window.location.origin;
   }
-  const raw = process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL || 'http://localhost:3000';
+  const raw = process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL || '';
   let val = raw.trim();
+  if (!val) {
+    // During build time, return a placeholder
+    return 'https://app.local';
+  }
   if (!val.startsWith('http://') && !val.startsWith('https://')) {
-    const protocol = val.includes('localhost') ? 'http://' : 'https://';
-    val = `${protocol}${val}`;
+    val = `https://${val}`;
   }
   try {
     return new URL(val).origin;
   } catch {
-    return 'http://localhost:3000';
+    return 'https://app.local';
   }
 };
 

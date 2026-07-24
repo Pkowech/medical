@@ -342,6 +342,7 @@ async function bootstrap() {
   const environment = configService.get('NODE_ENV', 'development');
   const dbHost = configService.get('POSTGRES_HOST', 'postgres');
   const redisHost = configService.get('REDIS_HOST', 'redis');
+  const redisUrl = configService.get<string>('REDIS_URL');
 
   // Display correct URL based on environment
   const displayHostname =
@@ -363,7 +364,11 @@ async function bootstrap() {
   Logger.log(
     `🗄️  Database: ${dbHost}:${configService.get('POSTGRES_PORT', 5432)}`,
   );
-  Logger.log(`🔴 Redis: ${redisHost}:${configService.get('REDIS_PORT', 6379)}`);
+  if (redisUrl) {
+    Logger.log(`🔴 Redis URL: ${redisUrl}`);
+  } else {
+    Logger.log(`🔴 Redis: ${redisHost}:${configService.get('REDIS_PORT', 6379)}`);
+  }
   Logger.log(`=======================================================`);
   Logger.log(`📝 API Documentation: ${serverUrl}/api/docs`);
   Logger.log(`❤️  Health Check: ${apiUrl}/health`);

@@ -30,7 +30,11 @@ async function refreshAccessToken(token: JWT): Promise<JWT> {
     }
 
     const raw =
-      process.env.NEXT_PUBLIC_API_URL || process.env.BACKEND_URL || 'http://localhost:3002';
+      process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || '';
+    
+    if (!raw) {
+      throw new Error('Backend URL not configured for token refresh');
+    }
     
     console.warn('[Token Refresh] Attempting to refresh token from:', raw);
     
@@ -98,22 +102,28 @@ export const authOptions: NextAuthOptions = {
           return null;
         }
 
-        // Prefer explicit BACKEND_URL, fall back to public envs, then default
+        // Prefer explicit BACKEND_URL, fall back to public envs
         const raw =
           process.env.BACKEND_URL ||
           process.env.NEXT_PUBLIC_API_BASE_URL ||
           process.env.NEXT_PUBLIC_API_URL ||
-          'http://localhost:3002';
+          '';
         
-        let validBase = (raw || 'http://localhost:3002').trim();
+        if (!raw) {
+          console.error('Backend URL not configured for login');
+          return null;
+        }
+        
+        let validBase = raw.trim();
         if (!validBase.startsWith('http://') && !validBase.startsWith('https://')) {
           validBase = `https://${validBase}`;
         }
         let loginUrl: string;
         try {
           loginUrl = new URL('/v1/auth/login', validBase).href;
-        } catch {
-          loginUrl = 'http://localhost:3002/v1/auth/login';
+        } catch (error) {
+          console.error('Failed to construct login URL:', error);
+          return null;
         }
 
         const loginBody = {
@@ -375,7 +385,10 @@ export const authOptions: NextAuthOptions = {
 
     async redirect({ url, baseUrl }) {
       try {
-        let validBase = (baseUrl || 'http://localhost:3000').trim();
+        if (!baseUrl) {
+          return '/dashboard';
+        }
+        let validBase = baseUrl.trim();
         if (!validBase.startsWith('http://') && !validBase.startsWith('https://')) {
           validBase = `https://${validBase}`;
         }
