@@ -18,11 +18,12 @@ RUN --mount=type=bind,source=.,target=/tmp/ctx \
 # Build stage
 FROM rust:${RUST_VERSION}-alpine AS build
 ARG APP_NAME
+ARG CARGO_BUILD_JOBS=8
 WORKDIR /app
 
 # Optimization flags for faster builds
-ENV SQLX_OFFLINE=false
-ENV CARGO_BUILD_JOBS=4
+ENV SQLX_OFFLINE=true
+ENV CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS}
 ENV RUSTFLAGS="-C embed-bitcode=no"
 
 # Install build dependencies

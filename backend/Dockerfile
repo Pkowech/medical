@@ -53,25 +53,32 @@ ARG DATABASE_URL
 ENV DATABASE_URL=${DATABASE_URL}
 ENV DIRECT_URL=${DATABASE_URL}
 ENV NODE_ENV=production
+ENV PORT=3002
+ENV HOSTNAME=0.0.0.0
 
 WORKDIR /usr/src/app
 
 # Copy package.json, dependencies, build output, and Prisma schema/config
 # with node user ownership
 COPY --chown=node:node package.json .
+COPY --chown=node:node pnpm-lock.yaml .
 COPY --chown=node:node --from=build /usr/src/app/node_modules ./node_modules
 COPY --chown=node:node --from=build /usr/src/app/dist ./dist
 COPY --chown=node:node --from=build /usr/src/app/prisma ./prisma
 COPY --chown=node:node --from=build /usr/src/app/prisma.config.ts ./prisma.config.ts
 
 # Ensure the node user has write permissions to the app directory (for pnpm tmp files)
-RUN chmod -R u+w /usr/src/app
+RUN chmod -R u+w /usr/src/app && chown -R node:node /usr/src/app
 
 # Run the application as non-root user
 USER node
 
 # Expose the port that the application listens on.
 EXPOSE 3002
+
+# Healthcheck to monitor application status
+HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:3002/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
 
 # Run Prisma migrations and start the application with Node directly.
 CMD ["sh", "-c", "./node_modules/.bin/prisma migrate deploy && node dist/src/main"]

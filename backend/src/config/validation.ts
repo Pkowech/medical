@@ -8,11 +8,12 @@ import * as Joi from 'joi';
 export const validationSchema = Joi.object({
   // Application
   NODE_ENV: Joi.string()
+    .trim()
     .valid('development', 'production', 'test', 'staging')
     .default('development'),
   PORT: Joi.number().port().default(3002),
-  APP_NAME: Joi.string().default('MedTrack Hub'),
-  APP_VERSION: Joi.string().default('1.0.0'),
+  APP_NAME: Joi.string().trim().default('MedTrack Hub'),
+  APP_VERSION: Joi.string().trim().default('1.0.0'),
 
   // Database
   // Support both Neon/managed Postgres URLs and traditional host-based config.
@@ -149,8 +150,18 @@ export const validationSchema = Joi.object({
 /**
  * Validates environment variables and provides helpful error messages
  */
+function normalizeConfigValues(config: Record<string, unknown>) {
+  return Object.fromEntries(
+    Object.entries(config).map(([key, value]) => [
+      key,
+      typeof value === 'string' ? value.trim() : value,
+    ]),
+  );
+}
+
 export function validateConfig(config: Record<string, unknown>) {
-  const { error, value } = validationSchema.validate(config, {
+  const normalizedConfig = normalizeConfigValues(config);
+  const { error, value } = validationSchema.validate(normalizedConfig, {
     allowUnknown: true,
     abortEarly: false,
   });
