@@ -49,7 +49,7 @@ RUN --mount=type=bind,source=.,target=/tmp/ctx \
       cp -r /tmp/ctx/rust_analytics/.sqlx/* /app/.sqlx/ 2>/dev/null || true; \
     fi
 
-RUN --mount=type=bind,from=protos,source=.,target=protos \
+RUN --mount=type=bind,from=protos,source=.,target=/protos \
     --mount=type=cache,target=/app/target/ \
     --mount=type=cache,target=/usr/local/cargo/git/db \
     --mount=type=cache,target=/usr/local/cargo/registry/ \
