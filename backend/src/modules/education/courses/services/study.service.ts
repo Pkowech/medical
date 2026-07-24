@@ -339,7 +339,7 @@ export class StudyService {
       }));
 
     const existingScores: QuizScore[] = Array.isArray(progress.quizScores)
-      ? (progress.quizScores)
+      ? (progress.quizScores as unknown as QuizScore[])
       : [];
     const updatedQuizScores = [...existingScores, ...quizScores];
     const completionPercentage = Math.min(
@@ -594,7 +594,7 @@ export class StudyService {
         id: d.id,
         title: d.title,
         dueDate: d.dueDate,
-        type: (d.metadata)?.type || 'deadline', // use metadata type if available
+        type: (d.metadata as any)?.type || 'deadline', // use metadata type if available
         courseId: d.courseId,
         course: (d.course)?.title || 'General',
         priority: d.priority || 'medium',
@@ -622,7 +622,7 @@ export class StudyService {
 
     // 4. Sort by date ascending
     return combined.sort(
-      (a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime(),
+      (a, b) => new Date(a.dueDate || 0).getTime() - new Date(b.dueDate || 0).getTime(),
     );
   }
 

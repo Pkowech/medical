@@ -449,7 +449,7 @@ export class LearningPathProgressService {
     if (analytics.study_sessions.length > 100) {
       analytics.study_sessions = analytics.study_sessions.slice(-100);
     }
-    p.analytics = analytics;
+    p.analytics = analytics as any;
   }
 
   private async calculateEstimatedCompletion(

@@ -130,11 +130,11 @@ export class AuditLogService {
       userId: log.userId || undefined,
       action: log.action as SecurityEventType,
       resource: log.resource || 'unknown',
-      details: log.details,
+      details: (log.details as Record<string, any>) || {},
       ipAddress: log.ipAddress || 'unknown',
       userAgent: log.userAgent || 'unknown',
-      status: (log.status as 'success' | 'failure') || 'failure',
-      metadata: log.details, // Re-using details for metadata for now
+      status: (log.status as 'success' | 'failure') || 'success',
+      metadata: (log.details as Record<string, any>) || {},
     }));
   }
 }

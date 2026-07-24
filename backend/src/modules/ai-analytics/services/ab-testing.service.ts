@@ -126,10 +126,10 @@ export class AbTestingService {
     );
 
     const controlPasses = controlAssignments.filter(
-      (a) => (a.outcomes)?.passed === true,
+      (a) => (a.outcomes as any)?.passed === true,
     ).length;
     const treatmentPasses = treatmentAssignments.filter(
-      (a) => (a.outcomes)?.passed === true,
+      (a) => (a.outcomes as any)?.passed === true,
     ).length;
 
     const controlTotal = controlAssignments.length;

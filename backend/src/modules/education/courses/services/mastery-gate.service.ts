@@ -172,7 +172,7 @@ export class MasteryGateService {
         };
       } else {
         // Quiz failed - increment failed attempts (only in logs/memory)
-        const newFailedAttempts = (progress.quizScores)?.lastScore
+        const newFailedAttempts = (progress.quizScores as any)?.lastScore
           ? 1
           : 1;
 

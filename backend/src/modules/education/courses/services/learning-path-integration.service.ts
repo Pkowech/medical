@@ -531,7 +531,7 @@ export class LearningPathIntegrationService {
 
       return pathProgresses.filter((p) =>
         this.pathContainsResource(
-          p.learningPath.pathStructure,
+          p.learningPath.pathStructure as any,
           'course',
           courseId,
         ),
@@ -570,7 +570,7 @@ export class LearningPathIntegrationService {
 
       return pathProgresses.filter((p) =>
         this.pathContainsResource(
-          p.learningPath.pathStructure,
+          p.learningPath.pathStructure as any,
           'assessment',
           assessmentId,
         ),
@@ -609,7 +609,7 @@ export class LearningPathIntegrationService {
 
       return pathProgresses.filter((p) =>
         this.pathContainsResource(
-          p.learningPath.pathStructure,
+          p.learningPath.pathStructure as any,
           'clinical_case',
           caseId,
         ),

@@ -25,26 +25,23 @@ class ApiService {
   private static buildApiBaseUrl(): string {
     const fallback = 'http://localhost:3002';
     try {
-      // Use backend URL with /v1 prefix directly
-      const raw = process.env.NEXT_PUBLIC_API_URL || fallback;
-      let backendUrl = (raw || fallback).trim();
+      const raw = (process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL || fallback).trim();
       
-      if (backendUrl.startsWith('/')) {
+      if (raw.startsWith('/')) {
         if (typeof window !== 'undefined' && window.location?.origin) {
-          backendUrl = window.location.origin + backendUrl;
-        } else {
-          const host = process.env.VERCEL_URL || process.env.NEXT_PUBLIC_APP_URL || 'localhost:3000';
-          const protocol = host.includes('localhost') ? 'http://' : 'https://';
-          backendUrl = `${protocol}${host.replace(/^https?:\/\//, '')}${backendUrl}`;
+          return `${window.location.origin}${raw.replace(/\/+$/, '')}`;
         }
-      } else if (!backendUrl.startsWith('http://') && !backendUrl.startsWith('https://')) {
-        backendUrl = `https://${backendUrl}`;
+        return `${fallback}${raw.replace(/\/+$/, '')}`;
       }
-      
-      // Validate constructed URL before returning
-      new URL(backendUrl);
-      backendUrl = backendUrl.replace(/\/+$/, '');
-      return `${backendUrl}/v1`;
+
+      let formatted = raw;
+      if (!formatted.startsWith('http://') && !formatted.startsWith('https://')) {
+        const protocol = formatted.includes('localhost') ? 'http://' : 'https://';
+        formatted = `${protocol}${formatted}`;
+      }
+
+      const u = new URL(formatted);
+      return `${u.origin}${u.pathname.replace(/\/+$/, '')}`;
     } catch {
       return `${fallback}/v1`;
     }

@@ -391,7 +391,7 @@ export class AssessmentsService implements OnModuleInit {
     });
 
     // Update BKT
-    const topicIds = (question).topic_ids;
+    const topicIds = (question as any).topic_ids || (question as any).topicIds;
     if (topicIds && topicIds.length > 0) {
       topicIds.forEach((topicId: string) => {
         // Fire-and-forget but ensure we log if RPC fails

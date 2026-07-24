@@ -111,7 +111,7 @@ export abstract class BaseService<T = any> {
   }
 
   protected async executeTransaction<R>(
-    fn: (tx: PrismaService) => Promise<R>,
+    fn: (tx: any) => Promise<R>,
   ): Promise<R> {
     return this.prisma.$transaction(async (tx) => {
       return fn(tx);

@@ -224,10 +224,12 @@ jobs:
         run: sleep 40
 
       - name: Backend health check
-        if: ${{ secrets.BACKEND_HEALTH_URL != '' }}
+        if: env.BACKEND_HEALTH_URL != ''
+        env:
+          BACKEND_HEALTH_URL: ${{ secrets.BACKEND_HEALTH_URL }}
         run: |
           for i in 1 2 3 4 5; do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${{ secrets.BACKEND_HEALTH_URL }}")
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$BACKEND_HEALTH_URL")
             echo "Attempt $i — HTTP $STATUS"
             if [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 400 ]; then
               echo "Backend healthy"; exit 0
@@ -237,10 +239,12 @@ jobs:
           echo "Backend health check failed" >&2; exit 1
 
       - name: Frontend health check
-        if: ${{ secrets.FRONTEND_HEALTH_URL != '' }}
+        if: env.FRONTEND_HEALTH_URL != ''
+        env:
+          FRONTEND_HEALTH_URL: ${{ secrets.FRONTEND_HEALTH_URL }}
         run: |
           for i in 1 2 3 4 5; do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${{ secrets.FRONTEND_HEALTH_URL }}")
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$FRONTEND_HEALTH_URL")
             echo "Attempt $i — HTTP $STATUS"
             if [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 400 ]; then
               echo "Frontend healthy"; exit 0
@@ -250,10 +254,12 @@ jobs:
           echo "Frontend health check failed" >&2; exit 1
 
       - name: Rust analytics health check
-        if: ${{ secrets.RUST_HEALTH_URL != '' }}
+        if: env.RUST_HEALTH_URL != ''
+        env:
+          RUST_HEALTH_URL: ${{ secrets.RUST_HEALTH_URL }}
         run: |
           for i in 1 2 3 4 5; do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${{ secrets.RUST_HEALTH_URL }}")
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$RUST_HEALTH_URL")
             echo "Attempt $i — HTTP $STATUS"
             if [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 400 ]; then
               echo "Rust analytics healthy"; exit 0

@@ -1380,16 +1380,16 @@ export class LearningAnalyticsService implements OnModuleInit {
           acc[category] = (acc[category] || 0) + 1;
           return acc;
         },
-        {},
+        {} as Record<string, number>,
       );
 
       const goalsByPriority = learningGoals.reduce(
         (acc, goal) => {
-          const priority = goal.priority ?? 'normal';
+          const priority = String(goal.priority ?? 'normal');
           acc[priority] = (acc[priority] || 0) + 1;
           return acc;
         },
-        {},
+        {} as Record<string, number>,
       );
 
       const upcomingDeadlines = learningGoals

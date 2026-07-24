@@ -1,10 +1,19 @@
-CI/CD overview
+CI/CD Overview & Deployment Guidelines
 
-This repository contains a GitHub Actions workflow to build Docker images for the backend and rust_analytics service, push them to GitHub Container Registry (GHCR), create Koyeb apps if missing, trigger Koyeb deployments, and optionally run smoke tests.
+This repository contains GitHub Actions workflows and Docker configuration to build container images for the backend, frontend, and rust_analytics services.
 
-The Rust analytics image is built from `rust_analytics/` with `protos/` supplied as an additional build context, so local `docker compose up --build` and the GitHub Actions workflows use the same layout.
+1. Single Source of Truth for Protobufs
+- The protobuf definitions live exclusively in `./protos/analytics.proto` at the repository root.
+- `rust_analytics/Dockerfile` dynamically inspects the build context and resolves `./protos` natively whether built from root repository context (`.`) or from subfolders (`rust_analytics/`). No duplicate proto files are needed or maintained.
 
-Workflow: `.github/workflows/deploy-to-koyeb.yml`
+2. Non-Root Docker Image Permissions
+- Both `backend/Dockerfile` and `frontend/Dockerfile` use `COPY --chown=node:node` to set file ownership during copy, with `USER node` positioned after file placement for production security.
+
+3. Dynamic Frontend Base URLs
+- All frontend URL utilities ([frontend/src/lib/urls.ts](file:///c:/Users/user/medical/frontend/src/lib/urls.ts)) dynamically construct origins based on `window.location.origin` in the browser or environment variables (`NEXT_PUBLIC_BASE_URL`, `NEXT_PUBLIC_APP_URL`, `VERCEL_URL`) on the server.
+- No static or unpurchased domain names are hardcoded.
+
+4. Workflows: `.github/workflows/deploy.yml` and `.github/workflows/ci.yml`
 
 Required GitHub secrets
 

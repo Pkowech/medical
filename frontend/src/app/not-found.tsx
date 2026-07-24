@@ -1,8 +1,6 @@
-'use client';
+import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
-
-import Link from 'next/link';
 
 export default function NotFound() {
   return (

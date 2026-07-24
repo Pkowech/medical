@@ -550,7 +550,7 @@ export class QuizService {
 
         // Update BKT for the specific skill/topic associated with the question
         // We prioritize the question's specific topic, falling back to the quiz's topic
-        const skillId = (question).topicId || activeQuiz.topicId;
+        const skillId = (question as any).topicId || (question as any).topic_ids?.[0] || (question as any).topicIds?.[0] || activeQuiz.topicId;
         if (skillId) {
           // Fire-and-forget BKT update
           void this.analyticsService

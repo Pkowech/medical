@@ -15,7 +15,12 @@ ARG APP_NAME=rust_analytics
 # will override this stage with the external build context.
 FROM alpine:3.18 AS protos
 WORKDIR /protos
-COPY protos/ .
+RUN --mount=type=bind,source=.,target=/tmp/ctx \
+    if [ -d /tmp/ctx/protos ]; then \
+      cp -r /tmp/ctx/protos/* /protos/ 2>/dev/null || true; \
+    elif [ -d /tmp/ctx/../protos ]; then \
+      cp -r /tmp/ctx/../protos/* /protos/ 2>/dev/null || true; \
+    fi
 
 ################################################################################
 # Create a stage for building the application.
@@ -31,10 +36,18 @@ ENV SQLX_OFFLINE=true
 # Install host build dependencies.
 RUN apk add --no-cache clang lld musl-dev git protobuf-dev protoc
 
-# Copy crate source files
-COPY Cargo.toml Cargo.lock build.rs ./
-COPY src ./src
-COPY .sqlx ./.sqlx
+# Copy crate source files dynamically whether build context is repo root or rust_analytics folder
+RUN --mount=type=bind,source=.,target=/tmp/ctx \
+    mkdir -p /app/src /app/.sqlx && \
+    if [ -f /tmp/ctx/Cargo.toml ]; then \
+      cp /tmp/ctx/Cargo.toml /tmp/ctx/Cargo.lock /tmp/ctx/build.rs /app/ && \
+      cp -r /tmp/ctx/src/* /app/src/ && \
+      cp -r /tmp/ctx/.sqlx/* /app/.sqlx/ 2>/dev/null || true; \
+    elif [ -f /tmp/ctx/rust_analytics/Cargo.toml ]; then \
+      cp /tmp/ctx/rust_analytics/Cargo.toml /tmp/ctx/rust_analytics/Cargo.lock /tmp/ctx/rust_analytics/build.rs /app/ && \
+      cp -r /tmp/ctx/rust_analytics/src/* /app/src/ && \
+      cp -r /tmp/ctx/rust_analytics/.sqlx/* /app/.sqlx/ 2>/dev/null || true; \
+    fi
 
 RUN --mount=type=bind,from=protos,source=.,target=protos \
     --mount=type=cache,target=/app/target/ \

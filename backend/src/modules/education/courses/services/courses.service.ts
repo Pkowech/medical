@@ -571,10 +571,10 @@ export class CoursesService {
             id: course.category.id,
             name: course.category.name,
             slug: course.category.slug,
-            parentCategory: (course.category).parentCategory
+            parentCategory: (course.category as any).parentCategory
               ? {
-                  id: (course.category).parentCategory.id,
-                  name: (course.category).parentCategory.name,
+                  id: (course.category as any).parentCategory.id,
+                  name: (course.category as any).parentCategory.name,
                 }
               : undefined,
           }
@@ -585,8 +585,8 @@ export class CoursesService {
             id: course.createdBy.id,
             firstName: course.createdBy.firstName ?? '',
             lastName: course.createdBy.lastName ?? '',
-            expertise: (course.createdBy).expertise || [],
-            rating: (course.createdBy).rating ?? undefined,
+            expertise: (course.createdBy as any).expertise || [],
+            rating: (course.createdBy as any).rating ?? undefined,
           }
         : undefined;
 

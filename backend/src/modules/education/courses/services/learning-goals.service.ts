@@ -206,7 +206,7 @@ export class LearningGoalsService {
       if (filters.status === 'active') {
         where.status = ProgressStatus.inProgress;
       } else {
-        where.status = filters.status;
+        where.status = filters.status as any;
       }
     }
 
@@ -590,7 +590,7 @@ export class LearningGoalsService {
           metadata: {
             ...((goal.metadata as Prisma.JsonObject) || {}),
             milestones,
-          },
+          } as any,
           updatedAt: new Date(),
         },
         include: {
@@ -931,7 +931,7 @@ export class LearningGoalsService {
           metadata: {
             ...((goal.metadata as Prisma.JsonObject) || {}),
             milestones,
-          },
+          } as any,
         },
       });
     }

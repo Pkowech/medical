@@ -119,10 +119,10 @@ export class GlobalSearchSyncService implements OnModuleInit {
           description: m.description, 
           content: m.content, 
           metadata: { 
-            ...(m.metadata), 
+            ...((m.metadata as Record<string, any>) || {}), 
             courseId: m.topic?.unit?.courseId 
           },
-          tags: (m.metadata)?.tags
+          tags: (m.metadata as any)?.tags
         } : null);
       case 'quiz':
         return this.prisma.quiz.findUnique({ 
@@ -150,7 +150,7 @@ export class GlobalSearchSyncService implements OnModuleInit {
 
   private async getAllIds(type: SearchEntityType): Promise<string[]> {
     const table = type === 'clinical_case' ? 'clinicalCase' : type;
-    const records = await (this.prisma[table as any]).findMany({ select: { id: true } });
+    const records = await (this.prisma as any)[table].findMany({ select: { id: true } });
     return records.map((r: any) => r.id);
   }
 
