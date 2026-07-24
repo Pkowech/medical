@@ -53,23 +53,36 @@ const shouldEnableRedis =
   process.env.ENABLE_REDIS === 'true' || Boolean(process.env.REDIS_URL);
 
 const redisModules = shouldEnableRedis
-    ? [
-        RedisModule,
-        CacheModule.registerAsync({
-          imports: [ConfigModule],
-          useFactory: (configService: ConfigService) => ({
-            store: redisStore,
-            host: configService.get<string>('redis.host'),
-            port: configService.get<number>('redis.port'),
-            password: configService.get<string>('redis.password'),
-            db: configService.get<number>('redis.db'),
+  ? [
+      RedisModule,
+      CacheModule.registerAsync({
+        imports: [ConfigModule],
+        // The redisStore factory requires a config argument. Make the factory
+        // async and invoke redisStore(...) with the resolved config so the
+        // returned store instance is provided to Nest's cache manager.
+        useFactory: async (configService: ConfigService) => {
+          const host = configService.get<string>('redis.host');
+          const port = configService.get<number>('redis.port');
+          const password = configService.get<string>('redis.password');
+          const db = configService.get<number>('redis.db');
+
+          const store = await (redisStore as any)({
+            host,
+            port,
+            password,
+            db,
+          });
+
+          return {
+            store,
             ttl: 3600, // 1 hour
-          }),
-          inject: [ConfigService],
-          isGlobal: true, // Make cache module global
-        }),
-      ]
-    : [];
+          };
+        },
+        inject: [ConfigService],
+        isGlobal: true, // Make cache module global
+      }),
+    ]
+  : [];
 
 @Module({
   imports: [

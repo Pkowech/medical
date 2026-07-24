@@ -8,7 +8,6 @@
     "experimentalDecorators": true,
     "allowSyntheticDefaultImports": true,
     "target": "ES2021",
-    "baseUrl": ".",
     "sourceMap": true,
     "outDir": "./dist",
     "rootDir": "src",
@@ -24,7 +23,9 @@
       "*": ["./*"],
       "#common/*": ["./src/common/*"],
       "#infrastructure/*": ["./src/infrastructure/*"],
-      "#modules/*": ["./src/modules/*"]
+      "#modules/*": ["./src/modules/*"],
+      "#test/*": ["./test/*"],
+      "#test/ai-analytics/*": ["./test/ai-analytics/*"]
     }
   },
   "include": ["src/**/*", "test/ai-analytics/tests"],

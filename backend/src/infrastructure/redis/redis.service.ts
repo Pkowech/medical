@@ -9,10 +9,11 @@ export class RedisService {
   private readonly redis: Redis | null;
   private readonly logger = new Logger(RedisService.name);
   private isConnected = false;
-  private reconnectDelay = 1000;
-  private readonly maxReconnectDelay = 30000;
+  private subscriber: Redis | null = null;
   private memoryStore: Map<string, { value: string; expiry?: number }> =
     new Map();
+  private lastErrorLogAt = 0;
+  private readonly errorLogCooldownMs = 30000; // mute repeated errors for 30s
 
   constructor(private configService: ConfigService) {
     const shouldEnableRedis =
@@ -26,26 +27,37 @@ export class RedisService {
         this.redis = new Redis({ ...redisConn, lazyConnect: true });
       }
 
-      this.redis.on('connect', () => {
+      // Use 'ready' which indicates the client is fully ready to accept commands
+      this.redis.on('ready', () => {
         const wasConnected = this.isConnected;
         this.isConnected = true;
         if (!wasConnected) {
           this.logger.log('Connected to Redis');
         } else {
-          this.logger.debug('Redis connection event (already connected)');
+          this.logger.debug('Redis ready event (already connected)');
         }
-        // reset backoff on successful connect
-        this.reconnectDelay = 1000;
+      });
+
+      // 'close' is emitted when the connection has been closed
+      this.redis.on('close', () => {
+        if (this.isConnected) {
+          this.logger.debug('Redis connection closed');
+        }
+        this.isConnected = false;
       });
 
       this.redis.on('error', (error) => {
+        // Mark as not connected but do not schedule manual reconnects —
+        // ioredis manages reconnection via its built-in retry strategy.
         this.isConnected = false;
-        // Log at debug level to avoid spamming WARN on transient network issues
-        this.logger.debug(
-          'Redis connection error, will attempt reconnect:',
-          getErrorMessage(error),
-        );
-        void this.scheduleReconnect();
+        const now = Date.now();
+        if (now - this.lastErrorLogAt > this.errorLogCooldownMs) {
+          this.lastErrorLogAt = now;
+          this.logger.debug(
+            'Redis connection error (handled by ioredis):',
+            getErrorMessage(error),
+          );
+        }
       });
 
       void this.connectRedis();
@@ -80,24 +92,8 @@ export class RedisService {
     }
   }
 
-  private async scheduleReconnect() {
-    if (!this.redis || this.isConnected) return;
-    const delay = Math.min(this.reconnectDelay, this.maxReconnectDelay);
-    this.logger.debug(`Scheduling Redis reconnect in ${delay}ms`);
-    setTimeout(async () => {
-      try {
-        await this.connectRedis();
-        // on failure, increase backoff
-        if (!this.isConnected) {
-          this.reconnectDelay = Math.min(this.reconnectDelay * 2, this.maxReconnectDelay);
-          void this.scheduleReconnect();
-        }
-      } catch (e) {
-        this.reconnectDelay = Math.min(this.reconnectDelay * 2, this.maxReconnectDelay);
-        void this.scheduleReconnect();
-      }
-    }, delay);
-  }
+  // Manual reconnection scheduling removed; ioredis' built-in retry
+  // strategy is relied upon instead to avoid duplicate reconnect logic.
 
   private getFromMemory(key: string): Promise<string | null> {
     const data = this.memoryStore.get(key);
@@ -459,14 +455,30 @@ export class RedisService {
       return;
     }
 
-    const subConn = buildRedisConnection(this.configService);
-    const subscriber =
-      typeof subConn === 'string'
-        ? new Redis(subConn)
-        : new Redis(subConn);
+    if (!this.subscriber) {
+      const subConn = buildRedisConnection(this.configService);
+      this.subscriber =
+        typeof subConn === 'string' ? new Redis(subConn) : new Redis(subConn);
+      this.subscriber.on('error', (err) => {
+        const now = Date.now();
+        if (now - this.lastErrorLogAt > this.errorLogCooldownMs) {
+          this.lastErrorLogAt = now;
+          this.logger.debug('Redis subscriber error:', getErrorMessage(err));
+        }
+      });
+      try {
+        await this.subscriber.connect();
+      } catch (err) {
+        const now = Date.now();
+        if (now - this.lastErrorLogAt > this.errorLogCooldownMs) {
+          this.lastErrorLogAt = now;
+          this.logger.debug('Redis subscriber connect failed:', getErrorMessage(err));
+        }
+      }
+    }
 
-    await subscriber.subscribe(channel);
-    subscriber.on('message', (ch: string, message: string) => {
+    await this.subscriber.subscribe(channel);
+    this.subscriber.on('message', (ch: string, message: string) => {
       if (ch === channel) {
         callback(message);
       }
@@ -477,6 +489,13 @@ export class RedisService {
     const client = this.getConnectedClient();
     if (client) {
       await client.quit();
+    }
+    if (this.subscriber) {
+      try {
+        await this.subscriber.quit();
+      } catch (_e) {
+        // ignore
+      }
     }
   }
 
