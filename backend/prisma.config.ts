@@ -3,6 +3,7 @@ import { defineConfig, env } from 'prisma/config';
 
 type Env = {
   DATABASE_URL: string;
+  DIRECT_URL: string;
 };
 
 export default defineConfig({
@@ -13,9 +14,6 @@ export default defineConfig({
   },
   datasource: {
     url: env<Env>('DATABASE_URL'),
-    // Read directly instead of via env<>() — the helper throws on missing
-    // vars even for keys typed as optional, and SHADOW_DATABASE_URL is
-    // legitimately unset in most environments (build stages, prod deploys).
-    shadowDatabaseUrl: process.env.SHADOW_DATABASE_URL,
+    directUrl: env<Env>('DIRECT_URL'),
   },
 });

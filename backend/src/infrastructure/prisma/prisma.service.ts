@@ -16,14 +16,19 @@ export class PrismaService
 
   constructor() {
     const connectionString = process.env.DATABASE_URL;
-    const pool = new Pool({ connectionString });
+    const pool = new Pool({
+      connectionString,
+      ssl: {
+        rejectUnauthorized: false,
+      },
+    });
     const adapter = new PrismaPg(pool);
 
     super({
       adapter,
       log:
         process.env.NODE_ENV === 'development'
-          ? ['query', 'info', 'error', 'warn']
+          ? ['query', 'info', 'warn', 'error']
           : ['error'],
     });
 
