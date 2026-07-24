@@ -67,8 +67,8 @@ COPY --chown=node:node --from=build /usr/src/app/dist ./dist
 COPY --chown=node:node --from=build /usr/src/app/prisma ./prisma
 COPY --chown=node:node --from=build /usr/src/app/prisma.config.ts ./prisma.config.ts
 
-# Ensure the node user has write permissions to the app directory (for pnpm tmp files)
-RUN chmod -R u+w /usr/src/app && chown -R node:node /usr/src/app
+# Ensure the node user has full ownership and write permissions
+RUN chown -R node:node /usr/src/app && chmod -R u+w /usr/src/app
 
 # Run the application as non-root user
 USER node
