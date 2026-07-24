@@ -12,7 +12,7 @@ env:
   NODE_VERSION: "22"
   PNPM_VERSION: "10.32.1"
   REGISTRY: ghcr.io
-  OWNER: ${{ github.repository_owner }}
+  OWNER: ${{ github.repository_owner.toLower() }}
 
 jobs:
   # ──────────────────────────────────────────────
@@ -108,6 +108,13 @@ jobs:
 
       - name: Install Vercel CLI
         run: npm install -g vercel@latest
+
+      - name: Validate Vercel token
+        run: |
+          if [ -z "${{ secrets.VERCEL_TOKEN }}" ]; then
+            echo "Vercel token is not set. Please add secrets.VERCEL_TOKEN to the repository."
+            exit 1
+          fi
 
       - name: Pull Vercel environment
         working-directory: frontend

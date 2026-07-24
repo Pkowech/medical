@@ -10,6 +10,7 @@ FROM node:${NODE_VERSION}-alpine AS base
 ARG DATABASE_URL
 
 ENV DATABASE_URL=${DATABASE_URL}
+ENV DIRECT_URL=${DATABASE_URL}
 
 # Set working directory for all build stages.
 WORKDIR /usr/src/app
@@ -43,6 +44,7 @@ RUN --mount=type=bind,source=package.json,target=package.json \
 
 # Copy the rest of the source files into the image.
 COPY . .
+RUN if [ ! -f .env ] && [ -n "$DATABASE_URL" ]; then printf 'DIRECT_URL=%s\n' "$DATABASE_URL" > .env; fi
 RUN pnpm prisma generate
 RUN pnpm run build
 RUN pnpm prune --prod
