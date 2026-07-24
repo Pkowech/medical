@@ -69,7 +69,8 @@ services:
     environment:
       NODE_ENV: production
       PORT: ${BACKEND_PORT}
-      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL must be set}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}}
+      DATABASE_SSL: ${DATABASE_SSL:-false}
       POSTGRES_HOST: postgres
       REDIS_HOST: ${REDIS_HOST}
       # DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
@@ -84,7 +85,8 @@ services:
       # whatever's currently deployed with the old hardcoded value.
       JWT_SECRET: ${JWT_SECRET}
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
-      RUST_ANALYTICS_GRPC_URL: http://rust-analytics:50051
+      ANALYTICS_GRPC_URL: ${ANALYTICS_GRPC_URL:-rust-analytics:50051}
+      RUST_ANALYTICS_GRPC_URL: ${RUST_ANALYTICS_GRPC_URL:-rust-analytics:50051}
       FILE_STORAGE_PROVIDER: ${FILE_STORAGE_PROVIDER:-cloudinary}
       CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
       CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}

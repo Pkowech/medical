@@ -42,17 +42,24 @@ if (enableGrpc) {
         name: 'ANALYTICS_PACKAGE',
         imports: [ConfigModule],
         inject: [ConfigService],
-        useFactory: (configService: ConfigService) => ({
-          transport: Transport.GRPC,
-          options: {
-            package: 'analytics',
-            protoPath,
-            url: configService.get<string>('ANALYTICS_GRPC_URL'),
-            loader: {
-              keepCase: false,
+        useFactory: (configService: ConfigService) => {
+          const grpcUrl =
+            configService.get<string>('ANALYTICS_GRPC_URL') ||
+            configService.get<string>('RUST_ANALYTICS_GRPC_URL') ||
+            'localhost:50051';
+
+          return {
+            transport: Transport.GRPC,
+            options: {
+              package: 'analytics',
+              protoPath,
+              url: grpcUrl.replace(/^https?:\/\//, ''),
+              loader: {
+                keepCase: false,
+              },
             },
-          },
-        }),
+          };
+        },
       },
     ]),
   );

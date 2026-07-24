@@ -16,12 +16,22 @@ export class PrismaService
 
   constructor() {
     const connectionString = process.env.DATABASE_URL;
-    const pool = new Pool({
+    const shouldUseSsl =
+      process.env.DATABASE_SSL === 'true' ||
+      Boolean(connectionString?.includes('sslmode=require')) ||
+      Boolean(connectionString?.includes('ssl=true'));
+
+    const poolConfig: ConstructorParameters<typeof Pool>[0] = {
       connectionString,
-      ssl: {
+    };
+
+    if (shouldUseSsl) {
+      poolConfig.ssl = {
         rejectUnauthorized: false,
-      },
-    });
+      };
+    }
+
+    const pool = new Pool(poolConfig);
     const adapter = new PrismaPg(pool);
 
     super({
