@@ -113,7 +113,7 @@ jobs:
 
       - name: Type check
         working-directory: frontend
-        run: pnpm run type-check || true   # remove "|| true" once type-check script is added
+        run: pnpm run type-check 
 
       - name: Tests
         working-directory: frontend

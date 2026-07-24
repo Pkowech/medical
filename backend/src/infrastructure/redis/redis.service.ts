@@ -1,13 +1,15 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import Redis from 'ioredis';
 import buildRedisConnection from './redis.helper';
 import { ConfigService } from '@nestjs/config';
 import { getErrorMessage } from '#common/utils/error.utils';
 
 @Injectable()
-export class RedisService {
+export class RedisService implements OnModuleInit {
   private readonly redis: Redis | null;
   private readonly logger = new Logger(RedisService.name);
+  private readonly shouldEnableRedis =
+    process.env.ENABLE_REDIS === 'true' || Boolean(process.env.REDIS_URL);
   private isConnected = false;
   private subscriber: Redis | null = null;
   private memoryStore: Map<string, { value: string; expiry?: number }> =
@@ -19,10 +21,7 @@ export class RedisService {
   private errorLogCooldownMs = 60_000; // 1 minute
 
   constructor(private configService: ConfigService) {
-    const shouldEnableRedis =
-      process.env.ENABLE_REDIS === 'true' || Boolean(process.env.REDIS_URL);
-
-    if (shouldEnableRedis) {
+    if (this.shouldEnableRedis) {
       const redisConn = buildRedisConnection(this.configService);
       if (typeof redisConn === 'string') {
         this.redis = new Redis(redisConn, { lazyConnect: true });
@@ -61,8 +60,6 @@ export class RedisService {
           );
         }
       });
-
-      void this.connectRedis();
     } else {
       this.logger.log('Redis is disabled, operating in in-memory mode.');
       this.redis = null;
@@ -78,7 +75,13 @@ export class RedisService {
     }, 60000);
   }
 
-  private async connectRedis() {
+  async onModuleInit() {
+    if (this.shouldEnableRedis) {
+      await this.connectRedis(true);
+    }
+  }
+
+  private async connectRedis(throwOnFail = false) {
     if (!this.redis || this.isConnected) {
       return;
     }
@@ -91,6 +94,9 @@ export class RedisService {
         getErrorMessage(err),
       );
       this.isConnected = false;
+      if (throwOnFail) {
+        throw err;
+      }
     }
   }
 
