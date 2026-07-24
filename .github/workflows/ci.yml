@@ -198,7 +198,7 @@ jobs:
             dockerfile: ./frontend/Dockerfile
             target: final
           - service: rust-analytics
-            context: .
+            context: ./rust_analytics
             dockerfile: ./rust_analytics/Dockerfile
             target: ""
 
@@ -212,6 +212,8 @@ jobs:
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
+          build-contexts: |
+            protos=./protos
           target: ${{ matrix.target }}
           push: false
           cache-from: type=gha,scope=${{ matrix.service }}

@@ -23,13 +23,15 @@ ENV SQLX_OFFLINE=true
 # Install host build dependencies.
 RUN apk add --no-cache clang lld musl-dev git protobuf-dev protoc
 
-# Build the application.
-RUN --mount=type=bind,source=rust_analytics/src,target=src \
-    --mount=type=bind,source=rust_analytics/build.rs,target=build.rs \
-    --mount=type=bind,source=rust_analytics/Cargo.toml,target=Cargo.toml \
-    --mount=type=bind,source=rust_analytics/Cargo.lock,target=Cargo.lock \
-    --mount=type=bind,source=rust_analytics/.sqlx,target=.sqlx \
-    --mount=type=bind,source=protos,target=protos \
+# Build the application from the crate directory. Shared protobuf definitions
+# are provided as an additional build context so this works from CI and local
+# Docker builds without requiring the repo root as the main context.
+RUN --mount=type=bind,source=src,target=src \
+    --mount=type=bind,source=build.rs,target=build.rs \
+    --mount=type=bind,source=Cargo.toml,target=Cargo.toml \
+    --mount=type=bind,source=Cargo.lock,target=Cargo.lock \
+    --mount=type=bind,source=.sqlx,target=.sqlx \
+    --mount=type=bind,from=protos,source=.,target=protos \
     --mount=type=cache,target=/app/target/ \
     --mount=type=cache,target=/usr/local/cargo/git/db \
     --mount=type=cache,target=/usr/local/cargo/registry/ \

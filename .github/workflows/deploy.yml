@@ -74,8 +74,10 @@ jobs:
       - name: Build & push
         uses: docker/build-push-action@v6
         with:
-          context: .
+          context: ./rust_analytics
           file: ./rust_analytics/Dockerfile
+          build-contexts: |
+            protos=./protos
           platforms: linux/amd64
           push: true
           tags: |

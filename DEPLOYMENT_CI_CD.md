@@ -2,6 +2,8 @@ CI/CD overview
 
 This repository contains a GitHub Actions workflow to build Docker images for the backend and rust_analytics service, push them to GitHub Container Registry (GHCR), create Koyeb apps if missing, trigger Koyeb deployments, and optionally run smoke tests.
 
+The Rust analytics image is built from `rust_analytics/` with `protos/` supplied as an additional build context, so local `docker compose up --build` and the GitHub Actions workflows use the same layout.
+
 Workflow: `.github/workflows/deploy-to-koyeb.yml`
 
 Required GitHub secrets

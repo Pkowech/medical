@@ -116,10 +116,12 @@ services:
 
   rust-analytics:
     build:
-      # Build from the repo root so the Rust crate and shared protos are both
-      # available to the Dockerfile's bind mounts.
-      context: .
-      dockerfile: rust_analytics/Dockerfile
+      # Build from the Rust crate directory and supply shared protos as an
+      # additional context for the Dockerfile's bind mounts.
+      context: ./rust_analytics
+      dockerfile: Dockerfile
+      additional_contexts:
+        protos: ./protos
     container_name: medtrack_rust_analytics_prod
     restart: unless-stopped
     env_file:

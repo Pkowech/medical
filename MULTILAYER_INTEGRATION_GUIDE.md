@@ -229,7 +229,7 @@ Database (PostgreSQL + Redis)
 **Test Steps:**
 ```
 1. Start backend: npm run start
-2. Verify Rust service is running on port 5001
+2. Verify Rust service is running on port 50051
 3. In backend logs, verify gRPC channel connection
 4. Make recommendation request: GET /learning-paths/discovery/personalized
 5. Check response includes Rust-generated recommendations
@@ -280,7 +280,7 @@ redis-cli FLUSHDB
 ps aux | grep rust  # Look for analytics process
 
 # Test Rust directly (if available)
-grpcurl -plaintext list localhost:5001
+grpcurl -plaintext list localhost:50051
 
 # Clear cache manually
 curl -X DELETE http://localhost:6379/recommendations-{userId}
