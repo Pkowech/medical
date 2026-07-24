@@ -22,7 +22,7 @@ ARG CARGO_BUILD_JOBS=8
 WORKDIR /app
 
 # Optimization flags for faster builds
-ENV SQLX_OFFLINE=true
+ENV SQLX_OFFLINE=false
 ENV CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS}
 ENV RUSTFLAGS="-C embed-bitcode=no"
 
