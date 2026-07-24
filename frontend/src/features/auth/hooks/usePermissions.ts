@@ -4,7 +4,7 @@ import { navigationPermissions } from '@/core/app/components/layout/permissionCo
 import navigationConfig from '@/core/app/components/layout/navigationConfig';
 
 export const usePermissions = () => {
-  const { data: session } = useSession();
+  const { data: session } = useSession() || {};
   const user = session?.user;
 
   const getHighestRole = (roles: Role[]): Role => {

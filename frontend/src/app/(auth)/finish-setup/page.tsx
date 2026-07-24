@@ -1,5 +1,7 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
@@ -21,7 +23,7 @@ interface FinishSetupData {
 
 export default function FinishSetupPage() {
   const router = useRouter();
-  const { data: session } = useSession();
+  const { data: session } = useSession() || {};
   const { toast } = useToast();
 
   const [isLoading, setIsLoading] = useState(false);

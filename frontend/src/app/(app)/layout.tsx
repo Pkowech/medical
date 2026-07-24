@@ -1,5 +1,7 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import React, { ReactNode, useEffect } from 'react';
 import { DashboardLayout } from '@/core/app/components/layout/DashboardLayout';
 import { LayoutProvider } from '@/core/providers/LayoutContext';

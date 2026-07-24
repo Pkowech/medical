@@ -65,7 +65,7 @@ import { PerformanceAnalyticsContent } from '@/features/assessment/components/Pe
 import { Badge } from '@/shared/components/ui/badge';
 
 export default function AnalyticsDashboard() {
-  const { data: session } = useSession();
+  const { data: session } = useSession() || {};
   const { allRoles } = usePermissions();
   const userId = session?.user?.id;
   const isAdmin = allRoles?.includes(Role.admin);

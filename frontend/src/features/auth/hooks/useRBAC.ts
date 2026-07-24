@@ -12,7 +12,7 @@ import { useState, useEffect } from 'react';
  * @returns An object with the user's role, loading state, and a boolean indicating if they have the required role.
  */
 export const useRBAC = (requiredPermission?: Permission) => {
-  const { data: session, status } = useSession();
+  const { data: session, status } = useSession() || {};
   const isLoading = status === 'loading';
   const [data, setData] = useState<AuthSessionUser | null>(null);
   const [error, setError] = useState<Error | null>(null);
