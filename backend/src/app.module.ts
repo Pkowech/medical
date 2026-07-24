@@ -5,6 +5,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import redisConfig from './config/redis.config';
 import { LoggerModule } from 'nestjs-pino';
+import { validationSchema } from './config/validation';
 import { randomUUID } from 'crypto';
 import { CacheModule } from '@nestjs/cache-manager';
 import * as redisStore from 'cache-manager-redis-store';
@@ -82,6 +83,7 @@ const redisModules = shouldEnableRedis
       isGlobal: true,
       envFilePath: ['.env', '../.env'],
       load: [redisConfig],
+      validationSchema: validationSchema,
     }),
     JwtModule.registerAsync({
       imports: [ConfigModule],

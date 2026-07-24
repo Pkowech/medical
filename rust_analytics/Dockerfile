@@ -27,13 +27,15 @@ RUN apk add --no-cache clang lld musl-dev git
 # Leverage a bind mount to the src directory to avoid having to copy the
 # source code into the container. Once built, copy the executable to an
 # output directory before the cache mounted /app/target is unmounted.
-RUN --mount=type=bind,source=src,target=src \
-    --mount=type=bind,source=Cargo.toml,target=Cargo.toml \
-    --mount=type=bind,source=Cargo.lock,target=Cargo.lock \
+RUN --mount=type=bind,source=rust_analytics/src,target=src \
+    --mount=type=bind,source=rust_analytics/Cargo.toml,target=Cargo.toml \
+    --mount=type=bind,source=rust_analytics/Cargo.lock,target=Cargo.lock \
+    --mount=type=bind,source=rust_analytics/.sqlx,target=.sqlx \
+    --mount=type=bind,source=protos,target=protos \
     --mount=type=cache,target=/app/target/ \
     --mount=type=cache,target=/usr/local/cargo/git/db \
     --mount=type=cache,target=/usr/local/cargo/registry/ \
-cargo build --locked --release && \
+SQLX_OFFLINE=true cargo build --locked --release && \
 cp ./target/release/$APP_NAME /bin/server
 
 ################################################################################

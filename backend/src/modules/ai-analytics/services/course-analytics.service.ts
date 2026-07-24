@@ -1,5 +1,6 @@
 import { Injectable, Logger, Inject, OnModuleInit } from '@nestjs/common';
 import { ClientGrpc } from '@nestjs/microservices';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '#infrastructure/prisma/prisma.service';
 import { RedisService } from '#infrastructure/redis/redis.service';
 import { HttpService } from '@nestjs/axios';
@@ -34,18 +35,12 @@ import { RecommendationItemDto } from '#common/dto/analytics.dto';
 export class CourseAnalyticsService implements OnModuleInit {
   private readonly logger = new Logger(CourseAnalyticsService.name);
   private readonly cacheTtl = 3600;
-  private readonly rustAnalyticsUrl =
-    process.env.RUST_ANALYTICS_URL || 'http://rust-analytics:8000';
-  private readonly rustApiKey = process.env.RUST_ANALYTICS_API_KEY || '';
-  private readonly httpTimeoutMs = Number(
-    process.env.RUST_HTTP_TIMEOUT_MS || 5000,
-  );
-  private readonly httpRetries = Number(process.env.RUST_HTTP_RETRIES || 2);
-  private readonly grpcTimeoutMs = Number(
-    process.env.RUST_GRPC_TIMEOUT_MS || 5000,
-  );
-  private readonly grpcRetries = Number(process.env.RUST_GRPC_RETRIES || 2);
-
+  private readonly rustAnalyticsUrl: string;
+  private readonly rustApiKey: string;
+  private readonly httpTimeoutMs: number;
+  private readonly httpRetries: number;
+  private readonly grpcTimeoutMs: number;
+  private readonly grpcRetries: number;
   private analyticsServiceGrpc!: AnalyticsService;
 
   constructor(
@@ -56,7 +51,27 @@ export class CourseAnalyticsService implements OnModuleInit {
     private readonly requestDeduplicationService: RequestDeduplicationService,
     private readonly performanceMetrics: PerformanceMetricsService,
     private readonly tracingService: DistributedTracingService,
-  ) {}
+    private readonly configService: ConfigService,
+  ) {
+    this.rustAnalyticsUrl = this.configService.get<string>(
+      'RUST_ANALYTICS_URL',
+    )!;
+    this.rustApiKey = this.configService.get<string>(
+      'RUST_ANALYTICS_API_KEY',
+    )!;
+    this.httpTimeoutMs = this.configService.get<number>(
+      'RUST_HTTP_TIMEOUT_MS',
+    )!;
+    this.httpRetries = this.configService.get<number>(
+      'RUST_HTTP_RETRIES',
+    )!;
+    this.grpcTimeoutMs = this.configService.get<number>(
+      'RUST_GRPC_TIMEOUT_MS',
+    )!;
+    this.grpcRetries = this.configService.get<number>(
+      'RUST_GRPC_RETRIES',
+    )!;
+  }
 
   onModuleInit() {
     this.analyticsServiceGrpc =

@@ -182,10 +182,10 @@ async function bootstrap() {
   // CORS configuration - more permissive for Docker development
   Logger.log('Setting up CORS configuration...');
   const configService = app.get(ConfigService);
-  const allowedOrigins = configService
-    .get<string>('ALLOWED_ORIGINS', 'http://localhost:3000')
-    .split(',')
-    .map((origin) => origin.trim());
+    const allowedOrigins = configService
+      .get<string>('ALLOWED_ORIGINS')!
+      .split(',')
+      .map((origin) => origin.trim());
 
   Logger.log('Enabling CORS...');
   app.enableCors({
@@ -315,8 +315,8 @@ async function bootstrap() {
   app.use(apiLimiter);
 
   Logger.log('Getting port configuration...');
-  const port = configService.get('PORT', 3002);
-  const hostname = configService.get('HOSTNAME', '0.0.0.0');
+    const port = configService.get<number>('PORT')!;
+    const hostname = configService.get<string>('HOSTNAME')!;
 
   Logger.log('Logging routes...');
   if (process.env.NODE_ENV === 'development') {
@@ -373,10 +373,7 @@ async function bootstrap() {
   Logger.log(`   - GET ${apiUrl}/auth/profile`);
   Logger.log(`   - POST ${apiUrl}/auth/refresh`);
   Logger.log(
-    `📊 Analytics Service: ${configService.get(
-      'ANALYTICS_SERVICE_URL',
-      'http://localhost:8080',
-    )}`,
+    `📊 Analytics Service: ${configService.get<string>('ANALYTICS_SERVICE_URL')}`,
   );
   Logger.log(`=======================================================`);
 

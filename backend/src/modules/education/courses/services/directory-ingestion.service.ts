@@ -19,6 +19,7 @@
  * re-runnable sync utility (upsert semantics prevent duplicates).
  */
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { createHash } from 'crypto';
@@ -33,14 +34,14 @@ export class DirectoryIngestionService implements OnModuleInit {
   constructor(
     private readonly prisma: PrismaService,
     private readonly materialsService: MaterialsService,
+    private readonly configService: ConfigService,
   ) {}
 
   // ─────────────────────── lifecycle ────────────────────────────────────────
 
   async onModuleInit() {
-    if (process.env.RUN_INGESTION === 'true') {
-      const rootPath =
-        process.env.INGESTION_ROOT_PATH || 'C:\\Users\\user\\PHARMACY';
+    if (this.configService.get<boolean>('RUN_INGESTION')) {
+      const rootPath = this.configService.get<string>('INGESTION_ROOT_PATH')!;
       this.logger.log(
         `RUN_INGESTION is set – starting ingestion from: ${rootPath}`,
       );

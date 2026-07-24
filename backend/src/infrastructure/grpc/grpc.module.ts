@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ClientsModule, Transport } from '@nestjs/microservices';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { join } from 'path';
 import { existsSync } from 'fs';
 import { of } from 'rxjs';
@@ -32,20 +33,26 @@ if (!protoPath) {
 // This avoids runtime proto-loading errors in development environments
 // where the external gRPC service or protos are not available.
 const grpcImports = [] as any[];
-if (process.env.ENABLE_GRPC === 'true') {
+const enableGrpc = process.env.ENABLE_GRPC === 'true';
+
+if (enableGrpc) {
   grpcImports.push(
-    ClientsModule.register([
+    ClientsModule.registerAsync([
       {
         name: 'ANALYTICS_PACKAGE',
-        transport: Transport.GRPC,
-        options: {
-          package: 'analytics',
-          protoPath,
-          url: 'localhost:50051',
-          loader: {
-            keepCase: false,
+        imports: [ConfigModule],
+        inject: [ConfigService],
+        useFactory: (configService: ConfigService) => ({
+          transport: Transport.GRPC,
+          options: {
+            package: 'analytics',
+            protoPath,
+            url: configService.get<string>('ANALYTICS_GRPC_URL'),
+            loader: {
+              keepCase: false,
+            },
           },
-        },
+        }),
       },
     ]),
   );
@@ -80,9 +87,6 @@ if (process.env.ENABLE_GRPC !== 'true') {
 @Module({
   imports: grpcImports,
   providers: grpcProviders,
-  exports:
-    process.env.ENABLE_GRPC === 'true'
-      ? [ClientsModule, 'ANALYTICS_PACKAGE']
-      : ['ANALYTICS_PACKAGE'],
+  exports: enableGrpc ? [ClientsModule, 'ANALYTICS_PACKAGE'] : ['ANALYTICS_PACKAGE'],
 })
 export class GrpcModule {}

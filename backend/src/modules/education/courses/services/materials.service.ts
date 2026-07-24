@@ -18,9 +18,6 @@ import {
   hashBuffer,
   hashStreamAndCollect,
 } from '#infrastructure/storage/hash.util';
-import libre from 'libreoffice-convert';
-
-import { promisify } from 'util';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { PrismaService } from '#infrastructure/prisma/prisma.service';
@@ -36,7 +33,8 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ProgressService } from './progress.service';
 import { AiAnalyticsService } from '../../../ai-analytics/services/ai-analytics.service';
 import { FtsUtils } from '#common/utils/fts.utils';
-const convertAsync = promisify(libre.convert);
+// Local LibreOffice conversion removed. All document conversions are
+// delegated to the Gotenberg service configured via `GOTENBERG_URL`.
 
 import { GlobalSearchSyncService } from '#infrastructure/search/services/global-search-sync.service';
 
@@ -747,7 +745,7 @@ export class MaterialsService {
           const formData = new FormData();
           formData.append('files', new Blob([uploadBuffer as any]), file.originalname);
           
-          const gotenbergUrl = process.env.GOTENBERG_URL || 'http://localhost:3010';
+          const gotenbergUrl = this.configService.get<string>('GOTENBERG_URL');
           const response = await fetch(`${gotenbergUrl}/forms/libreoffice/convert`, {
             method: 'POST',
             body: formData,
@@ -1036,20 +1034,28 @@ export class MaterialsService {
 
       // Compute hash and reuse if exists
       const fileHash = createHash('sha256').update(file.buffer).digest('hex');
-      // convert with libreoffice-convert (requires libreoffice binary installed on the server)
-      const outputExt = '.pdf';
+      // Convert via Gotenberg (remote LibreOffice service)
       let pdfBuf: Buffer | undefined;
       try {
-        const result = await convertAsync(file.buffer, outputExt, undefined);
-        pdfBuf = Buffer.from(result as Uint8Array);
+        const formData = new FormData();
+        formData.append('files', new Blob([file.buffer as any]), file.originalname);
+
+        const gotenbergUrl = this.configService.get<string>('GOTENBERG_URL')!;
+        const response = await fetch(`${gotenbergUrl}/forms/libreoffice/convert`, {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          this.logger.error(`Gotenberg conversion failed: ${response.status} ${response.statusText}`);
+          throw new BadRequestException('Gotenberg conversion failed');
+        }
+
+        const pdfArrayBuffer = await response.arrayBuffer();
+        pdfBuf = Buffer.from(pdfArrayBuffer);
       } catch (err) {
-        this.logger.error(
-          'Conversion failed; will return error or enqueue for worker',
-          { error: (err as any)?.message },
-        );
-        throw new BadRequestException(
-          'Conversion failed; ensure libreoffice is installed on the host',
-        );
+        this.logger.error('Conversion failed via Gotenberg', { error: (err as any)?.message });
+        throw new BadRequestException('Conversion failed');
       }
 
       // Store PDF to S3 and create file + material record
