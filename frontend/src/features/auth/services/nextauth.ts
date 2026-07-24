@@ -104,7 +104,17 @@ export const authOptions: NextAuthOptions = {
           process.env.NEXT_PUBLIC_API_BASE_URL ||
           process.env.NEXT_PUBLIC_API_URL ||
           'http://localhost:3002';
-        const loginUrl = new URL('/v1/auth/login', raw).href;
+        
+        let validBase = (raw || 'http://localhost:3002').trim();
+        if (!validBase.startsWith('http://') && !validBase.startsWith('https://')) {
+          validBase = `https://${validBase}`;
+        }
+        let loginUrl: string;
+        try {
+          loginUrl = new URL('/v1/auth/login', validBase).href;
+        } catch {
+          loginUrl = 'http://localhost:3002/v1/auth/login';
+        }
 
         const loginBody = {
           password: credentials.password,
@@ -363,10 +373,24 @@ export const authOptions: NextAuthOptions = {
 
 
 
-    async redirect({ baseUrl }) {
-      // Always redirect to the dashboard after sign-in if authenticated.
-      // The middleware will handle further redirects based on user role or other factors.
-      return new URL('/dashboard', baseUrl).toString();
+    async redirect({ url, baseUrl }) {
+      try {
+        let validBase = (baseUrl || 'http://localhost:3000').trim();
+        if (!validBase.startsWith('http://') && !validBase.startsWith('https://')) {
+          validBase = `https://${validBase}`;
+        }
+        if (url && url.startsWith('/')) return `${validBase}${url}`;
+        if (url) {
+          let validUrl = url.trim();
+          if (!validUrl.startsWith('http://') && !validUrl.startsWith('https://')) {
+            validUrl = `https://${validUrl}`;
+          }
+          if (new URL(validUrl).origin === new URL(validBase).origin) return url;
+        }
+        return new URL('/dashboard', validBase).toString();
+      } catch {
+        return '/dashboard';
+      }
     },
   },
 

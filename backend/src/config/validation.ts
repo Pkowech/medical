@@ -87,10 +87,10 @@ export const validationSchema = Joi.object({
   CLOUDINARY_URL: Joi.string().uri().optional(),
   CLOUDINARY_FOLDER: Joi.string().default('medtrack'),
   FILE_STORAGE_PROVIDER: Joi.string().valid('cloudinary', 's3', 'local').default('cloudinary'),
-  LOCAL_STORAGE_PATH: Joi.string().default('C:\\Users\\user\\PHARMACY'),
+  LOCAL_STORAGE_PATH: Joi.string().default('./uploads'),
   ENABLE_REDIS: Joi.boolean().default(false),
   RUN_INGESTION: Joi.boolean().default(false),
-  INGESTION_ROOT_PATH: Joi.string().default('C:\\Users\\user\\PHARMACY'),
+  INGESTION_ROOT_PATH: Joi.string().default('./data/ingestion'),
   HOSTNAME: Joi.string().default('0.0.0.0'),
   ALLOWED_ORIGINS: Joi.string().default('http://localhost:3000'),
 

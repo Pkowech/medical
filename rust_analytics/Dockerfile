@@ -17,17 +17,11 @@ ARG APP_NAME
 WORKDIR /app
 
 # Install host build dependencies.
-RUN apk add --no-cache clang lld musl-dev git
+RUN apk add --no-cache clang lld musl-dev git protobuf-dev protoc
 
 # Build the application.
-# Leverage a cache mount to /usr/local/cargo/registry/
-# for downloaded dependencies, a cache mount to /usr/local/cargo/git/db
-# for git repository dependencies, and a cache mount to /app/target/ for
-# compiled dependencies which will speed up subsequent builds.
-# Leverage a bind mount to the src directory to avoid having to copy the
-# source code into the container. Once built, copy the executable to an
-# output directory before the cache mounted /app/target is unmounted.
 RUN --mount=type=bind,source=rust_analytics/src,target=src \
+    --mount=type=bind,source=rust_analytics/build.rs,target=build.rs \
     --mount=type=bind,source=rust_analytics/Cargo.toml,target=Cargo.toml \
     --mount=type=bind,source=rust_analytics/Cargo.lock,target=Cargo.lock \
     --mount=type=bind,source=rust_analytics/.sqlx,target=.sqlx \
@@ -35,8 +29,8 @@ RUN --mount=type=bind,source=rust_analytics/src,target=src \
     --mount=type=cache,target=/app/target/ \
     --mount=type=cache,target=/usr/local/cargo/git/db \
     --mount=type=cache,target=/usr/local/cargo/registry/ \
-SQLX_OFFLINE=true cargo build --locked --release && \
-cp ./target/release/$APP_NAME /bin/server
+    cargo build --locked --release && \
+    cp ./target/release/$APP_NAME /bin/server
 
 ################################################################################
 # Create a new stage for running the application that contains the minimal

@@ -73,7 +73,7 @@ export class MaterialsService {
         : 's3';
     this.localStoragePath =
       this.configService.get<string>('LOCAL_STORAGE_PATH') ||
-      'C:\\Users\\user\\PHARMACY';
+      './uploads';
 
     this.logger.log(
       `Materials service initialized with ${this.storageProvider} storage`,

@@ -24,6 +24,5 @@ export const swaggerConfig = new DocumentBuilder()
   .addTag('Analytics', 'Learning analytics and reporting')
   .addTag('Communication', 'Chat and notifications')
   .addTag('Admin', 'Administrative functions')
-  .addServer('http://localhost:3000', 'Development server')
-  .addServer('https://api.medicalapp.com', 'Production server')
+  .addServer(process.env.NEXT_PUBLIC_API_URL || process.env.SWAGGER_SERVER_URL || 'http://localhost:3002', 'API Server')
   .build();

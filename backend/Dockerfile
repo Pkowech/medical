@@ -61,13 +61,13 @@ FROM base AS final
 # Use production node environment by default.
 ENV NODE_ENV=production
 
-# Copy package.json and build outputs with node user ownership.
-COPY --chown=node:node package.json .
-COPY --chown=node:node --from=build /usr/src/app/node_modules ./node_modules
-COPY --chown=node:node --from=build /usr/src/app/dist ./dist
+# Ensure app directory permissions before copying
+RUN mkdir -p /usr/src/app && chown node:node /usr/src/app
 
-# Give the non-root user ownership of the app directory so pnpm can write temporary files at runtime.
-RUN chown -R node:node /usr/src/app
+# Copy package.json and clean production node_modules from deps stage
+COPY --chown=node:node package.json .
+COPY --chown=node:node --from=deps /usr/src/app/node_modules ./node_modules
+COPY --chown=node:node --from=build /usr/src/app/dist ./dist
 
 # Run the application as a non-root user.
 USER node
@@ -76,4 +76,4 @@ USER node
 EXPOSE 3002
 
 # Run Prisma migrations and start the application.
-CMD ["sh", "-c", "pnpm prisma migrate deploy && pnpm start"]
+CMD ["sh", "-c", "npx prisma migrate deploy && pnpm start"]

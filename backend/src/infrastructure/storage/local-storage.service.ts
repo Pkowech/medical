@@ -12,7 +12,7 @@ export class LocalStorageService implements IFileStorage {
   constructor(private readonly configService: ConfigService) {
     this.basePath =
       this.configService.get<string>('LOCAL_STORAGE_PATH') ||
-      'C:\\Users\\user\\PHARMACY';
+      './uploads';
   }
 
   private resolveLocalPath(key: string) {

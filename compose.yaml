@@ -91,7 +91,7 @@ services:
       CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
       CLOUDINARY_FOLDER: ${CLOUDINARY_FOLDER:-medtrack}
     command: >
-      sh -c "pnpm prisma migrate deploy && node dist/main.js"
+      sh -c "npx prisma migrate deploy && node dist/src/main.js"
     ports:
       - "${BACKEND_PORT}:${BACKEND_PORT}"
     # Updated healthcheck to use Node.js (no curl dependency)

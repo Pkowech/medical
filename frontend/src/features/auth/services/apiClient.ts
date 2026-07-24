@@ -24,7 +24,13 @@ class ApiService {
 
   private static buildApiBaseUrl(): string {
     // Use backend URL with /v1 prefix directly
-    const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
+    const raw = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
+    let backendUrl = (raw || 'http://localhost:3002').trim();
+    if (!backendUrl.startsWith('http://') && !backendUrl.startsWith('https://')) {
+      backendUrl = `https://${backendUrl}`;
+    }
+    // Remove trailing slash if present
+    backendUrl = backendUrl.replace(/\/+$/, '');
     return `${backendUrl}/v1`;
   }
 
