@@ -101,7 +101,7 @@ export class TransformInterceptor<T> implements NestInterceptor<
               statusCode: serializedData.statusCode,
               timestamp: serializedData.timestamp,
               errors: serializedData.errors,
-            } as unknown as Response<T>;
+            };
           }
 
           // If data has success, data, timestamp properties, it's already formatted
@@ -118,7 +118,7 @@ export class TransformInterceptor<T> implements NestInterceptor<
             ) {
               serializedData.data = {};
             }
-            return serializedData as unknown as Response<T>;
+            return serializedData;
           }
 
           // Get status code from response
@@ -131,7 +131,7 @@ export class TransformInterceptor<T> implements NestInterceptor<
               data: {},
               statusCode,
               timestamp: new Date().toISOString(),
-            } as unknown as Response<T>;
+            };
           }
 
           // Wrap other responses in standard format
@@ -140,7 +140,7 @@ export class TransformInterceptor<T> implements NestInterceptor<
             data: serializedData,
             statusCode,
             timestamp: new Date().toISOString(),
-          } as unknown as Response<T>;
+          };
         } catch (error) {
           console.error('[TransformInterceptor] Serialization failed:', error);
           // Fallback to raw data if transformation fails catastrophically
@@ -149,7 +149,7 @@ export class TransformInterceptor<T> implements NestInterceptor<
             data,
             statusCode: response.statusCode || HttpStatus.OK,
             timestamp: new Date().toISOString(),
-          } as unknown as Response<T>;
+          };
         }
       }),
     );

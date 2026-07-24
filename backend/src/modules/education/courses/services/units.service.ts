@@ -476,7 +476,7 @@ export class UnitsService {
         unit.courseId,
       );
 
-      await (this.prisma.progress as any).upsert({
+      await (this.prisma.progress).upsert({
         where: {
           userId_topicId_materialId_unitId_courseId: {
             userId,

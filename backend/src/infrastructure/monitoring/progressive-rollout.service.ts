@@ -243,7 +243,7 @@ export class ProgressiveRolloutService {
 
       let treatmentCount = 0;
       for (const key of keys) {
-        const variantJson = await this.redisService.get<string>(key as any);
+        const variantJson = await this.redisService.get<string>(key);
         if (variantJson) {
           const variant = JSON.parse(variantJson) as FeatureVariant;
           if (variant.variant === 'treatment') {

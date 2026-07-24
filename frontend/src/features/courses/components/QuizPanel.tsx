@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { quizService } from '@/features/assessment/services/quiz';
 import { useXapi } from '@/lib/xapi/useXapi';
+import { URLS } from '@/lib/urls';
 import { CheckCircle, XCircle, AlertCircle, RefreshCw, Send } from 'lucide-react';
 
 interface Question {
@@ -64,7 +65,7 @@ export const QuizPanel = ({ lessonId, lessonTitle }: QuizPanelProps) => {
 
     // Track attempt
     trackAction(XAPI_VERBS.ATTEMPTED, {
-      id: `https://medtrackhub.com/quizzes/${lessonId || 'general'}/question/${currentQuestion.id}`,
+      id: `${URLS.BASE}/quizzes/${lessonId || 'general'}/question/${currentQuestion.id}`,
       definition: {
         name: { 'en-US': currentQuestion.text },
         type: 'http://adlnet.gov/expapi/activities/question',
@@ -84,7 +85,7 @@ export const QuizPanel = ({ lessonId, lessonTitle }: QuizPanelProps) => {
       setQuizComplete(true);
       // Track quiz completion
       trackAction(XAPI_VERBS.COMPLETED, {
-        id: `https://medtrackhub.com/quizzes/${lessonId || 'general'}`,
+        id: `${URLS.BASE}/quizzes/${lessonId || 'general'}`,
         definition: {
           name: { 'en-US': `Mastery Quiz: ${lessonTitle || 'Topic'}` },
           type: 'http://adlnet.gov/expapi/activities/assessment',

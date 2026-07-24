@@ -220,7 +220,7 @@ export class QuizService {
       throw new NotFoundException(`Quiz with ID ${id} not found`);
     }
 
-    if ((existingQuiz as any).createdBy !== creatorId) {
+    if ((existingQuiz).createdBy !== creatorId) {
       this.logger.error(
         `User ${creatorId} not authorized to update quiz ${id}`,
       );
@@ -246,7 +246,7 @@ export class QuizService {
           description: data.description,
           maxAttempts: data.maxAttempts,
           passingScore: data.passingScore,
-          isPublished: data.isPublished ?? (existingQuiz as any).isPublished,
+          isPublished: data.isPublished ?? (existingQuiz).isPublished,
         },
         include: {
           questions: { include: { question: true } },
@@ -273,7 +273,7 @@ export class QuizService {
       throw new NotFoundException(`Quiz with ID ${id} not found`);
     }
 
-    if ((existingQuiz as any).createdBy !== creatorId) {
+    if ((existingQuiz).createdBy !== creatorId) {
       this.logger.error(
         `User ${creatorId} not authorized to delete quiz ${id}`,
       );
@@ -530,7 +530,7 @@ export class QuizService {
         }
 
         const gradingResult = QuizUtils.gradeAnswer(
-          question as any,
+          question,
           answer.selectedOption,
         );
         await tx.userResponse.create({
@@ -550,7 +550,7 @@ export class QuizService {
 
         // Update BKT for the specific skill/topic associated with the question
         // We prioritize the question's specific topic, falling back to the quiz's topic
-        const skillId = (question as any).topicId || activeQuiz.topicId;
+        const skillId = (question).topicId || activeQuiz.topicId;
         if (skillId) {
           // Fire-and-forget BKT update
           void this.analyticsService

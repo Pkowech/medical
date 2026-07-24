@@ -3,6 +3,7 @@
 import React, { useState, useRef, useCallback } from 'react';
 import ReactPlayer from 'react-player';
 import { useXapi } from '@/lib/xapi/useXapi';
+import { URLS } from '@/lib/urls';
 import { Maximize, Minimize, Play, Pause, RefreshCw } from 'lucide-react';
 
 interface VideoPlayerProps {
@@ -19,7 +20,7 @@ export const VideoPlayer = ({ url, title, lessonId }: VideoPlayerProps) => {
   const [isReady, setIsReady] = useState(false);
   const playerRef = useRef<any>(null);
 
-  const objectId = `https://medtrackhub.com/units/${lessonId}/video`;
+  const objectId = `${URLS.BASE}/units/${lessonId}/video`;
   const object = {
     id: objectId,
     definition: {

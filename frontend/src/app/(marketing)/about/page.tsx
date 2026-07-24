@@ -20,8 +20,7 @@ export default function AboutPage() {
           content="Learn about MedTrack Hub's mission to transform medical education with AI-powered learning, expert-led content, and a supportive community."
         />
         <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://medtrackhub.com/about" />
-        <meta property="og:image" content="https://medtrackhub.com/og-image.png" />
+        <meta property="og:image" content="/og-image.png" />
       </Head>
       <main className="container mx-auto py-12 px-4">
         {/* Hero Section */}

@@ -927,7 +927,7 @@ export class MaterialsService {
 
       if (type) {
         // Check if type matches enum
-        if (Object.values(MaterialType).includes(type as MaterialType)) {
+        if (Object.values(MaterialType).includes(type)) {
           where.type = type as MaterialType;
         } else {
           // It might be an 'intent' filter (category)

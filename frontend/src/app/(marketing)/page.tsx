@@ -10,8 +10,7 @@ export const metadata: Metadata = {
     description:
       'Transform your medical education with AI-powered learning, progress tracking, and expert support.',
     type: 'website',
-    url: 'https://medtrackhub.com',
-    images: ['https://medtrackhub.com/og-image.png'],
+    images: ['/og-image.png'],
   },
 };
 

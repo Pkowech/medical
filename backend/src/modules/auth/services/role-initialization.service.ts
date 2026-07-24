@@ -95,7 +95,7 @@ export class RoleInitializationService {
         };
 
         // Build final permission sets with inheritance
-        const roles = (Object.values(Role) as Role[]).map((role) => {
+        const roles = (Object.values(Role)).map((role) => {
           const inherited = inheritedPermissions[role].flatMap(
             (r) => baseRolePermissions[r],
           );

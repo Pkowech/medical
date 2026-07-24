@@ -15,8 +15,7 @@ ARG APP_NAME=rust_analytics
 # will override this stage with the external build context.
 FROM alpine:3.18 AS protos
 WORKDIR /protos
-COPY protos* ./
-COPY ../protos* ./ 2>/dev/null || true
+COPY protos/ .
 
 ################################################################################
 # Create a stage for building the application.
@@ -32,15 +31,12 @@ ENV SQLX_OFFLINE=true
 # Install host build dependencies.
 RUN apk add --no-cache clang lld musl-dev git protobuf-dev protoc
 
-# Build the application from the crate directory. Shared protobuf definitions
-# are provided as an additional build context so this works from CI and local
-# Docker builds without requiring the repo root as the main context.
-RUN --mount=type=bind,source=src,target=src \
-    --mount=type=bind,source=build.rs,target=build.rs \
-    --mount=type=bind,source=Cargo.toml,target=Cargo.toml \
-    --mount=type=bind,source=Cargo.lock,target=Cargo.lock \
-    --mount=type=bind,source=.sqlx,target=.sqlx \
-    --mount=type=bind,from=protos,source=.,target=protos \
+# Copy crate source files
+COPY Cargo.toml Cargo.lock build.rs ./
+COPY src ./src
+COPY .sqlx ./.sqlx
+
+RUN --mount=type=bind,from=protos,source=.,target=protos \
     --mount=type=cache,target=/app/target/ \
     --mount=type=cache,target=/usr/local/cargo/git/db \
     --mount=type=cache,target=/usr/local/cargo/registry/ \

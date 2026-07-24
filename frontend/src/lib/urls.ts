@@ -1,6 +1,36 @@
-const BASE = process.env.NEXT_PUBLIC_BASE_URL || 'https://medtrackhub.com';
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3002';
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+const ensureProtocol = (urlStr: string, fallback: string): string => {
+  let val = (urlStr || fallback).trim();
+  if (!val.startsWith('http://') && !val.startsWith('https://')) {
+    val = `https://${val}`;
+  }
+  try {
+    new URL(val);
+    return val.replace(/\/+$/, '');
+  } catch {
+    return fallback;
+  }
+};
+
+const getDynamicOrigin = (): string => {
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    return window.location.origin;
+  }
+  const raw = process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL || 'http://localhost:3000';
+  let val = raw.trim();
+  if (!val.startsWith('http://') && !val.startsWith('https://')) {
+    const protocol = val.includes('localhost') ? 'http://' : 'https://';
+    val = `${protocol}${val}`;
+  }
+  try {
+    return new URL(val).origin;
+  } catch {
+    return 'http://localhost:3000';
+  }
+};
+
+const BASE = getDynamicOrigin();
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL || `${BASE}/v1`).replace(/\/+$/, '');
+const APP_URL = BASE;
 
 export const URLS = {
   BASE,

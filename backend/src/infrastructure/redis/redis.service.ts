@@ -434,7 +434,7 @@ export class RedisService {
     const subscriber =
       typeof subConn === 'string'
         ? new Redis(subConn)
-        : new Redis(subConn as any);
+        : new Redis(subConn);
 
     await subscriber.subscribe(channel);
     subscriber.on('message', (ch: string, message: string) => {

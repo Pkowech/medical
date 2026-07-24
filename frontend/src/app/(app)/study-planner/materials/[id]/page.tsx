@@ -13,6 +13,7 @@ import offlineSync from '@/features/learning-management/services/offlineProgress
 import { apiService as api } from '@/features/auth/services/apiClient';
 import { Material } from '@/shared/types/materialInterface';
 import { useXapi } from '@/lib/xapi/useXapi';
+import { URLS } from '@/lib/urls';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { hasPermission, Permission } from '@/lib/auth/roles';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -59,7 +60,7 @@ export default function MaterialViewPage() {
         setMaterial(data);
         
         trackAction(XAPI_VERBS.EXPERIENCED, {
-          id: `https://medtrackhub.com/materials/${materialId}`,
+          id: `${URLS.BASE}/materials/${materialId}`,
           definition: {
             name: { 'en-US': data.title },
             type: 'http://adlnet.gov/expapi/activities/media',

@@ -287,7 +287,7 @@ export class LearningPathsController {
     description: 'Learning paths retrieved successfully',
   })
   async findAll(@Query() filters: LearningPathFiltersDto) {
-    return await this.learningPathsService.findAll(filters as any);
+    return await this.learningPathsService.findAll(filters);
   }
 
   @Get(':id')

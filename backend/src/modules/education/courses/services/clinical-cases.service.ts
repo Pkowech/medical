@@ -65,7 +65,7 @@ export class ClinicalCasesService {
           status: CaseStatus.draft,
         } as any,
         include: { course: true, unit: true, createdBy: true } as any,
-      } as any)) as any;
+      } as any));
 
       this.logger.log('Clinical case created', {
         caseId: clinicalCase.id,
@@ -189,7 +189,7 @@ export class ClinicalCasesService {
           createdBy: { select: { id: true, firstName: true, lastName: true } },
           attempts: userId ? { where: { userId } } : false,
         } as any,
-      } as any)) as any;
+      } as any));
 
       if (!clinicalCase) {
         this.logger.warn('Clinical case not found', { caseId: id });
@@ -220,7 +220,7 @@ export class ClinicalCasesService {
     try {
       const clinicalCase: any = (await this.prisma.clinicalCase.findUnique({
         where: { id: caseId, status: CaseStatus.published } as any,
-      } as any)) as any;
+      } as any));
 
       if (!clinicalCase) {
         this.logger.warn('Clinical case not found or not published', {
@@ -237,7 +237,7 @@ export class ClinicalCasesService {
           userId,
           status: CaseAttemptStatus.inProgress,
         } as any,
-      } as any)) as any;
+      } as any));
 
       if (activeAttempt) {
         this.logger.log('Returning existing active attempt', {
@@ -266,7 +266,7 @@ export class ClinicalCasesService {
             section_times: [],
           },
         } as any,
-      } as any)) as any;
+      } as any));
 
       this.logger.log('New case attempt started', {
         caseId,
@@ -297,7 +297,7 @@ export class ClinicalCasesService {
           status: CaseAttemptStatus.inProgress,
         } as any,
         include: { clinicalCase: true } as any,
-      } as any)) as any;
+      } as any));
 
       if (!attempt) {
         this.logger.warn('Active attempt not found', { attemptId, userId });
@@ -376,7 +376,7 @@ export class ClinicalCasesService {
           percentage,
           time_spent_seconds: attempt.time_spent_seconds,
         } as any,
-      } as any)) as any;
+      } as any));
 
       this.logger.log('Case attempt progress updated', { attemptId, userId });
       return updatedAttempt;
@@ -403,7 +403,7 @@ export class ClinicalCasesService {
           status: CaseAttemptStatus.inProgress,
         } as any,
         include: { clinicalCase: true } as any,
-      } as any)) as any;
+      } as any));
 
       if (!attempt) {
         this.logger.warn('Active attempt not found', { attemptId, userId });
@@ -425,7 +425,7 @@ export class ClinicalCasesService {
           score,
           percentage,
         } as any,
-      } as any)) as any;
+      } as any));
 
       this.logger.log('Diagnosis submitted', { attemptId, userId });
       return updatedAttempt;
@@ -451,7 +451,7 @@ export class ClinicalCasesService {
           status: CaseAttemptStatus.inProgress,
         } as any,
         include: { clinicalCase: true } as any,
-      } as any)) as any;
+      } as any));
 
       if (!attempt) {
         this.logger.warn('Active attempt not found', { attemptId, userId });
@@ -469,7 +469,7 @@ export class ClinicalCasesService {
           feedback,
           analytics,
         } as any,
-      } as any)) as any;
+      } as any));
 
       this.logger.log('Case attempt completed', { attemptId, userId });
       return updatedAttempt;

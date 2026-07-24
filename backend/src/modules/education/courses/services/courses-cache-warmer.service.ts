@@ -29,7 +29,7 @@ export class CoursesCacheWarmerService implements OnModuleInit {
       // Warm total courses count (used in MarketingPage hero section)
       // The MarketingPage calls getCourses({ limit: 1 })
       await this.coursesService.findAll(
-        { limit: 1 } as any,
+        { limit: 1 },
         {
           page: 1,
           limit: 1,

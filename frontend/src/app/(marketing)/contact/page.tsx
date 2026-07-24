@@ -78,8 +78,7 @@ export default function ContactPage() {
           content="Have questions or feedback? Contact MedTrack Hub for support, inquiries, or partnership opportunities."
         />
         <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://medtrackhub.com/contact" />
-        <meta property="og:image" content="https://medtrackhub.com/og-image.png" />
+        <meta property="og:image" content="/og-image.png" />
       </Head>
       <main className="container mx-auto py-12 px-4">
         <section aria-labelledby="contact-heading" className="text-center mb-12">

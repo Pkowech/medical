@@ -449,7 +449,7 @@ export class LearningPathProgressService {
     if (analytics.study_sessions.length > 100) {
       analytics.study_sessions = analytics.study_sessions.slice(-100);
     }
-    p.analytics = analytics as unknown as Prisma.JsonObject;
+    p.analytics = analytics;
   }
 
   private async calculateEstimatedCompletion(

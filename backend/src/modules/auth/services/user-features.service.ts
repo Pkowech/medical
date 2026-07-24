@@ -90,7 +90,7 @@ export class UserFeaturesService {
         } as UserLearningPattern,
         preferences: profile.preferences,
         lastUpdated: profile.lastUpdated,
-      } as Partial<UserFeatureProfile>;
+      };
     } catch (error) {
       this.logger.error(`Failed to get user features for ${userId}:`, error);
       return null;

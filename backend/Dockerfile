@@ -55,10 +55,13 @@ FROM base AS final
 # Use production node environment by default.
 ENV NODE_ENV=production
 
-# Copy package.json, dependencies, and build output with node user ownership
+# Copy package.json, dependencies, build output, and Prisma schema/config
+# with node user ownership
 COPY --chown=node:node package.json .
 COPY --chown=node:node --from=build /usr/src/app/node_modules ./node_modules
 COPY --chown=node:node --from=build /usr/src/app/dist ./dist
+COPY --chown=node:node --from=build /usr/src/app/prisma ./prisma
+COPY --chown=node:node --from=build /usr/src/app/prisma.config.ts ./prisma.config.ts
 
 # Run the application as non-root user
 USER node

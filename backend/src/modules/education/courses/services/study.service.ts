@@ -339,7 +339,7 @@ export class StudyService {
       }));
 
     const existingScores: QuizScore[] = Array.isArray(progress.quizScores)
-      ? (progress.quizScores as unknown as QuizScore[])
+      ? (progress.quizScores)
       : [];
     const updatedQuizScores = [...existingScores, ...quizScores];
     const completionPercentage = Math.min(
@@ -594,9 +594,9 @@ export class StudyService {
         id: d.id,
         title: d.title,
         dueDate: d.dueDate,
-        type: (d.metadata as any)?.type || 'deadline', // use metadata type if available
+        type: (d.metadata)?.type || 'deadline', // use metadata type if available
         courseId: d.courseId,
-        course: (d.course as any)?.title || 'General',
+        course: (d.course)?.title || 'General',
         priority: d.priority || 'medium',
       })),
       ...goalDeadlines.map((g) => ({
@@ -605,7 +605,7 @@ export class StudyService {
         dueDate: g.targetDate,
         type: 'goal',
         courseId: g.courseId,
-        course: (g.course as any)?.title || 'General Learning',
+        course: (g.course)?.title || 'General Learning',
         priority: g.priority ? String(g.priority) : 'medium',
       })),
       ...scheduleEvents.map((e) => ({
@@ -614,7 +614,7 @@ export class StudyService {
         dueDate: e.date,
         type: e.type || 'schedule',
         courseId: e.courseId,
-        course: (e.course as any)?.title || 'Academic',
+        course: (e.course)?.title || 'Academic',
         priority:
           e.priority === 3 ? 'high' : e.priority === 2 ? 'medium' : 'low',
       })),
@@ -622,7 +622,7 @@ export class StudyService {
 
     // 4. Sort by date ascending
     return combined.sort(
-      (a, b) => new Date(a.dueDate!).getTime() - new Date(b.dueDate!).getTime(),
+      (a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime(),
     );
   }
 

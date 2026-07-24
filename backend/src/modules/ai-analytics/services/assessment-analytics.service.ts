@@ -1139,7 +1139,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
         topicScores: {},
         strengths: analytics.strengthAreas || [],
         weaknesses: analytics.weaknessAreas || [],
-      } as PerformanceAnalyticsDto;
+      };
 
       return dto;
     } catch (error) {
@@ -1157,7 +1157,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
         timePerQuestion: 0,
         strengths: [],
         weaknesses: [],
-      } as PerformanceAnalyticsDto;
+      };
     }
   }
 

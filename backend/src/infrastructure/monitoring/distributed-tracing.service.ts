@@ -166,7 +166,7 @@ export class DistributedTracingService {
 
       const spans: TraceSpan[] = [];
       for (const spanKey of spanKeys) {
-        const spanJson = await this.redisService.get<string>(spanKey as any);
+        const spanJson = await this.redisService.get<string>(spanKey);
         if (spanJson) {
           spans.push(JSON.parse(spanJson));
         }
@@ -216,7 +216,7 @@ export class DistributedTracingService {
       const userSpans: TraceSpan[] = [];
 
       for (const key of spanKeys.slice(0, limit)) {
-        const spanJson = await this.redisService.get<string>(key as any);
+        const spanJson = await this.redisService.get<string>(key);
         if (spanJson) {
           const span = JSON.parse(spanJson) as TraceSpan;
           if (span.tags.userId === userId) {
@@ -286,7 +286,7 @@ export class DistributedTracingService {
       const spans: TraceSpan[] = [];
 
       for (const key of spanKeys) {
-        const spanJson = await this.redisService.get<string>(key as any);
+        const spanJson = await this.redisService.get<string>(key);
         if (spanJson) {
           const span = JSON.parse(spanJson) as TraceSpan;
 

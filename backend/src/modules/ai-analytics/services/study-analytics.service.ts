@@ -122,7 +122,7 @@ export class StudyAnalyticsService implements OnModuleInit {
                   },
                   {},
                 ) || {},
-            } as StudyPatternsResponseDto;
+            };
 
             await this.redisService.set(
               cacheKey,
@@ -160,7 +160,7 @@ export class StudyAnalyticsService implements OnModuleInit {
               preferredStudyTimes: { morning: 0, afternoon: 0, evening: 0 },
               performanceByTopic: {},
               consistencyScore: 0,
-            } as StudyPatternsResponseDto;
+            };
           }
         },
       );
@@ -181,7 +181,7 @@ export class StudyAnalyticsService implements OnModuleInit {
         preferredStudyTimes: { morning: 0, afternoon: 0, evening: 0 },
         performanceByTopic: {},
         consistencyScore: 0,
-      } as StudyPatternsResponseDto;
+      };
     }
   }
 

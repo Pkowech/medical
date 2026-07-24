@@ -15,7 +15,7 @@ export class PasswordUtils {
       parallelism: this.parallelism,
     } as any);
     // Ensure we always return a string even if the lib types allow Buffer
-    return h as unknown as string;
+    return h;
   }
 
   static async compare(password: string, hashed: string): Promise<boolean> {

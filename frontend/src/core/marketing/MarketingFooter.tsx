@@ -228,7 +228,7 @@ export const MarketingFooter: React.FC = () => {
               <Mail className="h-5 w-5 text-blue-400 mr-3" aria-hidden="true" />
               <div>
                 <p className="text-sm text-gray-400">Email</p>
-                <p className="text-white">support@medtrackhub.com</p>
+                <p className="text-white">support@example.com</p>
               </div>
             </div>
             <div className="flex items-center">

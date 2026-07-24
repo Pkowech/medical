@@ -843,7 +843,7 @@ export class ProgressService {
 
         enrolledUnits.push({
           courseId: e.courseId,
-          courseTitle: (e.course as any)?.title || (e.course as any)?.name || 'Untitled Course',
+          courseTitle: (e.course)?.title || (e.course)?.name || 'Untitled Course',
           unitId: activeUnit?.unitId || `placeholder-${e.courseId}`,
           unitTitle: activeUnit?.unit?.title || 'Getting Started',
           progressPercentage: activeUnit?.progressPercentage || 0,

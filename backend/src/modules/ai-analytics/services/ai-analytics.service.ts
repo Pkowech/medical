@@ -100,7 +100,7 @@ export class AiAnalyticsService implements OnModuleInit {
   getPersonalizedRecommendations(
     userId: string,
   ): Promise<RecommendationItemDto[]> {
-    return this.learningAnalyticsService.getPathRecommendations(userId) as any;
+    return this.learningAnalyticsService.getPathRecommendations(userId);
   }
 
   async getRecommendationsAI(userId: string): Promise<RecommendationItemDto[]> {
@@ -418,7 +418,7 @@ export class AiAnalyticsService implements OnModuleInit {
     // Delegate DB-backed engagement computation to UserAnalyticsService
     return this.userAnalyticsService.getUserEngagementFromPrisma(
       userId,
-    ) as Promise<JsonObject>;
+    );
   }
 
   /**
@@ -459,7 +459,7 @@ export class AiAnalyticsService implements OnModuleInit {
     // Delegate to LearningAnalyticsService
     return this.learningAnalyticsService.calculatePerformanceMetrics(
       userId,
-    ) as Promise<JsonObject>;
+    );
   }
 
   async analyzeStudyPatterns(
@@ -472,14 +472,14 @@ export class AiAnalyticsService implements OnModuleInit {
     // Delegate to UserAnalyticsService which provides a gRPC-backed prediction
     return this.userAnalyticsService.generatePredictions(
       userId,
-    ) as Promise<JsonObject>;
+    );
   }
 
   async getUserEngagement(userId: string): Promise<JsonObject> {
     // Delegate to LearningAnalyticsService
     return this.learningAnalyticsService.getUserEngagement(
       userId,
-    ) as Promise<JsonObject>;
+    );
   }
 
   async getPathAnalytics(pathId: string): Promise<PathAnalyticsResponseDto> {
@@ -515,7 +515,7 @@ export class AiAnalyticsService implements OnModuleInit {
         confidenceInterval: [0, 0],
         riskLevel: 'unknown',
         successProbability: 0,
-      } as PerformancePredictionResponseDto;
+      };
     } catch (error) {
       this.logger.error(
         `Error predicting performance: ${getErrorMessage(error)}`,
@@ -533,7 +533,7 @@ export class AiAnalyticsService implements OnModuleInit {
     // Delegate to AssessmentAnalyticsService
     return this.assessmentAnalyticsService.getAssessmentAnalytics(
       userId,
-    ) as Promise<JsonObject>;
+    );
   }
 
   async getRelatedResources(assessmentId: string): Promise<JsonArray> {
@@ -553,7 +553,7 @@ export class AiAnalyticsService implements OnModuleInit {
         userId,
         knowledgeGaps,
       );
-    return results as unknown as JsonArray;
+    return results;
   }
 
   // Backwards-compatible alias used by some callers/controllers

@@ -23,6 +23,7 @@ import { ProgressBar } from '@/shared/components/ui/ProgressBar';
 import { CourseSidebar } from '@/features/courses/components/CourseSidebar';
 import { CourseContent } from '@/features/courses/components/CourseContent';
 import { Material } from '@/shared/types/materialInterface';
+import { URLS } from '@/lib/urls';
 import { Lesson } from '@/shared/types/courseInterface';
 import { NotesPanel } from '@/features/courses/components/NotesPanel';
 import { DiscussionPanel } from '@/features/courses/components/DiscussionPanel';
@@ -449,7 +450,7 @@ export const UnitLayout = ({ unitId: propUnitId }: UnitLayoutProps) => {
   useEffect(() => {
     if (unitData?.id && unitData?.title) {
       trackAction(XAPI_VERBS.LAUNCHED, {
-        id: `https://medtrackhub.com/units/${unitData.id}`,
+        id: `${URLS.BASE}/units/${unitData.id}`,
         definition: {
           name: { 'en-US': unitData.title },
           type: 'http://adlnet.gov/expapi/activities/unit',

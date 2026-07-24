@@ -29,7 +29,7 @@ export class SearchCacheService {
         // `RedisService.get` already attempts to parse stored JSON and returns
         // a parsed object when available; avoid parsing again here. Return the
         // cached value directly.
-        return cached as unknown as SearchResponseDto;
+        return cached;
       }
 
       this.logger.debug(`Cache miss for key: ${cacheKey}`);

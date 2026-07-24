@@ -187,7 +187,7 @@ export class SearchService {
 
     const facets = facetsResult.reduce(
       (acc, curr) => ({ ...acc, [curr.type]: curr.count }),
-      {} as Record<string, number>,
+      {},
     );
 
     return {

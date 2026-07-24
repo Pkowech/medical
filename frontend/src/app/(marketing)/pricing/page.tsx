@@ -26,8 +26,7 @@ export default function PricingPage() {
           content="Choose the perfect MedTrack Hub plan for your medical education journey. Transparent pricing for students, professionals, and institutions."
         />
         <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://medtrackhub.com/pricing" />
-        <meta property="og:image" content="https://medtrackhub.com/og-image.png" />
+        <meta property="og:image" content="/og-image.png" />
       </Head>
       <main className="container mx-auto py-12 px-4">
         <section aria-labelledby="pricing-heading" className="text-center mb-12">

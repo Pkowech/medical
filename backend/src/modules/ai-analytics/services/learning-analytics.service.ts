@@ -516,7 +516,7 @@ export class LearningAnalyticsService implements OnModuleInit {
             goalAnalytics.upcoming_deadlines[0] &&
             goalAnalytics.upcoming_deadlines[0].target_date) ||
           new Date().toISOString(),
-      } as UserInsights;
+      };
 
       await this.redisService.set(
         cacheKey,
@@ -629,7 +629,7 @@ export class LearningAnalyticsService implements OnModuleInit {
                 },
                 {},
               ) || {},
-          } as StudyPatternsResponseDto;
+          };
 
           await this.redisService.set(
             cacheKey,
@@ -679,7 +679,7 @@ export class LearningAnalyticsService implements OnModuleInit {
         preferredStudyTimes: { morning: 0, afternoon: 0, evening: 0 },
         performanceByTopic: {},
         consistencyScore: 0,
-      } as StudyPatternsResponseDto;
+      };
     }
   }
 
@@ -1380,7 +1380,7 @@ export class LearningAnalyticsService implements OnModuleInit {
           acc[category] = (acc[category] || 0) + 1;
           return acc;
         },
-        {} as Record<string, number>,
+        {},
       );
 
       const goalsByPriority = learningGoals.reduce(
@@ -1389,7 +1389,7 @@ export class LearningAnalyticsService implements OnModuleInit {
           acc[priority] = (acc[priority] || 0) + 1;
           return acc;
         },
-        {} as Record<string, number>,
+        {},
       );
 
       const upcomingDeadlines = learningGoals

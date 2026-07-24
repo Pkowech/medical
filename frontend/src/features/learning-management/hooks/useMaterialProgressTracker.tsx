@@ -6,6 +6,7 @@ import offlineSync, {
   ProgressQueueItem,
 } from '@/features/learning-management/services/offlineProgressSync';
 import { useXapi } from '@/lib/xapi/useXapi';
+import { URLS } from '@/lib/urls';
 
 type Options = {
   materialId?: string;
@@ -64,7 +65,7 @@ export default function useMaterialProgressTracker(options: Options) {
       if (materialId) {
         const verb = percent >= 100 ? XAPI_VERBS.COMPLETED : XAPI_VERBS.PROGRESSED;
         trackAction(verb, {
-          id: `https://medtrackhub.com/materials/${materialId}`,
+          id: `${URLS.BASE}/materials/${materialId}`,
           definition: {
             name: { 'en-US': `Material ${materialId}` },
             type: 'http://adlnet.gov/expapi/activities/media',

@@ -114,7 +114,7 @@ export abstract class BaseService<T = any> {
     fn: (tx: PrismaService) => Promise<R>,
   ): Promise<R> {
     return this.prisma.$transaction(async (tx) => {
-      return fn(tx as any);
+      return fn(tx);
     });
   }
 }

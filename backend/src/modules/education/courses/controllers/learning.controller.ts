@@ -247,7 +247,7 @@ export class LearningController {
     @Body() updateDto: Partial<CreateLearningGoalDto>,
     @Request() req: any,
   ) {
-    return this.learningGoalsService.update(id, updateDto as any, req.user.id);
+    return this.learningGoalsService.update(id, updateDto, req.user.id);
   }
 
   @Delete('goals/:id')

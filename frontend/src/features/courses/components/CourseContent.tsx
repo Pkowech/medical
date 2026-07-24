@@ -14,6 +14,7 @@ import {
 import type { Material } from '@/shared/types/materialInterface';
 import type { ReadinessSignal } from '@/shared/types/mastery.types';
 import { useXapi } from '@/lib/xapi/useXapi';
+import { URLS } from '@/lib/urls';
 import { useEffect, useRef } from 'react';
 import { VideoPlayer } from './VideoPlayer';
 
@@ -69,7 +70,7 @@ export const CourseContent = ({
   useEffect(() => {
     if (lesson?.id && lesson.id !== lastLessonId.current) {
       trackAction(XAPI_VERBS.INITIALIZED, {
-        id: `https://medtrackhub.com/units/${lesson.id}`,
+        id: `${URLS.BASE}/units/${lesson.id}`,
         definition: {
           name: { 'en-US': lesson.title },
           type: 'http://adlnet.gov/expapi/activities/lesson',
@@ -83,7 +84,7 @@ export const CourseContent = ({
   useEffect(() => {
     if (lesson?.id && progress[lessonKey]) {
       trackAction(XAPI_VERBS.COMPLETED, {
-        id: `https://medtrackhub.com/units/${lesson.id}`,
+        id: `${URLS.BASE}/units/${lesson.id}`,
         definition: {
           name: { 'en-US': lesson.title },
           type: 'http://adlnet.gov/expapi/activities/lesson',

@@ -578,7 +578,7 @@ export class RegisterDto {
   })
   @IsEnum(RoleStrings, { message: 'Invalid role' })
   @IsOptional()
-  role?: RoleType = 'student' as RoleType;
+  role?: RoleType = 'student';
 
   @ApiProperty({ description: 'Profile picture URL', required: false })
   @IsString()

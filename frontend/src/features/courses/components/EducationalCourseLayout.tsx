@@ -18,6 +18,7 @@ import { DiscussionPanel } from './DiscussionPanel';
 import { QuizPanel } from './QuizPanel';
 import { useCourseData } from '../hooks/useCourseData';
 import { useCourseNavigation } from '../hooks/useCourseNavigation';
+import { URLS } from '@/lib/urls';
 import { useXapi } from '@/lib/xapi/useXapi';
 import { MaterialPreviewModal } from './MaterialPreviewModal';
 import { Button } from '@/shared/components/ui/button';
@@ -160,7 +161,7 @@ export const EducationalCourseLayout = ({ courseId: propCourseId }: EducationalC
   useEffect(() => {
     if (courseData?.id && courseData?.title) {
       trackAction(XAPI_VERBS.LAUNCHED, {
-        id: `https://medtrackhub.com/courses/${courseData.id}`,
+        id: `${URLS.BASE}/courses/${courseData.id}`,
         definition: {
           name: { 'en-US': courseData.title },
           type: 'http://adlnet.gov/expapi/activities/course',

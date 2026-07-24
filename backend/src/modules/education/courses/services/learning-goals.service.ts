@@ -206,7 +206,7 @@ export class LearningGoalsService {
       if (filters.status === 'active') {
         where.status = ProgressStatus.inProgress;
       } else {
-        where.status = filters.status as unknown as ProgressStatus;
+        where.status = filters.status;
       }
     }
 
@@ -525,7 +525,7 @@ export class LearningGoalsService {
             milestones: updateDto.milestones,
             targetCriteria: updateDto.targetCriteria,
             progressTracking: updateDto.progressTracking,
-          } as any,
+          },
         },
         include: {
           user: true,
@@ -590,7 +590,7 @@ export class LearningGoalsService {
           metadata: {
             ...((goal.metadata as Prisma.JsonObject) || {}),
             milestones,
-          } as any,
+          },
           updatedAt: new Date(),
         },
         include: {
@@ -931,7 +931,7 @@ export class LearningGoalsService {
           metadata: {
             ...((goal.metadata as Prisma.JsonObject) || {}),
             milestones,
-          } as any,
+          },
         },
       });
     }
@@ -1253,7 +1253,7 @@ export class LearningGoalsService {
             metadata: {
               ...((dep.metadata as Prisma.JsonObject) || {}),
               extensionReason: `Parent goal ${parentGoal.title} extended by ${daysExtended} days`,
-            } as any,
+            },
           },
         });
 
