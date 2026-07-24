@@ -16,6 +16,10 @@ FROM rust:${RUST_VERSION}-alpine AS build
 ARG APP_NAME
 WORKDIR /app
 
+# SQLx macros should use the checked-in offline query cache during container
+# builds so the image does not depend on DATABASE_URL being available at build time.
+ENV SQLX_OFFLINE=true
+
 # Install host build dependencies.
 RUN apk add --no-cache clang lld musl-dev git protobuf-dev protoc
 
