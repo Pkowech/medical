@@ -3,7 +3,6 @@
 'use client';
 
 export const dynamic = 'force-dynamic';
-export const revalidate = 0;
 
 import AnalyticsDashboard from '@/features/analytics/components/analytics-dashboard';
 

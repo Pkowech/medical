@@ -78,6 +78,9 @@ export class RedisService implements OnModuleInit {
   async onModuleInit() {
     if (this.shouldEnableRedis) {
       await this.connectRedis(true);
+      if (this.isConnected) {
+        this.logger.log('Redis connection validated during startup');
+      }
     }
   }
 
@@ -88,6 +91,11 @@ export class RedisService implements OnModuleInit {
     this.logger.log('Attempting to connect to Redis...');
     try {
       await this.redis.connect();
+      if (this.isConnected) {
+        this.logger.debug('Redis connect() completed and ready event already fired');
+      } else {
+        this.logger.debug('Redis connect() completed; waiting for ready event');
+      }
     } catch (err) {
       this.logger.debug(
         'Initial Redis connection failed:',
