@@ -10,6 +10,15 @@ ARG RUST_VERSION=1.96.1
 ARG APP_NAME=rust_analytics
 
 ################################################################################
+# Fallback stage for additional build context 'protos' if not supplied externally.
+# When --build-context protos=... is passed (e.g. via Docker Compose or CI), BuildKit
+# will override this stage with the external build context.
+FROM alpine:3.18 AS protos
+WORKDIR /protos
+COPY protos* ./
+COPY ../protos* ./ 2>/dev/null || true
+
+################################################################################
 # Create a stage for building the application.
 
 FROM rust:${RUST_VERSION}-alpine AS build

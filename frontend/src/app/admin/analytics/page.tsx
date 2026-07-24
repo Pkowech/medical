@@ -1,5 +1,7 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import AnalyticsDashboard from '@/features/analytics/components/analytics-dashboard';
 import React from 'react';
 

@@ -55,20 +55,13 @@ FROM base AS final
 # Use production node environment by default.
 ENV NODE_ENV=production
 
-# Run the application as a non-root user.
+# Copy package.json, dependencies, and build output with node user ownership
+COPY --chown=node:node package.json .
+COPY --chown=node:node --from=build /usr/src/app/node_modules ./node_modules
+COPY --chown=node:node --from=build /usr/src/app/dist ./dist
+
+# Run the application as non-root user
 USER node
-
-# Copy package.json for runtime metadata and Prisma tooling.
-COPY package.json .
-
-# Copy the production dependencies and build output from the build stage
-COPY --from=build /usr/src/app/node_modules ./node_modules
-COPY --from=build /usr/src/app/dist ./dist
-
-# Ensure the non-root runtime user can write the app directory.
-# pnpm creates temporary files in the current working directory when running
-# the startup command, so the directory must be writable by `node`.
-RUN chown -R node:node /usr/src/app
 
 # Expose the port that the application listens on.
 EXPOSE 3002

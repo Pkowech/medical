@@ -23,25 +23,31 @@ class ApiService {
   private isSigningOut = false;
 
   private static buildApiBaseUrl(): string {
-    // Use backend URL with /v1 prefix directly
-    const raw = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
-    let backendUrl = (raw || 'http://localhost:3002').trim();
-    
-    if (backendUrl.startsWith('/')) {
-      if (typeof window !== 'undefined') {
-        backendUrl = window.location.origin + backendUrl;
-      } else {
-        const host = process.env.VERCEL_URL || process.env.NEXT_PUBLIC_APP_URL || 'localhost:3000';
-        const protocol = host.includes('localhost') ? 'http://' : 'https://';
-        backendUrl = `${protocol}${host.replace(/^https?:\/\//, '')}${backendUrl}`;
+    const fallback = 'http://localhost:3002';
+    try {
+      // Use backend URL with /v1 prefix directly
+      const raw = process.env.NEXT_PUBLIC_API_URL || fallback;
+      let backendUrl = (raw || fallback).trim();
+      
+      if (backendUrl.startsWith('/')) {
+        if (typeof window !== 'undefined' && window.location?.origin) {
+          backendUrl = window.location.origin + backendUrl;
+        } else {
+          const host = process.env.VERCEL_URL || process.env.NEXT_PUBLIC_APP_URL || 'localhost:3000';
+          const protocol = host.includes('localhost') ? 'http://' : 'https://';
+          backendUrl = `${protocol}${host.replace(/^https?:\/\//, '')}${backendUrl}`;
+        }
+      } else if (!backendUrl.startsWith('http://') && !backendUrl.startsWith('https://')) {
+        backendUrl = `https://${backendUrl}`;
       }
-    } else if (!backendUrl.startsWith('http://') && !backendUrl.startsWith('https://')) {
-      backendUrl = `https://${backendUrl}`;
+      
+      // Validate constructed URL before returning
+      new URL(backendUrl);
+      backendUrl = backendUrl.replace(/\/+$/, '');
+      return `${backendUrl}/v1`;
+    } catch {
+      return `${fallback}/v1`;
     }
-    
-    // Remove trailing slash if present
-    backendUrl = backendUrl.replace(/\/+$/, '');
-    return `${backendUrl}/v1`;
   }
 
   private constructor() {
