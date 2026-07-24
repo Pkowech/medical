@@ -19,7 +19,7 @@ impl PostgresRecommendationRepository {
 
 #[async_trait::async_trait]
 impl RecommendationRepository for PostgresRecommendationRepository {
-    async fn get_recommendations(&self, user_id: &str, limit: usize) -> Result<Vec<Recommendation>, AnalyticsError> {
+    async fn get_recommendations(&self, _user_id: &str, limit: usize) -> Result<Vec<Recommendation>, AnalyticsError> {
         let rows = sqlx::query(
             r#"
             SELECT r.item_id, r.score, m.title, m.description
@@ -46,7 +46,7 @@ impl RecommendationRepository for PostgresRecommendationRepository {
         Ok(recs)
     }
 
-    async fn store_recommendation_score(&self, user_id: &str, material_id: &str, score: f64) -> Result<(), AnalyticsError> {
+    async fn store_recommendation_score(&self, _user_id: &str, material_id: &str, score: f64) -> Result<(), AnalyticsError> {
         sqlx::query(
             r#"
             INSERT INTO recommendation_scores (item_id, score, created_at)

@@ -23,24 +23,19 @@ RUN --mount=type=cache,target=/root/.npm \
 # Create a stage for installing production dependencies.
 FROM base AS deps
 
-# Download dependencies as a separate step to take advantage of Docker's caching.
-# Leverage bind mounts to package.json, pnpm-lock.yaml, and pnpm-workspace.yaml.
-RUN --mount=type=bind,source=package.json,target=package.json \
-    --mount=type=bind,source=pnpm-lock.yaml,target=pnpm-lock.yaml \
-    --mount=type=bind,source=pnpm-workspace.yaml,target=pnpm-workspace.yaml \
-    --mount=type=cache,target=/root/.local/share/pnpm/store \
-    pnpm install --prod --frozen-lockfile
+# Copy only the manifest files first so Docker can cache dependency resolution
+# independently from the application source.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
+    pnpm install --prod --frozen-lockfile --prefer-offline
 
 ################################################################────────────────
 # Create a stage for building the application.
 FROM deps AS build
 
-# Download additional development dependencies before building.
-RUN --mount=type=bind,source=package.json,target=package.json \
-    --mount=type=bind,source=pnpm-lock.yaml,target=pnpm-lock.yaml \
-    --mount=type=bind,source=pnpm-workspace.yaml,target=pnpm-workspace.yaml \
-    --mount=type=cache,target=/root/.local/share/pnpm/store \
-    pnpm install --frozen-lockfile
+# Install the full dev dependency set needed for compilation and generation.
+RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
+    pnpm install --frozen-lockfile --prefer-offline
 
 # Copy the rest of the source files into the image.
 COPY . .
@@ -52,10 +47,14 @@ RUN pnpm prune --prod
 ################################################################────────────────
 # Create a new stage to run the application with minimal runtime dependencies
 # where the necessary files are copied from the build stage.
-FROM base AS final
+FROM node:${NODE_VERSION}-alpine AS final
+ARG DATABASE_URL
 
-# Use production node environment by default.
+ENV DATABASE_URL=${DATABASE_URL}
+ENV DIRECT_URL=${DATABASE_URL}
 ENV NODE_ENV=production
+
+WORKDIR /usr/src/app
 
 # Copy package.json, dependencies, build output, and Prisma schema/config
 # with node user ownership
@@ -64,6 +63,9 @@ COPY --chown=node:node --from=build /usr/src/app/node_modules ./node_modules
 COPY --chown=node:node --from=build /usr/src/app/dist ./dist
 COPY --chown=node:node --from=build /usr/src/app/prisma ./prisma
 COPY --chown=node:node --from=build /usr/src/app/prisma.config.ts ./prisma.config.ts
+
+# Ensure the node user has write permissions to the app directory (for pnpm tmp files)
+RUN chmod -R u+w /usr/src/app
 
 # Run the application as non-root user
 USER node

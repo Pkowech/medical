@@ -244,7 +244,7 @@ impl SpacedRepetitionAnalytics {
     /// Get retention rates broken down by interval
     pub async fn get_retention_by_interval(
         &self,
-        user_id: &str,
+        _user_id: &str,
     ) -> Result<Vec<IntervalRetention>, SpacedRepetitionError> {
         let results = sqlx::query_as::<_, (i32, i64, i64)>(
             r#"
@@ -543,3 +543,4 @@ mod tests {
         assert_eq!(dist.card_count, 50);
     }
 }
+

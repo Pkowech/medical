@@ -1,3 +1,6 @@
+-- CreateExtension
+CREATE EXTENSION IF NOT EXISTS "pg_trgm";
+
 -- CreateEnum
 CREATE TYPE "RoleName" AS ENUM ('admin', 'instructor', 'moderator', 'student');
 
@@ -263,6 +266,21 @@ CREATE TABLE "quizzes" (
     "fts" tsvector,
 
     CONSTRAINT "quizzes_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "auto_generated_quizzes" (
+    "id" TEXT NOT NULL,
+    "user_id" TEXT NOT NULL,
+    "quiz_id" TEXT NOT NULL,
+    "weakness_topic_id" TEXT NOT NULL,
+    "detected_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "completed_at" TIMESTAMP(3),
+    "risk_level" TEXT NOT NULL,
+    "score_improvement" DOUBLE PRECISION,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "auto_generated_quizzes_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -639,6 +657,7 @@ CREATE TABLE "materials" (
     "title" VARCHAR(255) NOT NULL,
     "type" "MaterialType" NOT NULL,
     "file_id" TEXT,
+    "preview_file_id" TEXT,
     "content" TEXT,
     "description" TEXT,
     "category" TEXT,
@@ -716,6 +735,22 @@ CREATE TABLE "material_engagements" (
     "updated_at" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "material_engagements_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "material_notes" (
+    "id" TEXT NOT NULL,
+    "user_id" TEXT NOT NULL,
+    "material_id" TEXT NOT NULL,
+    "content" TEXT NOT NULL,
+    "page_number" INTEGER,
+    "position" JSONB,
+    "color" TEXT DEFAULT '#FFFF00',
+    "is_private" BOOLEAN NOT NULL DEFAULT true,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "material_notes_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -1604,6 +1639,35 @@ CREATE TABLE "sync_logs" (
     CONSTRAINT "sync_logs_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "global_search_index" (
+    "id" TEXT NOT NULL,
+    "entity_id" TEXT NOT NULL,
+    "entity_type" TEXT NOT NULL,
+    "title" TEXT NOT NULL,
+    "description" TEXT,
+    "content" TEXT,
+    "tags" TEXT[] DEFAULT ARRAY[]::TEXT[],
+    "metadata" JSONB,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+    "fts" tsvector,
+
+    CONSTRAINT "global_search_index_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "medical_synonyms" (
+    "id" TEXT NOT NULL,
+    "term" TEXT NOT NULL,
+    "synonyms" TEXT[],
+    "category" TEXT,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "medical_synonyms_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE INDEX "questions_course_id_idx" ON "questions"("course_id");
 
@@ -1654,6 +1718,21 @@ CREATE INDEX "quizzes_fts_idx" ON "quizzes" USING GIN ("fts");
 
 -- CreateIndex
 CREATE INDEX "quizzes_title_idx" ON "quizzes"("title");
+
+-- CreateIndex
+CREATE INDEX "auto_generated_quizzes_user_id_idx" ON "auto_generated_quizzes"("user_id");
+
+-- CreateIndex
+CREATE INDEX "auto_generated_quizzes_detected_at_idx" ON "auto_generated_quizzes"("detected_at");
+
+-- CreateIndex
+CREATE INDEX "auto_generated_quizzes_completed_at_idx" ON "auto_generated_quizzes"("completed_at");
+
+-- CreateIndex
+CREATE INDEX "auto_generated_quizzes_risk_level_idx" ON "auto_generated_quizzes"("risk_level");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "auto_generated_quizzes_user_id_quiz_id_key" ON "auto_generated_quizzes"("user_id", "quiz_id");
 
 -- CreateIndex
 CREATE INDEX "quiz_questions_quiz_id_idx" ON "quiz_questions"("quiz_id");
@@ -1939,6 +2018,12 @@ CREATE INDEX "xapi_statements_occurred_at_idx" ON "xapi_statements"("occurred_at
 
 -- CreateIndex
 CREATE UNIQUE INDEX "material_engagements_user_id_material_id_key" ON "material_engagements"("user_id", "material_id");
+
+-- CreateIndex
+CREATE INDEX "material_notes_user_id_idx" ON "material_notes"("user_id");
+
+-- CreateIndex
+CREATE INDEX "material_notes_material_id_idx" ON "material_notes"("material_id");
 
 -- CreateIndex
 CREATE INDEX "topic_progress_user_id_idx" ON "topic_progress"("user_id");
@@ -2474,6 +2559,21 @@ CREATE INDEX "sync_logs_user_id_idx" ON "sync_logs"("user_id");
 -- CreateIndex
 CREATE INDEX "sync_logs_resource_type_resource_id_idx" ON "sync_logs"("resource_type", "resource_id");
 
+-- CreateIndex
+CREATE INDEX "global_search_index_entity_id_idx" ON "global_search_index"("entity_id");
+
+-- CreateIndex
+CREATE INDEX "global_search_index_entity_type_idx" ON "global_search_index"("entity_type");
+
+-- CreateIndex
+CREATE INDEX "global_search_index_fts_idx" ON "global_search_index" USING GIN ("fts");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "medical_synonyms_term_key" ON "medical_synonyms"("term");
+
+-- CreateIndex
+CREATE INDEX "medical_synonyms_term_idx" ON "medical_synonyms"("term");
+
 -- AddForeignKey
 ALTER TABLE "questions" ADD CONSTRAINT "questions_course_id_fkey" FOREIGN KEY ("course_id") REFERENCES "courses"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
@@ -2500,6 +2600,15 @@ ALTER TABLE "quizzes" ADD CONSTRAINT "quizzes_topic_id_fkey" FOREIGN KEY ("topic
 
 -- AddForeignKey
 ALTER TABLE "quizzes" ADD CONSTRAINT "quizzes_unit_id_fkey" FOREIGN KEY ("unit_id") REFERENCES "units"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "auto_generated_quizzes" ADD CONSTRAINT "auto_generated_quizzes_quiz_id_fkey" FOREIGN KEY ("quiz_id") REFERENCES "quizzes"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "auto_generated_quizzes" ADD CONSTRAINT "auto_generated_quizzes_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "auto_generated_quizzes" ADD CONSTRAINT "auto_generated_quizzes_weakness_topic_id_fkey" FOREIGN KEY ("weakness_topic_id") REFERENCES "topics"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "quiz_questions" ADD CONSTRAINT "quiz_questions_question_id_fkey" FOREIGN KEY ("question_id") REFERENCES "questions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -2595,6 +2704,9 @@ ALTER TABLE "materials" ADD CONSTRAINT "materials_course_id_fkey" FOREIGN KEY ("
 ALTER TABLE "materials" ADD CONSTRAINT "materials_file_id_fkey" FOREIGN KEY ("file_id") REFERENCES "files"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "materials" ADD CONSTRAINT "materials_preview_file_id_fkey" FOREIGN KEY ("preview_file_id") REFERENCES "files"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "materials" ADD CONSTRAINT "materials_topic_id_fkey" FOREIGN KEY ("topic_id") REFERENCES "topics"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -2622,10 +2734,19 @@ ALTER TABLE "xapi_statements" ADD CONSTRAINT "xapi_statements_material_id_fkey" 
 ALTER TABLE "xapi_statements" ADD CONSTRAINT "xapi_statements_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "material_engagements" ADD CONSTRAINT "material_engagements_material_id_fkey" FOREIGN KEY ("material_id") REFERENCES "materials"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "material_engagements" ADD CONSTRAINT "material_engagements_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "material_engagements" ADD CONSTRAINT "material_engagements_material_id_fkey" FOREIGN KEY ("material_id") REFERENCES "materials"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "material_notes" ADD CONSTRAINT "material_notes_material_id_fkey" FOREIGN KEY ("material_id") REFERENCES "materials"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "material_notes" ADD CONSTRAINT "material_notes_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "topic_progress" ADD CONSTRAINT "topic_progress_course_id_fkey" FOREIGN KEY ("course_id") REFERENCES "courses"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "topic_progress" ADD CONSTRAINT "topic_progress_material_id_fkey" FOREIGN KEY ("material_id") REFERENCES "materials"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -2635,9 +2756,6 @@ ALTER TABLE "topic_progress" ADD CONSTRAINT "topic_progress_topic_id_fkey" FOREI
 
 -- AddForeignKey
 ALTER TABLE "topic_progress" ADD CONSTRAINT "topic_progress_unit_id_fkey" FOREIGN KEY ("unit_id") REFERENCES "units"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "topic_progress" ADD CONSTRAINT "topic_progress_course_id_fkey" FOREIGN KEY ("course_id") REFERENCES "courses"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "topic_progress" ADD CONSTRAINT "topic_progress_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -2688,19 +2806,19 @@ ALTER TABLE "learning_path_milestones" ADD CONSTRAINT "learning_path_milestones_
 ALTER TABLE "learning_goals" ADD CONSTRAINT "learning_goals_courseId_fkey" FOREIGN KEY ("courseId") REFERENCES "courses"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "learning_goals" ADD CONSTRAINT "learning_goals_topic_id_fkey" FOREIGN KEY ("topic_id") REFERENCES "topics"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "learning_goals" ADD CONSTRAINT "learning_goals_material_id_fkey" FOREIGN KEY ("material_id") REFERENCES "materials"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "learning_goals" ADD CONSTRAINT "learning_goals_depends_on_goal_id_fkey" FOREIGN KEY ("depends_on_goal_id") REFERENCES "learning_goals"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "learning_goals" ADD CONSTRAINT "learning_goals_learning_path_id_fkey" FOREIGN KEY ("learning_path_id") REFERENCES "learning_paths"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "learning_goals" ADD CONSTRAINT "learning_goals_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "learning_goals" ADD CONSTRAINT "learning_goals_material_id_fkey" FOREIGN KEY ("material_id") REFERENCES "materials"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "learning_goals" ADD CONSTRAINT "learning_goals_depends_on_goal_id_fkey" FOREIGN KEY ("depends_on_goal_id") REFERENCES "learning_goals"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "learning_goals" ADD CONSTRAINT "learning_goals_topic_id_fkey" FOREIGN KEY ("topic_id") REFERENCES "topics"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "learning_goals" ADD CONSTRAINT "learning_goals_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "learning_goal_progress" ADD CONSTRAINT "learning_goal_progress_learning_goal_id_fkey" FOREIGN KEY ("learning_goal_id") REFERENCES "learning_goals"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -2724,6 +2842,9 @@ ALTER TABLE "learning_suggestions" ADD CONSTRAINT "learning_suggestions_user_id_
 ALTER TABLE "study_events" ADD CONSTRAINT "study_events_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "schedule_events" ADD CONSTRAINT "schedule_events_course_id_fkey" FOREIGN KEY ("course_id") REFERENCES "courses"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "schedule_events" ADD CONSTRAINT "schedule_events_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -2745,10 +2866,10 @@ ALTER TABLE "discussion_messages" ADD CONSTRAINT "discussion_messages_reply_to_i
 ALTER TABLE "discussion_messages" ADD CONSTRAINT "discussion_messages_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "study_sessions" ADD CONSTRAINT "study_sessions_topic_id_fkey" FOREIGN KEY ("topic_id") REFERENCES "topics"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "study_sessions" ADD CONSTRAINT "study_sessions_material_id_fkey" FOREIGN KEY ("material_id") REFERENCES "materials"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "study_sessions" ADD CONSTRAINT "study_sessions_material_id_fkey" FOREIGN KEY ("material_id") REFERENCES "materials"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "study_sessions" ADD CONSTRAINT "study_sessions_topic_id_fkey" FOREIGN KEY ("topic_id") REFERENCES "topics"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "study_sessions" ADD CONSTRAINT "study_sessions_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -2895,10 +3016,10 @@ ALTER TABLE "experiment_assignments" ADD CONSTRAINT "experiment_assignments_expe
 ALTER TABLE "experiment_assignments" ADD CONSTRAINT "experiment_assignments_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "skill_trajectories" ADD CONSTRAINT "skill_trajectories_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "skill_trajectories" ADD CONSTRAINT "skill_trajectories_topic_id_fkey" FOREIGN KEY ("topic_id") REFERENCES "topics"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "skill_trajectories" ADD CONSTRAINT "skill_trajectories_topic_id_fkey" FOREIGN KEY ("topic_id") REFERENCES "topics"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "skill_trajectories" ADD CONSTRAINT "skill_trajectories_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "instructor_overrides" ADD CONSTRAINT "instructor_overrides_instructor_id_fkey" FOREIGN KEY ("instructor_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;

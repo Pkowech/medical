@@ -12,7 +12,7 @@ pub async fn predict_bkt(
     user_id: &str,
     skill_id: &str,
     feature_vector: &[f64],
-    pool: &Pool<Postgres>,
+    _pool: &Pool<Postgres>,
 ) -> Result<(f64, f64), String> {
     // This is a placeholder for the actual BKT prediction logic.
     // It should utilize the BktRepository trait for data access.
