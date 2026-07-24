@@ -9,6 +9,8 @@ export class RedisService {
   private readonly redis: Redis | null;
   private readonly logger = new Logger(RedisService.name);
   private isConnected = false;
+  private reconnectDelay = 1000;
+  private readonly maxReconnectDelay = 30000;
   private memoryStore: Map<string, { value: string; expiry?: number }> =
     new Map();
 
@@ -25,17 +27,25 @@ export class RedisService {
       }
 
       this.redis.on('connect', () => {
+        const wasConnected = this.isConnected;
         this.isConnected = true;
-        this.logger.log('Connected to Redis');
+        if (!wasConnected) {
+          this.logger.log('Connected to Redis');
+        } else {
+          this.logger.debug('Redis connection event (already connected)');
+        }
+        // reset backoff on successful connect
+        this.reconnectDelay = 1000;
       });
 
       this.redis.on('error', (error) => {
         this.isConnected = false;
-        this.logger.warn(
-          'Redis connection error, using in-memory fallback:',
+        // Log at debug level to avoid spamming WARN on transient network issues
+        this.logger.debug(
+          'Redis connection error, will attempt reconnect:',
           getErrorMessage(error),
         );
-        setTimeout(() => void this.connectRedis(), 5000);
+        void this.scheduleReconnect();
       });
 
       void this.connectRedis();
@@ -62,12 +72,31 @@ export class RedisService {
     try {
       await this.redis.connect();
     } catch (err) {
-      this.logger.warn(
+      this.logger.debug(
         'Initial Redis connection failed:',
         getErrorMessage(err),
       );
       this.isConnected = false;
     }
+  }
+
+  private async scheduleReconnect() {
+    if (!this.redis || this.isConnected) return;
+    const delay = Math.min(this.reconnectDelay, this.maxReconnectDelay);
+    this.logger.debug(`Scheduling Redis reconnect in ${delay}ms`);
+    setTimeout(async () => {
+      try {
+        await this.connectRedis();
+        // on failure, increase backoff
+        if (!this.isConnected) {
+          this.reconnectDelay = Math.min(this.reconnectDelay * 2, this.maxReconnectDelay);
+          void this.scheduleReconnect();
+        }
+      } catch (e) {
+        this.reconnectDelay = Math.min(this.reconnectDelay * 2, this.maxReconnectDelay);
+        void this.scheduleReconnect();
+      }
+    }, delay);
   }
 
   private getFromMemory(key: string): Promise<string | null> {
@@ -348,7 +377,7 @@ export class RedisService {
   async getList(key: string, start: number, end: number): Promise<string[]> {
     const client = this.getConnectedClient();
     if (!client) {
-      this.logger.warn(
+      this.logger.debug(
         'Redis not connected, returning empty array for getList operation',
       );
       return [];
@@ -378,7 +407,7 @@ export class RedisService {
   async getSetMembers(key: string): Promise<string[]> {
     const client = this.getConnectedClient();
     if (!client) {
-      this.logger.warn(
+      this.logger.debug(
         'Redis not connected, returning empty array for getSetMembers operation',
       );
       return [];
@@ -426,7 +455,7 @@ export class RedisService {
     callback: (message: string) => void,
   ): Promise<void> {
     if (!this.getConnectedClient()) {
-      this.logger.warn('Redis not connected, skipping subscribe operation');
+      this.logger.debug('Redis not connected, skipping subscribe operation');
       return;
     }
 
