@@ -26,9 +26,19 @@ class ApiService {
     // Use backend URL with /v1 prefix directly
     const raw = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
     let backendUrl = (raw || 'http://localhost:3002').trim();
-    if (!backendUrl.startsWith('http://') && !backendUrl.startsWith('https://')) {
+    
+    if (backendUrl.startsWith('/')) {
+      if (typeof window !== 'undefined') {
+        backendUrl = window.location.origin + backendUrl;
+      } else {
+        const host = process.env.VERCEL_URL || process.env.NEXT_PUBLIC_APP_URL || 'localhost:3000';
+        const protocol = host.includes('localhost') ? 'http://' : 'https://';
+        backendUrl = `${protocol}${host.replace(/^https?:\/\//, '')}${backendUrl}`;
+      }
+    } else if (!backendUrl.startsWith('http://') && !backendUrl.startsWith('https://')) {
       backendUrl = `https://${backendUrl}`;
     }
+    
     // Remove trailing slash if present
     backendUrl = backendUrl.replace(/\/+$/, '');
     return `${backendUrl}/v1`;
