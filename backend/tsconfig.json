@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "baseUrl": ".",
     "module": "es2022",
     "moduleResolution": "bundler",
     "declaration": true,
