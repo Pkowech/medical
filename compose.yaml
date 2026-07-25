@@ -1,51 +1,5 @@
 services:
-  postgres:
-    image: postgres:18
-    container_name: medtrack_postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
-    ports:
-      - "${POSTGRES_PORT}:5432"
-    # For PostgreSQL 18+ images we mount the volume at /var/lib/postgresql so
-    # the server can create a major-version specific subdirectory under it.
-    # See: https://github.com/docker-library/postgres/issues/1259
-    volumes:
-      - postgres_data:/var/lib/postgresql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - medtrack_net
-
-  redis:
-    image: redis:7-alpine
-    container_name: medtrack_redis
-    restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD}"]
-    # Redis port binding is controlled via the root `.env` file (REDIS_PORT)
-    # — make the root `.env` the source of truth for runtime host mapping.
-    # By default the project ships with REDIS_PORT=6379 in the root .env so
-    # host-based tools can reach the container on 127.0.0.1:6379. Change the
-    # value in `.env` if you need a different host port (for example to avoid
-    # collision with an existing Redis instance).
-    ports:
-      - "${REDIS_PORT}:6379"
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "${REDIS_PASSWORD}", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - medtrack_net
-
-  backend:
+   backend:
     build:
       # Build from the repository root so backend can access shared root-level
       # proto definitions under ./protos without requiring a separate backend
@@ -110,7 +64,7 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  rust-analytics:
+   rust-analytics:
     build:
       # Build from the Rust crate directory and supply shared protos as an
       # additional context for the Dockerfile's bind mounts.
@@ -150,7 +104,7 @@ services:
       retries: 3
       start_period: 30s
 
-  prometheus:
+   prometheus:
     image: prom/prometheus:v2.47.0
     container_name: medtrack_prometheus
     restart: unless-stopped
@@ -169,9 +123,8 @@ services:
       - medtrack_net
     depends_on:
       - backend
-      - frontend
 
-  alertmanager:
+   alertmanager:
     image: prom/alertmanager:v0.26.0
     container_name: medtrack_alertmanager
     restart: unless-stopped
@@ -187,7 +140,7 @@ services:
     depends_on:
       - prometheus
 
-  grafana:
+   grafana:
     image: grafana/grafana:10.1.5
     container_name: medtrack_grafana
     restart: unless-stopped
@@ -206,8 +159,8 @@ services:
       - medtrack_net
     depends_on:
       - prometheus
-
-  gotenberg:
+  
+   gotenberg:
     image: gotenberg/gotenberg:8
     container_name: medtrack_gotenberg
     restart: unless-stopped

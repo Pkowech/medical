@@ -179,13 +179,19 @@ async function bootstrap() {
     );
   }
 
-  // CORS configuration - more permissive for Docker development
+  // CORS configuration
   Logger.log('Setting up CORS configuration...');
   const configService = app.get(ConfigService);
-    const allowedOrigins = configService
-      .get<string>('ALLOWED_ORIGINS')!
-      .split(',')
-      .map((origin) => origin.trim());
+  const allowedOriginsRaw = configService.get<string>('ALLOWED_ORIGINS');
+  
+  if (!allowedOriginsRaw) {
+    Logger.warn('ALLOWED_ORIGINS env var not set; CORS will only allow no-origin requests and localhost in dev');
+  }
+  
+  const allowedOrigins = (allowedOriginsRaw || '')
+    .split(',')
+    .filter((origin) => origin.trim().length > 0)
+    .map((origin) => origin.trim());
 
   Logger.log('Enabling CORS...');
   app.enableCors({
@@ -315,8 +321,8 @@ async function bootstrap() {
   app.use(apiLimiter);
 
   Logger.log('Getting port configuration...');
-    const port = configService.get<number>('PORT')!;
-    const hostname = configService.get<string>('HOSTNAME')!;
+  const port = configService.get<number>('PORT') || 3002;
+  const hostname = configService.get<string>('HOSTNAME') || '0.0.0.0';
 
   Logger.log('Logging routes...');
   if (process.env.NODE_ENV === 'development') {

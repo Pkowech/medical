@@ -69,4 +69,4 @@ EXPOSE 3002
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
   CMD node -e "require('http').get('http://localhost:3002/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
 
-CMD ["sh", "-c", "if [ -n \"$DATABASE_URL\" ]; then echo 'DATABASE_URL present — running migrations'; ./node_modules/.bin/prisma migrate deploy; else echo 'DATABASE_URL not set — skipping migrations'; fi && node dist/src/main"]
+CMD ["sh", "-c", "set -e; if [ -n \"$DATABASE_URL\" ]; then echo 'DATABASE_URL present — running migrations'; timeout 120 ./node_modules/.bin/prisma migrate deploy || { code=$?; if [ $code -ne 124 ]; then echo 'Migration failed with exit code '\"$code\"''; exit $code; fi; echo 'Migration timeout after 120s, continuing startup'; }; else echo 'DATABASE_URL not set — skipping migrations'; fi; echo 'Starting application'; exec node dist/src/main"]

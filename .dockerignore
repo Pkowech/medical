@@ -5,7 +5,6 @@
 
 # Exclude large project folders from repo-root build context
 frontend/
-rust_analytics/
 
 # Ignore local development files
 .env
@@ -66,7 +65,7 @@ __pycache__/
 .venv
 venv/
 
-# Ignore Rust specific
+# Ignore Rust specific (but NOT rust_analytics source dir)
 Cargo.lock
 
 # Ignore monitoring/infra configs not needed for builds
