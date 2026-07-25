@@ -27,7 +27,7 @@ COPY . .
 RUN if [ ! -f .env ] && [ -n "$DATABASE_URL" ]; then printf 'DIRECT_URL=%s\n' "$DATABASE_URL" > .env; fi
 RUN pnpm prisma generate
 RUN pnpm run build
-RUN pnpm --filter <backend-package-name> deploy --prod /prod
+RUN pnpm --filter medtrack-hub-backend deploy --prod /prod
 
 ################################################################────────────────
 FROM node:${NODE_VERSION}-alpine AS final

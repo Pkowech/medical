@@ -179,7 +179,7 @@ function LoginContent() {
             router.replace(callbackUrl);
           } catch (e) {
             // fallback push
-            // eslint-disable-next-line no-console
+             
             console.warn('[Login] router.replace failed, using push', e);
             router.push(callbackUrl);
           }
