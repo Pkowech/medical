@@ -3,10 +3,18 @@
 .gitignore
 .github
 
-# Exclude large project folders from build context
-frontend/
-backend/
-rust_analytics/
+# Ignore build artifacts and unrelated workspace folders for per-service builds
+# Keep `protos/` available in the service context (don't exclude it).
+target/
+.cargo/
+.rustup/
+node_modules/
+.pnpm-store/
+dist/
+build/
+.next/
+.env
+.env*
 
 # Ignore local development files
 .env

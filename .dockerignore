@@ -3,8 +3,9 @@
 .gitignore
 .github
 
-# Exclude large project folders from build context
+# Exclude large project folders from repo-root build context
 frontend/
+rust_analytics/
 
 # Ignore local development files
 .env

@@ -30,7 +30,9 @@ ENV RUSTFLAGS="-C embed-bitcode=no"
 RUN apk add --no-cache clang lld musl-dev git protobuf-dev protoc pkgconfig
 
 # Copy the crate into a temporary path and assemble /app deterministically.
-COPY rust_analytics /tmp/rust_analytics
+# When building with the service directory as the build context this will copy
+# the crate files. When building from repo root a different path may be used.
+COPY . /tmp/rust_analytics
 RUN mkdir -p /app/src /app/.sqlx && \
     cp /tmp/rust_analytics/Cargo.toml /tmp/rust_analytics/Cargo.lock /tmp/rust_analytics/build.rs /app/ 2>/dev/null || true; \
     cp -r /tmp/rust_analytics/src/* /app/src/ 2>/dev/null || true; \

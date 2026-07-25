@@ -20,6 +20,12 @@ RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
 FROM deps AS build
 ARG DATABASE_URL
 
+# Copy protos (if present in build context) so backend can use shared proto types
+# when building from a per-service context. The `scripts/sync-protos.sh` script
+# will populate `backend/protos` prior to a per-service build.
+COPY protos ./protos
+
+# Copy service source
 COPY . .
 
 # DATABASE_URL used transiently for `prisma generate` schema introspection
