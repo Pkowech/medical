@@ -4,14 +4,12 @@ ARG RUST_VERSION=1.96.1
 ARG APP_NAME=rust_analytics
 
 ################################################################################
-# Fallback stage for additional build context 'protos' if not supplied externally.
+# Stage for 'protos' build context.
+# Copying directly from the local workspace avoids Render/BuildKit attempting 
+# to pull an external image named `protos:latest`.
 FROM alpine:3.18 AS proto_context
 WORKDIR /protos
-# Prefer copying the local `protos` directory from the repository root. Some
-# CI/build systems (Render, older builders) do not support additional build
-# contexts via BuildKit; copying is more portable and avoids attempts to pull
-# an image named `protos:latest`.
-COPY --from=protos / /protos
+COPY protos/ /protos/
 
 ################################################################################
 # Build stage

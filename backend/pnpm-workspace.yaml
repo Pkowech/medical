@@ -60,7 +60,9 @@ onlyBuiltDependencies:
   - '@prisma/engines'
   - '@scarf/scarf'
   - argon2
+  - esbuild
   - grpc-tools
   - msgpackr-extract
   - prisma
   - protobufjs
+  - sharp

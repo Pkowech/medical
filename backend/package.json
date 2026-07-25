@@ -162,20 +162,5 @@
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.59.1"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "@prisma/engines",
-      "@scarf/scarf",
-      "@swc/core",
-      "argon2",
-      "esbuild",
-      "grpc-tools",
-      "msgpackr-extract",
-      "prisma",
-      "protobufjs",
-      "sharp",
-      "unrs-resolver"
-    ]
   }
 }
