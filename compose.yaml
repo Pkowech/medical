@@ -47,18 +47,11 @@ services:
 
   backend:
     build:
-      # Build context narrowed to ./backend. The backend Dockerfile only ever
-      # touches files inside backend/ (package.json, pnpm-lock.yaml, src, etc.)
-      # — it does not reference any root-level workspace files. Using the repo
-      # root as context meant every backend build shipped the entire monorepo
-      # (frontend source, monitoring configs, secrets/, etc.) to the Docker
-      # daemon as part of the build context for no reason, which is a large
-      # part of what made backend builds slow. If you later convert this repo
-      # into a real pnpm workspace and the Dockerfile needs root-level
-      # pnpm-workspace.yaml / root lockfile, switch this back to `.` and add
-      # the relevant COPY lines to the Dockerfile.
-      context: ./backend
-      dockerfile: Dockerfile
+      # Build from the repository root so backend can access shared root-level
+      # proto definitions under ./protos without requiring a separate backend
+      # copy or root-level context workaround.
+      context: .
+      dockerfile: backend/Dockerfile
       target: final
       args:
         DATABASE_URL: ${DATABASE_URL:?DATABASE_URL must be set}

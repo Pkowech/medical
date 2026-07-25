@@ -12,7 +12,7 @@ RUN --mount=type=cache,target=/root/.npm \
 ################################################################────────────────
 # Full deps (including dev) — needed to run `nest build`
 FROM base AS deps
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY backend/package.json backend/pnpm-lock.yaml backend/pnpm-workspace.yaml ./
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
     pnpm install --frozen-lockfile --prefer-offline --trust-lockfile || \
       (pnpm approve-builds --all && pnpm install --frozen-lockfile --prefer-offline --trust-lockfile)
@@ -21,13 +21,12 @@ RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
 FROM deps AS build
 ARG DATABASE_URL
 
-# Copy protos (if present in build context) so backend can use shared proto types
-# when building from a per-service context. The `scripts/sync-protos.sh` script
-# will populate `backend/protos` prior to a per-service build.
+# Copy root-level protos into the backend build context, so the backend can
+# compile and load proto definitions from the workspace root.
 COPY protos ./protos
 
-# Copy service source
-COPY . .
+# Copy backend service source and config files from the repository root.
+COPY backend ./
 
 # DATABASE_URL used transiently for `prisma generate` schema introspection
 # only — never persisted as ENV, so it never lands in the final image.

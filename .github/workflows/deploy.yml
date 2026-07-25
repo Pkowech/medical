@@ -39,7 +39,7 @@ jobs:
       - name: Build & push
         uses: docker/build-push-action@v6
         with:
-          context: ./backend
+          context: .
           file: ./backend/Dockerfile
           target: production
           platforms: linux/amd64
