@@ -43,7 +43,7 @@ RUN --mount=type=bind,from=proto_context,source=/protos,target=/protos \
     --mount=type=cache,target=/app/target/ \
     --mount=type=cache,target=/usr/local/cargo/git/db \
     --mount=type=cache,target=/usr/local/cargo/registry/ \
-    SQLX_OFFLINE=true cargo build --locked --release && \
+    SQLX_OFFLINE=true cargo build --locked --release || SQLX_OFFLINE=true cargo build --release && \
     cp ./target/release/$APP_NAME /bin/server
 
 ################################################################################
