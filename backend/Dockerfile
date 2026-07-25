@@ -24,10 +24,24 @@ COPY . .
 
 # DATABASE_URL used transiently for `prisma generate` schema introspection
 # only — never persisted as ENV, so it never lands in the final image.
-RUN if [ ! -f .env ] && [ -n "$DATABASE_URL" ]; then printf 'DIRECT_URL=%s\n' "$DATABASE_URL" > .env; fi
-RUN pnpm prisma generate
+RUN if [ ! -f .env ]; then \
+      if [ -n "$DATABASE_URL" ]; then \
+        printf 'DATABASE_URL=%s\n' "$DATABASE_URL" > .env; \
+        printf 'DIRECT_URL=%s\n' "$DATABASE_URL" >> .env; \
+      else \
+        # Fallback to a local SQLite file for offline generation during image builds
+        printf 'DATABASE_URL=%s\n' "file:./dev.db" > .env; \
+        printf 'DIRECT_URL=%s\n' "file:./dev.db" >> .env; \
+      fi; \
+    fi && \
+    # Load env values and run Prisma generation with both variables available
+    export $(cat .env | xargs) && pnpm prisma generate
 RUN pnpm run build
-RUN pnpm --filter medtrack-hub-backend deploy --prod /prod
+RUN mkdir -p /prod && \
+  # Install only production dependencies for the backend package and assemble runtime
+  pnpm --filter medtrack-hub-backend install --prod --frozen-lockfile && \
+  # Copy runtime files into /prod
+  cp -a package.json prisma prisma.config.ts dist node_modules /prod 2>/dev/null || true
 
 ################################################################────────────────
 FROM node:${NODE_VERSION}-alpine AS final
@@ -49,4 +63,4 @@ EXPOSE 3002
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
   CMD node -e "require('http').get('http://localhost:3002/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
 
-CMD ["sh", "-c", "./node_modules/.bin/prisma migrate deploy && node dist/src/main"]
+CMD ["sh", "-c", "if [ -n \"$DATABASE_URL\" ]; then echo 'DATABASE_URL present — running migrations'; ./node_modules/.bin/prisma migrate deploy; else echo 'DATABASE_URL not set — skipping migrations'; fi && node dist/src/main"]

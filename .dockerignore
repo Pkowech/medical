@@ -3,6 +3,9 @@
 .gitignore
 .github
 
+# Exclude large project folders from build context
+frontend/
+
 # Ignore local development files
 .env
 .env*.local

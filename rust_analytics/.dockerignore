@@ -1,10 +1,95 @@
+# Ignore version control
+.git
+.gitignore
+.github
+
+# Exclude large project folders from build context
+frontend/
+backend/
+rust_analytics/
+
+# Ignore local development files
+.env
+.env*.local
+.vscode
+.vs
+.vscode-extensions
+
+# Ignore build artifacts
+target/
+dist/
+build/
+.next/
+coverage/
+node_modules/
+.pnpm-store/
+
+# Ignore package manager files and caches
+npm-debug.log
+pnpm-debug.log
+yarn-error.log
+.cache/
+
+# Ignore testing and documentation
+tests/
+test/
+*.md
+README.md
+
+# Ignore secrets and sensitive data
+secrets/
+*.sql
+.env.*
+
+# Ignore large binary files
+*.tar.gz
+*.tgz
+*.zip
+*.rar
+
+# Ignore temp files
+*.log
+*.tmp
+temp/
+tmp/
+**/seed-data
+app.log
+app_startup.log
+dev_startup.log
+output.log
+*.log
+/.pnpm
+/.pnpm-store
+
+# Ignore Python artifacts
+__pycache__/
+*.pyc
+.venv
+venv/
+
+# Ignore Rust specific
+Cargo.lock
+
+# Ignore monitoring/infra configs not needed for builds
+monitoring/
+nginx/
+
+# Large PDFs and media
+*.pdf
+*.mp4
+*.mp3
+*.mov
+
+# misc files
+*.sql
+.DS_Store
+
 # Include any files or directories that you don't want to be copied to your
 # container here (e.g., local build artifacts, temporary files, etc.).
 #
 # For more help, visit the .dockerignore file reference guide at
 # https://docs.docker.com/go/build-context-dockerignore/
 
-**/.DS_Store
 **/.classpath
 **/.dockerignore
 **/.env
@@ -15,6 +100,8 @@
 **/.toolstarget
 **/.vs
 **/.vscode
+**/.next
+**/.cache
 **/*.*proj.user
 **/*.dbmdl
 **/*.jfm
@@ -24,9 +111,98 @@
 **/Dockerfile*
 **/node_modules
 **/npm-debug.log
+**/obj
 **/secrets.dev.yaml
 **/values.dev.yaml
-/bin
-/target
+**/build
+**/dist
 LICENSE
 README.md
+# Logs and Error Outputs
+**/*.log
+**/build_errors.txt
+
+# Test Suites and Caches
+**/tests
+**/.pytest_cache
+**/coverage
+**/.nyc_output
+
+# Temporary and Scratch Directories
+**/tmp
+**/scratch
+
+# Linter and Formatter Configs
+**/.prettierrc*
+**/eslint.config.*
+**/.eslintrc*
+
+# Environment Variables (Broaden to catch .env.local, .env.development, etc.)
+**/.env*
+
+# Local Databases & Seed Artifacts (if not needed at runtime)
+**/*.db
+**/*.sqlite
+**/*.sqlite3
+
+# Include any files or directories that you don't want to be copied to your
+# container here (e.g., local build artifacts, temporary files, etc.).
+#
+# For more help, visit the .dockerignore file reference guide at
+# https://docs.docker.com/go/build-context-dockerignore/
+
+**/.classpath
+**/.dockerignore
+**/.env
+**/.git
+**/.gitignore
+**/.project
+**/.settings
+**/.toolstarget
+**/.vs
+**/.vscode
+**/.next
+**/.cache
+**/*.*proj.user
+**/*.dbmdl
+**/*.jfm
+**/charts
+**/docker-compose*
+**/compose.y*ml
+**/Dockerfile*
+**/node_modules
+**/npm-debug.log
+**/obj
+**/secrets.dev.yaml
+**/values.dev.yaml
+**/build
+**/dist
+LICENSE
+README.md
+# --- Added for Frontend Workspace ---
+
+# Environment Files (Broadened to catch .env.local)
+**/.env*
+
+# Local Logs, Diagnostics, and Temp Files
+**/*.log
+**/*.txt
+**/.tmp_*
+**/eslint-report.json
+
+# Test Directories and Configs
+**/e2e/
+**/jest.config.js
+**/jest.setup.js
+
+# Code Formatters & Linters
+**/.prettier*
+**/eslint.config.js
+**/lint.json
+
+# Markdown documentation (not needed in container)
+**/*.md
+
+# Loose root design/temp assets
+/png.png
+/controller_frontend_map_full.json
