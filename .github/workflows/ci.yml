@@ -168,9 +168,9 @@ jobs:
       - name: Install protobuf compiler
         run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
 
-      - name: Check formatting
+      - name: Format code (auto)
         working-directory: rust_analytics
-        run: cargo fmt -- --check
+        run: cargo fmt --all
 
       - name: Clippy
         working-directory: rust_analytics

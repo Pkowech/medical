@@ -44,6 +44,8 @@ RUN --mount=type=bind,from=proto_context,source=/protos,target=/protos \
     --mount=type=cache,target=/usr/local/cargo/git/db \
     --mount=type=cache,target=/usr/local/cargo/registry/ \
     SQLX_OFFLINE=true cargo build --locked --release || SQLX_OFFLINE=true cargo build --release && \
+    # strip the binary to reduce image size when possible
+    if command -v strip >/dev/null 2>&1; then strip ./target/release/$APP_NAME || true; fi && \
     cp ./target/release/$APP_NAME /bin/server
 
 ################################################################################

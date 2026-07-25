@@ -1,0 +1,71 @@
+name: Build & Deploy Rust Analytics to Render
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE_NAME: rust_analytics
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.set-image.outputs.image }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Set image tag
+        id: set-image
+        run: echo "::set-output name=image::ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHCR_PAT }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./rust_analytics
+          file: ./rust_analytics/Dockerfile
+          push: true
+          tags: ${{ steps.set-image.outputs.image }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    needs: build-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render deploy
+        env:
+          IMAGE: ${{ needs.build-push.outputs.image }}
+        run: |
+          if [ -z "${{ secrets.RENDER_API_KEY_RUST }}" ] || [ -z "${{ secrets.RENDER_SERVICE_ID_RUST }}" ]; then
+            echo "Render secrets not set. Skipping Render deploy.";
+            exit 0;
+          fi
+          curl -s -X POST \
+            -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY_RUST }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"dockerImage\": \"${{ needs.build-push.outputs.image }}\"}" \
+            "https://api.render.com/v1/services/${{ secrets.RENDER_SERVICE_ID_RUST }}/deploys" | jq -r '.' || true
+
+# Required secrets:
+# - GHCR_PAT: Personal access token with "write:packages" (or configure GITHUB_TOKEN permissions)
+# - RENDER_API_KEY_RUST: Render API key with deploy permissions
+# - RENDER_SERVICE_ID_RUST: Render service id for rust_analytics
