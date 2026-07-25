@@ -10,10 +10,11 @@ RUN --mount=type=cache,target=/root/.npm \
     npm install -g pnpm@${PNPM_VERSION}
 
 ################################################################────────────────
+# Full deps (including dev) — needed to run `nest build`
 FROM base AS deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
-    pnpm install --prod --frozen-lockfile --prefer-offline
+    pnpm install --frozen-lockfile --prefer-offline
 
 ################################################################────────────────
 FROM deps AS build

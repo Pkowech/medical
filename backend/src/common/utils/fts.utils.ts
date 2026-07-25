@@ -21,7 +21,7 @@ export class FtsUtils {
                     setweight(to_tsvector('english', coalesce(name, '')), 'A') ||
                     setweight(to_tsvector('english', coalesce(description, '')), 'B') ||
                     setweight(to_tsvector('english', coalesce(array_to_string(tags, ' '), '')), 'C')
-          WHERE id = '${id}';
+          WHERE id = $1;
         `;
         break;
 
@@ -32,7 +32,7 @@ export class FtsUtils {
                     setweight(to_tsvector('english', coalesce(name, '')), 'A') ||
                     setweight(to_tsvector('english', coalesce(description, '')), 'B') ||
                     setweight(to_tsvector('english', coalesce(content, '')), 'C')
-          WHERE id = '${id}';
+          WHERE id = $1;
         `;
         break;
 
@@ -41,7 +41,7 @@ export class FtsUtils {
           UPDATE "topics"
           SET fts = setweight(to_tsvector('english', coalesce(name, '')), 'A') ||
                     setweight(to_tsvector('english', coalesce(description, '')), 'B')
-          WHERE id = '${id}';
+          WHERE id = $1;
         `;
         break;
 
@@ -51,18 +51,14 @@ export class FtsUtils {
           SET fts = setweight(to_tsvector('english', coalesce(title, '')), 'A') ||
                     setweight(to_tsvector('english', coalesce(description, '')), 'B') ||
                     setweight(to_tsvector('english', coalesce(content, '')), 'C')
-          WHERE id = '${id}';
+          WHERE id = $1;
         `;
         break;
     }
 
     if (query) {
-      // Using queryRawUnsafe because table names are parameterized logic but 'id' is safe (uuid)
-      // or we can just inject the ID directly if we trust it (it comes from the app).
-      // Ideally we use parameters: $1, but for UPDATE with specific logic it's often easier to string build standard SQL for invariant parts.
-      // But let's use $1 for ID to be safe.
-      const safeQuery = query.replace(`'${id}'`, '$1');
-      await prisma.$executeRawUnsafe(safeQuery, id);
+      // Properly parameterize the ID using $1 placeholder
+      await prisma.$executeRawUnsafe(query, id);
     }
   }
 }

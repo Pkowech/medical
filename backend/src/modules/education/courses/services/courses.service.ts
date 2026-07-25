@@ -380,32 +380,50 @@ export class CoursesService {
     const skip = (page - 1) * limit;
 
     try {
-      // Build WHERE conditions for filters (applied after FTS)
+      // Build WHERE conditions with proper parameterization
+      const params: unknown[] = [search]; // $1 = search term
       const filterConditions: string[] = [];
+      let paramIndex = 2;
 
       if (status) {
-        filterConditions.push(`c.status = '${status}'`);
+        params.push(status);
+        filterConditions.push(`c.status = $${paramIndex}`);
+        paramIndex++;
       }
       if (categoryId) {
-        filterConditions.push(`c."categoryId" = '${categoryId}'`);
+        params.push(categoryId);
+        filterConditions.push(`c."categoryId" = $${paramIndex}`);
+        paramIndex++;
       }
       if (difficulty) {
-        filterConditions.push(`c.difficulty = '${difficulty}'`);
+        params.push(difficulty);
+        filterConditions.push(`c.difficulty = $${paramIndex}`);
+        paramIndex++;
       }
       if (isFeatured !== undefined) {
-        filterConditions.push(`c."isFeatured" = ${isFeatured}`);
+        params.push(isFeatured);
+        filterConditions.push(`c."isFeatured" = $${paramIndex}`);
+        paramIndex++;
       }
       if (instructorId) {
-        filterConditions.push(`c."createdById" = '${instructorId}'`);
+        params.push(instructorId);
+        filterConditions.push(`c."createdById" = $${paramIndex}`);
+        paramIndex++;
       }
       if (minRating) {
-        filterConditions.push(`c.rating >= ${minRating}`);
+        params.push(minRating);
+        filterConditions.push(`c.rating >= $${paramIndex}`);
+        paramIndex++;
       }
       if (maxPrice !== undefined) {
-        filterConditions.push(`(c.price IS NULL OR c.price <= ${maxPrice})`);
+        params.push(maxPrice);
+        filterConditions.push(`(c.price IS NULL OR c.price <= $${paramIndex})`);
+        paramIndex++;
       }
       if (tags && tags.length > 0) {
-        filterConditions.push(`c.tags && '{${tags.join(',')}}'`);
+        params.push(tags);
+        filterConditions.push(`c.tags && $${paramIndex}`);
+        paramIndex++;
       }
 
       const whereClause =
@@ -413,13 +431,18 @@ export class CoursesService {
           ? ` AND ${filterConditions.join(' AND ')}`
           : '';
 
+      // Add pagination parameters at the end
+      const limitParamIdx = paramIndex;
+      const offsetParamIdx = paramIndex + 1;
+      params.push(limit, skip);
+
       // Count total results with FTS + filters
       const countResult = await this.prisma.$queryRawUnsafe<
         Array<{ total: number }>
       >(
         `SELECT COUNT(*)::int as total FROM "courses" c
          WHERE c.fts @@ plainto_tsquery('english', $1)${whereClause}`,
-        search,
+        ...params.slice(0, paramIndex), // exclude limit/offset for count
       );
       const total = countResult[0]?.total || 0;
 
@@ -430,10 +453,8 @@ export class CoursesService {
          FROM "courses" c
          WHERE c.fts @@ plainto_tsquery('english', $1)${whereClause}
          ORDER BY relevance DESC, c."createdAt" DESC
-         LIMIT $2 OFFSET $3`,
-        search,
-        limit,
-        skip,
+         LIMIT $${limitParamIdx} OFFSET $${offsetParamIdx}`,
+        ...params,
       );
 
       const result = {

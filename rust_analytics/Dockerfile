@@ -7,7 +7,7 @@ ARG APP_NAME=rust_analytics
 # Fallback stage for additional build context 'protos' if not supplied externally.
 FROM alpine:3.18 AS proto_context
 WORKDIR /protos
-RUN --mount=type=bind,source=.,target=/tmp/ctx \
+RUN --mount=type=bind,from=protos,source=.,target=/tmp/ctx,required=false \
     if [ -f /tmp/ctx/analytics.proto ]; then \
       mkdir -p /protos && cp /tmp/ctx/analytics.proto /protos/analytics.proto; \
     elif [ -d /tmp/ctx/protos ]; then \

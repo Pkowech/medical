@@ -1,8 +1,10 @@
 'use client';
 
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { useSearch, SearchResult } from '@/features/search/hooks/useSearch';
+import { useSearch } from '@/features/search/hooks/useSearch';
 import Link from 'next/link';
+import { AlertCircle, RotateCcw, Zap } from 'lucide-react';
+import { formatSearchMetrics, getRelevanceLevel, getRelevanceColorClasses, isRetryableError } from '@/features/search/utils/searchUtils';
 
 interface SearchResultsProps {
   initialQuery?: string;
@@ -17,9 +19,10 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
   const [filter, setFilter] = useState(initialFilter);
   const [page, setPage] = useState(1);
   const limit = 20;
-  const { results, total, loading, search, facets, expandedQuery, synonymsMatched } = useSearch();
+  const { results, total, loading, search, facets, expandedQuery, error, retry, metrics } = useSearch();
   const itemRefs = useRef<Array<HTMLAnchorElement | null>>([]);
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
+  const isRetryable = error && isRetryableError(error.code);
 
   // Clear item refs when results change
   useEffect(() => {
@@ -144,9 +147,34 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
             </div>
           )}
 
+          {/* Error Recovery Card */}
+          {error && (
+            <div className="mb-6 px-6 py-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl flex items-start gap-4">
+              <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 mt-0.5 shrink-0" />
+              <div className="flex-1">
+                <h3 className="font-semibold text-red-900 dark:text-red-200 mb-1">Search Error</h3>
+                <p className="text-sm text-red-800 dark:text-red-300 mb-3">{error.message}</p>
+                {isRetryable && (
+                  <button
+                    onClick={() => retry()}
+                    className="inline-flex items-center gap-2 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors"
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                    Retry Search
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="mb-4 flex justify-between items-center px-2">
             <div className="text-sm text-gray-500">
               Found <span className="font-bold text-gray-900">{total}</span> results
+              {metrics?.totalTime && (
+                <span className="ml-3 text-gray-400">
+                  ({formatSearchMetrics(metrics.totalTime).display})
+                </span>
+              )}
             </div>
           </div>
 
@@ -160,12 +188,23 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
               else if (r.type === 'quiz') href = `/quiz/${r.id}`;
               else if (r.type === 'case') href = `/clinical-cases/${r.id}`;
 
+              const relevanceLevel = getRelevanceLevel(r.relevance);
+              const relevanceColors = getRelevanceColorClasses(r.relevance);
+
               return (
-                <div key={`${r.type}-${r.id}`} className="group relative bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md hover:border-blue-100 transition-all">
-                  <Link href={href} className="flex flex-col gap-2">
+                <div 
+                  key={`${r.type}-${r.id}`} 
+                  className={`group relative bg-white p-6 rounded-2xl shadow-sm border hover:shadow-md hover:border-blue-100 transition-all ${relevanceColors.border || 'border-gray-100'}`}
+                >
+                  <Link 
+                    ref={el => { if (el) itemRefs.current[idx] = el; }}
+                    href={href} 
+                    className="flex flex-col gap-2"
+                    aria-label={`${r.title} - ${r.type}`}
+                  >
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
                           <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-md ${
                             r.type === 'course' ? 'bg-blue-100 text-blue-700' :
                             r.type === 'material' ? 'bg-orange-100 text-orange-700' :
@@ -175,8 +214,12 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
                             {r.type}
                           </span>
                           {r.relevance > 0.8 && (
-                            <span className="text-[10px] font-bold text-green-600 uppercase tracking-widest">High Match</span>
+                            <span className="text-[10px] font-bold text-green-600 uppercase tracking-widest px-2 py-0.5 bg-green-50 rounded-md">High Match</span>
                           )}
+                          {/* Relevance badge */}
+                          <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-md ${relevanceColors.bg}`}>
+                            <span className={relevanceColors.text}>{relevanceLevel}</span>
+                          </span>
                         </div>
                         <h2 className="text-xl font-bold text-gray-900 group-hover:text-blue-600 transition-colors">
                           {r.title}
@@ -193,16 +236,19 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
                     <div 
                       className="text-gray-600 text-sm leading-relaxed"
                       dangerouslySetInnerHTML={{ 
-                        __html: (r as any).snippet || r.description || '' 
+                        __html: ((r as unknown as { snippet?: string }).snippet) || r.description || '' 
                       }}
+                      role="region"
+                      aria-label={`Content preview for ${r.title}`}
                     />
                   </Link>
                 </div>
               );
             })}
 
-            {results.length === 0 && !loading && (
+            {results.length === 0 && !loading && !error && (
               <div className="text-center py-20 bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200">
+                <Zap className="h-12 w-12 text-gray-300 mx-auto mb-4" />
                 <div className="text-gray-400 mb-2">No matches found for your query.</div>
                 <p className="text-sm text-gray-500">Try broadening your search or using medical terminology.</p>
               </div>

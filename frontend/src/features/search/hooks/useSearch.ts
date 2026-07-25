@@ -1,10 +1,21 @@
-import { useCallback, useState, useRef } from 'react';
-import { apiService } from '@/features/auth/services/apiClient';
+import { useCallback, useState, useRef, useEffect } from 'react';
+import { SearchError, searchEntities } from '../services/searchService';
+import { SEARCH_CONFIG } from '../config/searchConfig';
 
-export interface SearchError {
+export interface SearchMetrics {
+  queryTime: number;
+  totalTime: number;
+  resultCount: number;
+  cacheHit?: boolean;
+  retryAttempts?: number;
+}
+
+export interface SearchErrorInfo {
   message: string;
-  code?: string;
+  code: string;
   statusCode?: number;
+  retryable: boolean;
+  timestamp: number;
 }
 
 export interface SearchResult {
@@ -15,97 +26,178 @@ export interface SearchResult {
   relevance: number;
   fileType: string;
   instructor?: { name: string };
+  snippet?: string;
+  metadata?: Record<string, string | number | boolean>;
 }
 
-export function useSearch() {
+export interface UseSearchReturn {
+  results: SearchResult[];
+  total: number;
+  facets: Record<string, number>;
+  expandedQuery?: string;
+  synonymsMatched: string[];
+  loading: boolean;
+  error: SearchErrorInfo | null;
+  search: (query: string, type?: string, page?: number, limit?: number, contextType?: string, contextId?: string) => Promise<void>;
+  clearSearch: () => void;
+  retry: () => Promise<void>;
+  metrics: SearchMetrics | null;
+}
+
+export interface SearchParams {
+  query: string;
+  type?: string;
+  page: number;
+  limit: number;
+  contextType?: string;
+  contextId?: string;
+}
+
+/**
+ * Industrial-grade search hook with metrics, error handling, and retry logic
+ */
+export function useSearch(): UseSearchReturn {
+  // Results state
   const [results, setResults] = useState<SearchResult[]>([]);
   const [total, setTotal] = useState(0);
   const [facets, setFacets] = useState<Record<string, number>>({});
   const [expandedQuery, setExpandedQuery] = useState<string | undefined>();
   const [synonymsMatched, setSynonymsMatched] = useState<string[]>([]);
+
+  // Loading and error state
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<SearchError | null>(null);
+  const [error, setError] = useState<SearchErrorInfo | null>(null);
+
+  // Metrics state
+  const [metrics, setMetrics] = useState<SearchMetrics | null>(null);
+
+  // Refs for cleanup and retry logic
   const abortRef = useRef<AbortController | null>(null);
+  const lastSearchParamsRef = useRef<SearchParams | null>(null);
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const search = useCallback(async (
-    query: string,
-    type: string = 'all',
-    page = 1,
-    limit = 10,
-    contextType?: string,
-    contextId?: string
-  ) => {
-    // Abort previous request
-    if (abortRef.current) abortRef.current.abort();
+  /**
+   * Perform search with full error handling and analytics
+   */
+  const search = useCallback(
+    async (
+      query: string,
+      type: string = 'all',
+      page = 1,
+      limit: number = SEARCH_CONFIG.DEFAULT_PAGE_SIZE,
+      contextType?: string,
+      contextId?: string
+    ) => {
+      // Abort previous request
+      if (abortRef.current) {
+        abortRef.current.abort();
+      }
 
-    // Clear empty or too-short queries (backend requires min 2 chars)
-    if (!query || query.trim().length < 2) {
-      setResults([]);
-      setTotal(0);
-      setFacets({});
-      setExpandedQuery(undefined);
-      setSynonymsMatched([]);
-      setError(null);
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-    const ctrl = new AbortController();
-    abortRef.current = ctrl;
-
-    try {
-      const params: Record<string, string> = {
-        query,
-        page: String(page),
-        limit: String(limit),
-      };
-      
-      if (type && type !== 'all') params.type = type;
-      if (contextType) params.contextType = contextType;
-      if (contextId) params.contextId = contextId;
-
-      const response = await apiService.get<{ 
-        results: SearchResult[]; 
-        total: number;
-        facets?: Record<string, number>;
-        expandedQuery?: string;
-        synonymsMatched?: string[];
-      }>('/search', {
-        params,
-        signal: ctrl.signal,
-      });
-
-      // response.data contains the { results, total, facets, expandedQuery, synonymsMatched } object
-      setResults(response.data.results || []);
-      setTotal(response.data.total || 0);
-      setFacets(response.data.facets || {});
-      setExpandedQuery(response.data.expandedQuery);
-      setSynonymsMatched(response.data.synonymsMatched || []);
-
-    } catch (err: unknown) {
-      // Handle abort signal
-      if (typeof err === 'object' && err !== null) {
-        const e = err as Record<string, unknown>;
-        if (e.name === 'AbortError' || e.code === 'ERR_CANCELED') return;
-
-        const message = typeof e.message === 'string' ? e.message : 'Search failed. Please try again.';
-        setError({
-          message,
-          code: (typeof e.code === 'string' && e.code) || 'UNKNOWN',
-          statusCode: (typeof e.status === 'number' && e.status) || 500,
-        });
+      // Clear empty or too-short queries
+      if (!query || query.trim().length < SEARCH_CONFIG.MIN_QUERY_LENGTH) {
         setResults([]);
         setTotal(0);
         setFacets({});
-        console.error('Search error:', e);
-      } else {
-        setError({ message: 'Search failed. Please try again.', code: 'UNKNOWN', statusCode: 500 });
+        setExpandedQuery(undefined);
+        setSynonymsMatched([]);
+        setError(null);
+        setMetrics(null);
+        return;
       }
-    } finally {
-      setLoading(false);
+
+      setLoading(true);
+      setError(null);
+      const startTime = performance.now();
+      const ctrl = new AbortController();
+      abortRef.current = ctrl;
+
+      // Save search params for retry
+      lastSearchParamsRef.current = { query, type, page, limit, contextType, contextId };
+
+      try {
+        const response = await searchEntities({
+          query,
+          type: type !== 'all' ? type : undefined,
+          page,
+          limit,
+          courseContextId: contextId,
+          contextType,
+        });
+
+        // Process response
+        setResults((response.results || []) as SearchResult[]);
+        setTotal(response.total || 0);
+        setFacets(response.facets || {});
+        setExpandedQuery(response.expandedQuery);
+        setSynonymsMatched(response.synonymsMatched || []);
+
+        // Record metrics
+        const totalTime = performance.now() - startTime;
+        setMetrics({
+          queryTime: response.metrics?.queryTime || totalTime,
+          totalTime,
+          resultCount: response.results?.length || 0,
+        });
+
+        // Track search analytics (non-blocking)
+        trackSearchAnalytics({
+          query,
+          type,
+          resultCount: response.results?.length || 0,
+          totalFound: response.total || 0,
+          responseTime: totalTime,
+        }).catch(err => {
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('Analytics error:', err);
+          }
+        });
+      } catch (err: unknown) {
+        // Handle abort signal
+        if (err instanceof Error && err.name === 'AbortError') {
+          return;
+        }
+
+        // Process error
+        let errorInfo: SearchErrorInfo;
+        if (err instanceof SearchError) {
+          errorInfo = {
+            message: err.message,
+            code: err.code,
+            statusCode: err.statusCode,
+            retryable: err.retryable,
+            timestamp: Date.now(),
+          };
+        } else {
+          errorInfo = {
+            message: 'An unexpected error occurred during search',
+            code: 'UNKNOWN',
+            retryable: true,
+            timestamp: Date.now(),
+          };
+        }
+
+        setError(errorInfo);
+        setResults([]);
+        setTotal(0);
+        setFacets({});
+        console.error('Search error:', err);
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
+
+  /**
+   * Retry last search
+   */
+  const retry = useCallback(async () => {
+    if (!lastSearchParamsRef.current) {
+      return;
     }
-  }, []);
+    const { query, type, page, limit, contextType, contextId } = lastSearchParamsRef.current;
+    await search(query, type, page, limit, contextType, contextId);
+  }, [search]);
 
   /**
    * Clear current search and errors
@@ -117,9 +209,25 @@ export function useSearch() {
     setExpandedQuery(undefined);
     setSynonymsMatched([]);
     setError(null);
+    setMetrics(null);
     if (abortRef.current) {
       abortRef.current.abort();
     }
+    lastSearchParamsRef.current = null;
+  }, []);
+
+  /**
+   * Cleanup on unmount
+   */
+  useEffect(() => {
+    return () => {
+      if (abortRef.current) {
+        abortRef.current.abort();
+      }
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
   }, []);
 
   return {
@@ -132,5 +240,34 @@ export function useSearch() {
     error,
     search,
     clearSearch,
-  } as const;
+    retry,
+    metrics,
+  };
+}
+
+/**
+ * Track search analytics (non-blocking)
+ */
+async function trackSearchAnalytics(data: {
+  query: string;
+  type: string;
+  resultCount: number;
+  totalFound: number;
+  responseTime: number;
+}): Promise<void> {
+  if (!SEARCH_CONFIG.FEATURES.ENABLE_SEARCH_ANALYTICS) {
+    return;
+  }
+
+  try {
+    // This would integrate with your analytics service
+    // For now, just log to console in development
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('Search analytics:', data);
+    }
+  } catch (error) {
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('Failed to track search analytics:', error);
+    }
+  }
 }

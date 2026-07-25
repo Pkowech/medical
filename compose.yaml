@@ -157,29 +157,6 @@ services:
       retries: 3
       start_period: 30s
 
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      target: final
-    container_name: medtrack_frontend_prod
-    restart: unless-stopped
-    ports:
-      - "${FRONTEND_PORT}:3000"
-    environment:
-      NODE_ENV: production
-      NEXT_PUBLIC_API_URL: http://backend:${BACKEND_PORT}
-      NEXTAUTH_URL: http://localhost:${FRONTEND_PORT} # Update with actual production domain if deployed
-      NEXT_TELEMETRY_DISABLED: 1
-    depends_on:
-      backend:
-        condition: service_healthy
-    networks:
-      - medtrack_net
-    secrets:
-      - nextauth_secret
-    command: pnpm start
-
   prometheus:
     image: prom/prometheus:v2.47.0
     container_name: medtrack_prometheus

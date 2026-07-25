@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import {
   Menu,
   Search,
@@ -17,7 +17,6 @@ import { HeaderProps } from '@/shared/types/navigationInterface';
 
 // Local types to avoid `any`
 type Activity = { date?: string; createdAt?: string; timestamp?: string; time?: string; datetime?: string; startedAt?: string };
-interface SearchResult { id: string; title?: string; name?: string; type?: string; description?: string; fileType?: string; instructor?: { name?: string }; }
 
 import { useRouter, usePathname, useParams } from 'next/navigation';
 import { useSearch, SearchResult as HookSearchResult } from '@/features/search/hooks/useSearch';
@@ -27,6 +26,10 @@ import { SearchResultItem } from './SearchResultItem';
 import { usePageHeader } from '@/core/providers/HeaderContext';
 import { UserMenu } from './UserMenu';
 import { useMediaQuery } from '@/shared/hooks/useMediaQuery';
+import { searchHistoryService } from '@/features/search/services/searchHistoryService';
+import { SEARCH_CONFIG } from '@/features/search/config/searchConfig';
+import { matchesKeyboardShortcut, isRetryableError } from '@/features/search/utils/searchUtils';
+import { RotateCcw, Clock } from 'lucide-react';
 
 export const AppHeader: React.FC<HeaderProps> = ({
   theme,
@@ -106,12 +109,16 @@ export const AppHeader: React.FC<HeaderProps> = ({
   const userMenuButtonRef = useRef<HTMLButtonElement>(null);
 
   // Search hook
-  const { search, results: searchResults, loading: isSearching, error: searchHookError, clearSearch, expandedQuery, synonymsMatched } = useSearch();
+  const { search, results: searchResults, loading: isSearching, error: searchHookError, clearSearch, expandedQuery, synonymsMatched, retry } = useSearch();
   const searchError = searchHookError?.message || null;
+  const isRetryable = searchHookError && isRetryableError(searchHookError.code);
 
   // Search state (local + results)
   const [localQuery, setLocalQuery] = useState(searchQuery || '');
+  const [showSearchHistory, setShowSearchHistory] = useState(false);
   const searchTimeout = useRef<number | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchHistoryRef = useRef<HTMLDivElement>(null);
 
   // Detect context
   const pathname = usePathname();
@@ -164,6 +171,42 @@ export const AppHeader: React.FC<HeaderProps> = ({
     }
   }, [headerUserMenuOpen, setHeaderUserMenuOpen]);
 
+  // Handle click outside search history
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (
+        searchHistoryRef.current &&
+        searchInputRef.current &&
+        !searchHistoryRef.current.contains(target) &&
+        !searchInputRef.current.contains(target)
+      ) {
+        setShowSearchHistory(false);
+      }
+    };
+
+    if (showSearchHistory) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showSearchHistory]);
+
+  // Handle keyboard shortcuts (Cmd+K / Ctrl+K to focus search)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (matchesKeyboardShortcut(e, SEARCH_CONFIG.KEYBOARD_SHORTCUTS.OPEN_SEARCH)) {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        setShowSearchHistory(true);
+      } else if (e.key === 'Escape' && showSearchHistory) {
+        setShowSearchHistory(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showSearchHistory]);
+
   // Sync external searchQuery prop into localQuery when it changes externally
   useEffect(() => {
     setLocalQuery(searchQuery || '');
@@ -181,7 +224,16 @@ export const AppHeader: React.FC<HeaderProps> = ({
     // debounce 300ms
     searchTimeout.current = window.setTimeout(() => {
       search(q, selectedFilter, 1, 6, contextType, contextId);
+      if (q.trim()) {
+        searchHistoryService.addToHistory(q, selectedFilter, searchResults.length);
+      }
     }, 300);
+  };
+
+  const handleSelectFromHistory = (historyQuery: string) => {
+    setLocalQuery(historyQuery);
+    setShowSearchHistory(false);
+    search(historyQuery, selectedFilter, 1, 6, contextType, contextId);
   };
 
   useEffect(() => {
@@ -219,7 +271,7 @@ export const AppHeader: React.FC<HeaderProps> = ({
                     {header.title}
                   </h1>
                   {header.description && (
-                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate hidden md:block max-w-[200px] lg:max-w-md">
+                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate hidden md:block max-w-50 lg:max-w-md">
                       {header.description}
                     </p>
                   )}
@@ -261,13 +313,44 @@ export const AppHeader: React.FC<HeaderProps> = ({
             <div className="relative max-w-xs">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <input
+                ref={searchInputRef}
                 type="text"
-                placeholder="Search resources..."
+                placeholder="Search resources... (Cmd+K)"
                 value={localQuery}
                 onChange={e => handleSearchChange(e.target.value)}
-                aria-label="Search resources"
+                onFocus={() => !localQuery && setShowSearchHistory(true)}
+                aria-label="Search resources (use Cmd+K to focus)"
                 className="pl-10 pr-4 py-2 w-32 sm:w-48 md:w-64 lg:w-72 rounded-xl border border-gray-200 bg-white/50 dark:bg-slate-800/50 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-600 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all text-sm"
               />
+
+              {/* Search History Dropdown */}
+              {showSearchHistory && !localQuery && (
+                <div ref={searchHistoryRef} className="absolute left-0 right-0 mt-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl z-50 overflow-hidden max-h-48 overflow-y-auto">
+                  <div className="px-4 py-2 bg-gray-50 dark:bg-gray-750 border-b border-gray-100 dark:border-gray-700 sticky top-0">
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-3 w-3 text-gray-400" />
+                      <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Recent Searches</p>
+                    </div>
+                  </div>
+                  <ul className="divide-y divide-gray-100 dark:divide-gray-700">
+                    {searchHistoryService.getRecentSearches(5).map((item) => (
+                      <li key={item.query}>
+                        <button
+                          onClick={() => handleSelectFromHistory(item.query)}
+                          className="w-full text-left px-4 py-2 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors text-sm text-gray-700 dark:text-gray-300"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span>{item.query}</span>
+                            {item.resultCount !== undefined && (
+                              <span className="text-xs text-gray-400 dark:text-gray-600">{item.resultCount} results</span>
+                            )}
+                          </div>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
 
               {/* Results dropdown (z-50) */}
               {(searchResults.length > 0 || expandedQuery || synonymsMatched.length > 0) && (
@@ -297,8 +380,17 @@ export const AppHeader: React.FC<HeaderProps> = ({
                 </div>
               )}
               {searchError && (
-                <div className="absolute right-2 top-1/2 transform -translate-y-1/2 text-xs text-red-500 font-medium">
+                <div className="absolute right-2 top-1/2 transform -translate-y-1/2 text-xs text-red-500 font-medium flex items-center gap-1">
                   {searchError}
+                  {isRetryable && (
+                    <button
+                      onClick={() => retry()}
+                      className="ml-1 px-2 py-1 bg-red-50 hover:bg-red-100 rounded text-red-600 transition-colors inline-flex items-center gap-1"
+                      title="Retry search"
+                    >
+                      <RotateCcw className="h-3 w-3" />
+                    </button>
+                  )}
                 </div>
               )}
               {isSearching && !searchError && (
@@ -499,12 +591,37 @@ export const AppHeader: React.FC<HeaderProps> = ({
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
             <input
               type="text"
-              placeholder="Search..."
+              placeholder="Search... (Cmd+K)"
               value={localQuery}
               onChange={e => handleSearchChange(e.target.value)}
+              onFocus={() => !localQuery && setShowSearchHistory(true)}
               aria-label="Search"
               className="w-full pl-10 pr-3 py-2 text-sm rounded-lg border border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-500"
             />
+
+            {/* Mobile Search History */}
+            {showSearchHistory && !localQuery && (
+              <div ref={searchHistoryRef} className="absolute left-0 right-0 mt-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl z-50 overflow-hidden max-h-48 overflow-y-auto">
+                <div className="px-4 py-2 bg-gray-50 dark:bg-gray-750 border-b border-gray-100 dark:border-gray-700 sticky top-0">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-3 w-3 text-gray-400" />
+                    <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Recent</p>
+                  </div>
+                </div>
+                <ul className="divide-y divide-gray-100 dark:divide-gray-700">
+                  {searchHistoryService.getRecentSearches(5).map((item) => (
+                    <li key={item.query}>
+                      <button
+                        onClick={() => handleSelectFromHistory(item.query)}
+                        className="w-full text-left px-4 py-2 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors text-sm text-gray-700 dark:text-gray-300"
+                      >
+                        {item.query}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             {(searchResults.length > 0 || expandedQuery || synonymsMatched.length > 0) && (
               // Mobile search results dropdown (z-50)
@@ -534,8 +651,17 @@ export const AppHeader: React.FC<HeaderProps> = ({
               </div>
             )}
             {searchError && (
-              <div className="absolute right-2 top-1/2 transform -translate-y-1/2 text-xs text-red-500 font-medium">
+              <div className="absolute right-2 top-1/2 transform -translate-y-1/2 text-xs text-red-500 font-medium flex items-center gap-1">
                 {searchError}
+                {isRetryable && (
+                  <button
+                    onClick={() => retry()}
+                    className="ml-1 px-2 py-1 bg-red-50 hover:bg-red-100 rounded text-red-600 transition-colors inline-flex items-center gap-1"
+                    title="Retry search"
+                  >
+                    <RotateCcw className="h-3 w-3" />
+                  </button>
+                )}
               </div>
             )}
             {isSearching && !searchError && (
