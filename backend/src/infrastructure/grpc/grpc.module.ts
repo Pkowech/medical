@@ -94,6 +94,6 @@ if (process.env.ENABLE_GRPC !== 'true') {
 @Module({
   imports: grpcImports,
   providers: grpcProviders,
-  exports: enableGrpc ? [ClientsModule, 'ANALYTICS_PACKAGE'] : ['ANALYTICS_PACKAGE'],
+  exports: enableGrpc ? [ClientsModule] : ['ANALYTICS_PACKAGE'],
 })
 export class GrpcModule {}
