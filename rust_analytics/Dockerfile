@@ -5,13 +5,13 @@ ARG APP_NAME=rust_analytics
 
 ################################################################################
 # Fallback stage for additional build context 'protos' if not supplied externally.
-FROM alpine:3.18 AS protos
+FROM alpine:3.18 AS proto_context
 WORKDIR /protos
 RUN --mount=type=bind,source=.,target=/tmp/ctx \
-    if [ -d /tmp/ctx/protos ]; then \
-      cp -r /tmp/ctx/protos/* /protos/ 2>/dev/null || true; \
-    elif [ -d /tmp/ctx/../protos ]; then \
-      cp -r /tmp/ctx/../protos/* /protos/ 2>/dev/null || true; \
+    if [ -f /tmp/ctx/analytics.proto ]; then \
+      mkdir -p /protos && cp /tmp/ctx/analytics.proto /protos/analytics.proto; \
+    elif [ -d /tmp/ctx/protos ]; then \
+      mkdir -p /protos && cp -r /tmp/ctx/protos/* /protos/ 2>/dev/null || true; \
     fi
 
 ################################################################################
@@ -19,15 +19,16 @@ RUN --mount=type=bind,source=.,target=/tmp/ctx \
 FROM rust:${RUST_VERSION}-alpine AS build
 ARG APP_NAME
 ARG CARGO_BUILD_JOBS=8
+ARG SQLX_OFFLINE=true
 WORKDIR /app
 
 # Optimization flags for faster builds
-ENV SQLX_OFFLINE=false
+ENV SQLX_OFFLINE=${SQLX_OFFLINE}
 ENV CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS}
 ENV RUSTFLAGS="-C embed-bitcode=no"
 
 # Install build dependencies
-RUN apk add --no-cache clang lld musl-dev git protobuf-dev protoc
+RUN apk add --no-cache clang lld musl-dev git protobuf-dev protoc pkgconfig
 
 # Copy crate files with better layer caching
 RUN --mount=type=bind,source=.,target=/tmp/ctx \
@@ -43,12 +44,11 @@ RUN --mount=type=bind,source=.,target=/tmp/ctx \
     fi && \
     find /app/.sqlx -name '*.json' 2>/dev/null | wc -l
 
-# Build with mount caches
-RUN --mount=type=bind,from=protos,source=.,target=/protos \
+RUN --mount=type=bind,from=proto_context,source=.,target=/protos \
     --mount=type=cache,target=/app/target/ \
     --mount=type=cache,target=/usr/local/cargo/git/db \
     --mount=type=cache,target=/usr/local/cargo/registry/ \
-    cargo build --locked --release && \
+    SQLX_OFFLINE=true cargo build --locked --release && \
     cp ./target/release/$APP_NAME /bin/server
 
 ################################################################################

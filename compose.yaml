@@ -62,6 +62,7 @@ services:
       target: final
       args:
         DATABASE_URL: ${DATABASE_URL:?DATABASE_URL must be set}
+        SQLX_OFFLINE: ${SQLX_OFFLINE:-true}
     container_name: medtrack_backend_prod
     restart: unless-stopped
     env_file:
@@ -124,6 +125,8 @@ services:
       dockerfile: Dockerfile
       additional_contexts:
         protos: ./protos
+      args:
+        SQLX_OFFLINE: ${SQLX_OFFLINE:-true}
     container_name: medtrack_rust_analytics_prod
     restart: unless-stopped
     env_file:

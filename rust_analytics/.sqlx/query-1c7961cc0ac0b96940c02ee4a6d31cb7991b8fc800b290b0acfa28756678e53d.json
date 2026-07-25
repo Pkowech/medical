@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT t.name FROM user_skill_states uss\n            JOIN topics t ON uss.skill_id = t.id\n            WHERE uss.user_id = $1\n            ORDER BY uss.p_known ASC\n            LIMIT 5\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "name",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "1c7961cc0ac0b96940c02ee4a6d31cb7991b8fc800b290b0acfa28756678e53d"
+}

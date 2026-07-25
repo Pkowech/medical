@@ -50,6 +50,20 @@ sqlx database create
 sqlx migrate run
 ```
 
+## Production / CI
+
+This crate ships committed `.sqlx/*.json` metadata so production Docker builds can be fully hermetic.
+The `rust_analytics/Dockerfile` no longer installs `sqlx-cli` during image build and does not require a live `DATABASE_URL` connection at build time.
+
+If you change a query, regenerate the metadata locally or in a dedicated CI job with:
+
+```bash
+cargo install sqlx-cli --no-default-features --features postgres,rustls
+cargo sqlx prepare -- --lib
+```
+
+Then commit the updated `.sqlx/*.json` files before building the container.
+
 ## Usage Pattern
 
 ### Basic Query with Type Checking

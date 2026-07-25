@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT t.name as \"topic_name!\", uss.p_known as \"p_known!\"\n        FROM user_skill_states uss\n        JOIN topics t ON uss.skill_id = t.id\n        WHERE uss.user_id = $1\n        ORDER BY uss.p_known DESC\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "topic_name!",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "p_known!",
+        "type_info": "Float8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "84fea4f6fde80c04d45c7833e65f96605507665e45a9fdb6d92ef55c57d89070"
+}

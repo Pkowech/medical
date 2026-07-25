@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT COUNT(*) FROM course_progress WHERE status::text = 'completed' OR status::text = 'COMPLETED'",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "17cf4c0eeb02b2f74f487967ffd460d5b1d29b24db06b052171fdfe484a024b2"
+}
