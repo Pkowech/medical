@@ -108,6 +108,7 @@ export class SearchService {
 
   /**
    * Search against the GlobalSearchIndex table using Full-Text Search and Trigram similarity
+   * Properly parameterizes all user inputs to prevent SQL injection.
    */
   private async executeWithFts(
     expandedQuery: string,
@@ -117,72 +118,103 @@ export class SearchService {
     limit: number,
     courseContextId?: string,
   ): Promise<{ results: any[]; total: number; facets: Record<string, number> }> {
-    const offset = (page - 1) * limit;
-    const typeFilter = type ? `AND entity_type = '${type}'` : '';
-    const contextFilter = courseContextId 
-      ? `AND (metadata->>'courseId' = '${courseContextId}' OR metadata->>'courseContextId' = '${courseContextId}')` 
-      : '';
-
-    const ftsQuery = this.formatFtsQuery(expandedQuery);
-    
-    // 1. Calculate Total Count (combining FTS and Fuzzy Trigram)
-    const countQuery = `
-      SELECT COUNT(*)::int as total 
-      FROM "global_search_index"
-      WHERE (fts @@ to_tsquery('english', $1))
-      OR (title % $2)
-      ${typeFilter} ${contextFilter}
-    `;
-
-    const countResult = await this.prisma.$queryRawUnsafe<Array<{ total: number }>>(
-      countQuery,
-      ftsQuery,
-      originalQuery,
+    // Enforce search timeout using a race condition
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new InternalServerErrorException('Search operation exceeded timeout')), this.SEARCH_TIMEOUT_MS)
     );
-    const total = countResult[0]?.total || 0;
 
-    // 2. Fetch results with ranking and snippets
-    // We use ts_rank_cd for better density-based ranking and ts_headline for highlighting
+    const searchPromise = this.performSearch(expandedQuery, originalQuery, type, page, limit, courseContextId);
+    return Promise.race([searchPromise, timeoutPromise]);
+  }
+
+  /**
+   * Internal search implementation with proper parameter binding
+   */
+  private async performSearch(
+    expandedQuery: string,
+    originalQuery: string,
+    type: string | undefined,
+    page: number,
+    limit: number,
+    courseContextId?: string,
+  ): Promise<{ results: any[]; total: number; facets: Record<string, number> }> {
+    const offset = (page - 1) * limit;
+
+    // Build parameter array and filter clauses with proper placeholders
+    const params: unknown[] = [expandedQuery, originalQuery];
+    let typeFilterForResults = '';
+    let contextFilterForResults = '';
+    let contextFilterForFacets = '';
+
+    // Parameterize type filter
+    if (type) {
+      params.push(type);
+      const typeParamIdx = params.length;
+      typeFilterForResults = `AND entity_type = $${typeParamIdx}`;
+    }
+
+    // Parameterize context filter (uses same parameter for both OR conditions)
+    if (courseContextId) {
+      params.push(courseContextId);
+      const contextParamIdx = params.length;
+      contextFilterForResults = `AND (metadata->>'courseId' = $${contextParamIdx} OR metadata->>'courseContextId' = $${contextParamIdx})`;
+      contextFilterForFacets = `AND (metadata->>'courseId' = $${contextParamIdx} OR metadata->>'courseContextId' = $${contextParamIdx})`;
+    }
+
+    // Use websearch_to_tsquery for robust handling of arbitrary user text (handles quotes, hyphens, etc.)
+    // Fallback to to_tsquery if websearch_to_tsquery unavailable in this PostgreSQL version
+    const usesWebsearch = true; // Set to false if your PG version doesn't support websearch_to_tsquery
+    const tsqueryFunc = usesWebsearch ? 'websearch_to_tsquery' : 'to_tsquery';
+    const tsqueryCall = usesWebsearch ? `${tsqueryFunc}('english', $1)` : `${tsqueryFunc}('english', $1)`;
+
+    // 1. Fetch results with ranking, snippets, and total count in one query (using window function)
     const resultsQuery = `
       SELECT 
         entity_id as id, 
         entity_type as type, 
         title, 
         description, 
-        ts_rank_cd(fts, to_tsquery('english', $1), 32)::float8 as fts_relevance,
+        ts_rank_cd(fts, ${tsqueryCall}, 32)::float8 as fts_relevance,
         similarity(title, $2)::float8 as trgm_relevance,
-        ts_headline('english', coalesce(content, description, ''), to_tsquery('english', $1), 
-          'StartSel=<mark>, StopSel=</mark>, MaxWords=35, MinWords=15, ShortWord=3, HighlightAll=FALSE') as snippet
+        ts_headline('english', coalesce(content, description, ''), ${tsqueryCall}, 
+          'StartSel=<mark>, StopSel=</mark>, MaxWords=35, MinWords=15, ShortWord=3, HighlightAll=FALSE') as snippet,
+        COUNT(*)::int OVER() as total_count
       FROM "global_search_index"
-      WHERE (fts @@ to_tsquery('english', $1))
+      WHERE (fts @@ ${tsqueryCall})
       OR (title % $2)
-      ${typeFilter} ${contextFilter}
+      ${typeFilterForResults} ${contextFilterForResults}
       ORDER BY (fts_relevance * 0.8 + trgm_relevance * 0.2) DESC, created_at DESC
-      LIMIT $3 OFFSET $4
+      LIMIT $${params.length + 1} OFFSET $${params.length + 2}
     `;
 
     const results = await this.prisma.$queryRawUnsafe<any[]>(
       resultsQuery,
-      ftsQuery,
-      originalQuery,
+      ...params,
       limit,
       offset,
     );
 
-    // 3. Calculate Facets (Result counts per type)
+    const total = results.length > 0 ? results[0].total_count : 0;
+
+    // 2. Calculate Facets (Result counts per type)
+    // Reuse base parameters but rebuild facets filter without typeFilter
+    const facetsParams = [expandedQuery, originalQuery];
+    if (courseContextId) {
+      facetsParams.push(courseContextId);
+    }
+
     const facetsQuery = `
       SELECT entity_type as type, COUNT(*)::int as count
       FROM "global_search_index"
-      WHERE (fts @@ to_tsquery('english', $1))
+      WHERE (fts @@ ${tsqueryCall})
       OR (title % $2)
-      ${contextFilter}
+      ${contextFilterForFacets}
       GROUP BY entity_type
     `;
 
     const facetsResult = await this.prisma.$queryRawUnsafe<Array<{ type: string; count: number }>>(
       facetsQuery,
-      ftsQuery,
-      originalQuery,
+      ...facetsParams,
     );
 
     const facets = facetsResult.reduce(
@@ -192,22 +224,17 @@ export class SearchService {
 
     return {
       results: results.map((r) => ({
-        ...r,
+        id: r.id,
+        type: r.type,
+        title: r.title,
+        description: r.description,
+        snippet: r.snippet,
         relevance: Math.min(1, (r.fts_relevance || 0) + (r.trgm_relevance || 0)),
         fileType: this.getFileType(r.type),
       })),
       total,
       facets,
     };
-  }
-
-  private formatFtsQuery(query: string): string {
-    // If it already has operators (| or &), assume it's expanded
-    if (query.includes('|') || query.includes('&')) {
-      return query;
-    }
-    // Otherwise, turn "heart attack" into "heart & attack"
-    return query.trim().split(/\s+/).join(' & ');
   }
 
   private async trackSearchAnalytics(
@@ -233,7 +260,7 @@ export class SearchService {
     );
   }
 
-  private validateSearchInput(query: string, page: number, limit: number): void {
+  private validateSearchInput(query: string, _page?: number, _limit?: number): void {
     if (!query || query.trim().length === 0) {
       throw new BadRequestException('Search query cannot be empty');
     }
@@ -245,7 +272,7 @@ export class SearchService {
     }
   }
 
-  private validateSearchResponse(results: any[], total: number): void {
+  private validateSearchResponse(results: any[], _total?: number): void {
     if (!Array.isArray(results)) {
       throw new InternalServerErrorException('Invalid search response format');
     }
