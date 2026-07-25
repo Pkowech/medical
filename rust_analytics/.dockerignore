@@ -76,7 +76,6 @@ __pycache__/
 venv/
 
 # Ignore Rust specific
-Cargo.lock
 
 # Ignore monitoring/infra configs not needed for builds
 monitoring/

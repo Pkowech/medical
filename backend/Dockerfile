@@ -14,8 +14,8 @@ RUN --mount=type=cache,target=/root/.npm \
 FROM base AS deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
-    pnpm approve-builds --all && \
-    pnpm install --frozen-lockfile --prefer-offline --trust-lockfile
+    pnpm install --frozen-lockfile --prefer-offline --trust-lockfile || \
+      (pnpm approve-builds --all && pnpm install --frozen-lockfile --prefer-offline --trust-lockfile)
 
 ################################################################────────────────
 FROM deps AS build
