@@ -13,9 +13,13 @@ RUN --mount=type=cache,target=/root/.npm \
 # Full deps (including dev) — needed to run `nest build`
 FROM base AS deps
 COPY backend/package.json backend/pnpm-lock.yaml backend/pnpm-workspace.yaml ./
+# Build-script approvals now live in package.json's "pnpm.onlyBuiltDependencies"
+# field, so no interactive/fallback approve-builds step is needed here — and
+# because it's committed in package.json, the approval survives being copied
+# fresh into the build stage below (a runtime `approve-builds --all` call did
+# NOT survive that, since COPY backend ./ overwrote the approved package.json).
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
-    pnpm install --frozen-lockfile --prefer-offline --trust-lockfile || \
-      (pnpm approve-builds --all && pnpm install --frozen-lockfile --prefer-offline --trust-lockfile)
+    pnpm install --frozen-lockfile --prefer-offline --trust-lockfile
 
 ################################################################────────────────
 FROM deps AS build
