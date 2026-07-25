@@ -15,6 +15,7 @@
     "#modules/*": "./src/modules/*"
   },
   "scripts": {
+    "postinstall": "prisma generate",
     "build": "nest build",
     "check": "pnpm tsc --noEmit && pnpm run validate:circular && pnpm run validate:swagger",
     "start": "node dist/src/main",

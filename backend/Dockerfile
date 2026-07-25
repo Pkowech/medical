@@ -13,11 +13,6 @@ RUN --mount=type=cache,target=/root/.npm \
 # Full deps (including dev) — needed to run `nest build`
 FROM base AS deps
 COPY backend/package.json backend/pnpm-lock.yaml backend/pnpm-workspace.yaml ./
-# Build-script approvals now live in package.json's "pnpm.onlyBuiltDependencies"
-# field, so no interactive/fallback approve-builds step is needed here — and
-# because it's committed in package.json, the approval survives being copied
-# fresh into the build stage below (a runtime `approve-builds --all` call did
-# NOT survive that, since COPY backend ./ overwrote the approved package.json).
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
     pnpm install --frozen-lockfile --prefer-offline --trust-lockfile
 
@@ -25,35 +20,30 @@ RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
 FROM deps AS build
 ARG DATABASE_URL
 
-# Copy root-level protos into the backend build context, so the backend can
-# compile and load proto definitions from the workspace root.
 COPY protos ./protos
-
-# Copy backend service source and config files from the repository root.
 COPY backend ./
 
-# DATABASE_URL used transiently for `prisma generate` schema introspection
-# only — never persisted as ENV, so it never lands in the final image.
-#
-# Note: prisma.config.ts does `import 'dotenv/config'` and reads values via
-# env<Env>('DATABASE_URL'/'DIRECT_URL'), so Prisma loads the .env file itself —
-# no need to `export` values into the shell before invoking the CLI.
-#
-# The fallback MUST be a syntactically valid postgresql:// URL, since the
-# schema's datasource provider is "postgresql". A sqlite-style file: URL
-# fails Prisma's datasource validation (P1012) even though generate never
-# actually connects to the DB.
 RUN if [ ! -f .env ]; then \
-      : "${DATABASE_URL:=postgresql://dummy:dummy@localhost:5432/dummy}"; \
+      : "${DATABASE_URL:=postgresql://dummy:[REDACTED]@localhost:5432/dummy}"; \
       printf 'DATABASE_URL=%s\n' "$DATABASE_URL" > .env; \
       printf 'DIRECT_URL=%s\n' "$DATABASE_URL" >> .env; \
     fi && \
     pnpm prisma generate
 
 RUN pnpm run build
+
+# Create prod deps only — aggressive pruning
+RUN pnpm --filter medtrack-hub-backend install --prod --frozen-lockfile
+
+# Strip and prune aggressively for final image
 RUN mkdir -p /prod && \
-    pnpm --filter medtrack-hub-backend install --prod --frozen-lockfile && \
-    cp -a package.json prisma prisma.config.ts dist node_modules /prod
+    cp -a package.json prisma prisma.config.ts dist /prod/ && \
+    cp -a node_modules /prod/ && \
+    cd /prod && \
+    find node_modules -type f \( -name "*.md" -o -name "*.map" -o -name "*.ts" -o -name "*.test.js" -o -name "*.spec.js" \) -delete && \
+    find node_modules -type d \( -name "test" -o -name "tests" -o -name "example" -o -name "examples" -o -name "docs" -o -name ".bin" \) -prune -exec rm -rf {} + 2>/dev/null || true && \
+    rm -rf node_modules/@swc node_modules/@next node_modules/typescript node_modules/ts-node node_modules/eslint* node_modules/@eslint* node_modules/@types node_modules/jest* node_modules/supertest* node_modules/prettier* 2>/dev/null || true && \
+    du -sh .
 
 ################################################################────────────────
 FROM node:${NODE_VERSION}-alpine AS final
