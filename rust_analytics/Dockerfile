@@ -11,7 +11,7 @@ WORKDIR /protos
 # CI/build systems (Render, older builders) do not support additional build
 # contexts via BuildKit; copying is more portable and avoids attempts to pull
 # an image named `protos:latest`.
-COPY protos /protos
+COPY --from=protos / /protos
 
 ################################################################################
 # Build stage

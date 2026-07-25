@@ -14,7 +14,8 @@ RUN --mount=type=cache,target=/root/.npm \
 FROM base AS deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
-    pnpm install --frozen-lockfile --prefer-offline
+    pnpm approve-builds --all && \
+    pnpm install --frozen-lockfile --prefer-offline --trust-lockfile
 
 ################################################################────────────────
 FROM deps AS build
@@ -44,24 +45,16 @@ RUN if [ ! -f .env ]; then \
     export $(cat .env | xargs) && pnpm prisma generate
 RUN pnpm run build
 RUN mkdir -p /prod && \
-  # Install only production dependencies for the backend package and assemble runtime
-  pnpm --filter medtrack-hub-backend install --prod --frozen-lockfile && \
-  # Copy runtime files into /prod
-  cp -a package.json prisma prisma.config.ts dist node_modules /prod 2>/dev/null || true
+    pnpm --filter medtrack-hub-backend install --prod --frozen-lockfile && \
+    cp -a package.json prisma prisma.config.ts dist node_modules /prod
 
 ################################################################────────────────
 FROM node:${NODE_VERSION}-alpine AS final
 ENV NODE_ENV=production
 ENV PORT=3002
 ENV HOSTNAME=0.0.0.0
-
 WORKDIR /usr/src/app
-
 COPY --chown=node:node --from=build /prod ./
-COPY --chown=node:node --from=build /usr/src/app/dist ./dist
-COPY --chown=node:node --from=build /usr/src/app/prisma ./prisma
-COPY --chown=node:node --from=build /usr/src/app/prisma.config.ts ./prisma.config.ts
-
 USER node
 
 EXPOSE 3002
