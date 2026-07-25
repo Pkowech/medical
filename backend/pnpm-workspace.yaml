@@ -66,3 +66,16 @@ onlyBuiltDependencies:
   - prisma
   - protobufjs
   - sharp
+
+allowBuilds:
+  '@prisma/engines': false
+  '@scarf/scarf': false
+  '@swc/core': false
+  argon2: false
+  esbuild: false
+  grpc-tools: false
+  msgpackr-extract: false
+  prisma: false
+  protobufjs: false
+  sharp: false
+  unrs-resolver: false

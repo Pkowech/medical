@@ -5,8 +5,7 @@ ARG APP_NAME=rust_analytics
 
 ################################################################################
 # Stage for 'protos' build context.
-# Copying directly from the local workspace avoids Render/BuildKit attempting 
-# to pull an external image named `protos:latest`.
+# Pulls directly from the workspace root (medical/protos/).
 FROM alpine:3.18 AS proto_context
 WORKDIR /protos
 COPY protos/ /protos/
@@ -27,15 +26,14 @@ ENV RUSTFLAGS="-C embed-bitcode=no"
 # Install build dependencies
 RUN apk add --no-cache clang lld musl-dev git protobuf-dev protoc pkgconfig
 
-# Copy the crate into a temporary path and assemble /app deterministically.
-# When building with the service directory as the build context this will copy
-# the crate files. When building from repo root a different path may be used.
-COPY . /tmp/rust_analytics
-RUN mkdir -p /app/src /app/.sqlx && \
-    cp /tmp/rust_analytics/Cargo.toml /tmp/rust_analytics/Cargo.lock /tmp/rust_analytics/build.rs /app/ 2>/dev/null || true; \
-    cp -r /tmp/rust_analytics/src/* /app/src/ 2>/dev/null || true; \
-    cp -r /tmp/rust_analytics/.sqlx/* /app/.sqlx/ 2>/dev/null || true; \
-    find /app/.sqlx -name '*.json' 2>/dev/null | wc -l
+# Copy ONLY the rust_analytics subdirectory from your repo root into /app
+COPY rust_analytics/ /app/
+
+# Verify Cargo.toml arrived safely before running cargo
+RUN test -f /app/Cargo.toml || (echo "ERROR: Cargo.toml not found in /app! Check Render build context." && exit 1)
+
+# Debug print SQLX files if present
+RUN find /app/.sqlx -name '*.json' 2>/dev/null | wc -l || true
 
 RUN --mount=type=bind,from=proto_context,source=/protos,target=/protos \
     --mount=type=cache,target=/app/target/ \
