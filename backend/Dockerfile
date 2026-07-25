@@ -14,7 +14,7 @@ RUN --mount=type=cache,target=/root/.npm \
 FROM base AS deps
 COPY backend/package.json backend/pnpm-lock.yaml backend/pnpm-workspace.yaml ./
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
-    pnpm install --frozen-lockfile --prefer-offline --trust-lockfile
+    pnpm install --frozen-lockfile --prefer-offline --trust-lockfile --ignore-scripts
 
 ################################################################────────────────
 FROM deps AS build
@@ -22,6 +22,9 @@ ARG DATABASE_URL
 
 COPY protos ./protos
 COPY backend ./
+
+# Run postinstall scripts now that schema exists
+RUN pnpm install --frozen-lockfile --ignore-scripts=false
 
 RUN if [ ! -f .env ]; then \
       : "${DATABASE_URL:=postgresql://dummy:[REDACTED]@localhost:5432/dummy}"; \
