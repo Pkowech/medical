@@ -30,18 +30,22 @@ COPY backend ./
 
 # DATABASE_URL used transiently for `prisma generate` schema introspection
 # only — never persisted as ENV, so it never lands in the final image.
+#
+# Note: prisma.config.ts does `import 'dotenv/config'` and reads values via
+# env<Env>('DATABASE_URL'/'DIRECT_URL'), so Prisma loads the .env file itself —
+# no need to `export` values into the shell before invoking the CLI.
+#
+# The fallback MUST be a syntactically valid postgresql:// URL, since the
+# schema's datasource provider is "postgresql". A sqlite-style file: URL
+# fails Prisma's datasource validation (P1012) even though generate never
+# actually connects to the DB.
 RUN if [ ! -f .env ]; then \
-      if [ -n "$DATABASE_URL" ]; then \
-        printf 'DATABASE_URL=%s\n' "$DATABASE_URL" > .env; \
-        printf 'DIRECT_URL=%s\n' "$DATABASE_URL" >> .env; \
-      else \
-        # Fallback to a local SQLite file for offline generation during image builds
-        printf 'DATABASE_URL=%s\n' "file:./dev.db" > .env; \
-        printf 'DIRECT_URL=%s\n' "file:./dev.db" >> .env; \
-      fi; \
+      : "${DATABASE_URL:=postgresql://dummy:dummy@localhost:5432/dummy}"; \
+      printf 'DATABASE_URL=%s\n' "$DATABASE_URL" > .env; \
+      printf 'DIRECT_URL=%s\n' "$DATABASE_URL" >> .env; \
     fi && \
-    # Load env values and run Prisma generation with both variables available
-    export $(cat .env | xargs) && pnpm prisma generate
+    pnpm prisma generate
+
 RUN pnpm run build
 RUN mkdir -p /prod && \
     pnpm --filter medtrack-hub-backend install --prod --frozen-lockfile && \
