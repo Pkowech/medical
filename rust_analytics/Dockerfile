@@ -5,7 +5,6 @@ ARG APP_NAME=rust_analytics
 
 ################################################################################
 # Stage for 'protos' build context.
-# Pulls directly from the workspace root (medical/protos/).
 FROM alpine:3.18 AS proto_context
 WORKDIR /protos
 COPY protos/ /protos/
@@ -26,11 +25,11 @@ ENV RUSTFLAGS="-C embed-bitcode=no"
 # Install build dependencies
 RUN apk add --no-cache clang lld musl-dev git protobuf-dev protoc pkgconfig
 
-# Copy ONLY the rust_analytics subdirectory from your repo root into /app
-COPY rust_analytics/ /app/
+# Copy all files from the current directory (rust_analytics) directly into /app
+COPY . /app/
 
 # Verify Cargo.toml arrived safely before running cargo
-RUN test -f /app/Cargo.toml || (echo "ERROR: Cargo.toml not found in /app! Check Render build context." && exit 1)
+RUN test -f /app/Cargo.toml || (echo "ERROR: Cargo.toml not found in /app!" && exit 1)
 
 # Debug print SQLX files if present
 RUN find /app/.sqlx -name '*.json' 2>/dev/null | wc -l || true
