@@ -10,16 +10,14 @@ RUN npm install -g pnpm@${PNPM_VERSION} --no-fund --no-audit && npm cache clean 
 FROM base AS deps
 COPY backend/package.json backend/pnpm-lock.yaml backend/pnpm-workspace.yaml ./
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
-    pnpm install --frozen-lockfile --prefer-offline --ignore-scripts
+    pnpm install --frozen-lockfile --prefer-offline --ignore-scripts --shamefully-hoist
 
 FROM deps AS build
 COPY protos ./protos
 COPY backend ./
-COPY backend/install.sh /tmp/install.sh
-RUN chmod +x /tmp/install.sh
 
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
-    rm -rf node_modules && /tmp/install.sh
+    rm -rf node_modules && pnpm install --frozen-lockfile --ignore-scripts=false --shamefully-hoist
 
 RUN echo "DATABASE_URL=postgresql://dummy:[REDACTED]@localhost:5432/dummy" > .env && \
     echo "DIRECT_URL=postgresql://dummy:[REDACTED]@localhost:5432/dummy" >> .env && \
