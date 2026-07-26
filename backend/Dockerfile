@@ -28,17 +28,30 @@ COPY protos ./protos
 # Copy source only (node_modules excluded via .dockerignore)
 COPY backend ./
 
-# Reinstall fresh Linux-native binaries using pnpm store cache
+# Dummy env vars needed BEFORE the reinstall below. pnpm install with
+# --ignore-scripts=false triggers package.json's "postinstall": "prisma
+# generate" hook. Prisma 7 resolves DATABASE_URL eagerly during `generate`
+# (even just for schema parsing) and hard-fails if it's unset — so this
+# file must exist BEFORE that install runs, not after (this previously
+# caused: "PrismaConfigEnvError: Cannot resolve environment variable:
+# DATABASE_URL" during the reinstall step below).
+RUN echo "DATABASE_URL=postgresql://dummy:[REDACTED]@localhost:5432/dummy" > .env && \
+    echo "DIRECT_URL=postgresql://dummy:[REDACTED]@localhost:5432/dummy" >> .env && \
+    echo "JWT_SECRET=build-time-dummy-needs-32-characters-minimum" >> .env && \
+    echo "JWT_REFRESH_SECRET=build-time-dummy-refresh-needs-32-chars" >> .env
+
+# Reinstall fresh Linux-native binaries using pnpm store cache.
+# --ignore-scripts=false is required here so that:
+#   1) argon2/sharp's own native-binding install scripts run
+#   2) package.json's "postinstall": "prisma generate" hook runs
+#      (now safe since .env above already exists)
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
     rm -rf node_modules && \
     pnpm install --frozen-lockfile --ignore-scripts=false
 
-# Generate Prisma client (dummy URL — only schema parsing needed)
-RUN echo "DATABASE_URL=postgresql://dummy:[REDACTED]@localhost:5432/dummy" > .env && \
-    echo "DIRECT_URL=postgresql://dummy:[REDACTED]@localhost:5432/dummy" >> .env && \
-    echo "JWT_SECRET=build-time-dummy" >> .env && \
-    echo "JWT_REFRESH_SECRET=build-time-dummy-refresh" >> .env && \
-    pnpm prisma generate
+# Explicit generate call — kept for clarity/idempotency even though
+# postinstall above already generated the client with the same .env.
+RUN pnpm prisma generate
 
 # Prisma 7 ships WASM query compilers for every supported database
 # (postgresql/mysql/sqlite/cockroachdb/sqlserver) in @prisma/client — ~70MB of
