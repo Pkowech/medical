@@ -155,7 +155,8 @@ RUN cat <<'EOF' > package.json
     "argon2": "^0.41.1",
     "sharp": "^0.34.5",
     "@prisma/client": "^7.8.0",
-    "@prisma/client-runtime-utils": "^7.8.0"
+    "@prisma/client-runtime-utils": "^7.8.0",
+    "@grpc/proto-loader": "^0.7.15"
   }
 }
 EOF
