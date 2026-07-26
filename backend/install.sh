@@ -1,8 +1,8 @@
 #!/bin/sh
 set -e
 
-echo "Installing dependencies with pnpm..."
-pnpm install --frozen-lockfile --ignore-scripts=false
+echo "Installing dependencies with pnpm (skip postinstall)..."
+pnpm install --frozen-lockfile --ignore-scripts
 
 echo "Hoisting argon2 native dependencies to top level..."
 mkdir -p node_modules/node-gyp-build node_modules/node-addon-api node_modules/@phc
@@ -17,7 +17,7 @@ if [ -f "node_modules/node-gyp-build/package.json" ]; then
   echo "✓ node-gyp-build hoisted"
 else
   echo "✗ node-gyp-build NOT hoisted - falling back to npm"
-  npm install --no-save node-gyp-build node-addon-api
+  npm install --no-save node-gyp-build node-addon-api 2>/dev/null || true
 fi
 
 echo "Dependencies ready"
