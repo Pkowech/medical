@@ -3,8 +3,17 @@
 .gitignore
 .github
 
-# Ignore build artifacts first (MUST be before excluding directories)
+# Ignore build artifacts — explicit paths take priority over globs
+backend/node_modules
+backend/dist
 backend/target
+backend/*.log
+backend/*.tsbuildinfo
+backend/dev_startup.log
+backend/app_startup.log
+backend/app.log
+backend/run.log
+backend/tmp
 rust_analytics/target
 frontend/node_modules
 frontend/.next
@@ -20,14 +29,15 @@ frontend/
 .vs
 .vscode-extensions
 
-# Ignore build artifacts
+# Ignore build artifacts at any depth
 target/
 dist/
 build/
 .next/
 coverage/
-node_modules/
+**/node_modules/
 .pnpm-store/
+**/.pnpm-store/
 
 # Ignore package manager files and caches
 npm-debug.log

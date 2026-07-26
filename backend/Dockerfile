@@ -1,46 +1,136 @@
 # syntax=docker/dockerfile:1
 
 ARG NODE_VERSION=22.23.1
-ARG PNPM_VERSION=10.32.1
+ARG PNPM_VERSION=11.17.0
 
+################################################################
+# Stage 1: base — node + pnpm
 ################################################################
 FROM node:${NODE_VERSION}-alpine AS base
 WORKDIR /usr/src/app
-RUN npm install -g pnpm@${PNPM_VERSION}
+RUN npm install -g pnpm@${PNPM_VERSION} --no-fund --no-audit && \
+    npm cache clean --force
 
+################################################################
+# Stage 2: deps — install ALL deps with ignore-scripts (fast)
 ################################################################
 FROM base AS deps
 COPY backend/package.json backend/pnpm-lock.yaml backend/pnpm-workspace.yaml ./
-ENV PRISMA_GENERATE_SKIP=true
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
     pnpm install --frozen-lockfile --prefer-offline --ignore-scripts
 
 ################################################################
+# Stage 3: build — compile + generate prisma + esbuild bundle
+################################################################
 FROM deps AS build
+# Use root protos (canonical source of truth)
 COPY protos ./protos
+# Copy source only (node_modules excluded via .dockerignore)
 COPY backend ./
 
-RUN pnpm install --frozen-lockfile --ignore-scripts=false
+# Reinstall fresh Linux-native binaries using pnpm store cache
+RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
+    rm -rf node_modules && \
+    pnpm install --frozen-lockfile --ignore-scripts=false
 
-RUN if [ ! -f .env ]; then \
-      echo "DATABASE_URL=postgresql://dummy:dummy@localhost:5432/dummy" > .env && \
-      echo "DIRECT_URL=postgresql://dummy:dummy@localhost:5432/dummy" >> .env && \
-      echo "JWT_SECRET=build-time-dummy-secret-change-in-production" >> .env && \
-      echo "JWT_REFRESH_SECRET=build-time-dummy-refresh-change-in-production" >> .env; \
-    fi && \
+# Generate Prisma client (dummy URL — only schema parsing needed)
+RUN echo "DATABASE_URL=postgresql://dummy:dummy@localhost:5432/dummy" > .env && \
+    echo "DIRECT_URL=postgresql://dummy:dummy@localhost:5432/dummy" >> .env && \
+    echo "JWT_SECRET=build-time-dummy" >> .env && \
+    echo "JWT_REFRESH_SECRET=build-time-dummy-refresh" >> .env && \
     pnpm prisma generate
 
+# Compile TypeScript — must succeed before esbuild
 RUN pnpm run build
+# Strip source maps (reduces bundle input size, || true is safe here)
+RUN find dist -name "*.js.map" -delete 2>/dev/null || true
 
+# Install esbuild (not in package.json — build-time only tool)
+RUN npm install -g esbuild --no-fund --no-audit --prefer-offline 2>/dev/null; \
+    npm cache clean --force
+
+# Bundle entire app into single file with esbuild.
+# --keep-names: required for NestJS decorator/DI metadata (reflect-metadata).
+# NestJS microservices uses loadPackage() for optional transports — they are
+# not installed and NOT needed at runtime; marking as --external skips them.
+RUN esbuild dist/src/main.js \
+      --bundle \
+      --platform=node \
+      --target=node22 \
+      --outfile=dist/bundle.js \
+      --log-limit=0 \
+      --external:argon2 \
+      --external:sharp \
+      --external:'@prisma/client' \
+      --external:'.prisma' \
+      --external:'@nestjs/websockets' \
+      --external:'@nestjs/websockets/socket-module' \
+      --external:'@nestjs/platform-socket.io' \
+      --external:amqplib \
+      --external:amqp-connection-manager \
+      --external:nats \
+      --external:mqtt \
+      --external:kafkajs \
+      --external:'socket.io' \
+      --external:ws \
+      --external:bufferutil \
+      --external:'utf-8-validate' \
+      --external:'@grpc/proto-loader' \
+      --external:redis \
+      --external:'@redis/client' \
+      --external:'@redis/bloom' \
+      --external:'@redis/search' \
+      --external:'cache-manager-redis-yet' \
+      --external:'cache-manager-ioredis-yet' \
+      --keep-names \
+      --log-level=warning
+
+################################################################
+# Stage 4: prod-deps — only for native addons + Prisma binaries
+#   Everything else is in the bundle so we don't copy it.
 ################################################################
 FROM base AS prod-deps
 COPY backend/package.json backend/pnpm-lock.yaml backend/pnpm-workspace.yaml ./
-ENV PRISMA_GENERATE_SKIP=true
+# Schema needed for `prisma generate` postinstall
+COPY backend/prisma/schema.prisma ./prisma/schema.prisma
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
-    pnpm install --filter medtrack-hub-backend --prod --frozen-lockfile --ignore-scripts
+    pnpm install --frozen-lockfile --prod --ignore-scripts=false
+
+# --- Strip everything that won't be copied to final anyway ---
+
+# Remove Prisma engine binaries for wrong platforms (keep only linux-musl for Alpine)
+RUN find node_modules/@prisma/engines -type f \
+      ! -name "*linux-musl*" \
+      -delete 2>/dev/null || true && \
+    find node_modules/.prisma -type f \
+      ! -name "*linux-musl*" \
+      -delete 2>/dev/null || true
+
+# Remove heavy Prisma sub-tools not needed for migrate deploy
+RUN rm -rf \
+    node_modules/@prisma/engines/prisma-fmt-linux-musl* \
+    2>/dev/null || true
 
 ################################################################
+# Stage 5: final — minimal production image
+#
+# Image composition after bundling (target <300MB):
+#   ~120MB  node:22-alpine base + apk packages
+#   ~30MB   dist/bundle.js (entire app JS, bundled)
+#   ~35MB   node_modules/sharp (native)
+#   ~5MB    node_modules/argon2 (native)
+#   ~30MB   node_modules/.prisma (linux-musl query engine)
+#   ~15MB   node_modules/@prisma/client (runtime JS)
+#   ~50MB   node_modules/prisma (CLI for migrate deploy)
+#   ~1MB    prisma schema + migrations
+#   ------
+#   ~286MB total
+################################################################
 FROM node:${NODE_VERSION}-alpine AS final
+
+# TLS (Neon sslmode=require + Upstash rediss://) and healthcheck
+RUN apk add --no-cache ca-certificates tzdata wget && \
+    npm cache clean --force
 
 ENV NODE_ENV=production
 ENV PORT=3002
@@ -48,25 +138,41 @@ ENV HOSTNAME=0.0.0.0
 
 WORKDIR /usr/src/app
 
-COPY --from=prod-deps /usr/src/app/node_modules ./node_modules
-COPY --from=build /usr/src/app/dist ./dist
-COPY --from=build /usr/src/app/prisma ./prisma
-COPY --from=build /usr/src/app/package.json ./
+# Non-root user — created BEFORE COPY so --chown works without a separate RUN layer
+RUN addgroup -g 1001 -S nodejs && adduser -S nestjs -u 1001
 
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nestjs -u 1001 && \
-    chown -R nestjs:nodejs /usr/src/app
+# ── The esbuild bundle replaces all JS node_modules ──────────────────────────
+COPY --chown=nestjs:nodejs --from=build /usr/src/app/dist/bundle.js ./dist/main.js
+
+# ── Native addons (cannot be bundled) ────────────────────────────────────────
+COPY --chown=nestjs:nodejs --from=prod-deps /usr/src/app/node_modules/argon2 ./node_modules/argon2
+COPY --chown=nestjs:nodejs --from=prod-deps /usr/src/app/node_modules/sharp  ./node_modules/sharp
+
+# ── Prisma — bundle uses @prisma/client as external ──────────────────────────
+# @prisma/client runtime JS
+COPY --chown=nestjs:nodejs --from=prod-deps /usr/src/app/node_modules/@prisma ./node_modules/@prisma
+# linux-musl query engine binary — copied from build stage where we explicitly
+# ran `pnpm prisma generate` (prod-deps pnpm virtual store may not have .prisma)
+COPY --chown=nestjs:nodejs --from=build /usr/src/app/node_modules/.prisma ./node_modules/.prisma
+# Prisma CLI — needed for `migrate deploy` at startup
+COPY --chown=nestjs:nodejs --from=prod-deps /usr/src/app/node_modules/prisma  ./node_modules/prisma
+COPY --chown=nestjs:nodejs --from=prod-deps /usr/src/app/node_modules/.bin/prisma ./node_modules/.bin/prisma
+
+# ── App metadata ──────────────────────────────────────────────────────────────
+COPY --chown=nestjs:nodejs --from=build /usr/src/app/prisma      ./prisma
+COPY --chown=nestjs:nodejs --from=build /usr/src/app/package.json ./
 
 USER nestjs
 
-# Improved CMD - easier to read and less lint noise
+EXPOSE 3002
+
 CMD ["sh", "-c", "\
   echo 'Running Prisma migrations...' && \
   if [ -n \"$DATABASE_URL\" ]; then \
-    ./node_modules/.bin/prisma migrate deploy || echo 'Migration failed or timed out, continuing...'; \
+    ./node_modules/.bin/prisma migrate deploy || echo 'Migration failed, continuing...'; \
   else \
     echo 'DATABASE_URL not set - skipping migrations'; \
   fi && \
-  echo 'Starting NestJS application...' && \
-  exec node dist/src/main \
+  echo 'Starting NestJS...' && \
+  exec node dist/main.js \
 "]

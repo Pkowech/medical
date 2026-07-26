@@ -16,17 +16,19 @@ services:
 
     environment:
       NODE_ENV: production
-      PORT: ${BACKEND_PORT:-3000}
+      PORT: ${BACKEND_PORT:-3002}
 
-      # === Render-style External Services ===
+      # === Online External Services (Neon + Upstash) ===
       DATABASE_URL: ${DATABASE_URL}
+      DIRECT_URL: ${DIRECT_URL}
       REDIS_URL: ${REDIS_URL}
+      ENABLE_REDIS: "true"
 
       # Auth & Secrets
       JWT_SECRET: ${JWT_SECRET}
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
 
-      # Other services
+      # gRPC connection to rust-analytics sidecar (service name resolves in Docker network)
       ANALYTICS_GRPC_URL: ${ANALYTICS_GRPC_URL:-rust-analytics:50051}
       RUST_ANALYTICS_GRPC_URL: ${RUST_ANALYTICS_GRPC_URL:-rust-analytics:50051}
 
@@ -37,18 +39,21 @@ services:
       CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
       CLOUDINARY_FOLDER: ${CLOUDINARY_FOLDER:-medtrack}
 
-    command: >
-      sh -c "pnpm prisma migrate deploy && node dist/src/main.js"
+      # PDF generation
+      GOTENBERG_URL: http://gotenberg:3000
+
+    # NOTE: The Dockerfile CMD already runs prisma migrate deploy + node dist/src/main
+    # No command override needed here — the final image handles it correctly.
 
     ports:
-      - "${BACKEND_PORT:-3000}:${BACKEND_PORT:-3000}"
+      - "${BACKEND_PORT:-3002}:${BACKEND_PORT:-3002}"
 
     healthcheck:
-      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:${BACKEND_PORT:-3000}/api/health', (res) => { if (res.statusCode === 200) process.exit(0); else process.exit(1); })\" || exit 1"]
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:${BACKEND_PORT:-3002}/api/health', (res) => { if (res.statusCode === 200) process.exit(0); else process.exit(1); })\" || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      start_period: 60s
 
     depends_on:
       rust-analytics:
@@ -60,8 +65,8 @@ services:
 
   rust-analytics:
     build:
-      context: ./rust_analytics
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: rust_analytics/Dockerfile
       additional_contexts:
         protos: ./protos
       args:
@@ -74,7 +79,9 @@ services:
       - .env
 
     environment:
+      # Neon online DB
       DATABASE_URL: ${DATABASE_URL}
+      JWT_SECRET: ${JWT_SECRET}
       RUST_ANALYTICS_API_KEY: ${RUST_ANALYTICS_API_KEY}
 
       RUST_ANALYTICS_GRPC_HOST: 0.0.0.0
@@ -90,7 +97,7 @@ services:
       - medtrack_net
 
     healthcheck:
-      test: ["CMD", "/usr/local/bin/rust_analytics", "--health"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8000/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -132,21 +139,9 @@ services:
       interval: 10s
       retries: 5
 
-  # Monitoring services (unchanged)
-  prometheus:
-    image: prom/prometheus:v2.47.0
-    # ... (keep as before)
-
-  alertmanager:
-    image: prom/alertmanager:v0.26.0
-    # ... (keep as before)
-
-  grafana:
-    image: grafana/grafana:10.1.5
-    # ... (keep as before)
-
   gotenberg:
     image: gotenberg/gotenberg:8
+    container_name: medtrack_gotenberg
     restart: unless-stopped
     ports:
       - "3010:3000"

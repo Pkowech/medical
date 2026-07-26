@@ -51,12 +51,17 @@ RUN --mount=type=bind,from=proto_context,source=/protos,target=/protos \
 ################################################################################
 FROM alpine:3.18 AS final
 
-# 1. Install critical runtime libraries to prevent Render Exit 128 crashes
+# Runtime dependencies:
+# - libgcc/libstdc++: C++ runtime for linked libs
+# - libssl3/ca-certificates: TLS for Neon (SSL) and Upstash (rediss://)
+# - wget: needed by docker-compose healthcheck
+# - tzdata: timezone data
 RUN apk add --no-cache \
     libgcc \
     libstdc++ \
     libssl3 \
     ca-certificates \
+    wget \
     tzdata
 
 ARG UID=10001
@@ -75,8 +80,10 @@ RUN ln -s /usr/local/bin/rust_analytics /bin/server
 
 USER appuser
 
-# Render injects $PORT dynamically, but 8000 sets a clean default fallback
+# HTTP REST API
 EXPOSE 8000
+# gRPC
+EXPOSE 50051
 
 # Execute using the standard path expected by your docker-compose healthchecks
 CMD ["/usr/local/bin/rust_analytics"]
