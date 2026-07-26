@@ -188,6 +188,12 @@ importers:
       nestjs-pino:
         specifier: ^4.6.1
         version: 4.6.1(@nestjs/common@11.1.28(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(pino-http@10.5.0)(pino@9.14.0)(rxjs@7.8.2)
+      node-addon-api:
+        specifier: ^8.1.0
+        version: 8.9.0
+      node-gyp-build:
+        specifier: ^4.8.1
+        version: 4.8.4
       passport:
         specifier: ^0.7.0
         version: 0.7.0
