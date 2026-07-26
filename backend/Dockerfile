@@ -40,6 +40,13 @@ RUN echo "DATABASE_URL=postgresql://dummy:dummy@localhost:5432/dummy" > .env && 
     echo "JWT_REFRESH_SECRET=build-time-dummy-refresh" >> .env && \
     pnpm prisma generate
 
+# pnpm stores engine binary inside its virtual store (node_modules/.pnpm/.../.prisma/).
+# Copy to standard node_modules/.prisma/client/ so the final stage COPY can find it.
+RUN mkdir -p node_modules/.prisma/client && \
+    find node_modules/.pnpm -name "libquery_engine*linux-musl*" -type f \
+      -exec cp {} node_modules/.prisma/client/ \; 2>/dev/null || true && \
+    echo "Prisma engine files:" && ls node_modules/.prisma/client/ 2>/dev/null || true
+
 # Compile TypeScript — must succeed before esbuild
 RUN pnpm run build
 # Strip source maps (reduces bundle input size, || true is safe here)
@@ -82,6 +89,15 @@ RUN esbuild dist/src/main.js \
       --external:'@redis/search' \
       --external:'cache-manager-redis-yet' \
       --external:'cache-manager-ioredis-yet' \
+      --external:'@nestjs/mongoose' \
+      --external:'@nestjs/typeorm' \
+      --external:'@nestjs/sequelize' \
+      --external:'@nestjs/mikro-orm' \
+      --external:mongoose \
+      --external:typeorm \
+      --external:sequelize \
+      --external:'@mikro-orm/core' \
+      --external:'class-transformer/storage' \
       --keep-names \
       --log-level=warning
 
