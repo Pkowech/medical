@@ -40,8 +40,13 @@ RUN mkdir -p node_modules/.prisma/client node_modules/@prisma/client && \
 
 RUN pnpm run build && find dist -name "*.js.map" -delete 2>/dev/null || true
 
-RUN rm -rf node_modules/@types node_modules/typescript node_modules/eslint* 2>/dev/null || true && \
-    find node_modules -type d \( -name build -o -name docs -o -name test -o -name src -o -name .github \) -exec rm -rf {} + 2>/dev/null || true
+# Copy argon2 nested deps to top level so Node.js can find them
+RUN mkdir -p node_modules/node-gyp-build node_modules/node-addon-api && \
+    cp -r node_modules/argon2/node_modules/node-gyp-build/* node_modules/node-gyp-build/ 2>/dev/null || true && \
+    cp -r node_modules/argon2/node_modules/node-addon-api/* node_modules/node-addon-api/ 2>/dev/null || true
+
+RUN rm -rf node_modules/@types node_modules/typescript node_modules/eslint* node_modules/.bin 2>/dev/null || true && \
+    find node_modules/sharp -type d \( -name build -o -name docs -o -name test -o -name src -o -name .github \) -exec rm -rf {} + 2>/dev/null || true
 
 FROM node:${NODE_VERSION}-alpine AS final
 RUN apk add --no-cache ca-certificates tzdata wget && npm cache clean --force
@@ -55,6 +60,9 @@ COPY --chown=nestjs:nodejs --from=build /usr/src/app/node_modules ./node_modules
 COPY --chown=nestjs:nodejs --from=build /usr/src/app/prisma/schema.prisma ./prisma/
 COPY --chown=nestjs:nodejs --from=build /usr/src/app/package.json ./
 COPY --chown=nestjs:nodejs --from=build /usr/src/app/protos /usr/src/protos
+
+HEALTHCHECK --interval=10s --timeout=5s --start-period=10s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:3002/health || exit 1
 
 USER nestjs
 EXPOSE 3002
