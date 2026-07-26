@@ -40,12 +40,16 @@ RUN echo "DATABASE_URL=postgresql://dummy:dummy@localhost:5432/dummy" > .env && 
     echo "JWT_REFRESH_SECRET=build-time-dummy-refresh" >> .env && \
     pnpm prisma generate
 
-# pnpm stores engine binary inside its virtual store (node_modules/.pnpm/.../.prisma/).
-# Copy to standard node_modules/.prisma/client/ so the final stage COPY can find it.
-RUN mkdir -p node_modules/.prisma/client && \
+# pnpm stores engine binary and generated client inside virtual store (node_modules/.pnpm/...).
+# Copy to standard node_modules/.prisma and node_modules/@prisma/client so the final stage COPY can find them.
+RUN mkdir -p node_modules/.prisma/client node_modules/@prisma/client && \
     find node_modules/.pnpm -name "libquery_engine*linux-musl*" -type f \
       -exec cp {} node_modules/.prisma/client/ \; 2>/dev/null || true && \
-    echo "Prisma engine files:" && ls node_modules/.prisma/client/ 2>/dev/null || true
+    find node_modules/.pnpm -path "*/.prisma/client/*" -type f \
+      -exec cp {} node_modules/.prisma/client/ \; 2>/dev/null || true && \
+    find node_modules/.pnpm -path "*/@prisma/client/*" -type f \
+      -exec cp {} node_modules/@prisma/client/ \; 2>/dev/null || true && \
+    echo "Prisma engine & client files:" && ls node_modules/.prisma/client/ 2>/dev/null || true
 
 # Compile TypeScript — must succeed before esbuild
 RUN pnpm run build
@@ -163,15 +167,9 @@ COPY --chown=nestjs:nodejs --from=build /usr/src/app/dist/bundle.js ./dist/main.
 COPY --chown=nestjs:nodejs --from=prod-deps /usr/src/app/node_modules/argon2 ./node_modules/argon2
 COPY --chown=nestjs:nodejs --from=prod-deps /usr/src/app/node_modules/sharp  ./node_modules/sharp
 
-# ── Prisma — bundle uses @prisma/client as external ──────────────────────────
-# @prisma/client runtime JS
-COPY --chown=nestjs:nodejs --from=prod-deps /usr/src/app/node_modules/@prisma ./node_modules/@prisma
-# linux-musl query engine binary — copied from build stage where we explicitly
-# ran `pnpm prisma generate` (prod-deps pnpm virtual store may not have .prisma)
-COPY --chown=nestjs:nodejs --from=build /usr/src/app/node_modules/.prisma ./node_modules/.prisma
-# Prisma CLI — needed for `migrate deploy` at startup
-COPY --chown=nestjs:nodejs --from=prod-deps /usr/src/app/node_modules/prisma  ./node_modules/prisma
-COPY --chown=nestjs:nodejs --from=prod-deps /usr/src/app/node_modules/.bin/prisma ./node_modules/.bin/prisma
+# ── Prisma — copy generated client & engine from build stage ─────────────────
+COPY --chown=nestjs:nodejs --from=build /usr/src/app/node_modules/@prisma/client ./node_modules/@prisma/client
+COPY --chown=nestjs:nodejs --from=build /usr/src/app/node_modules/.prisma        ./node_modules/.prisma
 
 # ── App metadata ──────────────────────────────────────────────────────────────
 COPY --chown=nestjs:nodejs --from=build /usr/src/app/prisma      ./prisma
@@ -181,13 +179,4 @@ USER nestjs
 
 EXPOSE 3002
 
-CMD ["sh", "-c", "\
-  echo 'Running Prisma migrations...' && \
-  if [ -n \"$DATABASE_URL\" ]; then \
-    ./node_modules/.bin/prisma migrate deploy || echo 'Migration failed, continuing...'; \
-  else \
-    echo 'DATABASE_URL not set - skipping migrations'; \
-  fi && \
-  echo 'Starting NestJS...' && \
-  exec node dist/main.js \
-"]
+CMD ["node", "dist/main.js"]

@@ -38,7 +38,7 @@ impl AppConfig {
         let database_url = env::var("DATABASE_URL").map_err(|e| format!("DATABASE_URL not set: {}", e))?;
         let grpc_host = env::var("RUST_ANALYTICS_GRPC_HOST").unwrap_or_else(|_| "[::1]".to_string());
         let grpc_port = env::var("RUST_ANALYTICS_GRPC_PORT").unwrap_or_else(|_| "50051".to_string());
-        let http_host = env::var("RUST_ANALYTICS_HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
+        let http_host = env::var("RUST_ANALYTICS_HOST").unwrap_or_else(|_| "0.0.0.0".to_string());
         let http_port = env::var("RUST_ANALYTICS_PORT").unwrap_or_else(|_| "8000".to_string());
         let jwt_secret = env::var("JWT_SECRET").map_err(|e| format!("JWT_SECRET not set: {}", e))?;
         let rust_api_key = env::var("RUST_ANALYTICS_API_KEY").unwrap_or_default();

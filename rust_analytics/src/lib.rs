@@ -784,7 +784,7 @@ pub async fn run() -> std::io::Result<()> {
 
     // Actix-web Server
     println!("Configuring HTTP server...");
-    let http_host = env::var("RUST_ANALYTICS_HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
+    let http_host = env::var("RUST_ANALYTICS_HOST").unwrap_or_else(|_| "0.0.0.0".to_string());
     let http_port = env::var("RUST_ANALYTICS_PORT").unwrap_or_else(|_| "8000".to_string());
     let http_addr = format!("{}:{}", http_host, http_port);
     println!("HTTP server address: {}", http_addr);
