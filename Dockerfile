@@ -15,9 +15,11 @@ RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
 FROM deps AS build
 COPY protos ./protos
 COPY backend ./
+COPY backend/install.sh /tmp/install.sh
+RUN chmod +x /tmp/install.sh
 
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
-    rm -rf node_modules && pnpm install --frozen-lockfile --ignore-scripts=false
+    rm -rf node_modules && /tmp/install.sh
 
 RUN echo "DATABASE_URL=postgresql://dummy:[REDACTED]@localhost:5432/dummy" > .env && \
     echo "DIRECT_URL=postgresql://dummy:[REDACTED]@localhost:5432/dummy" >> .env && \
@@ -39,11 +41,6 @@ RUN mkdir -p node_modules/.prisma/client node_modules/@prisma/client && \
       -exec cp {} node_modules/@prisma/client/ \; 2>/dev/null || true
 
 RUN pnpm run build && find dist -name "*.js.map" -delete 2>/dev/null || true
-
-# Copy argon2 nested deps to top level so Node.js can find them
-RUN mkdir -p node_modules/node-gyp-build node_modules/node-addon-api && \
-    cp -r node_modules/argon2/node_modules/node-gyp-build/* node_modules/node-gyp-build/ 2>/dev/null || true && \
-    cp -r node_modules/argon2/node_modules/node-addon-api/* node_modules/node-addon-api/ 2>/dev/null || true
 
 RUN rm -rf node_modules/@types node_modules/typescript node_modules/eslint* node_modules/.bin 2>/dev/null || true && \
     find node_modules/sharp -type d \( -name build -o -name docs -o -name test -o -name src -o -name .github \) -exec rm -rf {} + 2>/dev/null || true

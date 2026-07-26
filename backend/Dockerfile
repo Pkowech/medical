@@ -34,11 +34,22 @@ RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
     pnpm install --frozen-lockfile --ignore-scripts=false
 
 # Generate Prisma client (dummy URL — only schema parsing needed)
-RUN echo "DATABASE_URL=postgresql://dummy:dummy@localhost:5432/dummy" > .env && \
-    echo "DIRECT_URL=postgresql://dummy:dummy@localhost:5432/dummy" >> .env && \
+RUN echo "DATABASE_URL=postgresql://dummy:[REDACTED]@localhost:5432/dummy" > .env && \
+    echo "DIRECT_URL=postgresql://dummy:[REDACTED]@localhost:5432/dummy" >> .env && \
     echo "JWT_SECRET=build-time-dummy" >> .env && \
     echo "JWT_REFRESH_SECRET=build-time-dummy-refresh" >> .env && \
     pnpm prisma generate
+
+# Prisma 7 ships WASM query compilers for every supported database
+# (postgresql/mysql/sqlite/cockroachdb/sqlserver) in @prisma/client — ~70MB of
+# it is dead weight since this service only uses @prisma/adapter-pg.
+# Strip everything but postgresql, plus source maps (not needed at runtime).
+# See: https://github.com/prisma/prisma/discussions/29095
+RUN find node_modules/@prisma/client -type f \
+      \( -iname "query_compiler_*" -o -iname "*.wasm" \) \
+      ! -iname "*postgresql*" -delete 2>/dev/null || true && \
+    find node_modules/@prisma/client -type f -iname "*.map" -delete 2>/dev/null || true && \
+    echo "@prisma/client size after strip:" && du -sh node_modules/@prisma/client 2>/dev/null || true
 
 # pnpm stores engine binary and generated client inside virtual store (node_modules/.pnpm/...).
 # Copy to standard node_modules/.prisma and node_modules/@prisma/client so the final stage COPY can find them.
@@ -73,6 +84,7 @@ RUN esbuild dist/src/main.js \
       --external:argon2 \
       --external:sharp \
       --external:'@prisma/client' \
+      --external:'@prisma/client-runtime-utils' \
       --external:'.prisma' \
       --external:'@nestjs/websockets' \
       --external:'@nestjs/websockets/socket-module' \
@@ -113,37 +125,42 @@ COPY backend/package.json backend/pnpm-lock.yaml backend/pnpm-workspace.yaml ./
 # Schema needed for `prisma generate` postinstall
 COPY backend/prisma/schema.prisma ./prisma/schema.prisma
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
-    pnpm install --frozen-lockfile --prod --ignore-scripts=false
+    pnpm install --frozen-lockfile --prod --ignore-scripts=false --shamefully-hoist
 
 # --- Strip everything that won't be copied to final anyway ---
 
-# Remove Prisma engine binaries for wrong platforms (keep only linux-musl for Alpine)
-RUN find node_modules/@prisma/engines -type f \
-      ! -name "*linux-musl*" \
-      -delete 2>/dev/null || true && \
-    find node_modules/.prisma -type f \
-      ! -name "*linux-musl*" \
-      -delete 2>/dev/null || true
+# Remove ALL Prisma binaries/engines (will copy only query engine needed)
+RUN rm -rf node_modules/@prisma/engines node_modules/.prisma 2>/dev/null || true
 
-# Remove heavy Prisma sub-tools not needed for migrate deploy
-RUN rm -rf \
-    node_modules/@prisma/engines/prisma-fmt-linux-musl* \
-    2>/dev/null || true
+# Remove prisma CLI and builder tools (only needed at build time)
+RUN rm -rf node_modules/prisma node_modules/@prisma/internals 2>/dev/null || true
+
+# Strip sharp to ONLY runtime binaries for Alpine linux-x64
+# Remove all build sources, docs, tests, and unnecessary architectures
+RUN find node_modules/sharp -type d \( -name build -o -name docs -o -name test -o -name src \) -exec rm -rf {} + 2>/dev/null || true && \
+    find node_modules/sharp -type f \( -name "*.ts" -o -name "*.cc" -o -name "*.h" \) -delete 2>/dev/null || true && \
+    find node_modules/@img -type f \( -name "*.ts" -o -name "*.cc" -o -name "*.h" \) -delete 2>/dev/null || true
+
+# Compute prod-deps size for reference
+RUN du -sh node_modules 2>/dev/null || true
 
 ################################################################
 # Stage 5: final — minimal production image
 #
-# Image composition after bundling (target <300MB):
-#   ~120MB  node:22-alpine base + apk packages
-#   ~30MB   dist/bundle.js (entire app JS, bundled)
-#   ~35MB   node_modules/sharp (native)
-#   ~5MB    node_modules/argon2 (native)
-#   ~30MB   node_modules/.prisma (linux-musl query engine)
-#   ~15MB   node_modules/@prisma/client (runtime JS)
-#   ~50MB   node_modules/prisma (CLI for migrate deploy)
-#   ~1MB    prisma schema + migrations
+# Target: <300MB total (includes node:22-alpine base ~163MB + app layers)
+#
+# Layer breakdown after bundling:
+#   ~120MB  node:22-alpine base (node binary, openssl, ca-certs)
+#   ~30MB   dist/bundle.js (entire app JS, bundled with esbuild)
+#   ~25MB   node_modules/sharp (native Linux x64 binary only)
+#   ~5MB    node_modules/argon2 (native binding)
+#   ~8MB    node_modules/@prisma/client (postgresql-only after WASM strip)
+#   ~6MB    .prisma/client (libquery_engine-linux-musl binary)
+#   <1MB    @prisma/client-runtime-utils (runtime utilities)
+#   <1MB    @phc/format (password hash codec)
+#   <1MB    prisma/schema.prisma + package.json
 #   ------
-#   ~286MB total
+#   ~200MB total (dev images can exceed 400MB if careful with cleanup)
 ################################################################
 FROM node:${NODE_VERSION}-alpine AS final
 
@@ -163,17 +180,30 @@ RUN addgroup -g 1001 -S nodejs && adduser -S nestjs -u 1001
 # ── The esbuild bundle replaces all JS node_modules ──────────────────────────
 COPY --chown=nestjs:nodejs --from=build /usr/src/app/dist/bundle.js ./dist/main.js
 
-# ── Native addons (cannot be bundled) ────────────────────────────────────────
+# ── Native addons (cannot be bundled) ─────────────────────────────────────────
 COPY --chown=nestjs:nodejs --from=prod-deps /usr/src/app/node_modules/argon2 ./node_modules/argon2
+COPY --chown=nestjs:nodejs --from=prod-deps /usr/src/app/node_modules/@phc/format ./node_modules/@phc/format
 COPY --chown=nestjs:nodejs --from=prod-deps /usr/src/app/node_modules/sharp  ./node_modules/sharp
+COPY --chown=nestjs:nodejs --from=prod-deps /usr/src/app/node_modules/@img ./node_modules/@img
 
-# ── Prisma — copy generated client & engine from build stage ─────────────────
-COPY --chown=nestjs:nodejs --from=build /usr/src/app/node_modules/@prisma/client ./node_modules/@prisma/client
-COPY --chown=nestjs:nodejs --from=build /usr/src/app/node_modules/.prisma        ./node_modules/.prisma
+# ── Prisma runtime (generated client & query engine) ──────────────────────────
+# Copy ONLY minimal Prisma files needed at runtime:
+#   - @prisma/client: JS client API
+#   - @prisma/client-runtime-utils: small utilities
+#   - .prisma/client: generated schema types + libquery_engine binary
+COPY --chown=nestjs:nodejs --from=prod-deps /usr/src/app/node_modules/@prisma/client ./node_modules/@prisma/client
+COPY --chown=nestjs:nodejs --from=prod-deps /usr/src/app/node_modules/@prisma/client-runtime-utils ./node_modules/@prisma/client-runtime-utils
+
+# Copy libquery_engine binary from build stage (already filtered to linux-musl)
+COPY --chown=nestjs:nodejs --from=build /usr/src/app/node_modules/.prisma/client ./node_modules/.prisma/client
 
 # ── App metadata ──────────────────────────────────────────────────────────────
-COPY --chown=nestjs:nodejs --from=build /usr/src/app/prisma      ./prisma
+# Copy ONLY schema (needed for runtime introspection if any); skip migrations
+COPY --chown=nestjs:nodejs --from=build /usr/src/app/prisma/schema.prisma ./prisma/
 COPY --chown=nestjs:nodejs --from=build /usr/src/app/package.json ./
+
+# ── Proto files — the gRPC module resolves these at runtime, not bundle-time ──
+COPY --chown=nestjs:nodejs --from=build /usr/src/app/protos /usr/src/protos
 
 USER nestjs
 
