@@ -88,7 +88,6 @@ RUN esbuild dist/src/main.js \
       --external:'@redis/bloom' \
       --external:'@redis/search' \
       --external:'cache-manager-redis-yet' \
-      --external:'cache-manager-ioredis-yet' \
       --external:'@nestjs/mongoose' \
       --external:'@nestjs/typeorm' \
       --external:'@nestjs/sequelize' \

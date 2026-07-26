@@ -7,8 +7,7 @@ import redisConfig from './config/redis.config';
 import { LoggerModule } from 'nestjs-pino';
 import { validateConfig } from './config/validation';
 import { randomUUID } from 'crypto';
-import { CacheModule } from '@nestjs/cache-manager';
-import * as redisStore from 'cache-manager-redis-store';
+import { redisCacheModule } from './config/cache.config';
 import { ScheduleModule } from '@nestjs/schedule';
 
 // Infrastructure Imports
@@ -53,40 +52,7 @@ const shouldEnableRedis =
   process.env.ENABLE_REDIS === 'true' || Boolean(process.env.REDIS_URL);
 
 const redisModules = shouldEnableRedis
-  ? [
-      RedisModule,
-      CacheModule.registerAsync({
-        imports: [ConfigModule],
-        // The redisStore factory requires a config argument. Make the factory
-        // async and invoke redisStore(...) with the resolved config so the
-        // returned store instance is provided to Nest's cache manager.
-        useFactory: async (configService: ConfigService) => {
-          const redisUrl = configService.get<string>('REDIS_URL');
-          const host = configService.get<string>('redis.host');
-          const port = configService.get<number>('redis.port');
-          const password = configService.get<string>('redis.password');
-          const db = configService.get<number>('redis.db');
-
-          const storeConfig: Record<string, any> = redisUrl
-            ? { url: redisUrl }
-            : {
-                host,
-                port,
-                password,
-                db,
-              };
-
-          const store = await (redisStore as any)(storeConfig);
-
-          return {
-            store,
-            ttl: 3600, // 1 hour
-          };
-        },
-        inject: [ConfigService],
-        isGlobal: true, // Make cache module global
-      }),
-    ]
+  ? [redisCacheModule]
   : [];
 
 @Module({
