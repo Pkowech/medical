@@ -79,7 +79,7 @@ const scheduleService = {
 
   async getDeadlines(userId?: string, _startDate?: Date, _endDate?: Date): Promise<ScheduleEvent[]> {
     try {
-      const endpoint = '/study/deadlines';
+      const endpoint = '/deadlines';
       const response = await apiService.get(endpoint);
       const raw = response as unknown;
       const maybeData = raw && typeof raw === 'object' ? (raw as { data?: unknown }).data : undefined;

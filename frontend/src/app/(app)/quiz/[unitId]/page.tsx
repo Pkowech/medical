@@ -109,16 +109,16 @@ export default function QuizPage({ params }: QuizPageProps) {
         <h2 className="text-xl font-semibold mb-4">{currentQuestion.question_text}</h2>
 
         <div className="space-y-3">
-          {currentQuestion.options.map((option, index) => (
+          {currentQuestion.options.map((option) => (
             <button
-              key={index}
-              onClick={() => answerQuestion(currentQuestion.id, option)}
-              className={`w-full p-4 text-left rounded-lg border transition-colors ${currentState?.answers[currentQuestion.id] === option
+              key={option.id}
+              onClick={() => answerQuestion(currentQuestion.id, option.id)}
+              className={`w-full p-4 text-left rounded-lg border transition-colors ${currentState?.answers[currentQuestion.id] === option.id
                 ? 'border-blue-500 bg-blue-50'
                 : 'border-gray-200 hover:border-gray-300'
                 }`}
             >
-              {option}
+              {option.text}
             </button>
           ))}
         </div>

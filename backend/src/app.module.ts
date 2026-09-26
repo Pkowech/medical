@@ -49,7 +49,8 @@ import { SearchModule } from '#infrastructure/search/search.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 
 const shouldEnableRedis =
-  process.env.ENABLE_REDIS === 'true' || Boolean(process.env.REDIS_URL);
+  process.env.ENABLE_REDIS !== 'false' &&
+  (process.env.ENABLE_REDIS === 'true' || Boolean(process.env.REDIS_URL));
 
 const redisModules = shouldEnableRedis
   ? [redisCacheModule]
@@ -92,7 +93,8 @@ const redisModules = shouldEnableRedis
           return id;
         },
         transport:
-          process.env.NODE_ENV !== 'production'
+          process.env.NODE_ENV !== 'production' ||
+          process.env.PINO_PRETTY === 'true'
             ? { target: 'pino-pretty' }
             : undefined,
         level: process.env.NODE_ENV !== 'production' ? 'debug' : 'info',

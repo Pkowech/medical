@@ -30,15 +30,19 @@ async function refreshAccessToken(token: JWT): Promise<JWT> {
     }
 
     const raw =
-      process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || '';
+      process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL || '';
     
     if (!raw) {
       throw new Error('Backend URL not configured for token refresh');
     }
     
-    console.warn('[Token Refresh] Attempting to refresh token from:', raw);
+    const normalizedBase = raw.replace(/\/+$/, '').endsWith('/v1')
+      ? raw.replace(/\/+$/, '')
+      : `${raw.replace(/\/+$/, '')}/v1`;
     
-    const response = await fetch(`${raw}/v1/auth/refresh`, {
+    console.warn('[Token Refresh] Attempting to refresh token from:', normalizedBase);
+    
+    const response = await fetch(`${normalizedBase}/auth/refresh`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -118,9 +122,12 @@ export const authOptions: NextAuthOptions = {
         if (!validBase.startsWith('http://') && !validBase.startsWith('https://')) {
           validBase = `https://${validBase}`;
         }
+        const normalizedBase = validBase.replace(/\/+$/, '').endsWith('/v1')
+          ? validBase.replace(/\/+$/, '')
+          : `${validBase.replace(/\/+$/, '')}/v1`;
         let loginUrl: string;
         try {
-          loginUrl = new URL('/v1/auth/login', validBase).href;
+          loginUrl = new URL('auth/login', `${normalizedBase}/`).href;
         } catch (error) {
           console.error('Failed to construct login URL:', error);
           return null;

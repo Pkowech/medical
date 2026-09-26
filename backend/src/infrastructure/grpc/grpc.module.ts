@@ -4,6 +4,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { join } from 'path';
 import { existsSync } from 'fs';
 import { of } from 'rxjs';
+import { InterceptingCall } from '@grpc/grpc-js';
 
 // Resolve proto path in a runtime-safe way:
 // 1) Prefer the proto copied into the compiled `dist` (production/self-contained)
@@ -47,6 +48,21 @@ if (enableGrpc) {
             configService.get<string>('ANALYTICS_GRPC_URL') ||
             configService.get<string>('RUST_ANALYTICS_GRPC_URL') ||
             'localhost:50051';
+          const apiKey = configService.get<string>('RUST_ANALYTICS_API_KEY');
+
+          if (!apiKey) {
+            throw new Error(
+              'RUST_ANALYTICS_API_KEY is required when ENABLE_GRPC=true',
+            );
+          }
+
+          const apiKeyInterceptor = (options: any, nextCall: any) =>
+            new InterceptingCall(nextCall(options), {
+              start(metadata, listener, next) {
+                metadata.set('x-api-key', apiKey);
+                next(metadata, listener);
+              },
+            });
 
           return {
             transport: Transport.GRPC,
@@ -57,6 +73,9 @@ if (enableGrpc) {
               loader: {
                 keepCase: false,
               },
+              channelOptions: {
+                interceptors: [apiKeyInterceptor],
+              } as any,
             },
           };
         },

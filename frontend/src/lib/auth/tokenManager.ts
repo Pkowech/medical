@@ -104,7 +104,13 @@ export class TokenManager {
     refreshToken: string
   ): Promise<{ accessToken: string; refreshToken: string } | null> {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/refresh`, {
+      const baseUrl = (process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL || '').trim();
+      const normalizedBase = baseUrl
+        ? baseUrl.replace(/\/+$/, '').endsWith('/v1')
+          ? baseUrl.replace(/\/+$/, '')
+          : `${baseUrl.replace(/\/+$/, '')}/v1`
+        : 'http://localhost:3002/v1';
+      const response = await fetch(`${normalizedBase}/auth/refresh`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

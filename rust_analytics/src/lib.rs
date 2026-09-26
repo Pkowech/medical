@@ -767,6 +767,15 @@ pub async fn run() -> std::io::Result<()> {
     let pool = init_pool().await.expect("Failed to create pool");
 
     // gRPC Server
+    let grpc_api_key = env::var("RUST_ANALYTICS_API_KEY")
+        .ok()
+        .filter(|key| !key.trim().is_empty())
+        .ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "RUST_ANALYTICS_API_KEY must be configured to enable gRPC",
+            )
+        })?;
     let grpc_pool = pool.clone();
     let grpc_host = env::var("RUST_ANALYTICS_GRPC_HOST").unwrap_or_else(|_| "[::1]".to_string());
     let grpc_port = env::var("RUST_ANALYTICS_GRPC_PORT").unwrap_or_else(|_| "50051".to_string());
@@ -775,8 +784,26 @@ pub async fn run() -> std::io::Result<()> {
 
     tokio::spawn(async move {
         println!("gRPC server listening on {}", grpc_addr);
+        let auth_interceptor = move |request: tonic::Request<()>| {
+            let supplied_key = request
+                .metadata()
+                .get("x-api-key")
+                .and_then(|value| value.to_str().ok());
+
+            if supplied_key == Some(grpc_api_key.as_str()) {
+                Ok(request)
+            } else {
+                Err(tonic::Status::unauthenticated(
+                    "Missing or invalid analytics API key",
+                ))
+            }
+        };
+
         Server::builder()
-            .add_service(AnalyticsServiceServer::new(analytics_service))
+            .add_service(AnalyticsServiceServer::with_interceptor(
+                analytics_service,
+                auth_interceptor,
+            ))
             .serve(grpc_addr)
             .await
             .unwrap();

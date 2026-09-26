@@ -3,6 +3,7 @@ import { signOut, getSession } from 'next-auth/react';
 import { ApiError, ApiResponse, RequestOptions } from '@/shared/types';
 import { errorService } from '@/app/services/error.service';
 import { useAuthStore } from '@/features/auth/store/useAuthStore';
+import { resolveApiBaseUrl } from '@/lib/urls';
 
 // Enhanced error classification
 type ErrorType = 'network' | 'timeout' | 'auth' | 'validation' | 'server' | 'unknown';
@@ -24,26 +25,7 @@ class ApiService {
 
   private static buildApiBaseUrl(): string {
     try {
-      const raw = (process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL || '').trim();
-      
-      if (!raw) {
-        throw new Error('API URL not configured');
-      }
-      
-      if (raw.startsWith('/')) {
-        if (typeof window !== 'undefined' && window.location?.origin) {
-          return `${window.location.origin}${raw.replace(/\/+$/, '')}`;
-        }
-        throw new Error('Relative API URL without window context');
-      }
-
-      let formatted = raw;
-      if (!formatted.startsWith('http://') && !formatted.startsWith('https://')) {
-        formatted = `https://${formatted}`;
-      }
-
-      const u = new URL(formatted);
-      return `${u.origin}${u.pathname.replace(/\/+$/, '')}`;
+      return resolveApiBaseUrl();
     } catch (error) {
       console.error('[ApiClient] Failed to build API base URL:', error);
       throw new Error('Invalid API configuration');

@@ -22,7 +22,7 @@ interface AuditLogFilter {
 }
 
 class AuditLogService {
-  private readonly baseUrl = '/admin/audit-logs';
+  private readonly baseUrl = '/auth/audit';
 
   async getAuditLogs(filters?: AuditLogFilter): Promise<AuditLog[]> {
     const params = new URLSearchParams();
@@ -38,12 +38,12 @@ class AuditLogService {
 
     const url = params.toString() ? `${this.baseUrl}?${params.toString()}` : this.baseUrl;
     const response = await apiService.get<AuditLogsResponse>(url);
-    return response.data.data;
+    return this.unwrapPayload<AuditLog[]>(response.data);
   }
 
   async getAuditLog(id: string): Promise<AuditLog> {
     const response = await apiService.get<ApiResponse<AuditLog>>(`${this.baseUrl}/${id}`);
-    return response.data.data;
+    return this.unwrapPayload<AuditLog>(response.data);
   }
 
   async deleteAuditLogs(olderThanDays: number): Promise<{ deleted: number }> {
@@ -53,7 +53,7 @@ class AuditLogService {
         olderThanDays,
       }
     );
-    return response.data.data;
+    return this.unwrapPayload<{ deleted: number }>(response.data);
   }
 
   async exportAuditLogs(format: 'csv' | 'json', filters?: AuditLogFilter): Promise<Blob> {
@@ -75,6 +75,19 @@ class AuditLogService {
     } as Record<string, unknown>);
     // The underlying axios call will return a Blob for response.data; cast to Blob for the service API.
     return response.data as unknown as Blob;
+  }
+
+  private unwrapPayload<T>(payload: unknown): T {
+    if (!payload || typeof payload !== 'object') {
+      return payload as T;
+    }
+
+    const record = payload as Record<string, unknown>;
+    if (record.data !== undefined) {
+      return record.data as T;
+    }
+
+    return payload as T;
   }
 }
 

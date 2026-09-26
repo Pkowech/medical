@@ -7,7 +7,7 @@ edition = "2021"
 path = "src/lib.rs"
 
 [features]
-default = []
+default = ["ml"]
 ml-dataframes = ["polars"]
 ml-models = ["burn", "linfa", "linfa-linear", "ndarray"]
 ml = ["ml-dataframes", "ml-models"]

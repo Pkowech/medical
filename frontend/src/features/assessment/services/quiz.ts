@@ -1,7 +1,7 @@
 import { apiService } from '@/features/auth/services/apiClient';
 
 class QuizService {
-  private readonly baseUrl = '/quiz';
+  private readonly baseUrl = '/quizzes';
 
   async getRapidReviewQuestions(userId: string, topics?: string[]): Promise<unknown[]> {
     try {
@@ -15,15 +15,28 @@ class QuizService {
     }
   }
 
-  async getQuestionsForLesson(lessonId: string | number): Promise<unknown[]> {
-    try {
-      const response = await apiService.get<unknown[]>(`${this.baseUrl}/lesson/${lessonId}`);
-      return response.data;
-    } catch (error) {
-      console.warn(`[QuizService] Failed to fetch questions for lesson ${lessonId}, using demo data`, error);
-      // Filter demo questions by topic if possible, or just return them all
-      return this.getDemoRapidReviewQuestions().slice(0, 5); 
-    }
+  async getQuestionsForLesson(
+    lessonId: string | number,
+    scope: 'unit' | 'topic',
+  ): Promise<unknown[]> {
+    const response = await apiService.get<unknown[]>(
+      `${this.baseUrl}/${scope}/${lessonId}`,
+    );
+    return response.data;
+  }
+
+  async submitAnswer(
+    questionId: string,
+    selectedOptionId: string,
+  ): Promise<{ correct: boolean; explanation?: string }> {
+    const response = await apiService.post<{
+      correct: boolean;
+      explanation?: string;
+    }>(`${this.baseUrl}/submit`, {
+      questionId,
+      selectedOptionIds: [selectedOptionId],
+    });
+    return response.data;
   }
 
   private getDemoRapidReviewQuestions(): unknown[] {

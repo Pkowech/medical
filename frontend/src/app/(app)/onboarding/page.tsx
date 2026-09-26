@@ -119,9 +119,8 @@ export default function OnboardingPage() {
         duration: 3000,
       });
 
-      setTimeout(() => {
-        router.push('/dashboard');
-      }, 2000);
+      setFinished(true);
+      setStep(4);
 
     } catch (err) {
       console.error('[Onboarding] Error saving data:', err);

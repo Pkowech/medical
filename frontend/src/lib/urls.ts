@@ -31,8 +31,25 @@ const getDynamicOrigin = (): string => {
   }
 };
 
+export const resolveApiBaseUrl = (): string => {
+  const raw = (process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL || '').trim();
+
+  if (!raw) {
+    return `${getDynamicOrigin()}/v1`;
+  }
+
+  const normalized = raw.replace(/\/+$/, '');
+  if (/^https?:\/\//i.test(normalized)) {
+    return normalized.endsWith('/v1') ? normalized : `${normalized}/v1`;
+  }
+
+  return `https://${normalized}`.replace(/\/+$/, '').endsWith('/v1')
+    ? `https://${normalized}`.replace(/\/+$/, '')
+    : `https://${normalized}/v1`;
+};
+
 const BASE = getDynamicOrigin();
-const API_BASE = (process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL || `${BASE}/v1`).replace(/\/+$/, '');
+const API_BASE = resolveApiBaseUrl();
 const APP_URL = BASE;
 
 export const URLS = {

@@ -7,6 +7,8 @@ import pytest
 import json
 from datetime import datetime, timezone
 import asyncio
+import uuid
+import grpc
 
 from grpc_utils import GrpcAnalyticsClient
 
@@ -20,15 +22,11 @@ class TestGrpcAnalyticsEvents:
     """Tests for batch event tracking via gRPC."""
 
     @pytest.mark.anyio
-    async def test_grpc_batch_submission(self, user_factory, grpc_analytics_channel_insecure):
-        student = user_factory(role="student")
-        user_id = student["user"]["id"]
-        access_token = student["accessToken"]
-
+    async def test_grpc_batch_submission(self, grpc_analytics_channel_insecure):
+        user_id = str(uuid.uuid4())
         client = GrpcAnalyticsClient(
             grpc_analytics_channel_insecure,
             user_id=user_id,
-            access_token=access_token,
         )
 
         events = [
@@ -53,35 +51,33 @@ class TestGrpcAnalyticsEvents:
         assert isinstance(response, dict)
         assert "processed" in response
         assert "failed" in response
+        assert response["processed"] + response["failed"] == len(events)
+        assert response["success"] is True
+        assert response["processed"] == len(events)
 
     @pytest.mark.anyio
-    async def test_grpc_empty_batch_submission(self, user_factory, grpc_analytics_channel_insecure):
+    async def test_grpc_empty_batch_submission(self, grpc_analytics_channel_insecure):
         """Tests gRPC batch submission with empty events list."""
-        student = user_factory(role="student")
-        user_id = student["user"]["id"]
-        access_token = student["accessToken"]
-
         client = GrpcAnalyticsClient(
             grpc_analytics_channel_insecure,
-            user_id=user_id,
-            access_token=access_token,
+            user_id=str(uuid.uuid4()),
         )
 
         response = await client.batch_track_events([])
         assert isinstance(response, dict)
-        assert "success" in response
+        assert response == {
+            "success": True,
+            "processed": 0,
+            "failed": 0,
+            "message": "No events to process",
+        }
 
     @pytest.mark.anyio
-    async def test_grpc_batch_with_various_event_types(self, user_factory, grpc_analytics_channel_insecure):
+    async def test_grpc_batch_with_various_event_types(self, grpc_analytics_channel_insecure):
         """Tests gRPC batch submission with various event types."""
-        student = user_factory(role="student")
-        user_id = student["user"]["id"]
-        access_token = student["accessToken"]
-
         client = GrpcAnalyticsClient(
             grpc_analytics_channel_insecure,
-            user_id=user_id,
-            access_token=access_token,
+            user_id=str(uuid.uuid4()),
         )
 
         events = [
@@ -95,6 +91,9 @@ class TestGrpcAnalyticsEvents:
 
         response = await client.batch_track_events(events)
         assert isinstance(response, dict)
+        assert response["processed"] + response["failed"] == len(events)
+        assert response["success"] is True
+        assert response["processed"] == len(events)
 
 class TestGrpcBKTModel:
     """Test Bayesian Knowledge Tracing model via gRPC."""
@@ -366,7 +365,16 @@ class TestGrpcHealthCheck:
         client = GrpcAnalyticsClient(grpc_analytics_channel_insecure)
         
         is_healthy = await client.health_check()
-        assert isinstance(is_healthy, bool)
+        assert is_healthy is True
+
+    @pytest.mark.asyncio
+    async def test_grpc_rejects_calls_without_service_api_key(self, grpc_analytics_channel_insecure):
+        from analytics_pb2 import HealthRequest
+        from analytics_pb2_grpc import AnalyticsServiceStub
+
+        unauthenticated_stub = AnalyticsServiceStub(grpc_analytics_channel_insecure)
+        with pytest.raises(grpc.RpcError):
+            unauthenticated_stub.GetHealth(HealthRequest(), timeout=5)
 
 
 class TestGrpcVsHttpParity:
@@ -425,26 +433,38 @@ class TestGrpcServerBindings:
 
     @pytest.mark.anyio
     async def test_server_rpc_bindings_and_basic_calls(self, grpc_analytics_channel_insecure):
-        # Ensure gRPC stubs are available; fail explicitly if not.
-        from grpc_utils import GRPC_STUBS_AVAILABLE, GrpcAnalyticsClient
+        import grpc_utils
+        from analytics_pb2 import GetUserLearningSummaryRequest, StudySession
 
-        assert GRPC_STUBS_AVAILABLE, (
-            "gRPC stubs not available. Generate them with: "
-            "python -m grpc_tools.protoc -I../../protos --python_out=. --grpc_python_out=. ../../protos/analytics.proto"
-        )
+        grpc_utils._load_stubs()
+        assert grpc_utils.GRPC_STUBS_AVAILABLE
 
-        client = GrpcAnalyticsClient(grpc_analytics_channel_insecure)
+        client = grpc_utils.GrpcAnalyticsClient(grpc_analytics_channel_insecure)
         stub = client.stub
 
-        expected_methods = ["GetUserAbility", "GetRecommendations"]
+        expected_methods = ["GetHealth", "GetUserLearningSummary"]
         missing = [m for m in expected_methods if not hasattr(stub, m)]
         assert not missing, f"Missing RPC methods on server stub: {missing}"
 
-        # Perform lightweight RPC calls; let exceptions surface as test failures so server-side issues are visible.
-        from analytics_pb2 import GetUserAbilityRequest, GetRecommendationsRequest
+        health = await stub.GetHealth(
+            grpc_utils.HealthRequest(), metadata=client.metadata
+        )
+        assert health.status == "ok"
 
-        ua_resp = await stub.GetUserAbility(GetUserAbilityRequest(user_id="test_user"), metadata=client.metadata)
-        assert ua_resp is not None
-
-        rec_resp = await stub.GetRecommendations(GetRecommendationsRequest(user_id="test_user"), metadata=client.metadata)
-        assert rec_resp is not None
+        user_id = "pytest-read-only-analytics"
+        summary_response = await stub.GetUserLearningSummary(
+            GetUserLearningSummaryRequest(
+                user_id=user_id,
+                study_sessions=[
+                    StudySession(
+                        user_id=user_id,
+                        duration=30,
+                        topic="pytest",
+                        score=80,
+                    )
+                ],
+            ),
+            metadata=client.metadata,
+        )
+        assert summary_response.HasField("summary")
+        assert summary_response.summary.total_study_time == 30

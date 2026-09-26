@@ -272,10 +272,12 @@ export class CreateAssessmentDto {
 export class StartAssessmentDto {
   @ApiProperty()
   @IsString()
+  @IsOptional()
   assessmentId!: string;
 
   @ApiProperty()
   @IsString()
+  @IsOptional()
   userId!: string;
 }
 
@@ -315,6 +317,23 @@ export class SubmitAnswerDto {
   @IsOptional()
   @IsNumber()
   timeSpentSeconds?: number;
+}
+
+export class SubmitQuizAnswerDto {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  questionId!: string;
+
+  @ApiProperty({ type: [String] })
+  @IsArray()
+  @IsString({ each: true })
+  selectedOptionIds!: string[];
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsObject()
+  answerData?: AnswerData;
 }
 
 export class QuizAnswerDto {

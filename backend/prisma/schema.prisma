@@ -89,6 +89,21 @@ model UserActivity {
   @@map("user_activities")
 }
 
+model AnalyticsEvent {
+  id        String   @id
+  userId    String   @map("user_id")
+  eventType String   @map("event_type")
+  data      Json     @default("{}") @db.JsonB
+  timestamp DateTime @db.Timestamptz(6)
+  sessionId String?  @map("session_id")
+  duration  Int?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([userId, timestamp])
+  @@index([eventType])
+  @@map("analytics_events")
+}
+
 model UnitAccess {
   id         String   @id @default(uuid())
   userId     String   @map("user_id")
@@ -323,8 +338,11 @@ model User {
   experimentAssignments   ExperimentAssignment[]
   File                    File[]
   flashcardResults        FlashcardResult[]
-  instructorOverrides     InstructorOverride[]
-  LearningGoalProgress    LearningGoalProgress[]
+  instructorOverrides          InstructorOverride[]
+  analyticsInstructorOverrides AnalyticsOverride[] @relation("OverrideInstructor")
+  analyticsStudentOverrides    AnalyticsOverride[] @relation("OverrideStudent")
+  LearningGoalProgress         LearningGoalProgress[]
+  notes                        Note[]
   learningGoals           LearningGoal[]
   learningHistory         LearningHistory[]
   learningPathProgress    LearningPathProgress[]
@@ -724,6 +742,8 @@ model Topic {
   skillTrajectories SkillTrajectory[]
   studySessions     StudySession[]
   progress          Progress[]
+  analyticsOverrides AnalyticsOverride[]
+  notes             Note[]
   unit              Unit                     @relation(fields: [unitId], references: [id], onDelete: Cascade)
   userSkillStates   UserSkillState[]
 
@@ -768,6 +788,7 @@ model Material {
   events              MaterialEvent[]
   notes               MaterialNote[]
   shares              MaterialShare[]
+  recommendationScore RecommendationScore?
   course              Course?                  @relation(fields: [courseId], references: [id])
   file                File?                    @relation("OriginalFile", fields: [fileId], references: [id])
   previewFile         File?                    @relation("PreviewFile", fields: [previewFileId], references: [id])
@@ -776,6 +797,7 @@ model Material {
   user                User?                    @relation(fields: [userId], references: [id])
   studySessions       StudySession[]
   progress            Progress[]
+  studentNotes        Note[]
   xapiStatements      XapiStatement[]
 
   @@index([fileId])
@@ -787,6 +809,15 @@ model Material {
   @@index([fts], type: Gin)
   @@index([title])
   @@map("materials")
+}
+
+model RecommendationScore {
+  itemId    String   @id @map("item_id")
+  score     Float
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  material  Material @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@map("recommendation_scores")
 }
 
 model MaterialShare {
@@ -1989,6 +2020,25 @@ model InstructorOverride {
   @@map("instructor_overrides")
 }
 
+model AnalyticsOverride {
+  id           String   @id @default(uuid())
+  instructorId String   @map("instructor_id")
+  studentId    String   @map("student_id")
+  topicId      String   @map("topic_id")
+  action       String   @db.VarChar(50)
+  reason       String?
+  appliedAt    DateTime @default(now()) @map("applied_at")
+
+  instructor   User     @relation("OverrideInstructor", fields: [instructorId], references: [id], onDelete: Cascade)
+  student      User     @relation("OverrideStudent", fields: [studentId], references: [id], onDelete: Cascade)
+  topic        Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@index([studentId])
+  @@index([topicId])
+  @@index([instructorId])
+  @@map("analytics_overrides")
+}
+
 model SyncLog {
   id           String    @id @default(uuid())
   userId       String    @map("user_id")
@@ -2453,6 +2503,49 @@ enum ProgressEntryType {
 enum ProgressUpdateSource {
   user
   system
+}
+
+enum NoteType {
+  student
+  ai_generated
+  peer_shared
+}
+
+model Note {
+  id               String       @id @default(uuid())
+  userId           String       @map("user_id")
+  topicId          String       @map("topic_id")
+  materialId       String?      @map("material_id")
+  type             NoteType     @default(student)
+  content          String
+  linkedQuizIds    String[]     @map("linked_quiz_ids")
+  linkedConceptIds String[]     @map("linked_concept_ids")
+  createdAt        DateTime     @default(now()) @map("created_at")
+  lastUpdatedAt    DateTime     @updatedAt @map("last_updated_at")
+  isStale          Boolean      @default(false) @map("is_stale")
+  staledAt         DateTime?    @map("staled_at")
+  
+  user             User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topic            Topic        @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  material         Material?    @relation(fields: [materialId], references: [id], onDelete: SetNull)
+  versions         NoteVersion[]
+
+  @@index([userId])
+  @@index([topicId])
+  @@index([materialId])
+  @@map("notes")
+}
+
+model NoteVersion {
+  id        String   @id @default(uuid())
+  noteId    String   @map("note_id")
+  content   String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  note      Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+
+  @@index([noteId])
+  @@map("note_versions")
 }
 
 enum GoalPriority {

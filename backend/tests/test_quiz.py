@@ -34,7 +34,7 @@ def test_student_can_get_quiz_for_unit(user_factory, course_and_unit):
     student = user_factory(role="student")
     headers = {"Authorization": f"Bearer {student['accessToken']}"}
     # Act: Request the quiz for a given unit
-    response = user_factory.session.get(f"{user_factory.base_url}/quiz/unit/{course_and_unit['id']}", headers=headers)
+    response = user_factory.session.get(f"{user_factory.base_url}/quizzes/unit/{course_and_unit['id']}", headers=headers)
 
     # Assert: Check for a successful response
     assert response.status_code == 200, f"Expected 200, got {response.status_code}. Response: {response.text}"
@@ -65,7 +65,7 @@ def test_student_can_submit_quiz(user_factory, course_and_unit):
     }
 
     # Act: Post the submission to the consolidated submit endpoint
-    response = user_factory.session.post(f"{user_factory.base_url}/quiz/submit?type=full", headers=headers, json=submission_payload)
+    response = user_factory.session.post(f"{user_factory.base_url}/quizzes/submit?type=full", headers=headers, json=submission_payload)
 
     # Assert: Check for a successful submission response
     assert response.status_code == 201, f"Expected 201, got {response.status_code}. Response: {response.text}"

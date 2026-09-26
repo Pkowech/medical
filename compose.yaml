@@ -89,9 +89,9 @@ services:
       RUST_ANALYTICS_HOST: 0.0.0.0
       RUST_ANALYTICS_PORT: 8000
 
-    ports:
-      - "50051:50051"
-      - "8000:8000"
+    expose:
+      - "50051"
+      - "8000"
 
     networks:
       - medtrack_net

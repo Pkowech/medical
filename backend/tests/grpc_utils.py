@@ -13,6 +13,42 @@ imported before the stubs exist, we defer importing the generated code until
 import; it will raise ImportError if the stubs are still missing.
 """
 
+import os
+import sys
+from pathlib import Path
+from typing import TYPE_CHECKING
+
+from dotenv import load_dotenv
+
+if TYPE_CHECKING:
+    from analytics_pb2 import (
+        AttemptMetricsRequest,
+        BatchEventRequest,
+        BatchEventResponse,
+        EventPayload,
+        GetEngagementMetricsRequest,
+        GetEngagementMetricsResponse,
+        GetNextAdaptiveQuestionRequest,
+        GetNextAdaptiveQuestionResponse,
+        GetRecommendationsRequest,
+        GetRecommendationsResponse,
+        GetUserAbilityRequest,
+        GetUserAbilityResponse,
+        HealthRequest,
+        HealthResponse,
+        NextStepsRequest,
+        NextStepsResponse,
+        PredictBKTRequest,
+        PredictBKTResponse,
+        PredictPerformanceRequest,
+        QuizAttemptHistoryRequest,
+        QuizAttemptHistoryResponse,
+        StudyRecommendationsRequest,
+        StudyRecommendationsResponse,
+        UpdateAttemptMetricsResponse,
+    )
+    from analytics_pb2_grpc import AnalyticsServiceStub
+
 GRPC_STUBS_AVAILABLE = False
 
 
@@ -26,7 +62,7 @@ def _load_stubs():
     if GRPC_STUBS_AVAILABLE:
         return
 
-    import os, sys
+    load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
     # Ensure this tests directory is on sys.path so generated stubs can be found
     tests_dir = os.path.dirname(__file__)
@@ -81,7 +117,13 @@ class GrpcAnalyticsClient:
     Provides async/await interface for gRPC calls.
     """
 
-    def __init__(self, channel, user_id: str = None, access_token: str = None):
+    def __init__(
+        self,
+        channel,
+        user_id: str = None,
+        access_token: str = None,
+        api_key: str = None,
+    ):
         """
         Initialize gRPC Analytics client.
         
@@ -107,9 +149,12 @@ class GrpcAnalyticsClient:
         self.user_id = user_id
         self.access_token = access_token
         self.metadata = []
-        
+
         if access_token:
             self.metadata = [("authorization", f"Bearer {access_token}")]
+        resolved_api_key = api_key or os.environ.get("RUST_ANALYTICS_API_KEY")
+        if resolved_api_key:
+            self.metadata.append(("x-api-key", resolved_api_key))
         # runtime helpers for sync vs async stubs
         import inspect, anyio
         self._anyio = anyio
@@ -142,7 +187,7 @@ class GrpcAnalyticsClient:
         try:
             request = HealthRequest()
             response = await self.stub.GetHealth(request, metadata=self.metadata)
-            return response.status == "healthy"
+            return response.status.lower() in {"ok", "healthy"}
         except Exception as e:
             print(f"Health check failed: {e}")
             return False
@@ -157,6 +202,8 @@ class GrpcAnalyticsClient:
         Returns:
             Response dict with success, processed, failed, message
         """
+        from google.protobuf.json_format import ParseDict
+
         event_payloads = []
         for event in events:
             payload = EventPayload()
@@ -164,7 +211,17 @@ class GrpcAnalyticsClient:
             payload.timestamp = event.get("timestamp", "")
             payload.session_id = event.get("sessionId", "")
             payload.duration = event.get("duration", 0)
-            # Note: data field (google.protobuf.Value) would need special handling
+            event_data = event.get("data")
+            if event_data is None:
+                event_data = {
+                    key: value
+                    for key, value in event.items()
+                    if key not in {"eventType", "timestamp", "sessionId", "duration"}
+                }
+            if event_data:
+                if not isinstance(event_data, dict):
+                    event_data = {"value": event_data}
+                ParseDict(event_data, payload.data)
             event_payloads.append(payload)
 
         request = BatchEventRequest(user_id=self.user_id, events=event_payloads)

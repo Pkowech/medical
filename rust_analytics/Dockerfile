@@ -40,7 +40,7 @@ RUN --mount=type=bind,from=proto_context,source=/protos,target=/protos \
     --mount=type=cache,target=/app/target/ \
     --mount=type=cache,target=/usr/local/cargo/git/db \
     --mount=type=cache,target=/usr/local/cargo/registry/ \
-    SQLX_OFFLINE=true cargo build --locked --release || SQLX_OFFLINE=true cargo build --release && \
+    SQLX_OFFLINE=true cargo build --features ml --locked --release || SQLX_OFFLINE=true cargo build --features ml --release && \
     # Strip the binary to reduce final image size
     if command -v strip >/dev/null 2>&1; then strip ./target/release/$APP_NAME || true; fi && \
     # Copy to standard Linux binary directory

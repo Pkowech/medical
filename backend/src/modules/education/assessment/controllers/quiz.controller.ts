@@ -14,7 +14,10 @@ import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { QuizService } from '../services/quiz.service';
 import { WeaknessOrchestrationService } from '../services/weakness-orchestration.service';
 import { JwtAuthGuard } from '#modules/auth/guards/jwt-auth.guard';
-import { SubmitQuizDto, SubmitAnswerDto } from '#common/dto/assessment.dto';
+import {
+  SubmitQuizDto,
+  SubmitQuizAnswerDto,
+} from '#common/dto/assessment.dto';
 
 @ApiTags('Quiz')
 @ApiBearerAuth()
@@ -62,7 +65,7 @@ export class QuizController {
   async submit(
     @Request() req: any,
     @Query('type') type: string,
-    @Body() body: SubmitQuizDto | SubmitAnswerDto,
+    @Body() body: SubmitQuizDto | SubmitQuizAnswerDto,
   ) {
     const userId = req.user.id;
 
@@ -72,7 +75,7 @@ export class QuizController {
     }
 
     // Default to single answer submission
-    const submitDto = body as SubmitAnswerDto;
+    const submitDto = body as SubmitQuizAnswerDto;
     const answer = submitDto.answerData
       ? JSON.stringify(submitDto.answerData)
       : submitDto.selectedOptionIds?.[0] || '';
@@ -122,21 +125,11 @@ export class QuizController {
     @Request() req: any,
     @Body() body: { quizId: string; score: number; maxScore: number },
   ) {
-    const userId = req.user.id;
-    const { quizId, score, maxScore } = body;
-
-    // Emit event for orchestration service to handle improvement tracking
-    this.orchestrationService['eventEmitter']?.emit('auto-quiz.completed', {
-      userId,
-      quizId,
-      score,
-      maxScore,
-      timestamp: new Date(),
-    });
-
-    return {
-      success: true,
-      message: 'Quiz completion recorded',
-    };
+    return this.orchestrationService.completeAutoQuiz(
+      req.user.id,
+      body.quizId,
+      body.score,
+      body.maxScore,
+    );
   }
 }

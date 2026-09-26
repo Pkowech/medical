@@ -22,7 +22,6 @@ import * as argon2 from 'argon2';
 import { randomUUID } from 'crypto';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
-import { RoleInitializationService } from '../../src/modules/auth/services/role-initialization.service';
 
 // Use the Postgres adapter so scripts executed directly (ts-node) work with Prisma v7
 const _seedPool = new Pool({ connectionString: process.env.DATABASE_URL });
@@ -337,13 +336,9 @@ async function main() {
   console.log('Start seeding...');
 
   try {
-    // --- 1. SEED ROLES AND PERMISSIONS ---
-    console.log('Seeding roles and permissions...'); // Bypassing NestJS service for seeding
-    const roleInitializationService = new RoleInitializationService(prisma as any);
-    await roleInitializationService.initializeDefaultRoles();
-    console.log('Roles and permissions seeded successfully via RoleInitializationService.');
-
-    // Fetch the roles created by the service to use their IDs later
+    // --- 1. LOAD SEEDED ROLES AND PERMISSIONS ---
+    // `seed_roles.ts` runs before this script and owns creation of default roles
+    // and permissions. Here we only fetch them for downstream seeding steps.
     const allRoles = await prisma.role.findMany();
     const adminRole = allRoles.find(r => r.name === 'admin');
     const studentRole = allRoles.find(r => r.name === 'student');
@@ -918,7 +913,7 @@ async function main() {
           id: 'lgp-kericho-cardiac',
           userId: kerichomogulUser.id,
           learningGoalId: cardiacGoal.id,
-          status: 'IN_PROGRESS', // Or mapped to DB enum if needed
+          status: ProgressStatus.inProgress,
           progress: 70,
           startDate: new Date('2025-09-15T00:00:00Z'),
           streakCount: 5,

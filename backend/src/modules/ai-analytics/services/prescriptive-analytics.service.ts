@@ -58,6 +58,25 @@ export class PrescriptiveAnalyticsService implements OnModuleInit {
    */
   async evaluateGates(userId: string, topicId: string): Promise<GateDecision> {
     try {
+      // 1. Check for active instructor overrides (Feedback Loop)
+      const activeOverride = await this.prisma.analyticsOverride.findFirst({
+        where: {
+          studentId: userId,
+          topicId: topicId,
+          action: 'unblock', // explicitly unblocked by instructor
+        },
+        orderBy: { appliedAt: 'desc' },
+      });
+
+      if (activeOverride) {
+        return {
+          canProceed: true,
+          reason: `Access granted via instructor override: ${activeOverride.reason || 'No reason provided'}`,
+          pKnown: 1.0, // Assumed mastery via override
+          explanation: ['An instructor has explicitly approved your progress.'],
+        };
+      }
+
       // Fetch knowledge states from Rust Analytics service
       const response = await firstValueFrom(
         this.analyticsServiceGrpc

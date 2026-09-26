@@ -261,6 +261,7 @@ export const EducationalCourseLayout = ({ courseId: propCourseId }: EducationalC
                 <QuizPanel 
                   lessonId={typedCurrentLesson?.id} 
                   lessonTitle={typedCurrentLesson?.title} 
+                  scope="unit"
                 />
               </div>
             ) : (

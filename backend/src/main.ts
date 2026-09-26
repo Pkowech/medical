@@ -16,28 +16,6 @@ import { ConfigService } from '@nestjs/config';
 import helmet from 'helmet';
 import { rateLimit } from 'express-rate-limit';
 
-// Quick startup diagnostics to help debug environment/connection issues when
-// running the backend on the host (outside docker). These logs are safe to
-// leave in development and help surface mismatched envs (for example when
-// Redis is mapped to a non-standard host port by docker-compose).
-if (process.env.NODE_ENV !== 'production') {
-  // Print only a few important env vars to avoid leaking secrets in logs.
-  // Use Nest's Logger so output can be controlled by log levels and
-  // respects centralized logging configuration.
-  Logger.debug(
-    `[startup] ENV SNAPSHOT: ${JSON.stringify({
-      NODE_ENV: process.env.NODE_ENV,
-      ENABLE_REDIS: process.env.ENABLE_REDIS,
-      REDIS_HOST: process.env.REDIS_HOST,
-      REDIS_PORT: process.env.REDIS_PORT,
-      REDIS_URL: process.env.REDIS_URL ? '[REDACTED]' : undefined,
-      POSTGRES_HOST: process.env.POSTGRES_HOST,
-      POSTGRES_PORT: process.env.POSTGRES_PORT,
-      PORT: process.env.PORT,
-    })}`,
-  );
-}
-
 async function logRoutes(app: INestApplication) {
   // Defer slightly to allow Nest/Express to finish wiring the router
   await new Promise((resolve) => setTimeout(resolve, 100));
@@ -84,18 +62,29 @@ async function logRoutes(app: INestApplication) {
 }
 
 async function bootstrap() {
-  Logger.log('Starting bootstrap...');
   const app = await NestFactory.create(AppModule, {
-    bufferLogs: process.env.NODE_ENV === 'development',
-    logger: ['error', 'warn', 'log', 'debug', 'verbose'],
+    bufferLogs: true,
   });
 
-  Logger.log('App module created successfully');
+  const pinoLogger = app.get(PinoLogger);
+  app.useLogger(pinoLogger);
 
-  try {
-    app.useLogger(app.get(PinoLogger));
-  } catch {
-    Logger.warn('Pino logger not available, using default logger');
+  pinoLogger.log('Starting bootstrap...');
+  pinoLogger.log('App module created successfully');
+
+  if (process.env.NODE_ENV !== 'production') {
+    pinoLogger.debug(
+      `[startup] ENV SNAPSHOT: ${JSON.stringify({
+        NODE_ENV: process.env.NODE_ENV,
+        ENABLE_REDIS: process.env.ENABLE_REDIS,
+        REDIS_HOST: process.env.REDIS_HOST,
+        REDIS_PORT: process.env.REDIS_PORT,
+        REDIS_URL: process.env.REDIS_URL ? '[REDACTED]' : undefined,
+        POSTGRES_HOST: process.env.POSTGRES_HOST,
+        POSTGRES_PORT: process.env.POSTGRES_PORT,
+        PORT: process.env.PORT,
+      })}`,
+    );
   }
 
   // Database connection handled by Prisma
@@ -371,7 +360,7 @@ async function bootstrap() {
     `🗄️  Database: ${dbHost}:${configService.get('POSTGRES_PORT', 5432)}`,
   );
   if (redisUrl) {
-    Logger.log(`🔴 Redis URL: ${redisUrl}`);
+    Logger.log('🔴 Redis URL: configured (credentials redacted)');
   } else {
     Logger.log(`🔴 Redis: ${redisHost}:${configService.get('REDIS_PORT', 6379)}`);
   }

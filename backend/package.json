@@ -34,6 +34,7 @@
     "test:all": "pnpm run test && pnpm run test:e2e && pnpm run test:integration",
     "prisma:generate": "prisma generate",
     "prisma:migrate": " prisma migrate dev",
+    "prisma:migrate:status": "prisma migrate status",
     "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:migrate:reset": "prisma migrate reset",
     "prisma:studio": "prisma studio",

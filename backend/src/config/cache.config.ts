@@ -6,7 +6,8 @@ export const redisCacheModule = CacheModule.registerAsync({
   inject: [ConfigService],
   useFactory: async (configService: ConfigService) => {
     const enableRedis =
-      process.env.ENABLE_REDIS === 'true' || Boolean(process.env.REDIS_URL);
+      process.env.ENABLE_REDIS !== 'false' &&
+      (process.env.ENABLE_REDIS === 'true' || Boolean(process.env.REDIS_URL));
 
     const ttl = configService.get<number>('REDIS_CACHE_TTL', 3600);
     const max = configService.get<number>('REDIS_CACHE_MAX', 100);

@@ -7,9 +7,15 @@ import { apiService } from '@/features/auth/services/apiClient';
 interface QuizQuestion {
   id: string;
   question_text: string;
-  options: string[];
-  correct_answer: string;
+  options: Array<{ id: string; text: string }>;
   explanation?: string;
+}
+
+interface ApiQuizQuestion {
+  id: string;
+  text: string;
+  options?: Array<{ id: string; text: string }>;
+  explanation?: string | null;
 }
 
 interface QuizState {
@@ -28,10 +34,11 @@ export function useQuiz(unitId: string, userId: string) {
   const [currentState, setCurrentState] = useState<QuizState | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
-  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const [isOffline, setIsOffline] = useState(false);
 
   // Handle online/offline status
   useEffect(() => {
+    setIsOffline(!navigator.onLine);
     const handleOnline = () => setIsOffline(false);
     const handleOffline = () => setIsOffline(true);
 
@@ -77,8 +84,13 @@ export function useQuiz(unitId: string, userId: string) {
         }
 
         // Load questions directly from backend
-        const response = await apiService.get<QuizQuestion[]>(`/quizzes/unit/${unitId}`);
-        setQuestions(response.data);
+        const response = await apiService.get<ApiQuizQuestion[]>(`/quizzes/unit/${unitId}`);
+        setQuestions(response.data.map((question) => ({
+          id: question.id,
+          question_text: question.text,
+          options: question.options || [],
+          explanation: question.explanation || undefined,
+        })));
       } catch (err) {
         setError(err instanceof Error ? err : new Error('Failed to load quiz'));
       } finally {
@@ -93,7 +105,6 @@ export function useQuiz(unitId: string, userId: string) {
     async (questionId: string, answer: string) => {
       if (!currentState) return;
 
-      const lastUpdated = Date.now();
       const newState = {
         ...currentState,
         answers: {
@@ -117,7 +128,7 @@ export function useQuiz(unitId: string, userId: string) {
         userId,
         questionId,
         selectedAnswer: answer,
-        isCorrect: questions.find(q => q.id === questionId)?.correct_answer === answer,
+        isCorrect: false,
         timestamp: new Date(),
         synced: false,
       };
@@ -126,16 +137,6 @@ export function useQuiz(unitId: string, userId: string) {
         console.error('Failed to save quiz response:', err);
       });
 
-      // Add to sync queue with timestamp for conflict resolution (using backend path)
-      syncService.addToOutbox(`/quizzes/submit/${currentState.id}`, 'POST', {
-        questionId,
-        answer,
-        timestamp: new Date().toISOString(),
-      }, {
-        'X-Client-Timestamp': String(lastUpdated),
-      }, lastUpdated).catch(err => {
-        console.error('Failed to add to outbox:', err);
-      });
     },
     [currentState, userId, questions]
   );
@@ -187,56 +188,52 @@ export function useQuiz(unitId: string, userId: string) {
       selectedOption,
     }));
 
-    // OPTIMISTIC UI: Mark quiz as submitted immediately
+    // Keep the attempt locally until the server accepts it or it is queued offline.
     const updatedState = {
       ...currentState,
       lastModified: new Date(),
-      synced: true, // Mark as "submitted" even if offline
+      synced: false,
     };
     setCurrentState(updatedState);
 
-    // BACKGROUND SYNC: Queue submission without blocking UI (using backend path)
-    await syncService.addToOutbox('/quizzes/submit?type=full', 'POST', {
+    const submission = {
       unitId,
       answers: formattedAnswers,
-    }, {
-      'X-Client-Timestamp': String(lastUpdated),
-    }, lastUpdated).catch(err => {
-      console.error('Failed to queue quiz submission:', err);
-      setError(err instanceof Error ? err : new Error('Failed to queue submission'));
-    });
+    };
 
-    // If online, attempt immediate sync via apiService
-    if (!isOffline) {
-      try {
-        const response = await apiService.post('/quizzes/submit?type=full', {
-          unitId,
-          answers: formattedAnswers,
-        }, {
+    if (isOffline) {
+      await syncService.addToOutbox(
+        '/quizzes/submit?type=full',
+        'POST',
+        submission,
+        { 'X-Client-Timestamp': String(lastUpdated) },
+        lastUpdated,
+      );
+      await quizStorage.saveQuizState({ ...updatedState, synced: true });
+      return { queued: true, offline: true };
+    }
+
+    try {
+      const response = await apiService.post(
+        '/quizzes/submit?type=full',
+        submission,
+        {
           headers: {
             'X-Client-Timestamp': String(lastUpdated),
           },
-        });
+        },
+      );
 
-        // Clear local state on immediate success
-        await quizStorage.saveQuizState({
-          ...updatedState,
-          synced: true,
-        });
-        return response.data;
-      } catch (err: unknown) {
-        if (err && typeof err === 'object' && 'status' in err && err.status === 409) {
-          // Conflict: server has newer data
-          console.warn('Quiz submission conflict - server has newer data');
-          return { conflict: true };
-        }
-        console.error('Online sync attempt failed, queued for later:', err);
-        // Don't throw - queued for later sync via background sync
+      await quizStorage.saveQuizState({ ...updatedState, synced: true });
+      return response.data;
+    } catch (err: unknown) {
+      if (err && typeof err === 'object' && 'status' in err && err.status === 409) {
+        console.warn('Quiz submission conflict - server has newer data');
+        return { conflict: true };
       }
+      setError(err instanceof Error ? err : new Error('Quiz submission failed'));
+      throw err;
     }
-
-    // Return optimistic result
-    return { queued: true, offline: isOffline };
   };
 
   return {

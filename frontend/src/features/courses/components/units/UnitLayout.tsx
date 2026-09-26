@@ -571,6 +571,7 @@ export const UnitLayout = ({ unitId: propUnitId }: UnitLayoutProps) => {
                 <QuizPanel
                   lessonId={typedCurrentTopic?.id}
                   lessonTitle={typedCurrentTopic?.title}
+                  scope="topic"
                 />
               </div>
             ) : (

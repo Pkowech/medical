@@ -9,13 +9,18 @@ import { RedisService } from '../../../../infrastructure/redis/redis.service';
 import { AssessmentProgressService } from './assessment-progress.service';
 import { AssessmentAnalyticsService } from '#modules/ai-analytics/services/assessment-analytics.service';
 import { MasteryGateService } from '../../courses/services/mastery-gate.service';
-import { Question, Quiz, QuizAttempt, UserActivityType } from '@prisma/client';
+import { Option, Question, Quiz, QuizAttempt, UserActivityType } from '@prisma/client';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { QuizUtils } from '#common/utils/quiz.utils';
 import { QuizAnswerDto, CreateQuizDto } from '#common/dto/assessment.dto';
 import { QuestionBankService } from './question-bank.service';
 
 import { GlobalSearchSyncService } from '../../../../infrastructure/search/services/global-search-sync.service';
+
+type PublicQuizQuestion = Omit<Question, 'options'> & {
+  options: Array<Pick<Option, 'id' | 'text' | 'order'>>;
+};
 
 @Injectable()
 @ApiTags('quizzes')
@@ -30,6 +35,7 @@ export class QuizService {
     private readonly masteryGateService: MasteryGateService,
     private readonly questionBankService: QuestionBankService,
     private readonly searchSync: GlobalSearchSyncService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   @ApiOperation({ summary: 'Create a new quiz' })
@@ -60,7 +66,7 @@ export class QuizService {
         },
       });
 
-      if (data.questions && data.questions.length > 0) {
+          if (data.questions && data.questions.length > 0) {
         await tx.quizQuestion.createMany({
           data: data.questions.map((qId, index) => ({
             quizId: createdQuiz.id,
@@ -292,8 +298,8 @@ export class QuizService {
 
   @ApiOperation({ summary: 'Get questions for a unit' })
   @ApiResponse({ status: 200, description: 'Questions retrieved successfully' })
-  async getQuestionsByUnit(unitId: string): Promise<Question[]> {
-    const cacheKey = `unit:${unitId}:questions`;
+  async getQuestionsByUnit(unitId: string): Promise<PublicQuizQuestion[]> {
+    const cacheKey = `unit:${unitId}:questions:v2`;
     const cachedQuestions = await this.redisService.get(cacheKey);
     if (cachedQuestions) {
       try {
@@ -305,10 +311,29 @@ export class QuizService {
       }
     }
 
-    const questions = await this.prisma.question.findMany({
-      where: { unitId },
-      orderBy: { createdAt: 'desc' },
+    const optionInclude = {
+      options: {
+        select: { id: true, text: true, order: true },
+        orderBy: { order: 'asc' as const },
+      },
+    };
+    const quiz = await this.prisma.quiz.findUnique({
+      where: { id: unitId },
+      include: {
+        questions: {
+          orderBy: { order: 'asc' },
+          include: { question: { include: optionInclude } },
+        },
+      },
     });
+
+    const questions: PublicQuizQuestion[] = quiz
+      ? quiz.questions.map(({ question }) => question)
+      : await this.prisma.question.findMany({
+          where: { unitId },
+          orderBy: { createdAt: 'desc' },
+          include: optionInclude,
+        });
 
     // Return an empty array when no questions exist for the unit instead of throwing
     // This allows callers (and tests) to handle empty quizzes gracefully.
@@ -318,8 +343,8 @@ export class QuizService {
 
   @ApiOperation({ summary: 'Get questions for a topic' })
   @ApiResponse({ status: 200, description: 'Topic questions retrieved successfully' })
-  async getQuestionsByTopic(topicId: string): Promise<Question[]> {
-    const cacheKey = `topic:${topicId}:questions`;
+  async getQuestionsByTopic(topicId: string): Promise<PublicQuizQuestion[]> {
+    const cacheKey = `topic:${topicId}:questions:v2`;
     const cachedQuestions = await this.redisService.get(cacheKey);
     if (cachedQuestions) {
       try {
@@ -338,6 +363,12 @@ export class QuizService {
         },
       },
       orderBy: { createdAt: 'desc' },
+      include: {
+        options: {
+          select: { id: true, text: true, order: true },
+          orderBy: { order: 'asc' },
+        },
+      },
     });
 
     await this.redisService.set(cacheKey, JSON.stringify(questions), 3600);
@@ -445,19 +476,26 @@ export class QuizService {
     unitId: string,
     answers: QuizAnswerDto[],
   ): Promise<QuizAttempt> {
-    let quiz = await this.prisma.quiz.findFirst({
-      where: { unitId },
-      include: {
-        questions: {
-          include: {
-            question: {
-              include: { options: true },
-            },
+    const quizInclude = {
+      questions: {
+        include: {
+          question: {
+            include: { options: true },
           },
         },
-        unit: { select: { courseId: true } },
       },
+      unit: { select: { courseId: true } },
+    };
+    let quiz = await this.prisma.quiz.findUnique({
+      where: { id: unitId },
+      include: quizInclude,
     });
+    if (!quiz) {
+      quiz = await this.prisma.quiz.findFirst({
+        where: { unitId },
+        include: quizInclude,
+      });
+    }
 
     // If no quiz exists for the unit, create a lightweight auto-generated quiz so
     // submissions can still be recorded and tests relying on this behavior succeed.
@@ -578,6 +616,22 @@ export class QuizService {
         },
       });
 
+      await tx.userActivity.create({
+        data: {
+          userId,
+          type: UserActivityType.QUIZ_ATTEMPT,
+          description: `Completed quiz: ${activeQuiz.title}`,
+          details: {
+            quizId: activeQuiz.id,
+            unitId: activeQuiz.unitId,
+            score: scorePercentage,
+            passed: isPassed,
+            totalQuestions,
+            correctAnswers,
+          },
+        },
+      });
+
       if (isPassed && activeQuiz.unitId) {
         // REMOVE THIS LINE: await tx.unitProgress.upsert({...});
       }
@@ -608,14 +662,36 @@ export class QuizService {
         }
       }
 
-      return attempt;
+      const autoQuizUpdate = await tx.autoGeneratedQuiz.updateMany({
+        where: {
+          userId,
+          quizId: activeQuiz.id,
+          completedAt: null,
+        },
+        data: { completedAt: new Date() },
+      });
+
+      return {
+        attempt,
+        autoQuizCompleted: autoQuizUpdate.count === 1,
+      };
     });
+
+    if (result.autoQuizCompleted) {
+      this.eventEmitter.emit('auto-quiz.completed', {
+        userId,
+        quizId: activeQuiz.id,
+        score: result.attempt.score ?? 0,
+        maxScore: result.attempt.maxScore,
+        timestamp: result.attempt.completedAt ?? new Date(),
+      });
+    }
 
     await this.redisService.del(`quiz:${activeQuiz.id}`);
     this.logger.log(
-      `Submitted quiz ${activeQuiz.id} for user ${userId} with score ${result.score}`,
+      `Submitted quiz ${activeQuiz.id} for user ${userId} with score ${result.attempt.score}`,
     );
-    return result;
+    return result.attempt;
   }
 
   @ApiOperation({ summary: 'Submit a topic-level quiz' })
@@ -644,7 +720,7 @@ export class QuizService {
             totalPoints += question.points || 1;
             
             // Check if answers are correct
-            const correctOptions = (question.options || []).filter((opt: any) => opt.is_correct);
+            const correctOptions = (question.options || []).filter((opt: any) => opt.isCorrect);
             const selectedIds = response.selectedAnswers || [];
             
             if (correctOptions.length === selectedIds.length && 
@@ -657,6 +733,15 @@ export class QuizService {
 
       const scorePercentage = totalPoints > 0 ? Math.round((score / totalPoints) * 100) : 0;
       const passed = scorePercentage >= 70;
+
+      await this.prisma.userActivity.create({
+        data: {
+          userId,
+          type: UserActivityType.QUIZ_ATTEMPT,
+          description: `Completed topic quiz: ${topicId}`,
+          details: { topicId, score: scorePercentage, passed, totalPoints },
+        },
+      });
       
       return {
         score: scorePercentage,

@@ -81,7 +81,11 @@ export default function RegisterPage() {
         confirmPassword: formData.confirmPassword,
         acceptTerms: formData.acceptTerms,
       });
-      router.push('/finish-setup');
+      toast({
+        title: 'Account created',
+        description: 'Sign in to finish setting up your profile and learning goals.',
+      });
+      router.push('/login?callbackUrl=%2Ffinish-setup');
     } catch (err: unknown) {
       let errorMessage = 'An unexpected error occurred during registration.';
       let fieldErrors: Record<string, string> = {};

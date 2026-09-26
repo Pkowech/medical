@@ -9,7 +9,8 @@ export class RedisService implements OnModuleInit {
   private readonly redis: Redis | null;
   private readonly logger = new Logger(RedisService.name);
   private readonly shouldEnableRedis =
-    process.env.ENABLE_REDIS === 'true' || Boolean(process.env.REDIS_URL);
+    process.env.ENABLE_REDIS !== 'false' &&
+    (process.env.ENABLE_REDIS === 'true' || Boolean(process.env.REDIS_URL));
   private isConnected = false;
   private subscriber: Redis | null = null;
   private memoryStore: Map<string, { value: string; expiry?: number }> =
@@ -77,7 +78,7 @@ export class RedisService implements OnModuleInit {
 
   async onModuleInit() {
     if (this.shouldEnableRedis) {
-      await this.connectRedis(true);
+      await this.connectRedis();
       if (this.isConnected) {
         this.logger.log('Redis connection validated during startup');
       }

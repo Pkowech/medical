@@ -10,17 +10,17 @@ interface Question {
   id: string;
   text: string;
   type: string;
-  options: { id: string; text: string; isCorrect: boolean }[];
-  explanation: string;
-  topic: string;
+  options: { id: string; text: string }[];
+  explanation?: string;
 }
 
 interface QuizPanelProps {
   lessonId?: string | number;
   lessonTitle?: string;
+  scope?: 'unit' | 'topic';
 }
 
-export const QuizPanel = ({ lessonId, lessonTitle }: QuizPanelProps) => {
+export const QuizPanel = ({ lessonId, lessonTitle, scope = 'unit' }: QuizPanelProps) => {
   const { trackAction, XAPI_VERBS } = useXapi();
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -29,51 +29,65 @@ export const QuizPanel = ({ lessonId, lessonTitle }: QuizPanelProps) => {
   const [score, setScore] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [quizComplete, setQuizComplete] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [submissionError, setSubmissionError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [answerCorrect, setAnswerCorrect] = useState<boolean | null>(null);
 
   useEffect(() => {
     const fetchQuestions = async () => {
-      if (!lessonId) return;
+      if (!lessonId) {
+        setIsLoading(false);
+        return;
+      }
       setIsLoading(true);
       try {
-        const data = await quizService.getQuestionsForLesson(lessonId);
+        const data = await quizService.getQuestionsForLesson(lessonId, scope);
         setQuestions(data as Question[]);
       } catch (error) {
-        console.error('Failed to fetch quiz questions:', error);
+        setLoadError(error instanceof Error ? error.message : 'Failed to load quiz questions.');
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchQuestions();
-  }, [lessonId]);
+  }, [lessonId, scope]);
 
   const handleOptionSelect = (optionId: string) => {
     if (isSubmitted) return;
     setSelectedOption(optionId);
   };
 
-  const handleSubmit = () => {
-    if (!selectedOption || isSubmitted) return;
-    
-    setIsSubmitted(true);
-    const currentQuestion = questions[currentQuestionIndex];
-    const selected = currentQuestion.options.find(o => o.id === selectedOption);
-    
-    if (selected?.isCorrect) {
-      setScore(prev => prev + 1);
-    }
+  const handleSubmit = async () => {
+    if (!selectedOption || isSubmitted || isSubmitting) return;
 
-    // Track attempt
-    trackAction(XAPI_VERBS.ATTEMPTED, {
-      id: `${URLS.BASE}/quizzes/${lessonId || 'general'}/question/${currentQuestion.id}`,
-      definition: {
-        name: { 'en-US': currentQuestion.text },
-        type: 'http://adlnet.gov/expapi/activities/question',
-      }
-    }, {
-      success: selected?.isCorrect,
-      response: selected?.text,
-    });
+    const currentQuestion = questions[currentQuestionIndex];
+    const selected = currentQuestion.options.find((option) => option.id === selectedOption);
+    setIsSubmitting(true);
+    setSubmissionError(null);
+
+    try {
+      const result = await quizService.submitAnswer(currentQuestion.id, selectedOption);
+      setAnswerCorrect(result.correct);
+      setIsSubmitted(true);
+      if (result.correct) setScore((previous) => previous + 1);
+
+      trackAction(XAPI_VERBS.ATTEMPTED, {
+        id: `${URLS.BASE}/quizzes/${lessonId || 'general'}/question/${currentQuestion.id}`,
+        definition: {
+          name: { 'en-US': currentQuestion.text },
+          type: 'http://adlnet.gov/expapi/activities/question',
+        },
+      }, {
+        success: result.correct,
+        response: selected?.text,
+      });
+    } catch (error) {
+      setSubmissionError(error instanceof Error ? error.message : 'Answer could not be submitted.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleNext = () => {
@@ -81,6 +95,8 @@ export const QuizPanel = ({ lessonId, lessonTitle }: QuizPanelProps) => {
       setCurrentQuestionIndex(prev => prev + 1);
       setSelectedOption(null);
       setIsSubmitted(false);
+      setAnswerCorrect(null);
+      setSubmissionError(null);
     } else {
       setQuizComplete(true);
       // Track quiz completion
@@ -107,6 +123,22 @@ export const QuizPanel = ({ lessonId, lessonTitle }: QuizPanelProps) => {
       <div className="flex flex-col items-center justify-center p-12 bg-white/80 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700/50">
         <RefreshCw className="w-8 h-8 text-blue-500 animate-spin mb-4" />
         <p className="text-slate-500">Loading quiz questions...</p>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div role="alert" className="p-6 text-center text-red-600">
+        {loadError}
+      </div>
+    );
+  }
+
+  if (!questions.length) {
+    return (
+      <div className="p-6 text-center text-slate-500">
+        No quiz questions are available for this {scope} yet.
       </div>
     );
   }
@@ -162,7 +194,8 @@ export const QuizPanel = ({ lessonId, lessonTitle }: QuizPanelProps) => {
           <div className="space-y-3">
             {currentQuestion.options.map((option) => {
               const isSelected = selectedOption === option.id;
-              const isCorrect = option.isCorrect;
+              const isCorrect = isSubmitted && isSelected && answerCorrect === true;
+              const isIncorrect = isSubmitted && isSelected && answerCorrect === false;
               let borderClass = 'border-gray-100 dark:border-slate-700/50';
               let bgClass = 'bg-white dark:bg-slate-800';
               let textClass = 'text-gray-700 dark:text-slate-300';
@@ -172,7 +205,7 @@ export const QuizPanel = ({ lessonId, lessonTitle }: QuizPanelProps) => {
                   borderClass = 'border-green-500 dark:border-green-500/50 ring-1 ring-green-500/20';
                   bgClass = 'bg-green-50/50 dark:bg-green-500/10';
                   textClass = 'text-green-700 dark:text-green-400';
-                } else if (isSelected) {
+                } else if (isIncorrect) {
                   borderClass = 'border-red-500 dark:border-red-500/50 ring-1 ring-red-500/20';
                   bgClass = 'bg-red-50/50 dark:bg-red-500/10';
                   textClass = 'text-red-700 dark:text-red-400';
@@ -192,7 +225,7 @@ export const QuizPanel = ({ lessonId, lessonTitle }: QuizPanelProps) => {
                 >
                   <span className={`text-sm font-medium ${textClass}`}>{option.text}</span>
                   {isSubmitted && isCorrect && <CheckCircle className="w-5 h-5 text-green-500" />}
-                  {isSubmitted && isSelected && !isCorrect && <XCircle className="w-5 h-5 text-red-500" />}
+                  {isIncorrect && <XCircle className="w-5 h-5 text-red-500" />}
                 </button>
               );
             })}
@@ -201,20 +234,22 @@ export const QuizPanel = ({ lessonId, lessonTitle }: QuizPanelProps) => {
           {isSubmitted && (
             <div className="mt-6 p-4 bg-blue-50/50 dark:bg-blue-500/5 border border-blue-100 dark:border-blue-800/30 rounded-xl animate-in fade-in slide-in-from-top-2 duration-300">
               <p className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-1">Explanation</p>
-              <p className="text-sm text-slate-700 dark:text-slate-300">{currentQuestion.explanation}</p>
+              <p className="text-sm text-slate-700 dark:text-slate-300">{currentQuestion.explanation || 'Answer recorded.'}</p>
             </div>
           )}
         </div>
+
+        {submissionError && <p role="alert" className="text-sm text-red-600">{submissionError}</p>}
 
         <div className="flex gap-4">
           {!isSubmitted ? (
             <button
               onClick={handleSubmit}
-              disabled={!selectedOption}
+              disabled={!selectedOption || isSubmitting}
               className="flex-1 bg-blue-600 text-white font-bold py-4 rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               <Send className="w-4 h-4" />
-              Submit Answer
+              {isSubmitting ? 'Checking answer...' : 'Submit Answer'}
             </button>
           ) : (
             <button

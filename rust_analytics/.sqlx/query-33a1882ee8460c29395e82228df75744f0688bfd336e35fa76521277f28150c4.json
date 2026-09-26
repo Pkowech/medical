@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT \n            lpp.learning_path_id,\n            lpp.started_at,\n            lpp.completed_at,\n            lp.estimated_duration_weeks\n        FROM learning_path_progress lpp\n        JOIN learning_paths lp ON lpp.learning_path_id = lp.id\n        WHERE lpp.user_id = $1\n        AND lpp.completed_at IS NOT NULL\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "learning_path_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "started_at",
+        "type_info": "Timestamp"
+      },
+      {
+        "ordinal": 2,
+        "name": "completed_at",
+        "type_info": "Timestamp"
+      },
+      {
+        "ordinal": 3,
+        "name": "estimated_duration_weeks",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "33a1882ee8460c29395e82228df75744f0688bfd336e35fa76521277f28150c4"
+}

@@ -160,8 +160,8 @@ export default function FinishSetupPage() {
     setIsSkipping(true);
     try {
 
-      // Just redirect to dashboard without saving
-      router.push('/dashboard');
+      // Profile details are optional, but new users should still see onboarding.
+      router.push('/onboarding');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to proceed';
       console.error('[FinishSetup] Error skipping setup:', error);
