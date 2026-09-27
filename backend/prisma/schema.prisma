@@ -21,14 +21,11 @@ model Question {
   tags                  String[]
   points                Int                    @default(1)
   metadata              Json?
-  isMultipleChoice      Boolean                @default(true) @map("is_multiple_choice")
   choices               Json?
   usageCount            Int                    @default(0) @map("usage_count")
   successRate           Float                  @default(0) @map("success_rate")
   averageTime           Int                    @default(0) @map("average_time")
-  discriminationIndex   Float?                 @map("discrimination_index")
   difficultyIndex       Float?                 @map("difficulty_index")
-  guessingParameter     Float?                 @map("guessing_parameter")
   discrimination        Float                  @default(0)
   guessing              Float                  @default(0)
   averageScore          Float?                 @default(0) @map("average_score")
@@ -43,12 +40,10 @@ model Question {
   instructorOverrides   InstructorOverride[]
   questionFlags         QuestionFlag[]
   options               Option[]
-  questionStats         QuestionStats?
   course                Course?                @relation(fields: [courseId], references: [id])
   unit                  Unit?                  @relation(fields: [unitId], references: [id])
   quizQuestions         QuizQuestion[]
   rapidReviewAnswers    RapidReviewAnswer[]
-  spacedRepetitionCards SpacedRepetitionCard[]
   userResponses         UserResponse[]
 
   @@index([courseId])
@@ -212,7 +207,6 @@ model QuizAttempt {
   score          Float          @default(0)
   maxScore       Float          @default(0) @map("max_score")
   percentage     Float          @default(0)
-  timeSpent      Int            @default(0) @map("time_spent")
   timeTaken      Int?           @map("time_taken")
   isPassed       Boolean        @default(false) @map("is_passed")
   correctAnswers Int            @default(0) @map("correct_answers")
@@ -239,7 +233,6 @@ model UserResponse {
   answer       Json
   isCorrect    Boolean     @default(false) @map("is_correct")
   score        Float?      @default(0)
-  timeSpent    Int         @default(0) @map("time_spent")
   responseTime Int?        @map("response_time")
   createdAt    DateTime    @default(now()) @map("created_at")
   updatedAt    DateTime    @updatedAt @map("updated_at")
@@ -328,7 +321,6 @@ model User {
   chatSessions            ChatSession[]
   enrollments             CourseEnrollment[]
   instructingCourses      CourseInstructor[]
-  courseProgress          CourseProgress[]
   coursesCreated          Course[]                 @relation("CourseCreator")
   cpdActivities           CPDActivity[]
   cpdCycles               CPDCycle[]
@@ -363,7 +355,6 @@ model User {
   securityAudits          SecurityAudit[]
   securityEvents          SecurityEvent[]
   skillTrajectories       SkillTrajectory[]
-  spacedRepetitionCards   SpacedRepetitionCard[]
   studentInteractions     StudentInteraction[]
   studyEvents             StudyEvent[]
   studyGroups             StudyGroupMember[]
@@ -372,7 +363,6 @@ model User {
   progress                Progress[]
   unitAccesses            UnitAccess[]
   unitCompletions         UnitCompletion[]
-  unitProgress            UnitProgress[]
   userActivities          UserActivity[]
   userBadges              UserBadge[]              @relation("UserUserBadges")
   userFlashcardProgresses UserFlashcardProgress[]
@@ -638,7 +628,6 @@ model Course {
   instructors       CourseInstructor[]
   prerequisites     CoursePrerequisite[]     @relation("PrerequisiteTo")
   isPrerequisiteFor CoursePrerequisite[]     @relation("PrerequisiteFor")
-  courseProgress    CourseProgress[]
   category          CourseCategory?          @relation(fields: [categoryId], references: [id])
   createdBy         User?                    @relation("CourseCreator", fields: [createdById], references: [id])
   deadlines         Deadline[]               @relation("CourseDeadlines")
@@ -702,7 +691,6 @@ model Unit {
   topics                  Topic[]
   accesses                UnitAccess[]
   unitCompletions         UnitCompletion[]
-  unitProgress            UnitProgress[]
   sourceUnitRelations     UnitRelation[]           @relation("SourceUnitRelations")
   targetUnitRelations     UnitRelation[]           @relation("TargetUnitRelations")
   course                  Course                   @relation(fields: [courseId], references: [id], onDelete: Cascade)
@@ -938,10 +926,6 @@ model Progress {
   materialVersion      Int?           @map("material_version")
   isStale              Boolean        @default(false) @map("is_stale")
   lastStudiedAt        DateTime?      @map("last_studied_at")
-  easeFactor           Float          @default(2.5) @map("ease_factor")
-  interval             Int            @default(0)
-  nextReviewDate       DateTime       @default(now()) @map("next_review_date")
-  lastReviewedAt       DateTime?      @map("last_reviewed_at")
   createdAt            DateTime       @default(now()) @map("created_at")
   updatedAt            DateTime       @updatedAt @map("updated_at")
   lastUpdated          BigInt         @default(0) @map("last_updated")
@@ -961,7 +945,6 @@ model Progress {
   @@index([lastAccessedAt])
   @@index([userId, status])
   @@index([userId, lastUpdated])
-  @@index([nextReviewDate])
   @@map("topic_progress")
 }
 
@@ -1463,7 +1446,6 @@ model Notification {
   priority    NotificationPriority @default(low)
   metadata    Json?
   createdAt   DateTime             @default(now()) @map("created_at")
-  severity    String?              @db.VarChar(20)
   throttled   Boolean              @default(false)
   sentViaPush Boolean              @default(false) @map("sent_via_push")
   user        User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -1472,7 +1454,6 @@ model Notification {
   @@index([read])
   @@index([priority])
   @@index([userId, createdAt(sort: Desc)])
-  @@index([severity])
   @@map("notifications")
 }
 
@@ -1741,45 +1722,6 @@ model SystemAnalytics {
   @@map("system_analytics")
 }
 
-model CourseProgress {
-  id                 String         @id @default(uuid())
-  userId             String         @map("user_id")
-  courseId           String         @map("course_id")
-  status             ProgressStatus @default(notStarted)
-  progressPercentage Int            @default(0) @map("progress_percentage")
-  completedUnits     Int            @default(0) @map("completed_units")
-  timeSpent          Int            @default(0) @map("time_spent")
-  startedAt          DateTime?      @map("started_at")
-  completedAt        DateTime?      @map("completed_at")
-  lastAccessedAt     DateTime       @default(now()) @map("last_accessed_at")
-  createdAt          DateTime       @default(now()) @map("created_at")
-  updatedAt          DateTime       @updatedAt @map("updated_at")
-  lastUpdated        BigInt         @default(0) @map("last_updated")
-  courses            Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  users              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, courseId])
-  @@index([courseId])
-  @@index([status])
-  @@index([userId])
-  @@index([userId, lastAccessedAt])
-  @@index([userId, lastUpdated])
-  @@map("course_progress")
-}
-
-model QuestionStats {
-  id              String   @id @default(uuid())
-  questionId      String   @unique @map("question_id")
-  totalAttempts   Int      @default(0) @map("total_attempts")
-  correctAttempts Int      @default(0) @map("correct_attempts")
-  averageTime     Int      @default(0) @map("average_time")
-  difficultyScore Float    @default(0) @map("difficulty_score")
-  lastCalculated  DateTime @default(now()) @map("last_calculated")
-  questions       Question @relation(fields: [questionId], references: [id])
-
-  @@map("question_stats")
-}
-
 model RapidReviewAnswer {
   id                  String             @id @default(uuid())
   sessionId           String
@@ -1812,27 +1754,6 @@ model RapidReviewSession {
   @@map("rapid_review_sessions")
 }
 
-model SpacedRepetitionCard {
-  id             String   @id @default(uuid())
-  userId         String
-  questionId     String
-  easinessFactor Float    @default(2.5)
-  interval       Int      @default(0)
-  repetitions    Int      @default(0)
-  correctStreak  Int      @default(0)
-  lastReviewedAt DateTime
-  nextReviewAt   DateTime
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  questions      Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
-  users          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, questionId])
-  @@index([nextReviewAt])
-  @@index([userId])
-  @@map("spaced_repetition_cards")
-}
-
 model UnitCompletion {
   id          String   @id @default(uuid())
   userId      String   @map("user_id")
@@ -1847,31 +1768,6 @@ model UnitCompletion {
   @@index([unitId])
   @@index([userId])
   @@map("unit_completions")
-}
-
-model UnitProgress {
-  id                 String         @id @default(uuid())
-  userId             String         @map("user_id")
-  unitId             String         @map("unit_id")
-  status             ProgressStatus @default(notStarted)
-  progressPercentage Int            @default(0) @map("progress_percentage")
-  timeSpent          Int            @default(0) @map("time_spent")
-  startedAt          DateTime?      @map("started_at")
-  completedAt        DateTime?      @map("completed_at")
-  lastAccessedAt     DateTime       @default(now()) @map("last_accessed_at")
-  createdAt          DateTime       @default(now()) @map("created_at")
-  updatedAt          DateTime       @updatedAt @map("updated_at")
-  lastUpdated        BigInt         @default(0) @map("last_updated")
-  units              Unit           @relation(fields: [unitId], references: [id], onDelete: Cascade)
-  users              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, unitId])
-  @@index([status])
-  @@index([unitId])
-  @@index([userId])
-  @@index([userId, lastAccessedAt])
-  @@index([userId, lastUpdated])
-  @@map("unit_progress")
 }
 
 model UserQuizProgress {

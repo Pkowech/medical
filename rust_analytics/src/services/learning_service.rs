@@ -257,7 +257,7 @@ impl LearningService {
         }
 
         let total: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM course_progress WHERE user_id = $1"
+            "SELECT COUNT(*) FROM course_enrollments WHERE user_id = $1"
         )
         .bind(&user_id)
         .fetch_one(&self.pool)
@@ -265,7 +265,7 @@ impl LearningService {
         .map_err(|e| Status::internal(format!("DB error: {}", e)))?;
 
         let completed: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM course_progress WHERE user_id = $1 AND status::text = 'completed'"
+            "SELECT COUNT(*) FROM course_enrollments WHERE user_id = $1 AND status::text = 'completed'"
         )
         .bind(&user_id)
         .fetch_one(&self.pool)
@@ -273,7 +273,12 @@ impl LearningService {
         .map_err(|e| Status::internal(format!("DB error: {}", e)))?;
 
         let total_time: i64 = sqlx::query_scalar(
-            "SELECT COALESCE(SUM(time_spent), 0) FROM course_progress WHERE user_id = $1"
+            "SELECT COALESCE(SUM(ss.duration), 0)
+             FROM study_sessions ss
+             LEFT JOIN topics t ON t.id = ss.topic_id
+             LEFT JOIN materials m ON m.id = ss.material_id
+             JOIN units u ON u.id = COALESCE(t.unit_id, m.unit_id)
+             WHERE ss.user_id = $1"
         )
         .bind(&user_id)
         .fetch_one(&self.pool)
@@ -281,7 +286,7 @@ impl LearningService {
         .map_err(|e| Status::internal(format!("DB error: {}", e)))?;
 
         let avg_progress: f32 = sqlx::query_scalar::<_, Option<f32>>(
-            "SELECT AVG(progress_percentage) FROM course_progress WHERE user_id = $1"
+            "SELECT AVG(progress_percentage) FROM course_enrollments WHERE user_id = $1"
         )
         .bind(&user_id)
         .fetch_one(&self.pool)
@@ -292,7 +297,7 @@ impl LearningService {
         let cs = CourseStatsResult {
             total_courses: total as i32,
             completed_courses: completed as i32,
-            total_study_time_minutes: total_time as i32,
+            total_study_time_minutes: total_time.min(i32::MAX as i64) as i32,
             average_course_progress: avg_progress,
         };
 
@@ -395,10 +400,14 @@ impl LearningService {
         
         // Get last activity date
         let last_activity_date: Option<NaiveDateTime> = sqlx::query_scalar(
-            "SELECT GREATEST(MAX(last_accessed_at), MAX(last_activity_date)) FROM (
-                SELECT last_accessed_at FROM course_progress WHERE user_id = $1
+            "SELECT MAX(activity_at) FROM (
+                SELECT last_accessed AS activity_at
+                FROM course_enrollments
+                WHERE user_id = $1 AND last_accessed IS NOT NULL
                 UNION ALL
-                SELECT last_activity_date FROM learning_path_progress WHERE user_id = $1
+                SELECT last_activity_date AS activity_at
+                FROM learning_path_progress
+                WHERE user_id = $1 AND last_activity_date IS NOT NULL
             ) AS activities"
         )
         .bind(&user_id)
@@ -409,9 +418,19 @@ impl LearningService {
 
         // Get most active hour (0-23)
         let most_active_hour: Option<i32> = sqlx::query_scalar(
-            "SELECT EXTRACT(HOUR FROM last_accessed_at)::int FROM course_progress WHERE user_id = $1 
-             UNION ALL SELECT EXTRACT(HOUR FROM last_activity_date)::int FROM learning_path_progress WHERE user_id = $1 
-             ORDER BY EXTRACT(HOUR FROM COALESCE(last_accessed_at, last_activity_date)) DESC LIMIT 1"
+            "SELECT EXTRACT(HOUR FROM activity_at)::int
+             FROM (
+                 SELECT last_accessed AS activity_at
+                 FROM course_enrollments
+                 WHERE user_id = $1 AND last_accessed IS NOT NULL
+                 UNION ALL
+                 SELECT last_activity_date AS activity_at
+                 FROM learning_path_progress
+                 WHERE user_id = $1 AND last_activity_date IS NOT NULL
+             ) AS activities
+             GROUP BY EXTRACT(HOUR FROM activity_at)
+             ORDER BY COUNT(*) DESC, EXTRACT(HOUR FROM activity_at) ASC
+             LIMIT 1"
         )
         .bind(&user_id)
         .fetch_optional(&self.pool)
@@ -482,116 +501,17 @@ impl LearningService {
             return Err(Status::invalid_argument("user_id and course_id required"));
         }
 
-        // 1. Get all units for the course
-        let units: Vec<(String,)> = sqlx::query_as("SELECT id FROM units WHERE course_id = $1")
-            .bind(&course_id)
-            .fetch_all(&self.pool)
-            .await
-            .map_err(|e| Status::internal(format!("DB error fetching units: {}", e)))?;
+        let progress = crate::modules::analytics::progress_tracking::calculate_course_progress(
+            &self.pool,
+            &user_id,
+            &course_id,
+        )
+        .await
+        .map_err(|error| {
+            Status::internal(format!("DB error calculating course progress: {error}"))
+        })?;
 
-        if units.is_empty() {
-            return Ok(Response::new(CourseProgress {
-                id: uuid::Uuid::new_v4().to_string(),
-                user_id,
-                course_id,
-                progress_percentage: 0,
-                status: crate::analytics_proto::ProgressStatus::NotStarted as i32,
-                last_accessed_at: None,
-                time_spent: 0,
-                completed_units: 0,
-                total_units: 0,
-                started_at: None,
-                completed_at: None,
-                created_at: None,
-                updated_at: None,
-            }));
-        }
-
-        let mut unit_completion_status = Vec::new();
-        let mut total_time_spent: i64 = 0;
-        let mut last_accessed_dates: Vec<NaiveDateTime> = Vec::new();
-
-        for (unit_id,) in units.iter() {
-            let total_materials: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM materials WHERE unit_id = $1")
-                .bind(unit_id)
-                .fetch_one(&self.pool)
-                .await
-                .unwrap_or(0);
-
-            let completed_materials: i64 = if total_materials > 0 {
-                sqlx::query_scalar("SELECT COUNT(*) FROM material_progress mp JOIN materials m ON mp.material_id = m.id WHERE mp.user_id = $1 AND m.unit_id = $2 AND mp.is_completed = true")
-                    .bind(&user_id)
-                    .bind(unit_id)
-                    .fetch_one(&self.pool)
-                    .await
-                    .unwrap_or(0)
-            } else {
-                0
-            };
-
-            let unit_progress_percentage = if total_materials > 0 {
-                (completed_materials as f32 / total_materials as f32) * 100.0
-            } else {
-                100.0 // unit with no materials considered complete
-            };
-
-            unit_completion_status.push(unit_progress_percentage >= 100.0);
-
-            if let Some(access_info) = sqlx::query_as::<_, (Option<i64>, Option<NaiveDateTime>)>("SELECT COALESCE(SUM(time_spent),0), MAX(accessed_at) FROM unit_access WHERE user_id = $1 AND unit_id = $2")
-                .bind(&user_id)
-                .bind(unit_id)
-                .fetch_optional(&self.pool)
-                .await
-                .map_err(|e| Status::internal(format!("DB error fetching unit access: {}", e)))? {
-                    if let Some(time) = access_info.0 {
-                        total_time_spent += time;
-                    }
-                    if let Some(date) = access_info.1 {
-                        last_accessed_dates.push(date);
-                    }
-            }
-        }
-
-        let completed_units = unit_completion_status.iter().filter(|&&is_completed| is_completed).count() as i32;
-        let total_units = units.len() as i32;
-        let final_progress_percentage = if total_units > 0 {
-            (completed_units as f32 / total_units as f32 * 100.0).round() as i32
-        } else {
-            100
-        };
-
-        let last_accessed = last_accessed_dates.iter().max().cloned();
-
-        let final_status = if final_progress_percentage >= 100 {
-            crate::analytics_proto::ProgressStatus::Completed as i32
-        } else if final_progress_percentage > 0 {
-            crate::analytics_proto::ProgressStatus::InProgress as i32
-        } else {
-            crate::analytics_proto::ProgressStatus::NotStarted as i32
-        };
-
-        let last_accessed_ts = last_accessed.map(|dt| prost_types::Timestamp {
-            seconds: chrono::Utc.from_utc_datetime(&dt).timestamp(),
-            nanos: chrono::Utc.from_utc_datetime(&dt).timestamp_subsec_nanos() as i32,
-        });
-
-        let result = CourseProgress {
-            id: uuid::Uuid::new_v4().to_string(),
-            user_id,
-            course_id,
-            progress_percentage: final_progress_percentage,
-            status: final_status,
-            last_accessed_at: last_accessed_ts,
-            time_spent: total_time_spent as i32,
-            completed_units,
-            total_units,
-            started_at: None,
-            completed_at: None,
-            created_at: None,
-            updated_at: None,
-        };
-
-        Ok(Response::new(result))
+        Ok(Response::new(progress))
     }
 
     pub async fn get_cohort_analytics(

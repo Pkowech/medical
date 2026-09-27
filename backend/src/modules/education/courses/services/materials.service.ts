@@ -848,6 +848,75 @@ export class MaterialsService {
     }
   }
 
+  /**
+   * Attach an already-uploaded R2 file as a new Material record on a different
+   * topic/unit/course — zero bytes re-uploaded, just a new DB row pointing at
+   * the same fileId.
+   */
+  async attachExistingMaterial(dto: {
+    sourceMaterialId: string;
+    title: string;
+    topicId?: string;
+    unitId?: string;
+    courseId?: string;
+    userId: string;
+    description?: string;
+    type?: MaterialType;
+  }): Promise<Material> {
+    const source = await this.prisma.material.findUnique({
+      where: { id: dto.sourceMaterialId },
+      include: { file: true },
+    });
+    if (!source) {
+      throw new NotFoundException(`Source material ${dto.sourceMaterialId} not found`);
+    }
+    if (!source.fileId) {
+      throw new BadRequestException('Source material has no associated file in R2 storage');
+    }
+
+    const material = await this.prisma.material.create({
+      data: {
+        title: dto.title || source.title,
+        description: dto.description ?? source.description,
+        type: dto.type ?? source.type,
+        fileId: source.fileId,
+        previewFileId: source.previewFileId ?? null,
+        courseId: dto.courseId ?? null,
+        unitId: dto.unitId ?? null,
+        topicId: dto.topicId ?? null,
+        userId: dto.userId,
+        category: source.category,
+        difficulty: source.difficulty,
+        metadata: (source.metadata as any) ?? {},
+      },
+      include: {
+        file: true,
+        unit: true,
+        user: { select: { id: true, firstName: true, lastName: true } },
+      },
+    });
+
+    await FtsUtils.updateFtsVector(this.prisma, 'materials', material.id);
+    await this.searchSync.syncEntity('material', material.id);
+
+    this.eventEmitter.emit('material.attach', {
+      materialId: material.id,
+      sourceMaterialId: dto.sourceMaterialId,
+      fileId: source.fileId,
+      topicId: dto.topicId,
+      unitId: dto.unitId,
+      courseId: dto.courseId,
+      userId: dto.userId,
+      timestamp: new Date(),
+    });
+
+    this.logger.log('Material attached from existing R2 library', {
+      newMaterialId: material.id,
+      sourceMaterialId: dto.sourceMaterialId,
+    });
+    return material;
+  }
+
   async findAllPaginated(options: {
     page: number;
     limit: number;
@@ -1585,6 +1654,63 @@ export class MaterialsService {
       this.logger.warn(`Could not generate preview URL for material ${materialId}`, error);
       return undefined;
     }
+  }
+
+  async getMaterialPreviewContent(materialId: string): Promise<{
+    content: Buffer;
+    mimeType: string;
+    fileName: string;
+  }> {
+    try {
+      const material = await this.prisma.material.findUnique({
+        where: { id: materialId },
+      });
+      if (!material) {
+        throw new NotFoundException(`Material with ID ${materialId} not found`);
+      }
+
+      const fileId = material.previewFileId || material.fileId;
+      if (!fileId) {
+        throw new NotFoundException('Material preview file not found');
+      }
+
+      const file = await this.prisma.file.findUnique({ where: { id: fileId } });
+      if (!file?.key) {
+        throw new NotFoundException('Material preview file not found');
+      }
+
+      if (file.key.startsWith('local:')) {
+        return this.serveLocalPdfByHash(file.key.slice('local:'.length));
+      }
+
+      const fileName = file.filename || file.key.split('/').pop() || 'preview.pdf';
+      const mimeType = file.mimetype || 'application/pdf';
+      const content =
+        this.storageProvider === 'local'
+          ? await this.fileStorage.downloadBuffer(file.key)
+          : await this.fetchStoredFile(file.key, fileName, mimeType);
+
+      return { content, mimeType, fileName };
+    } catch (error) {
+      handleServiceError(error, this.logger, 'getMaterialPreviewContent');
+    }
+  }
+
+  private async fetchStoredFile(
+    key: string,
+    fileName: string,
+    mimeType: string,
+  ): Promise<Buffer> {
+    const url = await this.fileStorage.getPresignedDownloadUrl(key, {
+      filename: fileName,
+      contentType: mimeType,
+      inline: true,
+    });
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new BadRequestException('Unable to retrieve preview file from storage');
+    }
+    return Buffer.from(await response.arrayBuffer());
   }
 
   /**

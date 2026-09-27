@@ -33,7 +33,9 @@ export interface Material extends MaterialBase {
   duration?: string;
   // Backwards compatibility: `type` used in older components; prefer `contentType`.
   type?: string;
-  unitId?: number;
+  courseId?: string;
+  unitId?: string | number;
+  topicId?: string;
   author?: string;
   source?: string;
   answer?: string;
@@ -45,7 +47,7 @@ export interface Material extends MaterialBase {
   file?: AppFile;
   previewFile?: AppFile;
   unit?: {
-    id: number;
+    id: string | number;
     name: string;
     order: number;
   };

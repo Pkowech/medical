@@ -83,6 +83,7 @@ pub trait CourseRepository: Send + Sync {
     /// Get all units in a course
     async fn get_course_units(
         &self,
+        user_id: &str,
         course_id: &str,
     ) -> Result<Vec<crate::domain::repositories::UnitProgress>, AnalyticsError>;
 
@@ -175,7 +176,6 @@ pub struct UnitProgress {
     pub completed_count: i32,
     pub total_count: i32,
     pub time_spent: i32,
-    pub concurrent_slot_number: Option<i32>,
     pub last_access: Option<chrono::DateTime<chrono::Utc>>,
 }
 

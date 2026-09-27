@@ -22,9 +22,12 @@ class TopicService {
   /**
    * Get topic by ID
    */
-  async getTopicById(id: string): Promise<Topic> {
-    const response = await apiService.get<Topic>(`${this.baseUrl}/${id}`);
-    return response.data;
+  async getTopicById(courseId: string, unitId: string, topicId: string): Promise<Topic> {
+    const response = await apiService.get<Topic>(
+      `/courses/${courseId}/units/${unitId}/topics/${topicId}`,
+    );
+    const topic = response.data as Topic & { name?: string };
+    return { ...topic, title: topic.title || topic.name || 'Topic' };
   }
 
   /**

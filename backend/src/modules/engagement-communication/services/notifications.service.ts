@@ -1,7 +1,6 @@
 import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from '#infrastructure/prisma/prisma.service';
-
-type NotificationSeverity = 'critical' | 'important' | 'suggestion';
+import { NotificationPriority } from '@prisma/client';
 
 @Injectable()
 export class NotificationsService {
@@ -14,15 +13,16 @@ export class NotificationsService {
    */
   private async checkThrottleLimit(
     userId: string,
-    severity: NotificationSeverity,
+    priority: NotificationPriority,
   ): Promise<boolean> {
-    const limits: Record<NotificationSeverity, number> = {
-      critical: 1,
-      important: 3,
-      suggestion: Infinity,
+    const limits: Record<NotificationPriority, number> = {
+      [NotificationPriority.low]: Infinity,
+      [NotificationPriority.medium]: 3,
+      [NotificationPriority.high]: 3,
+      [NotificationPriority.urgent]: 1,
     };
 
-    const limit = limits[severity];
+    const limit = limits[priority];
     if (limit === Infinity) {
       return true; // No throttling for suggestions
     }
@@ -33,7 +33,7 @@ export class NotificationsService {
     const count = await (this.prisma as any).notification.count({
       where: {
         userId,
-        severity,
+        priority,
         createdAt: { gte: todayStart },
         throttled: false,
       },
@@ -47,38 +47,38 @@ export class NotificationsService {
     content: string,
     type?: string,
     metadata?: any,
-    severity: NotificationSeverity = 'suggestion',
+    priority: NotificationPriority = NotificationPriority.low,
     sentViaPush = false,
   ) {
     // UX-001: Check throttle
-    const canSend = await this.checkThrottleLimit(userId, severity);
+    const canSend = await this.checkThrottleLimit(userId, priority);
 
     if (!canSend) {
       this.logger.warn(
-        `Notification throttled for user ${userId}, severity: ${severity}`,
+        `Notification throttled for user ${userId}, priority: ${priority}`,
       );
 
       // Still create notification but mark as throttled
-      return await (this.prisma as any).notification.create({
+      return await this.prisma.notification.create({
         data: {
           userId,
           message: content,
           type: type || 'info',
           metadata: metadata || {},
-          severity,
+          priority,
           throttled: true,
           sentViaPush: false, // Don't send throttled notifications
         },
       });
     }
 
-    return await (this.prisma as any).notification.create({
+    return await this.prisma.notification.create({
       data: {
         userId,
         message: content,
         type: type || 'info',
         metadata: metadata || {},
-        severity,
+        priority,
         throttled: false,
         sentViaPush, // UX-002: Track if sent via push
       },

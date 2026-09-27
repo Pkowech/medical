@@ -135,9 +135,9 @@ export default function AnalyticsDashboard() {
     data: learningPathRecommendations,
     isLoading: isLoadingLearningPathRecommendations,
     error: errorLearningPathRecommendations,
-  } = useQuery<LearningRecommendation[] | null>({
+  } = useQuery<LearningRecommendation[]>({
     queryKey: ['learningPathRecommendations'],
-    queryFn: () => getLearningPathRecommendations(),
+    queryFn: async () => (await getLearningPathRecommendations()) ?? [],
     enabled: !!userId,
     throwOnError: false,
   });
@@ -169,11 +169,11 @@ export default function AnalyticsDashboard() {
     isLoading: isLoadingPerformanceData,
     error: errorPerformanceData,
   } = useQuery<PerformanceData | null>({
-    queryKey: ['performanceData', userId],
+    queryKey: ['performanceData', userId, 'summary'],
     queryFn: async () => {
-      const res = await fetch(`/api/assessment-progress/summary/user/${userId}`, {
+      const res = await fetch('/api/assessment-progress/summary', {
         headers: {
-          Authorization: `Bearer ${session?.accessToken}`,
+          Authorization: `Bearer ${session?.user?.accessToken}`,
         },
       });
       if (!res.ok) {
@@ -181,7 +181,7 @@ export default function AnalyticsDashboard() {
       }
       return res.json();
     },
-    enabled: !!userId,
+    enabled: !!userId && !!session?.user?.accessToken,
     throwOnError: false,
   });
 

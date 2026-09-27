@@ -22,6 +22,7 @@ import { UnitCompletedEvent } from '../events/unit-completed.event';
 import { FtsUtils } from '#common/utils/fts.utils';
 
 import { GlobalSearchSyncService } from '../../../../infrastructure/search/services/global-search-sync.service';
+import { Role } from '#modules/auth/constants/role.constants';
 
 @Injectable()
 export class UnitsService {
@@ -35,6 +36,17 @@ export class UnitsService {
     private readonly eventEmitter: EventEmitter2,
     private readonly searchSync: GlobalSearchSyncService,
   ) {}
+
+  private async canManageUnit(courseOwnerId: string | null, userId: string): Promise<boolean> {
+    if (courseOwnerId === userId) return true;
+
+    const userRoles = await this.prisma.userRole.findMany({
+      where: { userId },
+      include: { role: { select: { name: true } } },
+    });
+
+    return userRoles.some((userRole) => userRole.role.name === Role.admin);
+  }
 
   async create(createUnitDto: CreateUnitDto, creatorId: string): Promise<Unit> {
     try {
@@ -77,7 +89,7 @@ export class UnitsService {
             order,
             estimatedDuration: createUnitDto.estimatedDuration || 30,
             learningObjectives: createUnitDto.learningObjectives,
-            isPublished: false,
+            isPublished: createUnitDto.isPublished ?? false,
             createdAt: new Date(),
             updatedAt: new Date(),
           },
@@ -314,13 +326,13 @@ export class UnitsService {
         throw new NotFoundException(`Unit with ID ${id} not found`);
       }
 
-      if (existingUnit.course.createdById !== userId) {
+      if (!(await this.canManageUnit(existingUnit.course.createdById, userId))) {
         this.logger.warn('Unauthorized unit update attempt', {
           unitId: id,
           userId,
         });
         throw new ForbiddenException(
-          'Only the course instructor can update units',
+          'Only the course instructor or an admin can update units',
         );
       }
 
@@ -397,13 +409,13 @@ export class UnitsService {
         throw new NotFoundException(`Unit with ID ${id} not found`);
       }
 
-      if (existingUnit.course.createdById !== userId) {
+      if (!(await this.canManageUnit(existingUnit.course.createdById, userId))) {
         this.logger.warn('Unauthorized unit deletion attempt', {
           unitId: id,
           userId,
         });
         throw new ForbiddenException(
-          'Only the course instructor can delete units',
+          'Only the course instructor or an admin can delete units',
         );
       }
 
@@ -418,15 +430,32 @@ export class UnitsService {
       }
 
       await this.prisma.$transaction(async (prisma) => {
-        await prisma.unit.updateMany({
+        const laterUnits = await prisma.unit.findMany({
           where: {
             courseId: existingUnit.courseId,
             order: { gt: existingUnit.order },
           },
-          data: { order: { decrement: 1 } },
+          select: { id: true, order: true },
         });
 
+        const temporaryOrderBase =
+          Math.max(existingUnit.order, ...laterUnits.map((unit) => unit.order)) +
+          1000;
+        for (const [index, unit] of laterUnits.entries()) {
+          await prisma.unit.update({
+            where: { id: unit.id },
+            data: { order: temporaryOrderBase + index },
+          });
+        }
+
         await prisma.unit.delete({ where: { id } });
+
+        for (const unit of laterUnits) {
+          await prisma.unit.update({
+            where: { id: unit.id },
+            data: { order: unit.order - 1 },
+          });
+        }
       });
 
       await this.clearCacheForUnit(existingUnit);

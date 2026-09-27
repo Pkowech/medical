@@ -14,10 +14,10 @@ Your system is **architecturally sound but conceptually scattered**. You have:
 - ✅ Assessment tracking (QuizAttempt, CaseAttempt, UserResponse)
 
 **But:**
-- 🟡 **Canonical SSOT Implementation Complete** — `Progress` model is now the SSOT; `UnitProgress`/`CourseProgress` deprecated.
+- 🟡 **Progress SSOT consumer migration complete; table retirement staged** — backend and Rust consumers now use `Progress`, `CourseEnrollment`, `StudySession`, and `UnitAccess`; a data-preserving migration removes `CourseProgress` and `UnitProgress`. Production parity/release review remains required. `UnitCompletion` remains separate because it stores score/feedback.
 - ✅ **Prerequisite Types Implemented (Jan 18, 2026)** — `PrerequisiteType` enum added.
 - ✅ **Dashboard Standardization Complete (Jan 25, 2026)** — 32+ files renamed to `kebab-case.tsx`; logic centralized in `AppHeader`.
-- ✅ **Centralized Streaks Implemented** — Redundant widgets removed; Header acts as authoritative progress tracker.
+- 🟡 **Streaks remain layered** — Learning-path and goal streaks are scoped counters; the canonical user-wide streak and its derived/cache fields still need to be defined.
 - ✅ **Enum Consolidation Complete** — Domain enums moved to `schema.prisma` as SSOT.
 - ✅ **Prescriptive Goals Implementation (Jan 25, 2026)** — Dynamic effort estimation, goal conflict detection, and USMLE/NCLEX high-stakes weighting implemented.
 - ✅ **Tiered Escalations Implemented** — Automated goal-overdue escalation job and tiered notifications (push/email) functional.
@@ -34,7 +34,7 @@ This document answers each of the 14 questions with honest gaps and concrete rec
 
 ### Current State
 
-**Canonical unit exists, but partially:**
+**Canonical progress design is implemented in consumers; database retirement is staged:**
 
 ```prisma
 // Hierarchy: Course → Unit → Topic (each is a real entity)
@@ -60,16 +60,16 @@ Question {
 }
 ```
 
-**Problem: Four overlapping progress tables:**
+**Current progress-related records:**
 
-1. `Progress` (topicId) — topic-level progress
-2. `UnitProgress` (unitId) — unit-level progress  
-3. `CourseProgress` (courseId) — course-level progress
-4. `UserSkillState` (skillId referencing Topic) — BKT state
+1. `Progress` — material/topic/unit/course progress, used as the intended canonical record
+2. `CourseEnrollment` — enrollment lifecycle plus course-level progress summary
+3. `UnitCompletion` — distinct completion outcome carrying score/feedback; retained until an explicit destination is defined
+4. `UserSkillState` — BKT knowledge state; a separate signal, not a completion record
 
-### Critical Gap (Status: Resolved Jan 16, 2026)
+### Critical Gap (Data migration prepared September 26, 2026)
 
-**Consolidation:** Redundant `UnitProgress` and `CourseProgress` tables have been removed. The `Progress` model (keyed by `userId`, `courseId`, `unitId`, `materialId`, `topicId`) now serves as the single source of truth for all learning progress.
+**Consolidation:** Backend and Rust runtime consumers have been moved off `CourseProgress` and `UnitProgress`; frontend response contracts remain intact. Migration `20260926130000_retire_course_and_unit_progress` copies course summaries into `CourseEnrollment`, copies unit summaries into unit-scoped `Progress`, then drops the two aggregate tables. Do not deploy before backup and production parity checks. `UnitCompletion` is intentionally retained because score/feedback are not represented in `Progress`.
 
 **Type Safety:** Services have been refactored to remove `as any` bypasses, ensuring Prisma interactions are fully type-safe against the consolidated schema.
 
@@ -83,11 +83,12 @@ Question {
 | **Unit** | Derived | Grouping of topics | Completion = all topics completed |
 | **Course** | Derived | Grouping of units | Completion = all units completed |
 
-**Implementation Status (Jan 16, 2026):**
-- [x] Keep `Progress` as the canonical topic-level record
-- [x] Deprecate redundant `UnitProgress` and `CourseProgress` — compute as aggregates
-- [x] Store UserSkillState separately for learning analytics (don't use as primary completion signal)
-- [x] Ensure type safety for all progress-related operations
+**Implementation Status:**
+- [x] Keep `Progress` as the canonical material/topic/unit record; use `CourseEnrollment` for enrollment and course summary state
+- [x] Migrate backend and Rust consumers from course/unit aggregate tables; preserve frontend response compatibility
+- [x] Preserve `UnitCompletion` score/feedback by retaining it pending a model ownership decision
+- [ ] Run production backup and data parity checks before applying the prepared table-retirement migration
+- [x] Keep `UserSkillState` separate from completion tracking
 
 ---
 
@@ -230,9 +231,8 @@ Question {
   difficulty: QuestionDifficulty  // easy, medium, hard
   category: QuestionCategory  // 20+ categories (anatomy, pharmacology, etc.)
   tags: String[]
-  discriminationIndex, difficultyIndex, guessingParameter  // IRT parameters
-  successRate: Float  // Empirical pass rate across all users
-  usageCount: Int
+  discrimination, difficultyIndex, guessing  // Runtime IRT parameters
+  successRate, usageCount, averageTime  // Active question-level metrics
   createdBy: String?
 }
 ```
@@ -250,7 +250,7 @@ Question {
 **What makes a quiz question official?**
 
 1. **Mapped to topic/unit/course** (exists ✅)
-2. **Difficulty calibrated** (exists via discriminationIndex/difficultyIndex ✅)
+2. **Difficulty calibrated** (runtime IRT reads `discrimination`, `difficultyIndex`, and `guessing`; duplicate `discriminationIndex`/`guessingParameter` columns are unused)
 3. **Exam-relevant** (missing ❌)
 4. **Statistical validation** (successRate exists, but **no action rule** ❌)
 
@@ -263,9 +263,9 @@ model QuestionMetric {
   questionId: String
   examMappings: Json  // { "USMLE_Step1": true, "NCLEX_RN": false }
   successRate: Float
-  discriminationIndex: Float
+  discrimination: Float
   flaggedAt: DateTime?  // When marked for review
-  flagReason: String?   // e.g., "successRate < 0.2", "discriminationIndex < 0.2"
+  flagReason: String?   // e.g., "successRate < 0.2", "discrimination < 0.2"
   isRelevant: Boolean @default(true)
   madeIrrelevantAt: DateTime?
 }
@@ -2429,7 +2429,7 @@ type StudentJourney = {
 
 ### What You Need to Formalize (Next 2 Sprints)
 
-1. **SSOT definition** (Topic is canonical, others are aggregates)
+1. **Complete the designated Progress SSOT migration** (Topic remains the canonical atomic learning unit; migrate persisted aggregate consumers and preserve distinct completion semantics)
 2. **Completion semantics** (Binary → Probabilistic with decay)
 3. **Analytics → Decisions** (Create PrescriptiveAnalyticsService in NestJS)
    - **Wire Rust outputs to blocking gates**
@@ -2644,7 +2644,7 @@ Your architecture is **85% there**. You have:
 - ✅ Personalization hooks (skill states, learning paths, recommendations)
 
 Your gap is **15% conceptual clarity**:
-- ❌ No agreed-upon SSOT
+- 🟡 Progress SSOT is designated, but consumers and persisted aggregates have not been fully consolidated
 - ❌ No completion definition
 - ❌ Analytics don't drive behavior
 - ❌ Accessories outnumber core
@@ -2921,7 +2921,7 @@ Based on all 14 questions + operational considerations, here's the prioritized a
 
 | Action | Question | Impact | Effort |
 |--------|----------|--------|--------|
-| **Define Topic as SSOT** | Q1 | Eliminates data conflicts | Low |
+| **Complete Progress SSOT migration** | Q1 | Removes conflicting persisted aggregates after consumer migration | High |
 | **Wire Rust BKT → NestJS gates** | Q7 | Enables blocking decisions | Medium |
 | **Add graduated autonomy config** | Operational | Respects user experience | Medium |
 | **Implement graceful degradation** | Operational | Prevents system lockouts | Medium |
@@ -2957,7 +2957,7 @@ Based on all 14 questions + operational considerations, here's the prioritized a
 
 ### The 14 System-Defining Questions → Resolved
 
-1. **SSOT:** Topic is canonical. Others aggregate.
+1. **SSOT design:** Topic is the canonical atomic learning unit; persisted course/unit aggregates remain in use and still require migration.
 2. **Notes:** Notes are structured knowledge objects with decay.
 3. **Boundaries:** If you can't fail/pass it, it's not a unit.
 4. **Quiz Authority:** Questions must be mapped, calibrated, and statistically validated.

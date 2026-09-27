@@ -9,8 +9,11 @@ import { ChevronDown, ChevronRight, Trash2, Edit, Plus } from 'lucide-react';
 
 interface AdminCourseListProps {
   courses: Course[];
+  loadingCourseIds: Set<string>;
+  onExpandCourse: (courseId: string) => void;
   onEdit: (course: Course) => void;
   onDelete: (course: Course) => void;
+  canDeleteCourse?: boolean;
   onAddUnit: (course: Course) => void;
   onEditUnit: (unit: Unit, courseId: string) => void;
   onDeleteUnit: (unit: Unit) => void;
@@ -21,8 +24,11 @@ interface AdminCourseListProps {
 
 export const AdminCourseList: React.FC<AdminCourseListProps> = ({
   courses,
+  loadingCourseIds,
+  onExpandCourse,
   onEdit,
   onDelete,
+  canDeleteCourse = true,
   onAddUnit,
   onEditUnit,
   onDeleteUnit,
@@ -34,13 +40,14 @@ export const AdminCourseList: React.FC<AdminCourseListProps> = ({
   const [expandedUnits, setExpandedUnits] = useState<Map<string, boolean>>(new Map());
 
   const toggleCourseExpanded = (courseId: string) => {
-    const newSet = new Set(expanded);
-    if (newSet.has(courseId)) {
-      newSet.delete(courseId);
-    } else {
-      newSet.add(courseId);
-    }
-    setExpanded(newSet);
+    const isExpanded = expanded.has(courseId);
+    setExpanded(current => {
+      const next = new Set(current);
+      if (isExpanded) next.delete(courseId);
+      else next.add(courseId);
+      return next;
+    });
+    if (!isExpanded) onExpandCourse(courseId);
   };
 
   const toggleUnitExpanded = (unitId: string) => {
@@ -96,15 +103,17 @@ export const AdminCourseList: React.FC<AdminCourseListProps> = ({
                   <Edit className="h-4 w-4" />
                   Edit
                 </Button>
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  onClick={() => onDelete(course)}
-                  className="gap-1"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  Delete
-                </Button>
+                {canDeleteCourse && (
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={() => onDelete(course)}
+                    className="gap-1"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Delete
+                  </Button>
+                )}
               </div>
             </div>
 
@@ -112,7 +121,9 @@ export const AdminCourseList: React.FC<AdminCourseListProps> = ({
             {expanded.has(course.id) && (
               <div className="mt-6 pl-12 border-l-2 border-gray-200 space-y-4">
                 <div className="flex justify-between items-center mb-4">
-                  <h4 className="font-semibold">Units ({course.units?.length || 0})</h4>
+                  <h4 className="font-semibold">
+                    Units ({loadingCourseIds.has(course.id) ? '...' : course.units?.length || 0})
+                  </h4>
                   <Button
                     size="sm"
                     variant="default"
@@ -124,7 +135,9 @@ export const AdminCourseList: React.FC<AdminCourseListProps> = ({
                   </Button>
                 </div>
 
-                {course.units && course.units.length > 0 ? (
+                {loadingCourseIds.has(course.id) ? (
+                  <p className="text-sm text-gray-500">Loading units and topics...</p>
+                ) : course.units && course.units.length > 0 ? (
                   <div className="space-y-3">
                     {course.units.map((unit: Unit) => (
                       <div key={unit.id} className="border rounded-lg p-4 bg-gray-50">
@@ -184,41 +197,48 @@ export const AdminCourseList: React.FC<AdminCourseListProps> = ({
 
                             {unit.topics && unit.topics.length > 0 ? (
                               <div className="space-y-2">
-                                {unit.topics.map((topic: Topic) => (
-                                  <div
-                                    key={topic.id}
-                                    className="flex items-center justify-between p-3 bg-white rounded border border-gray-200"
-                                  >
-                                    <div className="flex-1">
-                                      <p className="text-sm font-medium">{topic.title}</p>
-                                      <div className="flex gap-1 mt-1">
-                                        {topic.isMandatory && (
-                                          <Badge variant="default" className="text-xs">
-                                            Mandatory
-                                          </Badge>
-                                        )}
+                                {unit.topics.map((topic: Topic) => {
+                                  const normalizedTopic = {
+                                    ...topic,
+                                    title: topic.title || topic.name || 'Untitled Topic',
+                                  };
+
+                                  return (
+                                    <div
+                                      key={topic.id}
+                                      className="flex items-center justify-between p-3 bg-white rounded border border-gray-200"
+                                    >
+                                      <div className="flex-1">
+                                        <p className="text-sm font-medium">{normalizedTopic.title}</p>
+                                        <div className="flex gap-1 mt-1">
+                                          {topic.isMandatory && (
+                                            <Badge variant="default" className="text-xs">
+                                              Mandatory
+                                            </Badge>
+                                          )}
+                                        </div>
+                                      </div>
+                                      <div className="flex gap-1">
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => onEditTopic(normalizedTopic, unit.id)}
+                                          className="gap-1"
+                                        >
+                                          <Edit className="h-3 w-3" />
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          variant="destructive"
+                                          onClick={() => onDeleteTopic(normalizedTopic)}
+                                          className="gap-1"
+                                        >
+                                          <Trash2 className="h-3 w-3" />
+                                        </Button>
                                       </div>
                                     </div>
-                                    <div className="flex gap-1">
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => onEditTopic(topic, unit.id)}
-                                        className="gap-1"
-                                      >
-                                        <Edit className="h-3 w-3" />
-                                      </Button>
-                                      <Button
-                                        size="sm"
-                                        variant="destructive"
-                                        onClick={() => onDeleteTopic(topic)}
-                                        className="gap-1"
-                                      >
-                                        <Trash2 className="h-3 w-3" />
-                                      </Button>
-                                    </div>
-                                  </div>
-                                ))}
+                                  );
+                                })}
                               </div>
                             ) : (
                               <p className="text-xs text-gray-500 italic">No topics yet</p>

@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '#infrastructure/prisma/prisma.service';
 import { NotificationsService } from '#modules/engagement-communication/services/notifications.service';
+import { NotificationPriority } from '@prisma/client';
 
 @Injectable()
 export class DeadlinesTask {
@@ -24,10 +25,18 @@ export class DeadlinesTask {
     const twoDaysLater = new Date(now.getTime() + 48 * 60 * 60 * 1000);
 
     // 1. Check for deadlines due in exactly 1 day (approximated to the day)
-    await this.notifyForWindow(oneDayLater, 'due in 24 hours', 'important');
+    await this.notifyForWindow(
+      oneDayLater,
+      'due in 24 hours',
+      NotificationPriority.high,
+    );
 
     // 2. Check for deadlines due in exactly 2 days
-    await this.notifyForWindow(twoDaysLater, 'due in 48 hours', 'suggestion');
+    await this.notifyForWindow(
+      twoDaysLater,
+      'due in 48 hours',
+      NotificationPriority.low,
+    );
 
     this.logger.log('Finished checking deadlines.');
   }
@@ -35,7 +44,7 @@ export class DeadlinesTask {
   private async notifyForWindow(
     targetDate: Date,
     timeframe: string,
-    severity: 'important' | 'suggestion',
+    priority: NotificationPriority,
   ) {
     const startOfDay = new Date(targetDate);
     startOfDay.setHours(0, 0, 0, 0);
@@ -67,7 +76,7 @@ export class DeadlinesTask {
           message,
           'deadline_reminder',
           { deadlineId: deadline.id, courseId: deadline.courseId },
-          severity,
+          priority,
           true, // Send via push if possible
         );
         this.logger.debug(`Sent reminder for deadline ${deadline.id} to user ${deadline.userId}`);

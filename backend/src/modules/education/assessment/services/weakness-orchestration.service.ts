@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
-import { UserActivityType } from '@prisma/client';
+import { NotificationPriority, UserActivityType } from '@prisma/client';
 import { PrismaService } from '#infrastructure/prisma/prisma.service';
 import { WeaknessChainService } from '#modules/ai-analytics/services/weakness-chain.service';
 import { QuizGenerationService, WeaknessChain } from './quiz-generation.service';
@@ -79,10 +79,9 @@ export class WeaknessOrchestrationService {
             `We created a custom 5-question quiz to help strengthen this area. Your current mastery: ${(chain.weakTopic.pKnown * 100).toFixed(0)}%`,
             'WEAKNESS_QUIZ',
             {
-              title: `AI Detected Weakness in ${chain.weakTopic.name}`,
               actionUrl: `/quiz/${quiz.id}`,
             },
-            'important',
+            NotificationPriority.high,
           );
 
           // 4. Store relationship for tracking
@@ -175,7 +174,7 @@ export class WeaknessOrchestrationService {
           title: 'Great Progress!',
           actionUrl: `/progress`,
         },
-        'important',
+        NotificationPriority.high,
       );
 
       // 5. Emit event for downstream processing if needed

@@ -16,6 +16,19 @@ import { PlusCircle, AlertCircle } from 'lucide-react';
 
 type FormMode = 'none' | 'course' | 'unit' | 'topic';
 
+const getSaveErrorMessage = (error: unknown, fallback: string): string => {
+  if (
+    error &&
+    typeof error === 'object' &&
+    'message' in error &&
+    typeof error.message === 'string' &&
+    error.message.trim()
+  ) {
+    return error.message;
+  }
+  return fallback;
+};
+
 interface FormContext {
   mode: FormMode;
   course?: Course;
@@ -25,6 +38,7 @@ interface FormContext {
 
 export default function AdminContentPage() {
   const [courses, setCourses] = useState<Course[]>([]);
+  const [loadingCourseIds, setLoadingCourseIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -42,6 +56,27 @@ export default function AdminContentPage() {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadCourseDetails = async (courseId: string) => {
+    const course = courses.find(item => item.id === courseId);
+    if (course?.units !== undefined || loadingCourseIds.has(courseId)) return;
+
+    setLoadingCourseIds(current => new Set(current).add(courseId));
+    try {
+      const detailedCourse = await courseService.getCourseById(courseId);
+      setCourses(current =>
+        current.map(item => item.id === courseId ? detailedCourse : item),
+      );
+    } catch (err) {
+      setError(getSaveErrorMessage(err, 'Failed to load course units and topics'));
+    } finally {
+      setLoadingCourseIds(current => {
+        const next = new Set(current);
+        next.delete(courseId);
+        return next;
+      });
     }
   };
 
@@ -75,8 +110,9 @@ export default function AdminContentPage() {
       }
       setFormContext({ mode: 'none' });
     } catch (err) {
-      setError('Failed to save course');
-      console.error(err);
+      const message = getSaveErrorMessage(err, 'Failed to save course');
+      setError(message);
+      console.error('Failed to save course:', message);
     }
   };
 
@@ -124,8 +160,9 @@ export default function AdminContentPage() {
       }
       setFormContext({ mode: 'none' });
     } catch (err) {
-      setError('Failed to save unit');
-      console.error(err);
+      const message = getSaveErrorMessage(err, 'Failed to save unit');
+      setError(message);
+      console.error('Failed to save unit:', message);
     }
   };
 
@@ -260,7 +297,7 @@ export default function AdminContentPage() {
         </div>
       )}
       {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded flex items-gap-2">
+        <div role="alert" className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded flex items-gap-2">
           <AlertCircle className="h-5 w-5 mr-2" />
           {error}
         </div>
@@ -297,6 +334,8 @@ export default function AdminContentPage() {
       {formContext.mode === 'none' && (
         <AdminCourseList
           courses={courses}
+          loadingCourseIds={loadingCourseIds}
+          onExpandCourse={loadCourseDetails}
           onEdit={(course) => setFormContext({ mode: 'course', course })}
           onDelete={handleDeleteCourse}
           onAddUnit={(course) => setFormContext({ mode: 'unit', course })}

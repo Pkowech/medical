@@ -83,6 +83,15 @@ export class LearningGoalsController {
     return await this.learningGoalsService.getGoalsOverview(req.user.id);
   }
 
+  @Post('smart-suggestions')
+  @ApiOperation({ summary: 'Get SMART criteria suggestions' })
+  @ApiResponse({ status: 200, description: 'Suggestions generated successfully' })
+  getSmartSuggestions(
+    @Body() goalData: Partial<CreateLearningGoalDto>,
+  ) {
+    return this.learningGoalsService.generateSmartSuggestions(goalData);
+  }
+
   @Get('recommendations')
   @ApiOperation({ summary: 'Get AI-recommended learning goals' })
   @ApiResponse({

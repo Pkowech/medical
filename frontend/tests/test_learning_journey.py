@@ -1,5 +1,6 @@
 import json
 import os
+import uuid
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -160,13 +161,19 @@ def test_material_progress_and_streak_share_user_activity_dates():
     assert "toDateString()" in progress_service
 
 
-def request_status(url: str, method: str = "GET", body: dict | None = None) -> tuple[int, bytes]:
+def request_status(
+    url: str,
+    method: str = "GET",
+    body: dict | None = None,
+    headers: dict[str, str] | None = None,
+) -> tuple[int, bytes]:
     encoded_body = json.dumps(body).encode("utf-8") if body is not None else None
+    request_headers = {"Content-Type": "application/json", **(headers or {})}
     request = Request(
         url,
         data=encoded_body,
         method=method,
-        headers={"Content-Type": "application/json"},
+        headers=request_headers,
     )
     try:
         with urlopen(request, timeout=15) as response:
@@ -177,6 +184,37 @@ def request_status(url: str, method: str = "GET", body: dict | None = None) -> t
         pytest.fail(f"Timed out requesting {url}: {error}")
     except URLError as error:
         pytest.skip(f"Live service is unavailable: {error.reason}")
+
+
+def register_smoke_user(base_url: str) -> dict[str, str]:
+    unique_id = uuid.uuid4().hex
+    password = "SmokeTest-Password-123!"
+    status, body = request_status(
+        f"{base_url}/auth/register",
+        method="POST",
+        body={
+            "email": f"frontend-smoke-{unique_id}@example.com",
+            "username": f"frontend-smoke-{unique_id}",
+            "password": password,
+            "confirmPassword": password,
+            "firstName": "Frontend",
+            "lastName": "SmokeTest",
+            "role": "student",
+            "acceptTerms": True,
+        },
+    )
+    assert status == 201, body.decode("utf-8", errors="replace")
+
+    registration = json.loads(body)
+    registration_data = registration.get("data", registration)
+    return {"Authorization": f"Bearer {registration_data['accessToken']}"}
+
+
+def assert_frontend_get_routes(base_url: str, auth_headers: dict[str, str], routes: tuple[str, ...]):
+    for route in routes:
+        status, body = request_status(f"{base_url}{route}", headers=auth_headers)
+        assert status == 200, f"GET {route} returned {status}: {body!r}"
+        json.loads(body)
 
 
 @pytest.mark.skipif(not LIVE_SMOKE, reason="Set RUN_FRONTEND_LIVE_SMOKE=1 to test local services")
@@ -216,6 +254,79 @@ def test_backend_auth_and_learning_routes_are_present_and_protected():
 
 
 @pytest.mark.skipif(not LIVE_SMOKE, reason="Set RUN_FRONTEND_LIVE_SMOKE=1 to test local services")
+def test_authenticated_frontend_analytics_requests_reach_backend_and_rust():
+    base_url = os.environ.get("BACKEND_BASE_URL", "http://localhost:3002/v1").rstrip("/")
+    auth_headers = register_smoke_user(base_url)
+
+    routes = (
+        ("/assessment-progress/recommendations", dict),
+        ("/assessment-progress/study-materials?gaps=frontend-smoke-test", list),
+        ("/assessment-progress/next-steps", list),
+    )
+    for route, expected_type in routes:
+        status, response_body = request_status(
+            f"{base_url}{route}", headers=auth_headers
+        )
+        assert status == 200, f"{route} returned {status}: {response_body!r}"
+        response_data = json.loads(response_body)
+        if isinstance(response_data, dict) and "data" in response_data:
+            response_data = response_data["data"]
+        assert isinstance(response_data, expected_type), route
+
+
+@pytest.mark.skipif(not LIVE_SMOKE, reason="Set RUN_FRONTEND_LIVE_SMOKE=1 to test local services")
+def test_frontend_course_requests_reach_backend():
+    base_url = os.environ.get("BACKEND_BASE_URL", "http://localhost:3002/v1").rstrip("/")
+    auth_headers = register_smoke_user(base_url)
+    assert_frontend_get_routes(
+        base_url,
+        auth_headers,
+        (
+            "/courses?page=1&limit=3",
+            "/courses/featured?limit=3",
+            "/courses/recommended?limit=3",
+            "/courses/my-courses?page=1&limit=3",
+            "/courses/overview",
+        ),
+    )
+
+
+@pytest.mark.skipif(not LIVE_SMOKE, reason="Set RUN_FRONTEND_LIVE_SMOKE=1 to test local services")
+def test_frontend_material_requests_reach_backend():
+    base_url = os.environ.get("BACKEND_BASE_URL", "http://localhost:3002/v1").rstrip("/")
+    auth_headers = register_smoke_user(base_url)
+    assert_frontend_get_routes(
+        base_url,
+        auth_headers,
+        (
+            "/materials",
+            "/materials/paginated?page=1&limit=3",
+        ),
+    )
+
+
+@pytest.mark.skipif(not LIVE_SMOKE, reason="Set RUN_FRONTEND_LIVE_SMOKE=1 to test local services")
+def test_frontend_learning_requests_reach_backend_and_rust():
+    base_url = os.environ.get("BACKEND_BASE_URL", "http://localhost:3002/v1").rstrip("/")
+    auth_headers = register_smoke_user(base_url)
+    assert_frontend_get_routes(
+        base_url,
+        auth_headers,
+        (
+            "/learning-paths/my-progress",
+            "/learning-paths/discovery/trending?limit=3",
+            "/learning-paths/discovery/personalized?limit=3",
+            "/learning-paths/discovery/collaborative?limit=3",
+            "/learning-goals",
+            "/learning-goals/active",
+            "/learning-goals/completed",
+            "/learning-goals/analytics",
+            "/progress/me",
+        ),
+    )
+
+
+@pytest.mark.skipif(not LIVE_SMOKE, reason="Set RUN_FRONTEND_LIVE_SMOKE=1 to test local services")
 def test_rust_http_health_endpoint():
     url = os.environ.get("ANALYTICS_HEALTH_URL", "http://localhost:8000/health")
     status, body = request_status(url)
@@ -245,6 +356,35 @@ def test_analytics_grpc_health():
         channel.close()
 
     assert response.status == "ok"
+
+
+@pytest.mark.skipif(not LIVE_SMOKE, reason="Set RUN_FRONTEND_LIVE_SMOKE=1 to test local services")
+def test_analytics_grpc_recommendations():
+    grpc = pytest.importorskip("grpc")
+    import sys
+
+    sys.path.insert(0, str(BACKEND_ROOT / "tests"))
+    import analytics_pb2
+    import grpc_utils
+
+    grpc_utils._load_stubs()
+    target = os.environ.get("ANALYTICS_GRPC_TARGET", "localhost:50051")
+    channel = grpc.insecure_channel(target)
+    try:
+        response = grpc_utils.AnalyticsServiceStub(channel).GetRecommendations(
+            analytics_pb2.GetRecommendationsRequest(
+                user_id=f"frontend-smoke-{uuid.uuid4().hex}"
+            ),
+            metadata=analytics_grpc_metadata(),
+            timeout=10,
+        )
+    except grpc.RpcError as error:
+        pytest.fail(f"Analytics gRPC GetRecommendations failed: {error.code().name}: {error.details()}")
+    finally:
+        channel.close()
+
+    assert response is not None
+    assert hasattr(response, "items")
 
 
 @pytest.mark.skipif(not LIVE_SMOKE, reason="Set RUN_FRONTEND_LIVE_SMOKE=1 to test local services")

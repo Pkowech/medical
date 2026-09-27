@@ -15,6 +15,7 @@ import { Material } from '@/shared/types/materialInterface';
 import { useXapi } from '@/lib/xapi/useXapi';
 import { URLS } from '@/lib/urls';
 import { useAuth } from '@/features/auth/hooks/useAuth';
+import { usePageHeader } from '@/core/providers/HeaderContext';
 import { hasPermission, Permission } from '@/lib/auth/roles';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -29,12 +30,14 @@ const isUrl = (str: string) => {
 
 export default function MaterialViewPage() {
   const { isLoading: isAuthLoading, user, session } = useAuth();
+  const { setHeader } = usePageHeader();
   const router = useRouter();
   const params = useParams();
   const materialId = (params?.id as string) || '';
   const { trackAction, XAPI_VERBS } = useXapi();
   
   const [material, setMaterial] = useState<Material | null>(null);
+  const [pdfContent, setPdfContent] = useState<Uint8Array | null>(null);
   const [isLoadingMaterial, setIsLoadingMaterial] = useState(true);
   const [error, setError] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -49,6 +52,17 @@ export default function MaterialViewPage() {
   const trackingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const canDelete = user && (user.role === 'admin' || hasPermission(user.role as never, 'EDIT_COURSES' as Permission));
 
+  useEffect(() => {
+    if (!material) return;
+
+    setHeader({
+      title: material.title,
+      description: material.description || `${material.type || 'Study'} resource`,
+      icon: '📄',
+    });
+    return () => setHeader(null);
+  }, [material, setHeader]);
+
   // 1. Fetch Material Data
   useEffect(() => {
     if (!materialId) return;
@@ -56,7 +70,17 @@ export default function MaterialViewPage() {
     const fetchMaterial = async () => {
       try {
         setIsLoadingMaterial(true);
+        setPdfContent(null);
         const data = await materialService.getMaterialWithFileUrl(materialId);
+        const pdfUrl = data.previewFileUrl || data.fileUrl || data.url;
+        const isPdf =
+          data.type?.toLowerCase() === 'pdf' ||
+          data.file?.mimetype?.toLowerCase() === 'application/pdf' ||
+          Boolean(data.previewFileUrl) ||
+          Boolean(pdfUrl?.split('?')[0].toLowerCase().endsWith('.pdf'));
+        if (isPdf && !pdfUrl?.startsWith('file:')) {
+          setPdfContent(await materialService.getMaterialPreviewContent(materialId));
+        }
         setMaterial(data);
         
         trackAction(XAPI_VERBS.EXPERIENCED, {
@@ -202,9 +226,9 @@ export default function MaterialViewPage() {
       }
 
       return (
-        <div className="w-full h-full">
+        <div className="h-full min-h-0 w-full">
           <PDFViewer
-            file={localFile || effectiveUrl}
+            file={localFile || pdfContent || effectiveUrl}
             headers={pdfHeaders}
             onPageChange={handlePageChange}
           />
@@ -301,7 +325,6 @@ export default function MaterialViewPage() {
                         <File className="h-4 w-4" />
                         <span>{material.type || 'DOCUMENT'}</span>
                       </div>
-                      <CardTitle className="text-2xl md:text-3xl font-bold dark:text-white line-clamp-2">{material.title}</CardTitle>
                     </div>
                     <div className="flex gap-2">
                       <Button variant="outline" size="icon"><Share className="h-4 w-4" /></Button>
@@ -314,7 +337,7 @@ export default function MaterialViewPage() {
               )}
               
               <CardContent className="p-0 flex-1 min-h-0 overflow-hidden">
-                <div className="h-full w-full overflow-y-auto">
+                <div className="h-full min-h-0 w-full overflow-hidden">
                   {renderContent()}
                 </div>
               </CardContent>

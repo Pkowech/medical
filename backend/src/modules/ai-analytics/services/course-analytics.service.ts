@@ -16,6 +16,7 @@ import {
 } from './analytics-cache.constants';
 import { getErrorMessage } from '#common/utils/error.utils';
 import { RecommendationItemDto } from '#common/dto/analytics.dto';
+import { v4 as uuidv4 } from 'uuid';
 
 /**
  * CourseAnalyticsService
@@ -259,6 +260,7 @@ export class CourseAnalyticsService implements OnModuleInit {
     try {
       await this.prisma.analyticsEvent.create({
         data: {
+          id: uuidv4(),
           userId,
           eventType,
           data: metadata as any,

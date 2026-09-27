@@ -13,6 +13,7 @@ pub mod models;
 pub mod patterns;
 #[cfg(feature = "ml")]
 pub mod performance;
+pub mod progress_tracking;
 pub mod recommendations;
 pub mod reports;
 pub mod spaced_repetition;

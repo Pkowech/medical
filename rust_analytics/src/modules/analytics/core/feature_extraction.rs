@@ -170,10 +170,16 @@ pub async fn extract_user_features(
     .await
     .unwrap_or_default();
 
-    // Get material progress (completed materials)
+    // Get each material's latest progress record
     let material_progress = sqlx::query_as::<_, (String, i32, String)>(
-        "SELECT id, completion_percentage, unit_id FROM material_progress 
-         WHERE user_id = $1",
+        "SELECT DISTINCT ON (tp.material_id)
+            tp.material_id,
+            tp.completion_percentage,
+            COALESCE(m.unit_id, '')
+         FROM topic_progress tp
+         LEFT JOIN materials m ON m.id = tp.material_id
+         WHERE tp.user_id = $1 AND tp.material_id IS NOT NULL
+         ORDER BY tp.material_id, tp.updated_at DESC",
     )
     .bind(&user_id)
     .fetch_all(pool)

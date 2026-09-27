@@ -91,37 +91,29 @@ export class StudyAnalyticsService implements OnModuleInit {
 
             const mapped: StudyPatternsResponseDto = {
               userId,
-              patterns:
-                (grpcResp.progress_trends || []).map((t: any) =>
-                  (t.type || '').toUpperCase(),
-                ) || [],
-              consistency:
-                (grpcResp.user_learning_summary?.average_session_length as
-                  | number
-                  | undefined) ?? 0,
+              patterns: (grpcResp.progressTrends ?? []).map((trend) =>
+                trend.type.toUpperCase(),
+              ),
+              consistency: grpcResp.userLearningSummary?.averageSessionLength ?? 0,
               timeDistribution: {},
               studyDuration: {
-                averageDuration:
-                  grpcResp.user_learning_summary?.average_session_length || 0,
+                averageDuration: grpcResp.userLearningSummary?.averageSessionLength ?? 0,
                 longestSession: 0,
                 shortestSession: 0,
               },
-              consistencyScore: grpcResp.user_learning_summary
+              consistencyScore: grpcResp.userLearningSummary
                 ? Math.min(
                     1,
-                    (grpcResp.user_learning_summary.average_session_length ||
-                      0) / 60,
+                    (grpcResp.userLearningSummary.averageSessionLength || 0) / 60,
                   )
                 : 0,
               preferredStudyTimes: { morning: 0, afternoon: 0, evening: 0 },
               performanceByTopic:
-                grpcResp.performance_metrics?.weakness_areas?.reduce(
-                  (acc: any, cur: string) => {
-                    acc[cur] = 0;
-                    return acc;
-                  },
-                  {},
-                ) || {},
+                Object.fromEntries(
+                  (grpcResp.performanceMetrics?.weaknessAreas ?? []).map(
+                    (topic) => [topic, 0],
+                  ),
+                ),
             };
 
             await this.redisService.set(

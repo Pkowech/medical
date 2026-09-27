@@ -34,9 +34,14 @@ const SelectGroup: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <div>{children}</div>
 );
 
-const SelectValue: React.FC<{ placeholder?: string }> = ({ placeholder }) => {
+interface SelectValueProps {
+  placeholder?: string;
+  children?: React.ReactNode;
+}
+
+const SelectValue: React.FC<SelectValueProps> = ({ placeholder, children }) => {
   const { value } = React.useContext(SelectContext);
-  return <span>{value || placeholder}</span>;
+  return <span>{children || placeholder || value}</span>;
 };
 
 const SelectTrigger = React.forwardRef<

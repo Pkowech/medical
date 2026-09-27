@@ -9,13 +9,14 @@ import { ApiResponse } from '@/shared/types/base-responseInterface';
  * Fetches personalized learning path recommendations for the authenticated user.
  */
 export const getLearningPathRecommendations = async (): Promise<
-  LearningRecommendation[] | null
+  LearningRecommendation[]
 > => {
   try {
     const response = await apiService.get<ApiResponse<LearningRecommendation[]>>(
       '/learning-paths/discovery/personalized'
     );
-    return response.data.data;
+    const data = (response.data as any)?.data ?? response.data ?? [];
+    return Array.isArray(data) ? data : [];
   } catch (error) {
     const err = error instanceof Error ? error : new Error(String(error));
     console.error(
@@ -23,7 +24,6 @@ export const getLearningPathRecommendations = async (): Promise<
       err.message,
       err.stack
     );
-    toast.error('Failed to load learning path recommendations.');
-    return null;
+    return [];
   }
 };

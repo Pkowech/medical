@@ -28,9 +28,9 @@ impl MaterialRepository for PostgresMaterialRepository {
                 $1::text as user_id,
                 $2::text as unit_id,
                 COALESCE(
-                    (SELECT COUNT(*) FROM material_progress mp
-                     JOIN materials m ON mp.material_id = m.id
-                     WHERE mp.user_id = $1 AND m.unit_id = $2 AND mp.is_completed = true),
+                    (SELECT COUNT(DISTINCT tp.material_id) FROM topic_progress tp
+                     JOIN materials m ON tp.material_id = m.id
+                     WHERE tp.user_id = $1 AND m.unit_id = $2 AND tp.is_completed = true),
                     0
                 ) as completed_count,
                 COALESCE(
@@ -38,16 +38,19 @@ impl MaterialRepository for PostgresMaterialRepository {
                     0
                 ) as total_count,
                 COALESCE(
-                    (SELECT SUM(time_spent_minutes) FROM material_progress mp
-                     JOIN materials m ON mp.material_id = m.id
-                     WHERE mp.user_id = $1 AND m.unit_id = $2),
+                    (SELECT SUM(material_time.time_spent)
+                     FROM (
+                         SELECT tp.material_id, MAX(tp.time_spent) as time_spent
+                         FROM topic_progress tp
+                         JOIN materials m ON tp.material_id = m.id
+                         WHERE tp.user_id = $1 AND m.unit_id = $2
+                         GROUP BY tp.material_id
+                     ) as material_time),
                     0
                 ) as time_spent,
-                (SELECT MAX(last_accessed_at) FROM material_progress mp
-                 JOIN materials m ON mp.material_id = m.id
-                 WHERE mp.user_id = $1 AND m.unit_id = $2) as last_access,
-                (SELECT concurrent_slot_number FROM unit_progress 
-                 WHERE user_id = $1 AND unit_id = $2) as concurrent_slot_number
+                (SELECT MAX(tp.last_accessed_at) FROM topic_progress tp
+                 JOIN materials m ON tp.material_id = m.id
+                 WHERE tp.user_id = $1 AND m.unit_id = $2) as last_access
             "#,
         )
         .bind(user_id)
@@ -58,12 +61,15 @@ impl MaterialRepository for PostgresMaterialRepository {
             AnalyticsError::DatabaseError(format!("Failed to fetch unit progress: {}", e))
         })?;
 
+        let completed_count: i64 = row.try_get("completed_count").unwrap_or(0);
+        let total_count: i64 = row.try_get("total_count").unwrap_or(0);
+        let time_spent: i64 = row.try_get("time_spent").unwrap_or(0);
+
         Ok(UnitProgress {
             unit_id: row.try_get("unit_id").unwrap_or_default(),
-            completed_count: row.try_get("completed_count").unwrap_or(0),
-            total_count: row.try_get("total_count").unwrap_or(0),
-            time_spent: row.try_get("time_spent").unwrap_or(0),
-            concurrent_slot_number: row.try_get("concurrent_slot_number").ok(),
+            completed_count: completed_count.min(i32::MAX as i64) as i32,
+            total_count: total_count.min(i32::MAX as i64) as i32,
+            time_spent: time_spent.min(i32::MAX as i64) as i32,
             last_access: row
                 .try_get("last_access")
                 .ok()
@@ -89,8 +95,9 @@ impl MaterialRepository for PostgresMaterialRepository {
             FROM materials m
             WHERE m.difficulty >= $1 
               AND m.difficulty <= $2
-              AND m.id NOT IN (
-                SELECT material_id FROM material_progress WHERE user_id = $3
+                            AND NOT EXISTS (
+                                SELECT 1 FROM topic_progress tp
+                                WHERE tp.material_id = m.id AND tp.user_id = $3
               )
             ORDER BY m.difficulty, m.updated_at DESC
             LIMIT $4
@@ -130,7 +137,7 @@ impl MaterialRepository for PostgresMaterialRepository {
 
     async fn get_completed_materials(&self, user_id: &str) -> Result<Vec<String>, AnalyticsError> {
         sqlx::query_scalar(
-            "SELECT material_id FROM material_progress WHERE user_id = $1 AND is_completed = true",
+            "SELECT DISTINCT material_id FROM topic_progress WHERE user_id = $1 AND material_id IS NOT NULL AND is_completed = true",
         )
         .bind(user_id)
         .fetch_all(&*self.pool)

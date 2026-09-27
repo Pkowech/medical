@@ -49,15 +49,21 @@ pub async fn get_learning_history(
     }
 
     // Get material progress
-    let material_progress =
-        sqlx::query_as::<_, (String, i32, String, chrono::DateTime<chrono::Utc>)>(
-            "SELECT mp.id, mp.completion_percentage, uc.unit_id, mp.updated_at 
-         FROM material_progress mp
-         LEFT JOIN unit_completions uc ON mp.unit_id = uc.unit_id
-         WHERE mp.user_id = $1
-         ORDER BY mp.updated_at DESC
+    let material_progress = sqlx::query_as::<
+        _,
+        (String, i32, String, chrono::DateTime<chrono::Utc>),
+    >(
+        "SELECT DISTINCT ON (tp.material_id)
+            tp.material_id,
+            tp.completion_percentage,
+            COALESCE(m.unit_id, ''),
+            tp.updated_at
+         FROM topic_progress tp
+         LEFT JOIN materials m ON m.id = tp.material_id
+         WHERE tp.user_id = $1 AND tp.material_id IS NOT NULL
+         ORDER BY tp.material_id, tp.updated_at DESC
          LIMIT 100",
-        )
+    )
         .bind(user_id)
         .fetch_all(pool)
         .await
@@ -215,7 +221,7 @@ pub async fn get_learning_history(
         }
 
         let total_course_time: i64 = sqlx::query_scalar(
-            "SELECT COALESCE(SUM(time_spent),0) FROM course_progress WHERE user_id = $1 AND last_accessed_at BETWEEN $2 AND $3",
+            "SELECT COALESCE(SUM(duration), 0) FROM study_sessions WHERE user_id = $1 AND is_valid = true AND start_time BETWEEN $2 AND $3",
         )
         .bind(user_id)
         .bind(start_date)
@@ -291,7 +297,7 @@ pub async fn get_learning_history(
         }
 
         let courses_completed: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM course_progress WHERE user_id = $1 AND status = 'completed' AND last_accessed_at BETWEEN $2 AND $3",
+            "SELECT COUNT(*) FROM course_enrollments WHERE user_id = $1 AND status = 'completed' AND completed_at BETWEEN $2 AND $3",
         )
         .bind(user_id)
         .bind(start_date)

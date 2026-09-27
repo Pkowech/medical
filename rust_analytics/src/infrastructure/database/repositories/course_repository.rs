@@ -17,14 +17,19 @@ impl PostgresCourseRepository {
 
 #[async_trait::async_trait]
 impl CourseRepository for PostgresCourseRepository {
-    async fn get_course_units(&self, course_id: &str) -> Result<Vec<UnitProgress>, AnalyticsError> {
+    async fn get_course_units(
+        &self,
+        user_id: &str,
+        course_id: &str,
+    ) -> Result<Vec<UnitProgress>, AnalyticsError> {
         let rows = sqlx::query(
             r#"
             SELECT 
-                id,
+                u.id,
                 COALESCE(
-                    (SELECT COUNT(*) FROM materials m 
-                     WHERE m.unit_id = u.id AND m.is_completed = true),
+                    (SELECT COUNT(DISTINCT tp.material_id) FROM topic_progress tp
+                     JOIN materials m ON m.id = tp.material_id
+                     WHERE m.unit_id = u.id AND tp.user_id = $1 AND tp.is_completed = true),
                     0
                 ) as completed_count,
                 COALESCE(
@@ -33,16 +38,17 @@ impl CourseRepository for PostgresCourseRepository {
                     0
                 ) as total_count,
                 COALESCE(
-                    (SELECT SUM(time_spent) FROM unit_access ua 
-                     WHERE ua.unit_id = u.id),
+                    (SELECT SUM(ua.time_spent) FROM unit_accesses ua
+                     WHERE ua.unit_id = u.id AND ua.user_id = $1),
                     0
                 ) as time_spent,
-                (SELECT MAX(accessed_at) FROM unit_access ua 
-                 WHERE ua.unit_id = u.id) as last_access
+                (SELECT MAX(accessed_at) FROM unit_accesses ua
+                 WHERE ua.unit_id = u.id AND ua.user_id = $1) as last_access
             FROM units u
-            WHERE u.course_id = $1
+            WHERE u.course_id = $2
             "#,
         )
+        .bind(user_id)
         .bind(course_id)
         .fetch_all(&*self.pool)
         .await
@@ -54,18 +60,15 @@ impl CourseRepository for PostgresCourseRepository {
             .into_iter()
             .map(|row| {
                 let unit_id: String = row.try_get("id").unwrap_or_default();
-                let completed: i32 = row.try_get("completed_count").unwrap_or(0);
-                let total: i32 = row.try_get("total_count").unwrap_or(0);
-                let time_spent: i32 = row.try_get("time_spent").unwrap_or(0);
+                    let completed: i64 = row.try_get("completed_count").unwrap_or(0);
+                    let total: i64 = row.try_get("total_count").unwrap_or(0);
+                    let time_spent: i64 = row.try_get("time_spent").unwrap_or(0);
                 let last_access: Option<chrono::NaiveDateTime> = row.try_get("last_access").ok();
-                let slot: Option<i32> = row.try_get("concurrent_slot_number").ok();
-
                 UnitProgress {
                     unit_id,
-                    completed_count: completed,
-                    total_count: total,
-                    time_spent,
-                    concurrent_slot_number: slot,
+                        completed_count: completed.min(i32::MAX as i64) as i32,
+                        total_count: total.min(i32::MAX as i64) as i32,
+                        time_spent: time_spent.min(i32::MAX as i64) as i32,
                     last_access: last_access.map(|dt| dt.and_utc()),
                 }
             })
@@ -102,11 +105,18 @@ impl CourseRepository for PostgresCourseRepository {
             r#"
             SELECT
                 COUNT(*) as total_courses,
-                (SELECT COUNT(*) FROM course_progress 
+                (SELECT COUNT(*) FROM course_enrollments
                  WHERE user_id = $1 AND status::text = 'completed') as completed_courses,
-                COALESCE(SUM(time_spent), 0) as total_time,
+                COALESCE((
+                    SELECT SUM(ss.duration)
+                    FROM study_sessions ss
+                    LEFT JOIN topics t ON t.id = ss.topic_id
+                    LEFT JOIN materials m ON m.id = ss.material_id
+                    JOIN units u ON u.id = COALESCE(t.unit_id, m.unit_id)
+                    WHERE ss.user_id = $1 AND u.course_id = $2
+                ), 0) as total_time,
                 COALESCE(AVG(progress_percentage), 0.0) as avg_progress
-            FROM course_progress
+            FROM course_enrollments
             WHERE user_id = $1 AND course_id = $2
             "#,
         )
@@ -118,10 +128,12 @@ impl CourseRepository for PostgresCourseRepository {
             AnalyticsError::DatabaseError(format!("Failed to fetch course stats: {}", e))
         })?;
 
+        let total_time: i64 = row.try_get("total_time").unwrap_or(0);
+
         Ok(CourseStats {
             total_courses: row.try_get("total_courses").unwrap_or(0),
             completed_courses: row.try_get("completed_courses").unwrap_or(0),
-            total_study_time_minutes: row.try_get("total_time").unwrap_or(0),
+            total_study_time_minutes: total_time.min(i32::MAX as i64) as i32,
             average_course_progress: row.try_get::<f64, _>("avg_progress").unwrap_or(0.0) as f32,
         })
     }
@@ -130,7 +142,7 @@ impl CourseRepository for PostgresCourseRepository {
         sqlx::query_scalar::<_, i64>(
             r#"
             SELECT COUNT(*)
-            FROM course_progress
+            FROM course_enrollments
             WHERE user_id = $1 AND status::text = 'completed'
             "#,
         )
@@ -144,7 +156,9 @@ impl CourseRepository for PostgresCourseRepository {
     }
 
     async fn count_total_courses(&self, user_id: &str) -> Result<i32, AnalyticsError> {
-        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM course_progress WHERE user_id = $1")
+        sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM course_enrollments WHERE user_id = $1",
+        )
             .bind(user_id)
             .fetch_one(&*self.pool)
             .await

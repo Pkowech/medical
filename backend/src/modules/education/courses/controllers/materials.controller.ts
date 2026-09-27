@@ -129,6 +129,48 @@ export class MaterialsController {
     );
   }
 
+  @Post('attach')
+  @ApiOperation({ summary: 'Attach an existing R2 library material to a new topic/unit/course (zero re-upload)' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['sourceMaterialId', 'title'],
+      properties: {
+        sourceMaterialId: { type: 'string', description: 'ID of the existing material whose file to reuse' },
+        title:           { type: 'string' },
+        description:     { type: 'string' },
+        topicId:         { type: 'string' },
+        unitId:          { type: 'string' },
+        courseId:        { type: 'string' },
+        type:            { type: 'string' },
+      },
+    },
+  })
+  async attachExisting(
+    @Body('sourceMaterialId') sourceMaterialId: string,
+    @Body('title') title: string,
+    @Body('topicId') topicId?: string,
+    @Body('unitId') unitId?: string,
+    @Body('courseId') courseId?: string,
+    @Body('description') description?: string,
+    @Body('type') type?: MaterialType,
+    @GetUser() user?: PrismaUser,
+  ) {
+    if (!sourceMaterialId) {
+      throw new BadRequestException('sourceMaterialId is required');
+    }
+    return this.materialsService.attachExistingMaterial({
+      sourceMaterialId,
+      title: title || '',
+      topicId,
+      unitId,
+      courseId,
+      description,
+      type,
+      userId: user?.id || '',
+    });
+  }
+
   @Post('external')
   @ApiOperation({ summary: 'Register an external resource (link, video, etc)' })
   async registerExternalResource(
@@ -316,6 +358,26 @@ export class MaterialsController {
   @ApiOperation({ summary: 'Get material download URL' })
   async getDownloadUrl(@Param('id') id: string, @GetUser() user: PrismaUser) {
     return this.materialsService.getDownloadUrl(id, user.id);
+  }
+
+  @Get(':id/preview')
+  @ApiOperation({ summary: 'Get material preview content' })
+  async getPreviewContent(
+    @Param('id') id: string,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const { content, mimeType, fileName } =
+      await this.materialsService.getMaterialPreviewContent(id);
+    const safeFileName = fileName.replace(/["\r\n]/g, '_');
+
+    response.set({
+      'Content-Type': mimeType,
+      'Content-Disposition': `inline; filename="${safeFileName}"`,
+      'Content-Length': content.length,
+      'Cache-Control': 'private, no-store',
+    });
+
+    return new StreamableFile(content);
   }
 
   @Post(':id/track/view')

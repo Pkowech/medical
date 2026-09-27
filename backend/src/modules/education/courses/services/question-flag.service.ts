@@ -2,6 +2,7 @@
 // Allows students to flag problematic quiz questions. Auto-flags to instructor when 5+ flags share the same issue.
 
 import { Injectable, Logger } from '@nestjs/common';
+import { NotificationPriority } from '@prisma/client';
 import { PrismaService } from '#infrastructure/prisma/prisma.service';
 import { getErrorMessage } from '#common/utils/error.utils';
 
@@ -97,12 +98,12 @@ export class QuestionFlagService {
       const preview = question.text.substring(0, 80);
 
       for (const instructor of instructors) {
-        await (this.prisma as any).notification.create({
+        await this.prisma.notification.create({
           data: {
             userId: instructor.userId,
             message: `⚠️ Question flagged ${count}x for "${issue}": "${preview}...". Please review.`,
             type: 'question_flag_alert',
-            severity: 'important',
+            priority: NotificationPriority.high,
             metadata: { questionId, issue, flagCount: count },
           },
         });

@@ -4,7 +4,10 @@ import { useParams, useRouter } from 'next/navigation';
 type NavLesson = { id: string | number };
 type NavChapter = { id: string | number; lessons: NavLesson[] };
 
-export const useCourseNavigation = (chapters: NavChapter[] = []) => {
+export const useCourseNavigation = (
+  chapters: NavChapter[] = [],
+  parentUnitId?: string,
+) => {
   const params = useParams();
   const router = useRouter();
 
@@ -31,7 +34,10 @@ export const useCourseNavigation = (chapters: NavChapter[] = []) => {
     let chIdx = 0;
     let lsIdx = 0;
     
-    if (unitIdFromUrl) {
+    if (parentUnitId && topicIdFromUrl) {
+      chIdx = chapters.findIndex(c => String(c.id) === String(topicIdFromUrl));
+      if (chIdx === -1) chIdx = 0;
+    } else if (unitIdFromUrl) {
       chIdx = chapters.findIndex(c => String(c.id) === String(unitIdFromUrl));
       if (chIdx === -1) chIdx = 0;
       
@@ -43,7 +49,7 @@ export const useCourseNavigation = (chapters: NavChapter[] = []) => {
     
     setCurrentChapterIndex(chIdx);
     setCurrentLessonIndex(lsIdx);
-  }, [chapters, unitIdFromUrl, topicIdFromUrl]);
+  }, [chapters, parentUnitId, unitIdFromUrl, topicIdFromUrl]);
 
   const currentChapter = chapters?.[currentChapterIndex];
   const currentLesson = currentChapter?.lessons?.[currentLessonIndex];
@@ -55,9 +61,10 @@ export const useCourseNavigation = (chapters: NavChapter[] = []) => {
     
     if (targetChapter && courseId) {
       if (targetLesson) {
-        router.push(`/courses/${courseId}/units/${targetChapter.id}/topics/${targetLesson.id}`);
+        const routeUnitId = parentUnitId || String(targetChapter.id);
+        router.push(`/courses/${courseId}/units/${routeUnitId}/topics/${targetLesson.id}`);
       } else {
-        router.push(`/courses/${courseId}/units/${targetChapter.id}`);
+        router.push(`/courses/${courseId}/units/${parentUnitId || targetChapter.id}`);
       }
     }
   };

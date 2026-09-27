@@ -3,6 +3,7 @@
 // All actions are audit-logged and affected students are notified.
 
 import { Injectable, Logger } from '@nestjs/common';
+import { NotificationPriority } from '@prisma/client';
 import { PrismaService } from '#infrastructure/prisma/prisma.service';
 import { getErrorMessage } from '#common/utils/error.utils';
 
@@ -90,12 +91,12 @@ export class InstructorOverrideService {
       });
 
       for (const { userId } of affectedUsers) {
-        await (this.prisma as any).notification.create({
+        await this.prisma.notification.create({
           data: {
             userId,
             message: `A question you previously answered has been ${actionDescription}. Your past score is unaffected.`,
             type: 'instructor_override',
-            severity: 'suggestion',
+            priority: NotificationPriority.low,
             metadata: { questionId },
           },
         });

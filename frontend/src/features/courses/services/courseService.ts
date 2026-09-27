@@ -15,6 +15,7 @@ interface CourseStats {
 interface CourseFilter {
   page?: number;
   limit?: number;
+  instructorId?: string;
   difficulty?: 'beginner' | 'intermediate' | 'advanced' | 'expert';
   status?: 'draft' | 'published' | 'archived' | 'under_review';
   categoryId?: string;
@@ -59,6 +60,20 @@ const parseResponse = <T>(response: unknown): T => {
   return resp as T;
 };
 
+const toCourseWritePayload = (courseData: Partial<Course>) => ({
+  name: courseData.name || courseData.title,
+  title: courseData.title,
+  code: courseData.code,
+  description: courseData.description,
+  difficulty: courseData.difficulty,
+  categoryId: courseData.categoryId,
+  price: courseData.price,
+  status: courseData.status,
+  tags: courseData.tags,
+  prerequisiteCourseIds: courseData.prerequisiteCourseIds,
+  estimatedHours: courseData.estimatedHours,
+});
+
 class CourseService {
   private readonly baseUrl = '/courses';
 
@@ -73,6 +88,7 @@ class CourseService {
       limit: filters.limit || 12,
     };
 
+    if (filters.instructorId?.trim()) cleanedFilters.instructorId = filters.instructorId;
     if (filters.difficulty?.trim()) cleanedFilters.difficulty = filters.difficulty;
     if (filters.categoryId?.trim()) cleanedFilters.categoryId = filters.categoryId;
     if (filters.status?.trim()) cleanedFilters.status = filters.status;
@@ -100,7 +116,10 @@ class CourseService {
    * Creates a new course.
    */
   async createCourse(courseData: Partial<Course>): Promise<Course> {
-    const response = await apiService.post<unknown>(this.baseUrl, courseData);
+    const response = await apiService.post<unknown>(
+      this.baseUrl,
+      toCourseWritePayload(courseData),
+    );
     return parseResponse<Course>(response.data);
   }
 
@@ -108,7 +127,10 @@ class CourseService {
    * Updates an existing course.
    */
   async updateCourse(courseId: string, courseData: Partial<Course>): Promise<Course> {
-    const response = await apiService.patch<unknown>(`${this.baseUrl}/${courseId}`, courseData);
+    const response = await apiService.patch<unknown>(
+      `${this.baseUrl}/${courseId}`,
+      toCourseWritePayload(courseData),
+    );
     return parseResponse<Course>(response.data);
   }
 
@@ -258,6 +280,24 @@ class CourseService {
       maxConcurrent,
     });
     return parseResponse<UnitActivationResult>(response.data);
+  }
+
+  /**
+   * Gets all course categories for dropdown selection.
+   */
+  async getCategories(): Promise<Array<{ id: string; name: string }>> {
+    const response = await apiService.get<unknown>('/course-categories');
+    const payload = response.data;
+    const data =
+      payload && typeof payload === 'object' && 'data' in payload
+        ? payload.data
+        : payload;
+
+    if (!Array.isArray(data)) {
+      throw new Error('The categories response was invalid.');
+    }
+
+    return data;
   }
 }
 

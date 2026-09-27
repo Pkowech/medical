@@ -288,6 +288,11 @@ async function bootstrap() {
   Logger.log('Setting up rate limiting...');
   const isProduction = process.env.NODE_ENV === 'production';
 
+  app
+    .getHttpAdapter()
+    .getInstance()
+    .set('trust proxy', 'loopback, linklocal, uniquelocal');
+
   const loginLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: isProduction ? 5 : 50, // More attempts in dev

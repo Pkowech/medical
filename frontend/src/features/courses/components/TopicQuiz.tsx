@@ -79,7 +79,7 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
     try {
       setIsLoading(true);
       const response = await apiService.get<QuizQuestion[]>(
-        `/quiz/topic/${topicId}`
+        `/quizzes/topic/${topicId}`
       );
       setQuestions(response.data || []);
       if (response.data?.length === 0) {
@@ -121,7 +121,7 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
       }));
 
       const response = await apiService.post<{ score: number; feedback?: string }>(
-        `/quiz/topic/${topicId}/submit`,
+        `/quizzes/topic/${topicId}/submit`,
         { responses }
       );
 
@@ -161,6 +161,10 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
     return (
       <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Loading Topic Quiz</DialogTitle>
+            <DialogDescription>Quiz questions are loading for this topic.</DialogDescription>
+          </DialogHeader>
           <div className="flex items-center justify-center py-12">
             <div className="text-center space-y-4">
               <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mx-auto" />
@@ -181,6 +185,7 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
               <Award className="w-6 h-6 text-yellow-500" />
               Quiz Complete!
             </DialogTitle>
+            <DialogDescription>Your topic quiz results are ready.</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-6">

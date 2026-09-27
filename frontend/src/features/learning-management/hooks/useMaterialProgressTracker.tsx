@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import progressService from '@/features/learning-management/services/progressService';
 import api from '@/features/auth/services/apiClient';
@@ -21,6 +21,9 @@ export default function useMaterialProgressTracker(options: Options) {
   const [isTracking, setIsTracking] = useState(false);
   const timeStartedRef = useRef<number | null>(null);
   const intervalRef = useRef<number | null>(null);
+  const isTrackingRef = useRef(false);
+  const computePercentRef = useRef(computePercent);
+  computePercentRef.current = computePercent;
   const lastPercentRef = useRef<number>(0);
   const lastSyncTimeRef = useRef<number>(0);
   const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
@@ -38,12 +41,17 @@ export default function useMaterialProgressTracker(options: Options) {
   }, [materialId]);
 
   // Internal helper to send progress
-  async function sendProgress(percent: number, elapsedMinutes: number) {
+  const sendProgress = useCallback(async (percent: number, elapsedMinutes: number) => {
     const now = Date.now();
     // Throttling: Ensure at least 15s between syncs even for significant deltas
+    if (percent >= 100 && lastPercentRef.current >= 100) {
+      return;
+    }
     if (now - lastSyncTimeRef.current < 15000 && percent < 100) {
       return;
     }
+    lastPercentRef.current = percent;
+    lastSyncTimeRef.current = now;
 
     try {
       if (unitId) {
@@ -53,18 +61,15 @@ export default function useMaterialProgressTracker(options: Options) {
           percent,
           elapsedMinutes
         );
-        lastPercentRef.current = percent;
-        lastSyncTimeRef.current = now;
       } else if (materialId && percent >= 100) {
         // If no unit id, mark material as read (completion event)
         await api.post(`/progress/materials/${materialId}/read`);
-        lastSyncTimeRef.current = now;
       }
 
       // xAPI Progress/Completion tracking
       if (materialId) {
         const verb = percent >= 100 ? XAPI_VERBS.COMPLETED : XAPI_VERBS.PROGRESSED;
-        trackAction(verb, {
+        await trackAction(verb, {
           id: `${URLS.BASE}/materials/${materialId}`,
           definition: {
             name: { 'en-US': `Material ${materialId}` },
@@ -76,6 +81,7 @@ export default function useMaterialProgressTracker(options: Options) {
           duration: `PT${elapsedMinutes}M`,
         });
       }
+
     } catch (err) {
       console.error('Failed to send material progress', err);
       // Non-blocking; queue for offline sync
@@ -89,12 +95,13 @@ export default function useMaterialProgressTracker(options: Options) {
       await offlineSync.addToQueue(queueItem);
       // Only toast on severe errors, not on rate limiting which is handled by sync queue
     }
-  }
+  }, [materialId, unitId, trackAction, XAPI_VERBS]);
 
-  function computeCurrentPercent(): number {
-    if (typeof computePercent === 'function') {
+  const computeCurrentPercent = useCallback((): number => {
+    const currentComputePercent = computePercentRef.current;
+    if (typeof currentComputePercent === 'function') {
       try {
-        const p = computePercent();
+        const p = currentComputePercent();
         return Math.max(0, Math.min(100, Math.round(p)));
       } catch (err) {
         console.warn('computePercent callback failed', err);
@@ -105,10 +112,11 @@ export default function useMaterialProgressTracker(options: Options) {
     const minutes = Math.max(0, (Date.now() - start) / 60000);
     const estimate = Math.min(100, Math.round((minutes / 10) * 100));
     return estimate; // assumes 10 minutes ~ 100% heuristic
-  }
+  }, []);
 
-  const startTracking = () => {
-    if (isTracking) return;
+  const startTracking = useCallback(() => {
+    if (isTrackingRef.current) return;
+    isTrackingRef.current = true;
     timeStartedRef.current = Date.now();
     setIsTracking(true);
 
@@ -136,8 +144,8 @@ export default function useMaterialProgressTracker(options: Options) {
 
       if (isNewlyCompleted || isSignificantDelta || isTimeForSync) {
         await sendProgress(p, elapsedMin);
-        
-        if (p === 100 && lastPercentRef.current < 100) {
+
+        if (isNewlyCompleted) {
           toast.success('Material completed!', {
             icon: '✅',
             duration: 3000,
@@ -145,10 +153,11 @@ export default function useMaterialProgressTracker(options: Options) {
         }
       }
     }, 1000) as unknown as number;
-  };
+  }, [computeCurrentPercent, intervalMs, sendProgress]);
 
-  const stopTracking = async () => {
-    if (!isTracking) return;
+  const stopTracking = useCallback(async () => {
+    if (!isTrackingRef.current) return;
+    isTrackingRef.current = false;
     if (intervalRef.current) {
       window.clearInterval(intervalRef.current);
       intervalRef.current = null;
@@ -162,7 +171,7 @@ export default function useMaterialProgressTracker(options: Options) {
     setIsTracking(false);
     timeStartedRef.current = null;
     setElapsedSeconds(0);
-  };
+  }, [computeCurrentPercent, sendProgress]);
 
   // auto-cleanup on unmount
   useEffect(() => {

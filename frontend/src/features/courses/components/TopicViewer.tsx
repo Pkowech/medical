@@ -80,7 +80,7 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
     const fetchTopic = async () => {
       try {
         setIsLoading(true);
-        const topicData = await topicService.getTopicById(topicId);
+        const topicData = await topicService.getTopicById(courseId, unitId, topicId);
         setTopic(topicData);
 
         // Set page header
@@ -384,6 +384,8 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
         materialId={selectedMaterialId}
         isOpen={showMaterialModal}
         onClose={handleCloseMaterial}
+        materials={materials}
+        onNavigate={setSelectedMaterialId}
       />
     </div>
   );

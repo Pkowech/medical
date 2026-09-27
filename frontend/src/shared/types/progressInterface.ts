@@ -58,12 +58,6 @@ export interface Progress {
   updatedAt: string; // ISO 8601
   lastUpdated?: number; // Milliseconds since epoch for offline conflict resolution
 
-  // **Spaced Repetition Fields (SM-2 algorithm)** - CRITICAL for spaced repetition feature
-  easeFactor: number; // Ease factor (2.5 default, 1.3 minimum)
-  interval: number; // Days between reviews
-  nextReviewDate: string; // ISO 8601 - when item should be reviewed again
-  lastReviewedAt?: string; // ISO 8601
-
   // **Version Management**
   materialVersion?: number;
   isStale?: boolean; // Indicates if material has been updated since last review

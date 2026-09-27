@@ -115,10 +115,10 @@ export const getLearningAnalytics = async (userId: string): Promise<Record<strin
  */
 export const getConsolidatedAnalytics = async (): Promise<ConsolidatedAnalytics | null> => {
   try {
-    const response = await apiService.get<ApiResponse<ConsolidatedAnalytics>>(
+    const response = await apiService.get<ConsolidatedAnalytics>(
       `/admin/system-overview/consolidated-data`
     );
-    return response.data.data;
+    return response.data ?? null;
   } catch (error) {
     const err = error instanceof Error ? error : new Error(String(error));
     console.error('Error fetching consolidated analytics:', err.message, err.stack);

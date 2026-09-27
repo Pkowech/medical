@@ -21,11 +21,24 @@ pub async fn get_course_progress(
     course_id: &str,
 ) -> Result<Option<CourseProgressRecord>, sqlx::Error> {
     let row = sqlx::query(
-        "SELECT id, user_id, course_id, status, time_spent, progress_percentage, 
-                completed_units, total_units, started_at, completed_at, last_accessed_at, 
-                created_at, updated_at 
-         FROM course_progress 
-         WHERE user_id = $1 AND course_id = $2"
+        "SELECT ce.id, ce.user_id, ce.course_id, ce.status::text AS status,
+                LEAST(COALESCE((
+                    SELECT SUM(ss.duration)
+                    FROM study_sessions ss
+                    LEFT JOIN topics t ON t.id = ss.topic_id
+                    LEFT JOIN materials m ON m.id = ss.material_id
+                    JOIN units u ON u.id = COALESCE(t.unit_id, m.unit_id)
+                    WHERE ss.user_id = ce.user_id AND u.course_id = ce.course_id
+                ), 0), 2147483647)::int AS time_spent,
+                ROUND(COALESCE(ce.progress_percentage, 0))::int AS progress_percentage,
+                COALESCE(ce.completed_units, 0) AS completed_units,
+                COALESCE(ce.total_units, 0) AS total_units,
+                ce.enrolled_at AS started_at, ce.completed_at,
+                COALESCE(ce.last_accessed, ce.enrolled_at) AS last_accessed_at,
+                ce.enrolled_at AS created_at,
+                COALESCE(ce.last_accessed, ce.enrolled_at) AS updated_at
+         FROM course_enrollments ce
+         WHERE ce.user_id = $1 AND ce.course_id = $2"
     )
     .bind(user_id)
     .bind(course_id)
@@ -102,12 +115,11 @@ pub async fn update_course_progress(
     progress_percentage: i32,
 ) -> Result<u64, sqlx::Error> {
     let result = sqlx::query(
-        "UPDATE course_progress 
-         SET progress_percentage = $1, updated_at = $2 
-         WHERE id = $3"
+           "UPDATE course_enrollments
+            SET progress_percentage = $1
+            WHERE id = $2"
     )
     .bind(progress_percentage)
-    .bind(Utc::now().naive_utc())
     .bind(course_progress_id)
     .execute(pool)
     .await?;
@@ -157,8 +169,8 @@ pub async fn count_completed_courses(
 ) -> Result<i64, sqlx::Error> {
     let result = sqlx::query(
         "SELECT COUNT(*) as count 
-         FROM course_progress 
-         WHERE user_id = $1 AND status = 'completed'"
+         FROM course_enrollments
+         WHERE user_id = $1 AND status::text = 'completed'"
     )
     .bind(user_id)
     .fetch_one(pool)

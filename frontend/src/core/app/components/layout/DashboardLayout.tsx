@@ -88,7 +88,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                 {!isFullHeightPage && <Sidebar theme={colorScheme} user={user} navigationItems={navigationItems} />}
 
                 {/* Main app column (center) */}
-                <div className="flex-1 flex flex-col overflow-hidden">
+                <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
                     <AppHeader
                         theme={colorScheme}
                         toggleTheme={toggleTheme}
@@ -105,7 +105,10 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                     />
 
                     {/* content area */}
-                    <div className={cn("flex-1", !isFullHeightPage && "overflow-auto")}>
+                    <div className={cn(
+                        'min-h-0 flex-1',
+                        isFullHeightPage ? 'overflow-hidden' : 'overflow-auto',
+                    )}>
                         <div
                             className={cn(
                                 `w-full transition-all duration-300 pt-0`,
@@ -114,8 +117,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                                 sidebarOpen && !isFullHeightPage && 'lg:pl-0'
                             )}
                         >
-                            <main className={cn('flex-1 py-2 transition-all duration-300 min-w-0', isFullHeightPage && 'py-0 h-full')}>
-                                <div className={cn("space-y-6", isFullHeightPage && "space-y-0 h-full")}>
+                            <main className={cn('min-h-0 min-w-0 flex-1 py-2 transition-all duration-300', isFullHeightPage && 'h-full py-0')}>
+                                <div className={cn('min-h-0 space-y-6', isFullHeightPage && 'h-full space-y-0')}>
                                     <Suspense fallback={<LoadingSpinner />}>{children}</Suspense>
                                 </div>
                             </main>

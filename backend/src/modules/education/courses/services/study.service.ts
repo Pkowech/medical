@@ -178,12 +178,12 @@ export class StudyService {
     this.logger.log(`getNextTopicForCourse: Course ${courseId} has ${units.length} units`);
 
     for (const unit of units) {
-      // Check unit completion status (optimization)
-      const unitProgress = await this.prisma.unitProgress.findUnique({
-        where: { userId_unitId: { userId, unitId: unit.id } },
-      });
+      const unitProgress = await this.progressService.calculateUnitProgress(
+        userId,
+        unit.id,
+      );
 
-      if (!unitProgress || (unitProgress.progressPercentage || 0) < 100) {
+      if (!unitProgress.isCompleted) {
         // This unit is not fully done, check its topics
         this.logger.log(`Unit ${unit.id} not complete, checking topics`);
         const topicId = await this.getNextTopicForUnit(userId, unit.id);

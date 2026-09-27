@@ -566,14 +566,13 @@ export class CoursesService {
         isEnrolled = !!enrollment;
 
         if (isEnrolled && enrollment) {
-          const progress = await this.prisma.courseProgress.findUnique({
-            where: { userId_courseId: { userId, courseId: id } },
-            select: { progressPercentage: true, lastAccessedAt: true },
-          });
-          if (progress) {
+          if (
+            enrollment.progressPercentage !== null ||
+            enrollment.lastAccessed !== null
+          ) {
             userProgress = {
-              progressPercentage: progress.progressPercentage,
-              lastAccessedAt: progress.lastAccessedAt,
+              progressPercentage: enrollment.progressPercentage,
+              lastAccessedAt: enrollment.lastAccessed,
             };
           }
         }

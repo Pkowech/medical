@@ -39,11 +39,13 @@ interface Resource {
   size?: string;
   url: string;
   unitId?: string | number;
+  topicId?: string | number;
 }
 
 interface CourseSidebarProps {
   chapters: Chapter[];
   resources: Resource[];
+  parentUnitId?: string;
   currentChapterIndex: number;
   currentLessonIndex: number;
   navigateTo: (chapterIndex: number, lessonIndex: number) => void;
@@ -55,6 +57,7 @@ interface CourseSidebarProps {
 export const CourseSidebar = ({
   chapters,
   resources,
+  parentUnitId,
   currentChapterIndex,
   currentLessonIndex,
   navigateTo,
@@ -69,8 +72,18 @@ export const CourseSidebar = ({
     setExpandedLessonMaterials(prev => prev === lessonId ? null : lessonId);
   };
 
+  const getLessonResources = (
+    lessonId: string | number,
+    chapterId: string | number,
+  ) => resources.filter(resource => {
+    if (resource.topicId) {
+      return String(resource.topicId) === String(lessonId);
+    }
+    return String(resource.unitId) === String(parentUnitId || chapterId);
+  });
+
   return (
-    <div className="w-80 h-full transition-all duration-300 overflow-hidden bg-white dark:bg-slate-900 border-r border-gray-200 dark:border-slate-800 flex flex-col shadow-xl">
+    <div className="w-80 h-full min-h-0 transition-all duration-300 overflow-hidden bg-white dark:bg-slate-900 border-r border-gray-200 dark:border-slate-800 flex flex-col shadow-xl">
       <div className="lg:hidden flex justify-end p-4 border-b border-gray-100 dark:border-slate-800">
         <button
           onClick={() => setSidebarOpen(false)}
@@ -80,7 +93,7 @@ export const CourseSidebar = ({
           <X className="w-5 h-5" />
         </button>
       </div>
-      <div className="flex-1 overflow-y-auto">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
         <div className="p-6">
           {/* Course Navigation */}
           <div className="mb-8">
@@ -105,6 +118,7 @@ export const CourseSidebar = ({
                         {chapter.lessons.map((lesson, lessonIndex) => {
                           const isLocked = lessonIndex > 0 && !chapter.lessons[lessonIndex - 1].masteryUnlocked;
                           const isActive = currentLessonIndex === lessonIndex && currentChapterIndex === chapterIndex;
+                          const lessonResources = getLessonResources(lesson.id, chapter.id);
                           
                           return (
                             <React.Fragment key={lesson.id}>
@@ -125,7 +139,7 @@ export const CourseSidebar = ({
                                     <div 
                                       onClick={(e) => toggleMaterials(e, lesson.id)}
                                       className={`cursor-pointer hover:scale-125 transition-all p-0.5 rounded-full z-10 ${
-                                        resources.some(r => String(r.unitId) === String(lesson.id) || String(r.unitId) === String(chapter.id))
+                                        lessonResources.length > 0
                                           ? 'ring-2 ring-blue-400/30 bg-blue-50 dark:bg-blue-900/20 shadow-sm shadow-blue-500/20'
                                           : 'hover:bg-gray-100 dark:hover:bg-slate-800'
                                       }`}
@@ -137,7 +151,7 @@ export const CourseSidebar = ({
                                         <Circle className={`w-4 h-4 transition-colors ${
                                           expandedLessonMaterials === lesson.id 
                                             ? 'text-blue-600 fill-blue-500/20' 
-                                            : resources.some(r => String(r.unitId) === String(lesson.id) || String(r.unitId) === String(chapter.id))
+                                            : lessonResources.length > 0
                                               ? 'text-blue-500'
                                               : 'text-gray-400'
                                         }`} />
@@ -177,9 +191,7 @@ export const CourseSidebar = ({
                                 <div className="bg-blue-50/30 dark:bg-blue-900/10 border-t border-b border-blue-100/50 dark:border-blue-800/30 animate-in slide-in-from-top-1 duration-200 py-2">
                                   <p className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-2 px-6">Relevant Materials</p>
                                   <div className="space-y-0.5 px-3">
-                                    {resources
-                                      .filter(r => String(r.unitId) === String(lesson.id) || String(r.unitId) === String(chapter.id))
-                                      .map(material => (
+                                    {lessonResources.map(material => (
                                       <a
                                         key={material.id}
                                         onClick={(e) => {
@@ -203,7 +215,7 @@ export const CourseSidebar = ({
                                       </a>
                                       ))
                                     }
-                                    {resources.filter(r => String(r.unitId) === String(lesson.id)).length === 0 && (
+                                    {lessonResources.length === 0 && (
                                       <p className="text-[10px] text-gray-400 italic px-3 py-1">No additional materials for this unit.</p>
                                     )}
                                   </div>

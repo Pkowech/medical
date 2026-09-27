@@ -61,6 +61,16 @@ const materialService = {
     return response.data;
   },
 
+  async getMaterialPreviewContent(id: string): Promise<Uint8Array> {
+    const content = await apiService.get<ArrayBuffer>(`/materials/${id}/preview`, {
+      responseType: 'arraybuffer',
+    });
+    if (content.byteLength === 0) {
+      throw new Error(`Material preview ${id} is empty`);
+    }
+    return new Uint8Array(content);
+  },
+
   async uploadMaterial(
     formData: FormData,
     options?: { onUploadProgress?: (progressEvent: ProgressEvent | import('axios').AxiosProgressEvent) => void }
@@ -109,6 +119,20 @@ const materialService = {
     const baseUrl = process.env.NEXT_PUBLIC_API_URL || '';
     return `${baseUrl}/materials/local/file?path=${encodeURIComponent(path)}`;
   },
+
+  async attachMaterial(dto: {
+    sourceMaterialId: string;
+    title: string;
+    topicId?: string;
+    unitId?: string;
+    courseId?: string;
+    description?: string;
+    type?: string;
+  }): Promise<Material> {
+    const response = await apiService.post<Material>('/materials/attach', dto);
+    return response.data;
+  },
 };
 
+export { materialService };
 export default materialService;

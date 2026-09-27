@@ -121,12 +121,11 @@ export default function UploadMaterialPage() {
     formData.append('description', description);
     formData.append('courseId', selectedCourseId);
     
-    // Use topicId as the primary association if selected, otherwise fallback to unitId
-    if (topicId) {
-      formData.append('unitId', topicId); // Assuming backend uses unitId for the deepest level association
-      formData.append('topicId', topicId); // Pass explicitly just in case
-    } else if (unitId) {
+    if (unitId) {
       formData.append('unitId', unitId);
+    }
+    if (topicId) {
+      formData.append('topicId', topicId);
     }
     
     if (type) formData.append('type', type);

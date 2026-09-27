@@ -47,7 +47,11 @@ const normalizeUnitToChapters = (unit: UnitResponse): CourseData => {
   // ── Build one chapter per topic ─────────────────────────────────────────
   const chapters = topics.map(topic => {
     // Collect materials that belong to this topic
-    const topicMaterials: Material[] = topic.materials || [];
+    const topicMaterials = (topic.materials || []).map(material => ({
+      ...material,
+      unitId: material.unitId ?? unit.id,
+      topicId: material.topicId ?? topic.id,
+    }));
 
     return {
       id: topic.id,
@@ -75,9 +79,16 @@ const normalizeUnitToChapters = (unit: UnitResponse): CourseData => {
 
   // ── Aggregate all materials for the sidebar Resources section ───────────
   // Unit-level materials + all topic materials, deduped by id.
-  const unitMaterials = (unit.materials || unit.resources || []) as Material[];
+  const unitMaterials = ((unit.materials || unit.resources || []) as Material[]).map(material => ({
+    ...material,
+    unitId: material.unitId ?? unit.id,
+  }));
   const topicMaterials = topics
-    .flatMap(t => t.materials || [])
+    .flatMap(topic => (topic.materials || []).map(material => ({
+      ...material,
+      unitId: material.unitId ?? unit.id,
+      topicId: material.topicId ?? topic.id,
+    })))
     .filter((m, idx, arr) => arr.findIndex(x => x.id === m.id) === idx);
 
   const allMaterials = [

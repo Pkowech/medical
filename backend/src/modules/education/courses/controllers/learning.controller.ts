@@ -28,20 +28,14 @@ import { LearningPathProgressService } from '../services/learning-path-progress.
 import { LearningGoalsService } from '../services/learning-goals.service';
 import { LearningPathRecommendationsService } from '#modules/ai-analytics/services/learning-path-recommendations.service';
 import { LearningAnalyticsService } from '#modules/ai-analytics/services/learning-analytics.service';
-import {
-  CreateLearningPathDto,
-  UpdateLearningPathDto,
-  LearningPathFiltersDto,
-} from '../../../../common/dto/learning-paths.dto';
+
 import {
   CreateLearningGoalDto,
   GoalFiltersDto,
 } from '../../../../common/dto/learning-goals.dto';
-import { ProgressUpdateDto } from '../../../../common/dto/progress.dto';
 import {
   ProgressStatus,
   ProgressEntryType,
-  LearningPathCategory,
 } from '@prisma/client';
 import { RoleGuard } from '#common/guards/roles.guard';
 import { Roles } from '#common/decorators/roles.decorator';
@@ -189,7 +183,7 @@ export class LearningController {
   // ==================== LEARNING GOALS ENDPOINTS ====================
 
   @Post('goals')
-  @ApiOperation({ summary: 'Create learning goal' })
+  @ApiOperation({ summary: 'Create learning goal', deprecated: true })
   @ApiResponse({ status: 201, description: 'Goal created' })
   async createGoal(
     @Body() createDto: CreateLearningGoalDto,
@@ -200,14 +194,17 @@ export class LearningController {
 
   @Get('goals')
   @Header('Cache-Control', 'private, max-age=60')
-  @ApiOperation({ summary: 'Get all learning goals' })
+  @ApiOperation({ summary: 'Get all learning goals', deprecated: true })
   @ApiResponse({ status: 200, description: 'Goals retrieved' })
   async getAllGoals(@Request() req: any, @Query() filters: GoalFiltersDto) {
     return this.learningGoalsService.findAll(req.user.id, filters);
   }
 
   @Get('goals/recommendations')
-  @ApiOperation({ summary: 'Get recommended learning goals (gRPC-based)' })
+  @ApiOperation({
+    summary: 'Get recommended learning goals (gRPC-based)',
+    deprecated: true,
+  })
   @ApiResponse({ status: 200, description: 'Recommendations retrieved' })
   async getGoalRecommendations(@Request() req: any) {
     return this.learningGoalsService.getRecommendedGoals(req.user.id);
@@ -216,14 +213,14 @@ export class LearningController {
   @Get('goals/summary')
   @Roles(Role.student, Role.admin)
   @Header('Cache-Control', 'private, max-age=120')
-  @ApiOperation({ summary: 'Get learning goals analytics' })
+  @ApiOperation({ summary: 'Get learning goals analytics', deprecated: true })
   @ApiResponse({ status: 200, description: 'Analytics retrieved' })
   async getGoalsAnalytics(@Request() req: any) {
     return this.learningGoalsService.getAnalytics(req.user.id);
   }
 
   @Post('goals/smart-suggestions')
-  @ApiOperation({ summary: 'Get SMART criteria suggestions' })
+  @ApiOperation({ summary: 'Get SMART criteria suggestions', deprecated: true })
   @ApiResponse({ status: 200, description: 'Suggestions generated' })
   getSmartSuggestions(@Body() goalData: Partial<CreateLearningGoalDto>) {
     return this.learningGoalsService.generateSmartSuggestions(goalData);
@@ -231,7 +228,7 @@ export class LearningController {
 
   @Get('goals/:id')
   @Header('Cache-Control', 'private, max-age=60')
-  @ApiOperation({ summary: 'Get learning goal by ID' })
+  @ApiOperation({ summary: 'Get learning goal by ID', deprecated: true })
   @ApiParam({ name: 'id', description: 'Goal ID' })
   @ApiResponse({ status: 200, description: 'Goal retrieved' })
   async getGoal(@Param('id') id: string, @Request() req: any) {
@@ -239,7 +236,7 @@ export class LearningController {
   }
 
   @Patch('goals/:id')
-  @ApiOperation({ summary: 'Update learning goal' })
+  @ApiOperation({ summary: 'Update learning goal', deprecated: true })
   @ApiParam({ name: 'id', description: 'Goal ID' })
   @ApiResponse({ status: 200, description: 'Goal updated' })
   async updateGoal(
@@ -252,7 +249,7 @@ export class LearningController {
 
   @Delete('goals/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Delete learning goal' })
+  @ApiOperation({ summary: 'Delete learning goal', deprecated: true })
   @ApiParam({ name: 'id', description: 'Goal ID' })
   @ApiResponse({ status: 204, description: 'Goal deleted' })
   async deleteGoal(@Param('id') id: string, @Request() req: any) {
@@ -260,7 +257,7 @@ export class LearningController {
   }
 
   @Post('goals/:id/progress')
-  @ApiOperation({ summary: 'Add progress entry to goal' })
+  @ApiOperation({ summary: 'Add progress entry to goal', deprecated: true })
   @ApiParam({ name: 'id', description: 'Goal ID' })
   @ApiResponse({ status: 201, description: 'Progress entry added' })
   async addGoalProgress(
@@ -286,7 +283,7 @@ export class LearningController {
 
   @Get('goals/:id/progress')
   @Header('Cache-Control', 'private, max-age=30')
-  @ApiOperation({ summary: 'Get goal progress history' })
+  @ApiOperation({ summary: 'Get goal progress history', deprecated: true })
   @ApiParam({ name: 'id', description: 'Goal ID' })
   @ApiResponse({ status: 200, description: 'Progress history retrieved' })
   async getGoalProgress(@Param('id') id: string, @Request() req: any) {

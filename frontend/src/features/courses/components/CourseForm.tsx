@@ -13,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/shared/components/ui/select';
+import { courseService } from '../services/courseService';
 
 interface CourseFormProps {
   course: Course | null;
@@ -21,6 +22,12 @@ interface CourseFormProps {
 }
 
 export const CourseForm: React.FC<CourseFormProps> = ({ course, onSave, onCancel }) => {
+  const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
+  const [categoriesError, setCategoriesError] = useState<string | null>(null);
+  const [categoryReloadKey, setCategoryReloadKey] = useState(0);
+  const [isSaving, setIsSaving] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
   const [formData, setFormData] = useState<Partial<Course>>({
     title: '',
     description: '',
@@ -29,6 +36,29 @@ export const CourseForm: React.FC<CourseFormProps> = ({ course, onSave, onCancel
     price: 0,
     status: 'draft',
   });
+
+  useEffect(() => {
+    let isCurrent = true;
+    setCategoriesLoading(true);
+    setCategoriesError(null);
+
+    courseService.getCategories()
+      .then(cats => {
+        if (isCurrent) setCategories(cats);
+      })
+      .catch(() => {
+        if (isCurrent) {
+          setCategoriesError('Categories could not be loaded. Try again.');
+        }
+      })
+      .finally(() => {
+        if (isCurrent) setCategoriesLoading(false);
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [categoryReloadKey]);
 
   useEffect(() => {
     if (course) {
@@ -49,7 +79,7 @@ export const CourseForm: React.FC<CourseFormProps> = ({ course, onSave, onCancel
     const { id, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [id]: value,
+      [id]: id === 'estimatedHours' || id === 'price' ? (value === '' ? 0 : Number(value)) : value,
     }));
   };
 
@@ -62,10 +92,33 @@ export const CourseForm: React.FC<CourseFormProps> = ({ course, onSave, onCancel
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (formData.title && formData.description && formData.categoryId) {
-      await onSave(formData);
-    } else {
-      alert('Please fill in all required fields.');
+    const title = formData.title?.trim();
+    const description = formData.description?.trim();
+    const categoryExists = categories.some(category => category.id === formData.categoryId);
+
+    if (!title || !description) {
+      setFormError('Enter a title and description.');
+      return;
+    }
+    if (!categoryExists) {
+      setFormError('Select a category from the available categories.');
+      return;
+    }
+
+    setFormError(null);
+    setIsSaving(true);
+    try {
+      await onSave({
+        ...formData,
+        title,
+        description,
+        categoryId: formData.categoryId,
+        name: formData.name?.trim() || title,
+        estimatedHours: Number(formData.estimatedHours) || 0,
+        price: Number(formData.price) || 0,
+      });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -95,14 +148,45 @@ export const CourseForm: React.FC<CourseFormProps> = ({ course, onSave, onCancel
           </div>
           <div>
             <label htmlFor="categoryId" className="block text-sm font-medium mb-1">
-              Category ID
+              Category
             </label>
-            <Input
-              id="categoryId"
-              value={formData.categoryId || ''}
-              onChange={handleChange}
-              required
-            />
+            {categoriesLoading ? (
+              <p className="text-sm text-muted-foreground" role="status">Loading categories...</p>
+            ) : categoriesError ? (
+              <div className="flex items-center gap-3" role="alert">
+                <p className="text-sm text-destructive">{categoriesError}</p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCategoryReloadKey(key => key + 1)}
+                >
+                  Retry
+                </Button>
+              </div>
+            ) : categories.length > 0 ? (
+              <Select
+                onValueChange={value => handleSelectChange('categoryId', value)}
+                value={categories.some(category => category.id === formData.categoryId) ? formData.categoryId : ''}
+              >
+                <SelectTrigger id="categoryId" className="w-full" aria-required="true">
+                  <SelectValue placeholder="Select a category">
+                    {categories.find(category => category.id === formData.categoryId)?.name || 'Select a category'}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map(category => (
+                    <SelectItem key={category.id} value={category.id}>
+                      {category.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <p className="text-sm text-destructive" role="alert">
+                No categories are available. Create a course category before adding a course.
+              </p>
+            )}
           </div>
           <div>
             <label htmlFor="estimatedHours" className="block text-sm font-medium mb-1">
@@ -111,6 +195,8 @@ export const CourseForm: React.FC<CourseFormProps> = ({ course, onSave, onCancel
             <Input
               id="estimatedHours"
               type="number"
+              min="0"
+              step="0.5"
               value={formData.estimatedHours || 0}
               onChange={handleChange}
               required
@@ -123,6 +209,7 @@ export const CourseForm: React.FC<CourseFormProps> = ({ course, onSave, onCancel
             <Input
               id="price"
               type="number"
+              min="0"
               step="0.01"
               value={formData.price || 0}
               onChange={handleChange}
@@ -148,11 +235,17 @@ export const CourseForm: React.FC<CourseFormProps> = ({ course, onSave, onCancel
               </SelectContent>
             </Select>
           </div>
+          {formError && <p className="text-sm text-destructive" role="alert">{formError}</p>}
           <div className="flex justify-end space-x-2">
             <Button type="button" variant="outline" onClick={onCancel}>
               Cancel
             </Button>
-            <Button type="submit">Save Course</Button>
+            <Button
+              type="submit"
+              disabled={isSaving || categoriesLoading || !!categoriesError || categories.length === 0}
+            >
+              {isSaving ? 'Saving...' : course ? 'Save Changes' : 'Create Course'}
+            </Button>
           </div>
         </form>
       </CardContent>

@@ -87,11 +87,36 @@ export const useCourseData = (courseId: string) => {
       const normalizedChapters = chapters.map(u => {
         const anyUnit = u as unknown as Record<string, unknown>;
         let lessonArray: NormalizedLesson[] = [];
+        const topics = Array.isArray(anyUnit.topics)
+          ? (anyUnit.topics as Array<Record<string, unknown>>)
+          : [];
         
         // Use topic progress if it matches u.id (since topics map to lessons in this view)
         const unitProgress = unitProgressMap[u.id];
 
-        if (
+        if (topics.length > 0) {
+          lessonArray = topics.map(topic => {
+            const topicId = String(topic.id ?? topic.name ?? '');
+            const topicProgress = topicProgressMap[topicId];
+            const title = String(topic.title || topic.name || topicId);
+            const description =
+              typeof topic.description === 'string' ? topic.description : '';
+
+            return {
+              id: topicId,
+              title,
+              type: 'text',
+              duration:
+                typeof topic.estimatedMinutes === 'number'
+                  ? `${topic.estimatedMinutes}m`
+                  : '',
+              content: { text: description },
+              isCompleted: topicProgress?.isCompleted ?? false,
+              masteryUnlocked: topicProgress?.masteryUnlocked ?? false,
+              failedAttempts: topicProgress?.failedAttempts ?? 0,
+            };
+          });
+        } else if (
           Array.isArray(anyUnit.lessons) &&
           (anyUnit.lessons as Array<Record<string, unknown>>).length > 0
         ) {
@@ -139,44 +164,6 @@ export const useCourseData = (courseId: string) => {
               failedAttempts: topicProgress?.failedAttempts ?? 0,
             } as NormalizedLesson;
           });
-        } else {
-          // Map the unit itself to a single lesson (for simple units without sub-lessons)
-          const topicId = String(u.id);
-          const topicProgress = topicProgressMap[topicId];
-          const unitObj = u as unknown as Record<string, unknown>;
-
-          let contentText = '';
-          if (typeof unitObj.content === 'string') {
-            contentText = unitObj.content;
-          } else if (typeof unitObj.description === 'string') {
-            contentText = unitObj.description;
-          }
-
-          let videoUrl = '';
-          if (typeof unitObj.video === 'string') {
-            videoUrl = unitObj.video;
-          } else if (typeof unitObj.content === 'object' && unitObj.content !== null) {
-            const contentObj = unitObj.content as Record<string, unknown>;
-            if (typeof contentObj.video === 'string') {
-              videoUrl = contentObj.video;
-            }
-          }
-
-          lessonArray = [
-            {
-              id: u.id,
-              title: u.title || String(u.id),
-              type: 'text',
-              duration: u.duration ? `${u.duration}m` : '',
-              content: {
-                text: contentText,
-                video: videoUrl,
-              },
-              isCompleted: topicProgress?.isCompleted ?? false,
-              masteryUnlocked: topicProgress?.masteryUnlocked ?? false,
-              failedAttempts: topicProgress?.failedAttempts ?? 0,
-            } as NormalizedLesson,
-          ];
         }
 
         return {
@@ -199,7 +186,7 @@ export const useCourseData = (courseId: string) => {
           (unitObj.materials as unknown as Array<Record<string, unknown>>).forEach(m => {
             extraMaterials.push({
               ...(m as unknown as CourseMaterial),
-              unitId: Number(u.id),
+              unitId: String(u.id),
             });
           });
         }
@@ -211,7 +198,8 @@ export const useCourseData = (courseId: string) => {
               (t.materials as unknown as Array<Record<string, unknown>>).forEach(m => {
                 extraMaterials.push({
                   ...(m as unknown as CourseMaterial),
-                  unitId: Number(t.id),
+                  unitId: String(u.id),
+                  topicId: String(t.id),
                 });
               });
             }

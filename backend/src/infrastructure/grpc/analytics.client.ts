@@ -1,4 +1,5 @@
 import { Observable } from 'rxjs';
+import type { GetDetailedLearningAnalyticsResponse } from '../../generated/grpc/analytics';
 
 export interface AnalyticsService {
   updateBkt(data: {
@@ -141,7 +142,9 @@ export interface AnalyticsService {
 
   getUserDataForProfile(data: { user_id: string }): Observable<any>;
 
-  getDetailedLearningAnalytics(data: { user_id: string }): Observable<any>;
+  getDetailedLearningAnalytics(
+    data: { user_id: string },
+  ): Observable<GetDetailedLearningAnalyticsResponse>;
 
   getCollaborativeRecommendations(data: {
     user_id: string;

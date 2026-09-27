@@ -34,13 +34,12 @@ pub async fn get_system_analytics(pool: &Pool<Postgres>) -> Result<SystemAnalyti
         .map_err(|e| e.to_string())?
         .unwrap_or(0);
 
-    let completed_courses: i64 = sqlx::query_scalar!(
-        "SELECT COUNT(*) FROM course_progress WHERE status::text = 'completed' OR status::text = 'COMPLETED'"
+    let completed_courses: i64 = sqlx::query_scalar::<_, i64>(
+        "SELECT COUNT(*) FROM course_enrollments WHERE status::text = 'completed' OR status::text = 'COMPLETED'"
     )
     .fetch_one(pool)
     .await
-    .map_err(|e| e.to_string())?
-    .unwrap_or(0);
+    .map_err(|e| e.to_string())?;
 
     let total_paths: i64 = sqlx::query_scalar!("SELECT COUNT(*) FROM learning_paths")
         .fetch_one(pool)

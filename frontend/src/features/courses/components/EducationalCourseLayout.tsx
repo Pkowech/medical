@@ -148,10 +148,13 @@ export const EducationalCourseLayout = ({ courseId: propCourseId }: EducationalC
       const mWithUnit = m as Material & {
         unitId?: string | number;
         unit?: { id: string | number };
+        topicId?: string | number;
       };
+      if (mWithUnit.topicId) {
+        return String(mWithUnit.topicId) === lessonId;
+      }
       const materialUnitId = String(mWithUnit.unitId || mWithUnit.unit?.id || '');
-      // Include if it matches the specific topic OR the parent unit
-      return materialUnitId === lessonId || materialUnitId === unitId;
+      return materialUnitId === unitId;
     });
   }, [courseData, typedCurrentLesson, currentChapterIndex]);
 
@@ -200,21 +203,22 @@ export const EducationalCourseLayout = ({ courseId: propCourseId }: EducationalC
     );
   }
 
-  type ResourceLike = Partial<Material> & { contentType?: string; size?: string; url?: string; id?: string | number; title?: string; unitId?: string | number; unit?: { id: string | number } };
-  const sidebarResources: { id: string | number; title: string; type: string; size?: string; url: string; unitId?: string | number }[] = ((courseData.resources || []) as ResourceLike[]).map(m => ({
+  type ResourceLike = Partial<Material> & { contentType?: string; size?: string; url?: string; id?: string | number; title?: string; unitId?: string | number; topicId?: string | number; unit?: { id: string | number } };
+  const sidebarResources: { id: string | number; title: string; type: string; size?: string; url: string; unitId?: string | number; topicId?: string | number }[] = ((courseData.resources || []) as ResourceLike[]).map(m => ({
     id: m.id ?? 'unknown',
     title: m.title ?? 'Untitled',
     type: m.type ?? m.contentType ?? 'document',
     size: m.size,
     url: m.url ?? '',
     unitId: m.unitId || m.unit?.id,
+    topicId: m.topicId,
   }));
 
   return (
     <div className="flex flex-col flex-1 min-h-0 bg-gray-50/50 dark:bg-slate-900">
-      <div className="flex flex-1 overflow-hidden relative">
+      <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden relative">
         <div className={cn(
-          "fixed lg:static inset-y-0 left-0 z-[60] lg:z-40 transition-transform duration-300 ease-in-out",
+          "fixed lg:static inset-y-0 left-0 z-[60] lg:z-40 h-full min-h-0 transition-transform duration-300 ease-in-out",
           sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         )}>
           <CourseSidebar
@@ -230,7 +234,7 @@ export const EducationalCourseLayout = ({ courseId: propCourseId }: EducationalC
         </div>
 
         {/* Main Content Area */}
-        <main className="flex-1 p-4 md:p-8 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-slate-700">
+        <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain p-4 md:p-8 scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-slate-700">
           <div className="max-w-5xl mx-auto space-y-6 md:space-y-8 pb-20">
             <div className="space-y-4">
               <Breadcrumb />
@@ -365,6 +369,8 @@ export const EducationalCourseLayout = ({ courseId: propCourseId }: EducationalC
         materialId={selectedMaterialId}
         isOpen={!!selectedMaterialId}
         onClose={closeMaterial}
+        materials={sidebarResources}
+        onNavigate={setSelectedMaterialId}
       />
     </div>
   );

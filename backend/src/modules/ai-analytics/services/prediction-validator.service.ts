@@ -4,6 +4,7 @@
 
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
+import { NotificationPriority } from '@prisma/client';
 import { PrismaService } from '#infrastructure/prisma/prisma.service';
 import { getErrorMessage } from '#common/utils/error.utils';
 
@@ -218,7 +219,7 @@ export class PredictionValidatorService {
       });
 
       for (const admin of admins) {
-        await (this.prisma as any).notification.create({
+        await this.prisma.notification.create({
           data: {
             userId: admin.userId,
             message:
@@ -226,8 +227,18 @@ export class PredictionValidatorService {
               `F1 score: ${((2 * report.precision * report.recall) / (report.precision + report.recall)).toFixed(2)}. ` +
               `Please review the prediction model.`,
             type: 'system_alert',
-            severity: 'critical',
-            metadata: { report },
+            priority: NotificationPriority.urgent,
+            metadata: {
+              report: {
+                  periodStart: report.periodStart.toISOString(),
+                  periodEnd: report.periodEnd.toISOString(),
+                  totalValidated: report.totalValidated,
+                  precision: report.precision,
+                  recall: report.recall,
+                  calibrationError: report.calibrationError,
+                  isAccurate: report.isAccurate,
+              },
+            },
           },
         });
       }

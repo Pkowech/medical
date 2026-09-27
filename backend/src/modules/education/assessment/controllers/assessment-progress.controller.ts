@@ -62,23 +62,6 @@ export class AssessmentProgressController {
     );
   }
 
-  @Get(':assessmentId')
-  @ApiOperation({ summary: 'Get user progress for a specific assessment' })
-  @ApiParam({ name: 'assessmentId', description: 'Assessment ID' })
-  @ApiResponse({
-    status: 200,
-    description: 'Progress retrieved successfully',
-  })
-  async getProgress(
-    @Param('assessmentId', ParseUUIDPipe) assessmentId: string,
-    @Request() req: any,
-  ) {
-    return this.assessmentProgressService.getProgress(
-      req.user.id,
-      assessmentId,
-    );
-  }
-
   @Get('user/:userId')
   @ApiOperation({ summary: 'Get all assessment progress for a user' })
   @ApiParam({ name: 'userId', description: 'User ID' })
@@ -252,5 +235,22 @@ export class AssessmentProgressController {
     @Param('assessmentId', ParseUUIDPipe) assessmentId: string,
   ): Promise<any[]> {
     return await this.analyticsService.getRelatedResources(assessmentId);
+  }
+
+  @Get(':assessmentId')
+  @ApiOperation({ summary: 'Get user progress for a specific assessment' })
+  @ApiParam({ name: 'assessmentId', description: 'Assessment ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Progress retrieved successfully',
+  })
+  async getProgress(
+    @Param('assessmentId', ParseUUIDPipe) assessmentId: string,
+    @Request() req: any,
+  ) {
+    return this.assessmentProgressService.getProgress(
+      req.user.id,
+      assessmentId,
+    );
   }
 }

@@ -3,7 +3,7 @@
 use crate::domain::repositories::ActivityRepository;
 use crate::shared::error::AnalyticsError;
 use chrono::NaiveDateTime;
-use sqlx::{Pool, Postgres, Row};
+use sqlx::{Pool, Postgres};
 use std::sync::Arc;
 
 pub struct PostgresActivityRepository {
@@ -24,9 +24,9 @@ impl ActivityRepository for PostgresActivityRepository {
     ) -> Result<Vec<NaiveDateTime>, AnalyticsError> {
         let mut activities: Vec<NaiveDateTime> = Vec::new();
 
-        // Get course progress activities
+        // Get enrolled-course activity
         if let Ok(rows) = sqlx::query_scalar::<_, NaiveDateTime>(
-            "SELECT last_accessed_at FROM course_progress WHERE user_id = $1 ORDER BY last_accessed_at DESC LIMIT 100"
+            "SELECT last_accessed FROM course_enrollments WHERE user_id = $1 AND last_accessed IS NOT NULL ORDER BY last_accessed DESC LIMIT 100"
         )
         .bind(user_id)
         .fetch_all(&*self.pool)
@@ -46,7 +46,7 @@ impl ActivityRepository for PostgresActivityRepository {
 
         // Get material progress activities
         if let Ok(rows) = sqlx::query_scalar::<_, NaiveDateTime>(
-            "SELECT last_accessed_at FROM material_progress WHERE user_id = $1 ORDER BY last_accessed_at DESC LIMIT 100"
+            "SELECT last_accessed_at FROM topic_progress WHERE user_id = $1 AND material_id IS NOT NULL ORDER BY last_accessed_at DESC LIMIT 100"
         )
         .bind(user_id)
         .fetch_all(&*self.pool)
@@ -65,15 +65,16 @@ impl ActivityRepository for PostgresActivityRepository {
         &self,
         user_id: &str,
     ) -> Result<(i32, i32), AnalyticsError> {
-        let total: i64 =
-            sqlx::query_scalar("SELECT COUNT(*) FROM course_progress WHERE user_id = $1")
-                .bind(user_id)
-                .fetch_one(&*self.pool)
-                .await
-                .unwrap_or(0);
+        let total: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM course_enrollments WHERE user_id = $1",
+        )
+        .bind(user_id)
+        .fetch_one(&*self.pool)
+        .await
+        .unwrap_or(0);
 
         let completed: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM course_progress WHERE user_id = $1 AND status::text = 'completed'"
+            "SELECT COUNT(*) FROM course_enrollments WHERE user_id = $1 AND status::text = 'completed'"
         )
         .bind(user_id)
         .fetch_one(&*self.pool)
@@ -111,14 +112,15 @@ impl ActivityRepository for PostgresActivityRepository {
     ) -> Result<Option<NaiveDateTime>, AnalyticsError> {
         let result = sqlx::query_scalar(
             r#"
-            SELECT GREATEST(
-                MAX(last_accessed_at),
-                MAX(last_activity_date)
-            )
+            SELECT MAX(activity_at)
             FROM (
-                SELECT last_accessed_at FROM course_progress WHERE user_id = $1
+                SELECT last_accessed AS activity_at
+                FROM course_enrollments
+                WHERE user_id = $1 AND last_accessed IS NOT NULL
                 UNION ALL
-                SELECT last_activity_date FROM learning_path_progress WHERE user_id = $1
+                SELECT last_activity_date AS activity_at
+                FROM learning_path_progress
+                WHERE user_id = $1 AND last_activity_date IS NOT NULL
             ) AS activities
             "#,
         )
@@ -135,10 +137,10 @@ impl ActivityRepository for PostgresActivityRepository {
     async fn get_most_active_hour(&self, user_id: &str) -> Result<Option<i32>, AnalyticsError> {
         sqlx::query_scalar(
             r#"
-            SELECT CAST(EXTRACT(HOUR FROM last_accessed_at) AS INT)
-            FROM course_progress
-            WHERE user_id = $1
-            GROUP BY EXTRACT(HOUR FROM last_accessed_at)
+            SELECT CAST(EXTRACT(HOUR FROM last_accessed) AS INT)
+            FROM course_enrollments
+            WHERE user_id = $1 AND last_accessed IS NOT NULL
+            GROUP BY EXTRACT(HOUR FROM last_accessed)
             ORDER BY COUNT(*) DESC
             LIMIT 1
             "#,
@@ -153,30 +155,9 @@ impl ActivityRepository for PostgresActivityRepository {
 
     async fn get_active_unit_slots(
         &self,
-        user_id: &str,
+        _user_id: &str,
     ) -> Result<Vec<(String, i32)>, AnalyticsError> {
-        let rows = sqlx::query(
-            "SELECT unit_id, concurrent_slot_number 
-             FROM unit_progress 
-             WHERE user_id = $1 AND concurrent_slot_number IS NOT NULL",
-        )
-        .bind(user_id)
-        .fetch_all(&*self.pool)
-        .await
-        .map_err(|e| {
-            AnalyticsError::DatabaseError(format!("Failed to fetch active unit slots: {}", e))
-        })?;
-
-        let slots = rows
-            .into_iter()
-            .map(|row| {
-                let unit_id: String = row.try_get("unit_id").unwrap_or_default();
-                let slot: i32 = row.try_get("concurrent_slot_number").unwrap_or(0);
-                (unit_id, slot)
-            })
-            .collect();
-
-        Ok(slots)
+        Ok(Vec::new())
     }
 
     async fn get_topic_mastery_stats(&self, user_id: &str) -> Result<(i32, i32), AnalyticsError> {

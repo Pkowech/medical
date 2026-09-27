@@ -372,7 +372,15 @@ class ApiService {
     };
   }
 
-  async get<T = unknown>(url: string, options?: RequestOptions): Promise<ApiResponse<T>> {
+  get<T = unknown>(
+    url: string,
+    options: RequestOptions & { responseType: 'arraybuffer' },
+  ): Promise<T>;
+  get<T = unknown>(url: string, options?: RequestOptions): Promise<ApiResponse<T>>;
+  async get<T = unknown>(
+    url: string,
+    options?: RequestOptions,
+  ): Promise<ApiResponse<T> | T> {
     try {
       const config: AxiosRequestConfig = {
         headers: options?.headers,
@@ -383,7 +391,7 @@ class ApiService {
         signal: options?.signal,
       };
 
-      const response: AxiosResponse<ApiResponse<T>> = await this.api.get(url, config);
+      const response: AxiosResponse<ApiResponse<T> | T> = await this.api.get(url, config);
       return response.data;
     } catch (error) {
       if (error instanceof Error && 'isRetryable' in error) {

@@ -1041,9 +1041,9 @@ pub async fn get_progress_data_for_period_db(
         return Err(AnalyticsError::InvalidUserId);
     }
 
-    // total study time from course_progress
+    // total study time from valid study sessions
     let total_course_time: i64 = sqlx::query_scalar(
-        "SELECT COALESCE(SUM(time_spent),0) FROM course_progress WHERE user_id = $1 AND last_accessed_at BETWEEN $2 AND $3",
+        "SELECT COALESCE(SUM(duration), 0) FROM study_sessions WHERE user_id = $1 AND is_valid = true AND start_time BETWEEN $2 AND $3",
     )
     .bind(user_id)
     .bind(start_date)
@@ -1124,7 +1124,7 @@ pub async fn get_completion_data_for_period_db(
     }
 
     let courses_completed: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM course_progress WHERE user_id = $1 AND status = 'completed' AND last_accessed_at BETWEEN $2 AND $3",
+        "SELECT COUNT(*) FROM course_enrollments WHERE user_id = $1 AND status = 'completed' AND completed_at BETWEEN $2 AND $3",
     )
     .bind(user_id)
     .bind(start_date)

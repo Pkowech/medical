@@ -1,23 +1,11 @@
 import { Injectable, Logger, Inject, OnModuleInit } from '@nestjs/common';
-import { ClientGrpc } from '@nestjs/microservices';
 import { PrismaService } from '#infrastructure/prisma/prisma.service';
 import { RedisService } from '#infrastructure/redis/redis.service';
-import { HttpService } from '@nestjs/axios';
 import { firstValueFrom, timeout, Observable } from 'rxjs';
 import { retry } from 'rxjs/operators';
-import { AxiosRequestConfig, AxiosResponse } from 'axios';
-import { InjectQueue } from '@nestjs/bullmq';
-import { Queue } from 'bullmq';
 import { getErrorMessage, getErrorStack } from '#common/utils/error.utils';
 import { SystemAnalyticsResponseDto } from '#common/dto';
-import { LearningPath } from '@prisma/client';
-import { LearningAnalyticsService } from '#modules/ai-analytics/services/learning-analytics.service';
-import { AiAnalyticsService } from '#modules/ai-analytics/services/ai-analytics.service';
-import { RequestDeduplicationService } from '#modules/ai-analytics/services/request-deduplication.service';
-import { ANALYTICS_METRICS_CONFIG } from '#modules/ai-analytics/services/analytics-cache.constants';
-
-
-type JsonObject = { [key: string]: unknown };
+import { EnrollmentStatus } from '@prisma/client';
 
 @Injectable()
 export class AdminAnalyticsService implements OnModuleInit {
@@ -50,7 +38,6 @@ export class AdminAnalyticsService implements OnModuleInit {
   async getSystemAnalytics(): Promise<SystemAnalyticsResponseDto> {
     this.logger.log('getSystemAnalytics: Fetching system analytics');
     const cacheKey = 'admin:system-analytics';
-    const startTime = Date.now();
 
     try {
       // 1. Try cache first
@@ -104,8 +91,8 @@ export class AdminAnalyticsService implements OnModuleInit {
           }),
           this.prisma.user.count(),
           this.prisma.course.count(),
-          this.prisma.courseProgress.count({
-            where: { status: 'completed' as any },
+          this.prisma.courseEnrollment.count({
+            where: { status: EnrollmentStatus.completed },
           }),
           this.prisma.learningPath.count(),
           this.prisma.courseEnrollment.count(),
@@ -145,23 +132,23 @@ export class AdminAnalyticsService implements OnModuleInit {
     }
   }
 
-  async getProgressRecordsForPeriod(start: string, end: string) {
+  getProgressRecordsForPeriod(start: string, end: string) {
     this.logger.log(`getProgressRecordsForPeriod: ${start} to ${end}`);
-    return [];
+    return Promise.resolve([]);
   }
 
-  async processAnalyticsForUsers(userIds: string[]) {
+  processAnalyticsForUsers(userIds: string[]) {
     this.logger.log(`processAnalyticsForUsers: ${userIds.length} users`);
-    return { success: true, processed: 0 };
+    return Promise.resolve({ success: true, processed: 0 });
   }
 
-  async getTrendingPaths(limit: number) {
+  getTrendingPaths(limit: number) {
     this.logger.log(`getTrendingPaths: limit ${limit}`);
-    return [];
+    return Promise.resolve([]);
   }
 
   // Placeholder methods for other analytics functionality
-  async getSystemAnalyticsFromAI() {
-    return { message: 'AI Analytics not yet fully integrated' };
+  getSystemAnalyticsFromAI() {
+    return Promise.resolve({ message: 'AI Analytics not yet fully integrated' });
   }
 }

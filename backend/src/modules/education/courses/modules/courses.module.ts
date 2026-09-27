@@ -33,6 +33,9 @@ import { QuestionFlagService } from '../services/question-flag.service';
 import { InstructorOverrideService } from '../services/instructor-override.service';
 import { SyncService } from '../services/sync.service';
 
+import { NotesController } from '../controllers/notes.controller';
+import { NotesService } from '../services/notes.service';
+
 @Module({
   imports: [
     PrismaModule,
@@ -48,6 +51,7 @@ import { SyncService } from '../services/sync.service';
     StudyController,
     StudyGroupsController,
     XapiHealthController,
+    NotesController,
   ],
   providers: [
     CoursesService,
@@ -65,6 +69,7 @@ import { SyncService } from '../services/sync.service';
     StruggleDetectorService,
     BridgingMaterialService,
     EffortEstimatorService,
+    NotesService,
     // Architecture Batch 2
     CompetenceCalculatorService,
     QuestionFlagService,

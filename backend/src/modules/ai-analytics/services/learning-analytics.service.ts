@@ -337,81 +337,83 @@ export class LearningAnalyticsService implements OnModuleInit {
       );
 
       // Transform Rust response to local interface
+      const userSummary = response.userLearningSummary;
+      const goalAnalytics = response.goalAnalytics;
+      const courseStats = response.courseStats;
+      const pathStats = response.pathStats;
+      const engagementMetrics = response.engagementMetrics;
+      const performanceMetrics = response.performanceMetrics;
       const result: LearningAnalyticsDto = {
-        userId: response.user_id,
+        userId: response.userId || userId,
         userLearningSummary: {
-          totalStudyTime: response.user_learning_summary.total_study_time,
-          averageSessionLength:
-            response.user_learning_summary.average_session_length,
-          averageScore: response.user_learning_summary.average_score,
-          currentStreak: response.user_learning_summary.current_streak,
-          longestStreak: response.user_learning_summary.longest_streak,
-          strongestSubjects: response.user_learning_summary.strongest_subjects,
-          weakestSubjects: response.user_learning_summary.weakest_subjects,
+          totalStudyTime: userSummary?.totalStudyTime ?? 0,
+          averageSessionLength: userSummary?.averageSessionLength ?? 0,
+          averageScore: userSummary?.averageScore ?? 0,
+          currentStreak: userSummary?.currentStreak ?? 0,
+          longestStreak: userSummary?.longestStreak ?? 0,
+          strongestSubjects: userSummary?.strongestSubjects ?? [],
+          weakestSubjects: userSummary?.weakestSubjects ?? [],
         },
         goalAnalytics: {
-          userId: response.goal_analytics.user_id,
-          totalGoals: response.goal_analytics.total_goals,
-          activeGoals: response.goal_analytics.active_goals,
-          completedGoals: response.goal_analytics.completed_goals,
-          overdueGoals: response.goal_analytics.overdue_goals,
-          completionRate: response.goal_analytics.completion_rate,
+          userId: goalAnalytics?.userId || userId,
+          totalGoals: goalAnalytics?.totalGoals ?? 0,
+          activeGoals: goalAnalytics?.activeGoals ?? 0,
+          completedGoals: goalAnalytics?.completedGoals ?? 0,
+          overdueGoals: goalAnalytics?.overdueGoals ?? 0,
+          completionRate: goalAnalytics?.completionRate ?? 0,
           averageCompletionTimeDays:
-            response.goal_analytics.average_completion_time_days,
-          goalsByCategory: response.goal_analytics.goals_by_category,
-          goalsByPriority: response.goal_analytics.goals_by_priority,
+            goalAnalytics?.averageCompletionTimeDays ?? 0,
+          goalsByCategory: goalAnalytics?.goalsByCategory ?? {},
+          goalsByPriority: goalAnalytics?.goalsByPriority ?? {},
           streakData: {
-            currentStreak: response.goal_analytics.current_streak,
-            longestStreak: response.goal_analytics.longest_streak,
+            currentStreak: goalAnalytics?.currentStreak ?? 0,
+            longestStreak: goalAnalytics?.longestStreak ?? 0,
           },
-          streakGoalIds: response.goal_analytics.streak_goal_ids,
-          upcomingDeadlines: (
-            response.goal_analytics.upcoming_deadlines || []
-          ).map((deadline: any) => ({
-            goalId: deadline.goal_id,
-            title: deadline.title,
-            targetDate: deadline.target_date,
-            daysRemaining: deadline.days_remaining,
-          })),
+          streakGoalIds: goalAnalytics?.streakGoalIds ?? [],
+          upcomingDeadlines: (goalAnalytics?.upcomingDeadlines ?? []).map(
+            (deadline) => ({
+              goalId: deadline.goalId,
+              title: deadline.title,
+              targetDate: deadline.targetDate,
+              daysRemaining: deadline.daysRemaining,
+            }),
+          ),
         },
         courseStats: {
-          totalCourses: response.course_stats.total_courses,
-          completedCourses: response.course_stats.completed_courses,
-          totalStudyTimeMinutes: response.course_stats.total_study_time_minutes,
-          averageCourseProgress: response.course_stats.average_course_progress,
+          totalCourses: courseStats?.totalCourses ?? 0,
+          completedCourses: courseStats?.completedCourses ?? 0,
+          totalStudyTimeMinutes: courseStats?.totalStudyTimeMinutes ?? 0,
+          averageCourseProgress: courseStats?.averageCourseProgress ?? 0,
         },
         pathStats: {
-          totalLearningPaths: response.path_stats.total_learning_paths,
-          completedLearningPaths: response.path_stats.completed_learning_paths,
-          totalStudyTimeMinutes: response.path_stats.total_study_time_minutes,
-          averagePathProgress: response.path_stats.average_path_progress,
+          totalLearningPaths: pathStats?.totalLearningPaths ?? 0,
+          completedLearningPaths: pathStats?.completedLearningPaths ?? 0,
+          totalStudyTimeMinutes: pathStats?.totalStudyTimeMinutes ?? 0,
+          averagePathProgress: pathStats?.averagePathProgress ?? 0,
         },
         engagementMetrics: {
-          userId: response.engagement_metrics.user_id,
-          dailyActiveStreak: response.engagement_metrics.daily_active_streak,
-          weeklyActiveStreak: response.engagement_metrics.weekly_active_streak,
-          lastActivityDate: response.engagement_metrics.last_activity_date,
-          sessionCount: response.engagement_metrics.session_count,
+          userId: engagementMetrics?.userId || userId,
+          dailyActiveStreak: engagementMetrics?.dailyActiveStreak ?? 0,
+          weeklyActiveStreak: engagementMetrics?.weeklyActiveStreak ?? 0,
+          lastActivityDate: engagementMetrics?.lastActivityDate ?? '',
+          sessionCount: engagementMetrics?.sessionCount ?? 0,
           averageSessionDuration:
-            response.engagement_metrics.average_session_duration,
-          mostActiveTimeOfDay:
-            response.engagement_metrics.most_active_time_of_day,
-          mostActiveDayOfWeek:
-            response.engagement_metrics.most_active_day_of_week,
+            engagementMetrics?.averageSessionDuration ?? 0,
+          mostActiveTimeOfDay: engagementMetrics?.mostActiveTimeOfDay ?? '',
+          mostActiveDayOfWeek: engagementMetrics?.mostActiveDayOfWeek ?? '',
         },
         performanceMetrics: {
           averageAssessmentScore:
-            response.performance_metrics.average_assessment_score,
-          passRate: response.performance_metrics.pass_rate,
-          weaknessAreas: response.performance_metrics.weakness_areas,
-          strengthAreas: response.performance_metrics.strength_areas,
-          improvementRate: response.performance_metrics.improvement_rate,
+            performanceMetrics?.averageAssessmentScore ?? 0,
+          passRate: performanceMetrics?.passRate ?? 0,
+          weaknessAreas: performanceMetrics?.weaknessAreas ?? [],
+          strengthAreas: performanceMetrics?.strengthAreas ?? [],
+          improvementRate: performanceMetrics?.improvementRate ?? 0,
         },
-        progressTrends: (response.progress_trends || []).map((trend: any) => ({
-          date: trend.date,
+        progressTrends: (response.progressTrends ?? []).map((trend) => ({
+          date: trend.date ? new Date(trend.date) : undefined,
           value: trend.value,
           type: trend.type,
-          metadata: trend.metadata,
         })),
       };
 
@@ -1196,7 +1198,7 @@ export class LearningAnalyticsService implements OnModuleInit {
     probability: number,
   ): string[] {
     const explanations: string[] = [];
-    const [avgScore, consistency, studyDuration, engagement, recentScore] =
+    const [avgScore, consistency,  engagement, recentScore] =
       features;
 
     // 1. Performance-based explanations

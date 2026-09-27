@@ -372,7 +372,7 @@ export const UnitLayout = ({ unitId: propUnitId }: UnitLayoutProps) => {
     navigatePrev,
     isFirstLesson,
     isLastLesson,
-  } = useCourseNavigation(unitData?.chapters || []);
+  } = useCourseNavigation(unitData?.chapters || [], unitId);
 
   // ── Page header sync ───────────────────────────────────────────────────
   useEffect(() => {
@@ -420,8 +420,13 @@ export const UnitLayout = ({ unitId: propUnitId }: UnitLayoutProps) => {
 
     // 2. Fallback: scan top-level resources that reference this topic
     const topLevelMatches = ((unitData.resources || []) as Material[]).filter(m => {
-      const mTyped = m as Material & { unitId?: string | number; unit?: { id: string | number } };
-      return String(mTyped.unitId || mTyped.unit?.id || '') === topicId;
+      const mTyped = m as Material & {
+        unitId?: string | number;
+        topicId?: string | number;
+        unit?: { id: string | number };
+      };
+      if (mTyped.topicId != null) return String(mTyped.topicId) === topicId;
+      return String(mTyped.unitId || mTyped.unit?.id || '') === String(unitData.id);
     });
 
     // Merge and deduplicate
@@ -441,6 +446,7 @@ export const UnitLayout = ({ unitId: propUnitId }: UnitLayoutProps) => {
         url: m.url ?? '',
         description: m.description,
         unitId: (m as Material & { unitId?: string | number }).unitId,
+        topicId: (m as Material & { topicId?: string | number }).topicId,
       }));
   }, [unitData, typedCurrentTopic]);
 
@@ -498,6 +504,7 @@ export const UnitLayout = ({ unitId: propUnitId }: UnitLayoutProps) => {
     id?: string | number;
     title?: string;
     unitId?: string | number;
+    topicId?: string | number;
     unit?: { id: string | number };
   };
 
@@ -508,12 +515,13 @@ export const UnitLayout = ({ unitId: propUnitId }: UnitLayoutProps) => {
     size: m.size,
     url: m.url ?? '',
     unitId: m.unitId || m.unit?.id,
+    topicId: m.topicId,
   }));
 
   // ── Render ─────────────────────────────────────────────────────────────
   return (
-    <div className="flex flex-col flex-1 min-h-0 bg-gray-50/50 dark:bg-slate-900">
-      <div className="flex flex-1 overflow-hidden relative">
+    <div className="flex h-full flex-col flex-1 min-h-0 bg-gray-50/50 dark:bg-slate-900">
+      <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden relative">
 
         {/*
          * Sidebar
@@ -523,13 +531,14 @@ export const UnitLayout = ({ unitId: propUnitId }: UnitLayoutProps) => {
          */}
         <div
           className={cn(
-            'fixed lg:static inset-y-0 left-0 z-[60] lg:z-40 transition-transform duration-300 ease-in-out',
+            'fixed lg:static inset-y-0 left-0 z-[60] lg:z-40 h-full min-h-0 transition-transform duration-300 ease-in-out',
             sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
           )}
         >
           <CourseSidebar
             chapters={unitData.chapters || []}
             resources={sidebarResources}
+            parentUnitId={unitData.id}
             currentChapterIndex={currentChapterIndex}
             currentLessonIndex={currentLessonIndex}
             navigateTo={navigateTo}
@@ -540,7 +549,7 @@ export const UnitLayout = ({ unitId: propUnitId }: UnitLayoutProps) => {
         </div>
 
         {/* Main content area */}
-        <main className="flex-1 p-4 md:p-8 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-slate-700">
+        <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain p-4 md:p-8 scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-slate-700">
           <div className="max-w-5xl mx-auto space-y-6 md:space-y-8 pb-20">
 
             {/* Breadcrumb + progress */}
@@ -636,6 +645,8 @@ export const UnitLayout = ({ unitId: propUnitId }: UnitLayoutProps) => {
         materialId={selectedMaterialId}
         isOpen={!!selectedMaterialId}
         onClose={closeMaterial}
+        materials={sidebarResources}
+        onNavigate={setSelectedMaterialId}
       />
     </div>
   );

@@ -12,7 +12,7 @@ import { RedisOptions } from 'ioredis';
 import { MetricsModule } from '#infrastructure/metrics/metrics.module';
 import { AnalyticsAlertService } from './services/analytics-alert.service';
 // AI Controllers
-
+import { AnalyticsController } from './controllers/analytics.controller';
 // AI Services
 import { AiAnalyticsService } from './services/ai-analytics.service';
 import { RequestDeduplicationService } from './services/request-deduplication.service';
@@ -62,7 +62,7 @@ export const bullModuleForAnalytics = BullModule.registerQueueAsync({
     MetricsModule,
     forwardRef(() => CoursesModule),
   ],
-  controllers: [],
+  controllers: [AnalyticsController],
 
   providers: [
     // AI Services

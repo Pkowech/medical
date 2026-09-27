@@ -52,8 +52,6 @@ pub struct UnitProgress {
     pub time_spent: i32,
     #[sqlx(rename = "progress_percentage")]
     pub progress_percentage: i32,
-    #[sqlx(rename = "concurrent_slot_number")]
-    pub concurrent_slot_number: Option<i32>,
     #[sqlx(rename = "created_at")]
     pub created_at: NaiveDateTime,
     #[sqlx(rename = "updated_at")]
