@@ -76,6 +76,7 @@ NEXT_PUBLIC_API_URL=http://localhost:3002
 # NEXT_PUBLIC_API_URL=https://medtrackhubackend.onrender.com
 # Or provide the complete versioned URL:
 # NEXT_PUBLIC_API_BASE_URL=https://medtrackhubackend.onrender.com/v1
+AUTH_BACKEND_TIMEOUT_MS=30000
 NEXT_PUBLIC_ANALYTICS_URL=http://localhost:5000
 NEXT_PUBLIC_CLAUDE_API_KEY=your_claude_api_key
 ```

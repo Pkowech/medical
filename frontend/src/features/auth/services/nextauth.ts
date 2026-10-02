@@ -143,8 +143,14 @@ export const authOptions: NextAuthOptions = {
             : { username: credentials.identifier }),
         };
 
-        // timeout for fetch
-        const timeoutMs = 7000;
+        const configuredTimeout = Number.parseInt(
+          process.env.AUTH_BACKEND_TIMEOUT_MS || '30000',
+          10
+        );
+        const timeoutMs =
+          Number.isFinite(configuredTimeout) && configuredTimeout > 0
+            ? configuredTimeout
+            : 30000;
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), timeoutMs);
 

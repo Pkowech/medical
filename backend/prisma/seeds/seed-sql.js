@@ -58,6 +58,10 @@ async function seedData() {
       const result = await client.query(
         `INSERT INTO topics (id, name, description, "order", unit_id, created_at, updated_at)
          VALUES (gen_random_uuid(), $1, $2, $3, $4, NOW(), NOW())
+         ON CONFLICT (unit_id, "order") DO UPDATE
+         SET name = EXCLUDED.name,
+             description = EXCLUDED.description,
+             updated_at = NOW()
          RETURNING id`,
         [skill.name, skill.name, idx + 1, unitId],
       );
@@ -107,6 +111,7 @@ async function seedData() {
   } catch (error) {
     console.error('❌ Error:', error.message);
     console.error(error);
+    process.exitCode = 1;
   } finally {
     client.release();
     await pool.end();

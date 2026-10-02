@@ -50,9 +50,17 @@ async function main() {
       { name: 'Anatomy', slug: 'anatomy' },
     ];
 
+    const unit = await prisma.unit.findFirst({
+      orderBy: { createdAt: 'asc' },
+      select: { id: true },
+    });
+    if (!unit) {
+      throw new Error('Cannot seed BKT topics because no unit exists.');
+    }
+
     const skills = [];
-    for (const skillData of skillTopics) {
-      let topic = await prisma.topic.findUnique({
+    for (const [index, skillData] of skillTopics.entries()) {
+      let topic = await prisma.topic.findFirst({
         where: { slug: skillData.slug },
       });
 
@@ -62,6 +70,8 @@ async function main() {
             name: skillData.name,
             slug: skillData.slug,
             description: `${skillData.name} skill for BKT tracking`,
+            unitId: unit.id,
+            order: 1000 + index,
           },
         });
         console.log(`  ✅ Created topic: ${skillData.name}`);
