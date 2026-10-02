@@ -1,48 +1,54 @@
-import { Brain, Activity, Heart, Users, Target, Globe } from 'lucide-react';
+import { Brain, Activity, BookOpen, Users, Target, WifiOff } from 'lucide-react';
 
 export const features = [
   {
     icon: Brain,
     title: 'Precision AI Tutoring',
     description:
-      'Our neural engine analyzes your performance in real-time to generate a custom curriculum tailored to your unique learning style and retention rate.',
-    details: ['Predictive performance modeling', 'Spaced repetition optimization', 'Dynamic difficulty adjustment'],
+      'Adaptive quiz experiences and study recommendations help learners focus their review using available learning activity.',
+    details: ['Adaptive quiz sessions', 'Study recommendations', 'Progress-informed review'],
   },
   {
     icon: Activity,
     title: 'Clinical Case Analytics',
     description:
-      'Gain deep insights into your clinical reasoning patterns with advanced analytics that compare your diagnosis speed and accuracy against global benchmarks.',
-    details: ['Real-time diagnostic metrics', 'Competency heatmaps', 'Strategic study recommendations'],
+      'Review available course and assessment analytics to follow learning progress and identify topics for further study.',
+    details: ['Course and assessment progress', 'Performance trends', 'Study insights when data is available'],
   },
   {
-    icon: Heart,
-    title: 'Evidence-Based Curriculum',
+    icon: BookOpen,
+    title: 'Course and Case Library',
     description:
-      'Engage with high-yield content vetted by board-certified specialists and top-tier medical educators to ensure you are mastering the most relevant concepts.',
+      'Explore the medical courses, lessons, and clinical cases currently available in the catalog. Content coverage varies by course.',
     details: [
-      'Board-vetted study materials',
-      'Interactive 3D anatomical models',
-      'High-yield video lecture library',
-      'Peer-reviewed case studies',
+      'Course modules and topics',
+      'Clinical cases where available',
+      'Catalog availability varies',
     ],
   },
   {
     icon: Target,
-    title: 'Exam Readiness Prediction',
-    description: 'Proprietary algorithms predict your score on standardized exams with up to 95% accuracy based on your current performance trends.',
-    details: ['Mock exam simulations', 'USMLE/MCAT alignment', 'Goal-oriented milestones'],
+    title: 'Assessment and Progress Tracking',
+    description:
+      'Practice with quizzes and track course progress, study activity, and learning goals from your dashboard.',
+    details: ['Quiz results and trends', 'Course completion tracking', 'Study goals and activity'],
   },
   {
     icon: Users,
-    title: 'Collaborative Rounds',
-    description: 'Participate in virtual rounds and study groups with medical peers worldwide, fostering a collaborative environment for complex case discussion.',
-    details: ['Live tutoring sessions', 'Community-driven case labs', 'Active forum discussions'],
+    title: 'Peer Learning',
+    description:
+      'Use available community and study-group features to organize learning and connect with other learners.',
+    details: ['Study groups', 'Group schedules', 'Community features'],
   },
   {
-    icon: Globe,
-    title: 'Global Clinical Access',
-    description: 'Learn from a diverse library of clinical cases reflecting global health challenges, preparing you for a truly international medical career.',
-    details: ['Multi-regional case exposure', 'International health standards', 'Multilingual support options'],
+    icon: WifiOff,
+    title: 'Offline Access',
+    description:
+      'The app shell and selected public assets may be available offline. Supported quiz and progress updates can queue in this browser and sync when connectivity returns.',
+    details: [
+      'Supported updates queue locally',
+      'Queued updates sync when online',
+      'Courses and PDFs are not downloadable for offline use yet',
+    ],
   },
 ];

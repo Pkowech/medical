@@ -46,10 +46,10 @@ export const MarketingHeader: React.FC = () => {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent>
                     <DropdownMenuItem>
-                      <Link href="/features/ai-learning">AI Learning</Link>
+                      <Link href="/features/precision-ai-tutoring">AI Learning</Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem>
-                      <Link href="/features/progress-tracking">Progress Tracking</Link>
+                      <Link href="/features/assessment-and-progress-tracking">Progress Tracking</Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem>
                       <Link href="/features/peer-learning">Peer Learning</Link>
@@ -60,9 +60,6 @@ export const MarketingHeader: React.FC = () => {
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}
-              <Link href="/pricing" className="text-gray-600 hover:text-gray-900">
-                Pricing
-              </Link>
               <Link href="/about" className="text-gray-600 hover:text-gray-900">
                 About
               </Link>
@@ -104,7 +101,7 @@ export const MarketingHeader: React.FC = () => {
             >
               <div className="flex flex-col space-y-2 px-4">
                 <Link
-                  href="/features/ai-learning"
+                  href="/features/precision-ai-tutoring"
                   onClick={() => setMobileMenuOpen(false)}
                   className="py-2"
                   tabIndex={0}
@@ -112,7 +109,7 @@ export const MarketingHeader: React.FC = () => {
                   AI Learning
                 </Link>
                 <Link
-                  href="/features/progress-tracking"
+                  href="/features/assessment-and-progress-tracking"
                   onClick={() => setMobileMenuOpen(false)}
                   className="py-2"
                   tabIndex={0}
@@ -134,14 +131,6 @@ export const MarketingHeader: React.FC = () => {
                   tabIndex={0}
                 >
                   Offline Access
-                </Link>
-                <Link
-                  href="/pricing"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="py-2"
-                  tabIndex={0}
-                >
-                  Pricing
                 </Link>
                 <Link
                   href="/about"

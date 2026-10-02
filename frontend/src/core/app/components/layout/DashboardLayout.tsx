@@ -85,7 +85,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                 />
             )}
 
-            <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
+            <div className="flex h-screen h-dvh overflow-hidden bg-gray-50 dark:bg-gray-900">
                 {!isFullHeightPage && <Sidebar theme={colorScheme} user={user} navigationItems={navigationItems} />}
 
                 {/* Main app column (center) */}

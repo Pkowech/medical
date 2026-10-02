@@ -4,7 +4,7 @@ import React, { createContext, useContext, useState, ReactNode } from 'react';
 
 export interface PageHeader {
   title: string;
-  description: string;
+  description?: string;
   icon?: React.ReactNode;
 }
 

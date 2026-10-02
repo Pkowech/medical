@@ -36,32 +36,8 @@ export default function ContactPage() {
     },
   });
 
-  const onSubmit = async (values: ContactFormValues) => {
-    // In a real application, you would send this data to your backend or a service like EmailJS
-    console.warn(values);
-    toast.success('Your message has been sent!');
-    form.reset();
-
-    // Example EmailJS integration (requires EmailJS to be set up)
-    /*
-    try {
-      await emailjs.send(
-        'YOUR_SERVICE_ID',
-        'YOUR_TEMPLATE_ID',
-        {
-          from_name: values.name,
-          from_email: values.email,
-          message: values.message,
-        },
-        'YOUR_USER_ID'
-      );
-      toast.success('Your message has been sent!');
-      form.reset();
-    } catch (error) {
-      console.error('Failed to send message:', error);
-      toast.error('Failed to send message. Please try again later.');
-    }
-    */
+  const onSubmit = async () => {
+    toast.error('The contact form is not connected. Your message was not sent.');
   };
 
   return (
@@ -80,18 +56,21 @@ export default function ContactPage() {
         <meta property="og:type" content="website" />
         <meta property="og:image" content="/og-image.png" />
       </Head>
-      <main className="container mx-auto py-12 px-4">
+      <main className="container mx-auto px-4 py-8 sm:py-12">
         <section aria-labelledby="contact-heading" className="text-center mb-12">
-          <h1 id="contact-heading" className="text-4xl font-bold mb-4">
+          <h1 id="contact-heading" className="mb-4 text-3xl font-bold sm:text-4xl">
             Get in Touch
           </h1>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+          <p className="mx-auto max-w-2xl text-base text-muted-foreground sm:text-lg">
             We'd love to hear from you! Whether you have a question, feedback, or a partnership
             inquiry, please fill out the form below.
           </p>
         </section>
 
-        <div className="max-w-lg mx-auto bg-card p-8 rounded-lg shadow-lg border border-border">
+        <div className="mx-auto max-w-lg rounded-lg border border-border bg-card p-5 shadow-lg sm:p-8">
+          <p role="status" className="mb-6 rounded-md bg-amber-50 p-3 text-sm text-amber-900">
+            This form is not connected yet. Submitting it will not deliver a message.
+          </p>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
               <FormField

@@ -134,7 +134,7 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
       setHeader({
         title: unitData.title,
         description: unitData.description || 'Unit content and materials',
-        icon: '�',
+        icon: '📘',
       });
     }
     return () => setHeader(null);

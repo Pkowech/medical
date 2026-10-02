@@ -12,7 +12,7 @@ export default function MarketingLayout({ children }: MarketingLayoutProps) {
   return (
     <div className="bg-white">
       <MarketingHeader />
-      <main id="main-content">{children}</main>
+      <div id="main-content">{children}</div>
       <MarketingFooter />
     </div>
   );

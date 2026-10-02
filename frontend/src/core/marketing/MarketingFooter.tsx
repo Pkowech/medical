@@ -1,17 +1,7 @@
 'use client';
 
 import React from 'react';
-import {
-  Stethoscope,
-  Mail,
-  Phone,
-  MapPin,
-  Facebook,
-  Twitter,
-  Linkedin,
-  Instagram,
-  Youtube,
-} from 'lucide-react';
+import { Stethoscope } from 'lucide-react';
 import Link from 'next/link';
 
 export const MarketingFooter: React.FC = () => {
@@ -25,8 +15,8 @@ export const MarketingFooter: React.FC = () => {
         Skip to content
       </a>
       {/* Main Footer Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-4">
           {/* Company Info */}
           <div className="lg:col-span-2">
             <div className="flex items-center mb-6">
@@ -36,56 +26,8 @@ export const MarketingFooter: React.FC = () => {
               <span className="ml-3 text-2xl font-bold text-white">MedTrack Hub</span>
             </div>
             <p className="text-gray-400 mb-6 leading-relaxed max-w-md">
-              Empowering the next generation of medical professionals through innovative education,
-              AI-powered learning, and comprehensive medical curriculum designed by leading experts.
+              A platform for medical courses, practice, study planning, and progress tracking.
             </p>
-            <div className="flex space-x-4">
-              <a
-                href="https://facebook.com/medtrackhub"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-gray-400 hover:text-blue-400 transition-colors"
-                aria-label="MedTrack Hub on Facebook"
-              >
-                <Facebook className="h-6 w-6" aria-hidden="true" />
-              </a>
-              <a
-                href="https://twitter.com/medtrackhub"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-gray-400 hover:text-blue-400 transition-colors"
-                aria-label="MedTrack Hub on Twitter"
-              >
-                <Twitter className="h-6 w-6" aria-hidden="true" />
-              </a>
-              <a
-                href="https://linkedin.com/company/medtrackhub"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-gray-400 hover:text-blue-400 transition-colors"
-                aria-label="MedTrack Hub on LinkedIn"
-              >
-                <Linkedin className="h-6 w-6" aria-hidden="true" />
-              </a>
-              <a
-                href="https://instagram.com/medtrackhub"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-gray-400 hover:text-blue-400 transition-colors"
-                aria-label="MedTrack Hub on Instagram"
-              >
-                <Instagram className="h-6 w-6" aria-hidden="true" />
-              </a>
-              <a
-                href="https://youtube.com/medtrackhub"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-gray-400 hover:text-blue-400 transition-colors"
-                aria-label="MedTrack Hub on YouTube"
-              >
-                <Youtube className="h-6 w-6" aria-hidden="true" />
-              </a>
-            </div>
           </div>
 
           {/* Platform */}
@@ -111,66 +53,10 @@ export const MarketingFooter: React.FC = () => {
                 </li>
                 <li>
                   <Link
-                    href="/pricing"
-                    className="hover:text-white transition-colors text-gray-400"
-                  >
-                    Pricing
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="/testimonials"
-                    className="hover:text-white transition-colors text-gray-400"
-                  >
-                    Testimonials
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="/auth/register"
+                    href="/register"
                     className="hover:text-white transition-colors text-gray-400"
                   >
                     Get Started
-                  </Link>
-                </li>
-              </ul>
-            </div>
-          </nav>
-
-          {/* Resources */}
-          <nav aria-label="Resource links">
-            <div>
-              <h3 className="text-white font-semibold mb-6 text-lg">Resources</h3>
-              <ul className="space-y-3">
-                <li>
-                  <Link href="/blog" className="hover:text-white transition-colors text-gray-400">
-                    Learning Center
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/docs" className="hover:text-white transition-colors text-gray-400">
-                    Documentation
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="/api-reference"
-                    className="hover:text-white transition-colors text-gray-400"
-                  >
-                    API Reference
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="/community"
-                    className="hover:text-white transition-colors text-gray-400"
-                  >
-                    Community Forum
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/help" className="hover:text-white transition-colors text-gray-400">
-                    Help Center
                   </Link>
                 </li>
               </ul>
@@ -189,27 +75,6 @@ export const MarketingFooter: React.FC = () => {
                 </li>
                 <li>
                   <Link
-                    href="/careers"
-                    className="hover:text-white transition-colors text-gray-400"
-                  >
-                    Careers
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/press" className="hover:text-white transition-colors text-gray-400">
-                    Press
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="/partners"
-                    className="hover:text-white transition-colors text-gray-400"
-                  >
-                    Partners
-                  </Link>
-                </li>
-                <li>
-                  <Link
                     href="/contact"
                     className="hover:text-white transition-colors text-gray-400"
                   >
@@ -221,32 +86,6 @@ export const MarketingFooter: React.FC = () => {
           </nav>
         </div>
 
-        {/* Contact Information */}
-        <div className="border-t border-gray-800 mt-12 pt-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="flex items-center">
-              <Mail className="h-5 w-5 text-blue-400 mr-3" aria-hidden="true" />
-              <div>
-                <p className="text-sm text-gray-400">Email</p>
-                <p className="text-white">support@example.com</p>
-              </div>
-            </div>
-            <div className="flex items-center">
-              <Phone className="h-5 w-5 text-blue-400 mr-3" aria-hidden="true" />
-              <div>
-                <p className="text-sm text-gray-400">Phone</p>
-                <p className="text-white">+1 (555) 123-4567</p>
-              </div>
-            </div>
-            <div className="flex items-center">
-              <MapPin className="h-5 w-5 text-blue-400 mr-3" aria-hidden="true" />
-              <div>
-                <p className="text-sm text-gray-400">Address</p>
-                <p className="text-white">123 Medical Center Dr, Suite 100</p>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Bottom Footer */}

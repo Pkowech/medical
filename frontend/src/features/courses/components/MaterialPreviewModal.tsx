@@ -190,9 +190,30 @@ export const MaterialPreviewModal = ({
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-1">
-            <Button type="button" variant="ghost" size="sm" onClick={onClose} title="Back to topic">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={onClose}
+              title="Back to topic"
+              aria-label="Back to topic"
+              className="gap-2 border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+            >
               <ChevronLeft className="h-4 w-4" />
               Back
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={onClose}
+              title="Close preview"
+              aria-label="Close preview"
+              className="h-9 w-9 rounded-full border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+            >
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <path d="M6 6l12 12M18 6L6 18" />
+              </svg>
             </Button>
             {materials.length > 1 && (
               <>
@@ -246,9 +267,17 @@ export const MaterialPreviewModal = ({
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-1 pr-8">
-            <Button type="button" variant="ghost" size="sm" onClick={onClose} title="Back to study">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={onClose}
+              title="Back to study"
+              aria-label="Back to study"
+              className="gap-2 border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+            >
               <ChevronLeft className="h-4 w-4" />
-              <span className="hidden sm:inline">Back</span>
+              <span>Back</span>
             </Button>
             {materials.length > 1 && (
               <>
@@ -284,6 +313,19 @@ export const MaterialPreviewModal = ({
                 <Download className="h-4 w-4" />
               </Button>
             )}
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={onClose}
+              title="Close preview"
+              aria-label="Close preview"
+              className="h-9 w-9 rounded-full border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+            >
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <path d="M6 6l12 12M18 6L6 18" />
+              </svg>
+            </Button>
           </div>
         </DialogHeader>
         

@@ -430,8 +430,8 @@ const MedicalEducationDashboard = () => {
   // Note: Daily Flashcards widget now uses data.flashcards instead of a static question
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-gray-50 via-blue-50/30 to-purple-50/30 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 p-4 md:p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="min-h-[calc(100dvh-4rem)] w-full min-w-0 bg-linear-to-br from-gray-50 via-blue-50/30 to-purple-50/30 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 p-3 sm:p-4 md:p-6">
+      <div className="mx-auto w-full max-w-screen-2xl min-w-0 space-y-6">
 
         {/* ═══════════════════════════════════════════════════════════════════
             HERO SECTION - Chess.com Inspired
@@ -475,11 +475,11 @@ const MedicalEducationDashboard = () => {
         </div>
 
         {/* Quick Actions + Daily Question Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 items-start gap-4 sm:gap-6 lg:grid-cols-3">
           {/* Main Content - Left Side (2 cols) */}
           <div className="lg:col-span-2 space-y-6">
             {/* Quick Actions - Like Chess.com's Play buttons */}
-            <div className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-gray-200 dark:border-slate-700/50 h-full">
+            <div className="min-w-0 self-start bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm rounded-2xl p-4 sm:p-6 border border-gray-200 dark:border-slate-700/50">
               <div className="flex items-center gap-2 mb-4">
                 <Sparkles className="w-5 h-5 text-amber-500 dark:text-amber-400" />
                 <h3 className="text-lg font-bold text-gray-900 dark:text-white">Quick Start</h3>

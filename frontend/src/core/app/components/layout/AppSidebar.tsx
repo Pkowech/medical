@@ -42,7 +42,7 @@ export function Sidebar({ user, navigationItems }: SidebarProps) {
       {/* Sidebar (z-50) */}
       <nav
         className={cn(
-          'fixed lg:static inset-y-0 left-0 z-50 w-full lg:w-64 flex flex-col border-r transition-transform duration-300 ease-in-out',
+          'fixed lg:static inset-y-0 left-0 z-50 w-72 max-w-[85vw] lg:max-w-none lg:w-64 flex flex-col border-r transition-transform duration-300 ease-in-out',
           'bg-white dark:bg-slate-900 border-gray-200 dark:border-slate-800',
           // Mobile: transform-based drawer (full width)
           sidebarOpen ? 'translate-x-0' : '-translate-x-full',

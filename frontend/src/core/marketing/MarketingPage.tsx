@@ -4,61 +4,20 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import ReactGA from 'react-ga4';
 import { motion } from 'framer-motion';
-import { ArrowRight, Users, BookOpen, Award, Globe } from 'lucide-react';
-import { useMounted } from '@/shared/hooks/useMounted';
-import { stats as mockStats } from './data/stats';
+import { ArrowRight, BookOpen, Brain, BarChart3, RefreshCw } from 'lucide-react';
 import { features } from './data/features';
-import { pricingTiers } from './data/pricing';
 import { FeatureCard } from './cards/FeatureCard';
-import { TestimonialCard } from './cards/TestimonialCard';
-import { PricingCard } from './cards/PricingCard';
 import { StickyCta } from './StickyCta';
-import {
-  Accordion,
-  AccordionItem,
-  AccordionTrigger,
-  AccordionContent,
-} from '@/shared/components/ui/accordion';
 import { Skeleton } from '@/shared/components/ui/skeleton';
 import { courseService } from '@/features/courses/services/courseService';
 import { Course } from '@/shared/types/courseInterface';
 
 const GA_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID || '';
 
-const faqs = [
-  {
-    question: 'How does the AI-driven curriculum adapt to my performance?',
-    answer:
-      'Our neural engine evaluates your diagnostic accuracy and recall speed across every module. It automatically identifies knowledge gaps and adjusts your study roadmap, prioritizing high-yield concepts where you need the most reinforcement.',
-  },
-  {
-    question: 'Is the content aligned with board exam standards (USMLE, MCAT, PLAB)?',
-    answer:
-      'Yes. Our curriculum is mapped directly to the latest medical board examination blueprints. High-yield content is tagged and frequently updated by our board-certified specialist panel to ensure total alignment with current standards.',
-  },
-  {
-    question: 'Can I track my progress against global peer benchmarks?',
-    answer:
-      'Absolutely. Our Clinical Case Analytics section provides anonymized comparative data, allowing you to see how your diagnostic prowess and knowledge retention stacks up against thousands of medical professionals worldwide.',
-  },
-  {
-    question: 'Is offline access supported for hospital environments with poor connectivity?',
-    answer:
-      'Yes, our Pro and Institutional tiers support full offline synchronization. You can download courses, case studies, and 3D models to your device, ensuring uninterrupted learning even in the most demanding clinical settings.',
-  },
-];
-
-const trustedByLogos = [
-  { name: 'Mayo Clinic', src: '/logo.svg' },
-  { name: 'Johns Hopkins Medicine', src: '/logo.svg' },
-  { name: 'Cleveland Clinic', src: '/logo.svg' },
-  { name: 'Stanford Medicine', src: '/logo.svg' },
-];
-
 export default function MarketingPage() {
-  const isMounted = useMounted();
   const [featuredCourses, setFeaturedCourses] = useState<Course[]>([]);
   const [totalCourses, setTotalCourses] = useState<number>(0);
+  const [courseCatalogLoaded, setCourseCatalogLoaded] = useState(false);
 
   useEffect(() => {
     if (GA_MEASUREMENT_ID) {
@@ -73,6 +32,8 @@ export default function MarketingPage() {
         setFeaturedCourses(featured);
       } catch (error) {
         console.error('Failed to fetch courses:', error);
+      } finally {
+        setCourseCatalogLoaded(true);
       }
     };
 
@@ -106,28 +67,27 @@ export default function MarketingPage() {
               <div className="space-y-8">
                 <h1
                   id="hero-heading"
-                  className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold leading-tight"
+                  className="text-4xl sm:text-5xl lg:text-6xl font-bold leading-tight"
                 >
-                  Architect Your Medical Mastery with{' '}
+                  Build your medical knowledge with{' '}
                   <span
                     className="block text-transparent bg-clip-text bg-gradient-to-r from-blue-200 to-indigo-200 mt-2"
                     aria-live="polite"
                   >
-                    Precision AI Learning
+                    focused learning tools
                   </span>
                 </h1>
-                <p className="text-lg sm:text-xl text-blue-100 mb-8 leading-relaxed max-w-2xl">
-                  Empower your clinical journey with our sophisticated medical ecosystem. 
-                  Leveraging neural-adaptive pathways and real-time performance analytics, 
-                  MedTrack Hub transforms standard curriculum into a high-precision roadmap to medical excellence.
+                <p className="text-base sm:text-lg text-blue-100 mb-8 leading-relaxed max-w-2xl">
+                  Explore medical courses, practice with quizzes and flashcards, plan your study,
+                  and track learning progress in one place.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4">
                   <Link
                     href="/register"
-                    onClick={() => trackCTA('Hero Start Free Trial')}
+                    onClick={() => trackCTA('Hero Create Account')}
                     className="bg-white text-blue-600 px-8 py-4 rounded-xl font-semibold hover:bg-blue-50 transition-all transform hover:scale-105 flex items-center justify-center shadow-lg"
                   >
-                    Start Free Trial
+                    Create an Account
                     <ArrowRight className="h-5 w-5 ml-2" aria-hidden="true" />
                   </Link>
                   <Link
@@ -141,70 +101,42 @@ export default function MarketingPage() {
               </div>
               <div className="relative mt-8 lg:mt-0">
                 <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 sm:p-8 border border-white/20">
-                  <div className="grid grid-cols-2 gap-4 sm:gap-6">
-                    <div className="bg-white/10 p-3 sm:p-4 rounded-lg">
-                      <Users
-                        className="h-6 w-6 sm:h-8 sm:w-8 text-blue-200 mb-2"
-                        aria-hidden="true"
-                      />
-                      <h3 className="text-base sm:text-lg font-semibold mb-1">
-                        {mockStats.activeStudents}
-                      </h3>
-                      <p className="text-sm sm:text-base text-blue-100">Global Scholars</p>
-                    </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                     <div className="bg-white/10 p-3 sm:p-4 rounded-lg">
                       <BookOpen
                         className="h-6 w-6 sm:h-8 sm:w-8 text-blue-200 mb-2"
                         aria-hidden="true"
                       />
                       <h3 className="text-base sm:text-lg font-semibold mb-1">
-                        {totalCourses > 0 ? totalCourses : mockStats.coursesAvailable}
+                        {courseCatalogLoaded
+                          ? totalCourses > 0
+                            ? totalCourses
+                            : 'Browse'
+                          : '...'}
                       </h3>
-                      <p className="text-sm sm:text-base text-blue-100">Vetted Courses</p>
+                      <p className="text-sm sm:text-base text-blue-100">Available courses</p>
+                    </div>
+                    <div className="bg-white/10 p-3 sm:p-4 rounded-lg">
+                      <Brain
+                        className="h-6 w-6 sm:h-8 sm:w-8 text-blue-200 mb-2"
+                        aria-hidden="true"
+                      />
+                      <h3 className="text-base sm:text-lg font-semibold mb-1">Practice</h3>
+                      <p className="text-sm sm:text-base text-blue-100">Quizzes and flashcards</p>
                     </div>
                     <div className="bg-white/10 p-4 rounded-lg">
-                      <Award className="h-8 w-8 text-blue-200 mb-2" aria-hidden="true" />
-                      <h3 className="text-lg font-semibold mb-1">{mockStats.satisfactionRate}</h3>
-                      <p className="text-blue-100">Board Exam Pass Rate</p>
+                      <BarChart3 className="h-8 w-8 text-blue-200 mb-2" aria-hidden="true" />
+                      <h3 className="text-lg font-semibold mb-1">Track</h3>
+                      <p className="text-sm sm:text-base text-blue-100">Progress and study goals</p>
                     </div>
                     <div className="bg-white/10 p-4 rounded-lg">
-                      <Globe className="h-8 w-8 text-blue-200 mb-2" aria-hidden="true" />
-                      <h3 className="text-lg font-semibold mb-1">{(mockStats as Record<string, unknown>).partnerInstitutions as string || '120+'}</h3>
-                      <p className="text-blue-100">Global Partners</p>
+                      <RefreshCw className="h-8 w-8 text-blue-200 mb-2" aria-hidden="true" />
+                      <h3 className="text-lg font-semibold mb-1">Sync later</h3>
+                      <p className="text-sm sm:text-base text-blue-100">Queue supported updates offline</p>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
-        </motion.section>
-
-        {/* Trusted By Section */}
-        <motion.section
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.2 }}
-          viewport={{ once: true, amount: 0.3 }}
-          aria-labelledby="trusted-by-heading"
-          className="py-16 bg-gray-100"
-        >
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h2 id="trusted-by-heading" className="text-2xl font-bold text-gray-700 mb-8">
-              Trusted by Leading Institutions
-            </h2>
-            <div className="flex flex-wrap justify-center items-center gap-8 md:gap-16">
-              {trustedByLogos.map(logo => (
-                <motion.img
-                  key={logo.name}
-                  src={logo.src}
-                  alt={logo.name}
-                  className="h-12 transition-all duration-300"
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  whileInView={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 0.5 }}
-                  viewport={{ once: true, amount: 0.5 }}
-                />
-              ))}
             </div>
           </div>
         </motion.section>
@@ -222,10 +154,10 @@ export default function MarketingPage() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-16">
               <h2 id="features-heading" className="text-3xl font-bold text-gray-900 mb-4">
-                Redefining Medical Education Standards
+                Learning tools available today
               </h2>
-              <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-                Discover the sophisticated features that make MedTrack Hub the definitive choice for the modern clinician.
+              <p className="text-base sm:text-lg text-gray-600 max-w-3xl mx-auto">
+                Explore the learning, practice, progress, and study-planning tools currently available in MedTrack Hub.
               </p>
             </div>
 
@@ -265,14 +197,13 @@ export default function MarketingPage() {
               <h2 id="featured-courses-heading" className="text-3xl font-bold text-gray-900 mb-4">
                 Featured Courses
               </h2>
-              <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-                Explore our most popular courses, designed to give you a competitive edge.
+              <p className="text-base sm:text-lg text-gray-600 max-w-3xl mx-auto">
+                Browse courses currently available in the catalog. Course coverage varies.
               </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {featuredCourses.length === 0 ? (
-                // Skeleton loading state
+              {featuredCourses.length === 0 && !courseCatalogLoaded ? (
                 Array.from({ length: 3 }).map((_, i) => (
                   <div key={i} className="bg-gray-50 rounded-lg shadow-lg overflow-hidden p-6 space-y-4">
                     <Skeleton className="h-6 w-3/4" />
@@ -281,7 +212,7 @@ export default function MarketingPage() {
                     <Skeleton className="h-4 w-1/4" />
                   </div>
                 ))
-              ) : (
+              ) : featuredCourses.length > 0 ? (
                 featuredCourses.map((course, index) => (
                   <motion.div
                     key={course.id}
@@ -301,161 +232,19 @@ export default function MarketingPage() {
                     </div>
                   </motion.div>
                 ))
+              ) : (
+                <div className="md:col-span-2 lg:col-span-3 rounded-xl border border-gray-200 bg-gray-50 p-6 text-center">
+                  <p className="text-base text-gray-700">
+                    {courseCatalogLoaded
+                      ? 'Featured courses are unavailable right now. Browse the course catalog for current availability.'
+                      : 'No featured courses are available yet.'}
+                  </p>
+                  <Link href="/courses" className="mt-3 inline-flex items-center font-semibold text-blue-700 hover:underline">
+                    Browse courses <ArrowRight className="ml-1 h-4 w-4" aria-hidden="true" />
+                  </Link>
+                </div>
               )}
             </div>
-          </div>
-        </motion.section>
-
-        {/* Testimonials Section */}
-        <motion.section
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.2 }}
-          viewport={{ once: true, amount: 0.3 }}
-          id="testimonials"
-          aria-labelledby="testimonials-heading"
-          className="py-20 bg-gray-50"
-        >
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-16">
-              <h2 id="testimonials-heading" className="text-3xl font-bold text-gray-900 mb-4">
-                What Our Students Say
-              </h2>
-              <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-                Join thousands of successful medical students who have transformed their careers
-                with MedTrack Hub.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.3 }}
-                viewport={{ once: true, amount: 0.3 }}
-              >
-                <TestimonialCard
-                  name="Dr. Sarah Chen"
-                  role="Resident Physician, Internal Medicine"
-                  quote="MedTrack Hub revolutionized my study approach. The adaptive learning system helped me focus on my weak areas and improved my board scores significantly."
-                  avatar="S"
-                />
-              </motion.div>
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.4 }}
-                viewport={{ once: true, amount: 0.3 }}
-              >
-                <TestimonialCard
-                  name="Michael Rodriguez"
-                  role="Medical Student, Year 3"
-                  quote="The progress tracking features are incredible. I can see exactly where I need to improve, and the AI recommendations are spot-on."
-                  avatar="M"
-                />
-              </motion.div>
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.5 }}
-                viewport={{ once: true, amount: 0.3 }}
-              >
-                <TestimonialCard
-                  name="Dr. Ahmed Hassan"
-                  role="Emergency Medicine Resident"
-                  quote="As a busy resident, I love how I can study efficiently with bite-sized lessons and track my progress on the go."
-                  avatar="A"
-                />
-              </motion.div>
-            </div>
-          </div>
-        </motion.section>
-
-        {/* Pricing Section */}
-        <motion.section
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.2 }}
-          viewport={{ once: true, amount: 0.3 }}
-          id="pricing"
-          aria-labelledby="pricing-heading"
-          className="py-20 bg-white"
-        >
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-16">
-              <h2 id="pricing-heading" className="text-3xl font-bold text-gray-900 mb-4">
-                Choose Your Plan
-              </h2>
-              <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-                Flexible pricing options designed to fit every student's needs and budget.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              {pricingTiers.map((tier, index) => (
-                <motion.div
-                  key={tier.name}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.6, delay: 0.3 + index * 0.1 }}
-                  viewport={{ once: true, amount: 0.3 }}
-                >
-                  <PricingCard
-                    name={tier.name}
-                    price={tier.price}
-                    priceSuffix={tier.priceSuffix}
-                    description={tier.description}
-                    features={tier.features}
-                    cta={tier.cta}
-                    highlighted={tier.name === 'Pro'}
-                  />
-                </motion.div>
-              ))}
-            </div>
-          </div>
-        </motion.section>
-
-        {/* FAQ Section */}
-        <motion.section
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.2 }}
-          viewport={{ once: true, amount: 0.3 }}
-          id="faq"
-          aria-labelledby="faq-heading"
-          className="py-20 bg-gray-50"
-        >
-          <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-16">
-              <h2 id="faq-heading" className="text-3xl font-bold text-gray-900 mb-4">
-                Frequently Asked Questions
-              </h2>
-              <p className="text-xl text-gray-600">
-                Find answers to the most common questions about MedTrack Hub.
-              </p>
-            </div>
-            {!isMounted ? (
-              <div className="space-y-4">
-                {faqs.map((_faq, index) => (
-                  <div key={index} className="border-b border-gray-200 py-4">
-                    <Skeleton className="h-7 w-3/4 mb-2" />
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <Accordion type="single" collapsible className="w-full">
-                {faqs.map((faq, index) => (
-                  <AccordionItem key={index} value={`item-${index}`}>
-                    <AccordionTrigger className="text-lg font-semibold text-gray-800 hover:text-blue-600">
-                      {faq.question}
-                    </AccordionTrigger>
-                    <AccordionContent className="text-gray-600 text-base leading-relaxed">
-                      {faq.answer}
-                    </AccordionContent>
-                  </AccordionItem>
-                ))}
-              </Accordion>
-            )}
           </div>
         </motion.section>
 
@@ -473,17 +262,16 @@ export default function MarketingPage() {
               Ready to Transform Your Medical Education?
             </h2>
             <p className="text-xl text-blue-100 mb-8 max-w-3xl mx-auto">
-              Join thousands of medical students and professionals who are already advancing their
-              careers with MedTrack Hub. Start your free trial today and experience the future of
-              medical learning.
+              Create an account to explore the course catalog, learning tools, and progress
+              features currently available in MedTrack Hub.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link
                 href="/register"
-                onClick={() => trackCTA('Bottom CTA Get Started')}
+                onClick={() => trackCTA('Bottom CTA Create Account')}
                 className="bg-white text-blue-600 px-8 py-4 rounded-xl font-semibold hover:bg-blue-50 transition-all transform hover:scale-105 flex items-center justify-center shadow-lg"
               >
-                Get Started for Free
+                Create an Account
                 <ArrowRight className="h-5 w-5 ml-2" aria-hidden="true" />
               </Link>
               <Link

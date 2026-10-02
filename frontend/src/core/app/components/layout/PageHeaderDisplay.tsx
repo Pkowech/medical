@@ -11,12 +11,14 @@ export const PageHeaderDisplay: React.FC = () => {
   }
 
   return (
-    <div className="mb-8">
+    <div className="mb-4 sm:mb-8">
       <div className="flex items-center gap-3 mb-2">
-        {header.icon && <div className="text-3xl">{header.icon}</div>}
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{header.title}</h1>
+        {header.icon && <div className="shrink-0 text-2xl sm:text-3xl">{header.icon}</div>}
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">{header.title}</h1>
       </div>
-      <p className="text-gray-600 dark:text-gray-400">{header.description}</p>
+      {header.description && (
+        <p className="text-base sm:text-lg text-gray-600 dark:text-gray-400">{header.description}</p>
+      )}
     </div>
   );
 };
