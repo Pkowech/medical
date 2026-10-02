@@ -141,7 +141,7 @@ export default function RegisterPage() {
       footer={
         <p className="text-center text-sm text-gray-600 dark:text-gray-400">
           Already have an account?{' '}
-          <Link href="/login" className="text-blue-600 hover:text-blue-700 font-medium">
+          <Link href="/login" className="text-blue-600 hover:text-blue-700 font-medium dark:text-blue-400 dark:hover:text-blue-300">
             Sign in
           </Link>
         </p>
@@ -230,22 +230,22 @@ export default function RegisterPage() {
               onChange={handleChange}
               aria-invalid={!!fieldErrors.acceptTerms}
               aria-describedby={fieldErrors.acceptTerms ? 'acceptTerms-error' : undefined}
-              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded dark:border-slate-600 dark:bg-slate-800"
             />
           </div>
           {fieldErrors.acceptTerms && (
-            <p id="acceptTerms-error" role="alert" className="text-sm text-red-600">
+            <p id="acceptTerms-error" role="alert" className="text-sm text-red-600 dark:text-red-400">
               {fieldErrors.acceptTerms}
             </p>
           )}
           <div className="ml-3 text-sm">
-            <label htmlFor="acceptTerms" className="text-gray-600 dark:text-gray-300">
+            <label htmlFor="acceptTerms" className="text-gray-600 dark:text-slate-300">
               I agree to the{' '}
-              <Link href="/terms" className="text-blue-600 hover:text-blue-700 font-medium">
+              <Link href="/terms" className="text-blue-600 hover:text-blue-700 font-medium dark:text-blue-400 dark:hover:text-blue-300">
                 Terms of Service
               </Link>
               {' '}and{' '}
-              <Link href="/privacy" className="text-blue-600 hover:text-blue-700 font-medium">
+              <Link href="/privacy" className="text-blue-600 hover:text-blue-700 font-medium dark:text-blue-400 dark:hover:text-blue-300">
                 Privacy Policy
               </Link>
             </label>

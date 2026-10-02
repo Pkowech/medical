@@ -28,16 +28,6 @@ function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // Guards against submitting the raw HTML form (native GET, which would put
-  // the password in the URL/history/server logs) before React has hydrated
-  // and attached the real onSubmit handler. Next.js dev-mode compiles can
-  // take tens of seconds on first hit, leaving a window where the form is
-  // visible but not yet interactive-safe.
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
   // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated) {
@@ -234,47 +224,46 @@ function LoginContent() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Sign in to your account
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            Enter your username or email to continue
-          </p>
-        </div>
+    <div className="w-full space-y-8">
+      <div>
+        <h2 className="mt-2 text-center text-3xl font-extrabold text-gray-900 dark:text-white">
+          Sign in to your account
+        </h2>
+        <p className="mt-2 text-center text-sm text-gray-600 dark:text-slate-300">
+          Enter your username or email to continue
+        </p>
+      </div>
 
         {message && (
-          <div className="rounded-md bg-green-50 p-4">
+          <div className="rounded-md bg-green-50 p-4 dark:bg-emerald-950/50">
             <div className="flex">
               <div className="shrink-0">
                 <FaCheckCircle className="h-5 w-5 text-green-400" />
               </div>
               <div className="ml-3">
-                <p className="text-sm font-medium text-green-800">{message}</p>
+                <p className="text-sm font-medium text-green-800 dark:text-emerald-200">{message}</p>
               </div>
             </div>
           </div>
         )}
 
         {success && (
-          <div className="rounded-md bg-green-50 p-4">
-            <div className="text-sm text-green-700">{success}</div>
+          <div className="rounded-md bg-green-50 p-4 dark:bg-emerald-950/50">
+            <div className="text-sm text-green-700 dark:text-emerald-200">{success}</div>
           </div>
         )}
 
         {error && (
-          <div role="alert" aria-live="assertive" className="rounded-md bg-red-50 p-4">
+          <div role="alert" aria-live="assertive" className="rounded-md bg-red-50 p-4 dark:bg-red-950/30">
             <div className="flex">
               <div className="shrink-0">
                 <FaExclamationCircle className="h-5 w-5 text-red-400" />
               </div>
               <div className="ml-3">
-                <p className="text-sm font-medium text-red-800">
+                <p className="text-sm font-medium text-red-800 dark:text-red-200">
                   {error}
                   {showResendVerification && (
-                    <Link href="/resend-verification" className="ml-2 text-indigo-600 hover:text-indigo-500 underline">
+                    <Link href="/resend-verification" className="ml-2 text-indigo-600 hover:text-indigo-500 underline dark:text-indigo-300 dark:hover:text-indigo-200">
                       Resend verification email
                     </Link>
                   )}
@@ -284,7 +273,7 @@ function LoginContent() {
                     type="button"
                     onClick={() => void handleSubmit()}
                     disabled={loading}
-                    className="mt-3 rounded-md border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-800 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="mt-3 rounded-md border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-800 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-red-700 dark:bg-slate-800 dark:text-red-200 dark:hover:bg-slate-700"
                   >
                     Try again
                   </button>
@@ -294,7 +283,7 @@ function LoginContent() {
           </div>
         )}
         {loading && showSlowRequestHint && (
-          <p role="status" className="text-center text-sm text-gray-600">
+          <p role="status" className="text-center text-sm text-gray-600 dark:text-slate-300">
             Sign-in is taking longer than usual. Please keep this page open; you can retry if it
             fails.
           </p>
@@ -310,17 +299,17 @@ function LoginContent() {
           and hands off to NextAuth's signIn().
         */}
         <form className="mt-8 space-y-6" method="post" onSubmit={handleSubmit}>
-          <div className="rounded-md shadow-sm space-y-4">
+          <div className="space-y-4">
             <div>
-              <label htmlFor="identifier" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="identifier" className="block text-sm font-medium text-gray-700 mb-1 dark:text-slate-200">
                 Username or Email
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   {isEmail ? (
-                    <FaEnvelope className="h-5 w-5 text-gray-400" />
+                    <FaEnvelope className="h-5 w-5 text-gray-400 dark:text-slate-400" />
                   ) : (
-                    <FaUser className="h-5 w-5 text-gray-400" />
+                    <FaUser className="h-5 w-5 text-gray-400 dark:text-slate-400" />
                   )}
                 </div>
                 <input
@@ -344,22 +333,22 @@ function LoginContent() {
                   className={`appearance-none block w-full pl-10 pr-3 py-2 border ${
                     formErrors.identifier
                       ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
-                      : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
+                      : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500 dark:border-slate-600 dark:bg-slate-800 dark:text-white dark:placeholder-slate-400'
                   } rounded-md placeholder-gray-500 text-gray-900 focus:outline-none sm:text-sm`}
                   placeholder="Enter your username or email"
                 />
               </div>
               {formErrors.identifier && formTouched.identifier && (
-                <p id="identifier-error" className="mt-1 text-sm text-red-600">{formErrors.identifier}</p>
+                <p id="identifier-error" className="mt-1 text-sm text-red-600 dark:text-red-400">{formErrors.identifier}</p>
               )}
             </div>
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1 dark:text-slate-200">
                 Password
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <FaLock className="h-5 w-5 text-gray-400" />
+                  <FaLock className="h-5 w-5 text-gray-400 dark:text-slate-400" />
                 </div>
                 <input
                   id="password"
@@ -382,7 +371,7 @@ function LoginContent() {
                   className={`appearance-none block w-full pl-10 pr-10 py-2 border ${
                     formErrors.password
                       ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
-                      : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
+                      : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500 dark:border-slate-600 dark:bg-slate-800 dark:text-white dark:placeholder-slate-400'
                   } rounded-md placeholder-gray-500 text-gray-900 focus:outline-none sm:text-sm`}
                   placeholder="Enter your password"
                 />
@@ -392,14 +381,14 @@ function LoginContent() {
                   onClick={() => setShowPassword(!showPassword)}
                 >
                   {showPassword ? (
-                    <FaEyeSlash className="h-5 w-5 text-gray-400" />
+                    <FaEyeSlash className="h-5 w-5 text-gray-400 dark:text-slate-300" />
                   ) : (
-                    <FaEye className="h-5 w-5 text-gray-400" />
+                    <FaEye className="h-5 w-5 text-gray-400 dark:text-slate-300" />
                   )}
                 </button>
               </div>
               {formErrors.password && formTouched.password && (
-                <p id="password-error" className="mt-1 text-sm text-red-600">{formErrors.password}</p>
+                <p id="password-error" className="mt-1 text-sm text-red-600 dark:text-red-400">{formErrors.password}</p>
               )}
             </div>
           </div>
@@ -412,9 +401,9 @@ function LoginContent() {
                 type="checkbox"
                 checked={rememberMe}
                 onChange={e => setRememberMe(e.target.checked)}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded cursor-pointer"
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded cursor-pointer dark:border-slate-600 dark:bg-slate-800"
               />
-              <label htmlFor="rememberMe" className="ml-2 block text-sm text-gray-900">
+              <label htmlFor="rememberMe" className="ml-2 block text-sm text-gray-900 dark:text-slate-200">
                 Remember me
               </label>
             </div>
@@ -422,7 +411,7 @@ function LoginContent() {
             <div className="text-sm">
               <Link
                 href="/forgot-password"
-                className="font-medium text-blue-600 hover:text-blue-500"
+                className="font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
               >
                 Forgot your password?
               </Link>
@@ -432,32 +421,28 @@ function LoginContent() {
           <div>
             <button
               type="submit"
-              // Disabled until hydration completes so a pre-hydration click
-              // can't fall through to a native form submission.
-              disabled={loading || !mounted}
-              title={!mounted ? 'Page is still loading…' : undefined}
-              className={`group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
-                loading || !mounted ? 'opacity-50 cursor-not-allowed' : ''
+              disabled={loading}
+              className={`group relative w-full flex justify-center py-2.5 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors dark:focus:ring-offset-slate-900 ${
+                loading ? 'opacity-50 cursor-not-allowed' : ''
               }`}
             >
               <>
-                {(loading || !mounted) && <FaSpinner className="animate-spin mr-2" />}
-                {mounted ? 'Sign in' : 'Loading…'}
+                {loading && <FaSpinner className="animate-spin mr-2" />}
+                {loading ? 'Signing in...' : 'Sign in'}
               </>
             </button>
           </div>
 
           <div className="mt-6 text-center">
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-gray-600 dark:text-slate-300">
               Don't have an account?{' '}
-              <Link href="/register" className="font-medium text-blue-600 hover:text-blue-500">
+              <Link href="/register" className="font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300">
                 Sign up
               </Link>
             </p>
           </div>
         </form>
       </div>
-    </div>
   );
 }
 

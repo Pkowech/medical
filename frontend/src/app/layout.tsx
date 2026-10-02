@@ -1,9 +1,8 @@
-
 import '@/shared/styles/globals.css';
 import type { ReactNode } from 'react';
 import type { Metadata, Viewport } from 'next';
 import { Providers } from './providers';
-import { Toaster } from 'react-hot-toast';
+import { ToastProvider } from './ToastProvider';
 import LayoutContent from '@/core/app/components/layout/LayoutContent';
 import { ConnectivityIndicator } from '@/components/ui/ConnectivityIndicator';
 import { ServiceWorkerRegister } from './ServiceWorkerRegister';
@@ -31,7 +30,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
     <html lang="en" suppressHydrationWarning>
       <body suppressHydrationWarning>
         <Providers>
-          <Toaster position="top-right" />
+          <ToastProvider />
           <ServiceWorkerRegister />
           <ConnectivityIndicator />
           <LayoutContent>{children}</LayoutContent>

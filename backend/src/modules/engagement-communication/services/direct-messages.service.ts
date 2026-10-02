@@ -20,6 +20,25 @@ interface DirectMessageRecord {
   };
 }
 
+interface DirectConversationParticipantRecord {
+  userId: string;
+  lastReadAt: Date;
+  user: {
+    id: string;
+    firstName: string | null;
+    lastName: string | null;
+    username: string | null;
+  };
+}
+
+interface DirectConversationRecord {
+  id: string;
+  createdAt: Date;
+  updatedAt: Date;
+  participants: DirectConversationParticipantRecord[];
+  messages: DirectMessageRecord[];
+}
+
 @Injectable()
 export class DirectMessagesService {
   constructor(private readonly prisma: PrismaService) {}
@@ -101,7 +120,7 @@ export class DirectMessagesService {
   }
 
   async getConversations(userId: string) {
-    const conversations = await this.prisma.directConversation.findMany({
+    const conversations = (await this.prisma.directConversation.findMany({
       where: { participants: { some: { userId } } },
       include: {
         participants: {
@@ -123,7 +142,7 @@ export class DirectMessagesService {
         },
       },
       orderBy: { updatedAt: 'desc' },
-    });
+    })) as DirectConversationRecord[];
 
     return Promise.all(
       conversations.map(conversation =>
@@ -153,10 +172,10 @@ export class DirectMessagesService {
       data: { lastReadAt: new Date() },
     });
 
-    const recipients = await this.prisma.directConversationParticipant.findMany({
+    const recipients = (await this.prisma.directConversationParticipant.findMany({
       where: { conversationId },
       select: { userId: true, lastReadAt: true },
-    });
+    })) as Array<{ userId: string; lastReadAt: Date | null }>;
     const recipientReadAt = recipients.find(
       recipient => recipient.userId !== userId,
     )?.lastReadAt;
@@ -220,13 +239,19 @@ export class DirectMessagesService {
     return participant;
   }
 
-  private async mapConversation(conversation: any, userId: string) {
+  private async mapConversation(
+    conversation: DirectConversationRecord,
+    userId: string,
+  ) {
     const currentParticipant = conversation.participants.find(
-      (participant: any) => participant.userId === userId,
+      participant => participant.userId === userId,
     );
     const otherParticipant = conversation.participants.find(
-      (participant: any) => participant.userId !== userId,
+      participant => participant.userId !== userId,
     );
+    if (!currentParticipant || !otherParticipant) {
+      throw new NotFoundException('Conversation participants are incomplete.');
+    }
     const unreadCount = await this.prisma.directMessage.count({
       where: {
         conversationId: conversation.id,
@@ -238,7 +263,7 @@ export class DirectMessagesService {
     const latest = conversation.messages[0] as DirectMessageRecord | undefined;
     return {
       id: conversation.id,
-      participants: conversation.participants.map((participant: any) => ({
+      participants: conversation.participants.map(participant => ({
         id: participant.user.id,
         name: this.displayName(participant.user),
       })),
