@@ -16,18 +16,22 @@ export class PrismaService
 
   constructor() {
     const connectionString = process.env.DATABASE_URL;
+    if (!connectionString) {
+      throw new Error(
+        'DATABASE_URL is required to initialize Prisma. Configure the managed Postgres connection string in the runtime environment.',
+      );
+    }
+
     const shouldUseSsl =
       process.env.DATABASE_SSL === 'true' ||
-      Boolean(connectionString?.includes('sslmode=require')) ||
-      Boolean(connectionString?.includes('ssl=true'));
+      new URL(connectionString).searchParams.get('sslmode') === 'require' ||
+      new URL(connectionString).searchParams.get('ssl') === 'true';
 
-    const poolConnectionString = connectionString
-      ? (() => {
-          const url = new URL(connectionString);
-          url.searchParams.delete('sslmode');
-          return url.toString();
-        })()
-      : connectionString;
+    // pg receives TLS configuration through `ssl`; remove Prisma/libpq's
+    // sslmode parameter so it does not override the explicit pool setting.
+    const poolUrl = new URL(connectionString);
+    poolUrl.searchParams.delete('sslmode');
+    const poolConnectionString = poolUrl.toString();
 
     const poolConfig: ConstructorParameters<typeof Pool>[0] = {
       connectionString: poolConnectionString,

@@ -2,6 +2,7 @@
 .env
 .env.*
 !.env.example
+render.env
 frontend/.env.local
 frontend/.env.development.local
 frontend/.env.test.local
