@@ -169,21 +169,27 @@ function LoginContent() {
       } else if (result?.ok) {
         setSuccess('Login successful! Redirecting...');
 
-        // Respect an optional callbackUrl param (used by some OAuth flows)
-        const callbackUrl = searchParams?.get('callbackUrl') || '/dashboard';
-
-        // Give the UI a moment to show the success state, then replace
-        // the history entry so the user can't go back to the login page.
-        setTimeout(() => {
+        // Keep same-origin callback URLs as client-side paths. Passing the
+        // complete deployment URL can make Next.js perform a full reload.
+        const requestedCallbackUrl = searchParams?.get('callbackUrl');
+        let callbackUrl = '/dashboard';
+        if (requestedCallbackUrl) {
           try {
-            router.replace(callbackUrl);
-          } catch (e) {
-            // fallback push
-             
-            console.warn('[Login] router.replace failed, using push', e);
-            router.push(callbackUrl);
+            const resolvedUrl = new URL(requestedCallbackUrl, window.location.origin);
+            if (resolvedUrl.origin === window.location.origin) {
+              callbackUrl = `${resolvedUrl.pathname}${resolvedUrl.search}${resolvedUrl.hash}`;
+            }
+          } catch {
+            console.warn('[Login] Ignoring invalid callback URL');
           }
-        }, 150);
+        }
+
+        try {
+          router.replace(callbackUrl);
+        } catch (e) {
+          console.warn('[Login] router.replace failed, using push', e);
+          router.push(callbackUrl);
+        }
       }
     } catch (error: unknown) {
       console.error('Login failed:', error); // Log the full error object

@@ -6,7 +6,7 @@ import AuthSynchronizer from './AuthSynchronizer';
 
 export default function SessionWrapper({ children }: { children: ReactNode }) {
   return (
-    <SessionProvider>
+    <SessionProvider refetchInterval={0} refetchOnWindowFocus={false}>
       <AuthSynchronizer>{children}</AuthSynchronizer>
     </SessionProvider>
   );
