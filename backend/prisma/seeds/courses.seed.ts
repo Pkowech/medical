@@ -38,16 +38,13 @@ import {
   QuestionCategory,
   MaterialType,
 } from '@prisma/client';
-import { PrismaPg } from '@prisma/adapter-pg';
-import { Pool } from 'pg';
+import { createSeedPrisma } from './seed-db';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
 // ─── Prisma setup ─────────────────────────────────────────────────────────────
 
-const _pool = new Pool({ connectionString: process.env.DATABASE_URL });
-const _adapter = new PrismaPg(_pool);
-const prisma = new PrismaClient({ adapter: _adapter });
+const { pool: _pool, prisma } = createSeedPrisma();
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

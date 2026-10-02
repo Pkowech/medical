@@ -1,11 +1,8 @@
 import 'dotenv/config';
 import { PrismaClient, Permission } from '@prisma/client';
-import { PrismaPg } from '@prisma/adapter-pg';
-import { Pool } from 'pg';
+import { createSeedPrisma } from './seed-db';
 
-const _seedPool = new Pool({ connectionString: process.env.DATABASE_URL });
-const _seedAdapter = new PrismaPg(_seedPool);
-const prisma = new PrismaClient({ adapter: _seedAdapter });
+const { pool: _seedPool, prisma } = createSeedPrisma();
 
 async function main() {
   console.log('Start seeding roles...');

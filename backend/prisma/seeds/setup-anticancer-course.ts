@@ -1,14 +1,10 @@
 import 'dotenv/config';
 import { PrismaClient, CourseDifficulty, CourseStatus, MaterialType } from '@prisma/client';
-import { PrismaPg } from '@prisma/adapter-pg';
-import { Pool } from 'pg';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { createSeedPrisma } from './seed-db';
 
-// Create a Postgres pool + Prisma adapter for running seeds directly with tsx
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-const adapter = new PrismaPg(pool);
-const prisma = new PrismaClient({ adapter });
+const { pool, prisma } = createSeedPrisma();
 
 interface TopicConfig {
   name: string;

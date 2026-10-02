@@ -3,12 +3,9 @@
  * Uses raw SQL to populate the database with test users, skills, and BKT states
  */
 
-const { Pool } = require('pg');
 require('dotenv').config();
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
+const { createSeedPrisma } = require('./seed-db.cjs');
+const { pool } = createSeedPrisma();
 
 async function seedData() {
   const client = await pool.connect();

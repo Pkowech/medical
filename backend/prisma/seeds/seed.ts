@@ -20,13 +20,9 @@ import {
 // succeeds and avoids PrismaClientValidationError: "Invalid value for argument `type`. Expected UserActivityType."
 import * as argon2 from 'argon2';
 import { randomUUID } from 'crypto';
-import { PrismaPg } from '@prisma/adapter-pg';
-import { Pool } from 'pg';
+import { createSeedPrisma } from './seed-db';
 
-// Use the Postgres adapter so scripts executed directly (ts-node) work with Prisma v7
-const _seedPool = new Pool({ connectionString: process.env.DATABASE_URL });
-const _seedAdapter = new PrismaPg(_seedPool);
-const prisma = new PrismaClient({ adapter: _seedAdapter });
+const { pool: _seedPool, prisma } = createSeedPrisma();
 
 async function seedJamesBarchokUser(
   studentRoleId: string,
@@ -848,7 +844,7 @@ async function main() {
           status: ProgressStatus.inProgress,
           progressPercentage: 87,
           completionPercentage: 87,
-          timeSpent: 1800,
+          timeTaken: 1800,
           startedAt: new Date('2025-08-15T00:00:00Z'),
           lastAccessedAt: new Date(),
         },
@@ -1108,7 +1104,7 @@ async function main() {
         score: 85,
         maxScore: 100,
         percentage: 85,
-        timeSpent: 1800,
+        timeTaken: 1800,
         isPassed: true,
         correctAnswers: 8,
         totalQuestions: 10,
@@ -1127,7 +1123,7 @@ async function main() {
         score: 90,
         maxScore: 100,
         percentage: 90,
-        timeSpent: 1500,
+        timeTaken: 1500,
         isPassed: true,
         correctAnswers: 9,
         totalQuestions: 10,
@@ -1397,7 +1393,7 @@ async function main() {
         score: 92,
         maxScore: 100,
         percentage: 92,
-        timeSpent: 1800,
+        timeTaken: 1800,
         isPassed: true,
         correctAnswers: 9,
         totalQuestions: 10,

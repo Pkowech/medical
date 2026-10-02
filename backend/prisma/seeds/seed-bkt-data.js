@@ -8,9 +8,9 @@
  * 4. Creates analytics events for testing
  */
 
-const { PrismaClient } = require('@prisma/client');
-
-const prisma = new PrismaClient();
+require('dotenv').config();
+const { createSeedPrisma } = require('./seed-db.cjs');
+const { prisma } = createSeedPrisma();
 
 async function main() {
   console.log('\n╔════════════════════════════════════════════════╗');

@@ -1,16 +1,3 @@
-const ensureProtocol = (urlStr: string, fallback: string): string => {
-  let val = (urlStr || fallback).trim();
-  if (!val.startsWith('http://') && !val.startsWith('https://')) {
-    val = `https://${val}`;
-  }
-  try {
-    new URL(val);
-    return val.replace(/\/+$/, '');
-  } catch {
-    return fallback;
-  }
-};
-
 const getDynamicOrigin = (): string => {
   if (typeof window !== 'undefined' && window.location?.origin) {
     return window.location.origin;

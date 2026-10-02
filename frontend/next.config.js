@@ -18,7 +18,11 @@ const ALLOWED_DEV_ORIGINS = [
   'http://192.168.137.1:3000'
 ];
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
+const configuredBackendUrl =
+  process.env.NEXT_PUBLIC_API_URL ||
+  process.env.NEXT_PUBLIC_API_BASE_URL ||
+  '';
+const BACKEND_URL = configuredBackendUrl.replace(/\/v1\/?$/, '');
 
 // ============================================================================
 // PWA CONFIGURATION

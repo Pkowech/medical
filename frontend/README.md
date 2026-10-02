@@ -72,9 +72,17 @@ Create a `.env.local` file:
 
 ```bash
 NEXT_PUBLIC_API_URL=http://localhost:3002
+# Production example:
+# NEXT_PUBLIC_API_URL=https://medtrackhubackend.onrender.com
+# Or provide the complete versioned URL:
+# NEXT_PUBLIC_API_BASE_URL=https://medtrackhubackend.onrender.com/v1
 NEXT_PUBLIC_ANALYTICS_URL=http://localhost:5000
 NEXT_PUBLIC_CLAUDE_API_KEY=your_claude_api_key
 ```
+
+For Vercel, add `NEXT_PUBLIC_API_URL` with the deployed backend origin
+(`https://medtrackhubackend.onrender.com`) in the project's Environment Variables,
+then redeploy. Do not commit production values to source files.
 
 ## Learn More
 

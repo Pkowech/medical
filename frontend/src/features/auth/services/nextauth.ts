@@ -30,7 +30,10 @@ async function refreshAccessToken(token: JWT): Promise<JWT> {
     }
 
     const raw =
-      process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL || '';
+      process.env.BACKEND_URL ||
+      process.env.NEXT_PUBLIC_API_BASE_URL ||
+      process.env.NEXT_PUBLIC_API_URL ||
+      '';
     
     if (!raw) {
       throw new Error('Backend URL not configured for token refresh');
