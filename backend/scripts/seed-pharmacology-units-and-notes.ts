@@ -265,8 +265,8 @@ async function main() {
       });
     }
 
-    const result = await prisma.$transaction(async tx => {
-      const currentUnits = await tx.unit.findMany({
+    const result = await (async () => {
+      const currentUnits = await prisma.unit.findMany({
         where: { courseId: course.id },
         orderBy: { order: 'asc' },
         select: { id: true, name: true, title: true, slug: true, order: true },
@@ -277,7 +277,7 @@ async function main() {
       const temporaryOrder = Math.max(0, ...currentUnits.map(unit => unit.order)) + 100;
 
       for (const [index, unit] of [...existingTargets, ...otherUnits].entries()) {
-        await tx.unit.update({ where: { id: unit.id }, data: { order: temporaryOrder + index } });
+        await prisma.unit.update({ where: { id: unit.id }, data: { order: temporaryOrder + index } });
       }
 
       const unitIds = new Map<string, string>();
@@ -293,26 +293,26 @@ async function main() {
           isPublished: true,
         };
         const unit = existing
-          ? await tx.unit.update({ where: { id: existing.id }, data: unitData })
-          : await tx.unit.create({ data: { ...unitData, courseId: course.id } });
+          ? await prisma.unit.update({ where: { id: existing.id }, data: unitData })
+          : await prisma.unit.create({ data: { ...unitData, courseId: course.id } });
         unitIds.set(unitSpec.title, unit.id);
       }
 
       for (const [index, unit] of otherUnits.entries()) {
         const order = unit.order === 1 ? 1 : unit.order + 2;
-        await tx.unit.update({ where: { id: unit.id }, data: { order: Math.max(order, 1) } });
+        await prisma.unit.update({ where: { id: unit.id }, data: { order: Math.max(order, 1) } });
       }
 
       const topicIds = new Map<string, string>();
       for (const unitSpec of UNITS) {
         const unitId = unitIds.get(unitSpec.title)!;
         for (const [index, topicSpec] of unitSpec.topics.entries()) {
-          const topic = await tx.topic.upsert({
+          const topic = await prisma.topic.upsert({
             where: { unitId_order: { unitId, order: index + 1 } },
             update: { name: topicSpec.name, description: topicSpec.description },
             create: { unitId, order: index + 1, name: topicSpec.name, description: topicSpec.description },
             select: { id: true },
-          }, { maxWait: 120000, timeout: 120000 });
+          });
           topicIds.set(`${unitSpec.title}\0${topicSpec.name}`, topic.id);
         }
       }
@@ -320,9 +320,9 @@ async function main() {
       const fileIds = new Map<string, string>();
       for (const [relativePath, item] of prepared) {
         const existing = item.fileId
-          ? await tx.file.findUnique({ where: { id: item.fileId } })
-          : await tx.file.findFirst({ where: { hash: item.hash } });
-        const file = existing || await tx.file.create({
+          ? await prisma.file.findUnique({ where: { id: item.fileId } })
+          : await prisma.file.findFirst({ where: { hash: item.hash } });
+        const file = existing || await prisma.file.create({
           data: {
             filename: item.filename,
             mimetype: item.mimetype,
@@ -342,13 +342,13 @@ async function main() {
           const topicId = topicIds.get(`${unitSpec.title}\0${topicSpec.name}`)!;
           for (const item of topicSpec.notes) {
             const fileId = fileIds.get(item.relativePath)!;
-            const existing = await tx.material.findFirst({
+            const existing = await prisma.material.findFirst({
               where: { fileId, courseId: course.id, unitId, topicId, title: item.title },
               select: { id: true },
             });
             if (existing) continue;
             const isPdf = item.relativePath.toLowerCase().endsWith('.pdf');
-            await tx.material.create({
+            await prisma.material.create({
               data: {
                 title: item.title,
                 description: item.description,
@@ -374,7 +374,7 @@ async function main() {
         uniqueNotes: prepared.size,
         materialsCreated,
       };
-    });
+    })();
 
     console.log(JSON.stringify(result, null, 2));
   } finally {

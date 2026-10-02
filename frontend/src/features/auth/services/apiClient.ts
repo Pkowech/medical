@@ -3,7 +3,6 @@ import { signOut, getSession } from 'next-auth/react';
 import { ApiError, ApiResponse, RequestOptions } from '@/shared/types';
 import { errorService } from '@/app/services/error.service';
 import { useAuthStore } from '@/features/auth/store/useAuthStore';
-import { resolveApiBaseUrl } from '@/lib/urls';
 
 // Enhanced error classification
 type ErrorType = 'network' | 'timeout' | 'auth' | 'validation' | 'server' | 'unknown';
@@ -23,33 +22,13 @@ class ApiService {
   private refreshTokenPromise: Promise<boolean> | null = null;
   private isSigningOut = false;
 
-  private static buildApiBaseUrl(): string {
-    try {
-      return resolveApiBaseUrl();
-    } catch (error) {
-      console.error('[ApiClient] Failed to build API base URL:', error);
-      throw new Error('Invalid API configuration');
-    }
-  }
-
   private constructor() {
-    try {
-      const baseURL = ApiService.buildApiBaseUrl();
-      this.api = axios.create({
-        baseURL,
-        timeout: 30000,
-        withCredentials: true,
-      });
-      this.setupInterceptors();
-    } catch (error) {
-      console.error('[ApiClient] Failed to initialize:', error);
-      // Create a fallback axios instance for error handling
-      this.api = axios.create({
-        timeout: 30000,
-        withCredentials: true,
-      });
-      this.setupInterceptors();
-    }
+    this.api = axios.create({
+      baseURL: '/api/backend',
+      timeout: 30000,
+      withCredentials: true,
+    });
+    this.setupInterceptors();
   }
 
   static getInstance(): ApiService {
@@ -104,11 +83,25 @@ class ApiService {
   private setupInterceptors(): void {
     // Request interceptor - uses Zustand store for token (not getSession on every request)
     this.api.interceptors.request.use(
-      config => {
+      async config => {
         try {
           // Get token from Zustand store (should be synced by AuthSynchronizer on mount)
           const user = useAuthStore.getState().user;
-          const token = user?.accessToken;
+          let token = user?.accessToken;
+
+          // Requests can start before AuthSynchronizer finishes its first
+          // session fetch. Read the NextAuth session before sending an
+          // authenticated request instead of issuing a tokenless request.
+          if (!token && !config.url?.includes('/auth/')) {
+            const session = await getSession();
+            token = session?.user?.accessToken;
+            if (token && session?.user) {
+              useAuthStore.setState({
+                user: session.user as unknown as ReturnType<typeof useAuthStore.getState>['user'],
+                isAuthenticated: true,
+              });
+            }
+          }
 
           if (token) {
             // Ensure headers object exists

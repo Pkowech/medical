@@ -66,7 +66,7 @@ async function seedPDFs() {
     let adminUser = await prisma.user.findFirst({
       where: {
         userRoles: {
-          some: { role: { name: 'ADMIN' } },
+          some: { role: {           name: 'admin' } },
         },
       },
     });

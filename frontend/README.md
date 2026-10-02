@@ -71,22 +71,16 @@ pnpm build
 Create a `.env.local` file:
 
 ```bash
-NEXT_PUBLIC_API_URL=http://localhost:3002
-# Production example:
-# NEXT_PUBLIC_API_URL=https://medtrackhubackend.onrender.com
-# Or provide the complete versioned URL:
-# NEXT_PUBLIC_API_BASE_URL=https://medtrackhubackend.onrender.com/v1
+BACKEND_URL=http://localhost:3002
 AUTH_BACKEND_TIMEOUT_MS=30000
 NEXT_PUBLIC_ANALYTICS_URL=http://localhost:5000
 NEXT_PUBLIC_CLAUDE_API_KEY=your_claude_api_key
 ```
 
-For Vercel, add `NEXT_PUBLIC_API_URL` with the deployed backend origin
-(`https://medtrackhubackend.onrender.com`) in the project's Environment Variables,
-then redeploy. Configure these NextAuth variables for the Production environment
-as well:
+The browser sends API requests to the same-origin `/api/backend` proxy. For Vercel, set the server-only backend URL to `https://medtrackhubackend.onrender.com` and redeploy. Do not expose this value as a `NEXT_PUBLIC_*` variable. Configure these NextAuth variables for the Production environment as well:
 
 ```bash
+BACKEND_URL=https://medtrackhubbackend.onrender.com
 NEXTAUTH_URL=https://medical-two-eosin.vercel.app
 NEXTAUTH_SECRET=<stable-random-secret>
 ```

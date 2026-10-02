@@ -233,8 +233,8 @@ async function main() {
   let topicIds: string[] = [];
 
   try {
-    const result = await prisma.$transaction(async tx => {
-      const unit = await tx.unit.findFirst({
+    const result = await (async () => {
+      const unit = await prisma.unit.findFirst({
         where: { courseId: COURSE_ID, slug: UNIT_SLUG },
         include: {
           course: { select: { id: true, createdById: true } },
@@ -242,24 +242,26 @@ async function main() {
         },
       });
       if (!unit) throw new Error('PPB 311 unit was not found.');
-      if (unit.topics.length !== TOPIC_QUIZZES.length) {
-        throw new Error(`Expected ${TOPIC_QUIZZES.length} topics, found ${unit.topics.length}; refusing to attach quizzes to an unexpected outline.`);
-      }
-      if (unit.topics.some((topic, index) => topic.name !== TOPIC_QUIZZES[index].name)) {
-        throw new Error('PPB 311 topic names/order do not match the course outline; refusing to create quizzes.');
-      }
       if (!unit.course.createdById) throw new Error('The Pharmacology course has no owner to attribute quiz content to.');
 
-      topicIds = unit.topics.map(topic => topic.id);
+      const topicsByName = new Map(unit.topics.map(topic => [topic.name, topic]));
+      const selectedTopics = TOPIC_QUIZZES.map(spec => {
+        const topic = topicsByName.get(spec.name);
+        if (!topic) {
+          throw new Error(`PPB 311 topic "${spec.name}" was not found; refusing to create quizzes.`);
+        }
+        return topic;
+      });
+      topicIds = selectedTopics.map(topic => topic.id);
       let questionsCreated = 0;
       let quizzesCreated = 0;
 
-      for (const [topicIndex, topic] of unit.topics.entries()) {
+      for (const [topicIndex, topic] of selectedTopics.entries()) {
         const spec = TOPIC_QUIZZES[topicIndex];
         const title = `PPB 311: ${topic.name} Quiz`;
-        let quiz = await tx.quiz.findFirst({ where: { topicId: topic.id, title }, select: { id: true } });
+        let quiz = await prisma.quiz.findFirst({ where: { topicId: topic.id, title }, select: { id: true } });
         if (!quiz) {
-          quiz = await tx.quiz.create({
+          quiz = await prisma.quiz.create({
             data: {
               title,
               description: `Past-paper knowledge check for ${topic.name}. Questions are lightly reworded; the Pharmacogenetics set is a course-aligned supplement because no matching item appeared in the OCR excerpt.`,
@@ -277,14 +279,14 @@ async function main() {
               createdBy: unit.course.createdById,
             },
             select: { id: true },
-          }, { maxWait: 120000, timeout: 120000 });
+          });
           quizzesCreated += 1;
         }
 
         const questionIds: string[] = [];
         for (const [questionIndex, item] of spec.questions.entries()) {
           const stableTag = `ppb311-topic-${topicIndex + 1}-${VERSION}-q${questionIndex + 1}`;
-          let existing = await tx.question.findFirst({
+          let existing = await prisma.question.findFirst({
             where: { topicIds: { has: topic.id }, tags: { has: stableTag } },
             select: { id: true },
           });
@@ -293,7 +295,7 @@ async function main() {
             const choices = [...item.distractors];
             choices.splice(item.answerPosition, 0, item.answer);
             const sourceTag = item.sourcePage ? `past-paper-page-${item.sourcePage}` : 'course-aligned-supplement';
-            const createdQuestion = await tx.question.create({
+            const createdQuestion = await prisma.question.create({
               data: {
                 text: item.prompt,
                 type: QuestionType.multiple_choice,
@@ -324,15 +326,15 @@ async function main() {
           questionIds.push(existing.id);
         }
 
-        await tx.quizQuestion.createMany({
+        await prisma.quizQuestion.createMany({
           data: questionIds.map((questionId, order) => ({ quizId: quiz.id, questionId, order: order + 1 })),
           skipDuplicates: true,
         });
-        await tx.quiz.update({ where: { id: quiz.id }, data: { questionCount: questionIds.length, isPublished: true } });
+        await prisma.quiz.update({ where: { id: quiz.id }, data: { questionCount: questionIds.length, isPublished: true } });
       }
 
       return { unitId: unit.id, topicCount: unit.topics.length, quizzesCreated, questionsCreated };
-    });
+    })();
 
     console.log(JSON.stringify(result, null, 2));
 

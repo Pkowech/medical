@@ -229,8 +229,8 @@ async function main() {
   const { pool, prisma } = createSeedPrisma();
 
   try {
-    const result = await prisma.$transaction(async (tx) => {
-      const course = await tx.course.findUnique({
+    const result = await (async () => {
+      const course = await prisma.course.findUnique({
         where: { id: COURSE_ID },
         select: { id: true, title: true, createdById: true },
       });
@@ -239,17 +239,17 @@ async function main() {
         throw new Error('The expected Pharmacology course was not found.');
       }
 
-      const existingUnits = await tx.unit.findMany({
+      const existingUnits = await prisma.unit.findMany({
         where: { courseId: course.id },
         select: { id: true, order: true, slug: true },
-      }, { maxWait: 120000, timeout: 120000 });
+      });
       const existingPpb311 = existingUnits.find((item) => item.slug === 'ppb-311');
       const otherUnits = existingUnits.filter((item) => item.id !== existingPpb311?.id);
       const temporaryOrderBase =
         Math.max(0, ...existingUnits.map((item) => item.order)) + 1000;
 
       for (const [index, item] of otherUnits.entries()) {
-        await tx.unit.update({
+        await prisma.unit.update({
           where: { id: item.id },
           data: { order: temporaryOrderBase + index },
         });
@@ -264,16 +264,16 @@ async function main() {
           isPublished: true,
       };
       const unit = existingPpb311
-        ? await tx.unit.update({
+        ? await prisma.unit.update({
             where: { id: existingPpb311.id },
             data: unitData,
           })
-        : await tx.unit.create({
+        : await prisma.unit.create({
             data: { ...unitData, slug: 'ppb-311', courseId: course.id },
           });
 
       for (const item of otherUnits) {
-        await tx.unit.update({
+        await prisma.unit.update({
           where: { id: item.id },
           data: { order: item.order + 1 },
         });
@@ -281,7 +281,7 @@ async function main() {
 
       const topicIds = new Map<number, string>();
       for (const topicData of TOPICS) {
-        const topic = await tx.topic.upsert({
+        const topic = await prisma.topic.upsert({
           where: {
             unitId_order: { unitId: unit.id, order: topicData.order },
           },
@@ -312,7 +312,7 @@ async function main() {
         key?: string;
       }) => {
         const key = input.key ?? `${R2_PREFIX}/${input.filename}`;
-        await tx.file.upsert({
+        await prisma.file.upsert({
           where: { id: input.fileId },
           update: {
             filename: input.filename,
@@ -331,7 +331,7 @@ async function main() {
           },
         });
 
-        await tx.material.upsert({
+        await prisma.material.upsert({
           where: { id: input.materialId },
           update: {
             title: input.title,
@@ -388,7 +388,7 @@ async function main() {
         coreBooks: CORE_BOOKS.length,
         outlineAttached: true,
       };
-    });
+    })();
 
     console.log(JSON.stringify(result, null, 2));
   } finally {
