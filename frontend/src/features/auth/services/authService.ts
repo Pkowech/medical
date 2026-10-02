@@ -156,12 +156,12 @@ class AuthService {
     return response.data;
   }
 
-  async resetPassword(password: string, token: string): Promise<ApiResponse<GenericRecord>> {
+  async resetPassword(token: string, newPassword: string): Promise<ApiResponse<GenericRecord>> {
     const response = await apiService.post<ApiResponse<GenericRecord>>(
       '/auth/security/recovery/verify',
       {
         token,
-        answers: { password }, // Assuming the backend takes password in answers for now or needs another check
+        answers: { password: newPassword },
       }
     );
     return response.data;
@@ -228,8 +228,16 @@ class AuthService {
   }
 
   // New method to change password
-  async changePassword(currentPassword: string, newPassword: string): Promise<void> {
-    await apiService.put('/auth/security/password', { currentPassword, newPassword });
+  async changePassword(
+    currentPassword: string,
+    newPassword: string,
+    confirmPassword: string
+  ): Promise<void> {
+    await apiService.put('/auth/security/password', {
+      currentPassword,
+      newPassword,
+      confirmPassword,
+    });
   }
 
   // New method to setup 2FA

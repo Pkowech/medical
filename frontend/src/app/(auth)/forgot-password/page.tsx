@@ -6,6 +6,8 @@ import { useAuthStore } from '@/features/auth/store/useAuthStore';
 import { AuthForm } from '@/features/auth/components/AuthForm';
 import { FormField } from '@/features/auth/components/FormField';
 import { Notification } from '@/features/auth/components/Notification';
+import { forgotPasswordSchema } from '@/lib/auth/validations';
+import { getAuthErrorDetails } from '@/features/auth/services/authErrors';
 
 export default function ForgotPasswordPage() {
   const { forgotPassword } = useAuthStore();
@@ -13,19 +15,26 @@ export default function ForgotPasswordPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [email, setEmail] = useState('');
+  const [emailError, setEmailError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setEmailError(null);
+
+    const validation = forgotPasswordSchema.safeParse({ email });
+    if (!validation.success) {
+      setEmailError(validation.error.issues[0]?.message ?? 'Enter a valid email address.');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      await forgotPassword(email);
+      await forgotPassword(validation.data.email);
       setSuccess(true);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : 'An error occurred while processing your request'
-      );
+    } catch (err: unknown) {
+      setError(getAuthErrorDetails(err, 'Could not process your password recovery request.').message);
     } finally {
       setIsLoading(false);
     }
@@ -80,10 +89,15 @@ export default function ForgotPasswordPage() {
           label="Email Address"
           type="email"
           name="email"
+          autoComplete="email"
           value={email}
-          onChange={e => setEmail(e.target.value)}
+          onChange={e => {
+            setEmail(e.target.value);
+            setEmailError(null);
+          }}
           required
           placeholder="Enter your email"
+          error={emailError}
         />
       </AuthForm>
     </>

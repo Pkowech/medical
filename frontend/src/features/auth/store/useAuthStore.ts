@@ -1,8 +1,9 @@
 // store/useAuthStore.ts
 import { create } from 'zustand';
-import { patchData, apiService } from '@/features/auth/services/apiClient';
+import { patchData } from '@/features/auth/services/apiClient';
 import { authService } from '../services/authService'; // Use the unified authService
 import { User as BackendUser, RegisterDTO } from '@/shared/types/authInterface';
+import { getAuthErrorDetails } from '@/features/auth/services/authErrors';
 
 type User = BackendUser;
 
@@ -16,7 +17,11 @@ interface AuthState {
   clearUser: () => void;
   setUser: (user: User | null) => void;
   updateUser: (userData: Partial<User>) => Promise<void>;
-  changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
+  changePassword: (
+    currentPassword: string,
+    newPassword: string,
+    confirmPassword: string
+  ) => Promise<void>;
   forgotPassword: (email: string) => Promise<void>;
   resetPassword: (token: string, newPassword: string) => Promise<void>;
   verifyEmail: (token: string) => Promise<void>;
@@ -73,12 +78,9 @@ export const useAuthStore = create<AuthState>((set, _get) => ({
       set({ isLoading: false });
       return response;
     } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : (error as { response?: { data?: { message?: string } } })?.response?.data?.message ?? String(error);
+      const message = getAuthErrorDetails(error).message;
       set({ error: message, isLoading: false });
-      throw error instanceof Error ? error : new Error(String(error));
+      throw error;
     }
   },
 
@@ -96,15 +98,15 @@ export const useAuthStore = create<AuthState>((set, _get) => ({
       throw error instanceof Error ? error : new Error(String(error));
     }
   },
-  changePassword: async (currentPassword: string, newPassword: string) => {
+  changePassword: async (currentPassword, newPassword, confirmPassword) => {
     try {
       set({ isLoading: true, error: null });
-      await apiService.post('/auth/change-password', { currentPassword, newPassword });
+      await authService.changePassword(currentPassword, newPassword, confirmPassword);
       set({ isLoading: false });
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = getAuthErrorDetails(error, 'Could not change your password.').message;
       set({ error: message || 'Change password failed', isLoading: false });
-      throw error instanceof Error ? error : new Error(String(error));
+      throw error;
     }
   },
 
@@ -114,9 +116,9 @@ export const useAuthStore = create<AuthState>((set, _get) => ({
       await authService.forgotPassword(email);
       set({ isLoading: false });
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = getAuthErrorDetails(error, 'Could not start password recovery.').message;
       set({ error: message || 'Forgot password failed', isLoading: false });
-      throw error instanceof Error ? error : new Error(String(error));
+      throw error;
     }
   },
 
@@ -126,9 +128,9 @@ export const useAuthStore = create<AuthState>((set, _get) => ({
       await authService.resetPassword(token, newPassword);
       set({ isLoading: false });
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = getAuthErrorDetails(error, 'Could not reset your password.').message;
       set({ error: message || 'Reset password failed', isLoading: false });
-      throw error instanceof Error ? error : new Error(String(error));
+      throw error;
     }
   },
 
@@ -138,9 +140,9 @@ export const useAuthStore = create<AuthState>((set, _get) => ({
       await authService.verifyEmail(token);
       set({ isLoading: false });
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = getAuthErrorDetails(error, 'Could not verify your email address.').message;
       set({ error: message || 'Email verification failed', isLoading: false });
-      throw error instanceof Error ? error : new Error(String(error));
+      throw error;
     }
   },
 }));

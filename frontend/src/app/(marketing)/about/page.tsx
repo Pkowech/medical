@@ -1,7 +1,6 @@
 import { Button } from '@/shared/components/ui/button';
 import Link from 'next/link';
 import Head from 'next/head';
-import { stats } from '@/core/marketing/data/stats';
 import { features } from '@/core/marketing/data/features';
 import { FeatureCard } from '@/core/marketing/cards/FeatureCard';
 
@@ -12,46 +11,46 @@ export default function AboutPage() {
         <title>About MedTrack Hub - Our Mission and Vision</title>
         <meta
           name="description"
-          content="Learn about MedTrack Hub's mission to transform medical education with AI-powered learning, expert-led content, and a supportive community."
+          content="Learn about MedTrack Hub and its tools for medical courses, practice, study planning, and progress tracking."
         />
         <meta property="og:title" content="About MedTrack Hub - Our Mission and Vision" />
         <meta
           property="og:description"
-          content="Learn about MedTrack Hub's mission to transform medical education with AI-powered learning, expert-led content, and a supportive community."
+          content="Learn about MedTrack Hub and its tools for medical courses, practice, study planning, and progress tracking."
         />
         <meta property="og:type" content="website" />
         <meta property="og:image" content="/og-image.png" />
       </Head>
       <main className="container mx-auto py-12 px-4">
         {/* Hero Section */}
-        <section aria-labelledby="about-hero-heading" className="text-center mb-20">
-          <h1 id="about-hero-heading" className="text-4xl md:text-6xl font-bold mb-6">
-            Transforming Medical Education
+        <section aria-labelledby="about-hero-heading" className="mb-14 text-center sm:mb-20">
+          <h1 id="about-hero-heading" className="mb-6 text-3xl font-bold sm:text-4xl md:text-5xl">
+            Medical learning, organized
           </h1>
-          <p className="text-xl text-muted-foreground max-w-3xl mx-auto mb-8">
-            MedTrack Hub combines cutting-edge technology with expert medical knowledge to create a
-            revolutionary learning experience for future healthcare professionals.
+          <p className="mx-auto mb-8 max-w-3xl text-base text-muted-foreground sm:text-lg">
+            MedTrack Hub brings available courses, quizzes, flashcards, study planning, and progress
+            tracking together for medical learners.
           </p>
-          <div className="flex justify-center gap-4">
-            <Link href="/auth/register">
+          <div className="flex flex-col justify-center gap-3 sm:flex-row">
+            <Link href="/register" className="inline-flex justify-center">
               <Button size="lg" className="px-8">
-                Get Started
+                Create an account
               </Button>
             </Link>
-            <Link href="/pricing">
+            <Link href="/features" className="inline-flex justify-center">
               <Button variant="outline" size="lg" className="px-8">
-                View Pricing
+                Explore features
               </Button>
             </Link>
           </div>
         </section>
 
         {/* Features Grid */}
-        <section aria-labelledby="about-features-heading" className="mb-20">
-          <h2 id="about-features-heading" className="text-3xl font-bold text-center mb-12">
-            Why Choose MedTrack Hub?
+        <section aria-labelledby="about-features-heading" className="mb-14 sm:mb-20">
+          <h2 id="about-features-heading" className="mb-8 text-center text-2xl font-bold sm:mb-12 sm:text-3xl">
+            Learning tools in one place
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2 xl:grid-cols-3">
             {features.map(feature => (
               <FeatureCard
                 key={feature.title}
@@ -65,7 +64,7 @@ export default function AboutPage() {
         </section>
 
         {/* Mission Statement */}
-        <section aria-labelledby="mission-heading" className="mb-20 text-center">
+        <section aria-labelledby="mission-heading" className="mb-14 text-center sm:mb-20">
           <div className="max-w-3xl mx-auto">
             <h2 id="mission-heading" className="text-3xl font-bold mb-6">
               Our Mission
@@ -74,38 +73,23 @@ export default function AboutPage() {
               To revolutionize medical education by providing accessible, personalized, and
               effective learning tools that empower the next generation of healthcare professionals.
             </p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
-              <div>
-                <h3 className="text-4xl font-bold text-primary mb-2">{stats.activeStudents}</h3>
-                <p className="text-muted-foreground">Active Students</p>
-              </div>
-              <div>
-                <h3 className="text-4xl font-bold text-primary mb-2">200+</h3>
-                <p className="text-muted-foreground">Expert Contributors</p>
-              </div>
-              <div>
-                <h3 className="text-4xl font-bold text-primary mb-2">{stats.satisfactionRate}</h3>
-                <p className="text-muted-foreground">Success Rate</p>
-              </div>
-            </div>
           </div>
         </section>
 
         {/* CTA Section */}
         <section
           aria-labelledby="about-cta-heading"
-          className="text-center bg-muted rounded-lg p-12"
+          className="rounded-2xl bg-muted p-6 text-center sm:p-10 lg:p-12"
         >
           <h2 id="about-cta-heading" className="text-3xl font-bold mb-6">
             Ready to Get Started?
           </h2>
           <p className="text-xl text-muted-foreground mb-8">
-            Join thousands of medical students already using MedTrack Hub to achieve their
-            educational goals.
+            Explore the courses and learning tools currently available.
           </p>
-          <Link href="/auth/register">
+          <Link href="/register">
             <Button size="lg" className="px-8">
-              Start Your Journey
+              Create an account
             </Button>
           </Link>
         </section>

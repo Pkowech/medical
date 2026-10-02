@@ -1,23 +1,23 @@
-import { Brain, Activity, BookOpen, Users, Target, WifiOff } from 'lucide-react';
+import { Brain, Activity, BookOpen, Target, WifiOff } from 'lucide-react';
 
 export const features = [
   {
     icon: Brain,
-    title: 'Precision AI Tutoring',
+    title: 'Quiz and flashcard practice',
     description:
-      'Adaptive quiz experiences and study recommendations help learners focus their review using available learning activity.',
-    details: ['Adaptive quiz sessions', 'Study recommendations', 'Progress-informed review'],
+      'Practice with available quizzes and use flashcards to review medical topics.',
+    details: ['Quiz practice', 'Flashcard review', 'Available course content'],
   },
   {
     icon: Activity,
-    title: 'Clinical Case Analytics',
+    title: 'Study progress',
     description:
-      'Review available course and assessment analytics to follow learning progress and identify topics for further study.',
-    details: ['Course and assessment progress', 'Performance trends', 'Study insights when data is available'],
+      'Review course progress, study activity, and learning goals from your dashboard.',
+    details: ['Course progress', 'Study activity', 'Learning goals'],
   },
   {
     icon: BookOpen,
-    title: 'Course and Case Library',
+    title: 'Medical course catalog',
     description:
       'Explore the medical courses, lessons, and clinical cases currently available in the catalog. Content coverage varies by course.',
     details: [
@@ -28,27 +28,20 @@ export const features = [
   },
   {
     icon: Target,
-    title: 'Assessment and Progress Tracking',
+    title: 'Study planning',
     description:
-      'Practice with quizzes and track course progress, study activity, and learning goals from your dashboard.',
-    details: ['Quiz results and trends', 'Course completion tracking', 'Study goals and activity'],
-  },
-  {
-    icon: Users,
-    title: 'Peer Learning',
-    description:
-      'Use available community and study-group features to organize learning and connect with other learners.',
-    details: ['Study groups', 'Group schedules', 'Community features'],
+      'Plan study time and organize goals alongside your course learning.',
+    details: ['Study schedules', 'Learning goals', 'Course-focused planning'],
   },
   {
     icon: WifiOff,
-    title: 'Offline Access',
+    title: 'Offline progress syncing',
     description:
-      'The app shell and selected public assets may be available offline. Supported quiz and progress updates can queue in this browser and sync when connectivity returns.',
+      'Supported quiz and progress updates can queue in this browser and sync when connectivity returns. Course content and PDFs are not available for offline download yet.',
     details: [
-      'Supported updates queue locally',
+      'Supported updates queue in this browser',
       'Queued updates sync when online',
-      'Courses and PDFs are not downloadable for offline use yet',
+      'Courses and PDFs are not downloadable offline',
     ],
   },
 ];

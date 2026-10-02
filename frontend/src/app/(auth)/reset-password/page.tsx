@@ -8,6 +8,8 @@ import { useAuthStore } from '@/features/auth/store/useAuthStore';
 import { AuthForm } from '@/features/auth/components/AuthForm';
 import { FormField } from '@/features/auth/components/FormField';
 import { Notification } from '@/features/auth/components/Notification';
+import { resetPasswordSchema } from '@/lib/auth/validations';
+import { getAuthErrorDetails } from '@/features/auth/services/authErrors';
 
 function ResetPasswordContent() {
   const router = useRouter();
@@ -16,6 +18,7 @@ function ResetPasswordContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [formData, setFormData] = useState({
     password: '',
     confirmPassword: '',
@@ -49,7 +52,7 @@ function ResetPasswordContent() {
           </p>
           <div className="pt-4">
             <Link
-              href="/auth/forgot-password"
+              href="/forgot-password"
               className="text-blue-600 hover:text-blue-700 font-medium"
             >
               Request new reset link
@@ -63,9 +66,18 @@ function ResetPasswordContent() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setFieldErrors({});
 
-    if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
+    const validation = resetPasswordSchema.safeParse({ ...formData, token });
+    if (!validation.success) {
+      setFieldErrors(
+        Object.fromEntries(
+          validation.error.issues.map(issue => [
+            String(issue.path[0]),
+            issue.message,
+          ])
+        )
+      );
       return;
     }
 
@@ -73,15 +85,13 @@ function ResetPasswordContent() {
 
     try {
       // useAuthStore.resetPassword expects (token, newPassword)
-      await resetPassword(token, formData.password);
+      await resetPassword(validation.data.token, validation.data.password);
       setSuccess(true);
       setTimeout(() => {
         router.push('/login');
       }, 3000);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : 'An error occurred while resetting your password'
-      );
+    } catch (err: unknown) {
+      setError(getAuthErrorDetails(err, 'Could not reset your password.').message);
     } finally {
       setIsLoading(false);
     }
@@ -122,7 +132,7 @@ function ResetPasswordContent() {
             shortly.
           </p>
           <div className="pt-4">
-            <Link href="/auth/login" className="text-blue-600 hover:text-blue-700 font-medium">
+            <Link href="/login" className="text-blue-600 hover:text-blue-700 font-medium">
               Go to login
             </Link>
           </div>
@@ -147,19 +157,23 @@ function ResetPasswordContent() {
             label="New Password"
             type="password"
             name="password"
+            autoComplete="new-password"
             value={formData.password}
             onChange={handleChange}
+            error={fieldErrors.password}
             required
             placeholder="Enter new password"
-            helperText="Must be at least 8 characters long"
+            helperText="At least 8 characters with uppercase and lowercase letters, a number, and a special character."
           />
 
           <FormField
             label="Confirm New Password"
             type="password"
             name="confirmPassword"
+            autoComplete="new-password"
             value={formData.confirmPassword}
             onChange={handleChange}
+            error={fieldErrors.confirmPassword}
             required
             placeholder="Confirm new password"
           />

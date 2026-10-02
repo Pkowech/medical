@@ -3,6 +3,7 @@ import {
   UnauthorizedException,
   BadRequestException,
   NotFoundException,
+  NotImplementedException,
   Logger,
   Inject,
   forwardRef,
@@ -361,18 +362,18 @@ export class SecurityService {
     return newCodes;
   }
 
-  initiateAccountRecovery(email: string): Promise<void> {
-    this.logger.log(`Initiating account recovery for ${email}`);
-    return Promise.resolve();
+  async initiateAccountRecovery(_email: string): Promise<void> {
+    throw new NotImplementedException(
+      'Password recovery is not configured yet. You can change your password in Settings while signed in.',
+    );
   }
 
-  verifyRecoveryRequest(
-    token: string,
-    answers: { [key: string]: string },
+  async verifyRecoveryRequest(
+    _token: string,
+    _answers: { [key: string]: string },
   ): Promise<boolean> {
-    this.logger.log(
-      `Verifying recovery request with token ${token} and answers ${JSON.stringify(answers)}`,
+    throw new NotImplementedException(
+      'Password recovery is not configured yet. Request a new recovery link later or change your password in Settings while signed in.',
     );
-    return Promise.resolve(true);
   }
 }

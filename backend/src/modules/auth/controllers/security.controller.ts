@@ -145,6 +145,10 @@ export class SecurityController {
   @Post('recovery/initiate')
   @ApiOperation({ summary: 'Initiate account recovery' })
   @ApiResponse({ status: 200, description: 'Account recovery initiated' })
+  @ApiResponse({
+    status: 501,
+    description: 'Password recovery is not configured',
+  })
   async initiateAccountRecovery(@Body() dto: AccountRecoveryDto) {
     await this.securityService.initiateAccountRecovery(dto.email);
     return { message: 'Recovery process initiated' };
@@ -153,6 +157,10 @@ export class SecurityController {
   @Post('recovery/verify')
   @ApiOperation({ summary: 'Verify account recovery request' })
   @ApiResponse({ status: 200, description: 'Recovery request verified' })
+  @ApiResponse({
+    status: 501,
+    description: 'Password recovery is not configured',
+  })
   async verifyRecoveryRequest(@Body() dto: VerifyRecoveryDto) {
     const verified = await this.securityService.verifyRecoveryRequest(
       dto.token,

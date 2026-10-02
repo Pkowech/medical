@@ -9,6 +9,14 @@ interface FormFieldProps extends InputHTMLAttributes<HTMLInputElement> {
 
 export const FormField = forwardRef<HTMLInputElement, FormFieldProps>(
   ({ label, error, helperText, className = '', ...props }, ref) => {
+    const errorId = `${props.id || props.name}-error`;
+    const describedBy = [
+      props['aria-describedby'],
+      error ? errorId : undefined,
+    ]
+      .filter(Boolean)
+      .join(' ') || undefined;
+
     return (
       <div className="space-y-1">
         <label
@@ -32,10 +40,16 @@ export const FormField = forwardRef<HTMLInputElement, FormFieldProps>(
             ${className}
           `}
           {...props}
+          aria-invalid={error ? true : props['aria-invalid']}
+          aria-describedby={describedBy}
         />
 
         {error && (
-          <div className="flex items-center space-x-1 text-sm text-red-600 dark:text-red-400">
+          <div
+            id={errorId}
+            role="alert"
+            className="flex items-center space-x-1 text-sm text-red-600 dark:text-red-400"
+          >
             <AlertCircle className="h-4 w-4" />
             <span>{error}</span>
           </div>

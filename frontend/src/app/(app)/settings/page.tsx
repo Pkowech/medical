@@ -12,6 +12,9 @@ import AppErrorBoundary from '@/features/security/components/AppErrorBoundary';
 import { toast } from 'sonner';
 import { Bell, Globe, Moon, Shield, Sun, User } from 'lucide-react';
 import { Settings } from '@/shared/types';
+import { useAuthStore } from '@/features/auth/store/useAuthStore';
+import { changePasswordSchema } from '@/lib/auth/validations';
+import { getAuthErrorDetails } from '@/features/auth/services/authErrors';
 
 interface UserSettings {
   email: string;
@@ -34,9 +37,17 @@ interface UserSettings {
 export default function SettingsPage() {
   const { isLoading, session } = useRequireAuth();
   const router = useRouter();
+  const changePassword = useAuthStore(state => state.changePassword);
   const [saving, setSaving] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [saveMessage, setSaveMessage] = useState('');
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
+  const [passwordFormError, setPasswordFormError] = useState('');
+  const [changingPassword, setChangingPassword] = useState(false);
 
   const [settings, setSettings] = useState<UserSettings>({
     email: '',
@@ -122,6 +133,34 @@ export default function SettingsPage() {
       } else {
         document.documentElement.classList.remove('dark');
       }
+    }
+  };
+
+  const handleChangePassword = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setPasswordFormError('');
+
+    const validation = changePasswordSchema.safeParse(passwordForm);
+    if (!validation.success) {
+      setPasswordFormError(validation.error.issues[0]?.message ?? 'Check the password fields.');
+      return;
+    }
+
+    setChangingPassword(true);
+    try {
+      await changePassword(
+        passwordForm.currentPassword,
+        passwordForm.newPassword,
+        passwordForm.confirmPassword
+      );
+      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      toast.success('Password changed successfully.');
+    } catch (error: unknown) {
+      const authError = getAuthErrorDetails(error, 'Could not change your password.');
+      setPasswordFormError(authError.message);
+      toast.error(authError.message);
+    } finally {
+      setChangingPassword(false);
     }
   };
 
@@ -427,9 +466,54 @@ export default function SettingsPage() {
                   />
                 </div>
 
-                <Button variant="secondary" size="sm">
-                  Change Password
-                </Button>
+                <form onSubmit={handleChangePassword} className="space-y-3 border-t pt-4">
+                  <h3 className="font-medium">Change Password</h3>
+                  <Input
+                    type="password"
+                    autoComplete="current-password"
+                    aria-label="Current password"
+                    placeholder="Current password"
+                    value={passwordForm.currentPassword}
+                    onChange={event =>
+                      setPasswordForm(prev => ({ ...prev, currentPassword: event.target.value }))
+                    }
+                    required
+                  />
+                  <Input
+                    type="password"
+                    autoComplete="new-password"
+                    aria-label="New password"
+                    placeholder="New password"
+                    value={passwordForm.newPassword}
+                    onChange={event =>
+                      setPasswordForm(prev => ({ ...prev, newPassword: event.target.value }))
+                    }
+                    required
+                  />
+                  <Input
+                    type="password"
+                    autoComplete="new-password"
+                    aria-label="Confirm new password"
+                    placeholder="Confirm new password"
+                    value={passwordForm.confirmPassword}
+                    onChange={event =>
+                      setPasswordForm(prev => ({ ...prev, confirmPassword: event.target.value }))
+                    }
+                    required
+                  />
+                  <p className="text-xs text-gray-500">
+                    Use at least 8 characters with uppercase and lowercase letters, a number, and a
+                    special character.
+                  </p>
+                  {passwordFormError && (
+                    <p role="alert" className="text-sm text-red-600">
+                      {passwordFormError}
+                    </p>
+                  )}
+                  <Button type="submit" variant="secondary" size="sm" disabled={changingPassword}>
+                    {changingPassword ? 'Changing password...' : 'Update password'}
+                  </Button>
+                </form>
 
                 <Button variant="destructive" size="sm">
                   Delete Account

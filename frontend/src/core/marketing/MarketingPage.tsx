@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import ReactGA from 'react-ga4';
 import { motion } from 'framer-motion';
-import { ArrowRight, BookOpen, Brain, BarChart3, RefreshCw } from 'lucide-react';
+import { ArrowRight, BookOpen, Brain, BarChart3 } from 'lucide-react';
 import { features } from './data/features';
 import { FeatureCard } from './cards/FeatureCard';
 import { StickyCta } from './StickyCta';
@@ -52,126 +52,156 @@ export default function MarketingPage() {
 
   return (
     <div>
-      <main className="min-h-screen bg-white">
+      <main className="min-h-screen overflow-x-clip bg-white pb-24 md:pb-0">
         {/* Hero Section */}
         <motion.section
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
           aria-labelledby="hero-heading"
-          className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white relative overflow-hidden"
+          className="relative isolate overflow-hidden bg-gradient-to-br from-blue-950 via-blue-900 to-indigo-950 text-white"
         >
-          <div className="absolute inset-0 bg-gradient-to-b from-blue-600/20 to-indigo-700/20 backdrop-blur-sm"></div>
-          <div className="w-full px-4 sm:px-6 lg:px-8 py-12 sm:py-16 lg:py-20 relative">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
-              <div className="space-y-8">
+          <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+            <div className="absolute -right-24 -top-32 h-96 w-96 rounded-full bg-blue-500/20 blur-3xl" />
+            <div className="absolute -bottom-48 left-1/4 h-96 w-96 rounded-full bg-indigo-400/20 blur-3xl" />
+          </div>
+          <div className="mx-auto grid w-full max-w-screen-2xl grid-cols-1 items-center gap-8 px-4 py-10 sm:gap-10 sm:px-6 sm:py-14 lg:grid-cols-12 lg:gap-12 lg:px-8 lg:py-20">
+              <div className="min-w-0 lg:col-span-7">
+                <p className="mb-5 inline-flex items-center gap-2 rounded-full border border-blue-300/30 bg-white/10 px-3 py-1.5 text-xs font-semibold tracking-wide text-blue-100 sm:text-sm">
+                  <span className="h-2 w-2 rounded-full bg-emerald-300" />
+                  Medical learning, organized around you
+                </p>
                 <h1
                   id="hero-heading"
-                  className="text-4xl sm:text-5xl lg:text-6xl font-bold leading-tight"
+                  className="max-w-3xl text-4xl font-bold leading-[1.08] tracking-tight sm:text-5xl md:text-6xl lg:text-[3.6rem] xl:text-6xl"
                 >
-                  Build your medical knowledge with{' '}
+                  Make your next study session count.
                   <span
-                    className="block text-transparent bg-clip-text bg-gradient-to-r from-blue-200 to-indigo-200 mt-2"
-                    aria-live="polite"
+                    className="mt-2 block text-blue-200"
                   >
-                    focused learning tools
+                    Learn with a clearer plan.
                   </span>
                 </h1>
-                <p className="text-base sm:text-lg text-blue-100 mb-8 leading-relaxed max-w-2xl">
-                  Explore medical courses, practice with quizzes and flashcards, plan your study,
-                  and track learning progress in one place.
+                <p className="mb-7 mt-5 max-w-2xl text-base leading-7 text-blue-100 sm:mb-8 sm:mt-6 sm:text-lg sm:leading-8">
+                  Find medical courses, practice with quizzes and flashcards, plan your study time,
+                  and see your progress—all in one place.
                 </p>
-                <div className="flex flex-col sm:flex-row gap-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
                   <Link
                     href="/register"
                     onClick={() => trackCTA('Hero Create Account')}
-                    className="bg-white text-blue-600 px-8 py-4 rounded-xl font-semibold hover:bg-blue-50 transition-all transform hover:scale-105 flex items-center justify-center shadow-lg"
+                    className="inline-flex min-h-12 items-center justify-center rounded-xl bg-white px-6 py-3 text-base font-bold text-blue-900 shadow-lg shadow-blue-950/20 transition-colors hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-blue-900"
                   >
-                    Create an Account
+                    Create your account
                     <ArrowRight className="h-5 w-5 ml-2" aria-hidden="true" />
                   </Link>
                   <Link
-                    href="/features"
-                    onClick={() => trackCTA('Hero Explore Features')}
-                    className="border-2 border-white text-white px-8 py-4 rounded-xl font-semibold hover:bg-white/10 transition-all transform hover:scale-105 backdrop-blur-sm"
+                    href="#featured-courses"
+                    onClick={() => trackCTA('Hero Browse Courses')}
+                    className="inline-flex min-h-12 items-center justify-center rounded-xl border border-white/50 bg-white/5 px-6 py-3 text-base font-semibold text-white transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
                   >
-                    Explore Features
+                    Browse courses
                   </Link>
                 </div>
+                <p className="mt-4 text-sm text-blue-200">
+                  Explore available courses and learning tools.
+                </p>
               </div>
-              <div className="relative mt-8 lg:mt-0">
-                <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 sm:p-8 border border-white/20">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-                    <div className="bg-white/10 p-3 sm:p-4 rounded-lg">
-                      <BookOpen
-                        className="h-6 w-6 sm:h-8 sm:w-8 text-blue-200 mb-2"
-                        aria-hidden="true"
-                      />
-                      <h3 className="text-base sm:text-lg font-semibold mb-1">
-                        {courseCatalogLoaded
-                          ? totalCourses > 0
-                            ? totalCourses
-                            : 'Browse'
-                          : '...'}
-                      </h3>
-                      <p className="text-sm sm:text-base text-blue-100">Available courses</p>
+              <div className="min-w-0 lg:col-span-5">
+                <div className="rounded-2xl border border-white/15 bg-white p-5 text-slate-900 shadow-2xl shadow-blue-950/30 sm:p-7">
+                  <div className="mb-5 flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-semibold text-blue-700">Your learning workspace</p>
+                      <h2 className="mt-1 text-xl font-bold tracking-tight sm:text-2xl">Build momentum, one step at a time</h2>
                     </div>
-                    <div className="bg-white/10 p-3 sm:p-4 rounded-lg">
-                      <Brain
-                        className="h-6 w-6 sm:h-8 sm:w-8 text-blue-200 mb-2"
-                        aria-hidden="true"
-                      />
-                      <h3 className="text-base sm:text-lg font-semibold mb-1">Practice</h3>
-                      <p className="text-sm sm:text-base text-blue-100">Quizzes and flashcards</p>
-                    </div>
-                    <div className="bg-white/10 p-4 rounded-lg">
-                      <BarChart3 className="h-8 w-8 text-blue-200 mb-2" aria-hidden="true" />
-                      <h3 className="text-lg font-semibold mb-1">Track</h3>
-                      <p className="text-sm sm:text-base text-blue-100">Progress and study goals</p>
-                    </div>
-                    <div className="bg-white/10 p-4 rounded-lg">
-                      <RefreshCw className="h-8 w-8 text-blue-200 mb-2" aria-hidden="true" />
-                      <h3 className="text-lg font-semibold mb-1">Sync later</h3>
-                      <p className="text-sm sm:text-base text-blue-100">Queue supported updates offline</p>
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
+                      <BookOpen className="h-6 w-6" aria-hidden="true" />
+                    </span>
+                  </div>
+                  <div className="space-y-3">
+                    <Link href="/courses" className="group flex min-w-0 items-center gap-3 rounded-xl border border-slate-200 p-3 transition-colors hover:border-blue-300 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 sm:p-4">
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-700">
+                        <BookOpen className="h-5 w-5" aria-hidden="true" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block font-semibold text-slate-900">Explore courses</span>
+                        <span className="block text-sm text-slate-600">
+                          {courseCatalogLoaded && totalCourses > 0
+                            ? `${totalCourses} courses in the catalog`
+                            : 'Find a topic to study'}
+                        </span>
+                      </span>
+                      <ArrowRight className="h-5 w-5 shrink-0 text-slate-400 transition-transform group-hover:translate-x-1" aria-hidden="true" />
+                    </Link>
+                    <div className="grid grid-cols-1 gap-3 min-[360px]:grid-cols-2">
+                      <div className="flex min-w-0 items-center gap-3 rounded-xl bg-slate-50 p-3">
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
+                          <Brain className="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block font-semibold">Practice</span>
+                          <span className="block text-sm text-slate-600">Quizzes & flashcards</span>
+                        </span>
+                      </div>
+                      <div className="flex min-w-0 items-center gap-3 rounded-xl bg-slate-50 p-3">
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-700">
+                          <BarChart3 className="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block font-semibold">See your progress</span>
+                          <span className="block text-sm text-slate-600">Goals & activity</span>
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
           </div>
         </motion.section>
 
+        <section aria-label="How MedTrack Hub supports learning" className="border-b border-slate-100 bg-white">
+          <div className="mx-auto grid w-full max-w-screen-2xl grid-cols-1 divide-y divide-slate-100 px-4 py-2 sm:grid-cols-3 sm:divide-x sm:divide-y-0 sm:px-6 lg:px-8">
+            {[
+              { icon: BookOpen, title: 'Find a course', description: 'Browse the available catalog' },
+              { icon: Brain, title: 'Practice actively', description: 'Use quizzes and flashcards' },
+              { icon: BarChart3, title: 'Stay on track', description: 'Plan and review progress' },
+            ].map(item => (
+              <div key={item.title} className="flex items-center gap-3 px-2 py-4 sm:justify-center sm:px-4 sm:py-5">
+                <item.icon className="h-5 w-5 shrink-0 text-blue-700" aria-hidden="true" />
+                <p className="text-sm text-slate-600">
+                  <span className="font-semibold text-slate-900">{item.title}</span>
+                  <span className="hidden sm:inline"> · {item.description}</span>
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+
         {/* Features Section */}
         <motion.section
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.2 }}
-          viewport={{ once: true, amount: 0.3 }}
           id="features"
           aria-labelledby="features-heading"
-          className="py-20 bg-gray-50"
+          className="scroll-mt-20 bg-slate-50 py-12 sm:py-16 lg:py-20"
         >
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-16">
-              <h2 id="features-heading" className="text-3xl font-bold text-gray-900 mb-4">
-                Learning tools available today
+          <div className="mx-auto w-full max-w-screen-2xl px-4 sm:px-6 lg:px-8">
+            <div className="mx-auto mb-8 max-w-2xl text-center sm:mb-12">
+              <p className="mb-2 text-sm font-bold uppercase tracking-wider text-blue-700">A more focused way to study</p>
+              <h2 id="features-heading" className="text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">
+                The tools you need to keep learning moving
               </h2>
-              <p className="text-base sm:text-lg text-gray-600 max-w-3xl mx-auto">
-                Explore the learning, practice, progress, and study-planning tools currently available in MedTrack Hub.
+              <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-slate-600 sm:text-lg">
+                Bring courses, practice, study planning, and progress into one practical workspace.
               </p>
+              <Link href="/register" onClick={() => trackCTA('Features Create Account')} className="mt-6 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-blue-700 px-5 py-2.5 font-semibold text-white shadow-sm transition-colors hover:bg-blue-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2">
+                Get started <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              </Link>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {features.map((feature, index) => (
+            <div className="grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-2 xl:grid-cols-3">
+              {features.map(feature => (
                 <motion.div
                   key={feature.title}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.6, delay: 0.3 + index * 0.1 }}
-                  viewport={{ once: true, amount: 0.3 }}
+                  className="min-w-0"
                 >
                   <FeatureCard
-                    icon={<feature.icon className="h-8 w-8 text-blue-600" aria-hidden="true" />}
+                    icon={<feature.icon className="h-6 w-6 text-blue-700" aria-hidden="true" />}
                     title={feature.title}
                     description={feature.description}
                     details={feature.details}
@@ -184,28 +214,30 @@ export default function MarketingPage() {
 
         {/* Featured Courses Section */}
         <motion.section
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.2 }}
-          viewport={{ once: true, amount: 0.3 }}
           id="featured-courses"
           aria-labelledby="featured-courses-heading"
-          className="py-20 bg-white"
+          className="scroll-mt-20 bg-white py-12 sm:py-16 lg:py-20"
         >
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-16">
-              <h2 id="featured-courses-heading" className="text-3xl font-bold text-gray-900 mb-4">
-                Featured Courses
-              </h2>
-              <p className="text-base sm:text-lg text-gray-600 max-w-3xl mx-auto">
-                Browse courses currently available in the catalog. Course coverage varies.
-              </p>
+          <div className="mx-auto w-full max-w-screen-2xl px-4 sm:px-6 lg:px-8">
+            <div className="mb-8 flex flex-col gap-4 sm:mb-10 sm:flex-row sm:items-end sm:justify-between">
+              <div className="max-w-2xl">
+                <p className="mb-2 text-sm font-bold uppercase tracking-wider text-blue-700">Start exploring</p>
+                <h2 id="featured-courses-heading" className="text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">
+                  Find your next topic
+                </h2>
+                <p className="mt-3 text-base leading-7 text-slate-600 sm:text-lg">
+                  Browse courses currently available in the catalog.
+                </p>
+              </div>
+              <Link href="/courses" className="inline-flex min-h-11 items-center gap-2 self-start rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-800 transition-colors hover:border-blue-700 hover:text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 sm:self-auto">
+                View all courses <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              </Link>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 xl:grid-cols-3">
               {featuredCourses.length === 0 && !courseCatalogLoaded ? (
                 Array.from({ length: 3 }).map((_, i) => (
-                  <div key={i} className="bg-gray-50 rounded-lg shadow-lg overflow-hidden p-6 space-y-4">
+                  <div key={i} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                     <Skeleton className="h-6 w-3/4" />
                     <Skeleton className="h-4 w-full" />
                     <Skeleton className="h-4 w-full" />
@@ -213,34 +245,32 @@ export default function MarketingPage() {
                   </div>
                 ))
               ) : featuredCourses.length > 0 ? (
-                featuredCourses.map((course, index) => (
+                featuredCourses.map(course => (
                   <motion.div
                     key={course.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.6, delay: 0.3 + index * 0.1 }}
-                    viewport={{ once: true, amount: 0.3 }}
+                    className="min-w-0"
                   >
-                    <div className="bg-gray-50 rounded-lg shadow-lg overflow-hidden">
-                      <div className="p-6">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-2">{course.title}</h3>
-                        <p className="text-gray-600 text-sm mb-4">{course.description}</p>
-                        <Link href={`/courses/${course.id}`} className="text-blue-600 font-semibold hover:underline">
-                          Learn More <ArrowRight className="inline h-4 w-4" />
-                        </Link>
+                    <article className="flex h-full min-w-0 flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-lg sm:p-6">
+                      <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
+                        <BookOpen className="h-5 w-5" aria-hidden="true" />
                       </div>
-                    </div>
+                      <h3 className="line-clamp-2 text-lg font-bold leading-snug text-slate-950 sm:text-xl">{course.title}</h3>
+                      <p className="mt-3 line-clamp-3 flex-1 text-sm leading-6 text-slate-600 sm:text-base">{course.description}</p>
+                      <Link href={`/courses/${course.id}`} className="mt-5 inline-flex min-h-10 items-center gap-2 self-start font-semibold text-blue-800 hover:text-blue-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600">
+                          Explore course <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                        </Link>
+                    </article>
                   </motion.div>
                 ))
               ) : (
-                <div className="md:col-span-2 lg:col-span-3 rounded-xl border border-gray-200 bg-gray-50 p-6 text-center">
-                  <p className="text-base text-gray-700">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center sm:col-span-2 xl:col-span-3 sm:p-8">
+                  <p className="text-base text-slate-700">
                     {courseCatalogLoaded
                       ? 'Featured courses are unavailable right now. Browse the course catalog for current availability.'
                       : 'No featured courses are available yet.'}
                   </p>
-                  <Link href="/courses" className="mt-3 inline-flex items-center font-semibold text-blue-700 hover:underline">
-                    Browse courses <ArrowRight className="ml-1 h-4 w-4" aria-hidden="true" />
+                  <Link href="/courses" className="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-blue-700 px-5 py-2 font-semibold text-white hover:bg-blue-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2">
+                    Browse all courses <ArrowRight className="h-4 w-4" aria-hidden="true" />
                   </Link>
                 </div>
               )}
@@ -250,34 +280,29 @@ export default function MarketingPage() {
 
         {/* CTA Section */}
         <motion.section
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.2 }}
-          viewport={{ once: true, amount: 0.3 }}
           aria-labelledby="cta-heading"
-          className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white py-20"
+          className="bg-gradient-to-br from-blue-950 via-blue-900 to-indigo-950 py-12 text-white sm:py-16 lg:py-20"
         >
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h2 id="cta-heading" className="text-4xl font-bold mb-6">
-              Ready to Transform Your Medical Education?
+          <div className="mx-auto w-full max-w-screen-2xl px-4 text-center sm:px-6 lg:px-8">
+            <h2 id="cta-heading" className="mx-auto max-w-3xl text-3xl font-bold tracking-tight sm:text-4xl lg:text-5xl">
+              Ready to make your next study session count?
             </h2>
-            <p className="text-xl text-blue-100 mb-8 max-w-3xl mx-auto">
-              Create an account to explore the course catalog, learning tools, and progress
-              features currently available in MedTrack Hub.
+            <p className="mx-auto mb-7 mt-4 max-w-2xl text-base leading-7 text-blue-100 sm:mb-8 sm:mt-5 sm:text-lg">
+              Create an account to explore courses, practice tools, and learning progress in one place.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <div className="flex flex-col justify-center gap-3 sm:flex-row">
               <Link
                 href="/register"
                 onClick={() => trackCTA('Bottom CTA Create Account')}
-                className="bg-white text-blue-600 px-8 py-4 rounded-xl font-semibold hover:bg-blue-50 transition-all transform hover:scale-105 flex items-center justify-center shadow-lg"
+                className="inline-flex min-h-12 items-center justify-center rounded-xl bg-white px-6 py-3 font-bold text-blue-900 shadow-lg transition-colors hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-blue-900"
               >
-                Create an Account
+                Create your account
                 <ArrowRight className="h-5 w-5 ml-2" aria-hidden="true" />
               </Link>
               <Link
                 href="#features"
                 onClick={() => trackCTA('Bottom CTA Learn More')}
-                className="border-2 border-white text-white px-8 py-4 rounded-xl font-semibold hover:bg-white/10 transition-all transform hover:scale-105 backdrop-blur-sm"
+                className="inline-flex min-h-12 items-center justify-center rounded-xl border border-white/50 bg-white/5 px-6 py-3 font-semibold text-white transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
               >
                 Learn More
               </Link>

@@ -10,29 +10,20 @@ import { useToast } from '@/shared/components/ui/use-toast';
 import { useAuthStore } from '@/features/auth/store/useAuthStore';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { registerSchema } from '@/lib/auth/validations';
+import { AuthErrorCode, getAuthErrorDetails } from '@/features/auth/services/authErrors';
 
 export default function RegisterPage() {
   const router = useRouter();
   const { toast } = useToast();
-  const { register, isLoading, error } = useAuthStore();
+  const { register, isLoading } = useAuthStore();
   const { isAuthenticated } = useAuth();
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (isAuthenticated) {
       router.replace('/dashboard');
     }
   }, [isAuthenticated, router]);
-
-  useEffect(() => {
-    if (error) {
-      toast({
-        title: 'Error',
-        description: error,
-        variant: 'destructive',
-      });
-      useAuthStore.getState().clearError(); // Clear the error after showing the toast
-    }
-  }, [error, toast]);
 
   const [formData, setFormData] = useState<AuthFormData>({
     firstName: '',
@@ -50,28 +41,28 @@ export default function RegisterPage() {
 
     const validationResult = registerSchema.safeParse(formData);
     if (!validationResult.success) {
-      toast({
-        title: 'Error',
-        description: validationResult.error.issues[0]?.message || 'Please check the form fields.',
-        variant: 'destructive',
-      });
+      setFieldErrors(
+        Object.fromEntries(
+          validationResult.error.issues.map(issue => [
+            String(issue.path[0]),
+            issue.message,
+          ])
+        )
+      );
       return;
     }
 
     try {
-      // Removed name splitting logic
-      // const [firstName, ...lastNameParts] = formData.name.split(' ');
-      // const lastName = lastNameParts.join(' ') || firstName; // If only one name, use it as last name
-
+      setFieldErrors({});
       await register({
-        email: formData.email,
-        password: formData.password,
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        username: formData.username,
+        email: validationResult.data.email,
+        password: validationResult.data.password,
+        firstName: validationResult.data.firstName,
+        lastName: validationResult.data.lastName,
+        username: validationResult.data.username,
         role: Role.student,
-        confirmPassword: formData.confirmPassword,
-        acceptTerms: formData.acceptTerms,
+        confirmPassword: validationResult.data.confirmPassword,
+        acceptTerms: validationResult.data.acceptTerms,
       });
       toast({
         title: 'Account created',
@@ -79,71 +70,60 @@ export default function RegisterPage() {
       });
       router.push('/login?callbackUrl=%2Ffinish-setup');
     } catch (err: unknown) {
-      let errorMessage = 'An unexpected error occurred during registration.';
-      let fieldErrors: Record<string, string> = {};
-
-      if (err instanceof Error) {
-        errorMessage = err.message; // Use the message from the re-thrown Error
-      }
-
-      // If there are specific backend validation errors, they might be in a nested structure
-      if (
-        err &&
-        typeof err === 'object' &&
-        'response' in err &&
-        err.response &&
-        typeof err.response === 'object' &&
-        'data' in err.response &&
-        err.response.data
-      ) {
-        const responseData = err.response.data as {
-          message?: string;
-          errors?: Record<string, string>;
-        };
-        errorMessage = responseData.message || errorMessage;
-        if (responseData.errors) {
-          fieldErrors = responseData.errors;
-        }
-      } else if (
-        errorMessage.includes('Connection refused') ||
-        errorMessage.includes('timed out') ||
-        errorMessage.includes('No response received')
-      ) {
-        errorMessage = `Unable to connect to the authentication service. Please ensure the backend is running and accessible.`;
-      }
+      useAuthStore.getState().clearError();
+      const authError = getAuthErrorDetails(
+        err,
+        'An unexpected error occurred during registration.'
+      );
+      setFieldErrors(authError.fieldErrors);
 
       if (
-        errorMessage.includes('Email or username already exists') ||
-        fieldErrors.email ||
-        fieldErrors.username
+        authError.code === AuthErrorCode.USERNAME_TAKEN ||
+        authError.fieldErrors.username
       ) {
+        setFieldErrors(prev => ({
+          ...prev,
+          username: 'That username is already in use. Please choose another.',
+        }));
+        return;
+      }
+
+      if (authError.code === AuthErrorCode.EMAIL_TAKEN || authError.fieldErrors.email) {
+        setFieldErrors(prev => ({
+          ...prev,
+          email: 'An account with this email already exists.',
+        }));
         toast({
-          title: 'Registration Failed',
+          title: 'Email already registered',
           description: (
             <p>
-              An account with this email or username already exists. Please{' '}
-              <Link href="/login" className="text-blue-600 hover:text-blue-700 font-medium">
+              Sign in to the existing account or use another email address.{' '}
+              <Link href="/login" className="font-medium underline">
                 Sign in
               </Link>
-              .
             </p>
           ),
           variant: 'destructive',
           duration: 5000,
         });
-      } else {
-        toast({
-          title: 'Registration Failed',
-          description: errorMessage,
-          variant: 'destructive',
-          duration: 5000,
-        });
+        return;
       }
+
+      if (Object.keys(authError.fieldErrors).length) return;
+      toast({
+        title: 'Registration failed',
+        description: authError.message,
+        variant: 'destructive',
+        duration: 5000,
+      });
     }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
+    if (fieldErrors[name]) {
+      setFieldErrors(prev => ({ ...prev, [name]: '' }));
+    }
     setFormData(prev => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value,
@@ -172,8 +152,10 @@ export default function RegisterPage() {
           label="First Name" // Changed label
           type="text"
           name="firstName" // Changed name
+          autoComplete="given-name"
           value={formData.firstName} // Changed value
           onChange={handleChange}
+          error={fieldErrors.firstName}
           required
           placeholder="Enter your first name" // Changed placeholder
         />
@@ -181,8 +163,10 @@ export default function RegisterPage() {
           label="Last Name" // Added
           type="text"
           name="lastName" // Added
+          autoComplete="family-name"
           value={formData.lastName} // Added
           onChange={handleChange}
+          error={fieldErrors.lastName}
           required
           placeholder="Enter your last name" // Added
         />
@@ -191,8 +175,10 @@ export default function RegisterPage() {
           label="Email Address"
           type="email"
           name="email"
+          autoComplete="email"
           value={formData.email}
           onChange={handleChange}
+          error={fieldErrors.email}
           required
           placeholder="Enter your email"
         />
@@ -201,8 +187,10 @@ export default function RegisterPage() {
           label="Username"
           type="text"
           name="username"
+          autoComplete="username"
           value={formData.username}
           onChange={handleChange}
+          error={fieldErrors.username}
           required
           placeholder="Create a username"
         />
@@ -211,8 +199,10 @@ export default function RegisterPage() {
           label="Password"
           type="password"
           name="password"
+          autoComplete="new-password"
           value={formData.password}
           onChange={handleChange}
+          error={fieldErrors.password}
           required
           placeholder="Create a password"
           helperText="Must be at least 8 characters with uppercase, lowercase, number, and special character"
@@ -222,8 +212,10 @@ export default function RegisterPage() {
           label="Confirm Password"
           type="password"
           name="confirmPassword"
+          autoComplete="new-password"
           value={formData.confirmPassword}
           onChange={handleChange}
+          error={fieldErrors.confirmPassword}
           required
           placeholder="Confirm your password"
         />
@@ -236,16 +228,23 @@ export default function RegisterPage() {
               name="acceptTerms"
               checked={formData.acceptTerms}
               onChange={handleChange}
+              aria-invalid={!!fieldErrors.acceptTerms}
+              aria-describedby={fieldErrors.acceptTerms ? 'acceptTerms-error' : undefined}
               className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
             />
           </div>
+          {fieldErrors.acceptTerms && (
+            <p id="acceptTerms-error" role="alert" className="text-sm text-red-600">
+              {fieldErrors.acceptTerms}
+            </p>
+          )}
           <div className="ml-3 text-sm">
             <label htmlFor="acceptTerms" className="text-gray-600 dark:text-gray-300">
               I agree to the{' '}
               <Link href="/terms" className="text-blue-600 hover:text-blue-700 font-medium">
                 Terms of Service
               </Link>
-              and{' '}
+              {' '}and{' '}
               <Link href="/privacy" className="text-blue-600 hover:text-blue-700 font-medium">
                 Privacy Policy
               </Link>

@@ -24,13 +24,15 @@ export function StickyCta() {
 
   return (
     <div
-      className={`fixed bottom-0 left-0 right-0 bg-blue-600 p-4 shadow-lg z-50 md:hidden transition-transform duration-300 ${isVisible ? 'translate-y-0' : 'translate-y-full'}`}
+      aria-hidden={!isVisible}
+      className={`fixed inset-x-0 bottom-0 z-40 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] transition-transform duration-300 md:hidden ${isVisible ? 'translate-y-0' : 'pointer-events-none translate-y-full'}`}
     >
       <Link
-        href="/auth/register"
-        className="w-full bg-white text-blue-600 px-6 py-3 rounded-lg font-semibold flex items-center justify-center hover:bg-blue-50 transition-colors"
+        href="/register"
+        tabIndex={isVisible ? 0 : -1}
+        className="mx-auto flex min-h-12 w-full max-w-lg items-center justify-center rounded-xl bg-blue-800 px-6 py-3 font-bold text-white shadow-xl shadow-slate-950/20 transition-colors hover:bg-blue-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
       >
-        Start Free Trial
+        Create your account
         <ArrowRight className="h-5 w-5 ml-2" aria-hidden="true" />
       </Link>
     </div>

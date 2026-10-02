@@ -117,8 +117,9 @@ export const authOptions: NextAuthOptions = {
           '';
         
         if (!raw) {
-          console.error('Backend URL not configured for login');
-          return null;
+          throw new Error(
+            'Sign-in is temporarily unavailable because the authentication service is not configured.'
+          );
         }
         
         let validBase = raw.trim();
@@ -133,7 +134,7 @@ export const authOptions: NextAuthOptions = {
           loginUrl = new URL('auth/login', `${normalizedBase}/`).href;
         } catch (error) {
           console.error('Failed to construct login URL:', error);
-          return null;
+          throw new Error('Sign-in is temporarily unavailable. Please try again later.');
         }
 
         const loginBody = {
@@ -144,13 +145,13 @@ export const authOptions: NextAuthOptions = {
         };
 
         const configuredTimeout = Number.parseInt(
-          process.env.AUTH_BACKEND_TIMEOUT_MS || '30000',
+          process.env.AUTH_BACKEND_TIMEOUT_MS || '90000',
           10
         );
         const timeoutMs =
           Number.isFinite(configuredTimeout) && configuredTimeout > 0
             ? configuredTimeout
-            : 30000;
+            : 90000;
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -177,10 +178,37 @@ export const authOptions: NextAuthOptions = {
           if (!response.ok) {
             console.error('Backend authentication failed:', response.status, responseData);
 
-            const errorMessage = responseData.message || 'Authentication failed';
+            if (response.status === 429) {
+              throw new AuthError(
+                AUTH_ERROR_MESSAGES[AuthErrorCode.RATE_LIMIT_EXCEEDED],
+                AuthErrorCode.RATE_LIMIT_EXCEEDED,
+                response.status
+              );
+            }
+            if (response.status === 423) {
+              throw new AuthError(
+                AUTH_ERROR_MESSAGES[AuthErrorCode.ACCOUNT_LOCKED],
+                AuthErrorCode.ACCOUNT_LOCKED,
+                response.status
+              );
+            }
+            if (response.status >= 500) {
+              throw new AuthError(
+                AUTH_ERROR_MESSAGES[AuthErrorCode.SERVICE_UNAVAILABLE],
+                AuthErrorCode.SERVICE_UNAVAILABLE,
+                response.status
+              );
+            }
+
+            const errorMessage =
+              response.status === 401
+                ? 'Invalid username/email or password.'
+                : typeof responseData.message === 'string'
+                  ? responseData.message
+                  : 'Could not sign in. Check the details and try again.';
             let errorCode: AuthErrorCode = AuthErrorCode.INVALID_CREDENTIALS;
 
-            switch (responseData.message) {
+            switch (errorMessage) {
               case AUTH_ERROR_MESSAGES[AuthErrorCode.INVALID_CREDENTIALS]:
                 errorCode = AuthErrorCode.INVALID_CREDENTIALS;
                 break;
@@ -258,14 +286,21 @@ export const authOptions: NextAuthOptions = {
           clearTimeout(timeout);
           if (isAbortError(err)) {
             console.error('Authorize error: request to backend timed out after', timeoutMs, 'ms');
+            throw new Error(AUTH_ERROR_MESSAGES[AuthErrorCode.REQUEST_TIMEOUT]);
           } else {
             console.error('Authorize error calling backend:', err);
           }
-          const message =
+          if (err instanceof AuthError) {
+            throw err;
+          }
+          if (err instanceof TypeError) {
+            throw new Error(AUTH_ERROR_MESSAGES[AuthErrorCode.SERVICE_UNAVAILABLE]);
+          }
+          throw new Error(
             err instanceof Error
               ? err.message
-              : 'An unexpected error occurred during authentication.';
-          throw new Error(message);
+              : 'An unexpected error occurred during authentication.'
+          );
         }
       },
     }),

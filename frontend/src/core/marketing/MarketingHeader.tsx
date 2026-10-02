@@ -2,164 +2,82 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { Stethoscope, Menu, X, ChevronDown } from 'lucide-react';
-import { useMounted } from '@/shared/hooks/useMounted';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/shared/components/ui/dropdown-menu';
+import { Stethoscope, Menu, X } from 'lucide-react';
 
 export const MarketingHeader: React.FC = () => {
-  const isMounted = useMounted();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const menuId = 'marketing-mobile-menu';
 
   return (
-    <nav className="sticky top-0 z-50 pointer-events-auto">
-      <div className="w-full">
-        <div className="-mt-2 bg-white/95 backdrop-blur-sm rounded-b-xl shadow-md border border-gray-100">
-          <div className="flex justify-between items-center h-16 px-4 lg:px-8">
-            <div className="flex items-center">
-              <div className="flex-shrink-0 flex items-center">
-                <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-2 rounded-lg">
-                  <Stethoscope className="h-8 w-8 text-white" />
-                </div>
-                <span className="ml-3 text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-                  MedTrack Hub
-                </span>
-              </div>
-            </div>
+    <nav aria-label="Main navigation" className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur">
+      <div className="mx-auto flex min-h-16 w-full max-w-screen-2xl items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
+        <Link href="/" className="flex min-w-0 items-center gap-2 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600">
+            <Stethoscope className="h-5 w-5 text-white" aria-hidden="true" />
+          </span>
+          <span className="truncate text-base font-bold tracking-tight text-slate-950 sm:text-lg">
+            MedTrack Hub
+          </span>
+        </Link>
 
-            <div className="hidden md:flex items-center space-x-6">
-              {!isMounted ? (
-                <button className="text-gray-600 hover:text-gray-900 flex items-center">
-                  Features <ChevronDown className="ml-1 h-4 w-4" />
-                </button>
-              ) : (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button className="text-gray-600 hover:text-gray-900 flex items-center">
-                      Features <ChevronDown className="ml-1 h-4 w-4" />
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent>
-                    <DropdownMenuItem>
-                      <Link href="/features/precision-ai-tutoring">AI Learning</Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem>
-                      <Link href="/features/assessment-and-progress-tracking">Progress Tracking</Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem>
-                      <Link href="/features/peer-learning">Peer Learning</Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem>
-                      <Link href="/features/offline-access">Offline Access</Link>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
-              <Link href="/about" className="text-gray-600 hover:text-gray-900">
-                About
-              </Link>
-            </div>
+        <div className="hidden items-center gap-7 md:flex">
+          <Link href="/#features" className="text-sm font-medium text-slate-700 hover:text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600">
+            Features
+          </Link>
+          <Link href="/#featured-courses" className="text-sm font-medium text-slate-700 hover:text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600">
+            Courses
+          </Link>
+          <Link href="/about" className="text-sm font-medium text-slate-700 hover:text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600">
+            About
+          </Link>
+        </div>
 
-            <div className="flex items-center space-x-4">
-              <div className="hidden md:flex items-center space-x-4">
-                <Link href="/login" className="text-gray-600 hover:text-gray-900">
-                  Log in
-                </Link>
+        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+          <Link
+            href="/login"
+            className="hidden min-h-10 items-center rounded-lg px-3 text-sm font-semibold text-slate-700 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 sm:inline-flex"
+          >
+            Log in
+          </Link>
+          <Link
+            href="/register"
+            className="inline-flex min-h-10 items-center justify-center whitespace-nowrap rounded-lg bg-blue-700 px-3 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-blue-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 sm:px-4 sm:text-sm"
+          >
+            Create account
+          </Link>
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen(open => !open)}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-slate-700 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 md:hidden"
+            aria-controls={menuId}
+            aria-expanded={mobileMenuOpen}
+            aria-label={mobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+          >
+            {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
+        </div>
+
+        {mobileMenuOpen && (
+          <div id={menuId} className="absolute inset-x-0 top-full border-b border-slate-200 bg-white px-4 py-3 shadow-lg md:hidden">
+            <div className="mx-auto flex max-w-screen-2xl flex-col">
+              {[
+                { href: '/#features', label: 'Explore features' },
+                { href: '/#featured-courses', label: 'Browse courses' },
+                { href: '/about', label: 'About MedTrack Hub' },
+                { href: '/login', label: 'Log in' },
+              ].map(item => (
                 <Link
-                  href="/register"
-                  className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium"
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex min-h-11 items-center rounded-lg px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
                 >
-                  Get Started
+                  {item.label}
                 </Link>
-              </div>
-
-              <div className="md:hidden">
-                <button
-                  type="button"
-                  onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                  className="text-gray-600 hover:text-gray-900 p-2 rounded-md"
-                  aria-controls={menuId}
-                  aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
-                >
-                  {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-                </button>
-              </div>
+              ))}
             </div>
           </div>
-
-          {mobileMenuOpen && (
-            <div
-              id={menuId}
-              role="navigation"
-              aria-label="Mobile menu"
-              className="md:hidden border-t border-gray-200 py-4"
-            >
-              <div className="flex flex-col space-y-2 px-4">
-                <Link
-                  href="/features/precision-ai-tutoring"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="py-2"
-                  tabIndex={0}
-                >
-                  AI Learning
-                </Link>
-                <Link
-                  href="/features/assessment-and-progress-tracking"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="py-2"
-                  tabIndex={0}
-                >
-                  Progress Tracking
-                </Link>
-                <Link
-                  href="/features/peer-learning"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="py-2"
-                  tabIndex={0}
-                >
-                  Peer Learning
-                </Link>
-                <Link
-                  href="/features/offline-access"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="py-2"
-                  tabIndex={0}
-                >
-                  Offline Access
-                </Link>
-                <Link
-                  href="/about"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="py-2"
-                  tabIndex={0}
-                >
-                  About
-                </Link>
-                <Link
-                  href="/login"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="py-2"
-                  tabIndex={0}
-                >
-                  Log in
-                </Link>
-                <Link
-                  href="/register"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="py-2"
-                  tabIndex={0}
-                >
-                  Get Started
-                </Link>
-              </div>
-            </div>
-          )}
-        </div>
+        )}
       </div>
     </nav>
   );

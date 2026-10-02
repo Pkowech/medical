@@ -4,11 +4,11 @@ import MarketingPage from '@/core/marketing/MarketingPage';
 export const metadata: Metadata = {
   title: 'MedTrack Hub - Intelligent Medical Education',
   description:
-    'Transform your medical education with MedTrack Hub. AI-powered learning, progress tracking, and expert support.',
+    'Explore medical courses, practice with quizzes and flashcards, plan study sessions, and track your learning progress with MedTrack Hub.',
   openGraph: {
     title: 'MedTrack Hub - Intelligent Medical Education',
     description:
-      'Transform your medical education with AI-powered learning, progress tracking, and expert support.',
+      'Explore medical courses, practice with quizzes and flashcards, plan study sessions, and track your learning progress with MedTrack Hub.',
     type: 'website',
     images: ['/og-image.png'],
   },

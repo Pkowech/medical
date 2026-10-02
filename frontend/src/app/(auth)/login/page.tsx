@@ -13,6 +13,10 @@ import {
   FaExclamationCircle,
 } from 'react-icons/fa';
 import { useAuth } from '@/features/auth/hooks/useAuth';
+import {
+  AuthErrorCode,
+  getAuthErrorDetails,
+} from '@/features/auth/services/authErrors';
 
 interface FormErrors {
   identifier?: string;
@@ -41,8 +45,11 @@ function LoginContent() {
     }
   }, [isAuthenticated, router]);
 
-  const [error, setError] = useState<string | React.ReactNode>('');
+  const [error, setError] = useState('');
+  const [canRetry, setCanRetry] = useState(false);
+  const [showResendVerification, setShowResendVerification] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showSlowRequestHint, setShowSlowRequestHint] = useState(false);
   const [success, setSuccess] = useState('');
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
@@ -101,6 +108,9 @@ function LoginContent() {
   // Handle input changes
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
+    setError('');
+    setCanRetry(false);
+    setShowResendVerification(false);
 
     if (name === 'identifier') {
       setIdentifier(value);
@@ -128,10 +138,11 @@ function LoginContent() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setLoading(true);
+  const handleSubmit = async (e?: React.FormEvent<HTMLFormElement>) => {
+    e?.preventDefault();
     setError('');
+    setCanRetry(false);
+    setShowResendVerification(false);
     setSuccess('');
 
     // Mark all fields as touched for validation
@@ -151,10 +162,12 @@ function LoginContent() {
 
     // If there are any errors, don't submit
     if (errors.identifier || errors.password) {
-      setError('Please fix the errors in the form before submitting.');
-      setLoading(false);
       return;
     }
+
+    setLoading(true);
+    setShowSlowRequestHint(false);
+    const slowRequestTimer = window.setTimeout(() => setShowSlowRequestHint(true), 8000);
 
     // Increment login attempts
     setLoginAttempts(prev => prev + 1);
@@ -163,9 +176,19 @@ function LoginContent() {
       const result = await login(identifier, password);
 
       if (result?.error) {
-        // The error from NextAuth's signIn will be a string like "CredentialsSignin"
-        // We can provide a more user-friendly message.
-        throw new Error('Invalid username/email or password.');
+        const authError = getAuthErrorDetails(
+          result.error,
+          'Could not sign in. Please try again.'
+        );
+        setError(authError.message);
+        setCanRetry(
+          [
+            AuthErrorCode.SERVICE_UNAVAILABLE,
+            AuthErrorCode.NETWORK_ERROR,
+            AuthErrorCode.REQUEST_TIMEOUT,
+          ].includes(authError.code)
+        );
+        setShowResendVerification(authError.code === 'EMAIL_NOT_VERIFIED');
       } else if (result?.ok) {
         setSuccess('Login successful! Redirecting...');
 
@@ -190,16 +213,22 @@ function LoginContent() {
       }
     } catch (error: unknown) {
       console.error('Login failed:', error); // Log the full error object
-      let errorMessage = 'An unexpected error occurred during login. Please try again later.';
-
-      if (error instanceof Error) {
-        errorMessage = error.message;
-      } else if (typeof error === 'string') {
-        errorMessage = error;
-      }
-
-      setError(errorMessage);
+      const authError = getAuthErrorDetails(
+        error,
+        'An unexpected error occurred during login. Please try again later.'
+      );
+      setError(authError.message);
+      setCanRetry(
+        [
+          AuthErrorCode.SERVICE_UNAVAILABLE,
+          AuthErrorCode.NETWORK_ERROR,
+          AuthErrorCode.REQUEST_TIMEOUT,
+        ].includes(authError.code)
+      );
+      setShowResendVerification(authError.code === 'EMAIL_NOT_VERIFIED');
     } finally {
+      window.clearTimeout(slowRequestTimer);
+      setShowSlowRequestHint(false);
       setLoading(false);
     }
   };
@@ -236,26 +265,39 @@ function LoginContent() {
         )}
 
         {error && (
-          <div className="rounded-md bg-red-50 p-4">
+          <div role="alert" aria-live="assertive" className="rounded-md bg-red-50 p-4">
             <div className="flex">
               <div className="shrink-0">
                 <FaExclamationCircle className="h-5 w-5 text-red-400" />
               </div>
               <div className="ml-3">
                 <p className="text-sm font-medium text-red-800">
-                  {typeof error === 'string' ? error : (error && typeof error === 'object' && 'message' in error ? (typeof error.message === 'string' ? error.message : JSON.stringify(error.message)) : JSON.stringify(error))}
-                  {typeof error === 'string' && error.includes('not verified') && (
-                    <Link
-                      href="/auth/resend-verification"
-                      className="ml-2 text-indigo-600 hover:text-indigo-500"
-                    >
+                  {error}
+                  {showResendVerification && (
+                    <Link href="/resend-verification" className="ml-2 text-indigo-600 hover:text-indigo-500 underline">
                       Resend verification email
                     </Link>
                   )}
                 </p>
+                {canRetry && (
+                  <button
+                    type="button"
+                    onClick={() => void handleSubmit()}
+                    disabled={loading}
+                    className="mt-3 rounded-md border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-800 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    Try again
+                  </button>
+                )}
               </div>
             </div>
           </div>
+        )}
+        {loading && showSlowRequestHint && (
+          <p role="status" className="text-center text-sm text-gray-600">
+            Sign-in is taking longer than usual. Please keep this page open; you can retry if it
+            fails.
+          </p>
         )}
 
         {/*
@@ -288,6 +330,8 @@ function LoginContent() {
                   required
                   value={identifier}
                   onChange={handleChange}
+                  aria-invalid={!!formErrors.identifier}
+                  aria-describedby={formErrors.identifier ? 'identifier-error' : undefined}
                   onBlur={() => {
                     if (!formTouched.identifier) {
                       setFormTouched({ ...formTouched, identifier: true });
@@ -306,7 +350,7 @@ function LoginContent() {
                 />
               </div>
               {formErrors.identifier && formTouched.identifier && (
-                <p className="mt-1 text-sm text-red-600">{formErrors.identifier}</p>
+                <p id="identifier-error" className="mt-1 text-sm text-red-600">{formErrors.identifier}</p>
               )}
             </div>
             <div>
@@ -324,6 +368,8 @@ function LoginContent() {
                   required
                   value={password}
                   onChange={handleChange}
+                  aria-invalid={!!formErrors.password}
+                  aria-describedby={formErrors.password ? 'password-error' : undefined}
                   onBlur={() => {
                     if (!formTouched.password) {
                       setFormTouched({ ...formTouched, password: true });
@@ -353,7 +399,7 @@ function LoginContent() {
                 </button>
               </div>
               {formErrors.password && formTouched.password && (
-                <p className="mt-1 text-sm text-red-600">{formErrors.password}</p>
+                <p id="password-error" className="mt-1 text-sm text-red-600">{formErrors.password}</p>
               )}
             </div>
           </div>
