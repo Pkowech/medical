@@ -184,12 +184,9 @@ function LoginContent() {
           }
         }
 
-        try {
-          router.replace(callbackUrl);
-        } catch (e) {
-          console.warn('[Login] router.replace failed, using push', e);
-          router.push(callbackUrl);
-        }
+        // Reload through the browser so the session cookie written by
+        // NextAuth is included in the first protected dashboard request.
+        window.location.assign(callbackUrl);
       }
     } catch (error: unknown) {
       console.error('Login failed:', error); // Log the full error object
