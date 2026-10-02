@@ -9,6 +9,7 @@ interface AuthFormProps {
   isLoading?: boolean;
   submitText: string;
   footer?: ReactNode;
+  noValidate?: boolean;
 }
 
 export function AuthForm({
@@ -19,6 +20,7 @@ export function AuthForm({
   isLoading = false,
   submitText,
   footer,
+  noValidate = false,
 }: AuthFormProps) {
   return (
     <div className="space-y-6">
@@ -27,7 +29,7 @@ export function AuthForm({
         {subtitle && <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">{subtitle}</p>}
       </div>
 
-      <form method="post" onSubmit={onSubmit} className="space-y-4">
+      <form method="post" onSubmit={onSubmit} noValidate={noValidate} className="space-y-4">
         {children}
 
         <button

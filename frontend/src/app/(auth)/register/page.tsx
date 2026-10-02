@@ -9,6 +9,7 @@ import { Role } from '@/shared/enums/role.enum';
 import { useToast } from '@/shared/components/ui/use-toast';
 import { useAuthStore } from '@/features/auth/store/useAuthStore';
 import { useAuth } from '@/features/auth/hooks/useAuth';
+import { registerSchema } from '@/lib/auth/validations';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -47,20 +48,11 @@ export default function RegisterPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Basic client-side validation
-    if (formData.password !== formData.confirmPassword) {
+    const validationResult = registerSchema.safeParse(formData);
+    if (!validationResult.success) {
       toast({
         title: 'Error',
-        description: 'Passwords do not match.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    if (!formData.acceptTerms) {
-      toast({
-        title: 'Error',
-        description: 'You must accept the terms and conditions.',
+        description: validationResult.error.issues[0]?.message || 'Please check the form fields.',
         variant: 'destructive',
       });
       return;
@@ -165,6 +157,7 @@ export default function RegisterPage() {
       onSubmit={handleSubmit}
       isLoading={isLoading}
       submitText="Create Account"
+      noValidate
       footer={
         <p className="text-center text-sm text-gray-600 dark:text-gray-400">
           Already have an account?{' '}

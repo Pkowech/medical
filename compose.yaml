@@ -12,7 +12,7 @@ services:
     restart: unless-stopped
 
     env_file:
-      - .env
+      - ./backend/.env
 
     environment:
       NODE_ENV: production
@@ -26,6 +26,7 @@ services:
 
       # Auth & Secrets
       JWT_SECRET: ${JWT_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
 
       # gRPC connection to rust-analytics sidecar (service name resolves in Docker network)
@@ -49,7 +50,7 @@ services:
       - "${BACKEND_PORT:-3002}:${BACKEND_PORT:-3002}"
 
     healthcheck:
-      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:${BACKEND_PORT:-3002}/api/health', (res) => { if (res.statusCode === 200) process.exit(0); else process.exit(1); })\" || exit 1"]
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:${BACKEND_PORT:-3002}/health', (res) => { if (res.statusCode === 200) process.exit(0); else process.exit(1); })\" || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -76,7 +77,7 @@ services:
     restart: unless-stopped
 
     env_file:
-      - .env
+      - ./backend/.env
 
     environment:
       # Neon online DB
