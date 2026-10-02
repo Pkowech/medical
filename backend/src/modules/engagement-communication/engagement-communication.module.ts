@@ -12,12 +12,14 @@ import { ChatController } from './controllers/chat.controller';
 import { NotificationsController } from './controllers/notifications.controller';
 import { WeeklyDigestController } from './controllers/weekly-digest.controller';
 import { ForumController } from './controllers/forum.controller';
+import { DirectMessagesController } from './controllers/direct-messages.controller';
 
 // Communication Services
 import { ChatService } from './services/chat.service';
 import { NotificationsService } from './services/notifications.service';
 import { WeeklyDigestService } from './services/weekly-digest.service';
 import { ForumService } from './services/forum.service';
+import { DirectMessagesService } from './services/direct-messages.service';
 
 // Engagement Controllers
 import { EngagementController } from './controllers/engagement.controller';
@@ -50,6 +52,7 @@ import { OnboardingService } from './services/onboarding.service';
     NotificationsController,
     WeeklyDigestController,
     ForumController,
+    DirectMessagesController,
     EngagementController,
     GamificationController,
     RewardsController,
@@ -60,6 +63,7 @@ import { OnboardingService } from './services/onboarding.service';
     NotificationsService,
     WeeklyDigestService,
     ForumService,
+    DirectMessagesService,
     GamificationService,
     RewardsService,
     PeerBenchmarkingService,
@@ -70,6 +74,7 @@ import { OnboardingService } from './services/onboarding.service';
     NotificationsService,
     WeeklyDigestService,
     ForumService,
+    DirectMessagesService,
     GamificationService,
     RewardsService,
     PeerBenchmarkingService,

@@ -1,6 +1,27 @@
 import { apiService } from '@/features/auth/services/apiClient';
-import { ApiResponse } from '@/shared/types';
-import { StudyGroup, StudyGroupSummary } from '@/shared/types/studyInterface';
+
+export interface StudyGroupRecord {
+  id: string;
+  name: string;
+  description: string | null;
+  type: 'general' | 'course_specific' | 'exam_prep' | 'research' | 'clinical_cases';
+  privacy: 'public' | 'private' | 'invite_only';
+  maxMembers: number;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  metadata?: {
+    memberCount?: number;
+    tags?: string[];
+    studyTopics?: string[];
+    courseId?: string | null;
+  };
+  members?: Array<{
+    userId: string;
+    role: string;
+    status: string;
+  }>;
+}
 
 class StudyGroupService {
   private static instance: StudyGroupService;
@@ -14,27 +35,43 @@ class StudyGroupService {
     return StudyGroupService.instance;
   }
 
-  async listGroups(): Promise<StudyGroupSummary[]> {
-    const res = await apiService.get<ApiResponse<StudyGroupSummary[]>>('/study-groups');
-    return res.data.data;
+  async listGroups(): Promise<StudyGroupRecord[]> {
+    const res = await apiService.get<StudyGroupRecord[]>('/study-groups');
+    return res.data;
   }
 
-  async getGroup(id: string): Promise<StudyGroup> {
-    const res = await apiService.get<ApiResponse<StudyGroup>>(`/study-groups/${id}`);
-    return res.data.data;
+  async listMyGroups(): Promise<StudyGroupRecord[]> {
+    const res = await apiService.get<StudyGroupRecord[]>('/study-groups/my-groups');
+    return res.data;
   }
 
-  async createGroup(payload: { name: string; description?: string; courseId?: string }): Promise<StudyGroup> {
-    const res = await apiService.post<ApiResponse<StudyGroup>>('/study-groups', payload);
-    return res.data.data;
+  async getGroup(id: string): Promise<StudyGroupRecord> {
+    const res = await apiService.get<StudyGroupRecord>(`/study-groups/${id}`);
+    return res.data;
+  }
+
+  async createGroup(payload: {
+    name: string;
+    description?: string;
+    type: StudyGroupRecord['type'];
+    privacy: StudyGroupRecord['privacy'];
+    maxMembers?: number;
+    courseId?: string;
+  }): Promise<StudyGroupRecord> {
+    const res = await apiService.post<StudyGroupRecord>('/study-groups', payload);
+    return res.data;
+  }
+
+  async joinGroup(id: string, inviteCode?: string): Promise<void> {
+    await apiService.post(`/study-groups/${id}/join`, { inviteCode });
   }
 
   async updateGroup(
     id: string,
     payload: Partial<{ name: string; description: string; courseId: string | null }>
-  ): Promise<StudyGroup> {
-    const res = await apiService.patch<ApiResponse<StudyGroup>>(`/study-groups/${id}`, payload);
-    return res.data.data;
+  ): Promise<StudyGroupRecord> {
+    const res = await apiService.put<StudyGroupRecord>(`/study-groups/${id}`, payload);
+    return res.data;
   }
 
   async deleteGroup(id: string): Promise<void> {

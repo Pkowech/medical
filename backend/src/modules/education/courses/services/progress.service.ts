@@ -140,6 +140,7 @@ export class ProgressService {
                   materialId,
                   isCompleted,
                   completedAt: isCompleted ? new Date() : undefined,
+                  lastUpdated: currentTimestamp,
                 },
               });
             }
@@ -737,9 +738,12 @@ export class ProgressService {
         }),
       );
 
-      const result: CourseProgress[] = progressItems.filter(
-        (item) => item !== null,
-      ) as CourseProgress[];
+      const result: CourseProgress[] = [];
+      for (const item of progressItems) {
+        if (item) {
+          result.push(item);
+        }
+      }
 
       return result;
     } catch (error) {

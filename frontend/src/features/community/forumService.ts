@@ -1,29 +1,41 @@
 import { apiService } from '@/features/auth/services/apiClient';
-import { ApiResponse } from '@/shared/types/base-responseInterface';
 
 export interface Forum {
   id: string;
-  title: string;
+  name: string;
   description?: string;
+  category?: string;
+  tags?: string[];
+  isPrivate?: boolean;
+  topicCount: number;
+  postCount: number;
+  lastActivity: string;
   createdAt: string;
-  updatedAt?: string;
+  updatedAt: string;
 }
 
 export interface Topic {
   id: string;
-  forumId: string;
-  title: string;
-  authorId: string;
+  discussionId: string;
+  userId: string;
+  content: string;
+  metadata?: {
+    title?: string;
+    tags?: string[];
+    isTopicStarter?: boolean;
+  };
   createdAt: string;
+  updatedAt: string;
 }
 
 export interface Post {
   id: string;
-  topicId: string;
-  authorId: string;
+  discussionId: string;
+  userId: string;
+  replyToId?: string;
   content: string;
   createdAt: string;
-  updatedAt?: string;
+  updatedAt: string;
 }
 
 class ForumService {
@@ -39,38 +51,44 @@ class ForumService {
   }
 
   async getForums(): Promise<Forum[]> {
-    const res = await apiService.get<ApiResponse<Forum[]>>('/forums');
-    return res.data.data;
+    const res = await apiService.get<Forum[]>('/forums');
+    return res.data;
   }
 
   async getForum(id: string): Promise<Forum> {
-    const res = await apiService.get<ApiResponse<Forum>>(`/forums/${id}`);
-    return res.data.data;
+    const res = await apiService.get<Forum>(`/forums/${id}`);
+    return res.data;
   }
 
-  async createForum(payload: { title: string; description?: string }): Promise<Forum> {
-    const res = await apiService.post<ApiResponse<Forum>>('/forums', payload);
-    return res.data.data;
+  async createForum(payload: { name: string; description?: string }): Promise<Forum> {
+    const res = await apiService.post<Forum>('/forums', payload);
+    return res.data;
   }
 
-  async createTopic(forumId: string, payload: { title: string; authorId: string }): Promise<Topic> {
-    const res = await apiService.post<ApiResponse<Topic>>(`/forums/${forumId}/topics`, payload);
-    return res.data.data;
+  async createTopic(
+    forumId: string,
+    payload: { title: string; content?: string; tags?: string[] },
+  ): Promise<Topic> {
+    const res = await apiService.post<Topic>(`/forums/${forumId}/topics`, payload);
+    return res.data;
   }
 
   async getTopics(forumId: string): Promise<Topic[]> {
-    const res = await apiService.get<ApiResponse<Topic[]>>(`/forums/${forumId}/topics`);
-    return res.data.data;
+    const res = await apiService.get<Topic[]>(`/forums/${forumId}/topics`);
+    return res.data;
   }
 
-  async createPost(topicId: string, payload: { authorId: string; content: string }): Promise<Post> {
-    const res = await apiService.post<ApiResponse<Post>>(`/topics/${topicId}/posts`, payload);
-    return res.data.data;
+  async createPost(
+    forumId: string,
+    payload: { content: string; parentId?: string },
+  ): Promise<Post> {
+    const res = await apiService.post<Post>(`/forums/${forumId}/posts`, payload);
+    return res.data;
   }
 
-  async getPosts(topicId: string, params?: Record<string, unknown>): Promise<Post[]> {
-    const res = await apiService.get<ApiResponse<Post[]>>(`/topics/${topicId}/posts`, { params });
-    return res.data.data;
+  async getPosts(forumId: string, params?: Record<string, unknown>): Promise<Post[]> {
+    const res = await apiService.get<Post[]>(`/forums/${forumId}/posts`, { params });
+    return res.data;
   }
 }
 

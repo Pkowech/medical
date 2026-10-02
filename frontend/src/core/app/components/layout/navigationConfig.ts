@@ -95,6 +95,12 @@ const navigationConfig: NavigationItem[] = [
         icon: MessageSquare,
       },
       {
+        id: 'messages',
+        label: 'Messages',
+        href: '/chat',
+        icon: MessageSquare,
+      },
+      {
         id: 'study-groups',
         label: 'Study Groups',
         href: '/study-groups',

@@ -112,6 +112,7 @@ export class MasteryGateService {
             unitId: topic.unitId,
             courseId: topic.unit.courseId,
             status: ProgressStatus.inProgress,
+            lastUpdated: BigInt(Date.now()),
           },
         });
       } else if (progress.unitId !== topic.unitId || progress.courseId !== topic.unit.courseId) {
@@ -171,15 +172,13 @@ export class MasteryGateService {
 
         // Architecture Decision: Prescriptive analytics has authority.
         // Even if quiz is passed, if p_known < threshold, we can block unlocking of NEXT topic.
-        let nextTopicUnlocked = false;
-        let nextTopicId: string | undefined;
         let message = `Congratulations! You've mastered this topic with a score of ${score}%.`;
 
         // A passing mastery quiz unlocks the next topic. Prescriptive analytics
         // can recommend additional review, but must not leave the next topic locked.
         const nextTopicResult = await this.unlockNextTopic(userId, topicId);
-        nextTopicUnlocked = nextTopicResult.unlocked;
-        nextTopicId = nextTopicResult.nextTopicId;
+        const nextTopicUnlocked = nextTopicResult.unlocked;
+        const nextTopicId = nextTopicResult.nextTopicId;
 
         if (!gateDecision.canProceed) {
           message = `You passed the quiz, but your predicted knowledge state (${(gateDecision.pKnown * 100).toFixed(1)}%) is below the mastery threshold. Reviewing additional materials is recommended before proceeding.`;
@@ -333,6 +332,7 @@ export class MasteryGateService {
             unitId: currentTopic.unitId,
             courseId: currentTopic.unit.courseId,
             status: ProgressStatus.notStarted,
+            lastUpdated: BigInt(Date.now()),
             // masteryUnlocked and failedAttempts removed
           },
         });

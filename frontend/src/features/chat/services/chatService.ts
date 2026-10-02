@@ -1,50 +1,52 @@
 import {
   Conversation,
   Message,
-  ConversationResponse,
-  ConversationsListResponse,
-  MessageResponse,
-  MessagesListResponse,
 } from '@/shared/types/chatInterface';
 import apiClient from './api/client';
+
+export interface ChatUser {
+  id: string;
+  name: string;
+  username: string | null;
+}
 
 class ChatService {
   private readonly baseUrl = '/chat';
 
-  async getConversations(page = 1, limit = 10): Promise<Conversation[]> {
-    const response = await apiClient.get<ConversationsListResponse>(
-      `${this.baseUrl}/conversations?page=${page}&limit=${limit}`
-    );
-    return response.data.data;
+  async getConversations(): Promise<Conversation[]> {
+    const response = await apiClient.get<Conversation[]>(`${this.baseUrl}/conversations`);
+    return response.data;
   }
 
-  async getConversation(id: string): Promise<Conversation> {
-    const response = await apiClient.get<ConversationResponse>(
-      `${this.baseUrl}/conversations/${id}`
+  async getMessages(conversationId: string, limit = 50): Promise<Message[]> {
+    const response = await apiClient.get<Message[]>(
+      `${this.baseUrl}/conversations/${conversationId}/messages`,
+      { params: { limit } },
     );
-    return response.data.data;
-  }
-
-  async getMessages(conversationId: string, page = 1, limit = 50): Promise<Message[]> {
-    const response = await apiClient.get<MessagesListResponse>(
-      `${this.baseUrl}/conversations/${conversationId}/messages?page=${page}&limit=${limit}`
-    );
-    return response.data.data;
+    return response.data;
   }
 
   async sendMessage(conversationId: string, content: string): Promise<Message> {
-    const response = await apiClient.post<MessageResponse>(
+    const response = await apiClient.post<Message>(
       `${this.baseUrl}/conversations/${conversationId}/messages`,
       { content }
     );
-    return response.data.data;
+    return response.data;
   }
 
-  async createConversation(participants: string[]): Promise<Conversation> {
-    const response = await apiClient.post<ConversationResponse>(`${this.baseUrl}/conversations`, {
-      participants,
+  async searchUsers(search: string): Promise<ChatUser[]> {
+    const response = await apiClient.get<ChatUser[]>(`${this.baseUrl}/users`, {
+      params: { search },
     });
-    return response.data.data;
+    return response.data;
+  }
+
+  async createConversation(targetUserId: string): Promise<Conversation> {
+    const response = await apiClient.post<Conversation>(
+      `${this.baseUrl}/conversations`,
+      { targetUserId },
+    );
+    return response.data;
   }
 
   async markMessagesAsRead(conversationId: string): Promise<void> {
