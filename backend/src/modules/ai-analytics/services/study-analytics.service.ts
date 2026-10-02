@@ -91,7 +91,7 @@ export class StudyAnalyticsService implements OnModuleInit {
 
             const mapped: StudyPatternsResponseDto = {
               userId,
-              patterns: (grpcResp.progressTrends ?? []).map((trend) =>
+              patterns: (grpcResp.progressTrends ?? []).map((trend: { type: string }) =>
                 trend.type.toUpperCase(),
               ),
               consistency: grpcResp.userLearningSummary?.averageSessionLength ?? 0,
@@ -111,7 +111,7 @@ export class StudyAnalyticsService implements OnModuleInit {
               performanceByTopic:
                 Object.fromEntries(
                   (grpcResp.performanceMetrics?.weaknessAreas ?? []).map(
-                    (topic) => [topic, 0],
+                    (topic: string) => [topic, 0],
                   ),
                 ),
             };

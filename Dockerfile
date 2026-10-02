@@ -16,6 +16,7 @@ FROM deps AS build
 COPY protos ./protos
 COPY backend ./
 
+RUN pnpm run generate:proto
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
     rm -rf node_modules && pnpm install --frozen-lockfile --ignore-scripts=false --shamefully-hoist
 

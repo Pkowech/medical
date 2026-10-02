@@ -372,14 +372,19 @@ export class LearningAnalyticsService implements OnModuleInit {
             longestStreak: goalAnalytics?.longestStreak ?? 0,
           },
           streakGoalIds: goalAnalytics?.streakGoalIds ?? [],
-          upcomingDeadlines: (goalAnalytics?.upcomingDeadlines ?? []).map(
-            (deadline) => ({
-              goalId: deadline.goalId,
-              title: deadline.title,
-              targetDate: deadline.targetDate,
-              daysRemaining: deadline.daysRemaining,
-            }),
-          ),
+          upcomingDeadlines: (
+            goalAnalytics?.upcomingDeadlines ?? []
+          ).map((deadline: {
+            goalId: string;
+            title: string;
+            targetDate: string;
+            daysRemaining: number;
+          }) => ({
+            goalId: deadline.goalId,
+            title: deadline.title,
+            targetDate: deadline.targetDate,
+            daysRemaining: deadline.daysRemaining,
+          })),
         },
         courseStats: {
           totalCourses: courseStats?.totalCourses ?? 0,
@@ -412,7 +417,11 @@ export class LearningAnalyticsService implements OnModuleInit {
           strengthAreas: performanceMetrics?.strengthAreas ?? [],
           improvementRate: performanceMetrics?.improvementRate ?? 0,
         },
-        progressTrends: (response.progressTrends ?? []).map((trend) => ({
+        progressTrends: (response.progressTrends ?? []).map((trend: {
+          date?: string;
+          value: any;
+          type: any;
+        }) => ({
           date: trend.date ? new Date(trend.date) : undefined,
           value: trend.value,
           type: trend.type,
