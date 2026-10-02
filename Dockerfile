@@ -5,7 +5,9 @@ ARG PNPM_VERSION=11.17.0
 
 FROM node:${NODE_VERSION}-alpine AS base
 WORKDIR /usr/src/app
-RUN npm install -g pnpm@${PNPM_VERSION} --no-fund --no-audit && npm cache clean --force
+RUN apk add --no-cache protobuf protobuf-dev && \
+    npm install -g pnpm@${PNPM_VERSION} --no-fund --no-audit && \
+    npm cache clean --force
 
 FROM base AS deps
 COPY backend/package.json backend/pnpm-lock.yaml backend/pnpm-workspace.yaml ./
@@ -39,7 +41,8 @@ RUN mkdir -p node_modules/.prisma/client node_modules/@prisma/client && \
     find node_modules/.pnpm -path "*/@prisma/client/*" -type f \
       -exec cp {} node_modules/@prisma/client/ \; 2>/dev/null || true
 
-RUN pnpm run build && find dist -name "*.js.map" -delete 2>/dev/null || true
+RUN NODE_OPTIONS=--max-old-space-size=4096 pnpm run build && \
+    find dist -name "*.js.map" -delete 2>/dev/null || true
 
 RUN rm -rf node_modules/@types node_modules/typescript node_modules/eslint* node_modules/.bin 2>/dev/null || true && \
     find node_modules/sharp -type d \( -name build -o -name docs -o -name test -o -name src -o -name .github \) -exec rm -rf {} + 2>/dev/null || true

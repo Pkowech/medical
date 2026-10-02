@@ -8,7 +8,7 @@ ARG PNPM_VERSION=11.17.0
 ################################################################
 FROM node:${NODE_VERSION}-alpine AS base
 WORKDIR /usr/src/app
-RUN apk add --no-cache protobuf && \
+RUN apk add --no-cache protobuf protobuf-dev && \
     npm install -g pnpm@${PNPM_VERSION} --no-fund --no-audit && \
     npm cache clean --force
 
@@ -77,7 +77,7 @@ RUN mkdir -p node_modules/.prisma/client node_modules/@prisma/client && \
     echo "Prisma engine & client files:" && ls node_modules/.prisma/client/ 2>/dev/null || true
 
 # Compile TypeScript — must succeed before esbuild
-RUN pnpm run build
+RUN NODE_OPTIONS=--max-old-space-size=4096 pnpm run build
 # Strip source maps (reduces bundle input size, || true is safe here)
 RUN find dist -name "*.js.map" -delete 2>/dev/null || true
 
@@ -258,7 +258,7 @@ COPY --chown=nestjs:nodejs --from=build /usr/src/app/prisma/schema.prisma ./pris
 COPY --chown=nestjs:nodejs --from=build /usr/src/app/package.json ./
 
 # ── Proto files — the gRPC module resolves these at runtime, not bundle-time ──
-COPY --chown=nestjs:nodejs --from=build /usr/src/app/protos /usr/src/protos
+COPY --chown=nestjs:nodejs --from=build /usr/src/protos /usr/src/protos
 
 USER nestjs
 
