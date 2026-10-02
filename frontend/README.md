@@ -95,3 +95,28 @@ to source files.
 - [Project Documentation](../docs/)
 - [API Documentation](../docs/api/)
 - [Contributing Guide](../docs/CONTRIBUTING.md)
+## Progressive Web App and offline behavior
+
+The production service worker caches versioned Next.js static assets and selected
+same-origin public image, icon, and font files. API routes, including `/api/auth`
+and `/api/backend`, are network-only so authenticated responses and mutations are
+not persisted in Cache Storage. On activation, the worker removes legacy runtime
+caches that may have stored API responses. If a navigation cannot be loaded while offline,
+the service worker serves `public/offline.html`.
+
+Supported quiz submissions and progress updates are stored in the
+`medical-education-db` IndexedDB `syncQueue` store and sent through the
+same-origin `/api/backend` proxy when connectivity returns. Temporary failures
+use bounded retries; failed records remain available for manual retry from the
+connectivity indicator. Existing progress records in
+`medtrackhub-offline-progress` are copied to the unified queue during app
+startup, then removed from the legacy queue only after the copy succeeds.
+
+This does not currently guarantee that course pages, PDFs, or all learning
+materials can be opened offline. Users should open/download required materials
+while connected until explicit course-download support is implemented.
+
+The service worker is registered by the root application component. When a new
+worker is waiting, the app shows an update prompt; accepting it activates the
+new worker and reloads the page. Browser Background Sync is used when available,
+with foreground online/visibility sync as the fallback.

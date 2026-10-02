@@ -88,9 +88,9 @@ export function SEO({
 
       {/* Icons */}
       <link rel="icon" href="/favicon.svg" />
-      <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+      <link rel="apple-touch-icon" href="/android-chrome-192x192.png" />
       <link rel="shortcut icon" href="/favicon-32x32.png" />
-      <link rel="manifest" href="/site.webmanifest" />
+      <link rel="manifest" href="/manifest.json" />
 
       {/* Theme */}
       <meta name="viewport" content="width=device-width, initial-scale=1" />

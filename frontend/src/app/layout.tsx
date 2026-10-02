@@ -6,6 +6,7 @@ import { Providers } from './providers';
 import { Toaster } from 'react-hot-toast';
 import LayoutContent from '@/core/app/components/layout/LayoutContent';
 import { ConnectivityIndicator } from '@/components/ui/ConnectivityIndicator';
+import { ServiceWorkerRegister } from './ServiceWorkerRegister';
 
 interface RootLayoutProps {
   children: ReactNode;
@@ -16,8 +17,8 @@ export const metadata: Metadata = {
   manifest: '/manifest.json',
   description: 'Comprehensive medical learning and tracking platform',
   icons: {
-    icon: '/favicon.ico',
-    apple: '/apple-touch-icon.png',
+    icon: '/favicon.svg',
+    apple: '/android-chrome-192x192.png',
   },
 };
 
@@ -31,6 +32,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
       <body suppressHydrationWarning>
         <Providers>
           <Toaster position="top-right" />
+          <ServiceWorkerRegister />
           <ConnectivityIndicator />
           <LayoutContent>{children}</LayoutContent>
         </Providers>

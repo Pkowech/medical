@@ -45,15 +45,6 @@ export default function QuizPage({ params }: QuizPageProps) {
     completeQuiz,
   } = useQuiz(unitId, session?.user?.id || '');
 
-  React.useEffect(() => {
-    // Register service worker
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').catch(error => {
-        console.warn('Service worker registration failed:', error instanceof Error ? error.message : error);
-      });
-    }
-  }, []);
-
   if (!unitId || isLoading) {
     return (
       <div className="container mx-auto p-6">

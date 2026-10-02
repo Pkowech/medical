@@ -36,6 +36,8 @@ export interface SyncQueueItem {
   attempts: number;
   status: 'pending' | 'failed';
   lastError?: string;
+  nextAttemptAt?: number;
+  userId?: string;
 }
 
 interface MedicalEducationDB extends DBSchema {
@@ -54,21 +56,44 @@ interface MedicalEducationDB extends DBSchema {
     value: SyncQueueItem;
     indexes: { 'by-timestamp': number };
   };
+  syncLocks: {
+    key: string;
+    value: {
+      name: string;
+      owner: string;
+      expiresAt: number;
+    };
+  };
 }
 
 const DB_NAME = 'medical-education-db';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
+let databasePromise: Promise<IDBPDatabase<MedicalEducationDB>> | undefined;
 
-export async function initDB(): Promise<IDBPDatabase<MedicalEducationDB>> {
-  return openDB<MedicalEducationDB>(DB_NAME, DB_VERSION, {
+export function initDB(): Promise<IDBPDatabase<MedicalEducationDB>> {
+  databasePromise ??= openDB<MedicalEducationDB>(DB_NAME, DB_VERSION, {
     upgrade(db, _oldVersion, _newVersion, transaction) {
       // Quiz Questions store
-      const quizStore = db.createObjectStore('quizQuestions', { keyPath: 'id' });
-      quizStore.createIndex('by-topic', 'topic');
+      if (!db.objectStoreNames.contains('quizQuestions')) {
+        const quizStore = db.createObjectStore('quizQuestions', { keyPath: 'id' });
+        quizStore.createIndex('by-topic', 'topic');
+      } else {
+        const quizStore = transaction?.objectStore('quizQuestions');
+        if (quizStore && !quizStore.indexNames.contains('by-topic')) {
+          quizStore.createIndex('by-topic', 'topic');
+        }
+      }
 
       // Reading Materials store
-      const readingStore = db.createObjectStore('readingMaterials', { keyPath: 'id' });
-      readingStore.createIndex('by-topic', 'metadata.topic');
+      if (!db.objectStoreNames.contains('readingMaterials')) {
+        const readingStore = db.createObjectStore('readingMaterials', { keyPath: 'id' });
+        readingStore.createIndex('by-topic', 'metadata.topic');
+      } else {
+        const readingStore = transaction?.objectStore('readingMaterials');
+        if (readingStore && !readingStore.indexNames.contains('by-topic')) {
+          readingStore.createIndex('by-topic', 'metadata.topic');
+        }
+      }
 
       // Sync Queue store
       if (!db.objectStoreNames.contains('syncQueue')) {
@@ -80,6 +105,22 @@ export async function initDB(): Promise<IDBPDatabase<MedicalEducationDB>> {
           syncStore.createIndex('by-timestamp', 'timestamp');
         }
       }
+
+      if (!db.objectStoreNames.contains('syncLocks')) {
+        db.createObjectStore('syncLocks', { keyPath: 'name' });
+      }
     },
+    blocked() {
+      console.warn('[OfflineDB] Upgrade is waiting for another tab to close its database connection.');
+    },
+    blocking() {
+      databasePromise?.then(db => db.close());
+      databasePromise = undefined;
+    },
+  }).catch(error => {
+    databasePromise = undefined;
+    throw error;
   });
+
+  return databasePromise;
 }

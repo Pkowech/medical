@@ -30,56 +30,30 @@ const BACKEND_URL = configuredBackendUrl.replace(/\/v1\/?$/, '');
  * Organizes cache strategies by endpoint category and HTTP method
  */
 const getPWACacheStrategies = () => [
-  // STRATEGY 1: StaleWhileRevalidate for static content (GET requests)
   {
-    urlPattern: /^https?.*\/api\/(dashboard|content|courses|materials|learning-paths|analytics|progress).*$/i,
-    method: 'GET',
-    handler: 'StaleWhileRevalidate',
+    // API responses can contain private user data; never persist them in Cache Storage.
+    urlPattern: /^https?:\/\/[^/]+\/api(?:\/|$)/i,
+    handler: 'NetworkOnly',
+  },
+  {
+    urlPattern: /^https?:\/\/[^/]+\/_next\/static\//i,
+    handler: 'CacheFirst',
     options: {
-      cacheName: 'api-data-cache',
+      cacheName: 'medtrack-static-v1',
+      expiration: {
+        maxEntries: 300,
+        maxAgeSeconds: 30 * 24 * 60 * 60,
+      },
+    },
+  },
+  {
+    urlPattern: /^https?:\/\/[^/]+\/(?:images|icons|fonts)\/.*\.(?:avif|gif|ico|jpe?g|png|svg|webp|woff2?)$/i,
+    handler: 'CacheFirst',
+    options: {
+      cacheName: 'medtrack-public-assets-v1',
       expiration: {
         maxEntries: 150,
-        maxAgeSeconds: 6 * 60 * 60, // 6 hours
-      },
-    },
-  },
-  // STRATEGY 2: NetworkFirst for sync endpoints (POST requests)
-  {
-    urlPattern: /^https?.*\/api\/(quiz|progress|sync|submit|statements).*$/i,
-    method: 'POST',
-    handler: 'NetworkFirst',
-    options: {
-      cacheName: 'sync-requests-cache',
-      networkTimeoutSeconds: 3,
-      expiration: {
-        maxEntries: 50,
-        maxAgeSeconds: 60 * 60, // 1 hour
-      },
-    },
-  },
-  // STRATEGY 3: NetworkFirst for auth and user data
-  {
-    urlPattern: /^https?.*\/api\/(auth|user|profile|notifications).*$/i,
-    handler: 'NetworkFirst',
-    options: {
-      cacheName: 'user-data-cache',
-      networkTimeoutSeconds: 2,
-      expiration: {
-        maxEntries: 50,
-        maxAgeSeconds: 60 * 60, // 1 hour
-      },
-    },
-  },
-  // STRATEGY 4: Fallback NetworkFirst for other routes
-  {
-    urlPattern: /^https?.*/,
-    handler: 'NetworkFirst',
-    options: {
-      cacheName: 'offline-cache',
-      networkTimeoutSeconds: 3,
-      expiration: {
-        maxEntries: 200,
-        maxAgeSeconds: 24 * 60 * 60, // 24 hours
+        maxAgeSeconds: 30 * 24 * 60 * 60,
       },
     },
   },
@@ -97,9 +71,15 @@ const initializePWA = () => {
   try {
     return require('next-pwa')({
       dest: 'public',
-      register: true,
-      skipWaiting: true,
+      register: false,
+      skipWaiting: false,
+      clientsClaim: true,
+      cacheOnFrontEndNav: false,
       disable: false,
+      customWorkerDir: 'worker',
+      fallbacks: {
+        document: '/offline.html',
+      },
       runtimeCaching: getPWACacheStrategies(),
     });
   } catch (error) {
