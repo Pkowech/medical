@@ -244,7 +244,7 @@ export default function ProfilePage() {
             <p className="text-sm text-gray-500 dark:text-slate-400 mb-6">
               Manage your account settings, notifications, and privacy preferences.
             </p>
-            <Button variant="outline" className="w-full" onClick={() => router.push('/profile/settings')}>Go to Settings</Button>
+            <Button variant="outline" className="w-full" onClick={() => router.push('/settings')}>Go to Settings</Button>
           </CardContent>
         </Card>
 
