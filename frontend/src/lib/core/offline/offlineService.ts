@@ -51,6 +51,11 @@ class OfflineService {
     const syncItem: SyncQueueItem = {
       ...item,
       id: crypto.randomUUID(),
+      url: item.type === 'quiz_submission' ? '/api/backend/quizzes/submit?type=full' : '/api/backend/progress/log',
+      method: 'POST',
+      body: item.data,
+      createdAt: item.timestamp,
+      status: 'pending',
       attempts: 0,
     };
     await tx.store.add(syncItem);

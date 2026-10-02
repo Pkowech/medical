@@ -24,10 +24,18 @@ export interface ReadingMaterial {
 
 export interface SyncQueueItem {
   id: string;
-  type: 'quiz_submission' | 'progress_log';
-  data: unknown;
+  type?: 'quiz_submission' | 'progress_log';
+  data?: unknown;
+  url: string;
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+  headers?: Record<string, string>;
+  body?: unknown;
   timestamp: number;
+  createdAt: number;
+  lastUpdated?: number;
   attempts: number;
+  status: 'pending' | 'failed';
+  lastError?: string;
 }
 
 interface MedicalEducationDB extends DBSchema {
@@ -49,11 +57,11 @@ interface MedicalEducationDB extends DBSchema {
 }
 
 const DB_NAME = 'medical-education-db';
-const DB_VERSION = 1;
+const DB_VERSION = 3;
 
 export async function initDB(): Promise<IDBPDatabase<MedicalEducationDB>> {
   return openDB<MedicalEducationDB>(DB_NAME, DB_VERSION, {
-    upgrade(db) {
+    upgrade(db, _oldVersion, _newVersion, transaction) {
       // Quiz Questions store
       const quizStore = db.createObjectStore('quizQuestions', { keyPath: 'id' });
       quizStore.createIndex('by-topic', 'topic');
@@ -63,8 +71,15 @@ export async function initDB(): Promise<IDBPDatabase<MedicalEducationDB>> {
       readingStore.createIndex('by-topic', 'metadata.topic');
 
       // Sync Queue store
-      const syncStore = db.createObjectStore('syncQueue', { keyPath: 'id' });
-      syncStore.createIndex('by-timestamp', 'timestamp');
+      if (!db.objectStoreNames.contains('syncQueue')) {
+        const syncStore = db.createObjectStore('syncQueue', { keyPath: 'id' });
+        syncStore.createIndex('by-timestamp', 'timestamp');
+      } else {
+        const syncStore = transaction?.objectStore('syncQueue');
+        if (syncStore && !syncStore.indexNames.contains('by-timestamp')) {
+          syncStore.createIndex('by-timestamp', 'timestamp');
+        }
+      }
     },
   });
 }

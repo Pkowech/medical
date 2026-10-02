@@ -1,44 +1,30 @@
-import { openDB, IDBPDatabase } from 'idb';
 import { useAuthStore } from '@/features/auth/store/useAuthStore';
 import { getSession } from 'next-auth/react';
+import { initDB, SyncQueueItem } from './db';
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
-interface OutboxItem {
-  id?: number; // IndexedDB will auto-increment this
-  url: string;
-  method: HttpMethod;
-  headers?: Record<string, string>;
-  body?: unknown;
-  createdAt: number;
-  lastUpdated?: number; // Timestamp for conflict resolution (client-side)
-  attempts: number;
-  status?: 'pending' | 'failed' | 'synced'; // Track state of each item
-  lastError?: string; // Store last error message
-}
-
-const DB_NAME = 'medical-education-db';
-const DB_VERSION = 2; // Bumped version for schema migration
-const SYNC_STORE_NAME = 'syncQueue';
-
-const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || '';
-const API_BASE_URL = `${BACKEND_URL}/v1`;
+const SYNC_STORE_NAME = 'syncQueue' as const;
+const MAX_SYNC_ATTEMPTS = 3;
 
 class SyncService {
-  private db: IDBPDatabase | null = null;
   private isFlushing = false; // Concurrency lock to prevent parallel flushes
 
-  private async getDb(): Promise<IDBPDatabase> {
-    if (!this.db) {
-      this.db = await openDB(DB_NAME, DB_VERSION, {
-        upgrade(db) {
-          if (!db.objectStoreNames.contains(SYNC_STORE_NAME)) {
-            db.createObjectStore(SYNC_STORE_NAME, { keyPath: 'id', autoIncrement: true });
-          }
-        },
-      });
+  private async getDb() {
+    return initDB();
+  }
+
+  private normalizeUrl(url: string): string {
+    if (url.startsWith('/api/backend/')) return url;
+
+    try {
+      const parsed = new URL(url, window.location.origin);
+      const path = parsed.pathname.replace(/^\/v1(?=\/|$)/, '');
+      return `/api/backend${path || '/'}`;
+    } catch {
+      const path = url.startsWith('/') ? url : `/${url}`;
+      return `/api/backend${path.replace(/^\/v1(?=\/|$)/, '')}`;
     }
-    return this.db;
   }
 
   async addToOutbox(
@@ -48,22 +34,23 @@ class SyncService {
     headers?: Record<string, string>,
     lastUpdated?: number
   ): Promise<void> {
-    // Ensure URL is relative to API base if it starts with /
-    const fullUrl = url.startsWith('/') ? `${API_BASE_URL}${url}` : url;
-    
+    const now = Date.now();
     const db = await this.getDb();
-    await db.add(SYNC_STORE_NAME, {
-      url: fullUrl,
+    const item: SyncQueueItem = {
+      id: crypto.randomUUID(),
+      url: this.normalizeUrl(url),
       method,
       headers,
       body,
-      createdAt: Date.now(),
-      lastUpdated: lastUpdated || Date.now(), // Store timestamp for conflict resolution
+      createdAt: now,
+      timestamp: now,
+      lastUpdated: lastUpdated || now,
       attempts: 0,
       status: 'pending',
-    });
+    };
+    await db.put(SYNC_STORE_NAME, item);
     // Request a background sync
-    if ('serviceWorker' in navigator && 'SyncManager' in window) {
+    if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator && 'SyncManager' in window) {
       try {
         const registration = await navigator.serviceWorker.ready;
         // `sync` is not present on all TS DOM lib versions; use a safe check and cast.
@@ -93,7 +80,10 @@ class SyncService {
   }> {
     try {
       const db = await this.getDb();
-      const count = await db.count(SYNC_STORE_NAME);
+      const items = await db.getAll(SYNC_STORE_NAME);
+      const count = items.filter(
+        item => item.status !== 'failed',
+      ).length;
       return {
         lastSyncTimestamp: Date.now(), // This should ideally come from actual last sync, but for now, current time
         isOnline: typeof navigator !== 'undefined' ? navigator.onLine : false,
@@ -102,7 +92,6 @@ class SyncService {
       };
     } catch (error) {
       console.warn('Failed to get sync status from IndexedDB. Connection may be closing.', error);
-      this.db = null; // Reset db connection so it reopens next time
       return {
         lastSyncTimestamp: Date.now(),
         isOnline: typeof navigator !== 'undefined' ? navigator.onLine : false,
@@ -136,8 +125,13 @@ class SyncService {
       // 1. Get all pending items
       const items = await db.getAll(SYNC_STORE_NAME);
 
-      // Filter to pending or failed items (retry mechanism)
-      const pendingItems = items.filter(item => item.status !== 'synced');
+      // Only retry active items. Failed records remain available for diagnostics
+      // but must not keep the global pending indicator or retry forever.
+      const pendingItems = items.filter(
+        item =>
+        item.status !== 'failed' &&
+        item.attempts < MAX_SYNC_ATTEMPTS,
+      );
 
       // Optimization: Fetch session once at start of flush
       const session = await getSession();
@@ -145,29 +139,17 @@ class SyncService {
 
       for (const item of pendingItems) {
         try {
-          // --- ARCHITECTURAL MIGRATION FIX: Sanitization ---
-          // 1. Correct redundant path naming (/sync/progress -> /sync)
-          if (item.url.includes('/sync/progress')) {
-            item.url = item.url.replace('/sync/progress', '/sync');
+          if (!item.url) {
+            item.url =
+              item.type === 'quiz_submission'
+                ? '/api/backend/quizzes/submit?type=full'
+                : '/api/backend/progress/log';
+            item.method = 'POST';
+            item.body = item.data;
           }
-          if (item.url.includes('/v1/quiz/')) {
-            item.url = item.url.replace('/v1/quiz/', '/v1/quizzes/');
-          }
-          // 2. Correct environment port mismatches (don't hit frontend port for API)
-          // Replace any frontend URL references with the API backend URL
-          if (item.url.includes('localhost:3000/v1') || item.url.includes('127.0.0.1:3000/v1')) {
-            const apiUrl = BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || '';
-            if (apiUrl) {
-              item.url = item.url.replace(/https?:\/\/(localhost|127\.0\.0\.1):3000\/v1/, `${apiUrl}/v1`);
-            }
-          }
-          // 3. Ensure API_BASE_URL prefix if relative (v1 fallback)
-          if (!item.url.startsWith('http')) {
-             const cleanPath = item.url.startsWith('/') ? item.url : `/${item.url}`;
-             if (API_BASE_URL) {
-               item.url = `${API_BASE_URL}${cleanPath}`;
-             }
-          }
+
+          // Migrate legacy records to the same-origin proxy at send time.
+          item.url = this.normalizeUrl(item.url);
 
           // Prepare headers: STRIP any existing auth headers from previous attempts to ensure clean override
           const cleanHeaders = { ...item.headers };
@@ -203,8 +185,7 @@ class SyncService {
           if (response.ok) {
             // Success: mark as synced and delete
             // Using atomic operations to avoid transaction timeouts
-            await db.put(SYNC_STORE_NAME, { ...item, status: 'synced' });
-            await db.delete(SYNC_STORE_NAME, item.id!);
+            await db.delete(SYNC_STORE_NAME, item.id);
             console.warn(`✅ Synced item ${item.id} to ${item.url}`);
           } else if (response.status === 404 || response.status === 400) {
             // 404/400 are treated as unrecoverable errors for the queue.
@@ -217,18 +198,18 @@ class SyncService {
               status: 'failed',
               lastError: `${response.status} Client Error - Payload or Endpoint invalid`,
             });
-            await db.delete(SYNC_STORE_NAME, item.id!);
           } else {
             // Other errors (5xx, 3xx, etc.): STOP flush and keep item queued
             const errorMsg = `Server error ${response.status}`;
+            const attempts = item.attempts + 1;
             console.error(
               `❌ Failed to sync item ${item.id} (${response.status}). Stopping flush to preserve causal order.`
             );
             await db.put(SYNC_STORE_NAME, {
               ...item,
-              status: 'failed',
+              status: attempts >= MAX_SYNC_ATTEMPTS ? 'failed' : 'pending',
               lastError: errorMsg,
-              attempts: item.attempts + 1,
+              attempts,
             });
             return; // BREAK - stop processing to preserve causal order
           }
@@ -239,11 +220,12 @@ class SyncService {
             `❌ Network error syncing item ${item.id}: ${errorMsg}. Stopping flush to preserve causal order.`
           );
           
+          const attempts = item.attempts + 1;
           await db.put(SYNC_STORE_NAME, {
             ...item,
-            status: 'failed',
+            status: attempts >= MAX_SYNC_ATTEMPTS ? 'failed' : 'pending',
             lastError: errorMsg,
-            attempts: item.attempts + 1,
+            attempts,
           });
           
           return; // BREAK - stop processing on network errors
@@ -269,7 +251,7 @@ class SyncService {
           const session = !storeToken ? await getSession() : null;
           const token = storeToken || session?.user?.accessToken;
 
-          const res = await fetch(`${API_BASE_URL}/progress/sync?userId=${encodeURIComponent(userId)}`, {
+          const res = await fetch(this.normalizeUrl(`/progress/sync?userId=${encodeURIComponent(userId)}`), {
             headers: {
                ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
                'Content-Type': 'application/json',
@@ -309,7 +291,7 @@ class SyncService {
   /**
    * Get pending items with errors for UI debugging
    */
-  async getFailedItems(): Promise<OutboxItem[]> {
+  async getFailedItems(): Promise<SyncQueueItem[]> {
     const db = await this.getDb();
     const allItems = await db.getAll(SYNC_STORE_NAME);
     return allItems.filter(item => item.status === 'failed');
@@ -318,7 +300,7 @@ class SyncService {
   /**
    * Manually retry a failed item
    */
-  async retryFailedItem(id: number): Promise<void> {
+  async retryFailedItem(id: string): Promise<void> {
     const db = await this.getDb();
     const tx = db.transaction(SYNC_STORE_NAME, 'readwrite');
     const store = tx.objectStore(SYNC_STORE_NAME);
