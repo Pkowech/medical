@@ -53,7 +53,7 @@
     "prisma:reset:docker": "docker-compose exec server-dev pnpm prisma migrate reset",
     "docker:down": "docker-compose down",
     "docker:down:volumes": "docker-compose down -v",
-    "generate:proto": "node -e \"require('fs').mkdirSync('src/generated/grpc', { recursive: true })\" && pnpm exec grpc_tools_node_protoc --plugin=protoc-gen-ts_proto=./node_modules/.bin/protoc-gen-ts_proto --ts_proto_out=src/generated/grpc --ts_proto_opt=nestJs=true,outputServices=grpc-js,paths=source_relative -I ../protos ../protos/*.proto",
+    "generate:proto": "node -e \"require('fs').mkdirSync('src/generated/grpc', { recursive: true })\" && protoc --plugin=protoc-gen-ts_proto=./node_modules/.bin/protoc-gen-ts_proto --ts_proto_out=src/generated/grpc --ts_proto_opt=nestJs=true,outputServices=grpc-js,paths=source_relative -I ../protos ../protos/*.proto",
     "convert:extract": "ts-node scripts/convert_extract_to_seed.ts",
     "backend:upload-files": "ts-node scripts/upload_files_to_s3.ts",
     "validate:circular": "madge --circular src/",

@@ -8,7 +8,8 @@ ARG PNPM_VERSION=11.17.0
 ################################################################
 FROM node:${NODE_VERSION}-alpine AS base
 WORKDIR /usr/src/app
-RUN npm install -g pnpm@${PNPM_VERSION} --no-fund --no-audit && \
+RUN apk add --no-cache protobuf && \
+    npm install -g pnpm@${PNPM_VERSION} --no-fund --no-audit && \
     npm cache clean --force
 
 ################################################################
