@@ -21,8 +21,16 @@ export class PrismaService
       Boolean(connectionString?.includes('sslmode=require')) ||
       Boolean(connectionString?.includes('ssl=true'));
 
+    const poolConnectionString = connectionString
+      ? (() => {
+          const url = new URL(connectionString);
+          url.searchParams.delete('sslmode');
+          return url.toString();
+        })()
+      : connectionString;
+
     const poolConfig: ConstructorParameters<typeof Pool>[0] = {
-      connectionString,
+      connectionString: poolConnectionString,
     };
 
     if (shouldUseSsl) {
