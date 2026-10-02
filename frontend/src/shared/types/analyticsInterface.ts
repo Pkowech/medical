@@ -17,7 +17,7 @@ export interface BaseAnalytics {
 // Core user analytics metrics
 export interface UserAnalyticsMetrics {
   quizzesTaken: number;
-  flashcardsReviewed: number;
+  flashcardsReviewed?: number;
   materialsCovered: number;
   studyTime: number; // in minutes
   completedItems: number;
@@ -29,13 +29,13 @@ export interface UserAnalyticsMetrics {
 // Comprehensive user analytics
 export interface UserAnalytics extends BaseAnalytics {
   userId: string;
-  learningVelocity: number; // learning speed metric (0-100)
+  learningVelocity?: number; // learning speed metric (0-100)
   averageScore: number;
   completionRate: number; // percentage as decimal
   timeSpent: number; // in seconds
-  weakAreas: string[]; // topic identifiers
-  strongAreas: string[]; // topic identifiers
-  lastActive: string; // ISO 8601 timestamp
+  weakAreas?: string[]; // topic identifiers
+  strongAreas?: string[]; // topic identifiers
+  lastActive?: string; // ISO 8601 timestamp
   metrics: UserAnalyticsMetrics;
   totalStudyHours?: number;
   coursesCompleted?: number;
@@ -229,11 +229,11 @@ export interface AggregateUserActivity {
 
 export interface SystemAnalytics {
   totalUsers: number;
-  activeUsers: number; // For compatibility
+  activeUsers?: number;
   activeLearners?: number; // Real field from backend
   totalCourses: number;
   completedCourses?: number;
-  totalEnrollments: number;
+  totalEnrollments?: number;
   totalAssessments?: number;
   totalPaths?: number;
   averageCompletionRate?: number;
@@ -245,6 +245,8 @@ export interface SystemAnalytics {
 export interface PerformanceData {
   userId: string;
   overallScore: number;
+  totalAttempts?: number;
+  questionsAttempted?: number;
   categoryBreakdown: {
     category: string;
     score: number;

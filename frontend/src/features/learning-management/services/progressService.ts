@@ -332,35 +332,82 @@ const progressService = {
       // Map progressTrends to performanceTrends
       interface RawTrend { date?: string; type?: string; value?: number | string }
       const rawTrends = ((stats as unknown) as Record<string, unknown>)['progressTrends'] as RawTrend[] | undefined || [];
-      const performanceTrends: { month: string; score: number; hours: number }[] = [];
-      const monthlyData: Record<string, { totalScore: number, scoreCount: number, totalHours: number }> = {};
+      const monthlyData = new Map<string, {
+        month: string;
+        totalScore: number;
+        scoreCount: number;
+        totalHours: number;
+        hoursCount: number;
+      }>();
+
+      const getMonthBucket = (date: Date) => {
+        const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        let bucket = monthlyData.get(key);
+        if (!bucket) {
+          bucket = {
+            month: date.toLocaleString('default', { month: 'short', year: '2-digit' }),
+            totalScore: 0,
+            scoreCount: 0,
+            totalHours: 0,
+            hoursCount: 0,
+          };
+          monthlyData.set(key, bucket);
+        }
+        return bucket;
+      };
       
       rawTrends.forEach((trend) => {
         if (!trend || !trend.date) return;
         const date = new Date(trend.date);
-        const month = date.toLocaleString('default', { month: 'short' });
-        
-        if (!monthlyData[month]) {
-          monthlyData[month] = { totalScore: 0, scoreCount: 0, totalHours: 0 };
-        }
+        if (Number.isNaN(date.getTime())) return;
+        const bucket = getMonthBucket(date);
+        const value = Number(trend.value);
+        if (!Number.isFinite(value)) return;
         
         // Aggregate based on trend type
         const type = String(trend.type || '').toLowerCase();
         if (['score', 'assessment', 'average_score'].includes(type)) {
-          monthlyData[month].totalScore += Number(trend.value || 0);
-          monthlyData[month].scoreCount++;
+          bucket.totalScore += value;
+          bucket.scoreCount++;
         } else if (['hours', 'study_time', 'study_duration'].includes(type)) {
-          monthlyData[month].totalHours += Number(trend.value || 0);
+          bucket.totalHours += value;
+          bucket.hoursCount++;
         }
       });
-      
-      Object.entries(monthlyData).forEach(([month, data]) => {
-        performanceTrends.push({
-          month,
-          score: data.scoreCount > 0 ? Math.round(data.totalScore / data.scoreCount) : 0,
-          hours: Math.round(data.totalHours / 60 * 10) / 10 // Assuming value is in minutes, convert to hours
+
+      if (monthlyData.size === 0) {
+        recentActivities.forEach(activity => {
+          const date = new Date(activity.date);
+          if (!activity.date || Number.isNaN(date.getTime())) return;
+          const bucket = getMonthBucket(date);
+
+          if (typeof activity.score === 'number' && Number.isFinite(activity.score)) {
+            bucket.totalScore += activity.score;
+            bucket.scoreCount++;
+          }
+          if (typeof activity.durationMinutes === 'number' && activity.durationMinutes > 0) {
+            bucket.totalHours += activity.durationMinutes / 60;
+            bucket.hoursCount++;
+          }
         });
-      });
+      }
+
+      const performanceTrends = Array.from(monthlyData.values())
+        .sort((left, right) => left.month.localeCompare(right.month))
+        .map(month => ({
+          month: month.month,
+          score: month.scoreCount > 0 ? Math.round(month.totalScore / month.scoreCount) : 0,
+          hours: Math.round(month.totalHours * 10) / 10,
+          scoreCount: month.scoreCount,
+          hoursCount: month.hoursCount,
+        }));
+
+      const unitProgressValues = enrolledUnitsRaw
+        .map(unit => unit.progressPercentage)
+        .filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
+      const overallProgress = unitProgressValues.length > 0
+        ? Math.round(unitProgressValues.reduce((total, value) => total + value, 0) / unitProgressValues.length)
+        : stats.overallProgress || 0;
 
       // Calculate average mastery from p_known values
       const masteryValues = Object.values(mastery) as number[];
@@ -369,9 +416,9 @@ const progressService = {
         : stats.averageScore || 0;
 
       const result: ProgressData = {
-        overallProgress: stats.overallProgress || 0,
+        overallProgress,
         stats: {
-          overallProgress: stats.overallProgress || 0,
+          overallProgress,
           coursesCompleted: stats.coursesCompleted || 0,
           totalCourses: stats.totalCourses || 0,
           averageScore: Math.round(averageMastery),

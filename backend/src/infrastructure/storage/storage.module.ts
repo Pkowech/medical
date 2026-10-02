@@ -5,6 +5,7 @@ import { StorageService } from './storage.service';
 import { S3StorageAdapter } from './s3-storage.adapter';
 import { LocalStorageService } from './local-storage.service';
 import { CloudinaryStorageAdapter } from './cloudinary-storage.adapter';
+import { GoogleDriveService } from './google-drive.service';
 import { FILE_STORAGE } from './file-storage.interface';
 
 @Module({
@@ -14,6 +15,7 @@ import { FILE_STORAGE } from './file-storage.interface';
     S3StorageAdapter,
     LocalStorageService,
     CloudinaryStorageAdapter,
+    GoogleDriveService,
     {
       provide: FILE_STORAGE,
       useFactory: (
@@ -30,6 +32,6 @@ import { FILE_STORAGE } from './file-storage.interface';
       inject: [ConfigService, S3StorageAdapter, LocalStorageService, CloudinaryStorageAdapter],
     },
   ],
-  exports: [FILE_STORAGE, StorageService],
+  exports: [FILE_STORAGE, StorageService, GoogleDriveService],
 })
 export class StorageModule {}

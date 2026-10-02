@@ -275,8 +275,7 @@ class CourseService {
    * Activates a unit (enrolls student in a study slot).
    */
   async activateUnit(unitId: string, maxConcurrent = 4): Promise<UnitActivationResult> {
-    const response = await apiService.post<unknown>(`/unit-progress/activate`, {
-      unitId,
+    const response = await apiService.post<unknown>(`/units/${unitId}/activate`, {
       maxConcurrent,
     });
     return parseResponse<UnitActivationResult>(response.data);

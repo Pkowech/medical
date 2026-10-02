@@ -88,6 +88,8 @@ export const validationSchema = Joi.object({
   CLOUDINARY_URL: Joi.string().uri().optional(),
   CLOUDINARY_FOLDER: Joi.string().default('medtrack'),
   FILE_STORAGE_PROVIDER: Joi.string().valid('cloudinary', 's3', 'local').default('cloudinary'),
+  GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON: Joi.string().optional(),
+  GOOGLE_DRIVE_SHARED_DRIVE_ID: Joi.string().optional(),
   LOCAL_STORAGE_PATH: Joi.string().default('./uploads'),
   ENABLE_REDIS: Joi.boolean().default(false),
   RUN_INGESTION: Joi.boolean().default(false),

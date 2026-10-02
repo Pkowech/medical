@@ -25,7 +25,6 @@ import { useProgress } from '@/shared/hooks/useProgress';
 import { SearchResultItem } from './SearchResultItem';
 import { usePageHeader } from '@/core/providers/HeaderContext';
 import { UserMenu } from './UserMenu';
-import { useMediaQuery } from '@/shared/hooks/useMediaQuery';
 import { searchHistoryService } from '@/features/search/services/searchHistoryService';
 import { SEARCH_CONFIG } from '@/features/search/config/searchConfig';
 import { matchesKeyboardShortcut, isRetryableError } from '@/features/search/utils/searchUtils';
@@ -49,7 +48,6 @@ export const AppHeader: React.FC<HeaderProps> = ({
 
   const { logout } = useAuth();
   const router = useRouter();
-  const isDesktop = useMediaQuery('(min-width: 1024px)');
   const { progressData, isLoading: progressLoading } = useProgress(); // RQ hook: Handles loading/error internally
   const [streak, setStreak] = useState<number | null>(null);
 
@@ -250,7 +248,7 @@ export const AppHeader: React.FC<HeaderProps> = ({
       <div className="px-3 sm:px-4 md:px-6 lg:px-8 py-3 sm:py-4 transition-all duration-300">
         {' '}
         {/* Adjusted py for better spacing */}
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center justify-between gap-2 sm:gap-4">
           {/* Left side - Welcome/Page Header */}
           <div className="flex items-center gap-3 flex-1 min-w-0">
             {/* Mobile hamburger to open sidebar */}
@@ -264,7 +262,7 @@ export const AppHeader: React.FC<HeaderProps> = ({
             </button>
 
             {header ? (
-              <div className="flex items-center gap-2 sm:gap-3">
+              <div className="flex min-w-0 items-center gap-2 sm:gap-3">
                 {header.icon && <div className="text-xl sm:text-2xl shrink-0">{header.icon}</div>}
                 <div className="min-w-0">
                   <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white truncate">
@@ -309,7 +307,7 @@ export const AppHeader: React.FC<HeaderProps> = ({
           </div>
 
           {/* Center - Search and Filter (Desktop only) */}
-          <div className="hidden sm:flex gap-2 items-center shrink-0">
+          <div className="hidden xl:flex gap-2 items-center shrink-0">
             <div className="relative max-w-xs">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <input
@@ -412,9 +410,9 @@ export const AppHeader: React.FC<HeaderProps> = ({
           </div>
 
           {/* Right controls - Notifications, User Menu and Theme */}
-          <div className="flex items-center space-x-2 shrink-0">
+          <div className="flex items-center space-x-1 sm:space-x-2 shrink-0">
             {/* Notifications */}
-            <div className="relative">
+            <div className="relative hidden sm:block">
               <button
                 ref={notificationsButtonRef}
                 type="button"
@@ -532,9 +530,8 @@ export const AppHeader: React.FC<HeaderProps> = ({
               )}
             </div>
 
-            {/* User Menu - Content rendered conditionally for desktop only */}
-            {isDesktop && (
-              <div className="relative">
+            {/* Account actions remain available on mobile and desktop. */}
+            <div className="relative">
                 <button
                   ref={userMenuButtonRef}
                   type="button"
@@ -552,7 +549,7 @@ export const AppHeader: React.FC<HeaderProps> = ({
                   <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
                     <User className="h-4 w-4 text-white" />
                   </div>
-                  <span className="text-sm font-medium truncate">
+                  <span className="hidden lg:inline text-sm font-medium truncate">
                     {user?.firstName}
                   </span>
                   <ChevronDown className="h-4 w-4 text-gray-500" />
@@ -566,14 +563,13 @@ export const AppHeader: React.FC<HeaderProps> = ({
                   setIsOpen={setHeaderUserMenuOpen}
                   direction="down"
                 />
-              </div>
-            )}
+            </div>
 
             {/* Theme Toggle */}
             <button
               type="button"
               onClick={toggleTheme}
-              className="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              className="hidden sm:inline-flex p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
               aria-label="Toggle theme"
               title="Toggle theme"
             >
@@ -586,7 +582,7 @@ export const AppHeader: React.FC<HeaderProps> = ({
           </div>
         </div>
         {/* Mobile search and filter */}
-        <div className="flex gap-2 mt-3 sm:hidden">
+        <div className="hidden gap-2 mt-3 sm:hidden">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
             <input

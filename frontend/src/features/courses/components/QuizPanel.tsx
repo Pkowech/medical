@@ -18,11 +18,24 @@ interface QuizPanelProps {
   lessonId?: string | number;
   lessonTitle?: string;
   scope?: 'unit' | 'topic';
+  onTopicCompleted?: () => void;
+  onTopicProgressUpdated?: () => void | Promise<void>;
+  onNextTopic?: (topicId: string) => void;
+  onReturn?: () => void;
 }
 
-export const QuizPanel = ({ lessonId, lessonTitle, scope = 'unit' }: QuizPanelProps) => {
+export const QuizPanel = ({
+  lessonId,
+  lessonTitle,
+  scope = 'unit',
+  onTopicCompleted,
+  onTopicProgressUpdated,
+  onNextTopic,
+  onReturn,
+}: QuizPanelProps) => {
   const { trackAction, XAPI_VERBS } = useXapi();
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [submittedAnswers, setSubmittedAnswers] = useState<Record<string, string[]>>({});
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -33,6 +46,13 @@ export const QuizPanel = ({ lessonId, lessonTitle, scope = 'unit' }: QuizPanelPr
   const [submissionError, setSubmissionError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [answerCorrect, setAnswerCorrect] = useState<boolean | null>(null);
+  const [finalResult, setFinalResult] = useState<{
+    score: number;
+    passed: boolean;
+    masteryUnlocked?: boolean;
+    nextTopicUnlocked?: boolean;
+    nextTopicId?: string;
+  } | null>(null);
 
   useEffect(() => {
     const fetchQuestions = async () => {
@@ -71,6 +91,10 @@ export const QuizPanel = ({ lessonId, lessonTitle, scope = 'unit' }: QuizPanelPr
       const result = await quizService.submitAnswer(currentQuestion.id, selectedOption);
       setAnswerCorrect(result.correct);
       setIsSubmitted(true);
+      setSubmittedAnswers(previous => ({
+        ...previous,
+        [currentQuestion.id]: [selectedOption],
+      }));
       if (result.correct) setScore((previous) => previous + 1);
 
       trackAction(XAPI_VERBS.ATTEMPTED, {
@@ -90,31 +114,90 @@ export const QuizPanel = ({ lessonId, lessonTitle, scope = 'unit' }: QuizPanelPr
     }
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex(prev => prev + 1);
       setSelectedOption(null);
       setIsSubmitted(false);
       setAnswerCorrect(null);
       setSubmissionError(null);
-    } else {
+      return;
+    }
+
+    setIsSubmitting(true);
+    setSubmissionError(null);
+    try {
+      let result: {
+        score: number;
+        passed: boolean;
+        masteryUnlocked: boolean;
+        nextTopicUnlocked: boolean;
+        nextTopicId?: string;
+      } = {
+        score: Math.round((score / questions.length) * 100),
+        passed: score / questions.length >= 0.7,
+        masteryUnlocked: false,
+        nextTopicUnlocked: false,
+      };
+
+      if (scope === 'topic' && lessonId) {
+        const topicResult = await quizService.submitTopicQuiz(
+          lessonId,
+          questions.map(question => ({
+            questionId: question.id,
+            selectedAnswers: submittedAnswers[question.id] || [],
+          })),
+        );
+        result = topicResult;
+      } else if (scope === 'unit' && lessonId) {
+        const unitResult = await quizService.submitUnitQuiz(
+          lessonId,
+          questions.map(question => ({
+            questionId: question.id,
+            selectedOption: submittedAnswers[question.id]?.[0] || '',
+          })),
+        );
+        result = {
+          ...result,
+          score: unitResult.percentage,
+          passed: unitResult.isPassed,
+        };
+      }
+
+      setFinalResult(result);
       setQuizComplete(true);
-      // Track quiz completion
+      if (scope === 'topic' && lessonId) {
+        try {
+          if (result.masteryUnlocked) onTopicCompleted?.();
+        } catch (error) {
+          console.warn('Quiz passed, but local progress state could not be refreshed:', error);
+        }
+
+        try {
+          await onTopicProgressUpdated?.();
+        } catch (error) {
+          console.warn('Quiz passed, but topic data could not be refreshed:', error);
+        }
+      }
       trackAction(XAPI_VERBS.COMPLETED, {
         id: `${URLS.BASE}/quizzes/${lessonId || 'general'}`,
-        definition: {
-          name: { 'en-US': `Mastery Quiz: ${lessonTitle || 'Topic'}` },
+          definition: {
+          name: { 'en-US': `${scope === 'topic' ? 'Topic Mastery Quiz' : 'Unit Quiz'}: ${lessonTitle || (scope === 'topic' ? 'Topic' : 'Unit')}` },
           type: 'http://adlnet.gov/expapi/activities/assessment',
         }
       }, {
         score: {
-          scaled: score / questions.length,
-          raw: score,
+          scaled: result.score / 100,
+          raw: result.score,
           min: 0,
-          max: questions.length
+          max: 100,
         },
-        success: (score / questions.length) >= 0.8
+        success: result.passed,
       });
+    } catch (error) {
+      setSubmissionError(error instanceof Error ? error.message : 'Could not save quiz results.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -144,7 +227,8 @@ export const QuizPanel = ({ lessonId, lessonTitle, scope = 'unit' }: QuizPanelPr
   }
 
   if (quizComplete) {
-    const passed = (score / questions.length) >= 0.8;
+    const scorePercentage = finalResult?.score ?? Math.round((score / questions.length) * 100);
+    const passed = finalResult?.passed ?? scorePercentage >= (scope === 'topic' ? 70 : 80);
     return (
       <div className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm rounded-xl p-8 shadow-sm border border-gray-200 dark:border-slate-700/50 text-center animate-in fade-in zoom-in duration-500">
         <div className={`w-20 h-20 mx-auto rounded-full flex items-center justify-center mb-6 ${passed ? 'bg-green-100 dark:bg-green-500/20' : 'bg-red-100 dark:bg-red-500/20'}`}>
@@ -152,24 +236,40 @@ export const QuizPanel = ({ lessonId, lessonTitle, scope = 'unit' }: QuizPanelPr
         </div>
         <h3 className="text-2xl font-bold text-slate-900 dark:text-white">Quiz Complete!</h3>
         <p className="text-slate-500 mt-2 mb-6 text-lg">
-          Your score: <span className="font-bold text-slate-900 dark:text-white">{score}/{questions.length}</span> ({Math.round((score / questions.length) * 100)}%)
+          Your score: <span className="font-bold text-slate-900 dark:text-white">{scorePercentage}%</span>
         </p>
         
         {passed ? (
           <div className="bg-green-50 dark:bg-green-900/20 border border-green-100 dark:border-green-800/30 p-4 rounded-lg mb-8">
-            <p className="text-green-800 dark:text-green-300 font-medium">Congratulations! You've mastered this topic.</p>
+            <p className="text-green-800 dark:text-green-300 font-medium">
+              {scope === 'topic' ? "Congratulations! You've mastered this topic." : 'You passed the unit quiz.'}
+            </p>
           </div>
         ) : (
           <div className="bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800/30 p-4 rounded-lg mb-8">
-            <p className="text-red-800 dark:text-red-300 font-medium">You didn't reach the 80% mastery threshold. We recommend reviewing the materials and trying again.</p>
+            <p className="text-red-800 dark:text-red-300 font-medium">
+              You did not reach the 70% passing score. Review the material and try again.
+            </p>
           </div>
         )}
 
+        {finalResult?.nextTopicUnlocked && (
+          <p className="mb-6 text-sm font-medium text-green-700 dark:text-green-300">
+            The next topic is now unlocked.
+          </p>
+        )}
+
         <button
-          onClick={() => window.location.reload()}
+          onClick={() => {
+            if (finalResult?.nextTopicId && onNextTopic) {
+              onNextTopic(finalResult.nextTopicId);
+            } else {
+              (onReturn ?? (() => window.location.reload()))();
+            }
+          }}
           className="px-8 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20"
         >
-          {passed ? "Continue to Next Lesson" : "Retry Quiz"}
+          {finalResult?.nextTopicId && onNextTopic ? 'Next Topic' : `Return to ${scope === 'topic' ? 'Topic' : 'Unit'}`}
         </button>
       </div>
     );
@@ -180,7 +280,9 @@ export const QuizPanel = ({ lessonId, lessonTitle, scope = 'unit' }: QuizPanelPr
   return (
     <div className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm rounded-xl p-6 shadow-sm border border-gray-200 dark:border-slate-700/50 mt-6 animate-in slide-in-from-bottom-4 duration-500">
       <div className="flex items-center justify-between mb-6">
-        <h3 className="text-lg font-bold text-gray-900 dark:text-white">Mastery Assessment</h3>
+        <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+          {scope === 'topic' ? 'Topic Mastery Quiz' : 'Unit Quiz'}
+        </h3>
         <span className="text-sm font-medium text-slate-500 bg-slate-100 dark:bg-slate-700 px-3 py-1 rounded-full">
           Question {currentQuestionIndex + 1} of {questions.length}
         </span>
@@ -254,9 +356,14 @@ export const QuizPanel = ({ lessonId, lessonTitle, scope = 'unit' }: QuizPanelPr
           ) : (
             <button
               onClick={handleNext}
+              disabled={isSubmitting}
               className="flex-1 bg-slate-900 dark:bg-blue-600 text-white font-bold py-4 rounded-xl hover:opacity-90 transition-all shadow-lg flex items-center justify-center gap-2"
             >
-              {currentQuestionIndex < questions.length - 1 ? "Next Question" : "View Results"}
+              {isSubmitting
+                ? 'Saving results...'
+                : currentQuestionIndex < questions.length - 1
+                  ? 'Next Question'
+                  : 'View Results'}
             </button>
           )}
         </div>

@@ -18,7 +18,7 @@ export class AdminService extends BaseAnalyticsService {
 
   async getSystemMetrics() {
     try {
-      const cacheKey = this.generateCacheKey('system-metrics');
+      const cacheKey = this.generateCacheKey('system-metrics:v2');
 
       try {
         const cached = await this.getCachedAnalytics(cacheKey);
@@ -36,12 +36,13 @@ export class AdminService extends BaseAnalyticsService {
         this.prisma.user.count(),
         this.prisma.quiz.count(),
         this.prisma.quizAttempt.count(),
+        this.prisma.quizAttempt.count({ where: { completedAt: { not: null } } }),
         this.prisma.course.count(),
         this.prisma.unit.count(),
         this.prisma.question.count(),
       ]);
 
-      const [users, quizzes, attempts, courses, units, questions] = metrics;
+      const [users, quizzes, attempts, completedAttempts, courses, units, questions] = metrics;
       const systemMetrics = {
         users,
         quizzes,
@@ -49,7 +50,7 @@ export class AdminService extends BaseAnalyticsService {
         courses,
         units,
         questions,
-        quizCompletionRate: attempts > 0 ? attempts / quizzes : 0,
+        quizCompletionRate: attempts > 0 ? (completedAttempts / attempts) * 100 : 0,
       };
 
       // Attempt to cache but don't block on cache errors

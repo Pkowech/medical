@@ -24,7 +24,6 @@ import { LearningAnalyticsService } from '#modules/ai-analytics/services/learnin
 import {
   UserProgressDetails,
   OverallProgress,
-  CourseProgressWithCourse,
   CourseProgress,
   PrismaClientLike,
   UserStats,
@@ -529,6 +528,7 @@ export class ProgressService {
       const [allProgress, units, allMaterials] = await Promise.all([
         this.prisma.progress.findMany({
           where: { userId, courseId },
+          orderBy: { updatedAt: 'desc' },
           include: { topic: true },
         }),
         this.prisma.unit.findMany({
@@ -578,7 +578,13 @@ export class ProgressService {
         };
       });
 
-      const topicProgress = allProgress.filter((p) => p.topicId !== null);
+      const topicProgressById = new Map<string, (typeof allProgress)[number]>();
+      for (const progress of allProgress) {
+        if (progress.topicId && progress.materialId === null && !topicProgressById.has(progress.topicId)) {
+          topicProgressById.set(progress.topicId, progress);
+        }
+      }
+      const topicProgress = Array.from(topicProgressById.values());
 
       const result: UserProgressDetails = {
         id: 'derived',
@@ -791,71 +797,118 @@ export class ProgressService {
 
   async getEnrolledUnitsDashboard(userId: string): Promise<any[]> {
     try {
-      const enrollments = await this.prisma.courseEnrollment.findMany({
-        where: { userId, status: EnrollmentStatus.active },
+      const [enrollments, unitProgressRows] = await Promise.all([
+        this.prisma.courseEnrollment.findMany({
+          where: {
+            userId,
+            status: { in: [EnrollmentStatus.active, EnrollmentStatus.completed] },
+          },
+          select: { courseId: true },
+        }),
+        this.prisma.progress.findMany({
+          where: {
+            userId,
+            unitId: { not: null },
+            topicId: null,
+            materialId: null,
+            status: { in: [ProgressStatus.inProgress, ProgressStatus.completed] },
+          },
+          orderBy: { lastAccessedAt: 'desc' },
+          select: { unitId: true, status: true, progressPercentage: true, lastAccessedAt: true },
+        }),
+      ]);
+
+      const courseIds = enrollments.map(enrollment => enrollment.courseId);
+      const activeUnitIds = unitProgressRows
+        .map(progress => progress.unitId)
+        .filter((id): id is string => Boolean(id));
+      const units = await this.prisma.unit.findMany({
+        where: {
+          OR: [
+            ...(courseIds.length ? [{ courseId: { in: courseIds } }] : []),
+            ...(activeUnitIds.length ? [{ id: { in: activeUnitIds } }] : []),
+          ],
+        },
         include: {
-          course: {
-            select: { id: true, title: true, name: true }
-          }
-        }
+          course: { select: { id: true, title: true, name: true } },
+          topics: {
+            orderBy: { order: 'asc' },
+            select: { id: true, name: true, order: true },
+          },
+        },
       });
 
-      const enrolledUnits = [];
-      for (const e of enrollments) {
-        // get detailed progress for the course
-        const detailedProgress = await this.getUserProgress(userId, e.courseId);
-
-        let activeUnit: any = null;
-        let nextTopic: any = null;
-        let completedTopicsCount = 0;
-        let totalTopicsCount = 0;
-
-        if (detailedProgress && detailedProgress.unitProgress && detailedProgress.unitProgress.length > 0) {
-          // Find the active unit (first inProgress or notStarted, or last completed)
-          activeUnit = detailedProgress.unitProgress.find(u => u.status === ProgressStatus.inProgress);
-          if (!activeUnit) {
-             activeUnit = detailedProgress.unitProgress.find(u => u.status === ProgressStatus.notStarted);
-          }
-          if (!activeUnit) {
-             activeUnit = detailedProgress.unitProgress[detailedProgress.unitProgress.length - 1];
-          }
-
-          if (activeUnit) {
-             // Find next topic
-             const topics = await this.prisma.topic.findMany({
-               where: { unitId: activeUnit.unitId },
-               orderBy: { order: 'asc' },
-               select: { id: true, name: true, order: true }
-             });
-
-             totalTopicsCount = topics.length;
-
-             for (const topic of topics) {
-                const topicProg = detailedProgress.topicProgress.find(p => p.topicId === topic.id);
-                if (topicProg && topicProg.isCompleted) {
-                   completedTopicsCount++;
-                } else if (!nextTopic) {
-                   nextTopic = topic;
-                }
-             }
-          }
+      const unitProgressById = new Map<string, (typeof unitProgressRows)[number]>();
+      for (const progress of unitProgressRows) {
+        if (progress.unitId && !unitProgressById.has(progress.unitId)) {
+          unitProgressById.set(progress.unitId, progress);
         }
-
-        enrolledUnits.push({
-          courseId: e.courseId,
-          courseTitle: (e.course)?.title || (e.course)?.name || 'Untitled Course',
-          unitId: activeUnit?.unitId || `placeholder-${e.courseId}`,
-          unitTitle: activeUnit?.unit?.title || 'Getting Started',
-          progressPercentage: activeUnit?.progressPercentage || 0,
-          status: activeUnit?.status || ProgressStatus.notStarted,
-          nextTopicId: nextTopic?.id,
-          nextTopicName: nextTopic?.name,
-          completedTopics: completedTopicsCount,
-          totalTopics: totalTopicsCount,
-          lastAccessedAt: activeUnit?.lastAccessedAt || e.enrolledAt || new Date()
-        });
       }
-      return enrolledUnits;
+
+      const topics = units.flatMap(unit => unit.topics);
+      const topicProgress = topics.length > 0
+        ? await this.prisma.progress.findMany({
+            where: {
+              userId,
+              topicId: { in: topics.map(topic => topic.id) },
+              materialId: null,
+            },
+            orderBy: { updatedAt: 'desc' },
+            select: { topicId: true, status: true, isCompleted: true, updatedAt: true },
+          })
+        : [];
+
+      const progressByTopicId = new Map<string, (typeof topicProgress)[number]>();
+      for (const progress of topicProgress) {
+        if (progress.topicId && !progressByTopicId.has(progress.topicId)) {
+          progressByTopicId.set(progress.topicId, progress);
+        }
+      }
+
+      return units
+        .map(unit => {
+          const unitProgress = unitProgressById.get(unit.id);
+          const completedTopics = unit.topics.filter(topic => {
+            const topicRecord = progressByTopicId.get(topic.id);
+            return topicRecord?.isCompleted || topicRecord?.status === ProgressStatus.completed;
+          }).length;
+          const totalTopics = unit.topics.length;
+          const hasTopicProgress = unit.topics.some(topic => {
+            const topicRecord = progressByTopicId.get(topic.id);
+            return topicRecord?.isCompleted ||
+              topicRecord?.status === ProgressStatus.inProgress ||
+              topicRecord?.status === ProgressStatus.completed;
+          });
+          const isCompleted = unitProgress?.status === ProgressStatus.completed ||
+            (totalTopics > 0 && completedTopics === totalTopics);
+          if (!unitProgress && !hasTopicProgress) return null;
+
+          const nextTopic = unit.topics.find(topic => {
+            const topicRecord = progressByTopicId.get(topic.id);
+            return !topicRecord?.isCompleted && topicRecord?.status !== ProgressStatus.completed;
+          });
+
+          return {
+            courseId: unit.courseId,
+            courseTitle: unit.course.title || unit.course.name || 'Untitled Course',
+            unitId: unit.id,
+            unitTitle: unit.title || unit.name,
+            unitDescription: unit.description,
+            progressPercentage: isCompleted
+              ? 100
+              : totalTopics > 0
+                ? Math.round((completedTopics / totalTopics) * 100)
+                : unitProgress?.progressPercentage ?? 0,
+            status: isCompleted ? ProgressStatus.completed : ProgressStatus.inProgress,
+            isCompleted,
+            nextTopicId: nextTopic?.id,
+            nextTopicName: nextTopic?.name,
+            completedTopics,
+            totalTopics,
+            lastAccessedAt: unitProgress?.lastAccessedAt ?? null,
+          };
+        })
+        .filter((unit): unit is NonNullable<typeof unit> => unit !== null);
     } catch (error) {
       handleServiceError(error, this.logger, 'getEnrolledUnitsDashboard');
       return [];

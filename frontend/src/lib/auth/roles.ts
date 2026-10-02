@@ -5,6 +5,7 @@ export enum Permission {
 
   // Course Permissions
   VIEW_COURSES = 'VIEW_COURSES',
+  VIEW_ANALYTICS = 'view_analytics',
   ENROLL_COURSES = 'ENROLL_COURSES',
   CREATE_COURSES = 'CREATE_COURSES',
   EDIT_COURSES = 'EDIT_COURSES',
@@ -28,12 +29,14 @@ export const ROLES_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.VIEW_PROFILE,
     Permission.EDIT_PROFILE,
     Permission.VIEW_COURSES,
+    Permission.VIEW_ANALYTICS,
     Permission.ENROLL_COURSES,
   ],
   [Role.moderator]: [
     Permission.VIEW_PROFILE,
     Permission.EDIT_PROFILE,
     Permission.VIEW_COURSES,
+    Permission.VIEW_ANALYTICS,
     Permission.ENROLL_COURSES,
     Permission.EDIT_COURSES, // Can moderate course content
   ],
@@ -41,6 +44,7 @@ export const ROLES_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.VIEW_PROFILE,
     Permission.EDIT_PROFILE,
     Permission.VIEW_COURSES,
+    Permission.VIEW_ANALYTICS,
     Permission.CREATE_COURSES,
     Permission.EDIT_COURSES,
   ],
@@ -48,6 +52,7 @@ export const ROLES_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.VIEW_PROFILE,
     Permission.EDIT_PROFILE,
     Permission.VIEW_COURSES,
+    Permission.VIEW_ANALYTICS,
     Permission.CREATE_COURSES,
     Permission.EDIT_COURSES,
     Permission.DELETE_COURSES,

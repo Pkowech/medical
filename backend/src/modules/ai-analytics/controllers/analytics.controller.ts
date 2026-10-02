@@ -5,7 +5,9 @@ import {
   UseGuards,
   Logger,
   ParseUUIDPipe,
+  ForbiddenException,
 } from '@nestjs/common';
+import { User } from '@prisma/client';
 import {
   ApiTags,
   ApiOperation,
@@ -14,6 +16,11 @@ import {
   ApiParam,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '#modules/auth/guards/jwt-auth.guard';
+import { RoleGuard } from '#common/guards/roles.guard';
+import { Roles } from '#common/decorators/roles.decorator';
+import { CurrentUser } from '#common/decorators/current-user.decorator';
+import { Role } from '#modules/auth/constants/role.constants';
+import { getUserPrimaryRole } from '#common/utils/role.util';
 import { PrismaService } from '#infrastructure/prisma/prisma.service';
 import { getErrorMessage } from '#common/utils/error.utils';
 import { UserAnalyticsService } from '../services/user-analytics.service';
@@ -38,7 +45,11 @@ export class AnalyticsController {
   @ApiOperation({ summary: 'Get user analytics summary' })
   @ApiParam({ name: 'userId', description: 'User UUID' })
   @ApiResponse({ status: 200, description: 'User analytics retrieved successfully' })
-  async getUserAnalytics(@Param('userId', ParseUUIDPipe) userId: string) {
+  async getUserAnalytics(
+    @Param('userId', ParseUUIDPipe) userId: string,
+    @CurrentUser() currentUser: User,
+  ) {
+    this.assertCanReadUserAnalytics(currentUser, userId);
     this.logger.log(`Fetching user analytics for ${userId}`);
 
     try {
@@ -55,15 +66,24 @@ export class AnalyticsController {
         }),
         this.prisma.courseEnrollment.findMany({
           where: { userId },
-          select: { status: true, course: { select: { title: true } } },
+          select: {
+            status: true,
+            progressPercentage: true,
+            course: { select: { title: true } },
+          },
         }),
         this.prisma.quizAttempt.findMany({
-          where: { userId },
-          select: { score: true, completedAt: true },
+          where: { userId, completedAt: { not: null } },
+          select: { percentage: true, completedAt: true },
         }),
         this.prisma.progress.findMany({
           where: { userId },
-          select: { timeSpent: true, isCompleted: true, updatedAt: true },
+          select: {
+            timeSpent: true,
+            isCompleted: true,
+            progressPercentage: true,
+            updatedAt: true,
+          },
         }),
         this.userAnalyticsService.getUserEngagementMetrics(userId).catch(() => null),
       ]);
@@ -87,78 +107,54 @@ export class AnalyticsController {
       const avgScore =
         quizAttempts.length > 0
           ? Math.round(
-              quizAttempts.reduce((acc, q) => acc + (q.score || 0), 0) /
+              quizAttempts.reduce((acc, attempt) => acc + (attempt.percentage || 0), 0) /
                 quizAttempts.length,
             )
-          : 80;
+          : 0;
 
       const completedItems = progressRecords.filter((p) => p.isCompleted).length;
+      const progressByDate = new Map<string, { total: number; count: number }>();
+      for (const record of progressRecords) {
+        const date = record.updatedAt.toISOString().slice(0, 10);
+        const dailyProgress = progressByDate.get(date) ?? { total: 0, count: 0 };
+        dailyProgress.total += record.progressPercentage;
+        dailyProgress.count += 1;
+        progressByDate.set(date, dailyProgress);
+      }
 
       return {
         userId,
-        learningVelocity: 75,
         averageScore: avgScore,
         completionRate,
         timeSpent: totalTimeSpentSeconds,
-        weakAreas: ['Pharmacokinetics', 'Renal Physiology'],
-        strongAreas: ['Cardiovascular System', 'Anatomy'],
-        lastActive: user?.lastLogin
-          ? user.lastLogin.toISOString()
-          : new Date().toISOString(),
+        lastActive: user?.lastLogin?.toISOString(),
         metrics: {
           quizzesTaken: quizAttempts.length,
-          flashcardsReviewed: Math.max(quizAttempts.length * 5, 10),
           materialsCovered: completedItems,
           studyTime: totalStudyMinutes,
           completedItems,
           accuracy: avgScore / 100,
-          streak: streakInfo?.dailyActiveStreak ?? user?.streakDays ?? 1,
-          points: (user?.points ?? 0) + completedItems * 10 + quizAttempts.length * 25,
+          streak: streakInfo?.dailyActiveStreak ?? user?.streakDays ?? 0,
+          points: user?.points ?? 0,
         },
         totalStudyHours,
         coursesCompleted: completedCourses,
         assessmentsTaken: quizAttempts.length,
         currentModules: enrollments.slice(0, 3).map((e) => e.course.title),
-        progressOverTime: [
-          { date: 'Mon', progress: 20 },
-          { date: 'Tue', progress: 35 },
-          { date: 'Wed', progress: 50 },
-          { date: 'Thu', progress: 65 },
-          { date: 'Fri', progress: 80 },
-        ],
+        progressOverTime: [...progressByDate.entries()]
+          .sort(([dateA], [dateB]) => dateA.localeCompare(dateB))
+          .map(([date, dailyProgress]) => ({
+            date,
+            progress: dailyProgress.total / dailyProgress.count,
+          })),
         moduleCompletion: enrollments.map((e) => ({
           moduleName: e.course.title,
-          completion: e.status === 'completed' ? 100 : 45,
+          completion: e.progressPercentage ?? (e.status === 'completed' ? 100 : 0),
         })),
       };
     } catch (error) {
       this.logger.error(`Error in getUserAnalytics: ${getErrorMessage(error)}`);
-      return {
-        userId,
-        learningVelocity: 70,
-        averageScore: 75,
-        completionRate: 0.5,
-        timeSpent: 0,
-        weakAreas: [],
-        strongAreas: [],
-        lastActive: new Date().toISOString(),
-        metrics: {
-          quizzesTaken: 0,
-          flashcardsReviewed: 0,
-          materialsCovered: 0,
-          studyTime: 0,
-          completedItems: 0,
-          accuracy: 0.75,
-          streak: 1,
-          points: 0,
-        },
-        totalStudyHours: 0,
-        coursesCompleted: 0,
-        assessmentsTaken: 0,
-        currentModules: [],
-        progressOverTime: [],
-        moduleCompletion: [],
-      };
+      throw error;
     }
   }
 
@@ -166,7 +162,11 @@ export class AnalyticsController {
   @ApiOperation({ summary: 'Get user study and learning insights' })
   @ApiParam({ name: 'userId', description: 'User UUID' })
   @ApiResponse({ status: 200, description: 'User insights retrieved successfully' })
-  async getUserInsights(@Param('userId', ParseUUIDPipe) userId: string) {
+  async getUserInsights(
+    @Param('userId', ParseUUIDPipe) userId: string,
+    @CurrentUser() currentUser: User,
+  ) {
+    this.assertCanReadUserAnalytics(currentUser, userId);
     this.logger.log(`Fetching user insights for ${userId}`);
 
     try {
@@ -236,6 +236,12 @@ export class AnalyticsController {
     }
   }
 
+  private assertCanReadUserAnalytics(currentUser: User, requestedUserId: string): void {
+    if (currentUser.id !== requestedUserId && getUserPrimaryRole(currentUser) !== Role.admin) {
+      throw new ForbiddenException('You can only access your own analytics');
+    }
+  }
+
   @Get('progress')
   @ApiOperation({ summary: 'Get general progress data' })
   getProgress() {
@@ -249,6 +255,8 @@ export class AnalyticsController {
   }
 
   @Get('metrics')
+  @UseGuards(RoleGuard)
+  @Roles(Role.admin)
   @ApiOperation({ summary: 'Get overall analytics metrics' })
   async getMetrics() {
     const totalUsers = await this.prisma.user.count().catch(() => 0);

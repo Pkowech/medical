@@ -28,13 +28,13 @@ import { toast } from 'sonner';
 
 interface QuizOption {
   id: string;
-  option_text: string;
-  is_correct: boolean;
+  text: string;
+  isCorrect?: boolean;
 }
 
 interface QuizQuestion {
   id: string;
-  question_text: string;
+  text: string;
   type: 'multiple_choice' | 'multiple_select' | 'true_false';
   difficulty: 'easy' | 'medium' | 'hard';
   options: QuizOption[];
@@ -48,7 +48,14 @@ interface TopicQuizProps {
   courseId: string;
   isOpen: boolean;
   onClose: () => void;
-  onComplete?: (score: number) => void;
+  onComplete?: (result: {
+    score: number;
+    passed: boolean;
+    masteryUnlocked: boolean;
+    nextTopicUnlocked: boolean;
+    nextTopicId?: string;
+  }) => void;
+  onNextTopic?: (topicId: string) => void;
 }
 
 export const TopicQuiz: React.FC<TopicQuizProps> = ({
@@ -58,6 +65,7 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
   isOpen,
   onClose,
   onComplete,
+  onNextTopic,
 }) => {
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -67,6 +75,7 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
   const [quizCompleted, setQuizCompleted] = useState(false);
   const [score, setScore] = useState(0);
   const [feedback, setFeedback] = useState<string>('');
+  const [nextTopicId, setNextTopicId] = useState<string | undefined>();
 
   // Load quiz questions
   React.useEffect(() => {
@@ -95,6 +104,7 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
 
   const currentQuestion = questions[currentQuestionIndex];
   const progress = ((currentQuestionIndex + 1) / questions.length) * 100;
+  const hasCurrentAnswer = Boolean(selectedAnswers[currentQuestion?.id]?.length);
 
   const handleAnswerSelect = (optionId: string, isMultiSelect: boolean) => {
     setSelectedAnswers(prev => {
@@ -120,7 +130,14 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
         selectedAnswers: answers,
       }));
 
-      const response = await apiService.post<{ score: number; feedback?: string }>(
+      const response = await apiService.post<{
+        score: number;
+        feedback?: string;
+        passed: boolean;
+        masteryUnlocked: boolean;
+        nextTopicUnlocked: boolean;
+        nextTopicId?: string;
+      }>(
         `/quizzes/topic/${topicId}/submit`,
         { responses }
       );
@@ -128,13 +145,20 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
       const result = response.data;
       setScore(result?.score || 0);
       setFeedback(result?.feedback || '');
+      setNextTopicId(result?.nextTopicId);
       setQuizCompleted(true);
 
       if (onComplete) {
-        onComplete(result?.score || 0);
+        onComplete({
+          score: result.score,
+          passed: result.passed,
+          masteryUnlocked: result.masteryUnlocked,
+          nextTopicUnlocked: result.nextTopicUnlocked,
+          nextTopicId: result.nextTopicId,
+        });
       }
 
-      toast.success(`Quiz completed! Score: ${result?.score || 0}%`);
+      toast.success(`Quiz completed! Score: ${result.score}%`);
     } catch (error) {
       console.error('Error submitting quiz:', error);
       toast.error('Failed to submit quiz');
@@ -213,8 +237,17 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
               <Button variant="outline" onClick={onClose} className="flex-1">
                 Close
               </Button>
-              <Button onClick={() => window.location.reload()} className="flex-1">
-                Retake Quiz
+              <Button
+                onClick={() => {
+                  if (nextTopicId && onNextTopic) {
+                    onNextTopic(nextTopicId);
+                  } else {
+                    window.location.reload();
+                  }
+                }}
+                className="flex-1"
+              >
+                {nextTopicId && onNextTopic ? 'Next Topic' : 'Retake Quiz'}
               </Button>
             </div>
           </div>
@@ -265,7 +298,7 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
           {/* Question */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
-              {currentQuestion.question_text}
+              {currentQuestion.text}
             </h3>
 
             <div className="flex gap-2">
@@ -303,7 +336,7 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
                       )}
                     </div>
                     <span className="text-slate-700 dark:text-slate-300">
-                      {option.option_text}
+                      {option.text}
                     </span>
                   </div>
                 </button>
@@ -322,14 +355,14 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
             </Button>
 
             {currentQuestionIndex < questions.length - 1 ? (
-              <Button onClick={handleNextQuestion} className="flex-1">
+              <Button onClick={handleNextQuestion} disabled={!hasCurrentAnswer} className="flex-1">
                 Next
                 <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
             ) : (
               <Button
                 onClick={handleSubmitQuiz}
-                disabled={isSubmitting}
+                disabled={isSubmitting || !hasCurrentAnswer}
                 className="flex-1"
               >
                 {isSubmitting ? 'Submitting...' : 'Submit Quiz'}

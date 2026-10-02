@@ -12,6 +12,10 @@ export const useCourseProgressStore = create<CourseProgressState>()(
         set(state => ({
           progress: { ...state.progress, [lessonKey]: true },
         })),
+      toggleLessonComplete: lessonKey =>
+        set(state => ({
+          progress: { ...state.progress, [lessonKey]: !state.progress[lessonKey] },
+        })),
       toggleBookmark: lessonKey => {
         const current = get().bookmarks || [];
         const exists = current.includes(lessonKey);

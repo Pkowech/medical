@@ -15,8 +15,8 @@ const CourseProgressList = ({ courses }: { courses?: CourseProgress[] }) => {
     <div>
       <h2 className="text-xl font-bold mb-4">Course Progress</h2>
       <div className="space-y-4">
-        {courses.map((course) => (
-          <Card key={course.id}>
+        {courses.map((course, index) => (
+          <Card key={`${course.id}-${course.unitId ?? index}`}>
             <CardContent className="p-4">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center">

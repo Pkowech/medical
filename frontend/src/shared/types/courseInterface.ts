@@ -5,7 +5,7 @@
 import { BaseEntity } from '@/shared/types/systemInterface';
 import { User } from '@/shared/types/authInterface';
 import { Material } from '@/shared/types/materialInterface';
-import { PerformanceMetric } from '@/shared/types/analyticsInterface';
+import type { ReadinessSignal } from '@/shared/types/mastery.types';
 
 export interface Course extends BaseEntity {
   name: string;
@@ -88,6 +88,7 @@ export interface Topic {
   orderIndex?: number;
   estimatedMinutes?: number;
   isMandatory?: boolean;
+  masteryUnlocked?: boolean;
   status?: 'active' | 'inactive';
   isCompleted?: boolean;
   materials?: Material[];
@@ -123,25 +124,48 @@ export interface CourseModule extends BaseEntity {
   lessons: Lesson[];
 }
 
-export interface Lesson extends BaseEntity {
-  title: string;
+export interface Lesson extends Omit<BaseEntity, 'id'> {
+  id: number | string;
   description: string;
   order: number;
-  isCompleted?: boolean;
+  title: string;
   resources?: Resource[];
   type: 'video' | 'interactive' | 'text' | 'quiz' | 'assignment';
   duration: string;
   content: { video?: string; transcript?: string; interactive?: boolean; text?: string };
+  isCompleted?: boolean;
   masteryUnlocked?: boolean;
   failedAttempts?: number;
+  readinessSignal?: ReadinessSignal;
 }
 
-export interface Resource extends BaseEntity {
+ export interface CourseContentProps {
+  currentLesson: Lesson | undefined;
+  lessonKey: string;
+  offlineMode: boolean;
+  bookmarks: Set<string>;
+  progress: Record<string, boolean>;
+  toggleBookmark: (lessonKey: string) => void;
+  toggleLessonComplete: (lessonKey: string) => void;
+  navigatePrev: () => void;
+  navigateNext: () => void;
+  onOpenMasteryQuiz: () => void;
+  isFirstLesson: boolean;
+  isLastLesson: boolean;
+  materials?: Material[];
+  openMaterial: (id: string) => void;
+  masteryPassingScore?: number;
+}
+
+export interface Resource {
   title: string;
-  type: 'document' | 'video' | 'audio' | 'image' | 'link';
+  type: string;
   url: string;
-  size?: number;
+  size?: string | number;
   description?: string;
+  id: string | number;
+  unitId?: string | number;
+  topicId?: string | number;
 }
 
 // Progress tracking API types (See progressInterface.ts for canonical Progress types)
@@ -237,6 +261,10 @@ export interface CourseData {
       type: 'text' | 'video' | 'interactive';
       duration: string;
       content: { text: string };
+      isCompleted?: boolean;
+      masteryUnlocked?: boolean;
+      nextTopicUnlocked?: boolean;
+      failedAttempts?: number;
     }>;
   }>;
   resources?: Material[];
@@ -254,10 +282,44 @@ export interface CourseProgressState {
   bookmarks: string[]; // persist-friendly
   notes: Record<string, Note[]>;
   markLessonComplete: (lessonKey: string) => void;
+  toggleLessonComplete: (lessonKey: string) => void;
   toggleBookmark: (lessonKey: string) => void;
   saveNote: (lessonKey: string, noteText: string) => void;
 }
 
 export interface EducationalCourseLayoutProps {
   courseId?: string;
+}
+
+
+export interface Chapter {
+  id: string | number;
+  title: string;
+  duration: string;
+  isCompleted?: boolean;
+  progressPercentage?: number;
+  lessons: {
+    id: string | number;
+    title: string;
+    duration: string;
+    isCompleted?: boolean;
+    masteryUnlocked?: boolean;
+    nextTopicUnlocked?: boolean;
+    failedAttempts?: number;
+    readinessSignal?: ReadinessSignal;
+  }[];
+}
+
+
+
+export interface CourseSidebarProps {
+  chapters: Chapter[];
+  resources: Resource[];
+  parentUnitId?: string;
+  currentChapterIndex: number;
+  currentLessonIndex: number;
+  navigateTo: (chapterIndex: number, lessonIndex: number) => void;
+  progress: Record<string, boolean>;
+  toggleCoursePanel: (panel: 'notes' | 'discussion' | 'quiz') => void;
+  openMaterial: (id: string) => void;
 }

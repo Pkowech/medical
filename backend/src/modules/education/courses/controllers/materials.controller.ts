@@ -129,6 +129,22 @@ export class MaterialsController {
     );
   }
 
+  @Post('drive')
+  @ApiOperation({ summary: 'Attach a material from the configured course Shared Drive' })
+  async registerDriveMaterial(
+    @Body() dto: {
+      url: string;
+      title: string;
+      description?: string;
+      courseId: string;
+      unitId: string;
+      topicId?: string;
+    },
+    @GetUser() user: PrismaUser,
+  ) {
+    return this.materialsService.registerGoogleDriveMaterial({ ...dto, userId: user.id });
+  }
+
   @Post('attach')
   @ApiOperation({ summary: 'Attach an existing R2 library material to a new topic/unit/course (zero re-upload)' })
   @ApiBody({
@@ -364,10 +380,11 @@ export class MaterialsController {
   @ApiOperation({ summary: 'Get material preview content' })
   async getPreviewContent(
     @Param('id') id: string,
+    @GetUser() user: PrismaUser,
     @Res({ passthrough: true }) response: Response,
   ) {
     const { content, mimeType, fileName } =
-      await this.materialsService.getMaterialPreviewContent(id);
+      await this.materialsService.getMaterialPreviewContent(id, user.id);
     const safeFileName = fileName.replace(/["\r\n]/g, '_');
 
     response.set({
@@ -394,8 +411,8 @@ export class MaterialsController {
 
   @Get(':id/with-url')
   @ApiOperation({ summary: 'Get material with file URL for frontend' })
-  async getMaterialWithFileUrl(@Param('id') id: string) {
-    return this.materialsService.getMaterialWithFileUrl(id);
+  async getMaterialWithFileUrl(@Param('id') id: string, @GetUser() user: PrismaUser) {
+    return this.materialsService.getMaterialWithFileUrl(id, user.id);
   }
 
 

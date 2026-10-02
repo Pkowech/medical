@@ -18,6 +18,7 @@ import {
   MessageType,
   StudyGroup,
   StudyGroupMember,
+  RoleName,
   GroupDiscussion,
   DiscussionMessage,
   Prisma,
@@ -55,6 +56,7 @@ export class StudyGroupsService {
     }
 
     const metadata: StudyGroupMetadata = {
+      courseId: createStudyGroupDto.courseId,
       tags: createStudyGroupDto.tags || [],
       studyTopics: createStudyGroupDto.studyTopics || [],
       goals: createStudyGroupDto.goals || {},
@@ -62,6 +64,10 @@ export class StudyGroupsService {
       rules: createStudyGroupDto.rules || {},
       memberCount: 1,
     };
+
+    if (createStudyGroupDto.courseId) {
+      await this.assertCanLinkCourse(createStudyGroupDto.courseId, creatorId);
+    }
 
     const studyGroup = await this.prisma.studyGroup.create({
       data: {
@@ -168,11 +174,14 @@ export class StudyGroupsService {
       },
       orderBy: { updatedAt: 'desc' },
     });
+    const filteredStudyGroups = filters.courseId
+      ? studyGroups.filter(group => this.getLinkedCourseId(group.metadata) === filters.courseId)
+      : studyGroups;
 
     try {
       await this.redisService.set(
         cacheKey,
-        JSON.stringify(studyGroups, (_key, value) =>
+        JSON.stringify(filteredStudyGroups, (_key, value) =>
           typeof value === 'bigint' ? value.toString() : value,
         ),
         this.CACHE_TTL,
@@ -181,7 +190,7 @@ export class StudyGroupsService {
       console.warn('Redis set failed:', error);
     }
 
-    return studyGroups;
+    return filteredStudyGroups;
   }
 
   async findOne(id: string, userId?: string): Promise<StudyGroupDetails> {
@@ -277,6 +286,7 @@ export class StudyGroupsService {
     const metadata =
       (studyGroup.metadata as unknown as StudyGroupMetadata) ||
       ({} as Partial<StudyGroupMetadata>);
+
     const currentMemberCount = metadata.memberCount || 0;
 
     if (currentMemberCount >= studyGroup.maxMembers) {
@@ -740,7 +750,14 @@ export class StudyGroupsService {
       (studyGroup.metadata as unknown as StudyGroupMetadata) ||
       ({} as Partial<StudyGroupMetadata>);
 
+    if (updateData.courseId && updateData.courseId !== metadata.courseId) {
+      await this.assertCanLinkCourse(updateData.courseId, requesterId);
+    }
+
     const newMetadata = {
+      courseId: updateData.courseId === undefined
+        ? metadata.courseId ?? null
+        : updateData.courseId || null,
       tags: updateData.tags ?? metadata.tags ?? [],
       studyTopics: updateData.studyTopics ?? metadata.studyTopics ?? [],
       goals: updateData.goals ?? metadata.goals ?? {},
@@ -790,6 +807,34 @@ export class StudyGroupsService {
       where: { studyGroupId: groupId },
       include: { user: true },
     });
+  }
+
+  private getLinkedCourseId(metadata: Prisma.JsonValue | null): string | undefined {
+    if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return undefined;
+    const courseId = (metadata as Record<string, unknown>).courseId;
+    return typeof courseId === 'string' && courseId.length > 0 ? courseId : undefined;
+  }
+
+  private async assertCanLinkCourse(courseId: string, userId: string): Promise<void> {
+    const [course, instructorAssignment, roles] = await Promise.all([
+      this.prisma.course.findUnique({
+        where: { id: courseId },
+        select: { createdById: true },
+      }),
+      this.prisma.courseInstructor.findUnique({
+        where: { courseId_userId: { courseId, userId } },
+        select: { id: true },
+      }),
+      this.prisma.userRole.findMany({
+        where: { userId },
+        select: { role: { select: { name: true } } },
+      }),
+    ]);
+    if (!course) throw new NotFoundException('Course not found');
+    const isAdmin = roles.some(userRole => userRole.role.name === RoleName.admin);
+    if (course.createdById !== userId && !instructorAssignment && !isAdmin) {
+      throw new ForbiddenException('Only the course instructor or an administrator can link a group to this course.');
+    }
   }
 
   private async invalidateCache(pattern: string): Promise<void> {

@@ -1425,7 +1425,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
         where.quizId = assessmentId;
       }
       const attempts = await tx.quizAttempt.findMany({
-        where,
+        where: { ...where, completedAt: { not: null } },
         include: {
           quiz: { include: { questions: { include: { question: true } } } },
         },
@@ -1435,6 +1435,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
       const responses = await tx.userResponse.findMany({
         where: {
           userId,
+          attemptId: { in: attempts.map((attempt) => attempt.id) },
           ...(assessmentId && {
             question: { quizQuestions: { some: { quizId: assessmentId } } },
           }),
@@ -1515,25 +1516,36 @@ export class AssessmentAnalyticsService implements OnModuleInit {
         }
       });
 
+      const questionsAttempted = attempts.reduce(
+        (total, attempt) => total + attempt.totalQuestions,
+        0,
+      ) || responses.length;
+      const correctAnswers = attempts.reduce(
+        (total, attempt) => total + attempt.correctAnswers,
+        0,
+      ) || responses.filter((response) => response.isCorrect).length;
+      const responseTime = responses.reduce(
+        (sum, response) => sum + (response.responseTime || 0),
+        0,
+      );
+      const timeTaken = responseTime || attempts.reduce(
+        (sum, attempt) => sum + (attempt.timeTaken || 0),
+        0,
+      );
+
       return {
         userId,
         quizId: assessmentId || '',
         overallScore,
         averageScore,
         recentScores,
-        questionsAttempted: responses.length,
-        correctAnswers: responses.filter((r) => r.isCorrect).length,
-        timeTaken: responses.reduce((sum, r) => sum + (r.responseTime || 0), 0),
-        timeSpent: Math.round(
-          responses.reduce((sum, r) => sum + (r.responseTime || 0), 0) / 60,
-        ),
+        questionsAttempted,
+        correctAnswers,
+        timeTaken,
+        timeSpent: Math.round(timeTaken / 60),
         timePerQuestion:
-          responses.length > 0
-            ? Math.round(
-                (responses.reduce((sum, r) => sum + (r.responseTime || 0), 0) /
-                  responses.length) *
-                  100,
-              ) / 100
+          questionsAttempted > 0
+            ? Math.round((timeTaken / questionsAttempted) * 100) / 100
             : 0,
         totalAttempts: attempts.length,
         categoryBreakdown, // Now an array of category objects
@@ -1554,10 +1566,10 @@ export class AssessmentAnalyticsService implements OnModuleInit {
     userId: string,
     assessmentId?: string,
   ): Promise<any> {
-    const cacheKey = ANALYTICS_CACHE_CONFIG.ASSESSMENT.PREDICTIONS(
+    const cacheKey = `${ANALYTICS_CACHE_CONFIG.ASSESSMENT.PREDICTIONS(
       userId,
       assessmentId,
-    );
+    )}:v2`;
     const _cachedAnalytics = await this.redisService.get<string>(cacheKey);
     if (typeof _cachedAnalytics === 'string') {
       this.logger.log(`Retrieved cached analytics for user ${userId}`);
@@ -1575,6 +1587,53 @@ export class AssessmentAnalyticsService implements OnModuleInit {
     );
 
     return analytics;
+  }
+
+  async getQuizHistory(userId: string) {
+    const attempts = await this.prisma.quizAttempt.findMany({
+      where: { userId, completedAt: { not: null } },
+      include: {
+        quiz: {
+          select: {
+            title: true,
+            unit: { select: { id: true, title: true, name: true } },
+          },
+        },
+      },
+      orderBy: { completedAt: 'desc' },
+    });
+
+    const scores = attempts.map(attempt => attempt.percentage ?? attempt.score);
+    const totalTimeSpentSeconds = attempts.reduce(
+      (total, attempt) => total + (attempt.timeTaken ?? 0),
+      0,
+    );
+
+    return {
+      attempts: attempts.map(attempt => ({
+        id: attempt.id,
+        quizId: attempt.quizId,
+        quizTitle: attempt.quiz.title,
+        score: attempt.percentage ?? attempt.score,
+        totalQuestions: attempt.totalQuestions,
+        correctAnswers: attempt.correctAnswers,
+        timeSpent: Math.round((attempt.timeTaken ?? 0) / 60),
+        completedAt: attempt.completedAt,
+        unitId: attempt.quiz.unit?.id ?? '',
+        unitTitle: attempt.quiz.unit?.title ?? attempt.quiz.unit?.name ?? '',
+      })),
+      stats: {
+        totalAttempts: attempts.length,
+        averageScore:
+          scores.length > 0
+            ? scores.reduce((total, score) => total + score, 0) / scores.length
+            : 0,
+        bestScore: scores.length > 0 ? Math.max(...scores) : 0,
+        totalTimeSpent: Math.round(totalTimeSpentSeconds / 60),
+        recentImprovement:
+          scores.length > 1 ? scores[0] - scores[1] : 0,
+      },
+    };
   }
 
   // ==================== CONSOLIDATED LEARNING ANALYTICS METHODS ====================

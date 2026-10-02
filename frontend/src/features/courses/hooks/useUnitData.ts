@@ -1,7 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiService } from '@/features/auth/services/apiClient';
+import { courseService } from '@/features/courses/services/courseService';
 import type { CourseData, Topic } from '@/shared/types/courseInterface';
 import type { Material } from '@/shared/types/materialInterface';
+import type { TopicProgress } from '@/shared/types/progressInterface';
 
 interface TopicWithMaterials extends Topic {
   materials?: Material[];
@@ -41,11 +43,23 @@ interface UnitResponse {
  * The unit-level and topic-level materials are both surfaced via `resources` so
  * the content area can display PDFs / videos / notes inline.
  */
-const normalizeUnitToChapters = (unit: UnitResponse): CourseData => {
+const normalizeUnitToChapters = (
+  unit: UnitResponse,
+  topicProgress: TopicProgress[] = [],
+): CourseData => {
   const topics = (unit.topics || []) as TopicWithMaterials[];
+  const progressByTopicId = new Map(topicProgress.map(progress => [String(progress.topicId), progress]));
 
   // ── Build one chapter per topic ─────────────────────────────────────────
   const chapters = topics.map(topic => {
+    const progress = progressByTopicId.get(String(topic.id));
+    const isCompleted = Boolean(progress?.isCompleted || progress?.status === 'completed' || topic.isCompleted);
+    const masteryUnlocked = Boolean(progress?.masteryUnlocked || progress?.status === 'completed' || topic.masteryUnlocked);
+    const quizScores = progress?.quizScores as Record<string, unknown> | undefined;
+    const nextTopicUnlocked = progress?.nextTopicUnlocked ||
+      (typeof quizScores?.nextTopicUnlocked === 'boolean'
+        ? quizScores.nextTopicUnlocked
+        : masteryUnlocked);
     // Collect materials that belong to this topic
     const topicMaterials = (topic.materials || []).map(material => ({
       ...material,
@@ -68,7 +82,10 @@ const normalizeUnitToChapters = (unit: UnitResponse): CourseData => {
           content: {
             text: topic.description || '',
           },
-          isCompleted: topic.isCompleted ?? false,
+          isCompleted,
+          masteryUnlocked,
+          nextTopicUnlocked,
+          failedAttempts: progress?.failedAttempts ?? Number(quizScores?.failedAttempts ?? 0),
           // Attach topic-level materials directly on the lesson so CourseContent
           // can render them without an extra lookup.
           resources: topicMaterials,
@@ -106,7 +123,7 @@ const normalizeUnitToChapters = (unit: UnitResponse): CourseData => {
   };
 };
 
-export const useUnitData = (unitId: string) => {
+export const useUnitData = (unitId: string, courseIdOverride?: string) => {
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['unit', unitId],
     queryFn: async (): Promise<CourseData | null> => {
@@ -125,7 +142,18 @@ export const useUnitData = (unitId: string) => {
           throw new Error(`Unit with ID ${unitId} not found`);
         }
 
-        return normalizeUnitToChapters(unit);
+        let topicProgress: TopicProgress[] = [];
+        const courseId = unit.courseId || courseIdOverride;
+        if (courseId) {
+          try {
+            const progress = await courseService.getDetailedCourseProgress(courseId);
+            topicProgress = progress.topicProgress || [];
+          } catch (progressError) {
+            console.warn('Failed to load topic progress for unit:', progressError);
+          }
+        }
+
+        return normalizeUnitToChapters(unit, topicProgress);
       } catch (err: unknown) {
         console.error('Failed to fetch unit:', err);
         const error = err as {

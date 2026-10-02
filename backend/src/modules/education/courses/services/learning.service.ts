@@ -6,7 +6,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '#infrastructure/prisma/prisma.service';
-import { ProgressStatus } from '@prisma/client';
+import { EnrollmentStatus, ProgressStatus } from '@prisma/client';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { LearningRecommendation } from '#common/dto/learning.dto';
 import { PrerequisiteCheck } from '#common/dto/prerequisites.dto';
@@ -55,6 +55,17 @@ export class LearningService {
             .join(', ')}`,
         );
       }
+
+      await this.prisma.courseEnrollment.upsert({
+        where: { userId_courseId: { userId, courseId } },
+        create: {
+          userId,
+          courseId,
+          status: EnrollmentStatus.active,
+          progressPercentage: 0,
+        },
+        update: { status: EnrollmentStatus.active },
+      });
 
       const existingProgress = await this.prisma.progress.findFirst({
         where: { userId, courseId, topicId: null, materialId: null },

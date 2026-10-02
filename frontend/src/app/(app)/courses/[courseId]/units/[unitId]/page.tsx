@@ -7,10 +7,11 @@ import { ProtectedRoute } from '@/features/auth/components/ProtectedRoute';
 export default function CoursesUnitPage() {
   const params = useParams();
   const unitId = params.unitId as string;
+  const courseId = params.courseId as string;
   
   return (
     <ProtectedRoute>
-      <UnitLayout unitId={unitId} />
+      <UnitLayout unitId={unitId} courseId={courseId} />
     </ProtectedRoute>
   );
 }

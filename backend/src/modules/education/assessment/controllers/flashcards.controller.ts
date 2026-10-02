@@ -6,9 +6,14 @@ import {
   Param,
   UseGuards,
   ParseUUIDPipe,
+  ForbiddenException,
 } from '@nestjs/common';
+import { User } from '@prisma/client';
 import { FlashcardsService } from '../services/flashcards.service';
 import { JwtAuthGuard } from '#modules/auth/guards/jwt-auth.guard';
+import { CurrentUser } from '#common/decorators/current-user.decorator';
+import { Role } from '#modules/auth/constants/role.constants';
+import { getUserPrimaryRole } from '#common/utils/role.util';
 
 @Controller('flashcards')
 @UseGuards(JwtAuthGuard)
@@ -17,16 +22,20 @@ export class FlashcardsController {
 
   @Post('create')
   async createFlashcard(
-    @Body('userId') userId: string,
     @Body('questionId') questionId: string,
+    @CurrentUser() currentUser: User,
   ) {
     // construct a CreateFlashcardDto shape so the service signature is satisfied
     const dto = { questionId } as any;
-    return this.flashcardsService.createFlashcard(userId, dto);
+    return this.flashcardsService.createFlashcard(currentUser.id, dto);
   }
 
   @Get('due/:userId')
-  async getDueCards(@Param('userId', ParseUUIDPipe) userId: string) {
+  async getDueCards(
+    @Param('userId', ParseUUIDPipe) userId: string,
+    @CurrentUser() currentUser: User,
+  ) {
+    this.assertCanAccessUser(currentUser, userId);
     return this.flashcardsService.getDueCards(userId);
   }
 
@@ -39,12 +48,20 @@ export class FlashcardsController {
   }
 
   @Get('overview/:userId')
-  async getCardStats(@Param('userId') userId: string) {
+  async getCardStats(
+    @Param('userId') userId: string,
+    @CurrentUser() currentUser: User,
+  ) {
+    this.assertCanAccessUser(currentUser, userId);
     return this.flashcardsService.getCardStats(userId);
   }
 
   @Get('high-risk-topics/:userId')
-  async getHighRiskTopics(@Param('userId') userId: string) {
+  async getHighRiskTopics(
+    @Param('userId') userId: string,
+    @CurrentUser() currentUser: User,
+  ) {
+    this.assertCanAccessUser(currentUser, userId);
     return this.flashcardsService.getHighRiskTopics(userId);
   }
 
@@ -52,7 +69,15 @@ export class FlashcardsController {
   async syncCards(
     @Param('userId') userId: string,
     @Body('cards') cards: any[],
+    @CurrentUser() currentUser: User,
   ) {
+    this.assertCanAccessUser(currentUser, userId);
     return this.flashcardsService.syncCards(userId, cards);
+  }
+
+  private assertCanAccessUser(currentUser: User, requestedUserId: string): void {
+    if (currentUser.id !== requestedUserId && getUserPrimaryRole(currentUser) !== Role.admin) {
+      throw new ForbiddenException('You can only access your own flashcards');
+    }
   }
 }

@@ -10,7 +10,10 @@ import {
   AlertCircle,
   Search,
   Award,
+  X,
   type LucideIcon,
+  Layers,
+  ChevronRight,
 } from 'lucide-react';
 import {
   useInfiniteQuery,
@@ -34,6 +37,7 @@ import {
   Course,
 } from '@/shared/types/courseInterface';
 import { Progress } from '@/shared/components/ui/progress';
+import { UnitSelectionModal } from '@/features/courses/components/UnitSelectionModal';
 
 interface CoursesPageData {
   courses: Course[];
@@ -55,7 +59,15 @@ export const CoursesDashboard = () => {
     status: 'enrolled', // Default to enrolled
   });
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+  const [unitSelectionCourse, setUnitSelectionCourse] = useState<Course | null>(null);
   const router = useRouter();
+
+  const { data: activeUnits = [] } = useQuery<Array<Record<string, unknown>>>({
+    queryKey: ['active-units', user?.id],
+    queryFn: () => courseService.getEnrolledUnits(),
+    enabled: Boolean(user?.id),
+    staleTime: 30_000,
+  });
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -173,7 +185,11 @@ export const CoursesDashboard = () => {
           categoryId: filters.category,
         });
       } else {
-        raw = await courseService.getEnrolledUnits();
+        raw = await courseService.getEnrolledCourses({
+          status: 'active',
+          page: pageNum,
+          limit: pageSize,
+        });
       }
 
       if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
@@ -249,25 +265,66 @@ export const CoursesDashboard = () => {
     inProgress: 0,
     avgScore: 0,
   };
+  const completedUnitCount = activeUnits.filter(
+    unit => unit.isCompleted === true || unit.status === 'completed',
+  ).length;
+  const ongoingUnitCount = activeUnits.length - completedUnitCount;
 
-  const enrollInCourse = async (courseId: string) => {
+  const openCourseUnits = async (course: Course) => {
     try {
-      await courseService.enrollInCourse(courseId);
-      toast.success('Successfully enrolled!');
-      
-      // Invalidate relevant queries to refresh data
-      await queryClient.invalidateQueries({ queryKey: ['courses'] });
-      await queryClient.invalidateQueries({ queryKey: ['courseStatistics'] });
-      
-      // Optional: Switch to enrolled tab to show the newly enrolled course
-      setActiveTab('enrolled');
-    } catch (error: unknown) {
-      let message = 'Failed to enroll';
-      if (typeof error === 'object' && error !== null && 'message' in error) {
-        message = String((error as Record<string, unknown>).message);
+      if (course.unitId) {
+        router.push(`/courses/${course.id}/units/${course.unitId}`);
+        return;
       }
-      handleUnknownError(error, `/courses/${courseId}/enroll`);
-      toast.error(message);
+
+      const resume = (await getResumePoint(course.id)) as
+        | { type?: string; unitId?: string; id?: string }
+        | null;
+
+      if (resume && resume.type === 'topic' && resume.unitId) {
+        router.push(`/courses/${course.id}/units/${resume.unitId}/topics/${resume.id}`);
+        return;
+      }
+
+      if (resume && resume.unitId) {
+        router.push(`/courses/${course.id}/units/${resume.unitId}`);
+        return;
+      }
+
+      router.push(`/courses/${course.id}`);
+    } catch (error: unknown) {
+      handleUnknownError(error, `/courses/${course.id}`);
+      router.push(`/courses/${course.id}`);
+      toast.error('Could not open the course. Redirecting to the course page.');
+    }
+  };
+
+  const handleUnitsStarted = async () => {
+    setUnitSelectionCourse(null);
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['courses'] }),
+      queryClient.invalidateQueries({ queryKey: ['active-units'] }),
+      queryClient.invalidateQueries({ queryKey: ['courseStatistics'] }),
+    ]);
+    setActiveTab('enrolled');
+    toast.success('Units added to My Learning.');
+  };
+
+  const removeCourseFromLearning = async (course: Course) => {
+    const courseName = course.title || course.name;
+    if (!window.confirm(`Remove ${courseName} from My Learning? Your progress will be kept.`)) return;
+
+    try {
+      await courseService.unenrollFromCourse(course.id);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['courses'] }),
+        queryClient.invalidateQueries({ queryKey: ['courseStatistics'] }),
+        queryClient.invalidateQueries({ queryKey: ['active-units'] }),
+      ]);
+      toast.success(`${courseName} removed from My Learning. Your progress was kept.`);
+    } catch (error) {
+      console.error('Failed to remove course from My Learning:', error);
+      toast.error('Could not remove this course from My Learning.');
     }
   };
 
@@ -280,21 +337,21 @@ export const CoursesDashboard = () => {
           <StatCard
             icon={BookOpen}
             title="My Units"
-            value={courseStatistics.totalEnrolled}
+            value={activeUnits.length}
             gradient="from-blue-500 to-indigo-600"
-            description="Active enrollments"
+            description="Enrolled units"
           />
           <StatCard
             icon={CheckCircle}
-            title="Completed"
-            value={courseStatistics.completed}
+            title="Completed Units"
+            value={completedUnitCount}
             gradient="from-emerald-500 to-teal-600"
-            description="Course achievements"
+            description="Units finished"
           />
           <StatCard
             icon={TrendingUp}
             title="In Progress"
-            value={courseStatistics.inProgress}
+            value={ongoingUnitCount}
             gradient="from-amber-500 to-orange-600"
             description="Ongoing learning"
           />
@@ -303,7 +360,7 @@ export const CoursesDashboard = () => {
             title="Avg Score"
             value={`${courseStatistics.avgScore || 0}%`}
             gradient="from-rose-500 to-pink-600"
-            description="Overall performance"
+            description="Average topic quiz score"
           />
         </div>
 
@@ -349,6 +406,85 @@ export const CoursesDashboard = () => {
           </form>
         </div>
 
+        {activeTab === 'enrolled' && (
+          <div className="space-y-8">
+            {[
+              {
+                title: 'Ongoing Units',
+                units: activeUnits.filter(unit => unit.isCompleted !== true && unit.status !== 'completed'),
+                completed: false,
+              },
+              {
+                title: 'Completed Units',
+                units: activeUnits.filter(unit => unit.isCompleted === true || unit.status === 'completed'),
+                completed: true,
+              },
+            ].map(section => (
+              <section key={section.title} aria-label={section.title}>
+                <div className="mb-4 flex items-center justify-between">
+                  <h2 className="text-lg font-bold text-slate-900 dark:text-white">{section.title}</h2>
+                  <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">{section.units.length}</span>
+                </div>
+                {section.units.length === 0 ? (
+                  <p className="rounded-lg border border-dashed border-slate-300 p-5 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                    {section.completed ? 'No completed units yet.' : 'No ongoing units yet. Start a unit from a course.'}
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    {section.units.map(unit => {
+                      const unitId = String(unit.unitId ?? '');
+                      const courseId = String(unit.courseId ?? '');
+                      const percentage = Math.min(100, Math.max(0, Number(unit.progressPercentage) || 0));
+                      return (
+                        <article key={unitId} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+                          <p className="mb-1 text-xs font-semibold uppercase text-slate-500 dark:text-slate-400">{String(unit.courseTitle ?? 'Course')}</p>
+                          <h3 className="font-bold text-slate-900 dark:text-white">{String(unit.unitTitle ?? 'Unit')}</h3>
+                          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                            {Number(unit.completedTopics) || 0} of {Number(unit.totalTopics) || 0} topics complete
+                          </p>
+                          <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700">
+                            <div className={`h-full ${section.completed ? 'bg-emerald-500' : 'bg-blue-600'}`} style={{ width: `${percentage}%` }} />
+                          </div>
+                          <div className="mt-4 flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => router.push(`/courses/${courseId}/units/${unitId}`)}
+                              className="inline-flex items-center gap-1 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                            >
+                              {section.completed ? 'Review unit' : 'Continue unit'}
+                              <ChevronRight className="h-4 w-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => router.push(`/courses/${courseId}`)}
+                              disabled={!courseId}
+                              aria-label={`View all units in ${String(unit.courseTitle ?? 'course')}`}
+                              className="inline-flex items-center gap-1 rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700"
+                            >
+                              <BookOpen className="h-4 w-4" />
+                              Course units
+                            </button>
+                            {section.completed && (
+                              <button
+                                type="button"
+                                onClick={() => router.push(`/quiz/unit/${unitId}`)}
+                                className="inline-flex items-center gap-1 rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700"
+                              >
+                                Unit quiz
+                                <ChevronRight className="h-4 w-4" />
+                              </button>
+                            )}
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
+            ))}
+          </div>
+        )}
+
         {/* Content Grid */}
         {coursesLoading ? (
           <div className="flex flex-col items-center justify-center py-20">
@@ -358,12 +494,14 @@ export const CoursesDashboard = () => {
         ) : (
           <div className="space-y-6">
             {(infiniteData as any)?.pages?.flatMap((p: any) => p.courses)?.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 md:gap-8">
                 {(infiniteData as any).pages.flatMap((p: any) => p.courses).map((course: any) => (
                   <CourseCard 
-                    key={course.id} 
+                    key={course.unitId || course.id} 
                     course={course} 
-                    onEnroll={enrollInCourse}
+                    onSelectCourse={openCourseUnits}
+
+                    onRemoveCourse={removeCourseFromLearning}
                     router={router}
                     getResumePoint={getResumePoint}
                   />
@@ -404,6 +542,14 @@ export const CoursesDashboard = () => {
           </div>
         )}
       </div>
+      {unitSelectionCourse && (
+        <UnitSelectionModal
+          course={unitSelectionCourse}
+          activeUnitIds={activeUnits.map(unit => String(unit.unitId || ''))}
+          onClose={() => setUnitSelectionCourse(null)}
+          onComplete={handleUnitsStarted}
+        />
+      )}
     </div>
   );
 };
@@ -452,12 +598,13 @@ const StatCard = ({ icon: Icon, title, value, gradient, description }: StatCardP
 
 interface CourseCardProps {
   course: Course;
-  onEnroll: (courseId: string) => Promise<void>;
+  onSelectCourse: (course: Course) => void;
+  onRemoveCourse: (course: Course) => void;
   router: ReturnType<typeof useRouter>;
   getResumePoint: (courseId: string) => unknown;
 }
 
-const CourseCard = ({ course, onEnroll, router, getResumePoint }: CourseCardProps) => {
+const CourseCard = ({ course, onSelectCourse, onRemoveCourse, router, getResumePoint }: CourseCardProps) => {
   const isEnrolled = course.isEnrolled;
   const progress = course.progressPercentage ?? 0;
 
@@ -465,9 +612,9 @@ const CourseCard = ({ course, onEnroll, router, getResumePoint }: CourseCardProp
     <div 
       onClick={() => {
         if (course.unitId) {
-           router.push(`/courses/${course.id}/units/${course.unitId}`);
+            router.push(`/courses/${course.id}/units/${course.unitId}`);
         } else {
-           router.push(`/courses/${course.id}`);
+            onSelectCourse(course);
         }
       }}
       className="group bg-white dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 overflow-hidden shadow-sm hover:shadow-2xl hover:-translate-y-1 transition-all cursor-pointer"
@@ -490,7 +637,7 @@ const CourseCard = ({ course, onEnroll, router, getResumePoint }: CourseCardProp
       </div>
 
       <div className="p-6 space-y-4">
-        <p className="text-slate-600 dark:text-slate-400 text-sm line-clamp-2 min-h-[40px]">
+        <p className="text-slate-600 dark:text-slate-400 text-sm line-clamp-2 min-h-10">
           {course.description}
         </p>
 
@@ -522,24 +669,20 @@ const CourseCard = ({ course, onEnroll, router, getResumePoint }: CourseCardProp
           </div>
         </div>
 
-        {!isEnrolled ? (
+        {!course.unitId && !isEnrolled ? (
           <button
-            onClick={(e) => { e.stopPropagation(); onEnroll(course.id); }}
-            className="w-full py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-black text-sm hover:scale-105 transition-transform"
+            onClick={(e) => { e.stopPropagation(); router.push(`/courses/${course.id}`); }}
+            className="w-full py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-black text-sm hover:scale-105 transition-transform flex items-center justify-center gap-2"
           >
-            Enroll in Course
+            <Layers className="h-4 w-4" /> View Units
           </button>
         ) : (
+          <div className="space-y-2">
           <button
             onClick={async (e) => {
               e.stopPropagation();
               if (course.unitId) {
-                if (course.nextTopicId) {
-                  router.push(`/courses/${course.id}/units/${course.unitId}/topics/${course.nextTopicId}`);
-                } else {
-                  // If no next topic, go to the unit overview page
-                  router.push(`/courses/${course.id}/units/${course.unitId}`);
-                }
+                router.push(`/courses/${course.id}/units/${course.unitId}`);
               } else {
                 const resume = await getResumePoint(course.id) as { type?: string; unitId?: string; id?: string } | null;
                 if (resume && resume.type === 'topic' && resume.unitId) {
@@ -554,6 +697,20 @@ const CourseCard = ({ course, onEnroll, router, getResumePoint }: CourseCardProp
           >
             {progress === 0 ? 'Start Unit' : 'Continue Path'}
           </button>
+          {isEnrolled && (
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                void onRemoveCourse(course);
+              }}
+              className="inline-flex w-full items-center justify-center gap-2 py-2 text-sm font-semibold text-rose-600 transition-colors hover:text-rose-700 dark:text-rose-400 dark:hover:text-rose-300"
+            >
+              <X className="h-4 w-4" />
+              Remove from My Learning
+            </button>
+          )}
+          </div>
         )}
       </div>
     </div>

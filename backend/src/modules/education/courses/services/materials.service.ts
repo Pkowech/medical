@@ -28,11 +28,15 @@ import {
   MaterialType,
   File,
   ProgressStatus,
+  RoleName,
+  MemberStatus,
+  StudyGroupStatus,
 } from '@prisma/client';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ProgressService } from './progress.service';
 import { AiAnalyticsService } from '../../../ai-analytics/services/ai-analytics.service';
 import { FtsUtils } from '#common/utils/fts.utils';
+import { GoogleDriveService } from '#infrastructure/storage/google-drive.service';
 // Local LibreOffice conversion removed. All document conversions are
 // delegated to the Gotenberg service configured via `GOTENBERG_URL`.
 
@@ -66,6 +70,7 @@ export class MaterialsService {
     private readonly aiAnalyticsService: AiAnalyticsService,
     private readonly progressService: ProgressService,
     private readonly searchSync: GlobalSearchSyncService,
+    private readonly googleDrive: GoogleDriveService,
   ) {
     this.storageProvider =
       this.configService.get<string>('FILE_STORAGE_PROVIDER') === 'local'
@@ -917,6 +922,132 @@ export class MaterialsService {
     return material;
   }
 
+  async registerGoogleDriveMaterial(dto: {
+    url: string;
+    title: string;
+    description?: string;
+    courseId: string;
+    unitId: string;
+    topicId?: string;
+    userId: string;
+  }): Promise<Material> {
+    const unit = await this.prisma.unit.findUnique({
+      where: { id: dto.unitId },
+      select: { id: true, courseId: true },
+    });
+    if (!unit || unit.courseId !== dto.courseId) {
+      throw new BadRequestException('Select a unit from the selected course.');
+    }
+    if (dto.topicId) {
+      const topic = await this.prisma.topic.findUnique({
+        where: { id: dto.topicId },
+        select: { unitId: true },
+      });
+      if (!topic || topic.unitId !== unit.id) {
+        throw new BadRequestException('Select a topic from the selected unit.');
+      }
+    }
+
+    await this.assertCanManageCourseMaterials(dto.courseId, dto.userId);
+    const driveFile = await this.googleDrive.getSharedDriveFile(dto.url);
+    const mimeType = driveFile.mimeType || '';
+    const supportedGoogleDocs = new Set([
+      'application/vnd.google-apps.document',
+      'application/vnd.google-apps.spreadsheet',
+      'application/vnd.google-apps.presentation',
+    ]);
+    if (mimeType !== 'application/pdf' && !supportedGoogleDocs.has(mimeType)) {
+      throw new BadRequestException('Drive materials currently support PDF, Google Docs, Sheets, and Slides files.');
+    }
+
+    const material = await this.prisma.material.create({
+      data: {
+        title: dto.title.trim() || driveFile.name || 'Drive material',
+        description: dto.description,
+        type: MaterialType.pdf,
+        courseId: dto.courseId,
+        unitId: unit.id,
+        topicId: dto.topicId,
+        userId: dto.userId,
+        category: 'Course Material',
+        content: null,
+        metadata: {
+          sourceProvider: 'google-drive',
+          driveFileId: driveFile.id,
+          driveId: driveFile.driveId,
+          driveMimeType: mimeType,
+          isExternal: true,
+        },
+      },
+    });
+
+    await FtsUtils.updateFtsVector(this.prisma, 'materials', material.id);
+    await this.searchSync.syncEntity('material', material.id);
+    return material;
+  }
+
+  private async assertCanManageCourseMaterials(courseId: string, userId: string): Promise<void> {
+    const [course, instructorAssignment, roles] = await Promise.all([
+      this.prisma.course.findUnique({ where: { id: courseId }, select: { createdById: true } }),
+      this.prisma.courseInstructor.findUnique({
+        where: { courseId_userId: { courseId, userId } },
+        select: { id: true },
+      }),
+      this.prisma.userRole.findMany({
+        where: { userId },
+        select: { role: { select: { name: true } } },
+      }),
+    ]);
+    if (!course) throw new NotFoundException('Course not found.');
+
+    const isAdmin = roles.some(userRole => userRole.role.name === RoleName.admin);
+    if (course.createdById !== userId && !instructorAssignment && !isAdmin) {
+      throw new ForbiddenException('Only this course’s instructors can attach Drive materials.');
+    }
+  }
+
+  private async assertCanReadDriveMaterial(material: Material, userId: string): Promise<void> {
+    const courseId = material.courseId || (material.unitId
+      ? (await this.prisma.unit.findUnique({ where: { id: material.unitId }, select: { courseId: true } }))?.courseId
+      : undefined);
+    if (!courseId) throw new ForbiddenException('This Drive material is not attached to a course.');
+
+    const [course, instructorAssignment, enrollment, groupMemberships, roles] = await Promise.all([
+      this.prisma.course.findUnique({ where: { id: courseId }, select: { createdById: true } }),
+      this.prisma.courseInstructor.findUnique({
+        where: { courseId_userId: { courseId, userId } },
+        select: { id: true },
+      }),
+      this.prisma.courseEnrollment.findUnique({
+        where: { userId_courseId: { userId, courseId } },
+        select: { status: true },
+      }),
+      this.prisma.studyGroupMember.findMany({
+        where: {
+          userId,
+          status: MemberStatus.active,
+          studyGroup: { is: { status: StudyGroupStatus.active } },
+        },
+        select: { studyGroup: { select: { metadata: true } } },
+      }),
+      this.prisma.userRole.findMany({
+        where: { userId },
+        select: { role: { select: { name: true } } },
+      }),
+    ]);
+    const isAdmin = roles.some(userRole => userRole.role.name === RoleName.admin);
+    const isInstructor = course?.createdById === userId || Boolean(instructorAssignment);
+    const isEnrolled = enrollment?.status === 'active' || enrollment?.status === 'completed';
+    const isCourseGroupMember = groupMemberships.some(({ studyGroup }) => {
+      const metadata = studyGroup.metadata;
+      if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return false;
+      return (metadata as Record<string, unknown>).courseId === courseId;
+    });
+    if (!isAdmin && !isInstructor && !isEnrolled && !isCourseGroupMember) {
+      throw new ForbiddenException('Enroll in this course to view its Drive materials.');
+    }
+  }
+
   async findAllPaginated(options: {
     page: number;
     limit: number;
@@ -949,17 +1080,18 @@ export class MaterialsService {
         // User's own materials
         where.userId = userId;
       } else if (scope === 'enrolled') {
-        // Materials in units of courses the user is enrolled in
-        where.unit = {
-          course: {
-            enrollments: {
-              some: {
-                userId,
-                status: 'active',
-              },
+        const enrolledCourse = {
+          enrollments: {
+            some: {
+              userId,
+              status: { in: ['active', 'completed'] },
             },
           },
         };
+        where.OR = [
+          { course: enrolledCourse },
+          { unit: { course: enrolledCourse } },
+        ];
       } else if (scope === 'recommended') {
         // Placeholder for recommended logic - for now, maybe featured courses or matching user interests
         // This likely needs a separate query or join with recommendations table
@@ -974,10 +1106,23 @@ export class MaterialsService {
         where.OR = [
           { userId },
           {
+            course: {
+              enrollments: {
+                some: {
+                  userId,
+                  status: { in: ['active', 'completed'] },
+                },
+              },
+            },
+          },
+          {
             unit: {
               course: {
                 enrollments: {
-                  some: { userId },
+                  some: {
+                    userId,
+                    status: { in: ['active', 'completed'] },
+                  },
                 },
               },
             },
@@ -1656,7 +1801,7 @@ export class MaterialsService {
     }
   }
 
-  async getMaterialPreviewContent(materialId: string): Promise<{
+  async getMaterialPreviewContent(materialId: string, userId: string): Promise<{
     content: Buffer;
     mimeType: string;
     fileName: string;
@@ -1667,6 +1812,19 @@ export class MaterialsService {
       });
       if (!material) {
         throw new NotFoundException(`Material with ID ${materialId} not found`);
+      }
+
+      const metadata = material.metadata && typeof material.metadata === 'object' && !Array.isArray(material.metadata)
+        ? material.metadata as Record<string, unknown>
+        : {};
+      if (metadata.sourceProvider === 'google-drive') {
+        await this.assertCanReadDriveMaterial(material, userId);
+        const driveFileId = typeof metadata.driveFileId === 'string' ? metadata.driveFileId : '';
+        const driveMimeType = typeof metadata.driveMimeType === 'string' ? metadata.driveMimeType : '';
+        if (!driveFileId || !driveMimeType) throw new NotFoundException('Drive material metadata is incomplete.');
+        const content = await this.googleDrive.downloadFile(driveFileId, driveMimeType);
+        const sourceName = material.title.replace(/\.pdf$/i, '');
+        return { content, mimeType: 'application/pdf', fileName: `${sourceName}.pdf` };
       }
 
       const fileId = material.previewFileId || material.fileId;
@@ -1718,11 +1876,20 @@ export class MaterialsService {
    */
   async getMaterialWithFileUrl(
     materialId: string,
+    userId: string,
   ): Promise<Material & { fileUrl?: string; previewFileUrl?: string }> {
     try {
       const material = await this.findOne(materialId);
       if (!material) {
         throw new NotFoundException(`Material with ID ${materialId} not found`);
+      }
+
+      const metadata = material.metadata && typeof material.metadata === 'object' && !Array.isArray(material.metadata)
+        ? material.metadata as Record<string, unknown>
+        : {};
+      if (metadata.sourceProvider === 'google-drive') {
+        await this.assertCanReadDriveMaterial(material, userId);
+        return material;
       }
 
       // If file is local (key starts with 'local:'), construct a URL to fetch it

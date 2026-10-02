@@ -190,19 +190,19 @@ export default function AdminDashboardPage() {
             title="Active Learners" 
             value={stats?.activeLearners ?? stats?.activeUsers ?? null} 
             icon={UserCheck} 
-            subValue="Active in last 30 days"
+            subValue={stats?.activeLearners !== undefined || stats?.activeUsers !== undefined ? 'Active in last 30 days' : undefined}
           />
           <StatCard 
             title="Total Courses" 
             value={stats?.totalCourses ?? null} 
             icon={BookOpen} 
-            subValue={stats ? `${stats?.completedCourses ?? 0} completed` : undefined}
+            subValue={stats?.completedCourses !== undefined ? `${stats.completedCourses} completed` : undefined}
           />
           <StatCard 
             title="Learning Paths" 
             value={stats?.totalPaths ?? null} 
             icon={AlertCircle} 
-            subValue={stats ? `${stats?.totalEnrollments ?? 0} total enrollments` : undefined}
+            subValue={stats?.totalEnrollments !== undefined ? `${stats.totalEnrollments} total enrollments` : undefined}
           />
         </div>
       )}

@@ -1,4 +1,4 @@
-import { EducationalCourseLayout } from '@/features/courses/components/EducationalCourseLayout';
+import { CourseOverview } from '@/features/courses/components/CourseOverview';
 import { ProtectedRoute } from '@/features/auth/components/ProtectedRoute';
 
 type PageProps = {
@@ -10,7 +10,7 @@ export default async function CoursePage({ params }: PageProps) {
   
   return (
     <ProtectedRoute>
-      <EducationalCourseLayout courseId={courseId} />
+      <CourseOverview />
     </ProtectedRoute>
   );
 }

@@ -13,6 +13,7 @@ type NormalizedLesson = {
   content: { text: string; video?: string };
   isCompleted?: boolean;
   masteryUnlocked?: boolean;
+  nextTopicUnlocked?: boolean;
   failedAttempts?: number;
 };
 
@@ -72,7 +73,7 @@ export const useCourseData = (courseId: string) => {
       if (progressData) {
         if (Array.isArray(progressData.topicProgress)) {
           progressData.topicProgress.forEach((p) => {
-            if (p.topicId) topicProgressMap[p.topicId] = p;
+            if (p.topicId) topicProgressMap[String(p.topicId)] = p;
           });
         }
         if (Array.isArray(progressData.unitProgress)) {
@@ -111,8 +112,12 @@ export const useCourseData = (courseId: string) => {
                   ? `${topic.estimatedMinutes}m`
                   : '',
               content: { text: description },
-              isCompleted: topicProgress?.isCompleted ?? false,
-              masteryUnlocked: topicProgress?.masteryUnlocked ?? false,
+              isCompleted: Boolean(topicProgress?.isCompleted || topicProgress?.status === 'completed' || topic.isCompleted),
+              masteryUnlocked: Boolean(topicProgress?.masteryUnlocked || topicProgress?.status === 'completed' || topic.masteryUnlocked),
+              nextTopicUnlocked: topicProgress?.nextTopicUnlocked ||
+                (typeof topicProgress?.quizScores?.['nextTopicUnlocked'] === 'boolean'
+                  ? topicProgress.quizScores['nextTopicUnlocked'] as boolean
+                  : topicProgress?.masteryUnlocked ?? topicProgress?.isCompleted ?? false),
               failedAttempts: topicProgress?.failedAttempts ?? 0,
             };
           });
@@ -161,6 +166,10 @@ export const useCourseData = (courseId: string) => {
               content: { text: contentText, video: videoUrl },
               isCompleted: topicProgress?.isCompleted ?? false,
               masteryUnlocked: topicProgress?.masteryUnlocked ?? false,
+              nextTopicUnlocked: topicProgress?.nextTopicUnlocked ||
+                (typeof topicProgress?.quizScores?.['nextTopicUnlocked'] === 'boolean'
+                  ? topicProgress.quizScores['nextTopicUnlocked'] as boolean
+                  : topicProgress?.masteryUnlocked ?? topicProgress?.isCompleted ?? false),
               failedAttempts: topicProgress?.failedAttempts ?? 0,
             } as NormalizedLesson;
           });

@@ -96,13 +96,8 @@ export class AdminService {
 
       return {
         totalUsers: analytics.users ?? 0,
-        activeUsers: analytics.users ?? 0,
-        activeLearners: analytics.users ?? 0,
         totalCourses: analytics.courses ?? 0,
-        completedCourses: analytics.courses ?? 0,
-        totalEnrollments: 0,
         totalAssessments: analytics.quizzes ?? 0,
-        totalPaths: analytics.courses ?? 0,
         averageCompletionRate: analytics.quizCompletionRate ?? 0,
         overallCompletionRate: analytics.quizCompletionRate ?? 0,
         lastUpdated: Date.now(),

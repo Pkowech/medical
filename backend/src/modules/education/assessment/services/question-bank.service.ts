@@ -293,6 +293,15 @@ export class QuestionBankService {
     );
 
     await this.redisService.del(`question:${questionId}:*`);
+
+    // Invalidate the unit-level generated quiz cache so the next request
+    // gets a fresh quiz that reflects updated question difficulty indices.
+    if (question.unitId) {
+      await this.redisService.del(`unit_quiz:${question.unitId}`);
+      this.logger.debug(
+        `Invalidated unit_quiz cache for unit ${question.unitId} after updating question ${questionId}`,
+      );
+    }
   }
 
   private async validateCourseAndUnit(courseId?: string, unitId?: string) {

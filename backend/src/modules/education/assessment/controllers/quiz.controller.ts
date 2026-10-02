@@ -9,11 +9,13 @@ import {
   Request,
   HttpCode,
   HttpStatus,
+  ForbiddenException,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { QuizService } from '../services/quiz.service';
 import { WeaknessOrchestrationService } from '../services/weakness-orchestration.service';
 import { JwtAuthGuard } from '#modules/auth/guards/jwt-auth.guard';
+import { User } from '#common/decorators/user.decorator';
 import {
   SubmitQuizDto,
   SubmitQuizAnswerDto,
@@ -88,7 +90,9 @@ export class QuizController {
   async getQuizResults(
     @Param('userId') userId: string,
     @Param('unitId') unitId: string,
+    @User('id') authenticatedUserId: string,
   ) {
+    this.assertOwnUser(authenticatedUserId, userId);
     return this.quizService.getUserQuizResults(userId, unitId);
   }
 
@@ -96,8 +100,10 @@ export class QuizController {
   @ApiOperation({ summary: 'Get rapid review questions' })
   async getRapidReviewQuestions(
     @Param('userId') userId: string,
+    @User('id') authenticatedUserId: string,
     @Query('topics') topics?: string,
   ) {
+    this.assertOwnUser(authenticatedUserId, userId);
     const topicsArray = topics ? topics.split(',') : undefined;
     return this.quizService.getRapidReviewQuestions(userId, topicsArray);
   }
@@ -131,5 +137,11 @@ export class QuizController {
       body.score,
       body.maxScore,
     );
+  }
+
+  private assertOwnUser(authenticatedUserId: string, requestedUserId: string): void {
+    if (authenticatedUserId !== requestedUserId) {
+      throw new ForbiddenException('You can only access your own quiz data');
+    }
   }
 }

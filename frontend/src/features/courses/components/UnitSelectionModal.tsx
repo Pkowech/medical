@@ -1,7 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
-  CheckCircle2, 
-  Circle, 
   Info, 
   AlertCircle, 
   X,
@@ -14,68 +12,48 @@ import { Course } from '@/shared/types/courseInterface';
 
 interface UnitSelectionModalProps {
   course: Course;
+  activeUnitIds?: string[];
   onClose: () => void;
   onComplete: () => void;
 }
 
-export const UnitSelectionModal = ({ course, onClose, onComplete }: UnitSelectionModalProps) => {
-  const [selectedUnits, setSelectedUnits] = useState<string[]>([]);
-  const [activeConcurrentCount, setActiveConcurrentCount] = useState<number>(0);
+export const UnitSelectionModal = ({ course, activeUnitIds = [], onClose, onComplete }: UnitSelectionModalProps) => {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [activatingUnitId, setActivatingUnitId] = useState<string | null>(null);
 
   const MAX_CONCURRENT = 4;
+  const activeUnitSet = new Set(activeUnitIds);
 
-  useEffect(() => {
-    fetchCurrentStats();
-  }, []);
-
-  const fetchCurrentStats = async () => {
-    try {
-      const stats = await courseService.getCourseStats();
-      setActiveConcurrentCount(stats.inProgress || 0);
-    } catch (err) {
-      console.error('Failed to fetch stats', err);
-    }
-  };
-
-  const toggleUnit = (unitId: string) => {
-    if (selectedUnits.includes(unitId)) {
-      setSelectedUnits(selectedUnits.filter(id => id !== unitId));
-      setError(null);
-    } else {
-      if (selectedUnits.length >= 5) {
-        setError('You can select a maximum of 5 units for initial enrollment.');
-        return;
-      }
-      if (activeConcurrentCount + selectedUnits.length >= MAX_CONCURRENT) {
-        setError(`You have reached the concurrent unit limit of ${MAX_CONCURRENT}. Free up slots by completing units.`);
-        return;
-      }
-      setSelectedUnits([...selectedUnits, unitId]);
-      setError(null);
-    }
-  };
-
-  const handleSubmit = async () => {
-    if (selectedUnits.length === 0) {
-      setError('Please select at least 1 unit to start.');
-      return;
-    }
-
+  const handleActivate = async (unitId: string) => {
     setIsSubmitting(true);
+    setActivatingUnitId(unitId);
     setError(null);
     try {
-      // Activate each selected unit
-      for (const unitId of selectedUnits) {
-        await courseService.activateUnit(unitId, MAX_CONCURRENT);
+      try {
+        const enrollments = await courseService.getEnrolledCourses({
+          status: 'active',
+          page: 1,
+          limit: 100,
+        });
+        const isCourseEnrolled = (enrollments.items || []).some(
+          enrollment => enrollment.courseId === course.id,
+        );
+        if (!isCourseEnrolled) await courseService.enrollInCourse(course.id);
+      } catch (enrollmentError) {
+        const errorMessage = enrollmentError instanceof Error ? enrollmentError.message : String(enrollmentError);
+        if (!errorMessage.toLowerCase().includes('already enrolled')) throw enrollmentError;
       }
+
+      const result = await courseService.activateUnit(unitId, MAX_CONCURRENT);
+      if (!result.success) throw new Error(result.message || 'Could not activate this unit.');
       onComplete();
     } catch (err: unknown) {
       const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? (err instanceof Error ? err.message : String(err));
-      setError(message || 'Failed to activate units. Check concurrent limits.');
+      setError(message || 'Failed to activate this unit. Check the concurrent unit limit.');
     } finally {
       setIsSubmitting(false);
+      setActivatingUnitId(null);
     }
   };
 
@@ -110,7 +88,7 @@ export const UnitSelectionModal = ({ course, onClose, onComplete }: UnitSelectio
             <Info className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
             <div className="text-sm text-blue-800 dark:text-blue-300">
               <p className="font-semibold mb-1">Study Slots & Concurrent Limits</p>
-              <p>Pick 2-5 units to start focusing on. You can have up to <strong>{MAX_CONCURRENT}</strong> units active at once across all courses. Currently using <strong>{activeConcurrentCount}</strong> slots.</p>
+              <p>Choose one or more units to start. You can have up to <strong>{MAX_CONCURRENT}</strong> units active across all courses. Currently using <strong>{activeUnitIds.length}</strong> slots.</p>
             </div>
           </div>
 
@@ -121,23 +99,22 @@ export const UnitSelectionModal = ({ course, onClose, onComplete }: UnitSelectio
             ) : (
               <div className="grid gap-3">
                 {units.map((unit) => {
-                  const isSelected = selectedUnits.includes(unit.id);
+                  const isActive = activeUnitSet.has(unit.id);
                   return (
-                    <button
+                    <div
                       key={unit.id}
-                      onClick={() => toggleUnit(unit.id)}
-                      className={`flex items-center justify-between p-4 rounded-xl border transition-all text-left ${
-                        isSelected 
-                          ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-900/10 ring-1 ring-blue-500' 
-                          : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-300 dark:hover:border-slate-700'
+                      className={`flex items-center justify-between gap-4 p-4 rounded-xl border transition-all ${
+                        isActive
+                          ? 'border-emerald-300 bg-emerald-50/70 dark:border-emerald-800 dark:bg-emerald-900/10'
+                          : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900'
                       }`}
                     >
                       <div className="flex items-center gap-4">
-                        <div className={`p-2 rounded-lg ${isSelected ? 'bg-blue-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
+                        <div className={`p-2 rounded-lg ${isActive ? 'bg-emerald-600 text-white' : 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'}`}>
                           <BookOpen className="w-5 h-5" />
                         </div>
-                        <div>
-                          <p className={`font-bold text-sm ${isSelected ? 'text-blue-700 dark:text-blue-400' : 'text-slate-900 dark:text-slate-200'}`}>
+                        <div className="min-w-0">
+                          <p className={`font-bold text-sm ${isActive ? 'text-emerald-800 dark:text-emerald-300' : 'text-slate-900 dark:text-slate-200'}`}>
                             {unit.title}
                           </p>
                           <p className="text-xs text-slate-500 dark:text-slate-500 line-clamp-1">
@@ -145,12 +122,20 @@ export const UnitSelectionModal = ({ course, onClose, onComplete }: UnitSelectio
                           </p>
                         </div>
                       </div>
-                      {isSelected ? (
-                        <CheckCircle2 className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                      {isActive ? (
+                        <span className="shrink-0 rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">Active</span>
                       ) : (
-                        <Circle className="w-6 h-6 text-slate-200 dark:text-slate-700" />
+                        <button
+                          type="button"
+                          onClick={() => void handleActivate(unit.id)}
+                          disabled={isSubmitting}
+                          className="shrink-0 inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-blue-700 disabled:cursor-wait disabled:opacity-60"
+                        >
+                          {activatingUnitId === unit.id ? 'Starting...' : 'Start unit'}
+                          <ChevronRight className="h-4 w-4" />
+                        </button>
                       )}
-                    </button>
+                    </div>
                   );
                 })}
               </div>
@@ -167,20 +152,14 @@ export const UnitSelectionModal = ({ course, onClose, onComplete }: UnitSelectio
             </div>
           )}
           
-          <div className="flex items-center justify-between gap-4">
-            <div className="text-sm font-medium">
-              <span className="text-slate-500 dark:text-slate-400">Selected: </span>
-              <span className={selectedUnits.length > 0 ? 'text-blue-600 font-bold' : 'text-slate-400'}>
-                {selectedUnits.length} / 5
-              </span>
-            </div>
+          <div className="flex justify-end">
             <button
-              onClick={handleSubmit}
-              disabled={isSubmitting || selectedUnits.length === 0}
-              className="px-8 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-blue-500/25 flex items-center gap-2"
+              type="button"
+              onClick={onClose}
+              disabled={isSubmitting}
+              className="px-6 py-2.5 bg-slate-100 text-slate-700 font-bold rounded-lg hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 disabled:opacity-50"
             >
-              {isSubmitting ? 'Activating...' : 'Start Learning'}
-              <ChevronRight className="w-4 h-4" />
+              Done
             </button>
           </div>
         </div>

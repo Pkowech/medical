@@ -25,7 +25,7 @@ const adminNavigationConfig: NavigationItem[] = [
     children: [
       {
         id: 'analytics',
-        label: 'Analytics',
+        label: 'System Analytics',
         href: '/admin/analytics',
         icon: BarChart3,
       },

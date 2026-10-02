@@ -41,13 +41,8 @@ export class AssessmentProgressService {
     progressData: Partial<AssessmentProgress>,
   ): Promise<AssessmentProgress> {
     const cacheKey = `progress:${userId}:${assessmentId}`;
-    const cachedProgress = await this.redisService.get(cacheKey);
-    if (cachedProgress) {
-      this.logger.log(
-        `Retrieved cached progress for user ${userId}, assessment ${assessmentId}`,
-      );
-      return JSON.parse(cachedProgress);
-    }
+    // NOTE: Do NOT read from cache here \u2014 this is a write operation and must
+    // always persist to the database regardless of any cached state.
 
     const quiz = await this.prisma.quiz.findUnique({
       where: { id: assessmentId },
@@ -101,7 +96,12 @@ export class AssessmentProgressService {
       isPassed: updatedProgress.isPassed,
     };
 
-    await this.redisService.set(cacheKey, JSON.stringify(result), 24 * 60 * 60); // 1 day TTL
+    // Write fresh progress to cache and bust the quiz results cache so
+    // getUserQuizResults reflects the latest submission immediately.
+    await Promise.all([
+      this.redisService.set(cacheKey, JSON.stringify(result), 24 * 60 * 60),
+      this.redisService.del(`quiz:results:${userId}:${quiz.unitId ?? ''}`),
+    ]);
     this.logger.log(
       `Updated progress for user ${userId}, assessment ${assessmentId}`,
     );

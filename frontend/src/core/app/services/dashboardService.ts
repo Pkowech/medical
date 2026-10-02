@@ -28,11 +28,6 @@ export async function getBadges(userId?: string) {
   return response.data;
 }
 
-export async function getSystemAnalytics() {
-  const response = await apiService.get('/analytics/system/metrics');
-  return response.data;
-}
-
 export async function getCPDActivities(userId?: string) {
   const url = userId ? `/cpd/activities?userId=${userId}` : `/cpd/activities`;
   try {

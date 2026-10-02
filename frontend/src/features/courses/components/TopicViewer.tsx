@@ -7,7 +7,6 @@ import {
   Play,
   Download,
   ChevronLeft,
-  ChevronRight,
   Bookmark,
   CheckCircle,
   Clock,
@@ -18,8 +17,6 @@ import {
 import { topicService, Topic } from '@/features/courses/services/topicService';
 import materialService from '@/features/courses/services/materialService';
 import progressService from '@/features/learning-management/services/progressService';
-import { quizProgressIntegration } from '@/features/learning-management/services/quizProgressIntegration';
-import { useSession } from 'next-auth/react';
 import { Material } from '@/shared/types/materialInterface';
 import { usePageHeader } from '@/core/providers/HeaderContext';
 import { useCourseProgressStore } from '@/features/courses/hooks/useCourseProgressStore';
@@ -59,7 +56,6 @@ const getMaterialColor = (type: string): string => {
 };
 
 export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topicId }) => {
-  const { data: session } = useSession();
   const router = useRouter();
   const { setHeader } = usePageHeader();
   const { toggleBookmark, bookmarks, markLessonComplete, progress } = useCourseProgressStore();
@@ -70,7 +66,7 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
   const [selectedMaterialId, setSelectedMaterialId] = useState<string | null>(null);
   const [showMaterialModal, setShowMaterialModal] = useState(false);
   const [showQuiz, setShowQuiz] = useState(false);
-  const [quizScore, setQuizScore] = useState<number | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const isBookmarked = bookmarks.includes(topicId);
   const isCompleted = progress[topicId];
@@ -80,6 +76,7 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
     const fetchTopic = async () => {
       try {
         setIsLoading(true);
+        setLoadError(null);
         const topicData = await topicService.getTopicById(courseId, unitId, topicId);
         setTopic(topicData);
 
@@ -104,7 +101,18 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
         }
       } catch (error) {
         console.error('Error fetching topic:', error);
-        toast.error('Failed to load topic');
+        const details = error as {
+          status?: number;
+          message?: string;
+          rawResponse?: { statusCode?: number; message?: string };
+        };
+        const status = details?.status ?? details?.rawResponse?.statusCode;
+        const message = details?.message ?? details?.rawResponse?.message;
+        setLoadError(
+          status === 403
+            ? message || 'Pass the previous topic quiz to unlock this topic.'
+            : 'Failed to load topic',
+        );
       } finally {
         setIsLoading(false);
       }
@@ -180,8 +188,12 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
         <div className="max-w-5xl mx-auto">
           <div className="flex flex-col items-center justify-center min-h-screen space-y-4">
             <AlertCircle className="w-12 h-12 text-red-500" />
-            <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Topic not found</h2>
-            <p className="text-slate-600 dark:text-slate-400">The topic you're looking for doesn't exist.</p>
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
+              {loadError || 'Topic not found'}
+            </h2>
+            <p className="text-slate-600 dark:text-slate-400">
+              {loadError ? 'Complete the preceding topic quiz before opening this topic.' : "The topic you're looking for doesn't exist."}
+            </p>
             <Button onClick={handleGoBack} variant="outline">
               Go Back
             </Button>
@@ -335,15 +347,13 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
             <ChevronLeft className="w-4 h-4" />
             Back to Unit
           </Button>
-          {!isCompleted && (
-            <Button
+          <Button
             onClick={() => setShowQuiz(true)}
-              className="flex items-center gap-2"
-            >
-              <Brain className="w-4 h-4" />
-              Take Topic Quiz
-            </Button>
-          )}
+            className="flex items-center gap-2"
+          >
+            <Brain className="w-4 h-4" />
+            {isCompleted ? 'Retake Topic Quiz' : 'Take Topic Quiz'}
+          </Button>
         </div>
       </div>
 
@@ -354,27 +364,16 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
         courseId={courseId}
         isOpen={showQuiz}
         onClose={() => setShowQuiz(false)}
-        onComplete={async (score) => {
-          setQuizScore(score);
-          markLessonComplete(topicId);
+        onNextTopic={(nextTopicId) => {
           setShowQuiz(false);
-          toast.success(`Great! You scored ${score}% on this topic quiz`);
-          
-          // Trigger multilayer integration: Quiz → Progress → Recommendations → Spaced Rep
-          if (session?.user?.id) {
-            try {
-              await quizProgressIntegration.handleQuizCompletion({
-                userId: session.user.id,
-                topicId,
-                unitId,
-                courseId,
-                score,
-                timestamp: Date.now(),
-              });
-            } catch (error) {
-              console.error('Error in quiz completion integration:', error);
-              // Still show success even if integration fails - user saw their score
-            }
+          router.push(`/courses/${courseId}/units/${unitId}/topics/${nextTopicId}`);
+        }}
+        onComplete={(result) => {
+          if (result.masteryUnlocked) {
+            markLessonComplete(topicId);
+            toast.success(`Topic mastered with ${result.score}%`);
+          } else {
+            toast.error(`You scored ${result.score}%. At least 70% is required to pass.`);
           }
         }}
       />

@@ -24,14 +24,14 @@ class StudyGroupService {
     return res.data.data;
   }
 
-  async createGroup(payload: { name: string; description?: string }): Promise<StudyGroup> {
+  async createGroup(payload: { name: string; description?: string; courseId?: string }): Promise<StudyGroup> {
     const res = await apiService.post<ApiResponse<StudyGroup>>('/study-groups', payload);
     return res.data.data;
   }
 
   async updateGroup(
     id: string,
-    payload: Partial<{ name: string; description: string }>
+    payload: Partial<{ name: string; description: string; courseId: string | null }>
   ): Promise<StudyGroup> {
     const res = await apiService.patch<ApiResponse<StudyGroup>>(`/study-groups/${id}`, payload);
     return res.data.data;

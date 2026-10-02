@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import {
+  ChevronLeft,
   ChevronRight,
   Download,
   MessageSquare,
@@ -12,47 +14,13 @@ import {
   PlayCircle,
   ExternalLink,
 } from 'lucide-react';
-import type { ReadinessSignal } from '@/shared/types/mastery.types';
 import { useLayoutStore } from '@/core/stores/useLayoutStore';
+import type { CourseSidebarProps } from '@/shared/types/courseInterface';
 
-interface Chapter {
-  id: string | number;
-  title: string;
-  duration: string;
-  isCompleted?: boolean;
-  progressPercentage?: number;
-  lessons: {
-    id: string | number;
-    title: string;
-    duration: string;
-    isCompleted?: boolean;
-    masteryUnlocked?: boolean;
-    failedAttempts?: number;
-    readinessSignal?: ReadinessSignal;
-  }[];
-}
-
-interface Resource {
-  id: string | number;
-  title: string;
-  type: string;
-  size?: string;
-  url: string;
-  unitId?: string | number;
-  topicId?: string | number;
-}
-
-interface CourseSidebarProps {
-  chapters: Chapter[];
-  resources: Resource[];
-  parentUnitId?: string;
-  currentChapterIndex: number;
-  currentLessonIndex: number;
-  navigateTo: (chapterIndex: number, lessonIndex: number) => void;
-  progress: Record<string, boolean>;
-  toggleCoursePanel: (panel: 'notes' | 'discussion' | 'quiz') => void;
-  openMaterial: (id: string) => void;
-}
+type CourseSidebarComponentProps = CourseSidebarProps & {
+  onDownloadMaterial?: (materialId: string) => void;
+  allowCollapse?: boolean;
+};
 
 export const CourseSidebar = ({
   chapters,
@@ -61,11 +29,24 @@ export const CourseSidebar = ({
   currentChapterIndex,
   currentLessonIndex,
   navigateTo,
+  progress,
   toggleCoursePanel,
   openMaterial,
-}: CourseSidebarProps) => {
-  const { setSidebarOpen } = useLayoutStore();
+  onDownloadMaterial,
+  allowCollapse = false,
+}: CourseSidebarComponentProps) => {
+  const { setSidebarOpen, setSidebarCollapsed } = useLayoutStore();
+  const router = useRouter();
+  const params = useParams<{ courseId?: string }>();
+  const courseId = params?.courseId;
   const [expandedLessonMaterials, setExpandedLessonMaterials] = useState<string | number | null>(null);
+  const [expandedChapterId, setExpandedChapterId] = useState<string | number | null>(
+    chapters[currentChapterIndex]?.id ?? null,
+  );
+
+  useEffect(() => {
+    setExpandedChapterId(chapters[currentChapterIndex]?.id ?? null);
+  }, [chapters[currentChapterIndex]?.id, currentChapterIndex]);
 
   const toggleMaterials = (e: React.MouseEvent, lessonId: string | number) => {
     e.stopPropagation();
@@ -79,6 +60,7 @@ export const CourseSidebar = ({
     if (resource.topicId) {
       return String(resource.topicId) === String(lessonId);
     }
+    if (parentUnitId) return false;
     return String(resource.unitId) === String(parentUnitId || chapterId);
   });
 
@@ -97,34 +79,70 @@ export const CourseSidebar = ({
         <div className="p-6">
           {/* Course Navigation */}
           <div className="mb-8">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Course Content</h3>
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Course Content</h3>
+              {allowCollapse && (
+                <button
+                  type="button"
+                  onClick={() => setSidebarCollapsed(true)}
+                  className="hidden rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white lg:inline-flex"
+                  aria-label="Collapse course sidebar"
+                  title="Collapse course sidebar"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+              )}
+            </div>
             <div className="space-y-2">
               {chapters.length > 0 ? (
-                chapters.map((chapter, chapterIndex) => (
+                chapters.map((chapter, chapterIndex) => {
+                  const previousChapter = chapters[chapterIndex - 1];
+                  const previousTopic = previousChapter?.lessons?.at(-1);
+                  const chapterLocked = Boolean(
+                    parentUnitId &&
+                    chapterIndex > 0 &&
+                    currentChapterIndex !== chapterIndex &&
+                    !(previousTopic?.nextTopicUnlocked || previousTopic?.masteryUnlocked),
+                  );
+                  const isExpanded = expandedChapterId === chapter.id;
+
+                  return (
                   <div key={chapter.id} className="border border-gray-200 dark:border-slate-800 rounded-lg overflow-hidden">
                     <button
-                      className="w-full flex items-center justify-between p-3 text-left hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors"
-                      onClick={() => navigateTo(chapterIndex, 0)}
-                      title={`Navigate to chapter ${chapter.title}`}
+                      type="button"
+                      disabled={chapterLocked}
+                      aria-expanded={isExpanded}
+                      className="w-full flex items-center justify-between p-3 text-left hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+                      onClick={() => {
+                        if (chapterLocked) return;
+                        setExpandedChapterId(isExpanded ? null : chapter.id);
+                        if (!parentUnitId && courseId) {
+                          router.push(`/courses/${courseId}/units/${chapter.id}`);
+                        } else if (!isExpanded && currentChapterIndex !== chapterIndex) {
+                          navigateTo(chapterIndex, 0);
+                        }
+                      }}
+                      title={chapterLocked ? 'Pass the previous topic quiz to unlock this topic' : `Navigate to chapter ${chapter.title}`}
                     >
                       <div>
                         <p className="font-semibold text-gray-900 dark:text-white">{chapter.title}</p>
                         <p className="text-xs text-gray-500 dark:text-slate-500">{chapter.duration}</p>
                       </div>
-                      <ChevronRight className={`w-4 h-4 text-gray-400 transition-transform ${currentChapterIndex === chapterIndex ? 'rotate-90' : ''}`} />
+                      <ChevronRight className={`w-4 h-4 text-gray-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
                     </button>
-                    {currentChapterIndex === chapterIndex && (
+                    {isExpanded && (
                       <div className="border-t border-gray-200 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-900/50">
                         {chapter.lessons.map((lesson, lessonIndex) => {
-                          const isLocked = lessonIndex > 0 && !chapter.lessons[lessonIndex - 1].masteryUnlocked;
+                          const previousLesson = chapter.lessons[lessonIndex - 1];
+                          const previousLessonUnlocked = previousLesson?.nextTopicUnlocked || previousLesson?.masteryUnlocked;
+                          const isLocked = chapterLocked || (lessonIndex > 0 && !previousLessonUnlocked);
                           const isActive = currentLessonIndex === lessonIndex && currentChapterIndex === chapterIndex;
+                          const isCompleted = lesson.isCompleted || progress[String(lesson.id)] || false;
                           const lessonResources = getLessonResources(lesson.id, chapter.id);
                           
                           return (
                             <React.Fragment key={lesson.id}>
-                              <button
-                                disabled={isLocked}
-                                onClick={() => !isLocked && navigateTo(chapterIndex, lessonIndex)}
+                              <div
                                 className={`w-full flex items-center justify-between p-3 text-left hover:bg-white dark:hover:bg-slate-800 transition-all ${
                                   isActive
                                     ? 'bg-blue-50 dark:bg-blue-500/10 border-l-2 border-blue-500'
@@ -136,8 +154,11 @@ export const CourseSidebar = ({
                                   {isLocked ? (
                                     <Lock className="w-4 h-4 text-gray-400" />
                                   ) : (
-                                    <div 
+                                    <button
+                                      type="button"
                                       onClick={(e) => toggleMaterials(e, lesson.id)}
+                                      aria-expanded={expandedLessonMaterials === lesson.id}
+                                      aria-label={`View materials for ${lesson.title}`}
                                       className={`cursor-pointer hover:scale-125 transition-all p-0.5 rounded-full z-10 ${
                                         lessonResources.length > 0
                                           ? 'ring-2 ring-blue-400/30 bg-blue-50 dark:bg-blue-900/20 shadow-sm shadow-blue-500/20'
@@ -145,7 +166,7 @@ export const CourseSidebar = ({
                                       }`}
                                       title="Click to view relevant materials (videos, links, etc.)"
                                     >
-                                      {lesson.isCompleted ? (
+                                      {isCompleted ? (
                                         <CheckCircle className="w-4 h-4 text-green-500" />
                                       ) : (
                                         <Circle className={`w-4 h-4 transition-colors ${
@@ -156,8 +177,15 @@ export const CourseSidebar = ({
                                               : 'text-gray-400'
                                         }`} />
                                       )}
-                                    </div>
+                                    </button>
                                   )}
+                                  <button
+                                    type="button"
+                                    disabled={isLocked}
+                                    onClick={() => !isLocked && navigateTo(chapterIndex, lessonIndex)}
+                                    className="flex-1 min-w-0 text-left disabled:cursor-not-allowed"
+                                    title={isLocked ? 'Lesson locked: complete the previous mastery quiz' : `Go to lesson ${lesson.title}`}
+                                  >
                                   <div>
                                     <p className="text-sm font-medium text-gray-900 dark:text-slate-200">{lesson.title}</p>
                                     <div className="flex items-center space-x-2">
@@ -169,22 +197,27 @@ export const CourseSidebar = ({
                                       )}
                                     </div>
                                   </div>
+                                  </button>
                                 </div>
                                 <div className="flex items-center space-x-2">
                                   {!isLocked && lesson.readinessSignal && (
-                                    <div 
+                                    <div
                                       className={`w-2 h-2 rounded-full ${
                                         lesson.readinessSignal === 'SAFE' ? 'bg-green-500' :
                                         lesson.readinessSignal === 'BORDERLINE' ? 'bg-yellow-500' : 'bg-red-500'
                                       }`} 
                                       title={`Readiness: ${lesson.readinessSignal}`}
-                                    />
+                                    >
+                                      <span className="sr-only">Readiness: {lesson.readinessSignal}</span>
+                                    </div>
                                   )}
                                   {!isLocked && lesson.masteryUnlocked && !lesson.readinessSignal && (
-                                     <div className="w-2 h-2 rounded-full bg-green-500" title="Mastery Unlocked" />
+                                     <div className="w-2 h-2 rounded-full bg-green-500" title="Mastery Unlocked">
+                                       <span className="sr-only">Mastery unlocked</span>
+                                     </div>
                                   )}
                                 </div>
-                              </button>
+                              </div>
 
                               {/* Relevant Materials Inline List */}
                               {expandedLessonMaterials === lesson.id && !isLocked && (
@@ -192,13 +225,11 @@ export const CourseSidebar = ({
                                   <p className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-2 px-6">Relevant Materials</p>
                                   <div className="space-y-0.5 px-3">
                                     {lessonResources.map(material => (
-                                      <a
+                                      <button
+                                        type="button"
                                         key={material.id}
-                                        onClick={(e) => {
-                                          e.preventDefault();
-                                          openMaterial(String(material.id));
-                                        }}
-                                        className="flex items-center space-x-3 px-3 py-1.5 rounded-md hover:bg-white dark:hover:bg-slate-800 transition-colors group cursor-pointer"
+                                        onClick={() => openMaterial(String(material.id))}
+                                        className="w-full flex items-center space-x-3 px-3 py-1.5 rounded-md text-left hover:bg-white dark:hover:bg-slate-800 transition-colors group cursor-pointer"
                                         title={`Open ${material.title} (Activity Tracked)`}
                                       >
                                         <div className="p-1 bg-blue-100/50 dark:bg-blue-900/20 rounded text-blue-600 dark:text-blue-400">
@@ -212,7 +243,7 @@ export const CourseSidebar = ({
                                           {material.title}
                                         </span>
                                         <ExternalLink className="w-2.5 h-2.5 text-gray-300 opacity-0 group-hover:opacity-100" />
-                                      </a>
+                                      </button>
                                       ))
                                     }
                                     {lessonResources.length === 0 && (
@@ -227,7 +258,8 @@ export const CourseSidebar = ({
                       </div>
                     )}
                   </div>
-                ))
+                  );
+                })
               ) : (
                 <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-dashed border-slate-200 dark:border-slate-700 text-center">
                   <p className="text-xs text-slate-500">No units available for this course yet.</p>
@@ -265,12 +297,23 @@ export const CourseSidebar = ({
                     >
                       <ExternalLink className="w-4 h-4" />
                     </button>
-                    <button
+                    {(onDownloadMaterial || resource.url) && (
+                      <button
+                      type="button"
                       className="p-1.5 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                       title={`Download ${resource.title}`}
+                      aria-label={`Download ${resource.title}`}
+                      onClick={() => {
+                        if (onDownloadMaterial) {
+                          onDownloadMaterial(String(resource.id));
+                        } else {
+                          window.open(resource.url, '_blank', 'noopener,noreferrer');
+                        }
+                      }}
                     >
                       <Download className="w-4 h-4" />
-                    </button>
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}

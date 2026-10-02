@@ -189,7 +189,7 @@ const configureWebpack = (config, { isServer }) => {
  */
 const getContentSecurityPolicy = () => {
   const baseCSP =
-    "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.r2.cloudflarestorage.com; font-src 'self'; worker-src 'self' blob:";
+    "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://www.youtube.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.r2.cloudflarestorage.com; font-src 'self'; frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com; worker-src 'self' blob:";
 
   if (isProd) {
     return `${baseCSP}; connect-src 'self' blob: https://*.amazonaws.com wss://*.amazonaws.com; frame-ancestors 'none'; block-all-mixed-content`;

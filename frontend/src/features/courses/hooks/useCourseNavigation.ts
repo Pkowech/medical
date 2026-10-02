@@ -1,7 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 
-type NavLesson = { id: string | number };
+type NavLesson = {
+  id: string | number;
+  masteryUnlocked?: boolean;
+  nextTopicUnlocked?: boolean;
+};
 type NavChapter = { id: string | number; lessons: NavLesson[] };
 
 export const useCourseNavigation = (
@@ -26,10 +30,22 @@ export const useCourseNavigation = (
 
   const [currentChapterIndex, setCurrentChapterIndex] = useState(0);
   const [currentLessonIndex, setCurrentLessonIndex] = useState(0);
+  const previousParentUnitId = useRef<string | undefined>(undefined);
 
   // Sync state from URL
   useEffect(() => {
     if (!chapters.length) return;
+
+    if (parentUnitId && !topicIdFromUrl) {
+      if (previousParentUnitId.current !== parentUnitId) {
+        setCurrentChapterIndex(0);
+        setCurrentLessonIndex(0);
+      }
+      previousParentUnitId.current = parentUnitId;
+      return;
+    }
+
+    previousParentUnitId.current = parentUnitId;
     
     let chIdx = 0;
     let lsIdx = 0;
@@ -58,13 +74,30 @@ export const useCourseNavigation = (
   const navigateTo = (chapterIndex: number, lessonIndex: number) => {
     const targetChapter = chapters?.[chapterIndex];
     const targetLesson = targetChapter?.lessons?.[lessonIndex];
-    
-    if (targetChapter && courseId) {
+
+    if (!targetChapter) return;
+
+    if (parentUnitId && chapterIndex > 0 && chapterIndex !== currentChapterIndex) {
+      const previousChapter = chapters[chapterIndex - 1];
+      const previousTopic = previousChapter?.lessons?.at(-1);
+      const previousTopicUnlocked = Boolean(
+        previousTopic?.nextTopicUnlocked || previousTopic?.masteryUnlocked,
+      );
+      if (!previousTopicUnlocked) return;
+    }
+
+    setCurrentChapterIndex(chapterIndex);
+    setCurrentLessonIndex(lessonIndex);
+
+    // Unit pages render topic selection in-place; the legacy nested topic page
+    // does not share the unit layout or its topic-material filtering.
+    if (parentUnitId) return;
+
+    if (courseId) {
       if (targetLesson) {
-        const routeUnitId = parentUnitId || String(targetChapter.id);
-        router.push(`/courses/${courseId}/units/${routeUnitId}/topics/${targetLesson.id}`);
+        router.push(`/courses/${courseId}/units/${targetChapter.id}/topics/${targetLesson.id}`);
       } else {
-        router.push(`/courses/${courseId}/units/${parentUnitId || targetChapter.id}`);
+        router.push(`/courses/${courseId}/units/${targetChapter.id}`);
       }
     }
   };

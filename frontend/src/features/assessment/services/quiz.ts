@@ -1,5 +1,14 @@
 import { apiService } from '@/features/auth/services/apiClient';
 
+export interface TopicQuizSubmission {
+  score: number;
+  feedback: string;
+  passed: boolean;
+  masteryUnlocked: boolean;
+  nextTopicUnlocked: boolean;
+  nextTopicId?: string;
+}
+
 class QuizService {
   private readonly baseUrl = '/quizzes';
 
@@ -36,6 +45,28 @@ class QuizService {
       questionId,
       selectedOptionIds: [selectedOptionId],
     });
+    return response.data;
+  }
+
+  async submitUnitQuiz(
+    unitId: string | number,
+    answers: Array<{ questionId: string; selectedOption: string }>,
+  ): Promise<{ percentage: number; isPassed: boolean }> {
+    const response = await apiService.post<{ percentage: number; isPassed: boolean }>(
+      `${this.baseUrl}/submit?type=full`,
+      { unitId, answers },
+    );
+    return response.data;
+  }
+
+  async submitTopicQuiz(
+    topicId: string | number,
+    responses: Array<{ questionId: string; selectedAnswers: string[] }>,
+  ): Promise<TopicQuizSubmission> {
+    const response = await apiService.post<TopicQuizSubmission>(
+      `${this.baseUrl}/topic/${topicId}/submit`,
+      { responses },
+    );
     return response.data;
   }
 

@@ -3,17 +3,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   ChevronLeft,
-  Play,
-  FileText,
-  Download,
-  BookOpen,
-  Lightbulb,
-  ExternalLink,
-  X,
+  ChevronRight,
   ChevronDown,
   ChevronUp,
+  ClipboardCheck,
 } from 'lucide-react';
 import { useParams } from 'next/navigation';
+import { useAuth } from '@/features/auth/hooks/useAuth';
+import { instructorRoles } from '@/shared/enums/role.enum';
 import { useLayoutStore } from '@/core/stores/useLayoutStore';
 import { cn } from '@/lib/utils/cn';
 import { usePageHeader } from '@/core/providers/HeaderContext';
@@ -33,20 +30,6 @@ import { useCourseNavigation } from '@/features/courses/hooks/useCourseNavigatio
 import { useXapi } from '@/lib/xapi/useXapi';
 import { MaterialPreviewModal } from '@/features/courses/components/MaterialPreviewModal';
 import { Button } from '@/shared/components/ui/button';
-import { Badge } from '@/shared/components/ui/badge';
-
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
-const MATERIAL_ICONS: Record<string, React.ReactNode> = {
-  VIDEO: <Play className="w-4 h-4" />,
-  PDF: <FileText className="w-4 h-4" />,
-  DOCUMENT: <FileText className="w-4 h-4" />,
-  ARTICLE: <FileText className="w-4 h-4" />,
-  INTERACTIVE: <Lightbulb className="w-4 h-4" />,
-  QUIZ: <BookOpen className="w-4 h-4" />,
-};
 
 // ---------------------------------------------------------------------------
 // Types
@@ -54,6 +37,7 @@ const MATERIAL_ICONS: Record<string, React.ReactNode> = {
 
 interface UnitLayoutProps {
   unitId?: string;
+  courseId?: string;
 }
 
 type NormalisedMaterial = {
@@ -66,284 +50,47 @@ type NormalisedMaterial = {
   unitId?: string | number;
 };
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-const getMaterialIcon = (type: string) =>
-  MATERIAL_ICONS[type.toUpperCase()] ?? <Download className="w-4 h-4" />;
-
-/**
- * Helper to organize materials by type
- */
-const organizeMaterialsByType = (materials: NormalisedMaterial[]): Record<string, NormalisedMaterial[]> => {
-  return materials.reduce((acc, material) => {
-    const type = material.type || 'DOCUMENT';
-    if (!acc[type]) {
-      acc[type] = [];
-    }
-    acc[type].push(material);
-    return acc;
-  }, {} as Record<string, NormalisedMaterial[]>);
-};
-
-/**
- * Inline material viewer.
- *
- * - VIDEO  → <video> element
- * - PDF    → <iframe> / <object>
- * - ARTICLE / DOCUMENT / TEXT → rich text / iframe
- * - anything else → download prompt
- */
-const InlineMaterialViewer = ({
-  material,
-  onClose,
-}: {
-  material: NormalisedMaterial;
-  onClose: () => void;
-}) => {
-  const type = (material.type || '').toUpperCase();
-
-  const renderContent = () => {
-    if (type === 'VIDEO') {
-      return (
-        <video
-          src={material.url}
-          controls
-          autoPlay
-          className="w-full rounded-lg max-h-[60vh] bg-black"
-        >
-          Your browser does not support video playback.
-        </video>
-      );
-    }
-
-    if (type === 'PDF') {
-      return (
-        <iframe
-          src={`${material.url}#toolbar=1&navpanes=0`}
-          title={material.title}
-          className="w-full rounded-lg border border-gray-200 dark:border-slate-600"
-          style={{ height: '70vh' }}
-        />
-      );
-    }
-
-    // ARTICLE / DOCUMENT — try iframe first, fallback to open-in-tab prompt
-    if (['ARTICLE', 'DOCUMENT', 'INTERACTIVE'].includes(type)) {
-      return (
-        <iframe
-          src={material.url}
-          title={material.title}
-          className="w-full rounded-lg border border-gray-200 dark:border-slate-600"
-          style={{ height: '70vh' }}
-        />
-      );
-    }
-
-    // Default: download / open externally
-    return (
-      <div className="flex flex-col items-center justify-center gap-4 py-16 text-center">
-        <div className="text-gray-400 dark:text-slate-500">{getMaterialIcon(type)}</div>
-        <p className="text-gray-600 dark:text-slate-300 text-sm">
-          This material type cannot be previewed inline.
-        </p>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => window.open(material.url, '_blank')}
-          className="gap-2"
-        >
-          <ExternalLink className="w-4 h-4" />
-          Open in new tab
-        </Button>
-      </div>
-    );
-  };
-
-  return (
-    <div className="mt-4 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900/50">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="text-gray-400 dark:text-slate-400 shrink-0">
-            {getMaterialIcon(material.type)}
-          </span>
-          <span className="text-sm font-medium text-gray-900 dark:text-white truncate">
-            {material.title}
-          </span>
-          <Badge variant="outline" className="text-xs shrink-0">
-            {material.type}
-          </Badge>
-        </div>
-        <div className="flex items-center gap-1 shrink-0 ml-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => window.open(material.url, '_blank')}
-            className="h-7 w-7 p-0"
-            title="Open in new tab"
-          >
-            <ExternalLink className="w-3.5 h-3.5" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onClose}
-            className="h-7 w-7 p-0"
-            title="Close"
-          >
-            <X className="w-3.5 h-3.5" />
-          </Button>
-        </div>
-      </div>
-
-      {/* Content */}
-      <div className="p-0">{renderContent()}</div>
-    </div>
-  );
-};
-
-/**
- * Expandable materials list for a topic, organized by type.
- * Clicking a material opens the InlineMaterialViewer below the list.
- */
-const TopicMaterialsSection = ({ materials }: { materials: NormalisedMaterial[] }) => {
-  const [openMaterialId, setOpenMaterialId] = useState<string | number | null>(null);
-
-  if (materials.length === 0) return null;
-
-  const activeMaterial = materials.find(m => m.id === openMaterialId) ?? null;
-  const materialsByType = organizeMaterialsByType(materials);
-
-  const handleMaterialClick = (material: NormalisedMaterial) => {
-    if (!material.url) return;
-    setOpenMaterialId(prev => (prev === material.id ? null : material.id));
-  };
-
-  return (
-    <div className="mt-8 pt-8 border-t border-gray-200 dark:border-slate-700">
-      <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Topic Materials</h2>
-
-      {Object.entries(materialsByType).map(([type, typeMaterials]) => (
-        <div key={type} className="mb-6">
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-slate-200 mb-3 flex items-center gap-2">
-            {getMaterialIcon(type)}
-            {type}s
-          </h3>
-          <div className="space-y-2">
-            {typeMaterials.map(material => {
-              const isOpen = openMaterialId === material.id;
-              return (
-                <div key={material.id}>
-                  <div
-                    className={cn(
-                      'flex items-center justify-between p-3 rounded-lg transition-colors border cursor-pointer select-none',
-                      isOpen
-                        ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700'
-                        : 'bg-gray-50 dark:bg-slate-700/50 border-gray-200 dark:border-slate-600 hover:bg-gray-100 dark:hover:bg-slate-700',
-                    )}
-                    onClick={() => handleMaterialClick(material)}
-                    role="button"
-                    tabIndex={0}
-                    onKeyDown={e => e.key === 'Enter' && handleMaterialClick(material)}
-                  >
-                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <div
-                        className={cn(
-                          'shrink-0 transition-colors',
-                          isOpen
-                            ? 'text-blue-500 dark:text-blue-400'
-                            : 'text-gray-400 dark:text-slate-400',
-                        )}
-                      >
-                        {getMaterialIcon(material.type || 'DOCUMENT')}
-                      </div>
-
-                      <div className="flex-1 min-w-0">
-                        <p
-                          className={cn(
-                            'text-sm font-medium truncate transition-colors',
-                            isOpen
-                              ? 'text-blue-700 dark:text-blue-300'
-                              : 'text-gray-900 dark:text-white',
-                          )}
-                        >
-                          {material.title}
-                        </p>
-                        {material.description && (
-                          <p className="text-xs text-gray-500 dark:text-slate-400 truncate mt-0.5">
-                            {material.description}
-                          </p>
-                        )}
-                      </div>
-
-                      <Badge
-                        variant="outline"
-                        className={cn(
-                          'text-xs whitespace-nowrap ml-2 transition-colors',
-                          isOpen && 'border-blue-300 dark:border-blue-600 text-blue-600 dark:text-blue-400',
-                        )}
-                      >
-                        {material.type || 'Material'}
-                      </Badge>
-                    </div>
-
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="ml-2 shrink-0 h-7 w-7 p-0"
-                      title="Download"
-                      onClick={e => {
-                        e.stopPropagation();
-                        if (material.url) window.open(material.url, '_blank');
-                      }}
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                    </Button>
-                  </div>
-
-                  {isOpen && activeMaterial && (
-                    <InlineMaterialViewer
-                      material={activeMaterial}
-                      onClose={() => setOpenMaterialId(null)}
-                    />
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-};
 
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
 
-export const UnitLayout = ({ unitId: propUnitId }: UnitLayoutProps) => {
+export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) => {
   const params = useParams();
   const unitId = propUnitId || (params?.unitId as string);
 
   // ── Global UI state ────────────────────────────────────────────────────
-  const { activeCoursePanel, toggleCoursePanel, sidebarOpen } = useLayoutStore();
+  const {
+    activeCoursePanel,
+    toggleCoursePanel,
+    closeCoursePanel,
+    sidebarOpen,
+    sidebarCollapsed,
+    setSidebarCollapsed,
+  } = useLayoutStore();
 
   // ── Page header ────────────────────────────────────────────────────────
   const { setHeader } = usePageHeader();
 
   // ── Progress store ─────────────────────────────────────────────────────
-  const { progress, bookmarks, notes, markLessonComplete, toggleBookmark, saveNote } =
+  const { progress, bookmarks, notes, markLessonComplete, toggleLessonComplete, toggleBookmark, saveNote } =
     useCourseProgressStore();
 
   // ── Local state ────────────────────────────────────────────────────────
   const [offlineMode, setOfflineMode] = useState(false);
   const [selectedMaterialId, setSelectedMaterialId] = useState<string | null>(null);
-  const [isAdmin, _setIsAdmin] = useState(true); // Placeholder for admin status
+  const [hasSelectedTopic, setHasSelectedTopic] = useState(Boolean(params?.topicId));
+  const { user } = useAuth();
+  const isAdmin = Boolean(user?.role && instructorRoles.includes(user.role));
 
-  const openMaterial = (id: string) => setSelectedMaterialId(id);
-  const closeMaterial = () => setSelectedMaterialId(null);
+  const openMaterial = (id: string) => {
+    setSidebarCollapsed(false);
+    setSelectedMaterialId(id);
+  };
+  const closeMaterial = () => {
+    setSidebarCollapsed(false);
+    setSelectedMaterialId(null);
+  };
 
   const handleAddTopic = async () => {
     console.warn('Admin wants to add a new topic!');
@@ -360,7 +107,7 @@ export const UnitLayout = ({ unitId: propUnitId }: UnitLayoutProps) => {
 
   // ── Data fetching ──────────────────────────────────────────────────────
   // useUnitData now returns chapters = one chapter per topic.
-  const { data: unitData, isLoading: isUnitLoading, error: unitError, refetch: refetchUnit } = useUnitData(unitId);
+  const { data: unitData, isLoading: isUnitLoading, error: unitError, refetch: refetchUnit } = useUnitData(unitId, courseId);
 
   // ── Navigation (chapter = topic, lesson = topic itself) ────────────────
   const {
@@ -373,6 +120,13 @@ export const UnitLayout = ({ unitId: propUnitId }: UnitLayoutProps) => {
     isFirstLesson,
     isLastLesson,
   } = useCourseNavigation(unitData?.chapters || [], unitId);
+
+  const selectTopic = (chapterIndex: number, lessonIndex: number) => {
+    setHasSelectedTopic(true);
+    closeCoursePanel('quiz');
+    closeCoursePanel('unit-quiz');
+    navigateTo(chapterIndex, lessonIndex);
+  };
 
   // ── Page header sync ───────────────────────────────────────────────────
   useEffect(() => {
@@ -406,6 +160,12 @@ export const UnitLayout = ({ unitId: propUnitId }: UnitLayoutProps) => {
   };
 
   const typedCurrentTopic = getCurrentTopic() as unknown as Lesson & { resources?: Material[] };
+  const unitProgressPercentage = unitData?.chapters?.length
+    ? Math.round(
+        (unitData.chapters.filter(chapter => chapter.lessons[0]?.isCompleted).length /
+          unitData.chapters.length) * 100,
+      )
+    : 0;
 
   // ── Materials for the current topic ───────────────────────────────────
   // The lesson carries `resources` (set in normalizeUnitToChapters).
@@ -418,15 +178,12 @@ export const UnitLayout = ({ unitId: propUnitId }: UnitLayoutProps) => {
     // 1. Materials attached directly to the lesson (preferred)
     const lessonResources: Material[] = typedCurrentTopic.resources || [];
 
-    // 2. Fallback: scan top-level resources that reference this topic
+    // 2. Include only top-level resources explicitly linked to this topic.
     const topLevelMatches = ((unitData.resources || []) as Material[]).filter(m => {
       const mTyped = m as Material & {
-        unitId?: string | number;
         topicId?: string | number;
-        unit?: { id: string | number };
       };
-      if (mTyped.topicId != null) return String(mTyped.topicId) === topicId;
-      return String(mTyped.unitId || mTyped.unit?.id || '') === String(unitData.id);
+      return mTyped.topicId != null && String(mTyped.topicId) === topicId;
     });
 
     // Merge and deduplicate
@@ -496,7 +253,7 @@ export const UnitLayout = ({ unitId: propUnitId }: UnitLayoutProps) => {
     );
   }
 
-  // ── Sidebar resources (all materials for the sidebar Resources panel) ──
+  // ── Separate topic materials from general sidebar resources ────────────
   type ResourceLike = Partial<Material> & {
     contentType?: string;
     size?: string;
@@ -508,7 +265,7 @@ export const UnitLayout = ({ unitId: propUnitId }: UnitLayoutProps) => {
     unit?: { id: string | number };
   };
 
-  const sidebarResources = ((unitData.resources || []) as ResourceLike[]).map(m => ({
+  const allResources = ((unitData.resources || []) as ResourceLike[]).map(m => ({
     id: m.id ?? 'unknown',
     title: m.title ?? 'Untitled',
     type: m.type ?? m.contentType ?? 'document',
@@ -517,6 +274,18 @@ export const UnitLayout = ({ unitId: propUnitId }: UnitLayoutProps) => {
     unitId: m.unitId || m.unit?.id,
     topicId: m.topicId,
   }));
+  const topicMaterialIds = new Set<string>();
+  (unitData.chapters || []).forEach(chapter => {
+    chapter.lessons.forEach(lesson => {
+      const topicResources = (lesson as typeof lesson & {
+        resources?: Array<{ id: string | number }>;
+      }).resources ?? [];
+      topicResources.forEach(resource => topicMaterialIds.add(String(resource.id)));
+    });
+  });
+  const sidebarResources = allResources.filter(resource =>
+    resource.topicId == null && !topicMaterialIds.has(String(resource.id)),
+  );
 
   // ── Render ─────────────────────────────────────────────────────────────
   return (
@@ -531,8 +300,9 @@ export const UnitLayout = ({ unitId: propUnitId }: UnitLayoutProps) => {
          */}
         <div
           className={cn(
-            'fixed lg:static inset-y-0 left-0 z-[60] lg:z-40 h-full min-h-0 transition-transform duration-300 ease-in-out',
+            'fixed lg:static inset-y-0 left-0 z-60 lg:z-40 h-full min-h-0 w-80 shrink-0 overflow-hidden transition-[width,transform] duration-300 ease-in-out',
             sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
+            sidebarCollapsed && selectedMaterialId ? 'lg:w-0' : 'lg:w-80',
           )}
         >
           <CourseSidebar
@@ -541,32 +311,112 @@ export const UnitLayout = ({ unitId: propUnitId }: UnitLayoutProps) => {
             parentUnitId={unitData.id}
             currentChapterIndex={currentChapterIndex}
             currentLessonIndex={currentLessonIndex}
-            navigateTo={navigateTo}
+            navigateTo={selectTopic}
             progress={progress}
             toggleCoursePanel={toggleCoursePanel}
             openMaterial={openMaterial}
+            allowCollapse={Boolean(selectedMaterialId)}
           />
         </div>
 
         {/* Main content area */}
-        <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain p-4 md:p-8 scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-slate-700">
-          <div className="max-w-5xl mx-auto space-y-6 md:space-y-8 pb-20">
+        <main className={cn(
+          'min-h-0 min-w-0 flex-1 overscroll-contain scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-slate-700',
+          selectedMaterialId ? 'flex overflow-hidden p-0' : 'overflow-y-auto p-4 md:p-8',
+        )}>
+          <div className={cn(
+            'max-w-5xl mx-auto space-y-6 md:space-y-8 pb-20',
+            selectedMaterialId && 'flex h-full w-full max-w-none flex-1 flex-col space-y-0 pb-0',
+          )}>
 
             {/* Breadcrumb + progress */}
-            <div className="space-y-4">
-              <Breadcrumb />
-              <ProgressBar value={50} className="h-2" />
-            </div>
+            {!selectedMaterialId && <div className="space-y-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-3">
+                {sidebarCollapsed && selectedMaterialId && (
+                  <button
+                    type="button"
+                    onClick={() => setSidebarCollapsed(false)}
+                    className="rounded-md border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+                    aria-label="Open course sidebar"
+                    title="Open course sidebar"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                )}
+                <Breadcrumb />
+                </div>
+                <Button
+                  type="button"
+                  variant={activeCoursePanel === 'unit-quiz' ? 'outline' : 'default'}
+                  onClick={() => toggleCoursePanel('unit-quiz')}
+                  aria-pressed={activeCoursePanel === 'unit-quiz'}
+                  className="shrink-0"
+                >
+                  <ClipboardCheck className="mr-2 h-4 w-4" />
+                  {activeCoursePanel === 'unit-quiz' ? 'Back to Unit' : 'Unit Quiz'}
+                </Button>
+              </div>
+              <ProgressBar value={unitProgressPercentage} className="h-2" />
+            </div>}
 
             {/* Admin actions - Add Topic */}
-            {isAdmin && (
+            {!selectedMaterialId && isAdmin && (
               <div className="flex justify-end mt-4">
                 <Button onClick={handleAddTopic}>Add New Topic</Button>
               </div>
             )}
 
-            {/* Quiz panel */}
-            {activeCoursePanel === 'quiz' ? (
+            {selectedMaterialId ? (
+              <MaterialPreviewModal
+                materialId={selectedMaterialId}
+                isOpen={Boolean(selectedMaterialId)}
+                onClose={closeMaterial}
+                materials={allResources}
+                onNavigate={setSelectedMaterialId}
+                inline
+              />
+            ) : activeCoursePanel === 'unit-quiz' ? (
+              <div className="animate-in fade-in slide-in-from-right-4 duration-500">
+                <div className="mb-4 flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => toggleCoursePanel('unit-quiz')}
+                    className="flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-blue-600"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    Back to Unit
+                  </button>
+                </div>
+                <QuizPanel
+                  lessonId={unitData.id}
+                  lessonTitle={unitData.title}
+                  scope="unit"
+                  onReturn={() => toggleCoursePanel('unit-quiz')}
+                />
+              </div>
+            ) : !hasSelectedTopic ? (
+              <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{unitData.title}</h1>
+                <p className="mt-2 text-slate-600 dark:text-slate-400">{unitData.description || 'Choose a topic to begin.'}</p>
+                <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:hidden">
+                  {(unitData.chapters || []).map((chapter, chapterIndex) => (
+                    <button
+                      key={chapter.id}
+                      type="button"
+                      onClick={() => selectTopic(chapterIndex, 0)}
+                      className="flex w-full items-center justify-between rounded-lg border border-slate-200 p-4 text-left hover:border-blue-400 hover:bg-blue-50/50 dark:border-slate-700 dark:hover:bg-blue-950/20"
+                    >
+                      <span>
+                        <span className="block font-semibold text-slate-900 dark:text-white">{chapter.title}</span>
+                        <span className="text-sm text-slate-500 dark:text-slate-400">{chapter.duration}</span>
+                      </span>
+                      <span className="text-sm font-semibold text-blue-600">Open topic</span>
+                    </button>
+                  ))}
+                </div>
+              </section>
+            ) : activeCoursePanel === 'quiz' ? (
               <div className="animate-in fade-in slide-in-from-right-4 duration-500">
                 <div className="flex items-center justify-between mb-4">
                   <button
@@ -581,6 +431,23 @@ export const UnitLayout = ({ unitId: propUnitId }: UnitLayoutProps) => {
                   lessonId={typedCurrentTopic?.id}
                   lessonTitle={typedCurrentTopic?.title}
                   scope="topic"
+                  onTopicProgressUpdated={() => refetchUnit().then(() => undefined)}
+                  onTopicCompleted={() => {
+                    markLessonComplete(lessonKey);
+                    if (typedCurrentTopic?.id != null) {
+                      markLessonComplete(String(typedCurrentTopic.id));
+                    }
+                  }}
+                  onNextTopic={(nextTopicId) => {
+                    const nextIndex = (unitData.chapters || []).findIndex(
+                      chapter => String(chapter.id) === String(nextTopicId),
+                    );
+                    if (nextIndex >= 0) {
+                      toggleCoursePanel('quiz');
+                      selectTopic(nextIndex, 0);
+                    }
+                  }}
+                  onReturn={() => toggleCoursePanel('quiz')}
                 />
               </div>
             ) : (
@@ -598,32 +465,27 @@ export const UnitLayout = ({ unitId: propUnitId }: UnitLayoutProps) => {
                   bookmarks={new Set(bookmarks)}
                   progress={progress}
                   toggleBookmark={toggleBookmark}
-                  markLessonComplete={markLessonComplete}
-                  navigatePrev={navigatePrev}
-                  navigateNext={navigateNext}
+                  toggleLessonComplete={toggleLessonComplete}
+                  navigatePrev={() => { setHasSelectedTopic(true); navigatePrev(); }}
+                  navigateNext={() => { setHasSelectedTopic(true); navigateNext(); }}
+                  onOpenMasteryQuiz={() => toggleCoursePanel('quiz')}
                   isFirstLesson={isFirstLesson}
                   isLastLesson={isLastLesson}
                   materials={materialsForCurrentTopic as unknown as Material[]}
                   openMaterial={openMaterial}
+                  masteryPassingScore={70}
                 />
 
-                {/*
-                 * Topic materials — expandable list with INLINE viewer.
-                 * Clicking a PDF opens it in an iframe right below the row.
-                 * Clicking a video opens a <video> player.
-                 * Everything stays on the same page; no modal required.
-                 */}
-                <TopicMaterialsSection materials={materialsForCurrentTopic} />
               </>
             )}
 
             {/* Notes panel */}
-            {activeCoursePanel === 'notes' && (
+            {!selectedMaterialId && activeCoursePanel === 'notes' && (
               <NotesPanel lessonKey={lessonKey} notes={notes} saveNote={saveNote} />
             )}
 
             {/* Discussion panel */}
-            {activeCoursePanel === 'discussion' && (
+            {!selectedMaterialId && activeCoursePanel === 'discussion' && (
               <DiscussionPanel
                 discussions={(
                   (unitData?.discussions || []) as unknown as Record<string, unknown>[]
@@ -640,14 +502,6 @@ export const UnitLayout = ({ unitId: propUnitId }: UnitLayoutProps) => {
         </main>
       </div>
 
-      {/* Fallback modal (used only when openMaterial() is called from sidebar resource clicks) */}
-      <MaterialPreviewModal
-        materialId={selectedMaterialId}
-        isOpen={!!selectedMaterialId}
-        onClose={closeMaterial}
-        materials={sidebarResources}
-        onNavigate={setSelectedMaterialId}
-      />
     </div>
   );
 };

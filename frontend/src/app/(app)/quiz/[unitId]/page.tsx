@@ -27,6 +27,10 @@ export default function QuizPage({ params }: QuizPageProps) {
     return () => { mounted = false; };
   }, [params]);
 
+  React.useEffect(() => {
+    if (unitId) router.replace(`/unit/${unitId}`);
+  }, [router, unitId]);
+
   const {
     questions,
     currentState,

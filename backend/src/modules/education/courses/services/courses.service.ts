@@ -1507,6 +1507,17 @@ export class CoursesService {
         },
       });
 
+      const topicQuizProgress = await this.prisma.progress.findMany({
+        where: {
+          userId,
+          topicId: { not: null },
+          materialId: null,
+          quizScores: { not: Prisma.JsonNull },
+        },
+        orderBy: { updatedAt: 'desc' },
+        select: { topicId: true, quizScores: true },
+      });
+
       const completed = enrollments.filter(
         (e) => e.status === EnrollmentStatus.completed,
       ).length;
@@ -1515,15 +1526,22 @@ export class CoursesService {
         (e) => e.status === EnrollmentStatus.active,
       ).length;
 
-      const avgProgress =
-        progressRecords.length > 0
-          ? Math.round(
-              progressRecords.reduce(
-                (sum: number, p: any) => sum + (p.progressPercentage || 0),
-                0,
-              ) / progressRecords.length,
-            )
-          : 0;
+      const bestQuizScoreByTopic = new Map<string, number>();
+      for (const progress of topicQuizProgress) {
+        if (!progress.topicId || bestQuizScoreByTopic.has(progress.topicId)) continue;
+
+        const quizScores = progress.quizScores as Record<string, unknown> | null;
+        const score = typeof quizScores?.bestScore === 'number'
+          ? quizScores.bestScore
+          : typeof quizScores?.lastScore === 'number'
+            ? quizScores.lastScore
+            : undefined;
+        if (score !== undefined) bestQuizScoreByTopic.set(progress.topicId, score);
+      }
+      const quizScores = Array.from(bestQuizScoreByTopic.values());
+      const avgScore = quizScores.length > 0
+        ? Math.round(quizScores.reduce((sum, score) => sum + score, 0) / quizScores.length)
+        : 0;
 
       // Calculate total hours (sum of timeSpent)
       const hoursSpent = Math.round(
@@ -1574,7 +1592,7 @@ export class CoursesService {
         totalEnrolled: enrollments.length,
         completed,
         inProgress,
-        avgScore: avgProgress,
+        avgScore,
         hoursSpent,
         streak,
       };
@@ -1742,30 +1760,66 @@ export class CoursesService {
         );
       }
 
+      if (userId) {
+        const previousTopic = await this.prisma.topic.findFirst({
+          where: {
+            unitId,
+            order: { lt: topic.order },
+          },
+          orderBy: { order: 'desc' },
+          select: { id: true },
+        });
+
+        if (previousTopic) {
+          const previousProgress = await this.prisma.progress.findFirst({
+            where: {
+              userId,
+              topicId: previousTopic.id,
+              materialId: null,
+              unitId,
+              courseId,
+            },
+            orderBy: { updatedAt: 'desc' },
+            select: { status: true, quizScores: true },
+          });
+          const quizScores = previousProgress?.quizScores as Record<string, unknown> | null;
+          const previousTopicUnlocked =
+            previousProgress?.status === ProgressStatus.completed ||
+            quizScores?.nextTopicUnlocked === true;
+
+          if (!previousTopicUnlocked) {
+            throw new ForbiddenException(
+              'Pass the previous topic quiz to unlock this topic',
+            );
+          }
+        }
+      }
+
       // Track topic access if user provided
       if (userId) {
-        await this.prisma.progress.upsert({
-          where: {
-            userId_topicId_materialId_unitId_courseId: {
-              userId,
-              topicId,
-              materialId: '00000000-0000-0000-0000-000000000000',
-              unitId: '00000000-0000-0000-0000-000000000000',
-              courseId: '00000000-0000-0000-0000-000000000000',
-            },
-          },
-          update: {
-            lastAccessedAt: new Date(),
-          },
-          create: {
-            userId,
-            topicId,
-            courseId,
-            unitId,
-            status: ProgressStatus.inProgress,
-            progressPercentage: 0,
-          },
-        }).catch(() => {
+        const topicProgress = await this.prisma.progress.findFirst({
+          where: { userId, topicId, materialId: null, unitId, courseId },
+          orderBy: { updatedAt: 'desc' },
+          select: { id: true },
+        });
+
+        const accessUpdate = topicProgress
+          ? this.prisma.progress.update({
+              where: { id: topicProgress.id },
+              data: { lastAccessedAt: new Date() },
+            })
+          : this.prisma.progress.create({
+              data: {
+                userId,
+                topicId,
+                courseId,
+                unitId,
+                status: ProgressStatus.inProgress,
+                progressPercentage: 0,
+              },
+            });
+
+        await accessUpdate.catch(() => {
           // Ignore errors from access tracking
         });
       }

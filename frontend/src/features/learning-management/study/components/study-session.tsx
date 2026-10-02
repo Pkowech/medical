@@ -14,8 +14,9 @@ import { Label } from '@/shared/components/ui/label';
 import { Textarea } from '@/shared/components/ui/textarea';
 import { ScrollArea } from '@/shared/components/ui/scroll-area';
 import { Play, Pause, Square, BookOpen, Sparkles, ScrollText } from 'lucide-react';
+import type { StudySessionActivity } from '@/shared/types/studyInterface';
 interface StudySessionProps {
-  topicId: string;
+  topicId?: string;
   onSessionEnd: () => void;
 }
 
@@ -31,6 +32,7 @@ export const StudySession: React.FC<StudySessionProps> = ({ topicId, onSessionEn
   const [activities, setActivities] = useState<Activity[]>([]);
   const [showEndDialog, setShowEndDialog] = useState(false);
   const [notes, setNotes] = useState('');
+  const [sessionError, setSessionError] = useState<string | null>(null);
 
   useEffect(() => {
     let timer: number | undefined;
@@ -45,14 +47,24 @@ export const StudySession: React.FC<StudySessionProps> = ({ topicId, onSessionEn
   }, [isActive]);
 
   const handleStart = async () => {
+    if (sessionId) {
+      setSessionError(null);
+      setIsActive(true);
+      return;
+    }
+
     try {
+      setSessionError(null);
       const session = await startSession(topicId);
       if (session) {
         setSessionId(session.id);
         setIsActive(true);
+      } else {
+        setSessionError('Could not start this session. Please try again.');
       }
     } catch (error) {
       console.error('Error starting session:', error);
+      setSessionError('Could not start this session. Please try again.');
     }
   };
 
@@ -68,10 +80,16 @@ export const StudySession: React.FC<StudySessionProps> = ({ topicId, onSessionEn
     if (!sessionId) return;
 
     try {
-      await endSession(sessionId, undefined, notes);
+      const sessionActivities: StudySessionActivity[] = activities.map(activity => ({
+        type: activity.type,
+        duration: activity.durationMinutes,
+        timestamp: activity.timestamp.toISOString(),
+      }));
+      await endSession(sessionId, notes, sessionActivities, elapsedTime);
       onSessionEnd();
     } catch (error) {
       console.error('Error ending session:', error);
+      setSessionError('Could not save this session. Please try again.');
     }
   };
 
@@ -98,7 +116,7 @@ export const StudySession: React.FC<StudySessionProps> = ({ topicId, onSessionEn
       <Card>
         <CardContent className="space-y-6">
           <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-semibold">Study Session</h2>
+            <h2 className="text-2xl font-semibold">{topicId ? 'Study Session' : 'Focus Session'}</h2>
             <div className="text-3xl font-mono text-blue-600 dark:text-blue-400">
               {formatTime(elapsedTime)}
             </div>
@@ -108,7 +126,7 @@ export const StudySession: React.FC<StudySessionProps> = ({ topicId, onSessionEn
             {!isActive ? (
               <Button onClick={handleStart} className="w-40">
                 <Play className="h-4 w-4 mr-2" />
-                Start Session
+                {sessionId ? 'Resume Session' : 'Start Session'}
               </Button>
             ) : (
               <>
@@ -124,11 +142,14 @@ export const StudySession: React.FC<StudySessionProps> = ({ topicId, onSessionEn
             )}
           </div>
 
+          {sessionError && <p role="alert" className="text-center text-sm text-red-600">{sessionError}</p>}
+
           <div className="flex justify-center gap-4">
             <Button
               variant="ghost"
               size="icon"
               onClick={() => addActivity('reading')}
+              disabled={!sessionId}
               title="Add Reading Activity"
               className="h-10 w-10"
             >
@@ -138,6 +159,7 @@ export const StudySession: React.FC<StudySessionProps> = ({ topicId, onSessionEn
               variant="ghost"
               size="icon"
               onClick={() => addActivity('quiz')}
+              disabled={!sessionId}
               title="Add Quiz Activity"
               className="h-10 w-10"
             >
@@ -147,6 +169,7 @@ export const StudySession: React.FC<StudySessionProps> = ({ topicId, onSessionEn
               variant="ghost"
               size="icon"
               onClick={() => addActivity('notes')}
+              disabled={!sessionId}
               title="Add Notes Activity"
               className="h-10 w-10"
             >
@@ -157,7 +180,7 @@ export const StudySession: React.FC<StudySessionProps> = ({ topicId, onSessionEn
           {activities.length > 0 && (
             <div>
               <h3 className="text-lg font-medium mb-2">Activities</h3>
-              <ScrollArea className="h-[200px] rounded-md border p-4">
+              <ScrollArea className="h-50 rounded-md border p-4">
                 <div className="space-y-2">
                   {activities.map((activity, index) => (
                     <div key={index} className="flex items-center gap-2 text-sm">
@@ -196,7 +219,7 @@ export const StudySession: React.FC<StudySessionProps> = ({ topicId, onSessionEn
                 value={notes}
                 onChange={e => setNotes(e.target.value)}
                 placeholder="Write your session notes here..."
-                className="min-h-[100px]"
+                className="min-h-25"
               />
             </div>
           </div>

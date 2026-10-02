@@ -18,6 +18,7 @@ interface LayoutState {
   setSearchQuery: (query: string) => void;
   toggleSidebar: () => void;
   toggleCoursePanel: (panelName: string) => void;
+  closeCoursePanel: (panelName: string) => void;
 }
 
 export const useLayoutStore = create<LayoutState>(set => ({
@@ -39,4 +40,6 @@ export const useLayoutStore = create<LayoutState>(set => ({
     set(state => ({
       activeCoursePanel: state.activeCoursePanel === panelName ? undefined : panelName,
     })),
+  closeCoursePanel: (panelName: string) =>
+    set(state => state.activeCoursePanel === panelName ? { activeCoursePanel: undefined } : state),
 }));

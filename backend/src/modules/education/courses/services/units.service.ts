@@ -248,7 +248,15 @@ export class UnitsService {
         where: { id },
         include: {
           course: {
-            select: { id: true, title: true, status: true },
+            select: {
+              id: true,
+              title: true,
+              status: true,
+              materials: {
+                where: { unitId: null },
+                select: { id: true, title: true, type: true, fileId: true },
+              },
+            },
           },
           materials: {
             select: { id: true, title: true, type: true, fileId: true },
@@ -284,11 +292,21 @@ export class UnitsService {
         await this.progressService.trackUnitAccess(userId, id);
       }
 
+      const courseMaterials = unit.course?.materials ?? [];
+      const materials = [
+        ...unit.materials,
+        ...courseMaterials.filter(
+          (courseMaterial) =>
+            !unit.materials.some((unitMaterial) => unitMaterial.id === courseMaterial.id),
+        ),
+      ];
+
       const result: UnitResponseDto = {
         ...unit,
+        materials,
         title: unit.title ?? '',
         learningObjectives: JSON.stringify(unit.learningObjectives),
-        materialsCount: unit.materials?.length || 0,
+        materialsCount: materials.length,
         progressPercentage,
         isCompleted,
       };

@@ -62,6 +62,7 @@ export class StudyService {
     }
 
     let resolvedTopicId = topicId;
+    let resolvedMaterialId: string | undefined;
     const metadata: any = {};
 
     if (context) {
@@ -73,23 +74,39 @@ export class StudyService {
           where: { id: context.id },
           select: { topicId: true },
         });
-        if (material?.topicId) {
-          resolvedTopicId = material.topicId;
-        }
+        if (!material) throw new NotFoundException('Material not found');
+        resolvedMaterialId = context.id;
+        resolvedTopicId = material.topicId ?? resolvedTopicId;
       } else if (context.type === 'unit') {
+        const unit = await this.prisma.unit.findUnique({
+          where: { id: context.id },
+          select: { id: true },
+        });
+        if (!unit) throw new NotFoundException('Unit not found');
         resolvedTopicId = await this.getNextTopicForUnit(userId, context.id);
       } else if (context.type === 'course') {
+        const course = await this.prisma.course.findUnique({
+          where: { id: context.id },
+          select: { id: true },
+        });
+        if (!course) throw new NotFoundException('Course not found');
         resolvedTopicId = await this.getNextTopicForCourse(userId, context.id);
       }
     }
 
-    // specific handling for material context to log it in activities immediately?
-    // For now, we just start the session. Activity tracking happens on 'end' or via 'trackActivity'.
+    if (resolvedTopicId) {
+      const topic = await this.prisma.topic.findUnique({
+        where: { id: resolvedTopicId },
+        select: { id: true },
+      });
+      if (!topic) throw new NotFoundException('Topic not found');
+    }
 
     return this.prisma.studySession.create({
       data: {
         userId,
         topicId: resolvedTopicId,
+        materialId: resolvedMaterialId,
         startTime: new Date(),
         duration: 0,
         focusScore: 0,
@@ -124,12 +141,20 @@ export class StudyService {
         userId,
         topicId: { in: topicIds },
       },
-      select: { topicId: true, isCompleted: true },
+      select: { topicId: true, status: true, quizScores: true },
     });
 
-    // 3. Find first incomplete
+    // 3. Resume from the first topic whose mastery quiz has not unlocked progression.
     const completedSet = new Set(
-      progress.filter((p) => p.isCompleted).map((p) => p.topicId),
+      progress
+        .filter((record) => {
+          const quizScores = record.quizScores as Record<string, unknown> | null;
+          return (
+            record.status === 'completed' ||
+            quizScores?.nextTopicUnlocked === true
+          );
+        })
+        .map((record) => record.topicId),
     );
     const nextTopic = topics.find((t) => !completedSet.has(t.id));
     const result = nextTopic?.id || topics[0]?.id;
@@ -139,11 +164,12 @@ export class StudyService {
   }
 
   async recordFocusEvent(
+    userId: string,
     sessionId: string,
     event: { type: 'gained' | 'lost'; timestamp: Date },
   ): Promise<void> {
-    const session = await this.prisma.studySession.findUnique({
-      where: { id: sessionId },
+    const session = await this.prisma.studySession.findFirst({
+      where: { id: sessionId, userId },
       select: { activities: true },
     });
 
@@ -205,22 +231,29 @@ export class StudyService {
   }
 
   async endStudySession(
+    userId: string,
     sessionId: string,
     activities: StudyActivity[],
+    notes?: string,
+    durationSeconds?: number,
   ): Promise<StudySession> {
-    const session = await this.prisma.studySession.findUnique({
-      where: { id: sessionId },
+    const session = await this.prisma.studySession.findFirst({
+      where: { id: sessionId, userId },
       include: { user: true, topic: { include: { unit: true } } },
     });
 
-    if (!session || !session.topic) {
-      throw new NotFoundException('Study session or topic not found');
-    }
+    if (!session) throw new NotFoundException('Study session not found');
 
     const endTime = new Date();
-    const duration = Math.round(
-      (endTime.getTime() - session.startTime.getTime()) / (1000 * 60),
+    const wallDurationSeconds = Math.max(
+      0,
+      (endTime.getTime() - session.startTime.getTime()) / 1000,
     );
+    const activeDurationSeconds =
+      typeof durationSeconds === 'number' && Number.isFinite(durationSeconds)
+        ? Math.min(Math.max(0, durationSeconds), wallDurationSeconds)
+        : wallDurationSeconds;
+    const duration = Math.round(activeDurationSeconds / 60);
 
     if (session.topic) {
       await this.updateTopicProgress({
@@ -246,7 +279,9 @@ export class StudyService {
       }
     }
 
-    const focusScore = this.calculateFocusScore(activities);
+    const focusScore = wallDurationSeconds > 0
+      ? Math.round((activeDurationSeconds / wallDurationSeconds) * 100)
+      : this.calculateFocusScore(activities);
 
     // SESS-001: Session outcome tracking
     const MIN_VALID_DURATION = 5; // minutes
@@ -257,12 +292,10 @@ export class StudyService {
       .map((a) => a?.attemptId)
       .filter(Boolean);
 
-    const isValid = duration >= MIN_VALID_DURATION && activities.length > 0;
-    const invalidReason = !isValid
-      ? duration < MIN_VALID_DURATION
-        ? `Session too short (${duration} min < ${MIN_VALID_DURATION} min minimum)`
-        : 'No activities recorded'
-      : undefined;
+    const isValid = duration >= MIN_VALID_DURATION;
+    const invalidReason = isValid
+      ? null
+      : `Session too short (${duration} min < ${MIN_VALID_DURATION} min minimum)`;
 
     // LearningGain: focus score improvement relative to baseline (0.5 expected)
     const learningGain = isValid
@@ -274,6 +307,7 @@ export class StudyService {
       data: {
         endTime,
         duration,
+        notes,
         activities: activities as any,
         focusScore,
         isValid,
@@ -376,7 +410,7 @@ export class StudyService {
       throw new BadRequestException('User ID is required');
     }
 
-    const [totalTimeResult, totalSessions, studySessions] = await Promise.all([
+    const [totalTimeResult, totalSessions] = await Promise.all([
       this.prisma.studySession.aggregate({
         where: { userId },
         _sum: { duration: true },
@@ -384,23 +418,7 @@ export class StudyService {
       this.prisma.studySession.count({
         where: { userId },
       }),
-      // Fetch all study sessions from the last 60 days to calculate streak
-      this.prisma.studySession.findMany({
-        where: {
-          userId,
-          startTime: {
-            gte: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000),
-          },
-        },
-        orderBy: { startTime: 'desc' },
-        select: { startTime: true },
-      }),
     ]);
-
-    // Calculate current consecutive streak from study session dates
-    const currentStreak = this.calculateCurrentStreak(
-      studySessions.map((s) => s.startTime),
-    );
 
     return {
       totalTime: totalTimeResult._sum.duration || 0,

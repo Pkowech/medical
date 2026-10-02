@@ -86,6 +86,18 @@ const materialService = {
     return response.data;
   },
 
+  async registerGoogleDriveMaterial(input: {
+    url: string;
+    title: string;
+    description?: string;
+    courseId: string;
+    unitId: string;
+    topicId?: string;
+  }): Promise<Material> {
+    const response = await apiService.post<Material>('/materials/drive', input);
+    return response.data;
+  },
+
 
   async deleteMaterial(id: string): Promise<void> {
     await apiService.delete(`/materials/${id}`);

@@ -6,7 +6,6 @@ import { Button } from '@/shared/components/ui/button';
 import URLS from '@/lib/urls';
 
 import { Document, Page, pdfjs } from 'react-pdf';
-import type { PDFPageProxy } from 'pdfjs-dist';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 
@@ -27,6 +26,8 @@ type ContinuousPDFPageProps = {
   width: number;
   scrollRoot: HTMLDivElement | null;
 };
+
+type PDFPageLoadSuccess = NonNullable<React.ComponentProps<typeof Page>['onLoadSuccess']>;
 
 const ContinuousPDFPage = ({ pageNumber, width, scrollRoot }: ContinuousPDFPageProps) => {
   const pageContainerRef = useRef<HTMLDivElement>(null);
@@ -50,7 +51,7 @@ const ContinuousPDFPage = ({ pageNumber, width, scrollRoot }: ContinuousPDFPageP
     return () => observer.disconnect();
   }, [scrollRoot]);
 
-  const handlePageLoad = useCallback((pdfPage: PDFPageProxy) => {
+  const handlePageLoad = useCallback<PDFPageLoadSuccess>((pdfPage) => {
     const [x1, y1, x2, y2] = pdfPage.view;
     const pageWidth = Math.abs(x2 - x1);
     const pageHeight = Math.abs(y2 - y1);

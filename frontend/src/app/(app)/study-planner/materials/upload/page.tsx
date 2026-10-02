@@ -6,6 +6,7 @@ import { courseService } from '@/features/courses/services/courseService';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import type { Course, CourseUnit, Lesson } from '@/shared/types/courseInterface';
+import { FileUp, HardDrive, Link2 } from 'lucide-react';
 
 // Helper type to handle potential differences between CourseUnit and chapter structure
 type ExtendedUnit = CourseUnit & { lessons?: Lesson[], topics?: any[] };
@@ -16,6 +17,8 @@ export default function UploadMaterialPage() {
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [source, setSource] = useState<'upload' | 'drive'>('upload');
+  const [driveUrl, setDriveUrl] = useState('');
   
   const [selectedCourseId, setSelectedCourseId] = useState('');
   const [unitId, setUnitId] = useState('');
@@ -93,13 +96,43 @@ export default function UploadMaterialPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!file) {
-      toast.error('Please select a file to upload');
-      return;
-    }
-    
     if (!selectedCourseId) {
       toast.error('Please select a course');
+      return;
+    }
+
+    if (source === 'drive') {
+      if (!unitId) {
+        toast.error('Select a unit for this Drive material');
+        return;
+      }
+      if (!driveUrl.trim()) {
+        toast.error('Paste a Google Drive file URL');
+        return;
+      }
+      try {
+        setIsUploading(true);
+        await materialService.registerGoogleDriveMaterial({
+          url: driveUrl.trim(),
+          title: title.trim(),
+          description: description.trim() || undefined,
+          courseId: selectedCourseId,
+          unitId,
+          topicId: topicId || undefined,
+        });
+        toast.success('Drive material attached to the unit');
+        router.push('/study-planner/materials');
+      } catch (err) {
+        console.error('Drive material registration failed', err);
+        toast.error(err instanceof Error ? err.message : 'Could not attach Drive material');
+      } finally {
+        setIsUploading(false);
+      }
+      return;
+    }
+
+    if (!file) {
+      toast.error('Please select a file to upload');
       return;
     }
 
@@ -153,6 +186,28 @@ export default function UploadMaterialPage() {
     <div className="max-w-2xl mx-auto py-8 px-4">
       <h1 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">Upload Material</h1>
       <form onSubmit={handleSubmit} className="space-y-6 bg-white dark:bg-slate-900 p-6 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm" aria-label="Upload material form">
+        <div>
+          <span className="mb-2 block text-sm font-medium text-gray-700 dark:text-slate-300">Material source</span>
+          <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1 dark:border-slate-700 dark:bg-slate-800" role="group" aria-label="Material source">
+            <button
+              type="button"
+              aria-pressed={source === 'upload'}
+              onClick={() => setSource('upload')}
+              className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium ${source === 'upload' ? 'bg-white text-blue-700 shadow-sm dark:bg-slate-700 dark:text-blue-300' : 'text-slate-600 dark:text-slate-300'}`}
+            >
+              <FileUp className="h-4 w-4" /> Upload to library
+            </button>
+            <button
+              type="button"
+              aria-pressed={source === 'drive'}
+              onClick={() => setSource('drive')}
+              className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium ${source === 'drive' ? 'bg-white text-blue-700 shadow-sm dark:bg-slate-700 dark:text-blue-300' : 'text-slate-600 dark:text-slate-300'}`}
+            >
+              <HardDrive className="h-4 w-4" /> Google Drive
+            </button>
+          </div>
+        </div>
+
         <div>
           <label htmlFor="title" className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
             Title <span className="text-red-500">*</span>
@@ -251,7 +306,7 @@ export default function UploadMaterialPage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
+          {source === 'upload' && <div>
             <label htmlFor="type-select" className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
               Material Type
             </label>
@@ -266,9 +321,9 @@ export default function UploadMaterialPage() {
               <option value="image">Image</option>
               <option value="doc">Word/Text Document</option>
             </select>
-          </div>
+          </div>}
 
-          <div>
+          {source === 'upload' ? <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">File <span className="text-red-500">*</span></label>
             <input
               type="file"
@@ -279,7 +334,26 @@ export default function UploadMaterialPage() {
               required
             />
             <div className="text-xs text-gray-500 dark:text-slate-500 mt-2">Max size: 50MB. Supported: PDF, DOC, PPT, JPG, PNG, MP4.</div>
-          </div>
+          </div> : <div>
+            <label htmlFor="drive-url" className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+              Shared Drive file URL <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <Link2 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                id="drive-url"
+                type="url"
+                value={driveUrl}
+                onChange={e => setDriveUrl(e.target.value)}
+                placeholder="https://drive.google.com/file/d/..."
+                className="block w-full rounded-md border border-gray-300 bg-white py-2 pl-10 pr-3 text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                required={source === 'drive'}
+              />
+            </div>
+            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+              The file must be in the institution’s MedTrack Shared Drive. Enrolled students can view it in the course reader; the file is not copied to R2.
+            </p>
+          </div>}
         </div>
 
         <div className="flex justify-end pt-4 border-t border-gray-200 dark:border-slate-800">
@@ -291,10 +365,10 @@ export default function UploadMaterialPage() {
             )}
             <button
               type="submit"
-              disabled={isUploading || !file || !selectedCourseId}
+              disabled={isUploading || !selectedCourseId || (source === 'upload' ? !file : !driveUrl.trim() || !unitId)}
               className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm shadow-blue-500/30"
             >
-              {isUploading ? 'Uploading…' : 'Upload Material'}
+              {isUploading ? (source === 'drive' ? 'Attaching…' : 'Uploading…') : (source === 'drive' ? 'Attach from Drive' : 'Upload Material')}
             </button>
           </div>
         </div>

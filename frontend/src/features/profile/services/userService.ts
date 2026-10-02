@@ -110,7 +110,7 @@ class UserService {
       const err = error instanceof Error ? error : new Error(String(error));
       console.error('Error fetching user analytics:', err.message, err.stack);
       toast.error('Failed to load user analytics.');
-      return null;
+      throw err;
     }
   }
 

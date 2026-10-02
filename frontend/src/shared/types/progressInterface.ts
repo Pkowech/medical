@@ -104,9 +104,12 @@ export interface TopicProgress {
   topicId: string;
   title?: string;
   isCompleted: boolean;
+  status?: string;
   masteryUnlocked?: boolean;
+  nextTopicUnlocked?: boolean;
   failedAttempts?: number;
   progressPercentage?: number;
+  quizScores?: Record<string, unknown>;
 }
 
 /**
@@ -246,6 +249,7 @@ export interface StudyGroup {
   time?: string;
   online?: boolean;
   createdAt?: string;
+  metadata?: Record<string, unknown> & { courseId?: string | null };
 }
 
 /**
@@ -353,6 +357,8 @@ export interface PerformanceTrend {
   month: string;
   score: number;
   hours: number;
+  scoreCount?: number;
+  hoursCount?: number;
 }
 
 /**

@@ -4,8 +4,8 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
-import { PrismaService } from '../../../../infrastructure/prisma/prisma.service';
-import { RedisService } from '../../../../infrastructure/redis/redis.service';
+import { PrismaService } from '#infrastructure/prisma/prisma.service';
+import { RedisService } from '#infrastructure/redis/redis.service';
 import { AssessmentProgressService } from './assessment-progress.service';
 import { AssessmentAnalyticsService } from '#modules/ai-analytics/services/assessment-analytics.service';
 import { MasteryGateService } from '../../courses/services/mastery-gate.service';
@@ -17,6 +17,7 @@ import { QuizAnswerDto, CreateQuizDto } from '#common/dto/assessment.dto';
 import { QuestionBankService } from './question-bank.service';
 
 import { GlobalSearchSyncService } from '../../../../infrastructure/search/services/global-search-sync.service';
+import { MaxAttemptsExceededException } from '#common/exceptions/quiz.exception';
 
 type PublicQuizQuestion = Omit<Question, 'options'> & {
   options: Array<Pick<Option, 'id' | 'text' | 'order'>>;
@@ -262,6 +263,10 @@ export class QuizService {
     });
 
     await this.redisService.del(`quiz:${id}`);
+    // Invalidate unit-level generated quiz cache if this quiz belongs to a unit
+    if (quiz.unitId) {
+      await this.redisService.del(`unit_quiz:${quiz.unitId}`);
+    }
     this.logger.log(`Updated quiz ${id} by user ${creatorId}`);
 
     // Sync to global search index
@@ -317,8 +322,8 @@ export class QuizService {
         orderBy: { order: 'asc' as const },
       },
     };
-    const quiz = await this.prisma.quiz.findUnique({
-      where: { id: unitId },
+    const quiz = await this.prisma.quiz.findFirst({
+      where: { unitId, topicId: null, isPublished: true },
       include: {
         questions: {
           orderBy: { order: 'asc' },
@@ -492,42 +497,17 @@ export class QuizService {
     });
     if (!quiz) {
       quiz = await this.prisma.quiz.findFirst({
-        where: { unitId },
+        where: { unitId, topicId: null, isPublished: true },
         include: quizInclude,
       });
     }
 
-    // If no quiz exists for the unit, create a lightweight auto-generated quiz so
-    // submissions can still be recorded and tests relying on this behavior succeed.
     if (!quiz) {
       this.logger.warn(
-        `No quiz found for unit ${unitId}, creating a default quiz`,
+        `No published quiz found for unit ${unitId} — submission rejected`,
       );
-      quiz = await this.prisma.quiz.create({
-        data: {
-          title: `Auto-generated quiz for unit ${unitId}`,
-          unitId,
-          maxAttempts: 1,
-          passingScore: 0,
-          isPublished: false,
-          createdBy: userId,
-        },
-        include: {
-          questions: {
-            include: {
-              question: {
-                include: { options: true },
-              },
-            },
-          },
-          unit: { select: { courseId: true } },
-        },
-      });
-    }
-
-    if (!quiz) {
       throw new NotFoundException(
-        `Quiz for unit ${unitId} could not be found or created`,
+        `No published quiz found for unit ${unitId}. Please use the generate endpoint first.`,
       );
     }
 
@@ -541,8 +521,10 @@ export class QuizService {
       this.logger.error(
         `Maximum attempts exceeded for quiz ${activeQuiz.id} by user ${userId}`,
       );
-      throw new BadRequestException('Maximum attempts exceeded');
+      throw new MaxAttemptsExceededException(activeQuiz.id);
     }
+
+    const bktUpdates: Array<{ skillId: string; isCorrect: boolean }> = [];
 
     const result = await this.prisma.$transaction(async (tx) => {
       const prelimAttempt = await tx.quizAttempt.create({
@@ -586,16 +568,10 @@ export class QuizService {
           correctAnswers++;
         }
 
-        // Update BKT for the specific skill/topic associated with the question
-        // We prioritize the question's specific topic, falling back to the quiz's topic
+        // Collect BKT update data — will be dispatched after transaction commits
         const skillId = (question as any).topicId || (question as any).topic_ids?.[0] || (question as any).topicIds?.[0] || activeQuiz.topicId;
         if (skillId) {
-          // Fire-and-forget BKT update
-          void this.analyticsService
-            .updateBktForAssessment(userId, skillId, gradingResult.isCorrect)
-            .catch((err) =>
-              this.logger.warn(`Failed to update BKT: ${String(err)}`),
-            );
+          bktUpdates.push({ skillId, isCorrect: gradingResult.isCorrect });
         }
       }
 
@@ -691,6 +667,16 @@ export class QuizService {
     this.logger.log(
       `Submitted quiz ${activeQuiz.id} for user ${userId} with score ${result.attempt.score}`,
     );
+
+    // Dispatch BKT updates outside the transaction so failures don't corrupt attempt state
+    for (const { skillId, isCorrect } of bktUpdates) {
+      void this.analyticsService
+        .updateBktForAssessment(userId, skillId, isCorrect)
+        .catch((err) =>
+          this.logger.warn(`Failed to update BKT for skill ${skillId}: ${String(err)}`),
+        );
+    }
+
     return result.attempt;
   }
 
@@ -704,44 +690,71 @@ export class QuizService {
     score: number;
     feedback: string;
     passed: boolean;
+    masteryUnlocked: boolean;
+    nextTopicUnlocked: boolean;
+    nextTopicId?: string;
   }> {
     try {
+      const topic = await this.prisma.topic.findUnique({
+        where: { id: topicId },
+        select: { id: true },
+      });
+      if (!topic) throw new NotFoundException(`Topic with ID ${topicId} not found`);
+      if (!Array.isArray(responses) || responses.length === 0) {
+        throw new BadRequestException('At least one topic quiz response is required');
+      }
+
+      // Batch-fetch all submitted questions in a single query (prevents N+1)
+      const questionIds = responses.map((r) => r.questionId);
+      const fetchedQuestions = await this.prisma.question.findMany({
+        where: { id: { in: questionIds } },
+        include: { options: true },
+      });
+      const questionMap = new Map(fetchedQuestions.map((q) => [q.id, q]));
+
       let score = 0;
       let totalPoints = 0;
 
-      if (responses && Array.isArray(responses)) {
-        for (const response of responses) {
-          const question = await this.prisma.question.findUnique({
-            where: { id: response.questionId },
-            include: { options: true },
-          });
+      for (const response of responses) {
+        const question = questionMap.get(response.questionId);
+        if (!question || !question.topicIds.includes(topicId)) {
+          throw new BadRequestException('A submitted question does not belong to this topic');
+        }
 
-          if (question) {
-            totalPoints += question.points || 1;
-            
-            // Check if answers are correct
-            const correctOptions = (question.options || []).filter((opt: any) => opt.isCorrect);
-            const selectedIds = response.selectedAnswers || [];
-            
-            if (correctOptions.length === selectedIds.length && 
-                correctOptions.every((opt: any) => selectedIds.includes(opt.id))) {
-              score += question.points || 1;
-            }
-          }
+        totalPoints += question.points || 1;
+        const correctOptions = question.options.filter(option => option.isCorrect);
+        const selectedIds: string[] = Array.isArray(response.selectedAnswers)
+          ? response.selectedAnswers
+          : [];
+        if (
+          correctOptions.length === selectedIds.length &&
+          correctOptions.every(option => selectedIds.includes(option.id))
+        ) {
+          score += question.points || 1;
         }
       }
 
       const scorePercentage = totalPoints > 0 ? Math.round((score / totalPoints) * 100) : 0;
       const passed = scorePercentage >= 70;
+      const mastery = await this.masteryGateService.onQuizComplete(
+        userId,
+        topicId,
+        passed,
+        scorePercentage,
+      );
 
-      await this.prisma.userActivity.create({
-        data: {
-          userId,
-          type: UserActivityType.QUIZ_ATTEMPT,
-          description: `Completed topic quiz: ${topicId}`,
-          details: { topicId, score: scorePercentage, passed, totalPoints },
-        },
-      });
+      try {
+        await this.prisma.userActivity.create({
+          data: {
+            userId,
+            type: UserActivityType.QUIZ_ATTEMPT,
+            description: `Completed topic quiz: ${topicId}`,
+            details: { topicId, score: scorePercentage, passed, totalPoints },
+          },
+        });
+      } catch (error) {
+        this.logger.warn(`Could not record activity for topic quiz ${topicId}: ${String(error)}`);
+      }
       
       return {
         score: scorePercentage,
@@ -749,6 +762,9 @@ export class QuizService {
           ? `Great job! You scored ${scorePercentage}%`
           : `You scored ${scorePercentage}%. Keep practicing!`,
         passed,
+        masteryUnlocked: mastery.masteryUnlocked,
+        nextTopicUnlocked: mastery.nextTopicUnlocked,
+        nextTopicId: mastery.nextTopicId,
       };
     } catch (error) {
       this.logger.error(`Error submitting topic quiz: ${String(error)}`);

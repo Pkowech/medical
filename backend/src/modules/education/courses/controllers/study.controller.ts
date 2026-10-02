@@ -17,6 +17,7 @@ import { CurrentUser } from '../../../../common/decorators/current-user.decorato
 import { User } from '@prisma/client';
 import { Role } from '#modules/auth/constants/role.constants';
 import { ApiOperation, ApiQuery } from '@nestjs/swagger';
+import { StudyActivity } from '#common/dto';
 
 @Controller('study')
 @UseGuards(JwtAuthGuard, RoleGuard)
@@ -58,20 +59,33 @@ export class StudyController {
   @Put('session/:sessionId/end')
   @Roles(Role.student)
   async endStudySession(
+    @CurrentUser() user: User,
     @Param('sessionId') sessionId: string,
-    @Body('activities') activities: any[],
+    @Body()
+    body: {
+      activities?: StudyActivity[];
+      notes?: string;
+      durationSeconds?: number;
+    },
   ) {
-    return this.studyService.endStudySession(sessionId, activities);
+    return this.studyService.endStudySession(
+      user.id,
+      sessionId,
+      body.activities ?? [],
+      body.notes,
+      body.durationSeconds,
+    );
   }
 
   @Post('session/:sessionId/focus')
   @Roles(Role.student)
   @ApiOperation({ summary: 'Record a focus gain/loss event' })
   async recordFocusEvent(
+    @CurrentUser() user: User,
     @Param('sessionId') sessionId: string,
     @Body() body: { type: 'gained' | 'lost'; timestamp?: string },
   ) {
-    return this.studyService.recordFocusEvent(sessionId, {
+    return this.studyService.recordFocusEvent(user.id, sessionId, {
       type: body.type,
       timestamp: body.timestamp ? new Date(body.timestamp) : new Date(),
     });

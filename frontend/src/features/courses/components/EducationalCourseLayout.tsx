@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { ChevronLeft, Play, FileText, Download, BookOpen, Lightbulb } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Play, FileText, Download, BookOpen, Lightbulb } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useLayoutStore } from '@/core/stores/useLayoutStore';
 import { cn } from '@/lib/utils/cn';
@@ -63,22 +63,28 @@ export const EducationalCourseLayout = ({ courseId: propCourseId }: EducationalC
 
   // --- STATE MANAGEMENT ---
   // Global UI state from Zustand
-  const { activeCoursePanel, toggleCoursePanel, sidebarOpen } = useLayoutStore();
+  const { activeCoursePanel, toggleCoursePanel, sidebarOpen, sidebarCollapsed, setSidebarCollapsed } = useLayoutStore();
   // Page header hook
   const { setHeader } = usePageHeader();
   // Course progress state from Zustand
-  const { progress, bookmarks, notes, markLessonComplete, toggleBookmark, saveNote } =
+  const { progress, bookmarks, notes, markLessonComplete, toggleLessonComplete, toggleBookmark, saveNote } =
     useCourseProgressStore();
   // Local component state
   const [offlineMode, setOfflineMode] = useState(false);
   const [showPrerequisites, setShowPrerequisites] = useState(true);
   const [selectedMaterialId, setSelectedMaterialId] = useState<string | null>(null);
 
-  const openMaterial = (id: string) => setSelectedMaterialId(id);
-  const closeMaterial = () => setSelectedMaterialId(null);
+  const openMaterial = (id: string) => {
+    setSidebarCollapsed(false);
+    setSelectedMaterialId(id);
+  };
+  const closeMaterial = () => {
+    setSidebarCollapsed(false);
+    setSelectedMaterialId(null);
+  };
 
   // --- DATA FETCHING & HOOKS ---
-  const { data: courseData, isLoading: isCourseLoading, error: courseError } = useCourseData(courseId);
+  const { data: courseData, isLoading: isCourseLoading, error: courseError, refetch: refetchCourse } = useCourseData(courseId);
   const {
     currentChapterIndex,
     currentLessonIndex,
@@ -203,6 +209,18 @@ export const EducationalCourseLayout = ({ courseId: propCourseId }: EducationalC
     );
   }
 
+  const courseTopicCount = (courseData.chapters || []).reduce(
+    (total, chapter) => total + chapter.lessons.length,
+    0,
+  );
+  const completedCourseTopicCount = (courseData.chapters || []).reduce(
+    (total, chapter) => total + chapter.lessons.filter(lesson => lesson.isCompleted).length,
+    0,
+  );
+  const courseProgressPercentage = courseTopicCount
+    ? Math.round((completedCourseTopicCount / courseTopicCount) * 100)
+    : 0;
+
   type ResourceLike = Partial<Material> & { contentType?: string; size?: string; url?: string; id?: string | number; title?: string; unitId?: string | number; topicId?: string | number; unit?: { id: string | number } };
   const sidebarResources: { id: string | number; title: string; type: string; size?: string; url: string; unitId?: string | number; topicId?: string | number }[] = ((courseData.resources || []) as ResourceLike[]).map(m => ({
     id: m.id ?? 'unknown',
@@ -218,8 +236,9 @@ export const EducationalCourseLayout = ({ courseId: propCourseId }: EducationalC
     <div className="flex flex-col flex-1 min-h-0 bg-gray-50/50 dark:bg-slate-900">
       <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden relative">
         <div className={cn(
-          "fixed lg:static inset-y-0 left-0 z-[60] lg:z-40 h-full min-h-0 transition-transform duration-300 ease-in-out",
-          sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+          "fixed lg:static inset-y-0 left-0 z-60 lg:z-40 h-full min-h-0 w-80 shrink-0 overflow-hidden transition-[width,transform] duration-300 ease-in-out",
+          sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
+          sidebarCollapsed && selectedMaterialId ? "lg:w-0" : "lg:w-80"
         )}>
           <CourseSidebar
             chapters={courseData.chapters || []}
@@ -230,19 +249,39 @@ export const EducationalCourseLayout = ({ courseId: propCourseId }: EducationalC
             progress={progress}
             toggleCoursePanel={toggleCoursePanel}
             openMaterial={openMaterial}
+            allowCollapse={Boolean(selectedMaterialId)}
           />
         </div>
 
         {/* Main Content Area */}
-        <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain p-4 md:p-8 scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-slate-700">
-          <div className="max-w-5xl mx-auto space-y-6 md:space-y-8 pb-20">
-            <div className="space-y-4">
-              <Breadcrumb />
-              <ProgressBar value={50} className="h-2" />
-            </div>
+        <main className={cn(
+          'min-h-0 min-w-0 flex-1 overscroll-contain scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-slate-700',
+          selectedMaterialId ? 'flex overflow-hidden p-0' : 'overflow-y-auto p-4 md:p-8',
+        )}>
+          <div className={cn(
+            'max-w-5xl mx-auto space-y-6 md:space-y-8 pb-20',
+            selectedMaterialId && 'flex h-full w-full max-w-none flex-1 flex-col space-y-0 pb-0',
+          )}>
+            {!selectedMaterialId && <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                {sidebarCollapsed && selectedMaterialId && (
+                  <button
+                    type="button"
+                    onClick={() => setSidebarCollapsed(false)}
+                    className="rounded-md border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+                    aria-label="Open course sidebar"
+                    title="Open course sidebar"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                )}
+                <Breadcrumb />
+              </div>
+              <ProgressBar value={courseProgressPercentage} className="h-2" />
+            </div>}
 
             {/* Prerequisites Checker */}
-            {showPrerequisites && courseId && (
+            {!selectedMaterialId && showPrerequisites && courseId && (
               <div className="animate-in fade-in slide-in-from-top-4 duration-500">
                 <PrerequisitesChecker
                   courseId={courseId}
@@ -251,7 +290,16 @@ export const EducationalCourseLayout = ({ courseId: propCourseId }: EducationalC
               </div>
             )}
 
-            {activeCoursePanel === 'quiz' ? (
+            {selectedMaterialId ? (
+              <MaterialPreviewModal
+                materialId={selectedMaterialId}
+                isOpen={Boolean(selectedMaterialId)}
+                onClose={closeMaterial}
+                materials={sidebarResources}
+                onNavigate={setSelectedMaterialId}
+                inline
+              />
+            ) : activeCoursePanel === 'quiz' ? (
               <div className="animate-in fade-in slide-in-from-right-4 duration-500">
                 <div className="flex items-center justify-between mb-4">
                    <button 
@@ -265,7 +313,9 @@ export const EducationalCourseLayout = ({ courseId: propCourseId }: EducationalC
                 <QuizPanel 
                   lessonId={typedCurrentLesson?.id} 
                   lessonTitle={typedCurrentLesson?.title} 
-                  scope="unit"
+                  scope="topic"
+                  onTopicProgressUpdated={() => refetchCourse().then(() => undefined)}
+                  onTopicCompleted={() => markLessonComplete(lessonKey)}
                 />
               </div>
             ) : (
@@ -277,9 +327,10 @@ export const EducationalCourseLayout = ({ courseId: propCourseId }: EducationalC
                   bookmarks={new Set(bookmarks)}
                   progress={progress}
                   toggleBookmark={toggleBookmark}
-                  markLessonComplete={markLessonComplete}
+                  toggleLessonComplete={toggleLessonComplete}
                   navigatePrev={navigatePrev}
                   navigateNext={navigateNext}
+                  onOpenMasteryQuiz={() => toggleCoursePanel('quiz')}
                   isFirstLesson={isFirstLesson}
                   isLastLesson={isLastLesson}
                   materials={materialsForCurrentLesson}
@@ -347,10 +398,10 @@ export const EducationalCourseLayout = ({ courseId: propCourseId }: EducationalC
             )}
 
             {/* Side Panels (Notes & Discussion stay as overlays/side panels) */}
-            {activeCoursePanel === 'notes' && (
+            {!selectedMaterialId && activeCoursePanel === 'notes' && (
               <NotesPanel lessonKey={lessonKey} notes={notes} saveNote={saveNote} />
             )}
-            {activeCoursePanel === 'discussion' && (
+            {!selectedMaterialId && activeCoursePanel === 'discussion' && (
               <DiscussionPanel
                 discussions={((courseData?.discussions || []) as unknown as Record<string, unknown>[]).map((d, idx) => ({
                   id: idx,
@@ -365,13 +416,6 @@ export const EducationalCourseLayout = ({ courseId: propCourseId }: EducationalC
         </main>
       </div>
 
-      <MaterialPreviewModal
-        materialId={selectedMaterialId}
-        isOpen={!!selectedMaterialId}
-        onClose={closeMaterial}
-        materials={sidebarResources}
-        onNavigate={setSelectedMaterialId}
-      />
     </div>
   );
 };

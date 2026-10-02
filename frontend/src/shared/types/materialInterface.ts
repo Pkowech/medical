@@ -66,6 +66,10 @@ export interface Material extends MaterialBase {
   metadata?: {
     createdAt: string;
     source: string;
+    sourceProvider?: 'google-drive' | 'r2' | 'local';
+    driveFileId?: string;
+    driveId?: string;
+    driveMimeType?: string;
     learningObjectives?: string[];
     prerequisites?: string[];
     estimatedTime?: number;

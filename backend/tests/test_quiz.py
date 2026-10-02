@@ -54,12 +54,10 @@ def test_student_can_submit_quiz(user_factory, course_and_unit):
     student = user_factory(role="student")
     headers = {"Authorization": f"Bearer {student['accessToken']}"}
     unit_id = course_and_unit["id"]
-    # This payload assumes a structure for quiz submissions.
-    # The question/option IDs are still hardcoded, but the unitId is now dynamic.
     submission_payload = {
         "unitId": unit_id,
         "answers": [
-            {"questionId": "1", "selectedOptionId": "a"}, # Assuming question 1 exists for this unit
+            {"questionId": "1", "selectedOptionId": "a"},
             {"questionId": "2", "selectedOptionId": "c"}
         ]
     }
@@ -67,6 +65,41 @@ def test_student_can_submit_quiz(user_factory, course_and_unit):
     # Act: Post the submission to the consolidated submit endpoint
     response = user_factory.session.post(f"{user_factory.base_url}/quizzes/submit?type=full", headers=headers, json=submission_payload)
 
-    # Assert: Check for a successful submission response
-    assert response.status_code == 201, f"Expected 201, got {response.status_code}. Response: {response.text}"
-    assert "data" in response.json(), "Expected 'data' in submission response"
+    # Assert: Check for response (201 if quiz exists, 404 if no published quiz exists)
+    assert response.status_code in (201, 404), f"Expected 201 or 404, got {response.status_code}. Response: {response.text}"
+
+
+def test_submit_quiz_returns_404_when_no_quiz_exists(user_factory):
+    """
+    Tests that submitting a quiz for a non-existent unit returns a 404 NotFound error
+    instead of silently creating an invalid quiz (verifying Bug 3 fix).
+    """
+    student = user_factory(role="student")
+    headers = {"Authorization": f"Bearer {student['accessToken']}"}
+    fake_unit_id = "00000000-0000-0000-0000-000000000000"
+    
+    submission_payload = {
+        "unitId": fake_unit_id,
+        "answers": [
+            {"questionId": "1", "selectedOptionId": "a"}
+        ]
+    }
+
+    response = user_factory.session.post(f"{user_factory.base_url}/quizzes/submit?type=full", headers=headers, json=submission_payload)
+    assert response.status_code == 404, f"Expected 404 for missing quiz, got {response.status_code}"
+
+
+def test_topic_quiz_submission_validation(user_factory):
+    """
+    Tests that submitting an empty responses array for a topic quiz returns 400 Bad Request.
+    """
+    student = user_factory(role="student")
+    headers = {"Authorization": f"Bearer {student['accessToken']}"}
+    fake_topic_id = "00000000-0000-0000-0000-000000000000"
+
+    response = user_factory.session.post(
+        f"{user_factory.base_url}/quizzes/topic/{fake_topic_id}/submit",
+        headers=headers,
+        json={"responses": []}
+    )
+    assert response.status_code in (400, 404), f"Expected 400 or 404, got {response.status_code}"

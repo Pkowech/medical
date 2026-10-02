@@ -1,24 +1,49 @@
 'use client';
 
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import ReactPlayer from 'react-player';
 import { useXapi } from '@/lib/xapi/useXapi';
 import { URLS } from '@/lib/urls';
-import { Maximize, Minimize, Play, Pause, RefreshCw } from 'lucide-react';
+import { Play, RefreshCw } from 'lucide-react';
 
 interface VideoPlayerProps {
   url: string;
   title: string;
   lessonId: string | number;
+  theaterMode?: boolean;
 }
 
-export const VideoPlayer = ({ url, title, lessonId }: VideoPlayerProps) => {
+const getYouTubeEmbedUrl = (value: string): string | null => {
+  try {
+    const videoUrl = new URL(value);
+    const hostname = videoUrl.hostname.toLowerCase();
+    const isYouTube = hostname === 'youtu.be'
+      || hostname.endsWith('.youtu.be')
+      || hostname === 'youtube.com'
+      || hostname.endsWith('.youtube.com')
+      || hostname === 'youtube-nocookie.com'
+      || hostname.endsWith('.youtube-nocookie.com');
+    if (!isYouTube) return null;
+
+    const videoId = hostname.endsWith('youtu.be')
+      ? videoUrl.pathname.split('/').filter(Boolean)[0]
+      : videoUrl.searchParams.get('v')
+        || videoUrl.pathname.match(/^\/(?:embed|shorts|live)\/([^/]+)/)?.[1];
+    return videoId ? `https://www.youtube-nocookie.com/embed/${encodeURIComponent(videoId)}?controls=1&rel=0` : null;
+  } catch {
+    return null;
+  }
+};
+
+export const VideoPlayer = ({ url, title, lessonId, theaterMode = false }: VideoPlayerProps) => {
   const { trackAction, XAPI_VERBS } = useXapi();
   const [playing, setPlaying] = useState(false);
   const [played, setPlayed] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isReady, setIsReady] = useState(false);
-  const playerRef = useRef<any>(null);
+  const [useYouTubeFallback, setUseYouTubeFallback] = useState(false);
+  const [playerError, setPlayerError] = useState(false);
+  const youtubeEmbedUrl = getYouTubeEmbedUrl(url);
 
   const objectId = `${URLS.BASE}/units/${lessonId}/video`;
   const object = {
@@ -47,13 +72,16 @@ export const VideoPlayer = ({ url, title, lessonId }: VideoPlayerProps) => {
     });
   }, [trackAction, XAPI_VERBS.PAUSED, object, played, duration]);
 
-  const handleProgress = (state: { played: number; playedSeconds: number }) => {
-    setPlayed(state.played);
-    // Track progress at certain milestones (25%, 50%, 75%, 90%)
+  const handleTimeUpdate = (event: React.SyntheticEvent<HTMLVideoElement>) => {
+    const media = event.currentTarget;
+    const currentPlayed = media.duration > 0 ? media.currentTime / media.duration : 0;
+    if (!Number.isFinite(currentPlayed)) return;
+
+    setPlayed(currentPlayed);
     const milestones = [0.25, 0.5, 0.75, 0.9];
     const prevPlayed = played;
     milestones.forEach(m => {
-        if (prevPlayed < m && state.played >= m) {
+        if (prevPlayed < m && currentPlayed >= m) {
             trackAction(XAPI_VERBS.PROGRESSED, object, {
                 extensions: {
                     'http://id.tincanapi.com/extension/progress': Math.round(m * 100),
@@ -72,38 +100,71 @@ export const VideoPlayer = ({ url, title, lessonId }: VideoPlayerProps) => {
     });
   };
 
-  const handleDuration = (d: number) => {
-    setDuration(d);
+  const handleDurationChange = (event: React.SyntheticEvent<HTMLVideoElement>) => {
+    setDuration(event.currentTarget.duration);
   };
 
+  React.useEffect(() => {
+    if (!youtubeEmbedUrl) return;
+
+    const handleYouTubeApiRejection = (event: PromiseRejectionEvent) => {
+      const rejectedScript = event.reason instanceof Event ? event.reason.target : null;
+      if (!(rejectedScript instanceof HTMLScriptElement) || !/youtube(?:-nocookie)?\.com\/iframe_api/i.test(rejectedScript.src)) {
+        return;
+      }
+
+      event.preventDefault();
+      setUseYouTubeFallback(true);
+      setIsReady(true);
+    };
+
+    window.addEventListener('unhandledrejection', handleYouTubeApiRejection);
+    return () => window.removeEventListener('unhandledrejection', handleYouTubeApiRejection);
+  }, [youtubeEmbedUrl]);
+
   return (
-    <div className="relative group w-full aspect-video bg-black rounded-xl overflow-hidden shadow-2xl border border-slate-800 animate-in fade-in zoom-in duration-700">
+    <div className={theaterMode
+      ? 'relative h-full w-full overflow-hidden bg-black'
+      : 'relative group aspect-video w-full overflow-hidden rounded-xl border border-slate-800 bg-black shadow-2xl animate-in fade-in zoom-in duration-700'}>
       {!isReady && (
         <div className="absolute inset-0 flex items-center justify-center bg-slate-900 z-10">
           <RefreshCw className="w-8 h-8 text-blue-500 animate-spin" />
         </div>
       )}
       
-      <ReactPlayer
-        {...({
-          ref: playerRef,
-          url,
-          width: '100%',
-          height: '100%',
-          playing,
-          controls: true,
-          onReady: () => setIsReady(true),
-          onPlay: handlePlay,
-          onPause: handlePause,
-          onProgress: handleProgress as any,
-          onEnded: handleEnded,
-          onDuration: handleDuration,
-          config: ({ youtube: { playerVars: { showinfo: 1, modestbranding: 1, rel: 0 } } } as any),
-        } as any)}
-      />
+      {useYouTubeFallback && youtubeEmbedUrl ? (
+        <iframe
+          src={youtubeEmbedUrl}
+          title={title}
+          className="h-full w-full border-0"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          referrerPolicy="strict-origin-when-cross-origin"
+          allowFullScreen
+        />
+      ) : playerError ? (
+        <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center text-white">
+          <p>Video could not be loaded.</p>
+          <a href={url} target="_blank" rel="noreferrer" className="text-sm underline">Open video on YouTube</a>
+        </div>
+      ) : (
+        <ReactPlayer
+          src={url}
+          width="100%"
+          height="100%"
+          playing={playing}
+          controls
+          onReady={() => setIsReady(true)}
+          onPlay={handlePlay}
+          onPause={handlePause}
+          onTimeUpdate={handleTimeUpdate}
+          onEnded={handleEnded}
+          onDurationChange={handleDurationChange}
+          onError={() => youtubeEmbedUrl ? setUseYouTubeFallback(true) : setPlayerError(true)}
+        />
+      )}
 
       {/* Premium Overlay for Play/Pause when not using native controls (optional) */}
-      {!playing && isReady && (
+      {!theaterMode && !playing && isReady && (
         <div 
           className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-[2px] cursor-pointer transition-opacity group-hover:opacity-100"
           onClick={() => setPlaying(true)}

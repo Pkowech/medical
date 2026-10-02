@@ -186,31 +186,33 @@ export class LearningAnalyticsService implements OnModuleInit {
           goals: [],
         }),
       );
+      const goalAnalytics = response.goalAnalytics;
+      if (!goalAnalytics) {
+        throw new Error('Analytics service returned no goal analytics payload');
+      }
 
       // Transform Rust response to local interface
       const result: GoalAnalytics = {
-        userId: response.goal_analytics.user_id,
-        totalGoals: response.goal_analytics.total_goals,
-        activeGoals: response.goal_analytics.active_goals,
-        completedGoals: response.goal_analytics.completed_goals,
-        overdueGoals: response.goal_analytics.overdue_goals,
-        completionRate: response.goal_analytics.completion_rate,
+        userId: goalAnalytics.userId,
+        totalGoals: goalAnalytics.totalGoals,
+        activeGoals: goalAnalytics.activeGoals,
+        completedGoals: goalAnalytics.completedGoals,
+        overdueGoals: goalAnalytics.overdueGoals,
+        completionRate: goalAnalytics.completionRate,
         averageCompletionTimeDays:
-          response.goal_analytics.average_completion_time_days,
-        goalsByCategory: response.goal_analytics.goals_by_category,
-        goalsByPriority: response.goal_analytics.goals_by_priority,
+          goalAnalytics.averageCompletionTimeDays,
+        goalsByCategory: goalAnalytics.goalsByCategory,
+        goalsByPriority: goalAnalytics.goalsByPriority,
         streakData: {
-          currentStreak: response.goal_analytics.current_streak,
-          longestStreak: response.goal_analytics.longest_streak,
+          currentStreak: goalAnalytics.currentStreak,
+          longestStreak: goalAnalytics.longestStreak,
         },
-        streakGoalIds: response.goal_analytics.streak_goal_ids,
-        upcomingDeadlines: (
-          response.goal_analytics.upcoming_deadlines || []
-        ).map((deadline: any) => ({
-          goalId: deadline.goal_id,
+        streakGoalIds: goalAnalytics.streakGoalIds,
+        upcomingDeadlines: (goalAnalytics.upcomingDeadlines || []).map(deadline => ({
+          goalId: deadline.goalId,
           title: deadline.title,
-          targetDate: deadline.target_date,
-          daysRemaining: deadline.days_remaining,
+          targetDate: deadline.targetDate,
+          daysRemaining: deadline.daysRemaining,
         })),
       };
 

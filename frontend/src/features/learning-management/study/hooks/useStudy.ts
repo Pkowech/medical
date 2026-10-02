@@ -6,6 +6,7 @@ import type { StudyStats, CourseProgressData, UnitProgressData } from '@/shared/
 import type { 
   StudySessionInternal, 
   StudySession, 
+  StudySessionActivity,
   CourseProgressResponse, 
   UnitProgressResponse,
 } from '@/shared/types/studyInterface';
@@ -30,7 +31,7 @@ export const useStudy = () => {
   }, [stats]);
 
   const startSession = useCallback(async (
-    contextId: string, 
+    contextId?: string,
     contextType: 'course' | 'unit' | 'topic' | 'material' = 'topic'
   ): Promise<StudySessionInternal | null> => {
     if (!user?.id) return null;
@@ -40,9 +41,9 @@ export const useStudy = () => {
       // If type is topic, we can pass it as topicId for legacy, or context.
       // New backend supports body: { context: { type, id } }
       
-      const payload = {
-        context: { type: contextType, id: contextId }
-      };
+      const payload = contextId
+        ? { context: { type: contextType, id: contextId } }
+        : {};
 
       const response = await apiService.post<StudySession>('/study/session/start', payload);
       const session = response.data;
@@ -55,7 +56,7 @@ export const useStudy = () => {
           endTime: session.endTime ? new Date(session.endTime) : undefined,
           userId: session.userId,
           duration: session.duration ?? 0,
-          topic: session.topicId || 'unknown'
+          topic: session.topicId || contextId || ''
       };
 
       setSessions(prev => [...prev, sessionInternal]);
@@ -66,11 +67,17 @@ export const useStudy = () => {
     }
   }, [user?.id]);
 
-  const endSession = useCallback(async (sessionId: string, score?: number, notes?: string): Promise<void> => {
+  const endSession = useCallback(async (
+    sessionId: string,
+    notes?: string,
+    activities: StudySessionActivity[] = [],
+    durationSeconds?: number,
+  ): Promise<void> => {
     try {
         await apiService.put(`/study/session/${sessionId}/end`, {
-            activities: score ? [{ type: 'quiz', score, duration: 0 }] : [], // Simplification
-            notes
+            activities,
+            notes,
+            durationSeconds,
         });
 
         // Update local state
@@ -80,10 +87,11 @@ export const useStudy = () => {
                 ? {
                     ...session,
                     endTime: new Date(),
-                    duration: session.startTime 
-                        ? (Date.now() - new Date(session.startTime).getTime()) / 1000 / 60 
+                    duration: durationSeconds !== undefined
+                      ? durationSeconds / 60
+                      : session.startTime
+                        ? (Date.now() - new Date(session.startTime).getTime()) / 1000 / 60
                         : 0,
-                    score,
                     notes,
                   }
                 : session
@@ -91,6 +99,7 @@ export const useStudy = () => {
           );
     } catch (error) {
         console.error('Failed to end study session:', error);
+      throw error;
     }
   }, []);
 

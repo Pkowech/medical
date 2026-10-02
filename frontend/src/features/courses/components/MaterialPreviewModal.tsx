@@ -9,7 +9,7 @@ import {
   DialogDescription,
 } from '@/shared/components/ui/dialog';
 import { Button } from '@/shared/components/ui/button';
-import { ChevronLeft, ChevronRight, ExternalLink, FileText, PlayCircle, Download } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ExternalLink, FileText, Youtube, Download } from 'lucide-react';
 import { VideoPlayer } from './VideoPlayer';
 import PDFViewer from '@/shared/components/pdf/PDFViewer';
 import materialService from '@/features/courses/services/materialService';
@@ -23,6 +23,7 @@ interface MaterialPreviewModalProps {
   onClose: () => void;
   materials?: Array<{ id: string | number }>;
   onNavigate?: (id: string) => void;
+  inline?: boolean;
 }
 
 export const MaterialPreviewModal = ({
@@ -31,6 +32,7 @@ export const MaterialPreviewModal = ({
   onClose,
   materials = [],
   onNavigate,
+  inline = false,
 }: MaterialPreviewModalProps) => {
   const [material, setMaterial] = useState<Material | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -113,15 +115,20 @@ export const MaterialPreviewModal = ({
 
     if (!material) return null;
 
-    const effectiveUrl = material.previewFileUrl || material.fileUrl || material.url;
+    const effectiveUrl = material.previewFileUrl || material.fileUrl || material.url || material.content;
     const resolvedEffectiveUrl = effectiveUrl?.startsWith('/api/materials/')
       ? `${URLS.API_BASE}${effectiveUrl.replace(/^\/api/, '')}`
       : effectiveUrl;
 
     if (isVideo && resolvedEffectiveUrl) {
       return (
-        <div className="aspect-video w-full">
-          <VideoPlayer url={resolvedEffectiveUrl} title={material.title} lessonId={material.id} />
+        <div className="flex h-full min-h-0 w-full items-center justify-center overflow-hidden bg-[#0b0b0b] p-2 sm:p-6">
+          <div
+            className="aspect-video w-full max-w-full overflow-hidden rounded-md shadow-2xl"
+            style={{ maxWidth: 'min(100%, calc((100dvh - 14rem) * 16 / 9))' }}
+          >
+            <VideoPlayer url={resolvedEffectiveUrl} title={material.title} lessonId={material.id} theaterMode />
+          </div>
         </div>
       );
     }
@@ -167,13 +174,66 @@ export const MaterialPreviewModal = ({
     );
   };
 
+  if (inline) {
+    return (
+      <section className="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden bg-white dark:bg-slate-900">
+        <header className="flex flex-col gap-3 border-b p-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className={`rounded-lg p-2 ${isVideo ? 'bg-red-50 text-red-600 dark:bg-red-500/10' : 'bg-blue-50 text-blue-600 dark:bg-blue-500/10'}`}>
+              {isVideo ? <Youtube className="h-5 w-5" /> : <FileText className="h-5 w-5" />}
+            </div>
+            <div className="min-w-0">
+              <h2 className="truncate text-lg font-bold text-slate-900 dark:text-white">{material?.title || 'Loading material...'}</h2>
+              <p className="text-xs font-medium uppercase text-slate-500">
+                {material?.type || 'Study material'}{material?.size ? ` • ${material.size}` : ''}
+              </p>
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-1">
+            <Button type="button" variant="ghost" size="sm" onClick={onClose} title="Back to topic">
+              <ChevronLeft className="h-4 w-4" />
+              Back
+            </Button>
+            {materials.length > 1 && (
+              <>
+                <Button type="button" variant="ghost" size="sm" onClick={() => navigateMaterial(-1)} disabled={materialIndex <= 0} aria-label="Open previous material" title="Previous material">
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="whitespace-nowrap text-xs text-slate-500">
+                  {materialIndex >= 0 ? `${materialIndex + 1} / ${materials.length}` : ''}
+                </span>
+                <Button type="button" variant="ghost" size="sm" onClick={() => navigateMaterial(1)} disabled={materialIndex < 0 || materialIndex >= materials.length - 1} aria-label="Open next material" title="Next material">
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </>
+            )}
+            {material?.fileUrl && (
+              <Button type="button" variant="ghost" size="sm" onClick={() => window.open(material.fileUrl, '_blank')} title="Download">
+                <Download className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        </header>
+        <div className="min-h-0 flex-1 overflow-hidden">
+          {renderContent()}
+        </div>
+        {!isLoading && material && (
+          <footer className="flex items-center justify-between gap-3 border-t bg-slate-50 p-3 text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-800/30">
+            <span>{material.type?.toLowerCase() === 'pdf' && pdfNumPages ? `Page ${pdfCurrentPage} of ${pdfNumPages}` : material.description || 'Study activity is being tracked'}</span>
+            <span className="shrink-0 font-medium text-blue-600 dark:text-blue-400">Activity is being tracked</span>
+          </footer>
+        )}
+      </section>
+    );
+  }
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="grid h-dvh max-h-dvh w-screen max-w-none grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden rounded-none border-none bg-white p-0 shadow-2xl dark:bg-slate-900">
         <DialogHeader className="sticky top-0 z-10 flex flex-col items-stretch justify-between space-y-2 border-b bg-white p-3 dark:border-slate-800 dark:bg-slate-900 sm:flex-row sm:items-center sm:space-y-0 sm:p-4">
           <div className="flex min-w-0 items-center gap-3">
             <div className={`p-2 rounded-lg ${isVideo ? 'bg-red-50 dark:bg-red-500/10 text-red-600' : 'bg-blue-50 dark:bg-blue-500/10 text-blue-600'}`}>
-              {isVideo ? <PlayCircle className="w-5 h-5" /> : <FileText className="w-5 h-5" />}
+              {isVideo ? <Youtube className="w-5 h-5" /> : <FileText className="w-5 h-5" />}
             </div>
             <div>
               <DialogTitle className="text-lg font-bold truncate max-w-[50vw]">{material?.title || 'Loading...'}</DialogTitle>

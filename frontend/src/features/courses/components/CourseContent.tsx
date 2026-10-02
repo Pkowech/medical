@@ -11,42 +11,11 @@ import {
   PlayCircle,
   XCircle,
 } from 'lucide-react';
-import type { Material } from '@/shared/types/materialInterface';
-import type { ReadinessSignal } from '@/shared/types/mastery.types';
 import { useXapi } from '@/lib/xapi/useXapi';
 import { URLS } from '@/lib/urls';
 import { useEffect, useRef } from 'react';
 import { VideoPlayer } from './VideoPlayer';
-
-type WindowWithTogglePanel = Window & { toggleCoursePanel?: (panel: 'notes' | 'discussion' | 'quiz') => void };
-
-interface Lesson {
-  id: number | string;
-  title: string;
-  type: 'video' | 'interactive' | 'text' | 'quiz' | 'assignment';
-  duration: string;
-  content: { video?: string; transcript?: string; interactive?: boolean; text?: string };
-  isCompleted?: boolean;
-  masteryUnlocked?: boolean;
-  failedAttempts?: number;
-  readinessSignal?: ReadinessSignal;
-}
-
-interface CourseContentProps {
-  currentLesson: Lesson | undefined;
-  lessonKey: string;
-  offlineMode: boolean;
-  bookmarks: Set<string>;
-  progress: Record<string, boolean>;
-  toggleBookmark: (lessonKey: string) => void;
-  markLessonComplete: (lessonKey: string) => void;
-  navigatePrev: () => void;
-  navigateNext: () => void;
-  isFirstLesson: boolean;
-  isLastLesson: boolean;
-  materials?: Material[];
-  openMaterial: (id: string) => void;
-}
+import type { CourseContentProps } from '@/shared/types/courseInterface';
 
 export const CourseContent = ({
   currentLesson: lesson,
@@ -55,13 +24,15 @@ export const CourseContent = ({
   bookmarks,
   progress,
   toggleBookmark,
-  markLessonComplete,
+  toggleLessonComplete,
   navigatePrev,
   navigateNext,
+  onOpenMasteryQuiz,
   isFirstLesson,
   isLastLesson,
   materials = [],
   openMaterial,
+  masteryPassingScore = 80,
 }: CourseContentProps) => {
   const { trackAction, XAPI_VERBS } = useXapi();
   const lastLessonId = useRef<string | number | null>(null);
@@ -111,26 +82,32 @@ export const CourseContent = ({
     <div className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm rounded-lg p-6 shadow-sm border border-gray-200 dark:border-slate-700/50">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{lesson.title}</h2>
-        <div className="flex items-center space-x-2">
+        <div className="flex shrink-0 items-center gap-2">
           <button
+            type="button"
             onClick={() => toggleBookmark(lessonKey)}
+            aria-label={bookmarks.has(lessonKey) ? `Remove bookmark for ${lesson.title}` : `Bookmark ${lesson.title} for later`}
+            aria-pressed={bookmarks.has(lessonKey)}
             className={`p-2 rounded-lg transition-colors ${
               bookmarks.has(lessonKey)
                 ? 'bg-yellow-100 dark:bg-yellow-500/20 text-yellow-600 dark:text-yellow-400'
                 : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-600'
             }`}
-            title={bookmarks.has(lessonKey) ? 'Remove bookmark' : 'Add bookmark'}
+            title={bookmarks.has(lessonKey) ? 'Remove bookmark' : 'Bookmark for later'}
           >
-            <Bookmark className="w-5 h-5" />
+            <Bookmark className={`w-5 h-5 ${bookmarks.has(lessonKey) ? 'fill-current' : ''}`} />
           </button>
           <button
-            onClick={() => markLessonComplete(lessonKey)}
+            type="button"
+            onClick={() => toggleLessonComplete(lessonKey)}
+            aria-label={progress[lessonKey] ? `Clear studied status for ${lesson.title}` : `Mark ${lesson.title} as studied`}
+            aria-pressed={Boolean(progress[lessonKey])}
             className={`p-2 rounded-lg transition-colors ${
               progress[lessonKey]
                 ? 'bg-green-100 dark:bg-green-500/20 text-green-600 dark:text-green-400'
                 : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-600'
             }`}
-            title={progress[lessonKey] ? 'Mark as incomplete' : 'Mark as complete'}
+            title={progress[lessonKey] ? 'Clear studied status' : 'Mark as studied'}
           >
             <CheckCircle className="w-5 h-5" />
           </button>
@@ -236,7 +213,7 @@ export const CourseContent = ({
       )}
 
       {/* Mastery Gate Section - Now feels like a natural "Next Step" */}
-      <div className="mt-12 p-8 bg-gradient-to-br from-slate-50 to-white dark:from-slate-900/80 dark:to-slate-900/40 rounded-2xl border border-blue-100 dark:border-blue-900/30 shadow-inner">
+      <div className="mt-12 p-8 bg-linear-to-br from-slate-50 to-white dark:from-slate-900/80 dark:to-slate-900/40 rounded-2xl border border-blue-100 dark:border-blue-900/30 shadow-inner">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-8">
           <div className="flex-1">
             <div className="flex items-center gap-3 mb-4">
@@ -251,7 +228,7 @@ export const CourseContent = ({
             <p className="text-gray-600 dark:text-slate-400 leading-relaxed max-w-xl">
               {lesson.masteryUnlocked 
                 ? "Excellent work! You have successfully mastered this topic. You can proceed or retake the assessment for a higher score." 
-                : "Verify your understanding of this topic to unlock the next part of your learning path. 80% passing score required."}
+                : `Verify your understanding of this topic to unlock the next part of your learning path. ${masteryPassingScore}% passing score required.`}
             </p>
             
             {/* Read-Before-Quiz Warning */}
@@ -265,9 +242,9 @@ export const CourseContent = ({
             )}
           </div>
           
-          <div className="flex flex-col items-center gap-3 min-w-[240px]">
+          <div className="flex flex-col items-center gap-3 min-w-60">
              <button
-              onClick={() => (window as WindowWithTogglePanel).toggleCoursePanel?.('quiz')}
+              onClick={onOpenMasteryQuiz}
               className={`w-full py-4 rounded-xl font-bold transition-all shadow-xl text-center flex items-center justify-center gap-2 group ${
                 lesson.masteryUnlocked
                   ? 'bg-green-600 text-white hover:bg-green-700'

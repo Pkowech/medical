@@ -16,7 +16,14 @@ export const useContextAwareNavigation = () => {
   const { filteredNavigation, allRoles } = usePermissions();
 
   // Define core items that should always be visible
-  const coreNavIds = ['dashboard', 'courses', 'learning-paths', 'ai-tutor', 'profile', 'help'];
+  const coreNavIds = [
+    'dashboard',
+    'courses',
+    'learning-paths',
+    'ai-tutor',
+    'profile',
+    'help',
+  ];
 
   // Define context-specific items for different sections
   const getContextSpecificItems = (path: string): string[] => {

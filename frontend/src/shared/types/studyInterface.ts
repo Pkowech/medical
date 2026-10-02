@@ -38,6 +38,13 @@ export interface StudySession {
 /**
  * Backend API response type for course progress
  */
+export interface StudySessionActivity {
+  type: 'reading' | 'quiz' | 'notes';
+  duration: number;
+  timestamp: string;
+  score?: number;
+}
+
 export interface CourseProgressResponse {
   id?: string;
   courseId?: string;

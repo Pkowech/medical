@@ -69,7 +69,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         );
     }
 
-    const isCoursePage = pathname?.startsWith('/courses/') && pathname !== '/courses';
+    const coursePathSegments = pathname?.split('/').filter(Boolean) ?? [];
+    const isCoursePage = coursePathSegments[0] === 'courses' && coursePathSegments.length > 2;
     const isMaterialViewPage = pathname?.startsWith('/study-planner/materials/');
     const isFullHeightPage = isCoursePage || isMaterialViewPage;
 

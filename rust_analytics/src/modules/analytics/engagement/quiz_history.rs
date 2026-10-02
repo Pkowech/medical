@@ -17,11 +17,14 @@ pub async fn get_quiz_attempt_history(
     pool: &Pool<Postgres>,
 ) -> Result<Vec<QuizAttempt>, Error> {
     let mut query_string = "SELECT quiz_id, score, completed_at FROM quiz_attempts WHERE user_id = $1 ORDER BY completed_at DESC".to_string();
+    let mut param_index = 2;
+
     if limit.is_some() {
-        query_string.push_str(" LIMIT $2");
+        query_string.push_str(&format!(" LIMIT ${}", param_index));
+        param_index += 1;
     }
     if offset.is_some() {
-        query_string.push_str(" OFFSET $3");
+        query_string.push_str(&format!(" OFFSET ${}", param_index));
     }
 
     let mut query = sqlx::query_as::<_, QuizAttemptDb>(&query_string).bind(user_id);

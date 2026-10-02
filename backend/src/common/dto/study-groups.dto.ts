@@ -151,6 +151,7 @@ export class JoinGroupDto {
 }
 
 export interface StudyGroupMetadata {
+  courseId?: string | null;
   tags: string[];
   studyTopics: string[];
   goals: Prisma.JsonValue;

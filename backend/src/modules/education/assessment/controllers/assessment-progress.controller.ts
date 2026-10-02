@@ -8,6 +8,7 @@ import {
   Request,
   ParseUUIDPipe,
   Query,
+  ForbiddenException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -20,6 +21,9 @@ import {
 import { AssessmentProgressService } from '../services/assessment-progress.service';
 import { JwtAuthGuard } from '#modules/auth/guards/jwt-auth.guard';
 import { User } from '#common/decorators/user.decorator';
+import { RoleGuard } from '#common/guards/roles.guard';
+import { Roles } from '#common/decorators/roles.decorator';
+import { Role } from '#modules/auth/constants/role.constants';
 import { PerformanceAnalyticsDto, AssessmentHistoryDto } from '#common/dto';
 import { AssessmentAnalyticsService } from '../../../ai-analytics/services/assessment-analytics.service';
 import {
@@ -69,7 +73,11 @@ export class AssessmentProgressController {
     status: 200,
     description: 'User assessment progress retrieved successfully',
   })
-  async getUserProgress(@Param('userId', ParseUUIDPipe) userId: string) {
+  async getUserProgress(
+    @Param('userId', ParseUUIDPipe) userId: string,
+    @User('id') authenticatedUserId: string,
+  ) {
+    this.assertOwnUser(authenticatedUserId, userId);
     return this.assessmentProgressService.getAllProgress(userId);
   }
 
@@ -78,8 +86,10 @@ export class AssessmentProgressController {
   @ApiResponse({ status: 200, type: () => PerformanceAnalyticsDto })
   async getUserPerformance(
     @Param('userId', ParseUUIDPipe) userId: string,
+    @User('id') authenticatedUserId: string,
     @Query('assessmentId') assessmentId?: string,
   ): Promise<PerformanceAnalyticsDto> {
+    this.assertOwnUser(authenticatedUserId, userId);
     return await this.analyticsService.generateAnalytics(userId, assessmentId);
   }
 
@@ -88,7 +98,9 @@ export class AssessmentProgressController {
   @ApiResponse({ status: 200, type: () => UserPerformanceProfileDto })
   async getUserProfile(
     @Param('userId', ParseUUIDPipe) userId: string,
+    @User('id') authenticatedUserId: string,
   ): Promise<UserPerformanceProfileDto> {
+    this.assertOwnUser(authenticatedUserId, userId);
     const profile =
       await this.analyticsService.getUserPerformanceProfile(userId);
     return profile as UserPerformanceProfileDto;
@@ -116,6 +128,13 @@ export class AssessmentProgressController {
     return await this.analyticsService.getPerformanceAnalyticsForAssessment(
       userId,
     );
+  }
+
+  @Get('history')
+  @ApiOperation({ summary: 'Get quiz history and stats for the authenticated user' })
+  @ApiResponse({ status: 200, description: 'Quiz history and stats retrieved' })
+  async getQuizHistory(@User('id') userId: string) {
+    return this.analyticsService.getQuizHistory(userId);
   }
 
   @Get('study-materials')
@@ -153,6 +172,8 @@ export class AssessmentProgressController {
   }
 
   @Get('admin/recommendations/:userId')
+  @UseGuards(RoleGuard)
+  @Roles(Role.admin)
   @ApiOperation({
     summary: 'Get recommendations for a specific user (Admin only)',
   })
@@ -178,7 +199,11 @@ export class AssessmentProgressController {
     status: 200,
     description: 'Returns user analytics data',
   })
-  async getUserAnalyticsById(@Param('userId', ParseUUIDPipe) userId: string) {
+  async getUserAnalyticsById(
+    @Param('userId', ParseUUIDPipe) userId: string,
+    @User('id') authenticatedUserId: string,
+  ) {
+    this.assertOwnUser(authenticatedUserId, userId);
     return this.userAnalyticsService.getUserAnalytics(userId);
   }
 
@@ -192,7 +217,11 @@ export class AssessmentProgressController {
     status: 200,
     description: 'Returns user insights data',
   })
-  async getUserInsights(@Param('userId', ParseUUIDPipe) userId: string) {
+  async getUserInsights(
+    @Param('userId', ParseUUIDPipe) userId: string,
+    @User('id') authenticatedUserId: string,
+  ) {
+    this.assertOwnUser(authenticatedUserId, userId);
     return this.learningAnalyticsService.getUserInsights(userId);
   }
 
@@ -200,6 +229,8 @@ export class AssessmentProgressController {
    * Get performance analytics for a specific assessment
    */
   @Get('summary/assessment/:assessmentId')
+  @UseGuards(RoleGuard)
+  @Roles(Role.admin, Role.instructor)
   @ApiOperation({ summary: 'Get assessment analytics' })
   @ApiParam({ name: 'assessmentId', description: 'Assessment ID' })
   @ApiResponse({
@@ -219,9 +250,11 @@ export class AssessmentProgressController {
   @ApiResponse({ status: 200, type: () => [AssessmentHistoryDto] })
   async getAssessmentHistory(
     @Param('userId', ParseUUIDPipe) userId: string,
+    @User('id') authenticatedUserId: string,
     @Query('limit') limit?: number,
     @Query('offset') offset?: number,
   ): Promise<AssessmentHistoryDto[]> {
+    this.assertOwnUser(authenticatedUserId, userId);
     return (await this.analyticsService.getQuizAttemptHistory(userId, {
       limit,
       offset,
@@ -235,6 +268,12 @@ export class AssessmentProgressController {
     @Param('assessmentId', ParseUUIDPipe) assessmentId: string,
   ): Promise<any[]> {
     return await this.analyticsService.getRelatedResources(assessmentId);
+  }
+
+  private assertOwnUser(authenticatedUserId: string, requestedUserId: string): void {
+    if (authenticatedUserId !== requestedUserId) {
+      throw new ForbiddenException('You can only access your own assessment data');
+    }
   }
 
   @Get(':assessmentId')

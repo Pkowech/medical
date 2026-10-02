@@ -185,40 +185,21 @@ const MedicalEducationDashboard = () => {
       ? Number(((data as unknown as { studySessions?: Array<{ durationHours?: number }> }).studySessions!.reduce((acc: number, session: { durationHours?: number }) => acc + (session.durationHours || 0), 0)).toFixed(1))
       : 0,
   };
-
-  // Error state with retry capability
-  if (error) {
-    const errorMessage = (error as any) instanceof Error ? (error as any).message : 'An unexpected error occurred';
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-slate-900 p-6 flex items-center justify-center">
-        <div className="text-center max-w-md">
-          <XCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Failed to load dashboard</h2>
-          <p className="text-gray-600 dark:text-slate-400 mb-4">
-            {errorMessage}
-          </p>
-          <button
-            onClick={handleRefetch}
-            className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-          >
-            Retry Loading
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // Loading state with better UX
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-slate-900 p-6 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4" />
-          <p className="text-gray-600 dark:text-slate-400 font-medium">Preparing your daily briefing...</p>
-        </div>
-      </div>
-    );
-  }
+  const trendPoints = selectedTrendMetric === 'score'
+    ? (data.performanceTrends || [])
+        .filter(point => point.scoreCount === undefined ? point.score > 0 : point.scoreCount > 0)
+        .map(point => ({ label: point.month, value: point.score }))
+    : (data.weeklyProgress || []).map(point => ({ label: point.day, value: point.hours }));
+  const hasTrendData = selectedTrendMetric === 'score'
+    ? trendPoints.length > 0
+    : trendPoints.some(point => point.value > 0);
+  const weeklyActivity = data.weeklyProgress || [];
+  const hasWeeklyActivity = weeklyActivity.some(day => day.hours > 0);
+  const peerComparison = data.peerComparison;
+  const peerProgressDifference = peerComparison
+    ? peerComparison.yourAverage - peerComparison.cohortAverage
+    : 0;
+  const hasOverallProgress = (stats.overallProgress ?? 0) > 0;
 
   // StatCard component reserved for future use - can be uncommented when needed
   // interface StatCardProps {
@@ -536,16 +517,12 @@ const MedicalEducationDashboard = () => {
                     if (firstCourse?.id) {
                       try {
                           if (firstCourse.unitId) {
-                              if (firstCourse.nextTopicId) {
-                                  router.push(`/courses/${firstCourse.id}/units/${firstCourse.unitId}/topics/${firstCourse.nextTopicId}`);
-                              } else {
-                                  router.push(`/courses/${firstCourse.id}/units/${firstCourse.unitId}`);
-                              }
+                            router.push(`/courses/${firstCourse.id}/units/${firstCourse.unitId}`);
                           } else {
                               const resumePoint = await getResumePoint(firstCourse.id);
                               if (resumePoint && resumePoint.id && resumePoint.type === 'topic') {
                                   if (resumePoint.unitId) {
-                                      router.push(`/courses/${firstCourse.id}/units/${resumePoint.unitId}/topics/${resumePoint.id}`);
+                                router.push(`/courses/${firstCourse.id}/units/${resumePoint.unitId}`);
                                   } else {
                                       router.push(`/courses/${firstCourse.id}`); // Fallback if no unit
                                   }
@@ -744,7 +721,7 @@ const MedicalEducationDashboard = () => {
                 <TrendingUp className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
                 Performance Trends
               </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Monthly progress and engagement</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Recorded assessment scores and study hours</p>
             </div>
             <div className="flex bg-slate-100 dark:bg-slate-900/50 p-1 rounded-xl border border-slate-200 dark:border-slate-700/50">
               <button
@@ -768,39 +745,49 @@ const MedicalEducationDashboard = () => {
             </div>
           </div>
           
-          <div className="flex items-end justify-between gap-2 md:gap-4 h-64 px-2 relative z-10">
-            {data.performanceTrends?.map((item: { score?: number; hours?: number; month?: string }, i: number) => {
-              const value = (selectedTrendMetric === 'score' ? item.score : item.hours) ?? 0;
-              const maxValue = selectedTrendMetric === 'score' ? 100 : 
-                            Math.max(...(data.performanceTrends?.map((t: { hours?: number }) => t.hours || 0) || [10]));
-              const height = Math.max(8, (value / maxValue) * 100);
+          {hasTrendData ? (
+            <div className="flex items-end justify-between gap-2 md:gap-4 h-64 px-2 relative z-10">
+              {trendPoints.map((point, index) => {
+                const maxValue = Math.max(
+                  selectedTrendMetric === 'score' ? 100 : 0,
+                  ...trendPoints.map(trend => trend.value),
+                  1,
+                );
+                const height = (point.value / maxValue) * 100;
 
-              return (
-                <div key={i} className="flex-1 flex flex-col items-center gap-3 group h-full justify-end">
-                  <div className="relative w-full h-48 flex items-end justify-center px-1 md:px-2">
-                    <motion.div
-                      initial={{ height: 0 }}
-                      animate={{ height: `${height}%` }}
-                      transition={{ type: 'spring', damping: 15, stiffness: 100 }}
-                      className={`w-full max-w-10 rounded-t-lg transition-colors cursor-pointer relative ${
-                        selectedTrendMetric === 'score' 
-                          ? 'bg-linear-to-t from-indigo-500 to-violet-400 hover:from-indigo-400 hover:to-violet-300' 
-                          : 'bg-linear-to-t from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300'
-                      }`}
-                    >
-                      <div className="absolute -top-10 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all transform scale-90 group-hover:scale-100 bg-slate-900 dark:bg-slate-800 text-white px-2.5 py-1.5 rounded-lg text-[10px] font-bold whitespace-nowrap border border-slate-700 shadow-xl z-20">
-                        <div className="flex flex-col items-center">
-                          <span>{value}{selectedTrendMetric === 'score' ? '%' : 'h'}</span>
-                          <div className="w-1.5 h-1.5 bg-slate-900 dark:bg-slate-800 rotate-45 absolute -bottom-1 left-1/2 -translate-x-1/2 border-r border-b border-slate-700" />
+                return (
+                  <div key={`${point.label}-${index}`} className="flex-1 flex flex-col items-center gap-3 group h-full justify-end">
+                    <div className="relative w-full h-48 flex items-end justify-center px-1 md:px-2">
+                      <motion.div
+                        initial={{ height: 0 }}
+                        animate={{ height: `${height}%` }}
+                        transition={{ type: 'spring', damping: 15, stiffness: 100 }}
+                        className={`w-full max-w-10 rounded-t-lg transition-colors cursor-pointer relative ${
+                          selectedTrendMetric === 'score'
+                            ? 'bg-linear-to-t from-indigo-500 to-violet-400 hover:from-indigo-400 hover:to-violet-300'
+                            : 'bg-linear-to-t from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300'
+                        }`}
+                      >
+                        <div className="absolute -top-10 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all transform scale-90 group-hover:scale-100 bg-slate-900 dark:bg-slate-800 text-white px-2.5 py-1.5 rounded-lg text-[10px] font-bold whitespace-nowrap border border-slate-700 shadow-xl z-20">
+                          {point.value}{selectedTrendMetric === 'score' ? '%' : 'h'}
                         </div>
-                      </div>
-                    </motion.div>
+                      </motion.div>
+                    </div>
+                    <span className="text-[10px] md:text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-tighter">{point.label}</span>
                   </div>
-                  <span className="text-[10px] md:text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-tighter">{item.month}</span>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="h-64 flex flex-col items-center justify-center gap-2 text-center text-slate-500 dark:text-slate-400">
+              <BarChart3 className="h-8 w-8 text-slate-300 dark:text-slate-600" />
+              <p className="text-sm font-medium">
+                {selectedTrendMetric === 'score'
+                  ? 'Assessment trends will appear after you complete a quiz.'
+                  : 'Study-hour trends will appear after you log study time.'}
+              </p>
+            </div>
+          )}
           
           <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-700/50 flex flex-wrap items-center justify-between gap-4 text-sm relative z-10">
             <div className="flex items-center gap-6">
@@ -811,16 +798,11 @@ const MedicalEducationDashboard = () => {
                 </span>
               </div>
             </div>
-            <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 dark:bg-emerald-500/10 rounded-full border border-emerald-100 dark:border-emerald-500/20">
-              <TrendingUp className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-              <span className="text-emerald-600 dark:text-emerald-400 font-bold text-xs">
-                +{selectedTrendMetric === 'score' ? '9.2' : '15.7'}% improved vs last period
-              </span>
-            </div>
           </div>
         </div>
 
         {/* Peer Comparison */}
+        {peerComparison && peerComparison.totalStudents > 1 ? (
         <div className="bg-linear-to-br from-violet-600 to-purple-700 dark:from-violet-900 dark:to-purple-950 rounded-2xl p-6 shadow-lg text-white">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
@@ -832,33 +814,43 @@ const MedicalEducationDashboard = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="bg-white/10 dark:bg-black/20 backdrop-blur-sm rounded-xl p-4 border border-white/20 dark:border-white/10">
-              <p className="text-sm text-white/80 mb-1">Your Average</p>
-              <p className="text-3xl font-bold">{data.peerComparison?.yourAverage}%</p>
-              <div className="flex items-center gap-1 mt-2 text-xs">
-                <TrendingUp className="w-3 h-3" />
-                <span>+3% from cohort</span>
-              </div>
+              <p className="text-sm text-white/80 mb-1">Your Course Progress</p>
+              <p className="text-3xl font-bold">{peerComparison.yourAverage}%</p>
+              <p className="mt-2 text-xs">
+                {peerProgressDifference === 0
+                  ? 'At the cohort average'
+                  : `${peerProgressDifference > 0 ? '+' : ''}${peerProgressDifference} points vs cohort`}
+              </p>
             </div>
 
             <div className="bg-white/10 dark:bg-black/20 backdrop-blur-sm rounded-xl p-4 border border-white/20 dark:border-white/10">
               <p className="text-sm text-white/80 mb-1">Cohort Average</p>
-              <p className="text-3xl font-bold">{data.peerComparison?.cohortAverage}%</p>
-              <p className="text-xs text-white/60 mt-2">150 students</p>
+              <p className="text-3xl font-bold">{peerComparison.cohortAverage}%</p>
+              <p className="text-xs text-white/60 mt-2">{peerComparison.totalStudents} learners</p>
             </div>
 
             <div className="bg-white/10 dark:bg-black/20 backdrop-blur-sm rounded-xl p-4 border border-white/20 dark:border-white/10">
               <p className="text-sm text-white/80 mb-1">Your Rank</p>
-              <p className="text-3xl font-bold">#{data.peerComparison?.rank}</p>
-              <p className="text-xs text-white/60 mt-2">Top 8%</p>
+              <p className="text-3xl font-bold">
+                {peerComparison.rank > 0 && peerComparison.rank <= peerComparison.totalStudents
+                  ? `#${peerComparison.rank}`
+                  : '—'}
+              </p>
+              <p className="text-xs text-white/60 mt-2">of {peerComparison.totalStudents} learners</p>
             </div>
 
             <div className="bg-white/10 dark:bg-black/20 backdrop-blur-sm rounded-xl p-4 border border-white/20 dark:border-white/10">
               <p className="text-sm text-white/80 mb-1">Top Performer</p>
-              <p className="text-3xl font-bold">{data.peerComparison?.topPerformer}%</p>
-              <p className="text-xs text-white/60 mt-2">Keep pushing!</p>
+              <p className="text-3xl font-bold">{peerComparison.topPerformer}%</p>
+              <p className="text-xs text-white/60 mt-2">Highest course progress</p>
             </div>
           </div>
         </div>
+        ) : (
+          <div className="rounded-2xl border border-dashed border-slate-300 bg-white/70 p-6 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-400">
+            Peer comparison will appear when cohort data is available.
+          </div>
+        )}
 
         {/* Upcoming Deadlines */}
         <div className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-gray-200 dark:border-slate-700/50">
@@ -934,10 +926,14 @@ const MedicalEducationDashboard = () => {
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">Overall Progress</h3>
             <ProgressRing progress={stats.overallProgress || 0} />
             <div className="mt-6 text-center">
-              <p className="text-sm text-gray-600 dark:text-slate-400">Keep up the great work!</p>
+              <p className="text-sm text-gray-600 dark:text-slate-400">
+                {hasOverallProgress ? 'Progress across your enrolled units.' : 'Start a course to build your progress history.'}
+              </p>
               <div className="flex items-center justify-center gap-2 mt-2">
-                <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">On track for your goals</span>
+                <div className={`w-2 h-2 rounded-full ${hasOverallProgress ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
+                <span className={`text-xs font-medium ${hasOverallProgress ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400'}`}>
+                  {hasOverallProgress ? 'Progress recorded' : 'No progress recorded yet'}
+                </span>
               </div>
             </div>
           </div>
@@ -953,8 +949,9 @@ const MedicalEducationDashboard = () => {
                 View Details <ArrowRight className="w-4 h-4" />
               </button>
             </div>
+            {hasWeeklyActivity ? (
             <div className="flex items-end justify-between gap-2 h-48">
-              {data.weeklyProgress?.map((day: { day?: string; hours?: number; target?: number }, i: number) => {
+              {weeklyActivity.map((day, i) => {
                 const hours = day.hours ?? 0;
                 const target = day.target ?? 4;
                 const percentage = (hours / 6) * 100;
@@ -988,7 +985,12 @@ const MedicalEducationDashboard = () => {
                 );
               })}
             </div>
-            <div className="mt-4 flex items-center justify-center gap-4 text-xs">
+            ) : (
+              <div className="h-48 flex items-center justify-center text-center text-sm text-slate-500 dark:text-slate-400">
+                No study hours logged this week yet.
+              </div>
+            )}
+            {hasWeeklyActivity && <div className="mt-4 flex items-center justify-center gap-4 text-xs">
               <div className="flex items-center gap-2">
                 <div className="w-3 h-1 border-t-2 border-dashed border-slate-500"></div>
                 <span className="text-slate-400">Target</span>
@@ -997,7 +999,7 @@ const MedicalEducationDashboard = () => {
                 <div className="w-3 h-3 rounded bg-emerald-500"></div>
                 <span className="text-slate-400">Above target</span>
               </div>
-            </div>
+            </div>}
           </div>
         </div>
 
@@ -1051,9 +1053,11 @@ const MedicalEducationDashboard = () => {
             </button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {data.courseData?.map((course: { id?: string; unitId?: string; name?: string; progressPercentage?: number; color?: string; nextTopic?: string; timeLeft?: string; lastUpdated?: number }) => (
+            {data.courseData
+              ?.filter((course: { progressPercentage?: number }) => (course.progressPercentage ?? 0) < 100)
+              .map((course: { id?: string; unitId?: string; name?: string; progressPercentage?: number; color?: string; nextTopic?: string; timeLeft?: string; lastUpdated?: number }, index) => (
               <div
-                key={course.id}
+                key={`${course.id ?? 'course'}-${course.unitId ?? index}`}
                 onClick={() => {
                   if (course.unitId && !course.unitId.startsWith('placeholder-')) {
                     router.push(`/courses/${course.id}/units/${course.unitId}`);

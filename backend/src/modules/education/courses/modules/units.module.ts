@@ -6,6 +6,7 @@ import { CoursesModule } from './courses.module';
 
 import { UnitsService } from '../services/units.service';
 import { UnitsController } from '../controllers/units.controller';
+import { UnitProgressController } from '../controllers/unit-progress.controller';
 import { TopicsService } from '../services/topics.service';
 import { TopicsController } from '../controllers/topics.controller';
 
@@ -17,7 +18,7 @@ import { TopicsController } from '../controllers/topics.controller';
     AuthModule,
     CoursesModule,
   ],
-  controllers: [UnitsController, TopicsController],
+  controllers: [UnitsController, UnitProgressController, TopicsController],
   providers: [UnitsService, TopicsService],
   exports: [UnitsService],
 })

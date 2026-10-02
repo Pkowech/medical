@@ -1,13 +1,13 @@
 // src/modules/education/courses/services/mastery-gate.service.ts
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '#infrastructure/prisma/prisma.service';
+import { RedisService } from '#infrastructure/redis/redis.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { getErrorMessage } from '#common/utils/error.utils';
 import {
   ReadinessSignal,
   MasteryStatus,
   QuizCompletionResult,
-  GateDecision,
 } from '../types/mastery.types';
 import { ProgressStatus } from '@prisma/client';
 import { PrescriptiveAnalyticsService } from '../../../ai-analytics/services/prescriptive-analytics.service';
@@ -21,6 +21,7 @@ export class MasteryGateService {
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly redisService: RedisService,
     private readonly eventEmitter: EventEmitter2,
     private readonly prescriptiveAnalytics: PrescriptiveAnalyticsService,
   ) {}
@@ -34,7 +35,7 @@ export class MasteryGateService {
   ): Promise<MasteryStatus> {
     try {
       const progress = await this.prisma.progress.findFirst({
-        where: { userId, topicId },
+        where: { userId, topicId, materialId: null },
       });
 
       if (!progress) {
@@ -59,8 +60,13 @@ export class MasteryGateService {
         userId,
         topicId,
         masteryUnlocked: progress.status === 'completed',
-        failedAttempts: 0, // Not tracking failed attempts in Progress model currently
-        isEligibleForNextTopic: progress.status === 'completed',
+        failedAttempts: Number(
+          (progress.quizScores as Record<string, unknown> | null)?.failedAttempts ?? 0,
+        ),
+        isEligibleForNextTopic:
+          typeof (progress.quizScores as Record<string, unknown> | null)?.nextTopicUnlocked === 'boolean'
+            ? Boolean((progress.quizScores as Record<string, unknown>).nextTopicUnlocked)
+            : progress.status === 'completed',
         readinessSignal,
       };
     } catch (error) {
@@ -84,9 +90,17 @@ export class MasteryGateService {
     const threshold = passingThreshold ?? this.PASSING_THRESHOLD;
 
     try {
+      const topic = await this.prisma.topic.findUnique({
+        where: { id: topicId },
+        include: { unit: { select: { id: true, courseId: true } } },
+      });
+      if (!topic) {
+        throw new Error(`Topic ${topicId} was not found while recording quiz mastery`);
+      }
+
       // Get or create progress record
       let progress = await this.prisma.progress.findFirst({
-        where: { userId, topicId },
+        where: { userId, topicId, materialId: null },
       });
 
       if (!progress) {
@@ -95,37 +109,50 @@ export class MasteryGateService {
             userId,
             topicId,
             materialId: null as any,
-            unitId: null as any,
-            courseId: null as any,
+            unitId: topic.unitId,
+            courseId: topic.unit.courseId,
             status: ProgressStatus.inProgress,
           },
         });
+      } else if (progress.unitId !== topic.unitId || progress.courseId !== topic.unit.courseId) {
+        progress = await this.prisma.progress.update({
+          where: { id: progress.id },
+          data: { unitId: topic.unitId, courseId: topic.unit.courseId },
+        });
       }
 
-      const _previousMastery = progress.status === 'completed';
+      const previousQuizScores = (progress.quizScores as Record<string, unknown> | null) ?? {};
+      const attempts = Number(previousQuizScores.attempts ?? 0) + 1;
+      const failedAttempts = Number(previousQuizScores.failedAttempts ?? 0);
 
       if (isPassed) {
         // Quiz passed - unlock mastery
         const updateData: any = {
-          lastUpdated: new Date(),
+          lastUpdated: BigInt(Date.now()),
           progressPercentage: Math.max(
             progress?.progressPercentage || 0,
             score || 0,
           ),
           quizScores: {
-            ...((progress.quizScores as object) || {}),
+            ...previousQuizScores,
+            attempts,
+            failedAttempts: 0,
             lastScore: score,
+            bestScore: Math.max(Number(previousQuizScores.bestScore ?? 0), score),
             passedAt: new Date().toISOString(),
           },
+          unitId: topic.unitId,
+          courseId: topic.unit.courseId,
           status: 'completed',
           isCompleted: true,
           completedAt: new Date(),
         };
 
-        await this.prisma.progress.update({
+        progress = await this.prisma.progress.update({
           where: { id: progress.id },
           data: updateData,
         });
+        await this.clearProgressCache(userId, topic.unit.courseId);
 
         // Emit xAPI statement for pass
         this.eventEmitter.emit('xapi.statement', {
@@ -148,14 +175,26 @@ export class MasteryGateService {
         let nextTopicId: string | undefined;
         let message = `Congratulations! You've mastered this topic with a score of ${score}%.`;
 
-        if (gateDecision.canProceed) {
-          // Try to unlock next topic
-          const nextTopicResult = await this.unlockNextTopic(userId, topicId);
-          nextTopicUnlocked = nextTopicResult.unlocked;
-          nextTopicId = nextTopicResult.nextTopicId;
-        } else {
+        // A passing mastery quiz unlocks the next topic. Prescriptive analytics
+        // can recommend additional review, but must not leave the next topic locked.
+        const nextTopicResult = await this.unlockNextTopic(userId, topicId);
+        nextTopicUnlocked = nextTopicResult.unlocked;
+        nextTopicId = nextTopicResult.nextTopicId;
+
+        if (!gateDecision.canProceed) {
           message = `You passed the quiz, but your predicted knowledge state (${(gateDecision.pKnown * 100).toFixed(1)}%) is below the mastery threshold. Reviewing additional materials is recommended before proceeding.`;
         }
+
+        await this.prisma.progress.update({
+          where: { id: progress.id },
+          data: {
+            quizScores: {
+              ...((progress.quizScores as Record<string, unknown> | null) ?? {}),
+              nextTopicUnlocked,
+            },
+          },
+        });
+        await this.clearProgressCache(userId, topic.unit.courseId);
 
         this.logger.log(
           `User ${userId} passed quiz for topic ${topicId} with score ${score}%. Gate: ${gateDecision.canProceed ? 'OPEN' : 'BLOCKED'} (pKnown: ${gateDecision.pKnown})`,
@@ -171,25 +210,31 @@ export class MasteryGateService {
           gateDecision,
         };
       } else {
-        // Quiz failed - increment failed attempts (only in logs/memory)
-        const newFailedAttempts = (progress.quizScores as any)?.lastScore
-          ? 1
-          : 1;
+        const newFailedAttempts = failedAttempts + 1;
 
         const updateData: any = {
-          // failedAttempts not stored in DB
           quizScores: {
-            ...((progress.quizScores as object) || {}),
+            ...previousQuizScores,
+            attempts,
+            failedAttempts: newFailedAttempts,
+            nextTopicUnlocked: false,
             lastScore: score,
             lastAttemptAt: new Date().toISOString(),
           },
-          lastUpdated: new Date(),
+          unitId: topic.unitId,
+          courseId: topic.unit.courseId,
+          progressPercentage: score,
+          status: ProgressStatus.inProgress,
+          isCompleted: false,
+          completedAt: null,
+          lastUpdated: BigInt(Date.now()),
         };
 
         await this.prisma.progress.update({
           where: { id: progress.id },
           data: updateData,
         });
+        await this.clearProgressCache(userId, topic.unit.courseId);
 
         // Emit xAPI statement for fail
         this.eventEmitter.emit('xapi.statement', {
@@ -217,6 +262,20 @@ export class MasteryGateService {
         `Error processing quiz completion for user ${userId}, topic ${topicId}: ${getErrorMessage(error)}`,
       );
       throw error;
+    }
+  }
+
+  private async clearProgressCache(userId: string, courseId: string): Promise<void> {
+    try {
+      await Promise.all([
+        this.redisService.del(`progress:user:${userId}:course:${courseId}`),
+        this.redisService.del(`progress:user:${userId}`),
+        this.redisService.del(`progress:overall:${userId}`),
+      ]);
+    } catch (error) {
+      this.logger.warn(
+        `Could not clear progress cache for user ${userId}: ${getErrorMessage(error)}`,
+      );
     }
   }
 
@@ -271,8 +330,8 @@ export class MasteryGateService {
             userId,
             topicId: nextTopic.id,
             materialId: null as any,
-            unitId: null as any,
-            courseId: null as any,
+            unitId: currentTopic.unitId,
+            courseId: currentTopic.unit.courseId,
             status: ProgressStatus.notStarted,
             // masteryUnlocked and failedAttempts removed
           },
@@ -390,6 +449,8 @@ export class MasteryGateService {
         where: {
           userId,
           unitId: { not: null },
+          topicId: null,
+          materialId: null,
           status: ProgressStatus.inProgress,
         },
       });
@@ -420,6 +481,19 @@ export class MasteryGateService {
     maxConcurrent: number = 4,
   ): Promise<{ success: boolean; slotNumber?: number; message?: string }> {
     try {
+      const unit = await this.prisma.unit.findUnique({
+        where: { id: unitId },
+        select: { id: true, courseId: true },
+      });
+      if (!unit) throw new NotFoundException(`Unit ${unitId} not found`);
+
+      const existing = await this.prisma.progress.findFirst({
+        where: { userId, unitId, topicId: null, materialId: null },
+      });
+      if (existing?.status === ProgressStatus.inProgress) {
+        return { success: true, slotNumber: 1 };
+      }
+
       const validation = await this.validateConcurrentUnitLimit(
         userId,
         maxConcurrent,
@@ -434,7 +508,9 @@ export class MasteryGateService {
         where: {
           userId,
           status: ProgressStatus.inProgress,
-          unitId: { not: null }, // Ensure it's a unit progress record
+          unitId: { not: null },
+          topicId: null,
+          materialId: null,
         },
         select: {
           unitId: true,
@@ -442,7 +518,6 @@ export class MasteryGateService {
       });
 
       const activeCount = activeSlots.length;
-      const activeUnitIds = activeSlots.map((slot) => slot.unitId);
 
       // Find next available slot (conceptually, as we don't store slot numbers)
       // This logic is more about counting active units than assigning a specific slot number
@@ -464,21 +539,13 @@ export class MasteryGateService {
 
       // Create or update progress record for the unit activation itself
       // We use findFirst to check if a specific unit-activation record exists
-      const existing = await this.prisma.progress.findFirst({
-        where: {
-          userId,
-          unitId,
-          topicId: null,
-          materialId: null,
-        },
-      });
-
       if (existing) {
         await this.prisma.progress.update({
           where: { id: existing.id },
           data: {
             status: ProgressStatus.inProgress,
             startedAt: new Date(),
+            courseId: unit.courseId,
           },
         });
       } else {
@@ -486,6 +553,7 @@ export class MasteryGateService {
           data: {
             userId,
             unitId,
+            courseId: unit.courseId,
             topicId: null,
             materialId: null,
             status: ProgressStatus.inProgress,

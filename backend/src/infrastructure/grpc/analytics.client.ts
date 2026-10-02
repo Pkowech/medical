@@ -46,24 +46,24 @@ export interface AnalyticsService {
   }): Observable<any>;
 
   getGoalAnalytics(data: { user_id: string; goals: any[] }): Observable<{
-    goal_analytics: {
-      user_id: string;
-      total_goals: number;
-      active_goals: number;
-      completed_goals: number;
-      overdue_goals: number;
-      completion_rate: number;
-      average_completion_time_days: number;
-      goals_by_category: Record<string, number>;
-      goals_by_priority: Record<string, number>;
-      current_streak: number;
-      longest_streak: number;
-      streak_goal_ids: string[];
-      upcoming_deadlines: Array<{
-        goal_id: string;
+    goalAnalytics?: {
+      userId: string;
+      totalGoals: number;
+      activeGoals: number;
+      completedGoals: number;
+      overdueGoals: number;
+      completionRate: number;
+      averageCompletionTimeDays: number;
+      goalsByCategory: Record<string, number>;
+      goalsByPriority: Record<string, number>;
+      currentStreak: number;
+      longestStreak: number;
+      streakGoalIds: string[];
+      upcomingDeadlines: Array<{
+        goalId: string;
         title: string;
-        target_date: string;
-        days_remaining: number;
+        targetDate: string;
+        daysRemaining: number;
       }>;
     };
   }>;

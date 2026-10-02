@@ -88,6 +88,23 @@ pnpm run test:cov
 
 ## Deployment
 
+### Google Shared Drive course materials
+
+New public/library uploads continue to use the configured R2/S3 storage provider. Instructors can also attach an existing file from the institution's Shared Drive without copying its bytes into R2. Drive-backed materials are streamed through the authenticated materials preview endpoint; only course creators, assigned instructors, admins, active/completed course enrollees, and active members of an active study group explicitly linked to that course can read them.
+
+To enable Drive-backed materials:
+
+1. Enable the Google Drive API in the institution's Google Cloud project and create a service account.
+2. Add the service account email as a **Viewer** of the institution's Shared Drive. Keep instructors as the people who add/manage course files there.
+3. Configure these backend secrets in the deployment environment (do not commit service-account credentials):
+
+	- `GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON`: the service-account JSON credential object.
+	- `GOOGLE_DRIVE_SHARED_DRIVE_ID`: the ID of the Shared Drive used for course materials.
+
+4. Restart the backend. Instructors can then choose **Google Drive** on the material upload page and attach a Shared Drive file URL to a course unit/topic.
+
+Only files in the configured Shared Drive are accepted. PDFs and native Google Docs, Sheets, and Slides are supported; Google-native documents are exported to PDF for the in-app reader. Existing R2 files are unchanged and should not be deleted as part of enabling this integration.
+
 When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
 
 If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
