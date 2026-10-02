@@ -41,7 +41,7 @@ jobs:
         with:
           context: .
           file: ./backend/Dockerfile
-          target: production
+          target: final
           platforms: linux/amd64
           push: true
           tags: |
@@ -74,7 +74,7 @@ jobs:
       - name: Build & push
         uses: docker/build-push-action@v6
         with:
-          context: ./rust_analytics
+          context: .
           file: ./rust_analytics/Dockerfile
           build-contexts: |
             protos=./protos
@@ -160,8 +160,8 @@ jobs:
       - name: Run migrations
         working-directory: backend
         env:
-          DATABASE_URL: ${{ secrets.NEON_DATABASE_URL || secrets.DATABASE_URL }}
-          DIRECT_URL: ${{ secrets.NEON_DIRECT_URL || secrets.DIRECT_URL || secrets.NEON_DATABASE_URL || secrets.DATABASE_URL }}
+          DATABASE_URL: ${{ secrets.AIVEN_DATABASE_URL || secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.AIVEN_DIRECT_URL || secrets.DIRECT_URL || secrets.AIVEN_DATABASE_URL || secrets.DATABASE_URL }}
         run: pnpm prisma migrate deploy
 
   # ──────────────────────────────────────────────

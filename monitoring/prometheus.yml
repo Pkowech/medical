@@ -37,7 +37,7 @@ scrape_configs:
   # Analytics service metrics
   - job_name: 'analytics'
     static_configs:
-      - targets: ['analytics:8000']
+      - targets: ['rust-analytics:8000']
     metrics_path: '/metrics'
     scrape_interval: 30s
     scrape_timeout: 10s

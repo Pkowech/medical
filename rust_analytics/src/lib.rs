@@ -777,7 +777,8 @@ pub async fn run() -> std::io::Result<()> {
             )
         })?;
     let grpc_pool = pool.clone();
-    let grpc_host = env::var("RUST_ANALYTICS_GRPC_HOST").unwrap_or_else(|_| "[::1]".to_string());
+    let grpc_host =
+        env::var("RUST_ANALYTICS_GRPC_HOST").unwrap_or_else(|_| "0.0.0.0".to_string());
     let grpc_port = env::var("RUST_ANALYTICS_GRPC_PORT").unwrap_or_else(|_| "50051".to_string());
     let grpc_addr = format!("{}:{}", grpc_host, grpc_port).parse().unwrap();
     let analytics_service = MyAnalyticsService::new(grpc_pool);

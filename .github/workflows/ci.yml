@@ -192,13 +192,13 @@ jobs:
           - service: backend
             context: .
             dockerfile: ./backend/Dockerfile
-            target: production
+            target: final
           - service: frontend
             context: ./frontend
             dockerfile: ./frontend/Dockerfile
             target: final
           - service: rust-analytics
-            context: ./rust_analytics
+            context: .
             dockerfile: ./rust_analytics/Dockerfile
             target: ""
 

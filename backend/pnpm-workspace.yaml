@@ -71,11 +71,11 @@ allowBuilds:
   '@prisma/engines': false
   '@scarf/scarf': false
   '@swc/core': false
-  argon2: false
+  argon2: true
   esbuild: false
   grpc-tools: false
   msgpackr-extract: false
   prisma: false
   protobufjs: false
-  sharp: false
+  sharp: true
   unrs-resolver: false

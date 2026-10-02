@@ -25,7 +25,7 @@ RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
 ################################################################
 FROM deps AS build
 # Use root protos (canonical source of truth)
-COPY protos ./protos
+COPY protos /usr/src/protos
 # Copy source only (node_modules excluded via .dockerignore)
 COPY backend ./
 
@@ -158,8 +158,17 @@ RUN cat <<'EOF' > package.json
     "@prisma/client": "^7.8.0",
     "@prisma/client-runtime-utils": "^7.8.0",
     "@grpc/proto-loader": "^0.7.15"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["argon2", "protobufjs", "sharp"]
   }
 }
+EOF
+RUN cat <<'EOF' > pnpm-workspace.yaml
+onlyBuiltDependencies:
+  - argon2
+  - protobufjs
+  - sharp
 EOF
 
 # --ignore-scripts avoids @prisma/client's postinstall (`prisma generate`),
@@ -170,8 +179,10 @@ EOF
 # fetch/build their platform-specific prebuilt binaries — so rebuild just
 # those two explicitly after the ignore-scripts install.
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
-    pnpm install --prod --ignore-scripts --shamefully-hoist && \
-    pnpm rebuild argon2 sharp
+    pnpm install --prod --ignore-scripts=false --shamefully-hoist \
+      --allow-build=argon2 \
+      --allow-build=protobufjs \
+      --allow-build=sharp
 
 # Strip sharp to runtime-only files
 RUN find node_modules/sharp -type d \( -name build -o -name docs -o -name test -o -name src \) -exec rm -rf {} + 2>/dev/null || true && \
