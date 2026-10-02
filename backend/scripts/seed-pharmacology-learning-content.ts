@@ -1,8 +1,7 @@
 import 'dotenv/config';
 import { MaterialType, PrismaClient, QuestionCategory, QuestionDifficulty, QuestionType } from '@prisma/client';
-import { PrismaPg } from '@prisma/adapter-pg';
-import { Pool } from 'pg';
 import Redis from 'ioredis';
+import { createSeedPrisma } from '../prisma/seeds/seed-db';
 
 const COURSE_ID = '95d7389e-cebf-4c83-a1b0-0ed6a7811851';
 const VERSION = 'pharmacology-practice-v1';
@@ -153,11 +152,13 @@ function slugify(value: string): string {
 }
 
 async function main() {
-  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-  const prisma = new PrismaClient({ adapter: new PrismaPg(pool) });
+  const { pool, prisma } = createSeedPrisma();
   const dryRun = process.argv.includes('--dry-run');
   const topicIds: string[] = [];
   const unitIds: string[] = [];
+  const questionSpecsBySlug = new Map(
+    Object.entries(TOPIC_QUESTIONS).map(([name, specs]) => [slugify(name), specs]),
+  );
 
   try {
     const course = await prisma.course.findUnique({
@@ -181,27 +182,29 @@ async function main() {
     const units = await prisma.unit.findMany({
       where: { courseId: course.id },
       orderBy: { order: 'asc' },
-      include: { topics: { orderBy: { order: 'asc' }, select: { id: true, name: true } } },
+      include: { topics: { orderBy: { order: 'asc' }, select: { id: true, name: true, slug: true } } },
     });
-    if (units.length !== Object.keys(UNIT_VIDEOS).length) {
-      throw new Error(`Expected ${Object.keys(UNIT_VIDEOS).length} pharmacology units, found ${units.length}; refusing partial seeding.`);
+    const mappedUnits = units.filter(unit => unit.slug && UNIT_VIDEOS[unit.slug]);
+    if (mappedUnits.length !== Object.keys(UNIT_VIDEOS).length) {
+      throw new Error(`Expected ${Object.keys(UNIT_VIDEOS).length} mapped pharmacology units, found ${mappedUnits.length}; refusing partial seeding.`);
     }
-    if (units.some(unit => !unit.slug || !UNIT_VIDEOS[unit.slug])) {
-      throw new Error('A live pharmacology unit is missing its video mapping or slug; refusing partial seeding.');
-    }
+    const contentUnits = mappedUnits.map(unit => ({
+      ...unit,
+      topics: unit.topics.filter(topic => TOPIC_QUESTIONS[topic.name] || (topic.slug && questionSpecsBySlug.has(topic.slug))),
+    }));
 
-    const missingTopics = units.flatMap(unit => unit.topics
-      .filter(topic => !TOPIC_QUESTIONS[topic.name])
+    const missingTopics = contentUnits.flatMap(unit => unit.topics
+      .filter(topic => !TOPIC_QUESTIONS[topic.name] && !(topic.slug && questionSpecsBySlug.has(topic.slug)))
       .map(topic => `${unit.title}: ${topic.name}`));
     if (missingTopics.length) throw new Error(`No question set is defined for: ${missingTopics.join('; ')}`);
 
-    const topicCount = units.reduce((sum, unit) => sum + unit.topics.length, 0);
+    const topicCount = contentUnits.reduce((sum, unit) => sum + unit.topics.length, 0);
     const questionCount = topicCount * 2;
     if (dryRun) {
       console.log(JSON.stringify({
         mode: 'dry-run',
         course: course.title,
-        units: units.map(unit => ({ title: unit.title, slug: unit.slug, topics: unit.topics.map(topic => topic.name) })),
+        units: contentUnits.map(unit => ({ title: unit.title, slug: unit.slug, topics: unit.topics.map(topic => topic.name) })),
         topicCount,
         supplementalQuestions: questionCount,
         unitVideos: Object.keys(UNIT_VIDEOS).length,
@@ -215,7 +218,7 @@ async function main() {
       let unitQuizzesCreated = 0;
       let videosCreated = 0;
 
-      for (const unit of units) {
+      for (const unit of contentUnits) {
         unitIds.push(unit.id);
         const unitSlug = unit.slug;
         if (!unitSlug) throw new Error(`Unit ${unit.id} is missing a slug.`);
@@ -280,7 +283,7 @@ async function main() {
           }
 
           const topicQuestionIds: string[] = [];
-          const specs = TOPIC_QUESTIONS[topic.name];
+          const specs = TOPIC_QUESTIONS[topic.name] ?? questionSpecsBySlug.get(topic.slug ?? '');
           for (const [questionIndex, item] of specs.entries()) {
             const stableTag = `${VERSION}-${slugify(unitSlug)}-${slugify(topic.name)}-q${questionIndex + 1}`;
             let question = await tx.question.findFirst({
@@ -370,7 +373,7 @@ async function main() {
         });
       }
 
-      return { units: units.length, topics: topicCount, questionsCreated, topicQuizzesCreated, unitQuizzesCreated, videosCreated };
+      return { units: contentUnits.length, topics: topicCount, questionsCreated, topicQuizzesCreated, unitQuizzesCreated, videosCreated };
     }, { maxWait: 10000, timeout: 60000 });
 
     console.log(JSON.stringify(result, null, 2));

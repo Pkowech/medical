@@ -4,16 +4,13 @@
  */
 
 import { PrismaClient, MaterialType } from '@prisma/client';
-import { PrismaPg } from '@prisma/adapter-pg';
-import { Pool } from 'pg';
 import 'dotenv/config';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { createHash } from 'crypto';
+import { createSeedPrisma } from '../prisma/seeds/seed-db';
 
-const _seedPool = new Pool({ connectionString: process.env.DATABASE_URL });
-const _seedAdapter = new PrismaPg(_seedPool);
-const prisma = new PrismaClient({ adapter: _seedAdapter, log: ['query', 'info', 'warn', 'error'], });
+const { pool: _seedPool, prisma } = createSeedPrisma();
 
 interface PDFMetadata {
   filePath: string;

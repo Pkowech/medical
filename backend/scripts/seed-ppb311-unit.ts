@@ -1,7 +1,6 @@
 import 'dotenv/config';
 import { MaterialType, PrismaClient } from '@prisma/client';
-import { PrismaPg } from '@prisma/adapter-pg';
-import { Pool } from 'pg';
+import { createSeedPrisma } from '../prisma/seeds/seed-db';
 
 const COURSE_ID = '95d7389e-cebf-4c83-a1b0-0ed6a7811851';
 const R2_PREFIX =
@@ -227,8 +226,7 @@ function toSlug(value: string): string {
 }
 
 async function main() {
-  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-  const prisma = new PrismaClient({ adapter: new PrismaPg(pool) });
+  const { pool, prisma } = createSeedPrisma();
 
   try {
     const result = await prisma.$transaction(async (tx) => {
@@ -244,7 +242,7 @@ async function main() {
       const existingUnits = await tx.unit.findMany({
         where: { courseId: course.id },
         select: { id: true, order: true, slug: true },
-      });
+      }, { maxWait: 120000, timeout: 120000 });
       const existingPpb311 = existingUnits.find((item) => item.slug === 'ppb-311');
       const otherUnits = existingUnits.filter((item) => item.id !== existingPpb311?.id);
       const temporaryOrderBase =

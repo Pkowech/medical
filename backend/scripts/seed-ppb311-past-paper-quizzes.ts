@@ -1,7 +1,6 @@
 import 'dotenv/config';
 import { PrismaClient, QuestionCategory, QuestionDifficulty, QuestionType } from '@prisma/client';
-import { PrismaPg } from '@prisma/adapter-pg';
-import { Pool } from 'pg';
+import { createSeedPrisma } from '../prisma/seeds/seed-db';
 import Redis from 'ioredis';
 
 const COURSE_ID = '95d7389e-cebf-4c83-a1b0-0ed6a7811851';
@@ -230,8 +229,7 @@ const TOPIC_QUIZZES: TopicQuizSpec[] = [
 ];
 
 async function main() {
-  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-  const prisma = new PrismaClient({ adapter: new PrismaPg(pool) });
+  const { pool, prisma } = createSeedPrisma();
   let topicIds: string[] = [];
 
   try {
@@ -279,7 +277,7 @@ async function main() {
               createdBy: unit.course.createdById,
             },
             select: { id: true },
-          });
+          }, { maxWait: 120000, timeout: 120000 });
           quizzesCreated += 1;
         }
 

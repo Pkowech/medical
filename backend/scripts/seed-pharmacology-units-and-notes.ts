@@ -8,8 +8,7 @@ import {
   S3Client,
 } from '@aws-sdk/client-s3';
 import { MaterialType, PrismaClient } from '@prisma/client';
-import { PrismaPg } from '@prisma/adapter-pg';
-import { Pool } from 'pg';
+import { createSeedPrisma } from '../prisma/seeds/seed-db';
 
 const COURSE_ID = '95d7389e-cebf-4c83-a1b0-0ed6a7811851';
 const SOURCE_ROOT = 'C:/Users/user/PHARMACY/LEVEL 3/3.1/PPB 310 PHARMACOLOGY I';
@@ -206,8 +205,7 @@ async function main() {
     throw new Error('R2 configuration is incomplete; no data was changed.');
   }
 
-  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-  const prisma = new PrismaClient({ adapter: new PrismaPg(pool) });
+  const { pool, prisma } = createSeedPrisma();
   const s3 = new S3Client({ region: 'auto', endpoint, credentials: { accessKeyId, secretAccessKey } });
 
   try {
@@ -314,7 +312,7 @@ async function main() {
             update: { name: topicSpec.name, description: topicSpec.description },
             create: { unitId, order: index + 1, name: topicSpec.name, description: topicSpec.description },
             select: { id: true },
-          });
+          }, { maxWait: 120000, timeout: 120000 });
           topicIds.set(`${unitSpec.title}\0${topicSpec.name}`, topic.id);
         }
       }

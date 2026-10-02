@@ -1,11 +1,8 @@
 import 'dotenv/config';
-import { PrismaClient, CourseStatus, CourseDifficulty } from '@prisma/client';
-import { PrismaPg } from '@prisma/adapter-pg';
-import { Pool } from 'pg';
+import { CourseStatus, CourseDifficulty } from '@prisma/client';
+import { createSeedPrisma } from '../prisma/seeds/seed-db';
 
-const _setupPool = new Pool({ connectionString: process.env.DATABASE_URL });
-const _setupAdapter = new PrismaPg(_setupPool);
-const prisma = new PrismaClient({ adapter: _setupAdapter });
+const { pool: _setupPool, prisma } = createSeedPrisma();
 
 async function setupPharmacologyCourse() {
   try {

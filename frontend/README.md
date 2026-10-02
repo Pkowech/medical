@@ -83,7 +83,18 @@ NEXT_PUBLIC_CLAUDE_API_KEY=your_claude_api_key
 
 For Vercel, add `NEXT_PUBLIC_API_URL` with the deployed backend origin
 (`https://medtrackhubackend.onrender.com`) in the project's Environment Variables,
-then redeploy. Do not commit production values to source files.
+then redeploy. Configure these NextAuth variables for the Production environment
+as well:
+
+```bash
+NEXTAUTH_URL=https://medical-two-eosin.vercel.app
+NEXTAUTH_SECRET=<stable-random-secret>
+```
+
+`NEXTAUTH_SECRET` must be the same stable value across deployments. Generate it
+with a password manager or a cryptographically secure random generator, and
+store it only in Vercel Environment Variables. Do not commit production values
+to source files.
 
 ## Learn More
 

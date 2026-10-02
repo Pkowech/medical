@@ -86,23 +86,14 @@ class AuthService {
 
   async logout(): Promise<void> {
     try {
-      // Call the consolidated backend logout endpoint
-      try {
-        await apiService.post('/auth/sessions/logout', {});
-      } catch (error) {
-        // Log but don't throw if backend logout fails
-        // We still want to clear local session
+      // Do not block local sign-out on a slow or sleeping backend.
+      void apiService.post('/auth/sessions/logout', {}).catch(error => {
         console.warn('[AuthService] Backend logout failed:', error);
-      }
+      });
 
       // Clear auth store state
       useAuthStore.getState().clearUser();
 
-      // Use NextAuth's signOut with explicit redirect: false and add timeout
-      // This ensures the signout callback is triggered
-      // The middleware will handle the redirect to /login
-      console.warn('[AuthService] Calling signOut with redirect: false');
-      
       try {
         await Promise.race([
           signOut({ redirect: false }),
@@ -114,14 +105,6 @@ class AuthService {
       } catch (signOutError) {
         console.warn('[AuthService] signOut timed out or failed:', signOutError);
       }
-      
-      // Add a small delay to ensure cookies are cleared and session is invalidated
-      // before redirecting
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      // After signOut completes, redirect to login
-      // This is a fallback in case the middleware redirect doesn't work
-      console.warn('[AuthService] Redirecting to /login');
       window.location.href = '/login';
     } catch (error) {
       console.error('Logout error:', error);
