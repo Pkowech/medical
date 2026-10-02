@@ -34,17 +34,37 @@ export interface UnitActivationResult {
 const parseResponse = <T>(response: unknown): T => {
   if (!response || typeof response !== 'object') return response as T;
   
-  const resp = response as Record<string, any>;
+  const resp = response as Record<string, unknown>;
+  const dataRecord =
+    resp.data && typeof resp.data === 'object' && !Array.isArray(resp.data)
+      ? (resp.data as Record<string, unknown>)
+      : undefined;
+
+  // Authenticated API responses are wrapped as
+  // { success: true, data: { data: [...], pagination: {...} } }.
+  // Unwrap the envelope before handling the paginated payload.
+  if (
+    resp.data &&
+    typeof resp.data === 'object' &&
+    !Array.isArray(resp.data) &&
+    dataRecord?.data !== undefined
+  ) {
+    return parseResponse<T>(resp.data);
+  }
   
   // Handle backend response format: { data: [], pagination: {} }
-  if (Array.isArray(resp.data) && resp.pagination) {
+  const pagination =
+    resp.pagination && typeof resp.pagination === 'object'
+      ? (resp.pagination as Record<string, unknown>)
+      : undefined;
+  if (Array.isArray(resp.data) && pagination) {
     return {
       items: resp.data,
-      total: resp.pagination.total,
-      page: resp.pagination.page,
-      pageSize: resp.pagination.limit,
-      totalPages: resp.pagination.totalPages,
-      hasMore: resp.pagination.hasNext
+      total: pagination.total,
+      page: pagination.page,
+      pageSize: pagination.limit,
+      totalPages: pagination.totalPages,
+      hasMore: pagination.hasNext
     } as unknown as T;
   }
 
@@ -52,8 +72,12 @@ const parseResponse = <T>(response: unknown): T => {
   if (resp.data !== undefined) {
      const data = resp.data;
      // If it's a PaginatedResult, we want the whole object because it contains items, total, etc.
-     if (resp.items !== undefined || data?.items !== undefined) {
-        return (data?.items !== undefined ? data : resp) as T;
+     const dataObject =
+       data && typeof data === 'object' && !Array.isArray(data)
+         ? (data as Record<string, unknown>)
+         : undefined;
+     if (resp.items !== undefined || dataObject?.items !== undefined) {
+        return (dataObject?.items !== undefined ? dataObject : resp) as T;
      }
      return data as T;
   }

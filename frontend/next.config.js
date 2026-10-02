@@ -18,10 +18,7 @@ const ALLOWED_DEV_ORIGINS = [
   'http://192.168.137.1:3000'
 ];
 
-const configuredBackendUrl =
-  process.env.NEXT_PUBLIC_API_URL ||
-  process.env.NEXT_PUBLIC_API_BASE_URL ||
-  '';
+const configuredBackendUrl = process.env.BACKEND_URL || '';
 const BACKEND_URL = configuredBackendUrl.replace(/\/v1\/?$/, '');
 
 // ============================================================================
@@ -247,25 +244,11 @@ const getSecurityHeaders = () => [
 // ============================================================================
 
 /**
- * Configure API rewrites to backend.
- *
- * IMPORTANT: NextAuth's routes (app/api/auth/[...nextauth]/route.ts) are a
- * dynamic catch-all. Next.js only resolves dynamic app routes AFTER
- * `afterFiles` rewrites have run, so a plain array here (which Next.js
- * treats as `afterFiles`) can shadow NextAuth entirely if the catch-all
- * `/api/:path*` -> backend rule matches first. A same-path "no-op" rewrite
- * (source === destination) does NOT reliably stop evaluation of later rules,
- * so `/api/auth/session` etc. was falling through to the backend and 404ing.
- *
- * Fix: exclude the `auth` segment directly in the catch-all's regex so
- * there's no dependency on rule ordering.
+ * Keep direct `/v1` rewrites for legacy server-generated URLs. Browser API
+ * calls use the same-origin route handler at `/api/backend/*`, which must not
+ * be captured by a broad `/api/*` rewrite.
  */
 const getApiRewrites = () => [
-  {
-    // Proxy all /api requests EXCEPT /api/auth/* (NextAuth stays local)
-    source: '/api/:path((?!auth).*)',
-    destination: `${BACKEND_URL}/v1/:path*`,
-  },
   {
     // Proxy direct /v1 requests (used by some backend-generated URLs like local material files)
     source: '/v1/:path*',
