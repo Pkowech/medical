@@ -101,11 +101,12 @@ export default function UploadMaterialPage() {
       return;
     }
 
+    if (!unitId) {
+      toast.error('Please select a unit');
+      return;
+    }
+
     if (source === 'drive') {
-      if (!unitId) {
-        toast.error('Select a unit for this Drive material');
-        return;
-      }
       if (!driveUrl.trim()) {
         toast.error('Paste a Google Drive file URL');
         return;
@@ -263,13 +264,15 @@ export default function UploadMaterialPage() {
 
           <div>
             <label htmlFor="unit-select" className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
-              Unit (optional)
+              Unit <span className="text-red-500">*</span>
             </label>
             <select
               id="unit-select"
               value={unitId}
               onChange={e => setUnitId(e.target.value)}
               disabled={!selectedCourseId || units.length === 0}
+              required
+              aria-required="true"
               className="block w-full border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-900 dark:text-white px-3 py-2 rounded-md focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:bg-gray-100 dark:disabled:bg-slate-900"
             >
               <option value="">{units.length === 0 && selectedCourseId ? 'No units found' : '-- Select a Unit --'}</option>
@@ -300,7 +303,7 @@ export default function UploadMaterialPage() {
               ))}
             </select>
             <p className="mt-1 text-xs text-gray-500 dark:text-slate-500">
-              Select a depth to attach this material. It will appear alongside this specific topic in the curriculum.
+              Course and unit placement is required. Choose a topic to attach the material more specifically; otherwise it appears at the unit level.
             </p>
           </div>
         </div>

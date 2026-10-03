@@ -39,7 +39,12 @@ export interface Course extends BaseEntity {
   units?: CourseUnit[];
   prerequisites?: Course[];
   prerequisiteCourseIds?: string[];
-  createdBy?: string;
+  createdBy?: string | {
+    id: string;
+    firstName?: string | null;
+    lastName?: string | null;
+    name?: string;
+  };
   updatedBy?: string;
 }
 

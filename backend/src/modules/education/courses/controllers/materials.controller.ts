@@ -57,15 +57,15 @@ export class MaterialsController {
         },
         courseId: {
           type: 'string',
-          description: 'ID of the course to attach material to',
+          description: 'Required together with unitId for course materials. Omit all placement IDs for a personal library upload.',
         },
         unitId: {
           type: 'string',
-          description: 'ID of the unit to attach material to',
+          description: 'Required together with courseId for course materials.',
         },
         topicId: {
           type: 'string',
-          description: 'ID of the topic to attach material to',
+          description: 'Optional topic within the selected unit.',
         },
         title: {
           type: 'string',
@@ -155,9 +155,9 @@ export class MaterialsController {
         sourceMaterialId: { type: 'string', description: 'ID of the existing material whose file to reuse' },
         title:           { type: 'string' },
         description:     { type: 'string' },
-        topicId:         { type: 'string' },
-        unitId:          { type: 'string' },
-        courseId:        { type: 'string' },
+        topicId:         { type: 'string', description: 'Optional topic within the selected unit.' },
+        unitId:          { type: 'string', description: 'Required together with courseId for course materials.' },
+        courseId:        { type: 'string', description: 'Required together with unitId for course materials.' },
         type:            { type: 'string' },
       },
     },

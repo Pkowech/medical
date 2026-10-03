@@ -197,7 +197,7 @@ class CourseService {
         console.warn('No user ID available, cannot fetch enrolled units');
         return [];
       }
-      
+
       const response = await apiService.get<unknown>(`/progress/dashboard/${userId}`);
       const data = parseResponse<Record<string, unknown>>(response.data);
       if (data && typeof data === 'object' && Array.isArray(data.enrolledUnits)) {
@@ -208,6 +208,19 @@ class CourseService {
       console.error('Error fetching enrolled units:', error);
       return [];
     }
+  }
+
+  async getProgressDashboard(userId: string): Promise<{
+    courses: Array<{
+      courseId: string;
+      progressPercentage: number;
+      completedUnits?: number;
+      totalUnits?: number;
+    }>;
+    enrolledUnits: Array<Record<string, unknown>>;
+  }> {
+    const response = await apiService.get<unknown>(`/progress/dashboard/${userId}`);
+    return parseResponse(response.data);
   }
 
   /**

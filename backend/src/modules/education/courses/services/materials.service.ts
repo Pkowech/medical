@@ -644,31 +644,7 @@ export class MaterialsService {
         throw new BadRequestException('File too large. Maximum size is 50MB.');
       }
 
-      // Optional: Check unit existence if unitId is provided and not empty
-      if (courseId) {
-        const course = await this.prisma.course.findUnique({
-          where: { id: courseId },
-        });
-        if (!course) {
-          throw new NotFoundException('Course not found');
-        }
-      }
-      if (unitId) {
-        const unit = await this.prisma.unit.findUnique({
-          where: { id: unitId },
-        });
-        if (!unit) {
-          throw new NotFoundException('Unit not found');
-        }
-      }
-      if (topicId) {
-        const topic = await this.prisma.topic.findUnique({
-          where: { id: topicId },
-        });
-        if (!topic) {
-          throw new NotFoundException('Topic not found');
-        }
-      }
+      await this.validateMaterialPlacement(courseId, unitId, topicId);
 
       // Calculate file hash for deduplication (streaming-friendly)
       let fileHash: string;
@@ -813,7 +789,7 @@ export class MaterialsService {
           fileId: fileRecord.id,
           previewFileId: previewFileRecord?.id || null,
           courseId: courseId || null,
-          unitId: unitId || null, // Allow null if not attached to unit
+          unitId: unitId || null, // Unplaced records are personal library uploads.
           topicId: topicId || null,
           userId,
           category,
@@ -879,6 +855,8 @@ export class MaterialsService {
       throw new BadRequestException('Source material has no associated file in R2 storage');
     }
 
+    await this.validateMaterialPlacement(dto.courseId, dto.unitId, dto.topicId);
+
     const material = await this.prisma.material.create({
       data: {
         title: dto.title || source.title,
@@ -931,22 +909,11 @@ export class MaterialsService {
     topicId?: string;
     userId: string;
   }): Promise<Material> {
-    const unit = await this.prisma.unit.findUnique({
+    await this.validateMaterialPlacement(dto.courseId, dto.unitId, dto.topicId);
+    const unit = await this.prisma.unit.findUniqueOrThrow({
       where: { id: dto.unitId },
-      select: { id: true, courseId: true },
+      select: { id: true },
     });
-    if (!unit || unit.courseId !== dto.courseId) {
-      throw new BadRequestException('Select a unit from the selected course.');
-    }
-    if (dto.topicId) {
-      const topic = await this.prisma.topic.findUnique({
-        where: { id: dto.topicId },
-        select: { unitId: true },
-      });
-      if (!topic || topic.unitId !== unit.id) {
-        throw new BadRequestException('Select a topic from the selected unit.');
-      }
-    }
 
     await this.assertCanManageCourseMaterials(dto.courseId, dto.userId);
     const driveFile = await this.googleDrive.getSharedDriveFile(dto.url);
@@ -984,6 +951,42 @@ export class MaterialsService {
     await FtsUtils.updateFtsVector(this.prisma, 'materials', material.id);
     await this.searchSync.syncEntity('material', material.id);
     return material;
+  }
+
+  private async validateMaterialPlacement(
+    courseId?: string,
+    unitId?: string,
+    topicId?: string,
+  ): Promise<void> {
+    if (!courseId && !unitId && !topicId) return;
+    if (!courseId || !unitId) {
+      throw new BadRequestException(
+        'Course materials must be assigned to a course and unit. Topic placement is optional.',
+      );
+    }
+
+    const unit = await this.prisma.unit.findUnique({
+      where: { id: unitId },
+      select: { id: true, courseId: true },
+    });
+    if (!unit) {
+      throw new NotFoundException('Unit not found');
+    }
+    if (unit.courseId !== courseId) {
+      throw new BadRequestException('The selected unit does not belong to the selected course.');
+    }
+
+    if (!topicId) return;
+    const topic = await this.prisma.topic.findUnique({
+      where: { id: topicId },
+      select: { unitId: true },
+    });
+    if (!topic) {
+      throw new NotFoundException('Topic not found');
+    }
+    if (topic.unitId !== unit.id) {
+      throw new BadRequestException('The selected topic does not belong to the selected unit.');
+    }
   }
 
   private async assertCanManageCourseMaterials(courseId: string, userId: string): Promise<void> {

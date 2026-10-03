@@ -12,15 +12,42 @@ pub async fn calculate_course_progress(
 	user_id: &str,
 	course_id: &str,
 ) -> Result<CourseProgress, sqlx::Error> {
-	let unit_material_counts: Vec<(i64, i64)> = sqlx::query_as(
+	let unit_progress: Vec<(i64, i64, bool, f64)> = sqlx::query_as(
 		r#"
-		SELECT COUNT(DISTINCT m.id), COUNT(DISTINCT tp.material_id)
+		SELECT
+			COUNT(DISTINCT t.id),
+			COUNT(DISTINCT t.id) FILTER (
+				WHERE COALESCE(tp.is_completed, false)
+			),
+			COALESCE(unit_progress.is_completed, false),
+			COALESCE(AVG(
+				CASE
+					WHEN t.id IS NULL THEN NULL
+					WHEN COALESCE(tp.is_completed, false) THEN 100
+					ELSE COALESCE(tp.progress_percentage, 0)
+				END
+			), 0)::float8
 		FROM units u
-		LEFT JOIN materials m ON m.unit_id = u.id
-		LEFT JOIN topic_progress tp
-			ON tp.material_id = m.id
-			AND tp.user_id = $1
-			AND tp.is_completed = true
+		LEFT JOIN topics t ON t.unit_id = u.id
+		LEFT JOIN LATERAL (
+			SELECT
+				BOOL_OR(p.is_completed = true OR p.status = 'completed') AS is_completed,
+				MAX(p.progress_percentage) AS progress_percentage
+			FROM topic_progress p
+			WHERE p.topic_id = t.id
+				AND p.user_id = $1
+				AND p.material_id IS NULL
+		) tp ON true
+		LEFT JOIN LATERAL (
+			SELECT BOOL_OR(
+				p.is_completed = true OR p.status = 'completed'
+			) AS is_completed
+			FROM topic_progress p
+			WHERE p.unit_id = u.id
+				AND p.user_id = $1
+				AND p.topic_id IS NULL
+				AND p.material_id IS NULL
+		) unit_progress ON true
 		WHERE u.course_id = $2
 		GROUP BY u.id
 		"#,
@@ -46,7 +73,7 @@ pub async fn calculate_course_progress(
 	Ok(build_course_progress(
 		user_id,
 		course_id,
-		&unit_material_counts,
+		&unit_progress,
 		time_spent.unwrap_or_default(),
 		last_accessed,
 	))
@@ -55,21 +82,33 @@ pub async fn calculate_course_progress(
 fn build_course_progress(
 	user_id: &str,
 	course_id: &str,
-	unit_material_counts: &[(i64, i64)],
+	unit_progress: &[(i64, i64, bool, f64)],
 	time_spent: i64,
 	last_accessed: Option<NaiveDateTime>,
 ) -> CourseProgress {
-	let total_units = unit_material_counts.len() as i32;
-	let completed_units = unit_material_counts
+	let total_units = unit_progress.len() as i32;
+	let completed_units = unit_progress
 		.iter()
-		.filter(|(total_materials, completed_materials)| {
-			total_materials == completed_materials
+		.filter(|(total_topics, completed_topics, explicitly_completed, _)| {
+			*explicitly_completed || (*total_topics > 0 && total_topics == completed_topics)
 		})
 		.count() as i32;
 	let progress_percentage = if total_units == 0 {
 		0
 	} else {
-		((completed_units as f64 / total_units as f64) * 100.0).round() as i32
+		let total_percentage: f64 = unit_progress
+			.iter()
+			.map(|(total_topics, _, explicitly_completed, topic_percentage)| {
+				if *explicitly_completed {
+					100.0
+				} else if *total_topics > 0 {
+					topic_percentage.clamp(0.0, 100.0)
+				} else {
+					0.0
+				}
+			})
+			.sum();
+		(total_percentage / total_units as f64).round() as i32
 	};
 	let status = if total_units == 0 || progress_percentage == 0 {
 		ProgressStatus::NotStarted
@@ -108,16 +147,16 @@ mod tests {
 	use super::{build_course_progress, ProgressStatus};
 
 	#[test]
-	fn aggregates_material_completion_per_unit() {
+	fn aggregates_topic_completion_and_unit_progress() {
 		let progress = build_course_progress(
 			"user-1",
 			"course-1",
-			&[(2, 2), (3, 1)],
+			&[(2, 2, false, 100.0), (3, 1, false, 40.0)],
 			42,
 			None,
 		);
 
-		assert_eq!(progress.progress_percentage, 50);
+		assert_eq!(progress.progress_percentage, 70);
 		assert_eq!(progress.completed_units, 1);
 		assert_eq!(progress.total_units, 2);
 		assert_eq!(progress.status, ProgressStatus::InProgress as i32);
@@ -125,13 +164,38 @@ mod tests {
 	}
 
 	#[test]
-	fn treats_units_without_materials_as_complete_but_empty_courses_as_not_started() {
-		let empty_unit = build_course_progress("user-1", "course-1", &[(0, 0)], 0, None);
-		assert_eq!(empty_unit.progress_percentage, 100);
-		assert_eq!(empty_unit.status, ProgressStatus::Completed as i32);
+	fn includes_explicit_unit_completion_and_leaves_empty_units_incomplete() {
+		let completed_unit = build_course_progress(
+			"user-1",
+			"course-1",
+			&[(0, 0, true, 0.0)],
+			0,
+			None,
+		);
+		assert_eq!(completed_unit.progress_percentage, 100);
+		assert_eq!(completed_unit.completed_units, 1);
+
+		let empty_unit = build_course_progress("user-1", "course-1", &[(0, 0, false, 0.0)], 0, None);
+		assert_eq!(empty_unit.progress_percentage, 0);
+		assert_eq!(empty_unit.completed_units, 0);
 
 		let empty_course = build_course_progress("user-1", "course-1", &[], 0, None);
 		assert_eq!(empty_course.progress_percentage, 0);
 		assert_eq!(empty_course.status, ProgressStatus::NotStarted as i32);
+	}
+
+	#[test]
+	fn aggregates_partial_topic_progress_into_course_progress() {
+		let progress = build_course_progress(
+			"user-1",
+			"course-1",
+			&[(4, 1, false, 25.0), (2, 0, false, 0.0)],
+			0,
+			None,
+		);
+
+		assert_eq!(progress.progress_percentage, 13);
+		assert_eq!(progress.completed_units, 0);
+		assert_eq!(progress.total_units, 2);
 	}
 }

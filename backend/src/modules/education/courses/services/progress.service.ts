@@ -961,48 +961,97 @@ export class ProgressService {
     { percentage: number; completedUnits: number; totalUnits: number } | undefined
   > {
     try {
-      const [courseProgressRows, units, materials] = await Promise.all([
-        this.prisma.progress.findMany({
-          where: { userId, courseId },
-          select: {
-            materialId: true,
-            unitId: true,
-            isCompleted: true,
-          },
-        }),
+      const [units, topicProgressRows, unitProgressRows] = await Promise.all([
         this.prisma.unit.findMany({
           where: { courseId },
-          select: { id: true },
+          select: { id: true, topics: { select: { id: true } } },
         }),
-        this.prisma.material.findMany({
-          where: { unit: { courseId } },
-          select: { id: true, unitId: true },
+        this.prisma.progress.findMany({
+          where: { userId, courseId, topicId: { not: null }, materialId: null },
+          select: {
+            topicId: true,
+            progressPercentage: true,
+            isCompleted: true,
+            status: true,
+          },
+        }),
+        this.prisma.progress.findMany({
+          where: {
+            userId,
+            courseId,
+            unitId: { not: null },
+            topicId: null,
+            materialId: null,
+          },
+          select: {
+            unitId: true,
+            progressPercentage: true,
+            isCompleted: true,
+            status: true,
+          },
         }),
       ]);
 
-      const completedMaterialIds = new Set(
-        courseProgressRows
-          .filter((item) => item.materialId && item.isCompleted)
-          .map((item) => item.materialId as string),
-      );
+      const topicProgressById = new Map<string, number>();
+      for (const progress of topicProgressRows) {
+        if (!progress.topicId) continue;
+        const percentage =
+          progress.isCompleted || progress.status === ProgressStatus.completed
+            ? 100
+            : Math.min(100, Math.max(0, progress.progressPercentage));
+        topicProgressById.set(
+          progress.topicId,
+          Math.max(topicProgressById.get(progress.topicId) ?? 0, percentage),
+        );
+      }
+
+      const unitProgressById = new Map<
+        string,
+        { percentage: number; completed: boolean }
+      >();
+      for (const progress of unitProgressRows) {
+        if (!progress.unitId) continue;
+        const previous = unitProgressById.get(progress.unitId);
+        unitProgressById.set(progress.unitId, {
+          percentage: Math.max(
+            previous?.percentage ?? 0,
+            Math.min(100, Math.max(0, progress.progressPercentage)),
+          ),
+          completed:
+            previous?.completed === true ||
+            progress.isCompleted ||
+            progress.status === ProgressStatus.completed,
+        });
+      }
+
+      let totalUnitPercentage = 0;
+      let completedUnits = 0;
+      for (const unit of units) {
+        const unitProgress = unitProgressById.get(unit.id);
+        const topicPercentages = unit.topics.map(
+          (topic) => topicProgressById.get(topic.id) ?? 0,
+        );
+        const topicPercentage = topicPercentages.length
+          ? topicPercentages.reduce((sum, percentage) => sum + percentage, 0) /
+            topicPercentages.length
+          : 0;
+        const isCompleted =
+          unitProgress?.completed ||
+          (topicPercentages.length > 0 && topicPercentages.every((value) => value === 100));
+        const unitPercentage = isCompleted
+          ? 100
+          : topicPercentages.length
+            ? topicPercentage
+            : unitProgress?.percentage ?? 0;
+
+        totalUnitPercentage += unitPercentage;
+        if (isCompleted) completedUnits += 1;
+      }
 
       const totalUnits = units.length;
-      const completedUnits = units.filter((unit) => {
-        const unitMaterials = materials.filter((material) => material.unitId === unit.id);
-        if (unitMaterials.length === 0) {
-          return false;
-        }
-
-        return unitMaterials.every((material) =>
-          completedMaterialIds.has(material.id),
-        );
-      }).length;
-
-      const totalMaterials = materials.length;
-      const percentage =
-        totalMaterials > 0
-          ? Math.round((completedMaterialIds.size / totalMaterials) * 100)
-          : 0;
+      const percentage = totalUnits
+        ? Math.round(totalUnitPercentage / totalUnits)
+        : 0;
 
       return {
         percentage,

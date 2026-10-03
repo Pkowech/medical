@@ -14,6 +14,7 @@ import {
   type LucideIcon,
   Layers,
   ChevronRight,
+  UserRound,
 } from 'lucide-react';
 import {
   useInfiniteQuery,
@@ -29,6 +30,7 @@ import { toast } from 'sonner';
 import { useStudy } from '@/features/learning-management/study/hooks/useStudy';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { handleUnknownError } from '@/app/services/error.service';
+import { getInstructorDisplayName } from '@/lib/utils';
 import {
   CourseFilter,
   CourseStatistics,
@@ -62,12 +64,16 @@ export const CoursesDashboard = () => {
   const [unitSelectionCourse, setUnitSelectionCourse] = useState<Course | null>(null);
   const router = useRouter();
 
-  const { data: activeUnits = [] } = useQuery<Array<Record<string, unknown>>>({
-    queryKey: ['active-units', user?.id],
-    queryFn: () => courseService.getEnrolledUnits(),
+  const { data: progressDashboard } = useQuery({
+    queryKey: ['course-progress-dashboard', user?.id],
+    queryFn: () => courseService.getProgressDashboard(user!.id),
     enabled: Boolean(user?.id),
     staleTime: 30_000,
   });
+  const activeUnits = progressDashboard?.enrolledUnits ?? [];
+  const courseProgressById = new Map(
+    (progressDashboard?.courses ?? []).map(item => [item.courseId, item]),
+  );
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -304,6 +310,7 @@ export const CoursesDashboard = () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['courses'] }),
       queryClient.invalidateQueries({ queryKey: ['active-units'] }),
+      queryClient.invalidateQueries({ queryKey: ['course-progress-dashboard'] }),
       queryClient.invalidateQueries({ queryKey: ['courseStatistics'] }),
     ]);
     setActiveTab('enrolled');
@@ -320,6 +327,7 @@ export const CoursesDashboard = () => {
         queryClient.invalidateQueries({ queryKey: ['courses'] }),
         queryClient.invalidateQueries({ queryKey: ['courseStatistics'] }),
         queryClient.invalidateQueries({ queryKey: ['active-units'] }),
+        queryClient.invalidateQueries({ queryKey: ['course-progress-dashboard'] }),
       ]);
       toast.success(`${courseName} removed from My Learning. Your progress was kept.`);
     } catch (error) {
@@ -494,11 +502,21 @@ export const CoursesDashboard = () => {
         ) : (
           <div className="space-y-6">
             {(infiniteData as any)?.pages?.flatMap((p: any) => p.courses)?.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 md:gap-8">
+              <div className={activeTab === 'enrolled'
+                ? 'grid grid-cols-1 gap-4'
+                : 'grid grid-cols-1 gap-5 md:grid-cols-2 md:gap-8 lg:grid-cols-3'}>
                 {(infiniteData as any).pages.flatMap((p: any) => p.courses).map((course: any) => (
                   <CourseCard 
                     key={course.unitId || course.id} 
-                    course={course} 
+                    course={activeTab === 'enrolled'
+                      ? {
+                          ...course,
+                          progressPercentage: courseProgressById.get(course.id)?.progressPercentage
+                            ?? course.progressPercentage
+                            ?? 0,
+                        }
+                      : course}
+                    wide={activeTab === 'enrolled'}
                     onSelectCourse={openCourseUnits}
 
                     onRemoveCourse={removeCourseFromLearning}
@@ -598,15 +616,17 @@ const StatCard = ({ icon: Icon, title, value, gradient, description }: StatCardP
 
 interface CourseCardProps {
   course: Course;
+  wide?: boolean;
   onSelectCourse: (course: Course) => void;
   onRemoveCourse: (course: Course) => void;
   router: ReturnType<typeof useRouter>;
   getResumePoint: (courseId: string) => unknown;
 }
 
-const CourseCard = ({ course, onSelectCourse, onRemoveCourse, router, getResumePoint }: CourseCardProps) => {
+const CourseCard = ({ course, wide = false, onSelectCourse, onRemoveCourse, router, getResumePoint }: CourseCardProps) => {
   const isEnrolled = course.isEnrolled;
   const progress = course.progressPercentage ?? 0;
+  const owner = getInstructorDisplayName(course.instructor ?? course.createdBy);
 
   return (
     <div 
@@ -617,9 +637,9 @@ const CourseCard = ({ course, onSelectCourse, onRemoveCourse, router, getResumeP
             onSelectCourse(course);
         }
       }}
-      className="group bg-white dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 overflow-hidden shadow-sm hover:shadow-2xl hover:-translate-y-1 transition-all cursor-pointer"
+      className={`group bg-white dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 overflow-hidden shadow-sm hover:shadow-xl transition-all cursor-pointer ${wide ? 'md:flex md:min-h-64' : 'hover:-translate-y-1'}`}
     >
-      <div className={`h-40 bg-linear-to-br ${isEnrolled ? 'from-blue-600 to-indigo-700' : 'from-slate-700 to-slate-900'} p-6 flex flex-col justify-between relative`}>
+      <div className={`relative h-40 bg-linear-to-br ${isEnrolled ? 'from-blue-600 to-indigo-700' : 'from-slate-700 to-slate-900'} p-6 flex flex-col justify-between ${wide ? 'md:h-auto md:min-h-64 md:w-[32%] md:flex-none' : ''}`}>
         <div className="flex justify-between items-start">
           <span className="px-3 py-1 bg-white/20 backdrop-blur-md rounded-full text-white text-[10px] font-bold uppercase tracking-widest border border-white/20">
             {course.difficulty}
@@ -636,10 +656,18 @@ const CourseCard = ({ course, onSelectCourse, onRemoveCourse, router, getResumeP
         </div>
       </div>
 
-      <div className="p-6 space-y-4">
-        <p className="text-slate-600 dark:text-slate-400 text-sm line-clamp-2 min-h-10">
-          {course.description}
-        </p>
+      <div className={`p-6 space-y-4 ${wide ? 'flex-1 md:flex md:flex-col md:justify-between' : ''}`}>
+        <div>
+          <p className="text-slate-600 dark:text-slate-400 text-sm line-clamp-2 min-h-10">
+            {course.description}
+          </p>
+          {isEnrolled && (
+            <p className="mt-3 inline-flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+              <UserRound className="h-4 w-4" />
+              <span>Course owner: <span className="font-semibold text-slate-700 dark:text-slate-200">{owner}</span></span>
+            </p>
+          )}
+        </div>
 
         {isEnrolled && (
           <div className="space-y-1.5">
@@ -695,7 +723,7 @@ const CourseCard = ({ course, onSelectCourse, onRemoveCourse, router, getResumeP
             }}
             className="w-full py-3 bg-blue-600 text-white rounded-2xl font-black text-sm hover:bg-blue-700 shadow-lg shadow-blue-200 dark:shadow-none"
           >
-            {progress === 0 ? 'Start Unit' : 'Continue Path'}
+            {progress === 0 ? 'View course' : 'Continue learning'}
           </button>
           {isEnrolled && (
             <button
