@@ -3,24 +3,24 @@ import type { GetDetailedLearningAnalyticsResponse } from '../../generated/grpc/
 
 export interface AnalyticsService {
   updateBkt(data: {
-    user_id: string;
-    skill_id: string;
-    is_correct: boolean;
+    userId: string;
+    skillId: string;
+    isCorrect: boolean;
   }): Observable<any>;
 
-  getUserFeatureVector(data: { user_id: string }): Observable<{
+  getUserFeatureVector(data: { userId: string }): Observable<{
     user_id: string;
     features: number[];
     featureMap: Record<string, number>;
   }>;
 
-  getUserAbility(data: { user_id: string }): Observable<{
+  getUserAbility(data: { userId: string }): Observable<{
     user_id: string;
     estimated_ability: number;
     p_known_by_skill: Record<string, number>;
   }>;
 
-  getDueCards(data: { user_id: string }): Observable<{
+  getDueCards(data: { userId: string }): Observable<{
     cards: Array<{
       card_id: string;
       topic_id: string;
@@ -30,7 +30,7 @@ export interface AnalyticsService {
   }>;
 
   getFocusRecommendations(data: {
-    user_id: string;
+    userId: string;
     limit: number;
   }): Observable<{
     areas: Array<{
@@ -41,11 +41,11 @@ export interface AnalyticsService {
   }>;
 
   calculateCourseProgress(data: {
-    user_id: string;
-    course_id: string;
+    userId: string;
+    courseId: string;
   }): Observable<any>;
 
-  getGoalAnalytics(data: { user_id: string; goals: any[] }): Observable<{
+  getGoalAnalytics(data: { userId: string; goals: any[] }): Observable<{
     goalAnalytics?: {
       userId: string;
       totalGoals: number;
@@ -68,7 +68,7 @@ export interface AnalyticsService {
     };
   }>;
 
-  getCourseStatistics(data: { user_id: string }): Observable<{
+  getCourseStatistics(data: { userId: string }): Observable<{
     course_stats: {
       total_courses: number;
       completed_courses: number;
@@ -77,7 +77,7 @@ export interface AnalyticsService {
     };
   }>;
 
-  getRecommendations(data: { user_id: string }): Observable<{
+  getRecommendations(data: { userId: string }): Observable<{
     items: Array<{
       id: string;
       title: string;
@@ -88,7 +88,7 @@ export interface AnalyticsService {
     }>;
   }>;
 
-  getUserLearningSummary(data: { user_id: string }): Observable<{
+  getUserLearningSummary(data: { userId: string }): Observable<{
     total_study_time: number;
     average_session_length: number;
     average_score: number;
@@ -98,11 +98,11 @@ export interface AnalyticsService {
     weakest_subjects: string[];
   }>;
 
-  predictPerformance(data: { user_id: string; skill_id: string }): Observable<{
+  predictPerformance(data: { userId: string; skillId: string }): Observable<{
     score: number;
   }>;
 
-  getEngagementMetrics(data: { user_id: string }): Observable<{
+  getEngagementMetrics(data: { userId: string }): Observable<{
     user_id: string;
     time_spent: number;
     completion_rate: number;
@@ -113,7 +113,7 @@ export interface AnalyticsService {
     average_session_duration: number;
   }>;
 
-  getLearningPathStatistics(data: { user_id: string }): Observable<{
+  getLearningPathStatistics(data: { userId: string }): Observable<{
     path_stats: {
       total_learning_paths: number;
       completed_learning_paths: number;
@@ -128,11 +128,11 @@ export interface AnalyticsService {
   }>;
 
   batchTrackEvents(data: {
-    user_id: string;
+    userId: string;
     events: Array<{
-      event_type: string;
+      eventType: string;
       timestamp: string;
-      session_id: string | null;
+      sessionId: string | null;
       duration: number;
     }>;
   }): Observable<{
@@ -140,14 +140,14 @@ export interface AnalyticsService {
     processed: number;
   }>;
 
-  getUserDataForProfile(data: { user_id: string }): Observable<any>;
+  getUserDataForProfile(data: { userId: string }): Observable<any>;
 
   getDetailedLearningAnalytics(
-    data: { user_id: string },
+    data: { userId: string },
   ): Observable<GetDetailedLearningAnalyticsResponse>;
 
   getCollaborativeRecommendations(data: {
-    user_id: string;
+    userId: string;
     limit: number;
   }): Observable<{
     items: Array<{
@@ -158,8 +158,8 @@ export interface AnalyticsService {
   }>;
 
   generateStudyRecommendations(data: {
-    user_id: string;
-    knowledge_gaps: string[];
+    userId: string;
+    knowledgeGaps: string[];
   }): Observable<{
     recommendations: Array<{
       recommendation: string;
@@ -176,7 +176,7 @@ export interface AnalyticsService {
     }>;
   }>;
 
-  getPathRecommendations(data: { user_id: string; limit: number }): Observable<{
+  getPathRecommendations(data: { userId: string; limit: number }): Observable<{
     recommendations: Array<{
       path_id: string;
       score: number;
@@ -186,7 +186,7 @@ export interface AnalyticsService {
   }>;
 
   getRelatedResources(data: {
-    resource_id: string;
+    resourceId: string;
     limit?: number;
   }): Observable<{
     resources: Array<{
@@ -197,7 +197,7 @@ export interface AnalyticsService {
     }>;
   }>;
 
-  generateNextSteps(data: { user_id: string }): Observable<{
+  generateNextSteps(data: { userId: string }): Observable<{
     steps: Array<{
       step: string;
       reason: string;
@@ -206,31 +206,31 @@ export interface AnalyticsService {
   }>;
 
   predictBkt(data: {
-    user_id: string;
-    skill_id: string;
-    feature_vector: number[];
+    userId: string;
+    skillId: string;
+    featureVector: number[];
   }): Observable<{
     p_known: number;
     p_next_correct: number;
   }>;
 
-  predictBurnModel(data: { user_id: string; features: number[] }): Observable<{
+  predictBurnModel(data: { userId: string; features: number[] }): Observable<{
     retention_score: number;
     model_version: string;
   }>;
 
   updateQuestionStatistics(data: {
-    question_id: string;
-    is_correct: boolean;
-    response_time_ms: number;
+    questionId: string;
+    isCorrect: boolean;
+    responseTimeMs: number;
   }): Observable<any>;
 
-  getNextAdaptiveQuestion(data: { user_id: string }): Observable<{
+  getNextAdaptiveQuestion(data: { userId: string }): Observable<{
     question_id: string;
     recommended_difficulty: number;
   }>;
 
-  getSpacedRepetitionStats(data: { user_id: string }): Observable<{
+  getSpacedRepetitionStats(data: { userId: string }): Observable<{
     total_cards: number;
     due_today: number;
     mastered_cards: number;
@@ -242,7 +242,7 @@ export interface AnalyticsService {
   }>;
 
   analyzeQuestionDifficulty(data: {
-    user_id: string;
+    userId: string;
     question: any;
   }): Observable<{
     difficulty_score: number;
@@ -250,23 +250,23 @@ export interface AnalyticsService {
   }>;
 
   getQuizAttemptHistory(data: {
-    user_id: string;
+    userId: string;
     limit?: number;
     offset?: number;
   }): Observable<{
     attempts: any[];
   }>;
 
-  getPathAnalytics(data: { path_id: string }): Observable<any>;
+  getPathAnalytics(data: { pathId: string }): Observable<any>;
 
   predictSuccessRate(data: {
-    user_id: string;
+    userId: string;
     features: number[];
   }): Observable<any>;
 
   extractQuizzes(data: {
-    material_id: string;
-    file_path: string;
+    materialId: string;
+    filePath: string;
   }): Observable<{
     success: boolean;
     questions_count: number;
