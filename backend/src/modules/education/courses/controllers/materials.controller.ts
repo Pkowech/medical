@@ -144,7 +144,7 @@ export class MaterialsController {
   }
 
   @Post('drive')
-  @ApiOperation({ summary: 'Attach a material from the configured course Shared Drive' })
+  @ApiOperation({ summary: 'Link a material from Google Drive to the signed-in user’s library' })
   async registerDriveMaterial(
     @Body() dto: {
       url: string;

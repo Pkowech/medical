@@ -403,7 +403,7 @@ export default function DriveFolderImport({
           <div>
             <h2 className="font-semibold text-slate-900 dark:text-white">Link a Year or subject folder</h2>
             <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-              Preview its files, then map each Drive folder to an existing course and unit. Topics are suggested from folder and file names; course codes are matched too.
+              Preview files, then optionally place folders at course, unit, or topic level. Course codes are matched automatically; review unit and topic suggestions before linking.
             </p>
           </div>
         </div>
@@ -594,7 +594,7 @@ export default function DriveFolderImport({
 
           {invalidSelectedFiles.length > 0 && (
             <p role="status" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
-              Choose an existing course and unit for each selected folder before linking. Course codes such as PPA 511 match regardless of spaces or letter case; unknown unit/topic codes need to be mapped here.
+              Choose a course before assigning a unit, and a unit before assigning a topic. Course-level and private My Drive links do not need a unit. Course codes such as PPA 511 match regardless of spaces or letter case; map unknown unit/topic codes here.
             </p>
           )}
           {importResult && importResult.results.some(result => result.status === 'failed') && (

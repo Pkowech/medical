@@ -196,7 +196,7 @@ export default function UploadMaterialPage() {
         router.push('/study-planner/materials');
       } catch (err) {
         console.error('Drive material registration failed', err);
-        toast.error(err instanceof Error ? err.message : 'Could not attach Drive material');
+        toast.error(err instanceof Error ? err.message : 'Could not link Drive material');
       } finally {
         setIsUploading(false);
       }

@@ -957,9 +957,6 @@ export class MaterialsService {
     if (dto.shareWithCourse && !courseId) {
       throw new BadRequestException('Assign a course before sharing this material with a class.');
     }
-    if (courseId) {
-      await this.assertCanManageCourseMaterials(courseId, dto.userId);
-    }
     const driveFile = await this.googleDrive.getSharedDriveFile(dto.url, dto.userId);
     const mimeType = driveFile.mimeType || '';
     const supportedGoogleDocs = new Set([
