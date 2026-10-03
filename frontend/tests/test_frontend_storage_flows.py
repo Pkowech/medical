@@ -404,7 +404,17 @@ def test_production_service_worker_returns_offline_fallback_for_uncached_navigat
                 timeout=15000,
             )
             assert page.title() == "Offline - MedTrack Hub"
-            assert page.get_by_role("heading", name="You're Offline").is_visible()
+            assert page.get_by_role("heading", name="Page Unavailable").is_visible()
+            assert page.locator("#status").inner_text() in {
+                "Reconnecting automatically when this page is reachable...",
+                "Still unable to reach this page. Retrying automatically...",
+            }
+            assert page.get_by_text("You are back online!").count() == 0
+            page.context.set_offline(False)
+            page.wait_for_function(
+                "() => document.title !== 'Offline - MedTrack Hub'",
+                timeout=20000,
+            )
         finally:
             page.context.set_offline(False)
             browser.close()

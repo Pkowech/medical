@@ -343,7 +343,6 @@ model User {
   learningSuggestions     LearningSuggestion[]
   materialEngagements     MaterialEngagement[]
   materialEvents          MaterialEvent[]
-  materialNotes           MaterialNote[]
   materialShares          MaterialShare[]
   materials               Material[]
   notifications           Notification[]
@@ -776,7 +775,6 @@ model Material {
   learningSuggestions LearningSuggestion[]
   engagements         MaterialEngagement[]
   events              MaterialEvent[]
-  notes               MaterialNote[]
   shares              MaterialShare[]
   recommendationScore RecommendationScore?
   course              Course?                  @relation(fields: [courseId], references: [id])
@@ -885,25 +883,6 @@ model MaterialEngagement {
 
   @@unique([userId, materialId])
   @@map("material_engagements")
-}
-
-model MaterialNote {
-  id         String   @id @default(uuid())
-  userId     String   @map("user_id")
-  materialId String   @map("material_id")
-  content    String
-  pageNumber Int?     @map("page_number")
-  position   Json?
-  color      String?  @default("#FFFF00")
-  isPrivate  Boolean  @default(true) @map("is_private")
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
-  material   Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([materialId])
-  @@map("material_notes")
 }
 
 /// Single Source of Truth for all learning progress (Topic, Material, and Unit-activation).

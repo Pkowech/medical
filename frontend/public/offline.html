@@ -69,30 +69,60 @@
 <body>
     <div class="container">
         <div class="icon">📶</div>
-        <h1>You're Offline</h1>
-        <p>This page is not available without a connection. Previously saved learning content may still be available on this device.</p>
+        <h1>Page Unavailable</h1>
+        <p>This page could not be loaded. Previously saved learning content may still be available on this device.</p>
         <p>Queued progress will sync when the app is open and your connection is restored.</p>
         <button class="button" type="button" onclick="window.location.reload()">Try Again</button>
-        <div class="status" id="status">Checking connection...</div>
+        <div class="status" id="status" aria-live="polite">Reconnecting automatically when this page is reachable...</div>
     </div>
 
     <script>
-        function updateStatus() {
-            const status = document.getElementById('status');
-            if (navigator.onLine) {
-                status.textContent = 'You are back online!';
-                status.style.backgroundColor = '#dcfce7';
-                status.style.color = '#16a34a';
-            } else {
-                status.textContent = 'Still offline. Please check your internet connection.';
-                status.style.backgroundColor = '#fee2e2';
-                status.style.color = '#dc2626';
+        const status = document.getElementById('status');
+        let recoveryInProgress = false;
+
+        function updateStatus(message, backgroundColor, color) {
+            status.textContent = message;
+            status.style.backgroundColor = backgroundColor;
+            status.style.color = color;
+        }
+
+        async function retryPageWhenReachable() {
+            if (recoveryInProgress) return;
+            recoveryInProgress = true;
+
+            const controller = new AbortController();
+            const timeout = window.setTimeout(() => controller.abort(), 5000);
+            try {
+                const response = await fetch(window.location.href, {
+                    method: 'HEAD',
+                    cache: 'no-store',
+                    credentials: 'same-origin',
+                    signal: controller.signal
+                });
+                if (response.ok) {
+                    updateStatus('Connection restored. Reloading this page...', '#dcfce7', '#16a34a');
+                    window.location.reload();
+                } else {
+                    updateStatus('Still unable to reach this page. Retrying automatically...', '#fee2e2', '#dc2626');
+                }
+            } catch {
+                updateStatus('Still unable to reach this page. Retrying automatically...', '#fee2e2', '#dc2626');
+            } finally {
+                window.clearTimeout(timeout);
+                recoveryInProgress = false;
             }
         }
 
-        window.addEventListener('online', updateStatus);
-        window.addEventListener('offline', updateStatus);
-        updateStatus();
+        window.addEventListener('online', retryPageWhenReachable);
+        window.addEventListener('offline', () => {
+            updateStatus(
+                'Connection lost. Retrying automatically when it returns...',
+                '#fee2e2',
+                '#dc2626'
+            );
+        });
+        void retryPageWhenReachable();
+        window.setInterval(retryPageWhenReachable, 10000);
     </script>
 </body>
 </html> 
