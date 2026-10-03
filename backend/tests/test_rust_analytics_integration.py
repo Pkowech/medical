@@ -11,11 +11,6 @@ from unittest.mock import patch, MagicMock
 import requests
 
 
-# Simulated test configurations
-BASE_URL = "http://localhost:3002"  # Backend URL
-RUST_ANALYTICS_URL = "http://localhost:8000"  # Rust analytics service URL
-
-
 class TestRustAnalyticsIntegration:
     """Test suite for Rust Analytics integration with backend endpoints."""
 

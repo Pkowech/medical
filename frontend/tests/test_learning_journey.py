@@ -12,6 +12,22 @@ from dotenv import dotenv_values
 FRONTEND_ROOT = Path(__file__).resolve().parents[1]
 BACKEND_ROOT = FRONTEND_ROOT.parent / "backend"
 
+def configured_service_url(*names: str, default: str) -> str:
+    for name in names:
+        value = os.environ.get(name)
+        if value:
+            return value.rstrip("/")
+    return default
+
+
+def configured_backend_base_url() -> str:
+    base_url = configured_service_url(
+        "BACKEND_BASE_URL",
+        "BACKEND_URL",
+        default="http://localhost:3002",
+    )
+    return base_url if base_url.endswith("/v1") else f"{base_url}/v1"
+
 
 def analytics_grpc_metadata() -> tuple[tuple[str, str], ...]:
     api_key = os.environ.get("RUST_ANALYTICS_API_KEY")
@@ -227,7 +243,7 @@ def register_smoke_user(base_url: str) -> dict[str, str]:
 
 @pytest.fixture(scope="session")
 def smoke_auth_headers() -> dict[str, str]:
-    base_url = os.environ.get("BACKEND_BASE_URL", "http://localhost:3002/v1").rstrip("/")
+    base_url = configured_backend_base_url()
     return register_smoke_user(base_url)
 
 
@@ -239,7 +255,11 @@ def assert_frontend_get_routes(base_url: str, auth_headers: dict[str, str], rout
 
 
 def test_registration_and_profile_setup_routes_render_or_require_authentication():
-    base_url = os.environ.get("FRONTEND_BASE_URL", "http://localhost:3000").rstrip("/")
+    base_url = configured_service_url(
+        "FRONTEND_BASE_URL",
+        "FRONTEND_URL",
+        default="http://localhost:3000",
+    )
 
     for path in ("/register", "/login?callbackUrl=%2Ffinish-setup"):
         status, _ = request_status(f"{base_url}{path}")
@@ -251,7 +271,7 @@ def test_registration_and_profile_setup_routes_render_or_require_authentication(
 
 
 def test_backend_auth_and_learning_routes_are_present_and_protected():
-    base_url = os.environ.get("BACKEND_BASE_URL", "http://localhost:3002/v1").rstrip("/")
+    base_url = configured_backend_base_url()
 
     login_status, _ = request_status(
         f"{base_url}/auth/login", method="POST", body={}
@@ -277,7 +297,7 @@ def test_backend_auth_and_learning_routes_are_present_and_protected():
 
 
 def test_authenticated_frontend_analytics_requests_reach_backend_and_rust(smoke_auth_headers):
-    base_url = os.environ.get("BACKEND_BASE_URL", "http://localhost:3002/v1").rstrip("/")
+    base_url = configured_backend_base_url()
 
     routes = (
         ("/assessment-progress/recommendations", dict),
@@ -296,7 +316,7 @@ def test_authenticated_frontend_analytics_requests_reach_backend_and_rust(smoke_
 
 
 def test_frontend_course_requests_reach_backend(smoke_auth_headers):
-    base_url = os.environ.get("BACKEND_BASE_URL", "http://localhost:3002/v1").rstrip("/")
+    base_url = configured_backend_base_url()
     assert_frontend_get_routes(
         base_url,
         smoke_auth_headers,
@@ -311,7 +331,7 @@ def test_frontend_course_requests_reach_backend(smoke_auth_headers):
 
 
 def test_frontend_material_requests_reach_backend(smoke_auth_headers):
-    base_url = os.environ.get("BACKEND_BASE_URL", "http://localhost:3002/v1").rstrip("/")
+    base_url = configured_backend_base_url()
     assert_frontend_get_routes(
         base_url,
         smoke_auth_headers,
@@ -323,7 +343,7 @@ def test_frontend_material_requests_reach_backend(smoke_auth_headers):
 
 
 def test_frontend_learning_requests_reach_backend_and_rust(smoke_auth_headers):
-    base_url = os.environ.get("BACKEND_BASE_URL", "http://localhost:3002/v1").rstrip("/")
+    base_url = configured_backend_base_url()
     assert_frontend_get_routes(
         base_url,
         smoke_auth_headers,
@@ -349,7 +369,12 @@ def test_analytics_grpc_health():
     import grpc_utils
 
     grpc_utils._load_stubs()
-    target = os.environ.get("ANALYTICS_GRPC_TARGET", "localhost:50051")
+    target = configured_service_url(
+        "ANALYTICS_GRPC_URL",
+        "RUST_ANALYTICS_GRPC_URL",
+        "ANALYTICS_GRPC_TARGET",
+        default="localhost:50051",
+    )
     channel = grpc.insecure_channel(target)
     try:
         response = grpc_utils.AnalyticsServiceStub(channel).GetHealth(
@@ -372,7 +397,12 @@ def test_analytics_grpc_recommendations():
     import grpc_utils
 
     grpc_utils._load_stubs()
-    target = os.environ.get("ANALYTICS_GRPC_TARGET", "localhost:50051")
+    target = configured_service_url(
+        "ANALYTICS_GRPC_URL",
+        "RUST_ANALYTICS_GRPC_URL",
+        "ANALYTICS_GRPC_TARGET",
+        default="localhost:50051",
+    )
     channel = grpc.insecure_channel(target)
     try:
         response = grpc_utils.AnalyticsServiceStub(channel).GetRecommendations(
@@ -400,7 +430,12 @@ def test_analytics_grpc_learning_summary_uses_submitted_data_without_db_writes()
     import grpc_utils
 
     grpc_utils._load_stubs()
-    target = os.environ.get("ANALYTICS_GRPC_TARGET", "localhost:50051")
+    target = configured_service_url(
+        "ANALYTICS_GRPC_URL",
+        "RUST_ANALYTICS_GRPC_URL",
+        "ANALYTICS_GRPC_TARGET",
+        default="localhost:50051",
+    )
     channel = grpc.insecure_channel(target)
     stub = grpc_utils.AnalyticsServiceStub(channel)
     user_id = "pytest-read-only-analytics"

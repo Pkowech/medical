@@ -11,7 +11,9 @@ import os
 import requests
 import pytest
 
-BASE_URL       = os.getenv("BACKEND_URL", "http://localhost:3002/v1")
+BACKEND_URL    = os.getenv("BACKEND_URL", "").rstrip("/")
+BASE_URL       = BACKEND_URL if BACKEND_URL.endswith("/v1") else f"{BACKEND_URL}/v1" if BACKEND_URL else ""
+pytestmark     = pytest.mark.skipif(not BASE_URL, reason="Set BACKEND_URL to run backend integration tests")
 ADMIN_EMAIL    = os.getenv("ADMIN_EMAIL",    "admin@example.com")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "AU110s/6081/2021MTH")
 CATEGORY_ID    = os.getenv("SEED_CATEGORY_ID", "88ff2a11-d982-4f66-ba37-9e9657934189")

@@ -13,11 +13,7 @@ pub async fn init_pool() -> Result<Pool<Postgres>, Error> {
     dotenv().ok();
     
     let database_url = env::var("DATABASE_URL")
-        .unwrap_or_else(|_| {
-            eprintln!("⚠️  WARNING: DATABASE_URL not set. Using default PostgreSQL connection.");
-            eprintln!("Set DATABASE_URL environment variable to use a real database.");
-            String::from("postgresql://postgres:[REDACTED]@localhost:5432/medtrack")
-        });
+        .map_err(|_| Error::Configuration("DATABASE_URL must be configured".into()))?;
     
     eprintln!("🔗 Connecting to database at: {}", database_url.split('@').last().unwrap_or("unknown"));
     

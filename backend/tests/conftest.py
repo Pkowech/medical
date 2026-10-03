@@ -8,6 +8,7 @@ import sys
 import os
 import asyncio as _asyncio
 import anyio as _anyio
+from urllib.parse import urlsplit
 
 # Compatibility shim: some tests call `asyncio.gather` directly. When tests
 # run under the Trio anyio backend there may be no asyncio event loop in the
@@ -44,10 +45,20 @@ _asyncio.gather = _gather_compat
 
 # --- Test Configuration ---
 # Base URL of the running backend application
-BASE_URL = "http://localhost:3002/v1"
-ANALYTICS_BASE_URL = BASE_URL  # Use same backend URL for analytics endpoints
-GRPC_ANALYTICS_HOST = "localhost"
-GRPC_ANALYTICS_PORT = 50051
+BACKEND_URL = os.getenv("BACKEND_URL", "").strip().rstrip("/")
+BASE_URL = (
+    BACKEND_URL if BACKEND_URL.endswith("/v1") else f"{BACKEND_URL}/v1"
+) if BACKEND_URL else ""
+ANALYTICS_BASE_URL = BASE_URL
+GRPC_ANALYTICS_TARGET = (
+    os.getenv("ANALYTICS_GRPC_URL") or os.getenv("RUST_ANALYTICS_GRPC_URL") or ""
+).strip()
+
+
+def _configured_grpc_target():
+    if not GRPC_ANALYTICS_TARGET:
+        pytest.skip("Set ANALYTICS_GRPC_URL or RUST_ANALYTICS_GRPC_URL to run gRPC tests")
+    return GRPC_ANALYTICS_TARGET.removeprefix("https://").removeprefix("http://")
 
 # Initialize Faker to generate random test data
 fake = Faker()
@@ -56,6 +67,8 @@ fake = Faker()
 @pytest.fixture(scope="session")
 def base_url():
     """Fixture to provide the base URL to tests."""
+    if not BASE_URL:
+        pytest.skip("Set BACKEND_URL to run backend API tests")
     return BASE_URL
 
 @pytest.fixture(scope="session")
@@ -195,10 +208,7 @@ async def grpc_analytics_channel():
     Create a gRPC channel for analytics service tests.
     This creates a session-scoped channel that persists across tests.
     """
-    channel = grpc.aio.secure_channel(
-        f"{GRPC_ANALYTICS_HOST}:{GRPC_ANALYTICS_PORT}",
-        grpc.ssl_channel_credentials(),
-    )
+    channel = grpc.aio.insecure_channel(_configured_grpc_target())
     try:
         yield channel
     finally:
@@ -218,7 +228,7 @@ def grpc_analytics_channel_insecure():
     # Use synchronous channel here so tests running under different anyio
     # backends (trio/asyncio) don't fail during channel creation. The
     # test client adapts by running blocking stub calls in a thread.
-    channel = grpc.insecure_channel(f"{GRPC_ANALYTICS_HOST}:{GRPC_ANALYTICS_PORT}")
+    channel = grpc.insecure_channel(_configured_grpc_target())
     try:
         yield channel
     finally:
@@ -231,8 +241,12 @@ def grpc_analytics_channel_insecure():
 @pytest.fixture(scope="session")
 def grpc_host_port():
     """Provide gRPC host and port configuration."""
+    target = _configured_grpc_target()
+    parsed_target = urlsplit(f"//{target}")
+    if not parsed_target.hostname or not parsed_target.port:
+        pytest.skip("Configured gRPC target must include a host and port")
     return {
-        "host": GRPC_ANALYTICS_HOST,
-        "port": GRPC_ANALYTICS_PORT,
-        "target": f"{GRPC_ANALYTICS_HOST}:{GRPC_ANALYTICS_PORT}"
+        "host": parsed_target.hostname,
+        "port": parsed_target.port,
+        "target": target,
     }

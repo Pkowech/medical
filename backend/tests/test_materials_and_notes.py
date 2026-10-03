@@ -3,7 +3,9 @@ import pytest
 import requests
 
 # Base API URL matching frontend API client calls
-BASE_URL = os.getenv('BACKEND_URL', 'http://localhost:3002/v1')
+BACKEND_URL = os.getenv("BACKEND_URL", "").rstrip("/")
+BASE_URL = BACKEND_URL if BACKEND_URL.endswith("/v1") else f"{BACKEND_URL}/v1" if BACKEND_URL else ""
+pytestmark = pytest.mark.skipif(not BASE_URL, reason="Set BACKEND_URL to run backend integration tests")
 
 # Credentials for seeded admin/user
 ADMIN_EMAIL = os.getenv('ADMIN_EMAIL', 'admin@example.com')
