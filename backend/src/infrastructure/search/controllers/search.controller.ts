@@ -18,6 +18,7 @@ import { getErrorMessage } from '#common/utils/error.utils';
 import { SearchCacheService } from '../services/search-cache.service';
 import { SearchQueryDto, SearchResponseDto } from '#common/dto/search.dto';
 import { JwtAuthGuard } from '#modules/auth/guards/jwt-auth.guard';
+import { User } from '#common/decorators/user.decorator';
 
 @ApiTags('Search')
 @Controller('search')
@@ -40,7 +41,10 @@ export class SearchController {
   })
   @ApiResponse({ status: 400, description: 'Invalid search parameters' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async search(@Query() queryDto: SearchQueryDto): Promise<SearchResponseDto> {
+  async search(
+    @Query() queryDto: SearchQueryDto,
+    @User('id') userId: string,
+  ): Promise<SearchResponseDto> {
     try {
       // Validate basic query structure
       if (!queryDto.query) {
@@ -61,7 +65,7 @@ export class SearchController {
       }
 
       // Perform search
-      const results = await this.searchService.search(queryDto);
+      const results = await this.searchService.search(queryDto, userId);
 
       // Cache results asynchronously (don't wait for it)
       this.searchCacheService.cacheResults(queryDto, results).catch((error) => {

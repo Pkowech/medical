@@ -31,6 +31,30 @@ const materialService = {
     }
   },
 
+  async getRecommendedMaterials() {
+    const response = await apiService.get<unknown>('/materials/recommended');
+    let payload = response.data;
+    for (let depth = 0; depth < 3; depth += 1) {
+      if (Array.isArray(payload)) return payload as Array<{
+        id: string;
+        title: string;
+        description: string;
+        type: string;
+        link: string;
+        priority: 'High' | 'Medium' | 'Low';
+        rationale: string;
+        relatedTopics: string[];
+        estimatedTime: string;
+      }>;
+      if (payload && typeof payload === 'object' && 'data' in payload) {
+        payload = (payload as { data: unknown }).data;
+        continue;
+      }
+      break;
+    }
+    throw new Error('Unexpected material recommendation response.');
+  },
+
   async createMaterial(material: Material): Promise<Material> {
     const response = await apiService.post<Material>('/materials', material);
     return response.data;

@@ -214,6 +214,14 @@ export class MaterialsController {
     });
   }
 
+  @Get('recommended')
+  @ApiOperation({
+    summary: 'Get material recommendations based on the authenticated user’s quiz performance',
+  })
+  async getRecommendedMaterials(@GetUser() user: PrismaUser) {
+    return this.materialsService.getRecommendedMaterialsForUser(user.id);
+  }
+
   @Get('paginated')
   @ApiOperation({ summary: 'Get paginated materials with scoping' })
   async getPaginated(

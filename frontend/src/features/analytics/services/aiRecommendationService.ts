@@ -4,7 +4,6 @@ import type {
   StudyPattern,
   AdaptiveLearningConfig,
   ApiResponse,
-  AISuggestion,
 } from '@/shared/types';
 
 class AiRecommendationService {
@@ -102,49 +101,6 @@ class AiRecommendationService {
       console.error('Error fetching weak areas recommendations:', error);
       throw new Error('Failed to fetch weak areas recommendations');
     }
-  }
-
-  async getAISuggestions(_userId: string): Promise<AISuggestion[]> {
-    // This is a mock implementation. In a real scenario, this would call an API.
-    console.warn('Using mock AI suggestions. Implement actual API call for getAISuggestions.');
-    return Promise.resolve([
-      {
-        id: 'ai-sugg-1',
-        title: 'Review Pharmacology of CNS Drugs',
-        description:
-          'Your recent assessment scores indicate a weakness in CNS pharmacology. Consider reviewing modules 3 and 7.',
-        type: 'Content Review',
-        link: '/courses/pharmacology/cns-drugs',
-        priority: 'High',
-        rationale: 'Low accuracy in recent CNS-related quizzes.',
-        relatedTopics: ['Neurotransmitters', 'Psychopharmacology'],
-        estimatedTime: '2 hours',
-      },
-      {
-        id: 'ai-sugg-2',
-        title: 'Practice Clinical Case Studies: Cardiology',
-        description:
-          'You are performing well in theoretical cardiology, but could benefit from applying knowledge to clinical scenarios.',
-        type: 'Practice',
-        link: '/practice/case-studies/cardiology',
-        priority: 'Medium',
-        rationale: 'High theoretical knowledge, but moderate application scores.',
-        relatedTopics: ['ECG Interpretation', 'Heart Failure Management'],
-        estimatedTime: '1.5 hours',
-      },
-      {
-        id: 'ai-sugg-3',
-        title: 'Explore Advanced Diagnostic Techniques',
-        description:
-          'Based on your learning path, consider diving into advanced diagnostic imaging for oncology.',
-        type: 'Exploration',
-        link: '/resources/advanced-diagnostics/oncology',
-        priority: 'Low',
-        rationale: 'Consistent high performance; ready for advanced topics.',
-        relatedTopics: ['Medical Imaging', 'Oncology'],
-        estimatedTime: '3 hours',
-      },
-    ]);
   }
 }
 

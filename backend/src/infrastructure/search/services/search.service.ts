@@ -28,7 +28,7 @@ export class SearchService {
     private readonly aiAnalytics: AiAnalyticsService,
   ) {}
 
-  async search(searchQuery: SearchQueryDto): Promise<SearchResponseDto & { metrics?: SearchMetrics }> {
+  async search(searchQuery: SearchQueryDto, userId: string): Promise<SearchResponseDto & { metrics?: SearchMetrics }> {
     const startTime = performance.now();
     const { query, page = 1, limit = this.DEFAULT_PAGE_SIZE, type, courseContextId } = searchQuery;
 
@@ -56,6 +56,7 @@ export class SearchService {
         page || 1,
         limit || 10,
         courseContextId,
+        userId,
       );
 
       metrics.databaseTime = performance.now() - dbStartTime;
@@ -117,13 +118,14 @@ export class SearchService {
     page: number,
     limit: number,
     courseContextId?: string,
+    userId?: string,
   ): Promise<{ results: any[]; total: number; facets: Record<string, number> }> {
     // Enforce search timeout using a race condition
     const timeoutPromise = new Promise<never>((_, reject) =>
       setTimeout(() => reject(new InternalServerErrorException('Search operation exceeded timeout')), this.SEARCH_TIMEOUT_MS)
     );
 
-    const searchPromise = this.performSearch(expandedQuery, originalQuery, type, page, limit, courseContextId);
+    const searchPromise = this.performSearch(expandedQuery, originalQuery, type, page, limit, courseContextId, userId);
     return Promise.race([searchPromise, timeoutPromise]);
   }
 
@@ -137,6 +139,7 @@ export class SearchService {
     page: number,
     limit: number,
     courseContextId?: string,
+    userId?: string,
   ): Promise<{ results: any[]; total: number; facets: Record<string, number> }> {
     const offset = (page - 1) * limit;
 
@@ -158,8 +161,58 @@ export class SearchService {
       params.push(courseContextId);
       const contextParamIdx = params.length;
       contextFilterForResults = `AND (metadata->>'courseId' = $${contextParamIdx} OR metadata->>'courseContextId' = $${contextParamIdx})`;
-      contextFilterForFacets = `AND (metadata->>'courseId' = $${contextParamIdx} OR metadata->>'courseContextId' = $${contextParamIdx})`;
+      contextFilterForFacets = `AND (metadata->>'courseId' = $3 OR metadata->>'courseContextId' = $3)`;
     }
+    if (!userId) {
+      throw new BadRequestException('Authenticated user is required for search.');
+    }
+    params.push(userId);
+    const userParamIdx = params.length;
+    const materialVisibilityFilter = `
+      AND (
+        entity_type <> 'material'
+        OR EXISTS (
+          SELECT 1
+          FROM materials m
+          WHERE m.id = entity_id
+            AND (
+              m.user_id = $${userParamIdx}
+              OR EXISTS (
+                SELECT 1 FROM material_shares ms
+                WHERE ms.material_id = m.id AND ms.user_id = $${userParamIdx}
+              )
+              OR (
+                COALESCE(m.metadata->>'shareWithCourse', 'true') <> 'false'
+                AND EXISTS (
+                  SELECT 1
+                  FROM course_enrollments ce
+                  WHERE ce.user_id = $${userParamIdx}
+                    AND ce.status IN ('active', 'completed')
+                    AND ce.course_id = COALESCE(
+                      m.course_id,
+                      (SELECT u.course_id FROM units u WHERE u.id = m.unit_id)
+                    )
+                )
+              )
+              OR EXISTS (
+                SELECT 1
+                FROM courses c
+                LEFT JOIN course_instructors ci
+                  ON ci.course_id = c.id AND ci.user_id = $${userParamIdx}
+                WHERE c.id = COALESCE(
+                  m.course_id,
+                  (SELECT u.course_id FROM units u WHERE u.id = m.unit_id)
+                )
+                  AND (c.created_by_id = $${userParamIdx} OR ci.id IS NOT NULL)
+              )
+              OR (
+                m.user_id IS NULL
+                AND m.course_id IS NULL
+                AND m.unit_id IS NULL
+              )
+            )
+        )
+      )`;
 
     // Use websearch_to_tsquery for robust handling of arbitrary user text (handles quotes, hyphens, etc.)
     // Fallback to to_tsquery if websearch_to_tsquery unavailable in this PostgreSQL version
@@ -180,9 +233,9 @@ export class SearchService {
           'StartSel=<mark>, StopSel=</mark>, MaxWords=35, MinWords=15, ShortWord=3, HighlightAll=FALSE') as snippet,
         COUNT(*)::int OVER() as total_count
       FROM "global_search_index"
-      WHERE (fts @@ ${tsqueryCall})
-      OR (title % $2)
-      ${typeFilterForResults} ${contextFilterForResults}
+      WHERE ((fts @@ ${tsqueryCall})
+      OR (title % $2))
+      ${typeFilterForResults} ${contextFilterForResults} ${materialVisibilityFilter}
       ORDER BY (fts_relevance * 0.8 + trgm_relevance * 0.2) DESC, created_at DESC
       LIMIT $${params.length + 1} OFFSET $${params.length + 2}
     `;
@@ -198,17 +251,23 @@ export class SearchService {
 
     // 2. Calculate Facets (Result counts per type)
     // Reuse base parameters but rebuild facets filter without typeFilter
-    const facetsParams = [expandedQuery, originalQuery];
+    const facetsParams: unknown[] = [expandedQuery, originalQuery];
     if (courseContextId) {
       facetsParams.push(courseContextId);
     }
+    facetsParams.push(userId);
+    const facetsUserParamIdx = facetsParams.length;
+    const facetsMaterialVisibilityFilter = materialVisibilityFilter.replaceAll(
+      `$${userParamIdx}`,
+      `$${facetsUserParamIdx}`,
+    );
 
     const facetsQuery = `
       SELECT entity_type as type, COUNT(*)::int as count
       FROM "global_search_index"
-      WHERE (fts @@ ${tsqueryCall})
-      OR (title % $2)
-      ${contextFilterForFacets}
+      WHERE ((fts @@ ${tsqueryCall})
+      OR (title % $2))
+      ${contextFilterForFacets} ${facetsMaterialVisibilityFilter}
       GROUP BY entity_type
     `;
 

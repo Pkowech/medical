@@ -242,6 +242,18 @@ export class CoursesService {
 
       const whereConditions: Prisma.CourseWhereInput[] = [];
 
+      if (search?.trim()) {
+        const term = search.trim();
+        whereConditions.push({
+          OR: [
+            { title: { contains: term, mode: 'insensitive' } },
+            { name: { contains: term, mode: 'insensitive' } },
+            { description: { contains: term, mode: 'insensitive' } },
+            { code: { contains: term, mode: 'insensitive' } },
+          ],
+        });
+      }
+
       if (categoryId) {
         whereConditions.push({ categoryId });
       }
@@ -498,8 +510,87 @@ export class CoursesService {
         error: getErrorMessage(error),
       });
       // Fall back to basic search if FTS fails
-      return this.findAll({ ...searchDto, search: undefined }, pagination, userId);
+      return this.findAllWithContains(search, searchDto, pagination, userId);
     }
+  }
+
+  private async findAllWithContains(
+    search: string,
+    searchDto: CourseSearchDto,
+    pagination: PaginationDto,
+    userId?: string,
+  ) {
+    const {
+      categoryId,
+      difficulty,
+      status = CourseStatus.published,
+      isFeatured,
+      instructorId,
+      tags,
+      minRating,
+      maxPrice,
+      sortBy = 'createdAt',
+      sortOrder = 'DESC',
+    } = searchDto;
+    const page = pagination.page || 1;
+    const limit = pagination.limit || 20;
+    const term = search.trim();
+    const where: Prisma.CourseWhereInput = {
+      AND: [
+        {
+          OR: [
+            { title: { contains: term, mode: 'insensitive' } },
+            { name: { contains: term, mode: 'insensitive' } },
+            { description: { contains: term, mode: 'insensitive' } },
+            { code: { contains: term, mode: 'insensitive' } },
+          ],
+        },
+        { status },
+        ...(categoryId ? [{ categoryId }] : []),
+        ...(difficulty ? [{ difficulty }] : []),
+        ...(isFeatured !== undefined ? [{ isFeatured }] : []),
+        ...(instructorId ? [{ createdById: instructorId }] : []),
+        ...(tags?.length ? [{ tags: { hasSome: tags } }] : []),
+        ...(minRating ? [{ rating: { gte: minRating } }] : []),
+        ...(maxPrice !== undefined
+          ? [{ OR: [{ price: null }, { price: { lte: maxPrice } }] }]
+          : []),
+      ],
+    };
+    const [courses, total] = await Promise.all([
+      this.prisma.course.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        include: {
+          category: { select: { id: true, name: true, slug: true } },
+          createdBy: { select: { id: true, firstName: true, lastName: true } },
+        },
+        orderBy: { [sortBy]: sortOrder.toLowerCase() as 'asc' | 'desc' },
+      }),
+      this.prisma.course.count({ where }),
+    ]);
+    const enrolledIds = userId
+      ? new Set((await this.prisma.courseEnrollment.findMany({
+          where: { userId, courseId: { in: courses.map((course) => course.id) } },
+          select: { courseId: true },
+        })).map((enrollment) => enrollment.courseId))
+      : new Set<string>();
+
+    return {
+      data: courses.map((course) => ({
+        ...course,
+        ...(userId ? { isEnrolled: enrolledIds.has(course.id) } : {}),
+      })) as Course[],
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+        hasNext: page * limit < total,
+        hasPrev: page > 1,
+      },
+    };
   }
 
   async findOne(id: string, userId?: string): Promise<ExtendedCourse> {
@@ -1275,16 +1366,14 @@ export class CoursesService {
         await this.aiAnalyticsService.getRecommendationsAI(userId);
       const courseIds = aiRecommendations
         .map((recommendation: any) =>
-          recommendation.materialId ??
-          recommendation.material_id ??
-          recommendation.courseId,
+          recommendation.courseId ?? recommendation.course_id,
         )
         .filter((id): id is string => typeof id === 'string' && id.length > 0)
         .slice(0, limit);
 
       if (courseIds.length === 0) return [];
 
-      return await this.prisma.course.findMany({
+      const courses = await this.prisma.course.findMany({
         where: {
           id: { in: courseIds },
           status: CourseStatus.published,
@@ -1296,6 +1385,11 @@ export class CoursesService {
           },
         },
         take: limit,
+      });
+      const coursesById = new Map(courses.map((course) => [course.id, course]));
+      return courseIds.flatMap((id) => {
+        const course = coursesById.get(id);
+        return course ? [course] : [];
       });
     } catch (error) {
       this.logger.warn('AI course recommendations refresh failed:', {

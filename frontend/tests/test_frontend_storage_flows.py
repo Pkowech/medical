@@ -410,11 +410,49 @@ def test_production_service_worker_returns_offline_fallback_for_uncached_navigat
                 "Still unable to reach this page. Retrying automatically...",
             }
             assert page.get_by_text("You are back online!").count() == 0
-            page.context.set_offline(False)
-            page.wait_for_function(
-                "() => document.title !== 'Offline - MedTrack Hub'",
-                timeout=20000,
-            )
         finally:
             page.context.set_offline(False)
+            browser.close()
+
+
+def test_offline_fallback_reloads_page_automatically_when_reachable():
+    offline_page = read_frontend("public/offline.html")
+    reachable = False
+    document_requests = 0
+
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch()
+        page = browser.new_page()
+
+        def respond_to_page_request(route):
+            nonlocal document_requests
+            request = route.request
+            if request.is_navigation_request():
+                document_requests += 1
+                if document_requests == 1:
+                    route.fulfill(body=offline_page, content_type="text/html")
+                else:
+                    route.fulfill(
+                        body="<html><head><title>Recovered page</title></head></html>",
+                        content_type="text/html",
+                    )
+            elif reachable:
+                route.fulfill(status=200, body="reachable")
+            else:
+                route.fulfill(status=503, body="unavailable")
+
+        try:
+            page.route("**/courses", respond_to_page_request)
+            page.goto("http://pwa.test/courses", wait_until="domcontentloaded")
+            page.wait_for_function(
+                "() => document.querySelector('#status')?.textContent.includes('Retrying automatically')"
+            )
+            reachable = True
+            page.evaluate("window.dispatchEvent(new Event('online'))")
+            page.wait_for_function(
+                "() => document.title === 'Recovered page'",
+                timeout=10000,
+            )
+            assert document_requests == 2
+        finally:
             browser.close()

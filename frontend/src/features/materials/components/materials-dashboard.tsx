@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { usePageHeader } from '@/core/providers/HeaderContext';
 import materialService from '@/features/courses/services/materialService';
-import { aiRecommendationService } from '@/features/analytics/services/aiRecommendationService'; // Implemented AI service
 import { Material } from '@/shared/types/materialInterface';
 import { MaterialListItem } from './MaterialListItem';
 import { MaterialCard } from './MaterialCard';
@@ -139,13 +138,17 @@ export default function MaterialsDashboard() {
   });
 
   // 2. Fetch AI Recommendations (Only for 'For You' tab)
-  const { data: recommendations, isLoading: isRecLoading } = useQuery({
-    queryKey: ['ai-recommendations'],
-    queryFn: async () => await aiRecommendationService.getAISuggestions('current-user'),
+  const {
+    data: recommendations,
+    isLoading: isRecLoading,
+    isError: isRecError,
+    error: recommendationError,
+  } = useQuery({
+    queryKey: ['material-recommendations'],
+    queryFn: () => materialService.getRecommendedMaterials(),
     enabled: filterContext === 'for_you',
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
     refetchOnWindowFocus: false,
-    refetchOnMount: false,
   });
 
   const allMaterials = useMemo(
@@ -447,7 +450,7 @@ export default function MaterialsDashboard() {
             </div>
             <div>
               <h2 className="text-xl font-bold text-slate-900 dark:text-white">Curated for your goals</h2>
-              <p className="text-sm text-slate-500">Based on your recent performance and study patterns</p>
+              <p className="text-sm text-slate-500">Matched to topics where your recorded quiz scores show room to improve</p>
             </div>
           </div>
           
@@ -455,11 +458,22 @@ export default function MaterialsDashboard() {
              <div className="flex justify-center py-20">
                <div className="animate-spin rounded-full h-12 w-12 border-4 border-slate-200 border-t-indigo-500" />
              </div>
-          ) : (
+          ) : isRecError ? (
+            <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-200">
+              Could not load your recommendations: {recommendationError instanceof Error ? recommendationError.message : 'Please try again later.'}
+            </div>
+          ) : recommendations?.length ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {recommendations?.map((rec) => (
+              {recommendations.map((rec) => (
                 <RecommendationCard key={rec.id} suggestion={rec} />
               ))}
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center dark:border-slate-700 dark:bg-slate-900">
+              <h3 className="font-semibold text-slate-900 dark:text-white">No targeted review suggestions yet</h3>
+              <p className="mx-auto mt-2 max-w-xl text-sm text-slate-500">
+                Recommendations appear when quiz results identify a topic below 70% and there is a material for that topic that you own or can access through sharing.
+              </p>
             </div>
           )}
         </div>

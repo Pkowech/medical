@@ -24,7 +24,6 @@ import {
   type InfiniteData,
 } from '@tanstack/react-query';
 import { usePageHeader } from '@/core/providers/HeaderContext';
-import { apiService } from '@/features/auth/services/apiClient';
 import { courseService } from '@/features/courses/services/courseService';
 import { toast } from 'sonner';
 import { useStudy } from '@/features/learning-management/study/hooks/useStudy';
@@ -34,8 +33,6 @@ import { getInstructorDisplayName } from '@/lib/utils';
 import {
   CourseFilter,
   CourseStatistics,
-  FtsSearchResult,
-  FtsSearchResponse,
   Course,
 } from '@/shared/types/courseInterface';
 import { Progress } from '@/shared/components/ui/progress';
@@ -84,6 +81,17 @@ export const CoursesDashboard = () => {
     }
   };
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const searchTerm = filters.searchTerm.trim();
+      setDebouncedSearchTerm(searchTerm);
+      if (searchTerm && activeTab !== 'discover') {
+        setActiveTab('discover');
+      }
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [filters.searchTerm, activeTab]);
+
   // Set page header
   useEffect(() => {
     setHeader({
@@ -124,47 +132,7 @@ export const CoursesDashboard = () => {
     queryFn: async ({ pageParam }: QueryFunctionContext): Promise<CoursesPageData> => {
       const pageNum = typeof pageParam === 'number' ? pageParam : 1;
       
-      const isSearching = debouncedSearchTerm.length >= 2;
-      
-      if (isSearching) {
-        try {
-          const response = await apiService.get<FtsSearchResponse>(
-            `/search?query=${encodeURIComponent(debouncedSearchTerm)}&type=course&limit=100&page=1`
-          );
-          const ftsResults = response.data.results || [];
-          const courses = (ftsResults as Array<Partial<FtsSearchResult & Course>>).map(
-            partial =>
-              ({
-                id: partial.id || '',
-                title: partial.title || '',
-                description: partial.description || '',
-                difficulty: (partial.difficulty as Course['difficulty']) || 'beginner',
-                estimatedHours: partial.estimatedHours ?? 0,
-                enrollmentCount: partial.enrollmentCount ?? 0,
-                rating: partial.rating ?? 0,
-                category: (partial.category as Course['category']) || undefined,
-                code: partial.code || undefined,
-                isEnrolled: partial.isEnrolled ?? false,
-              }) as Course
-          );
-
-          let filtered = courses;
-          if (filters.difficulty) {
-            filtered = filtered.filter(c => c.difficulty === filters.difficulty);
-          }
-
-          return {
-            courses: filtered,
-            stats: { total: response.data.total },
-            page: pageNum,
-            limit: pageSize,
-          };
-        } catch (error) {
-          console.warn('FTS search failed', error);
-        }
-      }
-
-      if (filters.status === 'recommended') {
+      if (filters.status === 'recommended' && !debouncedSearchTerm) {
         const recommended = await courseService.getRecommendedCourses(pageSize);
         return { 
           courses: recommended, 
@@ -187,6 +155,7 @@ export const CoursesDashboard = () => {
         raw = await courseService.getCourses({
           page: pageNum,
           limit: pageSize,
+          search: debouncedSearchTerm || undefined,
           difficulty: (filters.difficulty as "beginner" | "intermediate" | "advanced" | "expert") || undefined,
           categoryId: filters.category,
         });
@@ -379,7 +348,11 @@ export const CoursesDashboard = () => {
             <div className="flex items-center p-1 bg-slate-100 dark:bg-slate-900 rounded-2xl w-fit">
               <TabButton 
                 active={activeTab === 'enrolled'} 
-                onClick={() => { setActiveTab('enrolled'); setDebouncedSearchTerm(''); }}
+                onClick={() => {
+                  setActiveTab('enrolled');
+                  setFilters(prev => ({ ...prev, searchTerm: '' }));
+                  setDebouncedSearchTerm('');
+                }}
                 label="My Learning"
                 icon={BookOpen}
               />
@@ -391,14 +364,18 @@ export const CoursesDashboard = () => {
               />
               <TabButton 
                 active={activeTab === 'recommended'} 
-                onClick={() => { setActiveTab('recommended'); setDebouncedSearchTerm(''); }}
+                onClick={() => {
+                  setActiveTab('recommended');
+                  setFilters(prev => ({ ...prev, searchTerm: '' }));
+                  setDebouncedSearchTerm('');
+                }}
                 label="For You"
                 icon={Star}
               />
             </div>
             {activeTab === 'recommended' && (
               <p className="text-xs text-slate-500 dark:text-slate-400 ml-2 animate-in fade-in slide-in-from-left-2">
-                ✨ Curated courses based on your <span className="font-bold text-blue-600 dark:text-blue-400">{user?.specialization || 'Career Path'}</span> specialization and level.
+                Recommended from categories you’re enrolled in, ranked by rating and enrollment. Featured courses appear when there are no category matches.
               </p>
             )}
           </div>

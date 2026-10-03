@@ -27,6 +27,7 @@ import {
   MaterialShare,
   MaterialType,
   File,
+  Prisma,
   ProgressStatus,
   RoleName,
   MemberStatus,
@@ -1163,6 +1164,8 @@ export class MaterialsService {
     sortOrder?: 'asc' | 'desc';
     unitId?: string;
     courseId?: string;
+    topicId?: string;
+    topicIds?: string[];
   }) {
     try {
       const {
@@ -1176,6 +1179,8 @@ export class MaterialsService {
         sortOrder = 'desc',
         unitId,
         courseId,
+        topicId,
+        topicIds,
       } = options;
 
       const skip = (page - 1) * limit;
@@ -1229,12 +1234,29 @@ export class MaterialsService {
       }
 
       // 2. Filters
-      if (search) {
-        where.title = { contains: search, mode: 'insensitive' };
+      if (search?.trim()) {
+        const term = search.trim();
+        where.AND = [
+          ...(Array.isArray(where.AND) ? where.AND : []),
+          {
+            OR: [
+              { title: { contains: term, mode: 'insensitive' } },
+              { description: { contains: term, mode: 'insensitive' } },
+              { content: { contains: term, mode: 'insensitive' } },
+            ],
+          },
+        ];
       }
 
       if (unitId) {
         where.unitId = unitId;
+      }
+
+      if (topicId) {
+        where.topicId = topicId;
+      }
+      if (topicIds?.length) {
+        where.topicId = { in: topicIds };
       }
 
       if (courseId) {
@@ -1783,61 +1805,104 @@ export class MaterialsService {
    * Get recommended materials for a user using AI Analytics
    * Falls back to recent materials if recommendations unavailable
    */
-  async getRecommendedMaterialsForUser(
-    userId: string,
-    limit: number = 5,
-  ): Promise<Material[]> {
-    try {
-      // Get recommendations from Rust analytics
-      const recommendations =
-        await this.aiAnalyticsService.getRecommendationsAI(userId);
-
-      if (!recommendations || recommendations.length === 0) {
-        this.logger.warn(
-          `No material recommendations found for user ${userId}, using recent materials`,
-        );
-        return this.prisma.material.findMany({
-          take: limit,
-          orderBy: { createdAt: 'desc' },
-        });
-      }
-
-      // Extract material IDs from recommendations
-      const recommendedMaterialIds = recommendations
-        .map((rec: any) => rec.materialId || rec.material_id)
-        .filter(Boolean)
-        .slice(0, limit);
-
-      if (recommendedMaterialIds.length === 0) {
-        return this.prisma.material.findMany({
-          take: limit,
-          orderBy: { createdAt: 'desc' },
-        });
-      }
-
-      // Fetch actual material details
-      const materials = await this.prisma.material.findMany({
-        where: { id: { in: recommendedMaterialIds } },
-        take: limit,
-      });
-
-      this.logger.log(
-        `Found ${materials.length} recommended materials for user ${userId}`,
-      );
-      return materials;
-    } catch (error: any) {
-      this.logger.error(
-        `Error getting recommended materials for user ${userId}:`,
-        {
-          error: error?.message,
+  async getRecommendedMaterialsForUser(userId: string, limit = 6) {
+    const progress = await this.prisma.progress.findMany({
+      where: {
+        userId,
+        topicId: { not: null },
+        quizScores: { not: Prisma.JsonNull },
+      },
+      include: {
+        topic: {
+          select: {
+            id: true,
+            name: true,
+            unit: { select: { courseId: true } },
+          },
         },
-      );
-      // Graceful fallback
-      return this.prisma.material.findMany({
-        take: limit,
-        orderBy: { createdAt: 'desc' },
+      },
+      orderBy: { lastAccessedAt: 'desc' },
+    });
+
+    const topicScores = new Map<
+      string,
+      { title: string; scores: number[] }
+    >();
+    for (const record of progress) {
+      const topic = record.topic;
+      if (!topic) continue;
+
+      const rawScores = record.quizScores;
+      const entries = Array.isArray(rawScores)
+        ? rawScores
+        : rawScores && typeof rawScores === 'object'
+          ? [rawScores]
+          : [];
+      const scores = entries.flatMap((entry) => {
+        if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return [];
+        const data = entry as Record<string, unknown>;
+        const value =
+          typeof data.score === 'number'
+            ? data.score
+            : typeof data.bestScore === 'number'
+              ? data.bestScore
+              : typeof data.lastScore === 'number'
+                ? data.lastScore
+                : undefined;
+        if (value === undefined || value < 0) return [];
+        return [value <= 1 ? value * 100 : value];
       });
+      if (scores.length === 0) continue;
+
+      const current = topicScores.get(topic.id) ?? {
+        title: topic.name,
+        scores: [],
+      };
+      current.scores.push(...scores);
+      topicScores.set(topic.id, current);
     }
+
+    const weakTopics = Array.from(topicScores.entries())
+      .map(([id, topic]) => ({
+        id,
+        ...topic,
+        average: topic.scores.reduce((sum, score) => sum + score, 0) / topic.scores.length,
+      }))
+      .filter((topic) => topic.average < 70)
+      .sort((a, b) => a.average - b.average)
+      .slice(0, limit);
+
+    if (weakTopics.length === 0) return [];
+
+    const accessibleMaterials = await this.findAllPaginated({
+      page: 1,
+      limit: Math.max(limit * 5, 20),
+      scope: 'recommended',
+      userId,
+      topicIds: weakTopics.map((topic) => topic.id),
+    });
+    const weakTopicById = new Map(weakTopics.map((topic) => [topic.id, topic]));
+    const usedTopicIds = new Set<string>();
+
+    return accessibleMaterials.items.flatMap((material) => {
+      const topicId = material.topicId;
+      const topic = topicId ? weakTopicById.get(topicId) : undefined;
+      if (!topic || usedTopicIds.has(topic.id)) return [];
+      usedTopicIds.add(topic.id);
+
+      const roundedScore = Math.round(topic.average);
+      return [{
+        id: material.id,
+        title: material.title,
+        description: material.description || `Review ${topic.title} using this class resource.`,
+        type: roundedScore < 50 ? 'Focused review' : 'Practice',
+        link: `/study-planner/materials/${material.id}`,
+        priority: roundedScore < 50 ? 'High' : 'Medium',
+        rationale: `Your quiz average for ${topic.title} is ${roundedScore}% across ${topic.scores.length} recorded result${topic.scores.length === 1 ? '' : 's'}.`,
+        relatedTopics: [topic.title],
+        estimatedTime: material.duration ? `${material.duration} minutes` : 'Review at your pace',
+      }];
+    });
   }
 
   /**

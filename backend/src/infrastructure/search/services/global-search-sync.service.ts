@@ -113,14 +113,17 @@ export class GlobalSearchSyncService implements OnModuleInit {
       case 'material':
         return this.prisma.material.findUnique({ 
           where: { id }, 
-          include: { topic: { include: { unit: { select: { courseId: true } } } } } 
+          include: {
+            unit: { select: { courseId: true } },
+            topic: { include: { unit: { select: { courseId: true } } } },
+          },
         }).then(m => m ? { 
           title: m.title, 
           description: m.description, 
           content: m.content, 
           metadata: { 
             ...((m.metadata as Record<string, any>) || {}), 
-            courseId: m.topic?.unit?.courseId 
+            courseId: m.courseId ?? m.unit?.courseId ?? m.topic?.unit?.courseId,
           },
           tags: (m.metadata as any)?.tags
         } : null);
