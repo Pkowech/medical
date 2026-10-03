@@ -285,7 +285,7 @@ export class AIFeaturesService implements OnModuleInit {
       // Call Rust service via gRPC
       const response = await firstValueFrom(
         this.analyticsServiceGrpc
-          .getUserFeatureVector({ user_id: userId })
+          .getUserFeatureVector({ userId: userId })
           .pipe(timeout(this.grpcTimeoutMs), retry(this.grpcRetries)),
       );
 

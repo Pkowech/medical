@@ -122,7 +122,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
         try {
           const grpcResp = await this.callGrpcWithTimeout(
             this.analyticsServiceGrpc.getNextAdaptiveQuestion({
-              user_id: userId,
+              userId: userId,
             }),
             this.grpcTimeoutMs,
           );
@@ -255,7 +255,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
         try {
           const grpcResp = await this.callGrpcWithTimeout(
             this.analyticsServiceGrpc.getNextAdaptiveQuestion({
-              user_id: session.userId,
+              userId: session.userId,
             }),
             this.grpcTimeoutMs,
           );
@@ -392,7 +392,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
       // Try gRPC
       const grpcResp = await this.callGrpcWithTimeout(
         this.analyticsServiceGrpc.getNextAdaptiveQuestion({
-          user_id: userId,
+          userId: userId,
         }),
         this.grpcTimeoutMs,
       );
@@ -426,7 +426,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
     try {
       const grpcResp = await this.callGrpc(
         this.analyticsServiceGrpc.getRelatedResources({
-          resource_id: assessmentId,
+          resourceId: assessmentId,
         }),
       );
       return (grpcResp as any).resources || [];
@@ -445,8 +445,8 @@ export class AssessmentAnalyticsService implements OnModuleInit {
     try {
       const grpcResp = await this.callGrpc(
         (this.analyticsServiceGrpc as any).generateStudyRecommendations({
-          user_id: userId,
-          knowledge_gaps: knowledgeGaps,
+          userId: userId,
+          knowledgeGaps: knowledgeGaps,
         }),
       );
       return (grpcResp as any).recommendations || [];
@@ -461,7 +461,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
   async generateNextSteps(userId: string): Promise<string[]> {
     try {
       const grpcResp = await this.callGrpc(
-        this.analyticsServiceGrpc.generateNextSteps({ user_id: userId }),
+        this.analyticsServiceGrpc.generateNextSteps({ userId: userId }),
       );
       return (grpcResp as any).steps?.map((s: any) => s.step) || [];
     } catch (error) {
@@ -566,8 +566,8 @@ export class AssessmentAnalyticsService implements OnModuleInit {
       const startTime = Date.now();
       const response = await this.callGrpc(
         this.analyticsServiceGrpc.predictPerformance({
-          user_id: userId,
-          skill_id: skillId,
+          userId: userId,
+          skillId: skillId,
         }),
       );
       const responseTimeMs = Date.now() - startTime;
@@ -613,9 +613,9 @@ export class AssessmentAnalyticsService implements OnModuleInit {
       // Fire-and-forget gRPC call
       this.callGrpc(
         this.analyticsServiceGrpc.updateBkt({
-          user_id: userId,
-          skill_id: skillId,
-          is_correct: isCorrect,
+          userId: userId,
+          skillId: skillId,
+          isCorrect: isCorrect,
         }),
       ).catch((err) => {
         this.logger.warn(
@@ -659,7 +659,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
         async () => {
           // Strictly gRPC
           const response = await this.callGrpc(
-            this.analyticsServiceGrpc.getRecommendations({ user_id: userId }),
+            this.analyticsServiceGrpc.getRecommendations({ userId: userId }),
           );
 
           // Filter for assessment-type recommendations
@@ -708,7 +708,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
       const startTime = Date.now();
       const grpcResp = await this.callGrpc(
         this.analyticsServiceGrpc.getDetailedLearningAnalytics({
-          user_id: userId,
+          userId: userId,
         }),
       );
       const responseTimeMs = Date.now() - startTime;
@@ -776,7 +776,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
 
       const response = await this.callGrpc(
         this.analyticsServiceGrpc.getFocusRecommendations({
-          user_id: userId,
+          userId: userId,
           limit,
         }),
       );
@@ -809,7 +809,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
   async getDueCards(userId: string): Promise<any[]> {
     try {
       const grpcResp = await this.callGrpc(
-        this.analyticsServiceGrpc.getDueCards({ user_id: userId }),
+        this.analyticsServiceGrpc.getDueCards({ userId: userId }),
       );
       return (grpcResp as any).cards || [];
     } catch (error) {
@@ -833,12 +833,12 @@ export class AssessmentAnalyticsService implements OnModuleInit {
       // Proxy event to Rust
       await this.callGrpc(
         this.analyticsServiceGrpc.batchTrackEvents({
-          user_id: userId,
+          userId: userId,
           events: [
             {
-              event_type: 'assessment_submission',
+              eventType: 'assessment_submission',
               timestamp: new Date().toISOString(),
-              session_id: null,
+              sessionId: null,
               duration: 0,
             },
           ],
@@ -879,8 +879,8 @@ export class AssessmentAnalyticsService implements OnModuleInit {
       const startTime = Date.now();
       const grpcResp = await this.callGrpc(
         this.analyticsServiceGrpc.predictPerformance({
-          user_id: userId,
-          skill_id: assessmentId || '',
+          userId: userId,
+          skillId: assessmentId || '',
         }),
       );
       const responseTimeMs = Date.now() - startTime;
@@ -929,7 +929,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
         const startTime = Date.now();
         const grpcResp = await this.callGrpc(
           this.analyticsServiceGrpc.getDetailedLearningAnalytics({
-            user_id: userId,
+            userId: userId,
           }),
         );
         const responseTimeMs = Date.now() - startTime;
@@ -1004,8 +1004,8 @@ export class AssessmentAnalyticsService implements OnModuleInit {
         const startTime = Date.now();
         const grpcResp = await this.callGrpc(
           this.analyticsServiceGrpc.updateBktSkillMetrics({
-            user_id: userId,
-            skill_id: skillId,
+            userId: userId,
+            skillId: skillId,
           }),
         );
         const responseTimeMs = Date.now() - startTime;
@@ -1065,7 +1065,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
         const startTime = Date.now();
         const grpcResp = await this.callGrpc(
           this.analyticsServiceGrpc.predictBurnModel({
-            user_id: userId,
+            userId: userId,
             features: [],
           }),
         );
@@ -1204,7 +1204,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
     try {
       // Strictly gRPC
       const resp: any = await this.callGrpc(
-        this.grpc().getDetailedLearningAnalytics({ user_id: userId }),
+        this.grpc().getDetailedLearningAnalytics({ userId: userId }),
       );
       return {
         userId: resp?.userId,
@@ -1262,7 +1262,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
       // Strictly gRPC
       const startTime = Date.now();
       const grpcResp = await this.callGrpc(
-        this.analyticsServiceGrpc.getUserAbility({ user_id: userId }),
+        this.analyticsServiceGrpc.getUserAbility({ userId: userId }),
       );
       const responseTimeMs = Date.now() - startTime;
 
@@ -1326,7 +1326,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
       // Strictly gRPC
       const startTime = Date.now();
       const grpcResp: any = await this.callGrpc(
-        this.analyticsServiceGrpc.getSpacedRepetitionStats({ user_id: userId }),
+        this.analyticsServiceGrpc.getSpacedRepetitionStats({ userId: userId }),
       );
       const responseTimeMs = Date.now() - startTime;
 
@@ -1393,9 +1393,9 @@ export class AssessmentAnalyticsService implements OnModuleInit {
       // Fire-and-forget gRPC call
       void this.callGrpc(
         this.analyticsServiceGrpc.updateQuestionStatistics({
-          question_id: questionId,
-          is_correct: isCorrect,
-          response_time_ms: responseTimeMs,
+          questionId: questionId,
+          isCorrect: isCorrect,
+          responseTimeMs: responseTimeMs,
         }),
       ).catch((err) => {
         this.logger.warn(

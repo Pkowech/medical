@@ -108,7 +108,7 @@ export class CourseAnalyticsService implements OnModuleInit {
             // Try gRPC first
             const startTime = Date.now();
             const grpcResponse = await this.callGrpc(
-              this.analyticsServiceGrpc.getRecommendations({ user_id: userId }),
+              this.analyticsServiceGrpc.getRecommendations({ userId: userId }),
             );
             const responseTimeMs = Date.now() - startTime;
 
@@ -166,7 +166,7 @@ export class CourseAnalyticsService implements OnModuleInit {
       try {
         // Try gRPC first
         const response = await this.callGrpc(
-          this.analyticsServiceGrpc.getCourseStatistics({ user_id: userId }),
+          this.analyticsServiceGrpc.getCourseStatistics({ userId: userId }),
         );
 
         const stats = response.course_stats;
@@ -229,8 +229,8 @@ export class CourseAnalyticsService implements OnModuleInit {
       // Try gRPC
       const response = await this.callGrpc(
         this.analyticsServiceGrpc.calculateCourseProgress({
-          user_id: userId,
-          course_id: courseId,
+          userId: userId,
+          courseId,
         }),
       );
 
@@ -271,9 +271,9 @@ export class CourseAnalyticsService implements OnModuleInit {
       // Fire-and-forget batch event to gRPC/Rust
       void this.callGrpc(
         this.analyticsServiceGrpc.updateBkt({
-          user_id: userId,
-          skill_id: metadata.skillId as string,
-          is_correct: (metadata.isCorrect as boolean) || false,
+          userId: userId,
+          skillId: metadata.skillId as string,
+          isCorrect: (metadata.isCorrect as boolean) || false,
         }),
       ).catch((err) => {
         this.logger.warn(
@@ -303,7 +303,7 @@ export class CourseAnalyticsService implements OnModuleInit {
       try {
         // Try gRPC first (via engagement metrics)
         const response = await this.callGrpc(
-          this.analyticsServiceGrpc.getEngagementMetrics({ user_id: userId }),
+          this.analyticsServiceGrpc.getEngagementMetrics({ userId: userId }),
         );
 
         const patterns = {

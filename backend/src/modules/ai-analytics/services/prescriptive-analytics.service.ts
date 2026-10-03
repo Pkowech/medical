@@ -80,7 +80,7 @@ export class PrescriptiveAnalyticsService implements OnModuleInit {
       // Fetch knowledge states from Rust Analytics service
       const response = await firstValueFrom(
         this.analyticsServiceGrpc
-          .getUserAbility({ user_id: userId })
+          .getUserAbility({ userId: userId })
           .pipe(
             timeout(this.grpcTimeoutMs),
             retry({ count: this.grpcRetries, delay: 200 }),

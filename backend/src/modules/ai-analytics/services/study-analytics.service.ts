@@ -85,7 +85,7 @@ export class StudyAnalyticsService implements OnModuleInit {
           try {
             const grpcResp = await this.callGrpc(
               this.analyticsServiceGrpc.getDetailedLearningAnalytics({
-                user_id: userId,
+                userId: userId,
               }),
             );
 
@@ -210,8 +210,8 @@ export class StudyAnalyticsService implements OnModuleInit {
       // Strictly gRPC
       const grpcResp: any = await this.callGrpc(
         this.analyticsServiceGrpc.generateStudyRecommendations({
-          user_id: userId,
-          knowledge_gaps: knowledgeGaps,
+          userId: userId,
+          knowledgeGaps: knowledgeGaps,
         }),
       );
 
@@ -247,7 +247,7 @@ export class StudyAnalyticsService implements OnModuleInit {
   async getDueCards(userId: string): Promise<any[]> {
     try {
       const grpcResp = await this.callGrpc(
-        this.analyticsServiceGrpc.getDueCards({ user_id: userId }),
+        this.analyticsServiceGrpc.getDueCards({ userId: userId }),
       );
       return grpcResp.cards || [];
     } catch (error) {
@@ -267,7 +267,7 @@ export class StudyAnalyticsService implements OnModuleInit {
     try {
       const grpcResp = await this.callGrpc(
         this.analyticsServiceGrpc.getFocusRecommendations({
-          user_id: userId,
+          userId: userId,
           limit,
         }),
       );

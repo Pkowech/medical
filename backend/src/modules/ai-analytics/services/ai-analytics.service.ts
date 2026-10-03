@@ -149,7 +149,7 @@ export class AiAnalyticsService implements OnModuleInit {
             try {
               const grpcResponse = await this.callGrpc(
                 this.analyticsServiceGrpc.getRecommendations({
-                  user_id: userId,
+                  userId: userId,
                 }),
               );
 
@@ -327,11 +327,11 @@ export class AiAnalyticsService implements OnModuleInit {
       for (const [userId, userEvents] of Object.entries(eventsByUser)) {
         await this.callGrpc(
           this.analyticsServiceGrpc.batchTrackEvents({
-            user_id: userId,
+            userId: userId,
             events: userEvents.map((e) => ({
-              event_type: e.eventType,
+              eventType: e.eventType,
               timestamp: e.timestamp,
-              session_id: null,
+              sessionId: null,
               duration: e.data?.duration,
             })),
           }),
@@ -573,7 +573,7 @@ export class AiAnalyticsService implements OnModuleInit {
   async generateNextSteps(userId: string): Promise<string[]> {
     try {
       const grpcResp: any = await this.callGrpc(
-        this.analyticsServiceGrpc.generateNextSteps({ user_id: userId }),
+        this.analyticsServiceGrpc.generateNextSteps({ userId: userId }),
       );
 
       return grpcResp?.nextSteps || [];
@@ -623,8 +623,8 @@ export class AiAnalyticsService implements OnModuleInit {
       this.logger.log(`Triggering quiz extraction for material ${materialId}`);
       const response = await this.callGrpc(
         this.analyticsServiceGrpc.extractQuizzes({
-          material_id: materialId,
-          file_path: filePath,
+          materialId: materialId,
+          filePath: filePath,
         }),
       );
 

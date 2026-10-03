@@ -397,9 +397,9 @@ export class AssessmentsService implements OnModuleInit {
         // Fire-and-forget but ensure we log if RPC fails
         this.callGrpc(
           this.analyticsServiceGrpc.updateBkt({
-            user_id: userId,
-            skill_id: topicId,
-            is_correct: gradingResult.isCorrect,
+            userId: userId,
+            skillId: topicId,
+            isCorrect: gradingResult.isCorrect,
           }),
         ).catch((err) =>
           this.logger.warn(

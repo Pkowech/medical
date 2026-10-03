@@ -93,7 +93,7 @@ export class UserAnalyticsService implements OnModuleInit {
       // Strictly gRPC
       const startTime = Date.now();
       const response = await this.callGrpc(
-        this.analyticsServiceGrpc.getEngagementMetrics({ user_id: userId }),
+        this.analyticsServiceGrpc.getEngagementMetrics({ userId: userId }),
       );
       const responseTimeMs = Date.now() - startTime;
 
@@ -158,7 +158,7 @@ export class UserAnalyticsService implements OnModuleInit {
 
       // Strictly gRPC
       const response = await this.callGrpc(
-        this.analyticsServiceGrpc.getUserFeatureVector({ user_id: userId }),
+        this.analyticsServiceGrpc.getUserFeatureVector({ userId: userId }),
       );
 
       await this.redisService.set(
@@ -302,7 +302,7 @@ export class UserAnalyticsService implements OnModuleInit {
   async getUserProfileStats(userId: string): Promise<any> {
     try {
       const resp = await this.callGrpc(
-        this.analyticsServiceGrpc.getUserLearningSummary({ user_id: userId }),
+        this.analyticsServiceGrpc.getUserLearningSummary({ userId: userId }),
       );
 
       return {
@@ -340,8 +340,8 @@ export class UserAnalyticsService implements OnModuleInit {
     try {
       return await this.callGrpc(
         this.analyticsServiceGrpc.predictPerformance({
-          user_id: userId,
-          skill_id: '',
+          userId: userId,
+          skillId: '',
         }),
       );
     } catch (error) {
@@ -355,7 +355,7 @@ export class UserAnalyticsService implements OnModuleInit {
   async generateRecommendations(userId: string) {
     try {
       const response = await this.callGrpc(
-        this.analyticsServiceGrpc.getRecommendations({ user_id: userId }),
+        this.analyticsServiceGrpc.getRecommendations({ userId: userId }),
       );
       return response.items || [];
     } catch (error) {

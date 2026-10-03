@@ -85,7 +85,7 @@ export class LearningAnalyticsService implements OnModuleInit {
       }
 
       const grpcResp: any = await this.callGrpc(
-        this.analyticsServiceGrpc.getPathAnalytics({ path_id: pathId }),
+        this.analyticsServiceGrpc.getPathAnalytics({ pathId: pathId }),
       );
 
       const result: PathAnalyticsResponseDto = {
@@ -182,7 +182,7 @@ export class LearningAnalyticsService implements OnModuleInit {
       // Call Rust service via gRPC
       const response = await this.callGrpc(
         this.analyticsServiceGrpc.getGoalAnalytics({
-          user_id: userId,
+          userId: userId,
           goals: [],
         }),
       );
@@ -248,7 +248,7 @@ export class LearningAnalyticsService implements OnModuleInit {
       // Call Rust service via gRPC
       const response = await this.callGrpc(
         this.analyticsServiceGrpc.getCourseStatistics({
-          user_id: userId,
+          userId: userId,
         }),
       );
 
@@ -290,7 +290,7 @@ export class LearningAnalyticsService implements OnModuleInit {
       // Call Rust service via gRPC
       const response = await this.callGrpc(
         this.analyticsServiceGrpc.getLearningPathStatistics({
-          user_id: userId,
+          userId: userId,
         }),
       );
 
@@ -334,7 +334,7 @@ export class LearningAnalyticsService implements OnModuleInit {
       // Call Rust service via gRPC
       const response = await this.callGrpc(
         this.analyticsServiceGrpc.getDetailedLearningAnalytics({
-          user_id: userId,
+          userId: userId,
         }),
       );
 
@@ -509,7 +509,7 @@ export class LearningAnalyticsService implements OnModuleInit {
       // Delegate to Rust detailed analytics for robust insights
       const resp: any = await this.callGrpc(
         this.analyticsServiceGrpc.getDetailedLearningAnalytics({
-          user_id: userId,
+          userId: userId,
         }),
       );
 
@@ -605,7 +605,7 @@ export class LearningAnalyticsService implements OnModuleInit {
         async () => {
           const grpcResp: any = await this.callGrpc(
             this.analyticsServiceGrpc.getDetailedLearningAnalytics({
-              user_id: userId,
+              userId: userId,
             }),
           );
 
@@ -805,7 +805,7 @@ export class LearningAnalyticsService implements OnModuleInit {
         async () => {
           const grpcResp: any = await this.callGrpc(
             this.analyticsServiceGrpc.predictSuccessRate({
-              user_id: userId,
+              userId: userId,
               features,
             }),
           );
@@ -942,7 +942,7 @@ export class LearningAnalyticsService implements OnModuleInit {
         async () => {
           const grpcResp: any = await this.callGrpc(
             (this.analyticsServiceGrpc as any).getRecommendations({
-              user_id: userId,
+              userId: userId,
               limit,
             }),
           );
@@ -1016,7 +1016,7 @@ export class LearningAnalyticsService implements OnModuleInit {
 
       const grpcResp: any = await this.callGrpc(
         this.analyticsServiceGrpc.getCollaborativeRecommendations({
-          user_id: userId,
+          userId: userId,
           limit,
         }),
       );
@@ -1084,8 +1084,8 @@ export class LearningAnalyticsService implements OnModuleInit {
 
       const grpcResp: any = await this.callGrpc(
         this.analyticsServiceGrpc.generateStudyRecommendations({
-          user_id: userId,
-          knowledge_gaps: knowledgeGaps,
+          userId: userId,
+          knowledgeGaps: knowledgeGaps,
         }),
       );
 
