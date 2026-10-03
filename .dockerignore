@@ -84,6 +84,7 @@ venv/
 
 # Ignore Rust specific (but NOT rust_analytics source dir)
 Cargo.lock
+!rust_analytics/Cargo.lock
 
 # Ignore monitoring/infra configs not needed for builds
 monitoring/

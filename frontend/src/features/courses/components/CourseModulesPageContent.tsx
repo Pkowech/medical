@@ -14,7 +14,7 @@ export function CourseModulesPageContent() {
     return <LoadingSpinner fullScreen />;
   }
 
-  if (error) {
+  if (error && modules.length === 0) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-lg shadow-lg">

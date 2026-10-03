@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { courseService } from '@/features/courses/services/courseService';
+import { useAuthStore } from '@/features/auth/store/useAuthStore';
 import type { Course, CourseUnit, CourseData } from '@/shared/types/courseInterface';
 import type { Material as CourseMaterial } from '@/shared/types/materialInterface';
 import type { DetailedCourseProgress, TopicProgress, UnitProgress } from '@/shared/types/progressInterface';
@@ -18,8 +19,10 @@ type NormalizedLesson = {
 };
 
 export const useCourseData = (courseId: string) => {
+  const userId = useAuthStore(state => state.user?.id);
+
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['course', courseId],
+    queryKey: ['course', courseId, userId],
     queryFn: async (): Promise<CourseData | null> => {
       if (!courseId) return null;
       
@@ -240,6 +243,7 @@ export const useCourseData = (courseId: string) => {
     },
     enabled: !!courseId,
     staleTime: 5 * 60 * 1000,
+    meta: { persist: Boolean(userId) },
   });
 
   return { data, isLoading, error, refetch };

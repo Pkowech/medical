@@ -40,6 +40,13 @@ export interface SyncQueueItem {
   userId?: string;
 }
 
+export interface PersistedQueryCacheEntry {
+  key: string;
+  version: number;
+  savedAt: number;
+  state: unknown;
+}
+
 interface MedicalEducationDB extends DBSchema {
   quizQuestions: {
     key: string;
@@ -64,10 +71,14 @@ interface MedicalEducationDB extends DBSchema {
       expiresAt: number;
     };
   };
+  queryCache: {
+    key: string;
+    value: PersistedQueryCacheEntry;
+  };
 }
 
 const DB_NAME = 'medical-education-db';
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 let databasePromise: Promise<IDBPDatabase<MedicalEducationDB>> | undefined;
 
 export function initDB(): Promise<IDBPDatabase<MedicalEducationDB>> {
@@ -108,6 +119,10 @@ export function initDB(): Promise<IDBPDatabase<MedicalEducationDB>> {
 
       if (!db.objectStoreNames.contains('syncLocks')) {
         db.createObjectStore('syncLocks', { keyPath: 'name' });
+      }
+
+      if (!db.objectStoreNames.contains('queryCache')) {
+        db.createObjectStore('queryCache', { keyPath: 'key' });
       }
     },
     blocked() {

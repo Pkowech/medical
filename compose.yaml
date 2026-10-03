@@ -17,19 +17,28 @@ services:
     environment:
       NODE_ENV: production
       PORT: ${BACKEND_PORT:-3002}
+      HOSTNAME: 0.0.0.0
 
       # === Online External Services (Neon + Upstash) ===
       DATABASE_URL: ${DATABASE_URL}
       DIRECT_URL: ${DIRECT_URL}
       REDIS_URL: ${REDIS_URL}
       ENABLE_REDIS: "true"
+      ENABLE_GRPC: "true"
+      ANALYTICS_GRPC_URL: 127.0.0.1:50051
+      RUST_ANALYTICS_GRPC_URL: 127.0.0.1:50051
 
       # Auth & Secrets
       JWT_SECRET: ${JWT_SECRET}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
 
-      ANALYTICS_GRPC_URL: ${ANALYTICS_GRPC_URL:?Set ANALYTICS_GRPC_URL to the Rust analytics gRPC host and port}
+      # Rust analytics runs in this same container; its gRPC listener remains private.
+      RUST_ANALYTICS_API_KEY: ${RUST_ANALYTICS_API_KEY:?Set RUST_ANALYTICS_API_KEY}
+      RUST_ANALYTICS_GRPC_HOST: 0.0.0.0
+      RUST_ANALYTICS_GRPC_PORT: "50051"
+      RUST_ANALYTICS_HOST: 0.0.0.0
+      RUST_ANALYTICS_PORT: "8000"
 
       # File Storage
       FILE_STORAGE_PROVIDER: ${FILE_STORAGE_PROVIDER:-cloudinary}
@@ -41,9 +50,6 @@ services:
       # PDF generation
       GOTENBERG_URL: http://gotenberg:3000
 
-    # NOTE: The Dockerfile CMD already runs prisma migrate deploy + node dist/src/main
-    # No command override needed here — the final image handles it correctly.
-
     ports:
       - "${BACKEND_PORT:-3002}:${BACKEND_PORT:-3002}"
 
@@ -54,50 +60,8 @@ services:
       retries: 3
       start_period: 60s
 
-    depends_on:
-      rust-analytics:
-        condition: service_healthy
-
     networks:
       - medtrack_net
-
-
-  rust-analytics:
-    build:
-      context: .
-      dockerfile: rust_analytics/Dockerfile
-      additional_contexts:
-        protos: ./protos
-      args:
-        SQLX_OFFLINE: ${SQLX_OFFLINE:-true}
-
-    container_name: medtrack_rust_analytics
-    restart: unless-stopped
-
-    env_file:
-      - ./backend/.env
-
-    environment:
-      # Neon online DB
-      DATABASE_URL: ${DATABASE_URL}
-      JWT_SECRET: ${JWT_SECRET}
-      RUST_ANALYTICS_API_KEY: ${RUST_ANALYTICS_API_KEY}
-
-      RUST_ANALYTICS_GRPC_HOST: ${RUST_ANALYTICS_GRPC_HOST:?Set RUST_ANALYTICS_GRPC_HOST}
-      RUST_ANALYTICS_GRPC_PORT: ${RUST_ANALYTICS_GRPC_PORT:?Set RUST_ANALYTICS_GRPC_PORT}
-      RUST_ANALYTICS_HOST: ${RUST_ANALYTICS_HOST:?Set RUST_ANALYTICS_HOST}
-      RUST_ANALYTICS_PORT: ${RUST_ANALYTICS_PORT:?Set RUST_ANALYTICS_PORT}
-      PORT: ${RUST_ANALYTICS_PORT:?Set RUST_ANALYTICS_PORT}
-
-    networks:
-      - medtrack_net
-
-    healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:${RUST_ANALYTICS_PORT}/health || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
 
 
   # ===================== Local Development Only =====================

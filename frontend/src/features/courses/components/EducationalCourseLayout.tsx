@@ -188,7 +188,7 @@ export const EducationalCourseLayout = ({ courseId: propCourseId }: EducationalC
     );
   }
 
-  if (courseError) {
+  if (courseError && !courseData) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50/50 dark:bg-slate-900/50">
         <div className="text-center">

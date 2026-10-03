@@ -2,6 +2,23 @@
 
 ARG NODE_VERSION=22.23.1
 ARG PNPM_VERSION=11.17.0
+ARG RUST_VERSION=1.96.1
+
+FROM rust:${RUST_VERSION}-alpine AS analytics-build
+ARG CARGO_BUILD_JOBS=8
+ARG SQLX_OFFLINE=true
+WORKDIR /app
+ENV SQLX_OFFLINE=${SQLX_OFFLINE}
+ENV CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS}
+ENV RUSTFLAGS="-C embed-bitcode=no"
+RUN apk add --no-cache clang lld musl-dev git protobuf-dev protoc pkgconfig openssl-dev
+COPY rust_analytics/ /app/
+COPY protos/ /protos/
+RUN --mount=type=cache,target=/app/target/ \
+    --mount=type=cache,target=/usr/local/cargo/git/db \
+    --mount=type=cache,target=/usr/local/cargo/registry/ \
+    cargo build --features ml --locked --release && \
+    cp target/release/rust_analytics /usr/local/bin/rust_analytics
 
 ################################################################
 # Stage 1: base — node + pnpm
@@ -229,12 +246,19 @@ RUN du -sh node_modules 2>/dev/null || true
 FROM node:${NODE_VERSION}-alpine AS final
 
 # TLS (Neon sslmode=require + Upstash rediss://) and healthcheck
-RUN apk add --no-cache ca-certificates tzdata wget && \
+RUN apk add --no-cache bash ca-certificates libgcc libstdc++ libssl3 tini tzdata wget && \
     npm cache clean --force
 
-ENV NODE_ENV=production
-ENV PORT=3002
-ENV HOSTNAME=0.0.0.0
+ENV NODE_ENV=production \
+    PORT=10000 \
+    HOSTNAME=0.0.0.0 \
+    ENABLE_GRPC=true \
+    ANALYTICS_GRPC_URL=127.0.0.1:50051 \
+    RUST_ANALYTICS_GRPC_URL=127.0.0.1:50051 \
+    RUST_ANALYTICS_GRPC_HOST=0.0.0.0 \
+    RUST_ANALYTICS_GRPC_PORT=50051 \
+    RUST_ANALYTICS_HOST=0.0.0.0 \
+    RUST_ANALYTICS_PORT=8000
 
 WORKDIR /usr/src/app
 
@@ -259,9 +283,12 @@ COPY --chown=nestjs:nodejs --from=build /usr/src/app/package.json ./
 
 # ── Proto files — the gRPC module resolves these at runtime, not bundle-time ──
 COPY --chown=nestjs:nodejs --from=build /usr/src/protos /usr/src/protos
+COPY --from=analytics-build /usr/local/bin/rust_analytics /usr/local/bin/rust_analytics
+COPY --chmod=755 start-services.sh /usr/local/bin/start-services.sh
 
 USER nestjs
 
-EXPOSE 3002
+EXPOSE 10000
 
-CMD ["node", "dist/main.js"]
+ENTRYPOINT ["/sbin/tini", "-g", "--"]
+CMD ["/usr/local/bin/start-services.sh"]

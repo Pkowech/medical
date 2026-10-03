@@ -11,6 +11,7 @@ import React, {
 // AuthProvider removed — using Zustand `useAuthStore` as single source of truth
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+import { useSession } from 'next-auth/react';
 import SessionWrapper from '@/features/auth/components/SessionWrapper';
 import { useAuthStore } from '@/features/auth/store/useAuthStore';
 import { triggerNotificationsRefresh } from '@/features/community/notificationEvents';
@@ -147,36 +148,64 @@ export const ThemeProvider = SimpleThemeProvider;
 
 function PersistentQueryCache() {
   const client = useQueryClient();
+  const { status } = useSession();
   const userId = useAuthStore(state => state.user?.id);
+  const activeUserId = status === 'authenticated' ? userId : undefined;
 
   useEffect(() => {
+    if (status === 'loading') return;
+
     client.clear();
-    const cacheKey = userId ? getPersistentQueryCacheKey(userId) : undefined;
-    if (cacheKey) restorePersistentQueryCache(client, cacheKey);
-
+    const cacheKey = activeUserId ? getPersistentQueryCacheKey(activeUserId) : undefined;
+    let active = true;
+    let unsubscribe: (() => void) | undefined;
     let timeout: ReturnType<typeof setTimeout> | undefined;
-    const unsubscribe = client.getQueryCache().subscribe(event => {
-      if (
-        !cacheKey ||
-        event.type !== 'updated' ||
-        event.query.meta?.persist !== true
-      ) {
-        return;
-      }
+    let restoreTimeout: ReturnType<typeof setTimeout> | undefined;
+    const restoreAbortController = new AbortController();
 
-      if (timeout) clearTimeout(timeout);
-      timeout = setTimeout(
-        () => persistPersistentQueryCache(client, cacheKey),
-        250,
-      );
-    });
+    const initialize = async () => {
+      try {
+        if (cacheKey) {
+          await Promise.race([
+            restorePersistentQueryCache(client, cacheKey, restoreAbortController.signal),
+            new Promise<void>(resolve => {
+              restoreTimeout = setTimeout(() => {
+                console.warn('[QueryCache] Restore timed out; continuing without cached data.');
+                restoreAbortController.abort();
+                resolve();
+              }, 3000);
+            }),
+          ]);
+        }
+      } catch (error) {
+        console.warn('[QueryCache] Failed to hydrate persisted cache:', error);
+      } finally {
+        if (restoreTimeout) clearTimeout(restoreTimeout);
+        if (!active) return;
+
+        unsubscribe = client.getQueryCache().subscribe(event => {
+          if (!cacheKey || event.type !== 'updated' || event.query.meta?.persist !== true) {
+            return;
+          }
+
+          if (timeout) clearTimeout(timeout);
+          timeout = setTimeout(() => {
+            void persistPersistentQueryCache(client, cacheKey);
+          }, 250);
+        });
+      }
+    };
+    void initialize();
 
     return () => {
-      unsubscribe();
+      active = false;
+      restoreAbortController.abort();
+      unsubscribe?.();
       if (timeout) clearTimeout(timeout);
-      if (cacheKey) persistPersistentQueryCache(client, cacheKey);
+      if (restoreTimeout) clearTimeout(restoreTimeout);
+      if (cacheKey) void persistPersistentQueryCache(client, cacheKey);
     };
-  }, [client, userId]);
+  }, [activeUserId, client, status, userId]);
 
   return null;
 }

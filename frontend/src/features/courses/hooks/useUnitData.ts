@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiService } from '@/features/auth/services/apiClient';
+import { useAuthStore } from '@/features/auth/store/useAuthStore';
 import { courseService } from '@/features/courses/services/courseService';
 import type { CourseData, Topic } from '@/shared/types/courseInterface';
 import type { Material } from '@/shared/types/materialInterface';
@@ -124,8 +125,10 @@ const normalizeUnitToChapters = (
 };
 
 export const useUnitData = (unitId: string, courseIdOverride?: string) => {
+  const userId = useAuthStore(state => state.user?.id);
+
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['unit', unitId],
+    queryKey: ['unit', unitId, userId],
     queryFn: async (): Promise<CourseData | null> => {
       if (!unitId) return null;
 
@@ -178,6 +181,7 @@ export const useUnitData = (unitId: string, courseIdOverride?: string) => {
     enabled: !!unitId,
     staleTime: 5 * 60 * 1000,
     retry: 1,
+    meta: { persist: Boolean(userId) },
   });
 
   return { data, isLoading, error: error as Error | null, refetch };
@@ -187,8 +191,10 @@ export const useUnitData = (unitId: string, courseIdOverride?: string) => {
  * Hook to fetch a specific topic within a unit (unchanged).
  */
 export const useTopicData = (topicId: string) => {
+  const userId = useAuthStore(state => state.user?.id);
+
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['topic', topicId],
+    queryKey: ['topic', topicId, userId],
     queryFn: async (): Promise<TopicWithMaterials | null> => {
       if (!topicId) return null;
 
@@ -224,6 +230,7 @@ export const useTopicData = (topicId: string) => {
     enabled: !!topicId,
     staleTime: 5 * 60 * 1000,
     retry: 1,
+    meta: { persist: Boolean(userId) },
   });
 
   return { data, isLoading, error: error as Error | null, refetch };

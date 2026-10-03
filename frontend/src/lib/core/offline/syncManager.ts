@@ -20,7 +20,7 @@ class SyncManager {
 
   async queueProgressLog(progressData: unknown): Promise<void> {
     await syncService.addToOutbox(
-      '/progress/log',
+      '/progress/sync',
       'POST',
       { ...(progressData as Record<string, unknown>), syncedAt: new Date().toISOString() },
       { 'Content-Type': 'application/json' },

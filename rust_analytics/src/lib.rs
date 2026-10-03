@@ -837,8 +837,8 @@ pub async fn run() -> std::io::Result<()> {
     // Actix-web Server
     println!("Configuring HTTP server...");
     let http_host = required_env("RUST_ANALYTICS_HOST")?;
-    let http_port = env::var("PORT")
-        .or_else(|_| env::var("RUST_ANALYTICS_PORT"))
+    let http_port = env::var("RUST_ANALYTICS_PORT")
+        .or_else(|_| env::var("PORT"))
         .map_err(|_| {
             std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,

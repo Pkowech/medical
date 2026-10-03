@@ -8,7 +8,7 @@ export const useCourseModules = (courseId: string) => {
   const userId = useAuthStore(state => state.user?.id);
 
   // Reuse cached course data (if any) to avoid fetching course metadata twice
-  const cachedCourse = queryClient.getQueryData<Course>(['course', courseId]);
+  const cachedCourse = queryClient.getQueryData<Course>(['course', courseId, userId]);
 
   const {
     data: modules = [],

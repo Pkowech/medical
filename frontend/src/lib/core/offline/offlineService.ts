@@ -51,7 +51,10 @@ class OfflineService {
     const syncItem: SyncQueueItem = {
       ...item,
       id: crypto.randomUUID(),
-      url: item.type === 'quiz_submission' ? '/api/backend/quizzes/submit?type=full' : '/api/backend/progress/log',
+      url:
+        item.type === 'quiz_submission'
+          ? '/api/backend/quizzes/submit?type=full'
+          : '/api/backend/progress/sync',
       method: 'POST',
       body: item.data,
       createdAt: item.timestamp,

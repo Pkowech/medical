@@ -157,12 +157,15 @@ function normalizeUrl(url, type) {
   if (!url) {
     return type === 'quiz_submission'
       ? '/api/backend/quizzes/submit?type=full'
-      : '/api/backend/progress/log';
+      : '/api/backend/progress/sync';
   }
 
   const parsed = new URL(url, self.location.origin);
-  const path = parsed.pathname.replace(/^\/v1(?=\/|$)/, '');
-  return `/api/backend${path}${parsed.search}`;
+  const path = parsed.pathname
+    .replace(/^\/api\/backend(?=\/|$)/, '')
+    .replace(/^\/v1(?=\/|$)/, '');
+  const apiPath = path === '/progress/log' ? '/progress/sync' : path;
+  return `/api/backend${apiPath || '/'}${parsed.search}`;
 }
 
 async function updateItem(database, id, value) {

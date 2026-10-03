@@ -192,7 +192,7 @@ class SyncService {
             item.url =
               item.type === 'quiz_submission'
                 ? '/api/backend/quizzes/submit?type=full'
-                : '/api/backend/progress/log';
+                : '/api/backend/progress/sync';
             item.method = 'POST';
             item.body = item.data;
           }
