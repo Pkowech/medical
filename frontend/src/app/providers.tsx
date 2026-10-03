@@ -239,14 +239,13 @@ export function Providers({ children }: { children: ReactNode }) {
 
   // Lightweight WebSocket client to listen for server-side events and trigger
   // a notifications refresh when the backend signals new notifications.
-  // Configuration: set NEXT_PUBLIC_WS_URL to the full ws:// or wss:// URL if the
-  // server lives on a different host. Otherwise we default to `${window.location.host}/ws`.
+  // Configure NEXT_PUBLIC_WS_URL with the full ws:// or wss:// URL to enable it.
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    const defaultProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
     const envUrl = (process.env as { NEXT_PUBLIC_WS_URL?: string }).NEXT_PUBLIC_WS_URL;
-    const wsUrl = envUrl || `${defaultProtocol}://${window.location.host}/ws`;
+    if (!envUrl) return;
+    const wsUrl = envUrl;
 
     let ws: WebSocket | null = null;
     let reconnectDelay = 1000; // start with 1s

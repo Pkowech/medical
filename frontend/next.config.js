@@ -31,9 +31,16 @@ const BACKEND_URL = configuredBackendUrl.replace(/\/v1\/?$/, '');
  */
 const getPWACacheStrategies = () => [
   {
+    // Never cache potentially private page HTML; serve the document fallback offline.
+    urlPattern: ({ request }) => request.mode === 'navigate',
+    handler: 'NetworkOnly',
+    options: {},
+  },
+  {
     // API responses can contain private user data; never persist them in Cache Storage.
     urlPattern: /^https?:\/\/[^/]+\/api(?:\/|$)/i,
     handler: 'NetworkOnly',
+    options: {},
   },
   {
     urlPattern: /^https?:\/\/[^/]+\/_next\/static\//i,

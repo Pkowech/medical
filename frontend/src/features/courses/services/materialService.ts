@@ -15,7 +15,7 @@ const materialService = {
     type?: string;
     search?: string;
     courseId?: string;
-    scope?: 'all' | 'enrolled' | 'recommended';
+    scope?: 'all' | 'enrolled' | 'recommended' | 'owned' | 'shared';
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
     unitId?: string;
@@ -93,6 +93,7 @@ const materialService = {
     courseId: string;
     unitId: string;
     topicId?: string;
+    shareWithCourse?: boolean;
   }): Promise<Material> {
     const response = await apiService.post<Material>('/materials/drive', input);
     return response.data;
@@ -104,7 +105,16 @@ const materialService = {
   },
 
   async shareMaterial(id: string, userIds: string[]): Promise<void> {
-    await apiService.post('/materials/share', { materialId: id, userIds });
+    await Promise.all(
+      userIds
+        .filter(userId => userId.trim().length > 0)
+        .map(userId => apiService.post(`/materials/${id}/share`, { userId })),
+    );
+  },
+
+  async setCourseSharing(id: string, shared: boolean): Promise<Material> {
+    const response = await apiService.patch<Material>(`/materials/${id}/share-with-course`, { shared });
+    return response.data;
   },
 
   // Local File System Methods (for Offline/Local Library)

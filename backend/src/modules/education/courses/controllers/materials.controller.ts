@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
   Body,
   Param,
   Delete,
@@ -92,6 +93,10 @@ export class MaterialsController {
           type: 'string',
           description: 'Comma separated tags',
         },
+        shareWithCourse: {
+          type: 'boolean',
+          description: 'Share this material with enrolled students in its course. Defaults to false.',
+        },
       },
       required: ['file', 'title'],
     },
@@ -108,6 +113,7 @@ export class MaterialsController {
     @Body('category') category?: string,
     @Body('difficulty') difficulty?: number,
     @Body('tags') tags?: string,
+    @Body('shareWithCourse') shareWithCourse?: string,
   ) {
     if (!file) {
       throw new BadRequestException('No file uploaded');
@@ -126,6 +132,7 @@ export class MaterialsController {
       category,
       difficulty ? Number(difficulty) : undefined,
       tagsArray,
+      shareWithCourse === 'true',
     );
   }
 
@@ -139,6 +146,7 @@ export class MaterialsController {
       courseId: string;
       unitId: string;
       topicId?: string;
+      shareWithCourse?: boolean;
     },
     @GetUser() user: PrismaUser,
   ) {
@@ -214,10 +222,11 @@ export class MaterialsController {
     @Query('limit') limit: number = 20,
     @Query('search') search?: string,
     @Query('type') type?: string,
-    @Query('scope') scope?: 'all' | 'enrolled' | 'recommended' | 'owned',
+    @Query('scope') scope?: 'all' | 'enrolled' | 'recommended' | 'owned' | 'shared',
     @Query('sortBy') sortBy?: string,
     @Query('sortOrder') sortOrder?: 'asc' | 'desc',
     @Query('unitId') unitId?: string,
+    @Query('courseId') courseId?: string,
   ) {
     return this.materialsService.findAllPaginated({
       page: Number(page),
@@ -229,6 +238,7 @@ export class MaterialsController {
       sortBy,
       sortOrder,
       unitId,
+      courseId,
     });
   }
 
@@ -258,8 +268,8 @@ export class MaterialsController {
 
   @Get('unit/:unitId')
   @ApiOperation({ summary: 'Get all materials for a unit' })
-  async findMaterialsByUnitId(@Param('unitId') unitId: string) {
-    return this.materialsService.findMaterialsByUnitId(unitId);
+  async findMaterialsByUnitId(@Param('unitId') unitId: string, @GetUser() user: PrismaUser) {
+    return this.materialsService.findMaterialsByUnitId(unitId, user.id);
   }
 
   @Get('files/:fileId/metadata')
@@ -366,8 +376,8 @@ export class MaterialsController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Get material by ID' })
-  async findOne(@Param('id') id: string) {
-    return this.materialsService.findOne(id);
+  async findOne(@Param('id') id: string, @GetUser() user: PrismaUser) {
+    return this.materialsService.findOne(id, user.id);
   }
 
   @Get(':id/download')
@@ -429,13 +439,24 @@ export class MaterialsController {
     return { success: true };
   }
 
+  @Patch(':id/share-with-course')
+  @ApiOperation({ summary: 'Share or unshare a material with enrolled course students' })
+  async setCourseSharing(
+    @Param('id') materialId: string,
+    @Body('shared') shared: boolean,
+    @GetUser() user: PrismaUser,
+  ) {
+    return this.materialsService.setCourseSharing(materialId, user.id, shared);
+  }
+
   @Post(':id/share')
   @ApiOperation({ summary: 'Share material with another user' })
   async shareMaterial(
     @Param('id') materialId: string,
     @Body('userId') sharedWithUserId: string,
+    @GetUser() user: PrismaUser,
   ) {
-    return this.materialsService.shareMaterial(materialId, sharedWithUserId);
+    return this.materialsService.shareMaterial(materialId, user.id, sharedWithUserId);
   }
 
 

@@ -1,11 +1,13 @@
 import os
 from pathlib import Path
 
+import pytest
 from playwright.sync_api import sync_playwright
 
 
 FRONTEND_ROOT = Path(__file__).resolve().parents[1]
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:3000").rstrip("/")
+FRONTEND_PWA_URL = os.environ.get("FRONTEND_PWA_URL", "").rstrip("/")
 
 
 def read_frontend(path: str) -> str:
@@ -194,6 +196,26 @@ def test_local_file_metadata_is_saved_on_device_without_uploading_file_details()
     assert "const DB_VERSION = 6" in database
 
 
+def test_production_pwa_build_and_course_recommendations_use_cacheable_fast_path():
+    package = read_frontend("package.json")
+    next_config = read_frontend("next.config.js")
+    dashboard = read_frontend("src/features/courses/components/courses-dashboard.tsx")
+    providers = read_frontend("src/app/providers.tsx")
+    backend_courses = read_frontend(
+        "../backend/src/modules/education/courses/services/courses.service.ts"
+    )
+
+    assert "next build --webpack" in package
+    assert "urlPattern: ({ request }) => request.mode === 'navigate'" in next_config
+    assert "handler: 'NetworkOnly',\n    options: {}," in next_config
+    assert "handler: 'CacheFirst'" in next_config
+    assert "meta: { persist: Boolean(user?.id) }" in dashboard
+    assert "if (!envUrl) return;" in providers
+    assert "const aiRecommendations = this.getAiRecommendedCourses(userId, limit);" in backend_courses
+    assert "void aiRecommendations.then(async aiCourses =>" in backend_courses
+    assert "private async getAiRecommendedCourses(" in backend_courses
+
+
 def test_recommendation_session_cache_is_invalidated_before_refresh():
     integration = read_frontend(
         "src/features/learning-management/services/quizProgressIntegration.ts"
@@ -359,4 +381,30 @@ def test_browser_storage_survives_reload_and_theme_provider_reacts_to_storage_ev
                 }""",
                 storage_key,
             )
+            browser.close()
+
+
+def test_production_service_worker_returns_offline_fallback_for_uncached_navigation():
+    if not FRONTEND_PWA_URL:
+        pytest.skip("Set FRONTEND_PWA_URL to a production frontend server to test PWA fallback.")
+
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch()
+        page = browser.new_page()
+        try:
+            page.goto(f"{FRONTEND_PWA_URL}/login", wait_until="domcontentloaded")
+            page.wait_for_function(
+                "() => navigator.serviceWorker?.controller !== null",
+                timeout=20000,
+            )
+            page.context.set_offline(True)
+            page.goto(
+                f"{FRONTEND_PWA_URL}/courses",
+                wait_until="domcontentloaded",
+                timeout=15000,
+            )
+            assert page.title() == "Offline - MedTrack Hub"
+            assert page.get_by_role("heading", name="You're Offline").is_visible()
+        finally:
+            page.context.set_offline(False)
             browser.close()

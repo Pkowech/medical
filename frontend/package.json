@@ -10,7 +10,7 @@
     "postinstall": "npm run setup:pdfjs",
     "dev": "npm run setup:pdfjs && next dev",
     "setup:pdfjs": "node scripts/setup-pdfjs.js",
-    "build": "npm run setup:pdfjs && next build",
+    "build": "npm run setup:pdfjs && next build --webpack",
     "start": "next start",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",

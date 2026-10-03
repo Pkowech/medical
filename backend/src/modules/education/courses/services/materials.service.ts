@@ -475,6 +475,7 @@ export class MaterialsService {
       if (!material) {
         throw new NotFoundException(`Material with ID ${id} not found`);
       }
+      await this.assertCanReadMaterial(material, userId);
 
       const signedUrl = await this.getMaterialDownloadUrl(id);
 
@@ -497,10 +498,11 @@ export class MaterialsService {
     page?: number,
   ): Promise<void> {
     try {
-      const material = await this.findOne(materialId);
+      const material = await this.findOne(materialId, userId);
       if (!material) {
         throw new NotFoundException(`Material with ID ${materialId} not found`);
       }
+      await this.assertCanReadMaterial(material, userId);
 
       // Emit view event for tracking
       this.eventEmitter.emit('material.view', {
@@ -539,7 +541,7 @@ export class MaterialsService {
     }
   }
 
-  async findOne(id: string): Promise<Material> {
+  async findOne(id: string, userId?: string): Promise<Material> {
     try {
       const material = await this.prisma.material.findUnique({
         where: { id },
@@ -551,6 +553,7 @@ export class MaterialsService {
       if (!material) {
         throw new NotFoundException(`Material with ID ${id} not found`);
       }
+      if (userId) await this.assertCanReadMaterial(material, userId);
       this.logger.log('Material fetched', { materialId: id });
       return material;
     } catch (error) {
@@ -558,10 +561,42 @@ export class MaterialsService {
     }
   }
 
-  async findMaterialsByUnitId(unitId: string): Promise<Material[]> {
+  async findMaterialsByUnitId(unitId: string, userId?: string): Promise<Material[]> {
     try {
       const materials = await this.prisma.material.findMany({
-        where: { unitId },
+        where: userId
+          ? {
+              unitId,
+              OR: [
+                { userId },
+                { shares: { some: { userId } } },
+                {
+                  AND: [
+                    { metadata: { path: ['shareWithCourse'], not: false } },
+                    {
+                      unit: {
+                        course: {
+                          enrollments: {
+                            some: { userId, status: { in: ['active', 'completed'] } },
+                          },
+                        },
+                      },
+                    },
+                  ],
+                },
+                {
+                  unit: {
+                    course: {
+                      OR: [
+                        { createdById: userId },
+                        { instructors: { some: { userId } } },
+                      ],
+                    },
+                  },
+                },
+              ],
+            }
+          : { unitId },
         include: {
           unit: true,
           user: { select: { id: true, firstName: true, lastName: true } },
@@ -614,6 +649,7 @@ export class MaterialsService {
     category?: string,
     difficulty?: number,
     tags?: string[],
+    shareWithCourse = false,
   ): Promise<Material> {
     try {
       if (!file) {
@@ -645,6 +681,9 @@ export class MaterialsService {
       }
 
       await this.validateMaterialPlacement(courseId, unitId, topicId);
+      if (shareWithCourse && (!courseId || !unitId)) {
+        throw new BadRequestException('Assign a course and unit before sharing this material with a class.');
+      }
 
       // Calculate file hash for deduplication (streaming-friendly)
       let fileHash: string;
@@ -794,7 +833,7 @@ export class MaterialsService {
           userId,
           category,
           difficulty: difficulty || 0.5,
-          metadata: tags ? { tags } : {},
+          metadata: { ...(tags ? { tags } : {}), shareWithCourse },
         },
         include: {
           file: true,
@@ -908,6 +947,7 @@ export class MaterialsService {
     unitId: string;
     topicId?: string;
     userId: string;
+    shareWithCourse?: boolean;
   }): Promise<Material> {
     await this.validateMaterialPlacement(dto.courseId, dto.unitId, dto.topicId);
     const unit = await this.prisma.unit.findUniqueOrThrow({
@@ -944,6 +984,7 @@ export class MaterialsService {
           driveId: driveFile.driveId,
           driveMimeType: mimeType,
           isExternal: true,
+          shareWithCourse: dto.shareWithCourse === true,
         },
       },
     });
@@ -951,6 +992,43 @@ export class MaterialsService {
     await FtsUtils.updateFtsVector(this.prisma, 'materials', material.id);
     await this.searchSync.syncEntity('material', material.id);
     return material;
+  }
+
+  async setCourseSharing(
+    materialId: string,
+    userId: string,
+    shared: boolean,
+  ): Promise<Material> {
+    const material = await this.prisma.material.findUnique({
+      where: { id: materialId },
+    });
+    if (!material) throw new NotFoundException('Material not found.');
+
+    const courseId = material.courseId || (material.unitId
+      ? (await this.prisma.unit.findUnique({
+          where: { id: material.unitId },
+          select: { courseId: true },
+        }))?.courseId
+      : undefined);
+    if (!courseId || !material.unitId) {
+      throw new BadRequestException('Assign this material to a course and unit before sharing it with a class.');
+    }
+    await this.validateMaterialPlacement(courseId, material.unitId, material.topicId || undefined);
+
+    if (material.userId !== userId) {
+      await this.assertCanManageCourseMaterials(courseId, userId);
+    }
+
+    const currentMetadata =
+      material.metadata && typeof material.metadata === 'object' && !Array.isArray(material.metadata)
+        ? material.metadata as Record<string, unknown>
+        : {};
+    return this.prisma.material.update({
+      where: { id: materialId },
+      data: {
+        metadata: { ...currentMetadata, shareWithCourse: shared },
+      },
+    });
   }
 
   private async validateMaterialPlacement(
@@ -1041,14 +1119,37 @@ export class MaterialsService {
     const isAdmin = roles.some(userRole => userRole.role.name === RoleName.admin);
     const isInstructor = course?.createdById === userId || Boolean(instructorAssignment);
     const isEnrolled = enrollment?.status === 'active' || enrollment?.status === 'completed';
+    const metadata = material.metadata && typeof material.metadata === 'object' && !Array.isArray(material.metadata)
+      ? material.metadata as Record<string, unknown>
+      : {};
+    const sharedWithCourse = metadata.shareWithCourse !== false;
     const isCourseGroupMember = groupMemberships.some(({ studyGroup }) => {
       const metadata = studyGroup.metadata;
       if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return false;
       return (metadata as Record<string, unknown>).courseId === courseId;
     });
-    if (!isAdmin && !isInstructor && !isEnrolled && !isCourseGroupMember) {
+    if (!isAdmin && !isInstructor && !(sharedWithCourse && (isEnrolled || isCourseGroupMember))) {
       throw new ForbiddenException('Enroll in this course to view its Drive materials.');
     }
+  }
+
+  private async assertCanReadMaterial(material: Material, userId: string): Promise<void> {
+    if (material.userId === userId) return;
+
+    const directShare = await this.prisma.materialShare.findUnique({
+      where: { materialId_userId: { materialId: material.id, userId } },
+      select: { id: true },
+    });
+    if (directShare) return;
+
+    const metadata = material.metadata && typeof material.metadata === 'object' && !Array.isArray(material.metadata)
+      ? material.metadata as Record<string, unknown>
+      : {};
+    if (metadata.shareWithCourse !== false) {
+      await this.assertCanReadDriveMaterial(material, userId);
+      return;
+    }
+    throw new ForbiddenException('This material has not been shared with you.');
   }
 
   async findAllPaginated(options: {
@@ -1056,11 +1157,12 @@ export class MaterialsService {
     limit: number;
     search?: string;
     type?: string;
-    scope?: 'all' | 'enrolled' | 'recommended' | 'owned';
+    scope?: 'all' | 'enrolled' | 'recommended' | 'owned' | 'shared';
     userId: string;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
     unitId?: string;
+    courseId?: string;
   }) {
     try {
       const {
@@ -1073,63 +1175,56 @@ export class MaterialsService {
         sortBy = 'createdAt',
         sortOrder = 'desc',
         unitId,
+        courseId,
       } = options;
 
       const skip = (page - 1) * limit;
       const where: any = {};
+      const enrolledCourse = {
+        enrollments: {
+          some: {
+            userId,
+            status: { in: ['active', 'completed'] },
+          },
+        },
+      };
+      const sharedCoursePlacement = {
+        AND: [
+          { metadata: { path: ['shareWithCourse'], not: false } },
+          {
+            OR: [
+              { course: enrolledCourse },
+              { unit: { course: enrolledCourse } },
+            ],
+          },
+        ],
+      };
+      const directlyShared = { shares: { some: { userId } } };
 
       // 1. Scope Logic
       if (scope === 'owned') {
-        // User's own materials
         where.userId = userId;
       } else if (scope === 'enrolled') {
-        const enrolledCourse = {
-          enrollments: {
-            some: {
-              userId,
-              status: { in: ['active', 'completed'] },
-            },
-          },
-        };
-        where.OR = [
-          { course: enrolledCourse },
-          { unit: { course: enrolledCourse } },
-        ];
-      } else if (scope === 'recommended') {
-        // Placeholder for recommended logic - for now, maybe featured courses or matching user interests
-        // This likely needs a separate query or join with recommendations table
-        // Falling back to 'all' accessible for now, or maybe 'public' if we had that concept
-        where.OR = [
-          { userId }, // Own
-          { unit: { course: { isFeatured: true } } }, // Featured content
-        ];
-      } else if (scope === 'all') {
-        // Maybe admin only? Or search everything?
-        // Let's restrict 'all' to Own + Enrolled to be safe unless we want a public library
         where.OR = [
           { userId },
-          {
-            course: {
-              enrollments: {
-                some: {
-                  userId,
-                  status: { in: ['active', 'completed'] },
-                },
-              },
-            },
-          },
-          {
-            unit: {
-              course: {
-                enrollments: {
-                  some: {
-                    userId,
-                    status: { in: ['active', 'completed'] },
-                  },
-                },
-              },
-            },
-          },
+          sharedCoursePlacement,
+        ];
+      } else if (scope === 'shared') {
+        where.AND = [
+          { OR: [{ userId: null }, { userId: { not: userId } }] },
+          { OR: [directlyShared, sharedCoursePlacement] },
+        ];
+      } else if (scope === 'recommended') {
+        where.OR = [
+          { userId },
+          directlyShared,
+          sharedCoursePlacement,
+        ];
+      } else if (scope === 'all') {
+        where.OR = [
+          { userId },
+          directlyShared,
+          sharedCoursePlacement,
         ];
       }
 
@@ -1140,6 +1235,18 @@ export class MaterialsService {
 
       if (unitId) {
         where.unitId = unitId;
+      }
+
+      if (courseId) {
+        where.AND = [
+          ...(Array.isArray(where.AND) ? where.AND : []),
+          {
+            OR: [
+              { courseId },
+              { unit: { courseId } },
+            ],
+          },
+        ];
       }
 
       if (type) {
@@ -1162,16 +1269,33 @@ export class MaterialsService {
             [sortBy]: sortOrder,
           },
           include: {
+            course: {
+              select: {
+                id: true,
+                name: true,
+                title: true,
+              },
+            },
             unit: {
               select: {
                 id: true,
+                name: true,
                 title: true,
+                order: true,
                 course: {
                   select: {
                     id: true,
+                    name: true,
                     title: true,
                   },
                 },
+              },
+            },
+            topic: {
+              select: {
+                id: true,
+                name: true,
+                order: true,
               },
             },
             user: { select: { id: true, firstName: true, lastName: true } },
@@ -1589,6 +1713,7 @@ export class MaterialsService {
 
   async shareMaterial(
     materialId: string,
+    ownerId: string,
     sharedWithUserId: string,
   ): Promise<MaterialShare> {
     try {
@@ -1598,6 +1723,9 @@ export class MaterialsService {
       if (!material) {
         throw new NotFoundException('Material not found');
       }
+      if (material.userId !== ownerId) {
+        throw new ForbiddenException('Only the material owner can share it directly.');
+      }
 
       const sharedWithUser = await this.prisma.user.findUnique({
         where: { id: sharedWithUserId },
@@ -1606,11 +1734,15 @@ export class MaterialsService {
         throw new NotFoundException('Shared with user not found');
       }
 
-      const share = await this.prisma.materialShare.create({
-        data: {
-          materialId,
-          userId: sharedWithUserId, // userId represents the user with whom the material is shared
+      const share = await this.prisma.materialShare.upsert({
+        where: {
+          materialId_userId: { materialId, userId: sharedWithUserId },
         },
+        create: {
+          materialId,
+          userId: sharedWithUserId,
+        },
+        update: {},
         include: {
           material: true,
           user: { select: { id: true, firstName: true, lastName: true } },
@@ -1816,12 +1948,12 @@ export class MaterialsService {
       if (!material) {
         throw new NotFoundException(`Material with ID ${materialId} not found`);
       }
+      await this.assertCanReadMaterial(material, userId);
 
       const metadata = material.metadata && typeof material.metadata === 'object' && !Array.isArray(material.metadata)
         ? material.metadata as Record<string, unknown>
         : {};
       if (metadata.sourceProvider === 'google-drive') {
-        await this.assertCanReadDriveMaterial(material, userId);
         const driveFileId = typeof metadata.driveFileId === 'string' ? metadata.driveFileId : '';
         const driveMimeType = typeof metadata.driveMimeType === 'string' ? metadata.driveMimeType : '';
         if (!driveFileId || !driveMimeType) throw new NotFoundException('Drive material metadata is incomplete.');
@@ -1882,7 +2014,7 @@ export class MaterialsService {
     userId: string,
   ): Promise<Material & { fileUrl?: string; previewFileUrl?: string }> {
     try {
-      const material = await this.findOne(materialId);
+      const material = await this.findOne(materialId, userId);
       if (!material) {
         throw new NotFoundException(`Material with ID ${materialId} not found`);
       }
@@ -1891,7 +2023,6 @@ export class MaterialsService {
         ? material.metadata as Record<string, unknown>
         : {};
       if (metadata.sourceProvider === 'google-drive') {
-        await this.assertCanReadDriveMaterial(material, userId);
         return material;
       }
 

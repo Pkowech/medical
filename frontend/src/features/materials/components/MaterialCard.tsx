@@ -5,15 +5,21 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui
 import { Badge } from '@/shared/components/ui/badge';
 import { Button } from '@/shared/components/ui/button';
 import { Material } from '@/shared/types/materialInterface';
-import { Download, FileText } from 'lucide-react';
+import { Download, FileText, Share2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 interface MaterialCardProps {
   material: Material;
+  canManageSharing?: boolean;
+  onToggleCourseSharing?: (material: Material) => void;
 }
 
-export const MaterialCard: React.FC<MaterialCardProps> = React.memo(({ material }) => {
+export const MaterialCard: React.FC<MaterialCardProps> = React.memo(({ material, canManageSharing = false, onToggleCourseSharing }) => {
   const router = useRouter();
+  const ownerName = material.user
+    ? [material.user.firstName, material.user.lastName].filter(Boolean).join(' ')
+    : material.author;
+  const isSharedWithCourse = material.metadata?.shareWithCourse !== false;
 
   const getFileIcon = (type?: string) => {
     switch (type?.toLowerCase()) {
@@ -59,17 +65,29 @@ export const MaterialCard: React.FC<MaterialCardProps> = React.memo(({ material 
         <p className="text-sm text-gray-500 dark:text-slate-400 mb-4 line-clamp-2">{material.description}</p>
 
         <div className="flex items-center justify-between text-sm mb-4">
-          <span className="text-gray-500 dark:text-slate-500">By: {material.author || 'Unknown'}</span>
+          <span className="text-gray-500 dark:text-slate-500">By: {ownerName || 'Unknown'}</span>
           <span className="text-gray-500 dark:text-slate-500">
             {material.uploadDate ? formatDate(material.uploadDate) : ''}
           </span>
         </div>
 
         <div className="flex justify-end">
+          {canManageSharing && material.unitId && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onToggleCourseSharing?.(material)}
+              className="mr-2"
+              title={isSharedWithCourse ? 'Stop sharing with class' : 'Share with class'}
+            >
+              <Share2 className="mr-1 h-4 w-4" />
+              {isSharedWithCourse ? 'Unshare' : 'Share'}
+            </Button>
+          )}
           <Button
             variant="secondary"
             size="sm"
-            onClick={() => router.push(`/materials/${material.id}`)}
+            onClick={() => router.push(`/study-planner/materials/${material.id}`)}
             className="mr-2"
           >
             View

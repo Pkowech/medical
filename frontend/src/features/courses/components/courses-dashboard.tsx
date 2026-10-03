@@ -253,6 +253,7 @@ export const CoursesDashboard = () => {
       const loaded = lastPage.page * lastPage.limit;
       return loaded < total ? lastPage.page + 1 : undefined;
     },
+    meta: { persist: Boolean(user?.id) },
   });
 
   const { data: courseStatisticsData } = useQuery({
@@ -502,9 +503,7 @@ export const CoursesDashboard = () => {
         ) : (
           <div className="space-y-6">
             {(infiniteData as any)?.pages?.flatMap((p: any) => p.courses)?.length > 0 ? (
-              <div className={activeTab === 'enrolled'
-                ? 'grid grid-cols-1 gap-4'
-                : 'grid grid-cols-1 gap-5 md:grid-cols-2 md:gap-8 lg:grid-cols-3'}>
+              <div className="grid grid-cols-1 gap-5 md:grid-cols-2 md:gap-6 xl:grid-cols-3">
                 {(infiniteData as any).pages.flatMap((p: any) => p.courses).map((course: any) => (
                   <CourseCard 
                     key={course.unitId || course.id} 
@@ -627,6 +626,27 @@ const CourseCard = ({ course, wide = false, onSelectCourse, onRemoveCourse, rout
   const isEnrolled = course.isEnrolled;
   const progress = course.progressPercentage ?? 0;
   const owner = getInstructorDisplayName(course.instructor ?? course.createdBy);
+  const courseName = course.title || course.name;
+  const bannerPalettes = [
+    'from-sky-700 via-blue-700 to-indigo-800',
+    'from-teal-700 via-cyan-700 to-blue-800',
+    'from-violet-700 via-indigo-700 to-blue-800',
+    'from-emerald-700 via-teal-700 to-cyan-800',
+  ];
+  const paletteIndex = Array.from(course.id).reduce((sum, character) => sum + character.charCodeAt(0), 0) % bannerPalettes.length;
+
+  const openCourse = async () => {
+    if (course.unitId) {
+      router.push(`/courses/${course.id}/units/${course.unitId}`);
+      return;
+    }
+    const resume = await getResumePoint(course.id) as { type?: string; unitId?: string; id?: string } | null;
+    if (resume?.type === 'topic' && resume.unitId) {
+      router.push(`/courses/${course.id}/units/${resume.unitId}/topics/${resume.id}`);
+    } else {
+      router.push(`/courses/${course.id}`);
+    }
+  };
 
   return (
     <div 
@@ -637,67 +657,100 @@ const CourseCard = ({ course, wide = false, onSelectCourse, onRemoveCourse, rout
             onSelectCourse(course);
         }
       }}
-      className={`group bg-white dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 overflow-hidden shadow-sm hover:shadow-xl transition-all cursor-pointer ${wide ? 'md:flex md:min-h-64' : 'hover:-translate-y-1'}`}
+      className={`group bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm hover:-translate-y-1 hover:shadow-xl transition-all cursor-pointer ${wide ? 'min-h-[25rem]' : ''}`}
     >
-      <div className={`relative h-40 bg-linear-to-br ${isEnrolled ? 'from-blue-600 to-indigo-700' : 'from-slate-700 to-slate-900'} p-6 flex flex-col justify-between ${wide ? 'md:h-auto md:min-h-64 md:w-[32%] md:flex-none' : ''}`}>
-        <div className="flex justify-between items-start">
-          <span className="px-3 py-1 bg-white/20 backdrop-blur-md rounded-full text-white text-[10px] font-bold uppercase tracking-widest border border-white/20">
-            {course.difficulty}
-          </span>
-          {isEnrolled && (
-            <div className="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center shadow-lg">
-              <CheckCircle className="w-5 h-5 text-white" />
+      {wide ? (
+        <>
+          <div className={`relative flex h-44 flex-col justify-between overflow-hidden bg-linear-to-br ${bannerPalettes[paletteIndex]} p-5 text-white`}>
+            <BookOpen className="absolute -right-3 -bottom-8 h-36 w-36 rotate-[-12deg] text-white/10" aria-hidden="true" />
+            <div className="relative flex items-start justify-between gap-3">
+              <span className="rounded-md bg-black/15 px-2.5 py-1 text-xs font-semibold tracking-wide text-white/90">
+                {course.code || 'Course'}
+              </span>
+              {Math.round(progress) >= 100 && <CheckCircle className="h-6 w-6 text-emerald-300" aria-label="Course complete" />}
             </div>
-          )}
-        </div>
-        <div>
-          <h3 className="text-xl font-black text-white leading-tight line-clamp-2">{course.title}</h3>
-          <p className="text-white/70 text-xs font-mono mt-1">{course.code}</p>
-        </div>
-      </div>
-
-      <div className={`p-6 space-y-4 ${wide ? 'flex-1 md:flex md:flex-col md:justify-between' : ''}`}>
-        <div>
-          <p className="text-slate-600 dark:text-slate-400 text-sm line-clamp-2 min-h-10">
-            {course.description}
-          </p>
-          {isEnrolled && (
-            <p className="mt-3 inline-flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-              <UserRound className="h-4 w-4" />
-              <span>Course owner: <span className="font-semibold text-slate-700 dark:text-slate-200">{owner}</span></span>
-            </p>
-          )}
-        </div>
-
-        {isEnrolled && (
-          <div className="space-y-1.5">
-            <div className="flex justify-between text-xs font-bold text-slate-500">
-              <span>Progress</span>
-              <span>{Math.round(progress)}%</span>
+            <div className="relative">
+              <h3 className="line-clamp-2 text-2xl font-bold leading-tight">{courseName}</h3>
+              {course.description && <p className="mt-1 line-clamp-1 text-sm text-white/75">{course.description}</p>}
             </div>
-            <Progress value={progress} className="h-2 bg-slate-100 dark:bg-slate-900" />
           </div>
-        )}
 
-        <div className="flex items-center justify-between py-3 border-y border-slate-50 dark:border-slate-700/50">
-          <div className="flex flex-col items-center">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Hours</span>
-            <span className="text-sm font-black text-slate-700 dark:text-slate-200">{course.estimatedHours}h</span>
-          </div>
-          <div className="flex flex-col items-center">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Students</span>
-            <span className="text-sm font-black text-slate-700 dark:text-slate-200">{course.enrollmentCount}</span>
-          </div>
-          <div className="flex flex-col items-center">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Rating</span>
-            <span className="text-sm font-black text-slate-700 dark:text-slate-200 flex items-center gap-0.5">
-              {course.rating?.toFixed(1)}
-              <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
-            </span>
-          </div>
-        </div>
+          <div className="space-y-4 p-5">
+            <div className="flex min-h-10 items-center gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-700 dark:bg-blue-900/40 dark:text-blue-200">
+                <UserRound className="h-4 w-4" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Course instructor</p>
+                <p className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">{owner}</p>
+              </div>
+            </div>
 
-        {!course.unitId && !isEnrolled ? (
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs font-semibold text-slate-500 dark:text-slate-400">
+                <span>Course progress</span>
+                <span>{Math.round(progress)}%</span>
+              </div>
+              <Progress value={progress} className="h-2 bg-slate-100 dark:bg-slate-700" />
+            </div>
+
+            <div className="flex items-center justify-between border-t border-slate-100 pt-3 text-xs text-slate-500 dark:border-slate-700 dark:text-slate-400">
+              <span>{course.estimatedHours ?? 0} study hours</span>
+              <span>{course.enrollmentCount ?? 0} learners</span>
+              <span className="inline-flex items-center gap-1">
+                {course.rating?.toFixed(1) ?? '—'} <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={(event) => { event.stopPropagation(); void openCourse(); }}
+                className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2.5 text-sm font-bold text-white transition-colors hover:bg-blue-700"
+              >
+                {progress > 0 ? 'Continue class' : 'Open class'}
+                <ChevronRight className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  router.push(`/study-planner/materials?courseId=${encodeURIComponent(course.id)}&scope=enrolled`);
+                }}
+                className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700"
+              >
+                <Layers className="h-4 w-4" />
+                Materials
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={(event) => { event.stopPropagation(); void onRemoveCourse(course); }}
+              className="inline-flex w-full items-center justify-center gap-1.5 text-xs font-medium text-slate-400 transition-colors hover:text-rose-600"
+            >
+              <X className="h-3.5 w-3.5" />
+              Remove from My Learning
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="relative flex h-40 flex-col justify-between bg-linear-to-br from-slate-700 to-slate-900 p-6">
+            <div className="text-xs font-semibold uppercase tracking-wider text-white/70">{course.code || 'Course'}</div>
+            <div>
+              <h3 className="line-clamp-2 text-xl font-black leading-tight text-white">{courseName}</h3>
+            </div>
+          </div>
+          <div className="space-y-4 p-6">
+            <p className="line-clamp-2 min-h-10 text-sm text-slate-600 dark:text-slate-400">{course.description}</p>
+            <div className="flex items-center justify-between border-y border-slate-100 py-3 text-xs text-slate-500 dark:border-slate-700 dark:text-slate-400">
+              <span>{course.estimatedHours ?? 0}h</span>
+              <span>{course.enrollmentCount ?? 0} learners</span>
+              <span className="inline-flex items-center gap-1">
+                {course.rating?.toFixed(1) ?? '—'} <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+              </span>
+            </div>
+            {!course.unitId ? (
           <button
             onClick={(e) => { e.stopPropagation(); router.push(`/courses/${course.id}`); }}
             className="w-full py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-black text-sm hover:scale-105 transition-transform flex items-center justify-center gap-2"
@@ -740,7 +793,9 @@ const CourseCard = ({ course, wide = false, onSelectCourse, onRemoveCourse, rout
           )}
           </div>
         )}
-      </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };

@@ -19,6 +19,7 @@ export default function UploadMaterialPage() {
   const [description, setDescription] = useState('');
   const [source, setSource] = useState<'upload' | 'drive'>('upload');
   const [driveUrl, setDriveUrl] = useState('');
+  const [shareWithCourse, setShareWithCourse] = useState(false);
   
   const [selectedCourseId, setSelectedCourseId] = useState('');
   const [unitId, setUnitId] = useState('');
@@ -96,13 +97,16 @@ export default function UploadMaterialPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedCourseId) {
-      toast.error('Please select a course');
+    if ((selectedCourseId && !unitId) || (!selectedCourseId && unitId)) {
+      toast.error('Choose both a course and a unit, or leave both blank for My Drive');
       return;
     }
-
-    if (!unitId) {
-      toast.error('Please select a unit');
+    if (source === 'drive' && (!selectedCourseId || !unitId)) {
+      toast.error('Choose a course and unit for a Shared Drive material');
+      return;
+    }
+    if (shareWithCourse && (!selectedCourseId || !unitId)) {
+      toast.error('Choose a course and unit before sharing with a class');
       return;
     }
 
@@ -120,6 +124,7 @@ export default function UploadMaterialPage() {
           courseId: selectedCourseId,
           unitId,
           topicId: topicId || undefined,
+          shareWithCourse,
         });
         toast.success('Drive material attached to the unit');
         router.push('/study-planner/materials');
@@ -153,14 +158,16 @@ export default function UploadMaterialPage() {
     formData.append('file', file as Blob);
     formData.append('title', title);
     formData.append('description', description);
-    formData.append('courseId', selectedCourseId);
-    
     if (unitId) {
       formData.append('unitId', unitId);
+    }
+    if (selectedCourseId) {
+      formData.append('courseId', selectedCourseId);
     }
     if (topicId) {
       formData.append('topicId', topicId);
     }
+    formData.append('shareWithCourse', String(shareWithCourse));
     
     if (type) formData.append('type', type);
 
@@ -243,17 +250,15 @@ export default function UploadMaterialPage() {
           
           <div>
             <label htmlFor="course-select" className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
-              Course <span className="text-red-500">*</span>
+              Course <span className="text-gray-400">(optional)</span>
             </label>
             <select
               id="course-select"
               value={selectedCourseId}
               onChange={e => setSelectedCourseId(e.target.value)}
               className="block w-full border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-900 dark:text-white px-3 py-2 rounded-md focus:ring-blue-500 focus:border-blue-500"
-              required
-              aria-required="true"
             >
-              <option value="">-- Select a Course --</option>
+              <option value="">My Drive (not assigned to a course)</option>
               {courses.map(c => (
                 <option key={c.id} value={c.id}>
                   {c.title || c.name}
@@ -264,15 +269,14 @@ export default function UploadMaterialPage() {
 
           <div>
             <label htmlFor="unit-select" className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
-              Unit <span className="text-red-500">*</span>
+              Unit <span className="text-gray-400">(optional)</span>
             </label>
             <select
               id="unit-select"
               value={unitId}
               onChange={e => setUnitId(e.target.value)}
               disabled={!selectedCourseId || units.length === 0}
-              required
-              aria-required="true"
+              required={Boolean(selectedCourseId)}
               className="block w-full border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-900 dark:text-white px-3 py-2 rounded-md focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:bg-gray-100 dark:disabled:bg-slate-900"
             >
               <option value="">{units.length === 0 && selectedCourseId ? 'No units found' : '-- Select a Unit --'}</option>
@@ -303,9 +307,24 @@ export default function UploadMaterialPage() {
               ))}
             </select>
             <p className="mt-1 text-xs text-gray-500 dark:text-slate-500">
-              Course and unit placement is required. Choose a topic to attach the material more specifically; otherwise it appears at the unit level.
+              Assign both a course and unit to organize this material in a class. Leave both blank to keep it in My Drive. Topic placement is optional.
             </p>
           </div>
+          <label className={`flex items-start gap-3 rounded-lg border p-3 ${selectedCourseId && unitId ? 'cursor-pointer border-blue-200 bg-white dark:border-blue-900 dark:bg-slate-900' : 'cursor-not-allowed border-gray-200 opacity-60 dark:border-slate-700'}`}>
+            <input
+              type="checkbox"
+              checked={shareWithCourse}
+              disabled={!selectedCourseId || !unitId}
+              onChange={(event) => setShareWithCourse(event.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            />
+            <span>
+              <span className="block text-sm font-semibold text-gray-800 dark:text-slate-200">Share with enrolled class</span>
+              <span className="mt-0.5 block text-xs text-gray-500 dark:text-slate-400">
+                Private by default. Students enrolled in this course can see it only when you turn sharing on.
+              </span>
+            </span>
+          </label>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -1199,37 +1199,10 @@ export class CoursesService {
       this.logger.warn('Redis get failed in getRecommendedCourses:', error);
     }
 
+    const aiRecommendations = this.getAiRecommendedCourses(userId, limit);
+
     try {
-      // 1. Try AI Recommendations
-      const aiRecs = await this.aiAnalyticsService.getRecommendationsAI(userId);
-      if (aiRecs && aiRecs.length > 0) {
-        const recommendedCourseIds = aiRecs
-          .map((rec: any) => rec.materialId || rec.material_id || rec.courseId)
-          .filter(Boolean)
-          .slice(0, limit);
-
-        if (recommendedCourseIds.length > 0) {
-          const courses = await this.prisma.course.findMany({
-            where: { 
-              id: { in: recommendedCourseIds },
-              status: CourseStatus.published,
-            },
-            include: {
-              category: { select: { id: true, name: true, slug: true } },
-              createdBy: {
-                select: { id: true, firstName: true, lastName: true },
-              },
-            },
-            take: limit,
-          });
-          if (courses.length > 0) {
-            await this.cacheRecommended(cacheKey, courses);
-            return courses;
-          }
-        }
-      }
-
-      // 2. Fallback to category-based heuristic
+      // Return category-based recommendations immediately; AI refreshes the cache for later visits.
       const userEnrollments = await this.prisma.courseEnrollment.findMany({
         where: { userId },
         include: { course: { include: { category: true } } },
@@ -1277,6 +1250,11 @@ export class CoursesService {
       }
 
       await this.cacheRecommended(cacheKey, courses);
+      void aiRecommendations.then(async aiCourses => {
+        if (aiCourses.length > 0) {
+          await this.cacheRecommended(cacheKey, aiCourses);
+        }
+      });
       return courses;
     } catch (error) {
       this.logger.error('Error in getRecommendedCourses', {
@@ -1285,6 +1263,46 @@ export class CoursesService {
         error: getErrorMessage(error),
       });
       throw error;
+    }
+  }
+
+  private async getAiRecommendedCourses(
+    userId: string,
+    limit: number,
+  ): Promise<Course[]> {
+    try {
+      const aiRecommendations =
+        await this.aiAnalyticsService.getRecommendationsAI(userId);
+      const courseIds = aiRecommendations
+        .map((recommendation: any) =>
+          recommendation.materialId ??
+          recommendation.material_id ??
+          recommendation.courseId,
+        )
+        .filter((id): id is string => typeof id === 'string' && id.length > 0)
+        .slice(0, limit);
+
+      if (courseIds.length === 0) return [];
+
+      return await this.prisma.course.findMany({
+        where: {
+          id: { in: courseIds },
+          status: CourseStatus.published,
+        },
+        include: {
+          category: { select: { id: true, name: true, slug: true } },
+          createdBy: {
+            select: { id: true, firstName: true, lastName: true },
+          },
+        },
+        take: limit,
+      });
+    } catch (error) {
+      this.logger.warn('AI course recommendations refresh failed:', {
+        userId,
+        error: getErrorMessage(error),
+      });
+      return [];
     }
   }
 

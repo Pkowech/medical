@@ -36,6 +36,7 @@ export interface Material extends MaterialBase {
   courseId?: string;
   unitId?: string | number;
   topicId?: string;
+  userId?: string;
   author?: string;
   source?: string;
   answer?: string;
@@ -48,13 +49,34 @@ export interface Material extends MaterialBase {
   previewFile?: AppFile;
   unit?: {
     id: string | number;
+    name?: string;
+    title?: string;
+    order?: number;
+    course?: {
+      id: string;
+      name?: string;
+      title?: string;
+    };
+  };
+  course?: {
+    id: string;
+    name?: string;
+    title?: string;
+  };
+  topic?: {
+    id: string;
     name: string;
-    order: number;
+    order?: number;
   };
   creator?: {
     id: string;
     firstName: string;
     lastName: string;
+  };
+  user?: {
+    id: string;
+    firstName?: string | null;
+    lastName?: string | null;
   };
   analytics?: {
     views: number;
@@ -74,6 +96,7 @@ export interface Material extends MaterialBase {
     prerequisites?: string[];
     estimatedTime?: number;
     relatedMaterials?: string[];
+    shareWithCourse?: boolean;
   };
 }
 

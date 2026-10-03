@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Material } from '@/shared/types/materialInterface';
-import { FileText, Download, Eye, MoreHorizontal, File, Image as ImageIcon, Film } from 'lucide-react';
+import { FileText, Download, Eye, MoreHorizontal, File, Image as ImageIcon, Film, Share2 } from 'lucide-react';
 import { Button } from '@/shared/components/ui/button';
 import { useRouter } from 'next/navigation';
 import {
@@ -15,9 +15,15 @@ import {
 interface MaterialListItemProps {
   material: Material;
   onView: (material: Material) => void;
+  canManageSharing?: boolean;
+  onToggleCourseSharing?: (material: Material) => void;
 }
 
-export const MaterialListItem: React.FC<MaterialListItemProps> = React.memo(({ material, onView }) => {
+export const MaterialListItem: React.FC<MaterialListItemProps> = React.memo(({ material, onView, canManageSharing = false, onToggleCourseSharing }) => {
+  const ownerName = material.user
+    ? [material.user.firstName, material.user.lastName].filter(Boolean).join(' ')
+    : material.author;
+  const isSharedWithCourse = material.metadata?.shareWithCourse !== false;
 
   const getFileIcon = (type?: string) => {
     const t = type?.toLowerCase();
@@ -68,7 +74,7 @@ export const MaterialListItem: React.FC<MaterialListItemProps> = React.memo(({ m
         <span className="w-24 truncate">{material.type || 'File'}</span>
         <span className="w-20 text-right">{formatSize(material.size)}</span>
         <span className="w-28 text-right">{formatDate(material.uploadDate)}</span>
-        <span className="w-32 truncate text-right">{material.author || 'Unknown'}</span>
+        <span className="w-32 truncate text-right">{ownerName || 'Unknown'}</span>
       </div>
 
       <div className="ml-4 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -106,9 +112,18 @@ export const MaterialListItem: React.FC<MaterialListItemProps> = React.memo(({ m
             <DropdownMenuItem onClick={() => onView(material)}>
               View Details
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => {}}>
-              Share
-            </DropdownMenuItem>
+            {canManageSharing && (
+              <DropdownMenuItem
+                disabled={!material.unitId}
+                onSelect={(event) => {
+                  event.preventDefault();
+                  onToggleCourseSharing?.(material);
+                }}
+              >
+                <Share2 className="mr-2 h-4 w-4" />
+                {isSharedWithCourse ? 'Stop sharing with class' : 'Share with class'}
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem className="text-red-600 focus:text-red-600">
               Delete
             </DropdownMenuItem>
@@ -126,6 +141,8 @@ export const MaterialListItem: React.FC<MaterialListItemProps> = React.memo(({ m
     prevProps.material.type === nextProps.material.type &&
     prevProps.material.size === nextProps.material.size &&
     prevProps.material.uploadDate === nextProps.material.uploadDate &&
-    prevProps.material.author === nextProps.material.author
+    prevProps.material.author === nextProps.material.author &&
+    prevProps.material.metadata?.shareWithCourse === nextProps.material.metadata?.shareWithCourse &&
+    prevProps.canManageSharing === nextProps.canManageSharing
   );
 });
