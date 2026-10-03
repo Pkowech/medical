@@ -39,6 +39,24 @@ use analytics_proto::analytics_service_server::AnalyticsServiceServer;
 use crate::api::grpc::MyAnalyticsService;
 use crate::observability::metrics as obs_metrics;
 
+fn required_env(name: &str) -> std::io::Result<String> {
+    env::var(name).map_err(|_| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            format!("{name} must be configured"),
+        )
+    })
+}
+
+fn required_port(name: &str) -> std::io::Result<u16> {
+    required_env(name)?.parse().map_err(|_| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            format!("{name} must be a valid port number"),
+        )
+    })
+}
+
 // Define request and response structs for NestJS communication
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UserIdRequest {
@@ -777,10 +795,14 @@ pub async fn run() -> std::io::Result<()> {
             )
         })?;
     let grpc_pool = pool.clone();
-    let grpc_host =
-        env::var("RUST_ANALYTICS_GRPC_HOST").unwrap_or_else(|_| "0.0.0.0".to_string());
-    let grpc_port = env::var("RUST_ANALYTICS_GRPC_PORT").unwrap_or_else(|_| "50051".to_string());
-    let grpc_addr = format!("{}:{}", grpc_host, grpc_port).parse().unwrap();
+    let grpc_host = required_env("RUST_ANALYTICS_GRPC_HOST")?;
+    let grpc_port = required_port("RUST_ANALYTICS_GRPC_PORT")?;
+    let grpc_addr = format!("{grpc_host}:{grpc_port}").parse().map_err(|_| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "RUST_ANALYTICS_GRPC_HOST and RUST_ANALYTICS_GRPC_PORT must form a valid socket address",
+        )
+    })?;
     let analytics_service = MyAnalyticsService::new(grpc_pool);
 
     tokio::spawn(async move {
@@ -812,8 +834,21 @@ pub async fn run() -> std::io::Result<()> {
 
     // Actix-web Server
     println!("Configuring HTTP server...");
-    let http_host = env::var("RUST_ANALYTICS_HOST").unwrap_or_else(|_| "0.0.0.0".to_string());
-    let http_port = env::var("RUST_ANALYTICS_PORT").unwrap_or_else(|_| "8000".to_string());
+    let http_host = required_env("RUST_ANALYTICS_HOST")?;
+    let http_port = env::var("PORT")
+        .or_else(|_| env::var("RUST_ANALYTICS_PORT"))
+        .map_err(|_| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "PORT or RUST_ANALYTICS_PORT must be configured",
+            )
+        })?;
+    http_port.parse::<u16>().map_err(|_| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "PORT or RUST_ANALYTICS_PORT must be a valid port number",
+        )
+    })?;
     let http_addr = format!("{}:{}", http_host, http_port);
     println!("HTTP server address: {}", http_addr);
 

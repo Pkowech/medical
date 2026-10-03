@@ -211,8 +211,8 @@ export class CourseAnalyticsService implements OnModuleInit {
   /**
    * Calculate course progress (read-only authoritative compute)
    * Delegates the computation to the Rust analytics engine over gRPC.
-   * Local DB fallbacks were removed to prevent duplication and drift; callers must
-   * handle null/undefined return values when Rust is unavailable.
+   * When the Rust service is unavailable, callers may fall back to derived
+   * database progress so the app still serves progress data during outages.
    */
   async calculateCourseProgress(
     userId: string,

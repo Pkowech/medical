@@ -13,8 +13,18 @@ const grpc = require('@grpc/grpc-js');
 const protoLoader = require('@grpc/proto-loader');
 const path = require('path');
 const http = require('http');
-const { Client } = require('pg');
 require('dotenv').config();
+
+const rustGrpcUrl =
+  process.env.ANALYTICS_GRPC_URL || process.env.RUST_ANALYTICS_GRPC_URL;
+const rustHttpUrl = process.env.RUST_ANALYTICS_URL;
+
+if (!rustGrpcUrl || !rustHttpUrl) {
+  throw new Error(
+    'Set ANALYTICS_GRPC_URL (or RUST_ANALYTICS_GRPC_URL) and RUST_ANALYTICS_URL before running this integration report.',
+  );
+}
+const { Client } = require('pg');
 
 const PROTO_PATH = path.join(__dirname, '..', 'protos', 'analytics.proto');
 const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
@@ -41,7 +51,11 @@ async function runFullReport() {
     environment: process.env.NODE_ENV || 'development',
     components: {
       backend: { status: 'unknown', port: 3002 },
-      rust: { status: 'unknown', port: 8000, grpcPort: 50051 },
+      rust: {
+        status: 'unknown',
+        port: new URL(rustHttpUrl).port,
+        grpcPort: new URL(`http://${rustGrpcUrl}`).port,
+      },
       database: { status: 'unknown', users: 0, skills: 0, skillStates: 0 },
       prometheus: { status: 'unknown', port: 9090 },
     },
@@ -54,7 +68,7 @@ async function runFullReport() {
   console.log('═══════════════════════════════════════════════════════════════════════════\n');
 
   const client = new analyticsProto.AnalyticsService(
-    'localhost:50051',
+    rustGrpcUrl,
     grpc.credentials.createInsecure()
   );
 
@@ -83,7 +97,7 @@ async function runFullReport() {
   console.log('═══════════════════════════════════════════════════════════════════════════\n');
 
   let healthTest = await new Promise((resolve) => {
-    http.get('http://localhost:8000/health', (res) => {
+    http.get(`${rustHttpUrl}/health`, (res) => {
       let data = '';
       res.on('data', (chunk) => (data += chunk));
       res.on('end', () => {

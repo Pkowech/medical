@@ -18,6 +18,7 @@ module.exports = {
     '<rootDir>/.next/',
     '<rootDir>/__tests__/mocks/',
     '<rootDir>/src/__tests__/mocks/',
+    '<rootDir>/e2e/',
   ],
   testMatch: [
     '<rootDir>/src/**/__tests__/**/*.{js,jsx,ts,tsx}',

@@ -36,13 +36,12 @@ impl AppConfig {
         dotenvy::dotenv().ok();
 
         let database_url = env::var("DATABASE_URL").map_err(|e| format!("DATABASE_URL not set: {}", e))?;
-        let grpc_host = env::var("RUST_ANALYTICS_GRPC_HOST")
-            .unwrap_or_else(|_| "0.0.0.0".to_string());
-        let grpc_port = env::var("RUST_ANALYTICS_GRPC_PORT").unwrap_or_else(|_| "50051".to_string());
-        let http_host = env::var("RUST_ANALYTICS_HOST").unwrap_or_else(|_| "0.0.0.0".to_string());
-        let http_port = env::var("RUST_ANALYTICS_PORT")
-            .or_else(|_| env::var("PORT"))
-            .unwrap_or_else(|_| "8000".to_string());
+        let grpc_host = required_env("RUST_ANALYTICS_GRPC_HOST")?;
+        let grpc_port = required_env("RUST_ANALYTICS_GRPC_PORT")?;
+        let http_host = required_env("RUST_ANALYTICS_HOST")?;
+        let http_port = env::var("PORT")
+            .or_else(|_| env::var("RUST_ANALYTICS_PORT"))
+            .map_err(|_| "PORT or RUST_ANALYTICS_PORT not set".to_string())?;
         let jwt_secret = env::var("JWT_SECRET").map_err(|e| format!("JWT_SECRET not set: {}", e))?;
         let rust_api_key = env::var("RUST_ANALYTICS_API_KEY").unwrap_or_default();
 
@@ -75,4 +74,8 @@ impl AppConfig {
             linfa_weight,
         })
     }
+}
+
+fn required_env(name: &str) -> Result<String, String> {
+    env::var(name).map_err(|_| format!("{name} not set"))
 }

@@ -8,6 +8,22 @@ class NotificationService {
   // apiService already prefixes requests with the backend URL and '/v1'
   private readonly baseUrl = '/notifications';
 
+  private normalizeNotification(notification: Notification): Notification {
+    const normalizedNotification = { ...notification };
+    const metadata = notification.metadata;
+    const metadataTitle = metadata?.title;
+
+    if (typeof normalizedNotification.title !== 'string' && typeof metadataTitle === 'string') {
+      normalizedNotification.title = metadataTitle;
+    }
+
+    if (typeof normalizedNotification.title !== 'string') {
+      normalizedNotification.title = 'Notification';
+    }
+
+    return normalizedNotification;
+  }
+
   async getNotifications(page = 1, limit = 10): Promise<Notification[]> {
     const response = await apiClient.get<Notification[]>(
       `${this.baseUrl}?page=${page}&limit=${limit}`
@@ -17,11 +33,10 @@ class NotificationService {
     if (Array.isArray(response)) {
       notifications = response as Notification[];
     } else {
-      notifications = (response as any)?.data ?? [];
+      notifications = response.data ?? [];
     }
 
-    // Return notifications directly - title is already a property of Notification
-    return notifications;
+    return notifications.map(notification => this.normalizeNotification(notification));
   }
 
   async markNotificationAsRead(id: string): Promise<Notification> {

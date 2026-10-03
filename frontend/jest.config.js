@@ -29,6 +29,7 @@ const customJestConfig = {
     '<rootDir>/node_modules/',
     '<rootDir>/.next/',
     '<rootDir>/__tests__/mocks/',
+    '<rootDir>/e2e/',
     '<rootDir>/jest.setup.js', // Ignore jest.setup.js from being treated as a test file
   ],
   collectCoverageFrom: [

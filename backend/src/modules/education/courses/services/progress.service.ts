@@ -954,6 +954,70 @@ export class ProgressService {
     }
   }
 
+  private async calculateCourseProgressFromDatabase(
+    userId: string,
+    courseId: string,
+  ): Promise<
+    { percentage: number; completedUnits: number; totalUnits: number } | undefined
+  > {
+    try {
+      const [courseProgressRows, units, materials] = await Promise.all([
+        this.prisma.progress.findMany({
+          where: { userId, courseId },
+          select: {
+            materialId: true,
+            unitId: true,
+            isCompleted: true,
+          },
+        }),
+        this.prisma.unit.findMany({
+          where: { courseId },
+          select: { id: true },
+        }),
+        this.prisma.material.findMany({
+          where: { unit: { courseId } },
+          select: { id: true, unitId: true },
+        }),
+      ]);
+
+      const completedMaterialIds = new Set(
+        courseProgressRows
+          .filter((item) => item.materialId && item.isCompleted)
+          .map((item) => item.materialId as string),
+      );
+
+      const totalUnits = units.length;
+      const completedUnits = units.filter((unit) => {
+        const unitMaterials = materials.filter((material) => material.unitId === unit.id);
+        if (unitMaterials.length === 0) {
+          return false;
+        }
+
+        return unitMaterials.every((material) =>
+          completedMaterialIds.has(material.id),
+        );
+      }).length;
+
+      const totalMaterials = materials.length;
+      const percentage =
+        totalMaterials > 0
+          ? Math.round((completedMaterialIds.size / totalMaterials) * 100)
+          : 0;
+
+      return {
+        percentage,
+        completedUnits,
+        totalUnits,
+      };
+    } catch (error) {
+      this.logger.warn(
+        'Failed to derive course progress locally; gRPC remains unavailable',
+        { userId, courseId, error: getErrorMessage(error) },
+      );
+      return undefined;
+    }
+  }
+
   async calculateCourseProgress(
     userId: string,
     courseId: string,
@@ -963,9 +1027,8 @@ export class ProgressService {
     | undefined
   > {
     try {
-      // Delegate to Rust analytics service (gRPC) as the authoritative computation engine.
-      // NOTE: Local DB fallback removed to avoid duplicated logic between backend and Rust.
-      // If Rust is unavailable, callers should handle the undefined result appropriately.
+      // Prefer the Rust analytics gRPC service; if it is unavailable, fall back
+      // to the local database so progress endpoints remain usable during outages.
       const analytics: any =
         await this.courseAnalyticsService.calculateCourseProgress(
           userId,
@@ -980,13 +1043,14 @@ export class ProgressService {
       }
 
       this.logger.warn(
-        'Course analytics returned null; cannot compute course progress',
+        'Course analytics returned null; falling back to local DB progress',
         { userId, courseId },
       );
-      return undefined;
+
+      return this.calculateCourseProgressFromDatabase(userId, courseId);
     } catch (error) {
       handleServiceError(error, this.logger, 'calculateCourseProgress');
-      return undefined;
+      return this.calculateCourseProgressFromDatabase(userId, courseId);
     }
   }
 

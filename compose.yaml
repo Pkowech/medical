@@ -29,9 +29,7 @@ services:
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
 
-      # gRPC connection to rust-analytics sidecar (service name resolves in Docker network)
-      ANALYTICS_GRPC_URL: ${ANALYTICS_GRPC_URL:-rust-analytics:50051}
-      RUST_ANALYTICS_GRPC_URL: ${RUST_ANALYTICS_GRPC_URL:-rust-analytics:50051}
+      ANALYTICS_GRPC_URL: ${ANALYTICS_GRPC_URL:?Set ANALYTICS_GRPC_URL to the Rust analytics gRPC host and port}
 
       # File Storage
       FILE_STORAGE_PROVIDER: ${FILE_STORAGE_PROVIDER:-cloudinary}
@@ -85,20 +83,17 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       RUST_ANALYTICS_API_KEY: ${RUST_ANALYTICS_API_KEY}
 
-      RUST_ANALYTICS_GRPC_HOST: 0.0.0.0
-      RUST_ANALYTICS_GRPC_PORT: 50051
-      RUST_ANALYTICS_HOST: 0.0.0.0
-      RUST_ANALYTICS_PORT: 8000
-
-    expose:
-      - "50051"
-      - "8000"
+      RUST_ANALYTICS_GRPC_HOST: ${RUST_ANALYTICS_GRPC_HOST:?Set RUST_ANALYTICS_GRPC_HOST}
+      RUST_ANALYTICS_GRPC_PORT: ${RUST_ANALYTICS_GRPC_PORT:?Set RUST_ANALYTICS_GRPC_PORT}
+      RUST_ANALYTICS_HOST: ${RUST_ANALYTICS_HOST:?Set RUST_ANALYTICS_HOST}
+      RUST_ANALYTICS_PORT: ${RUST_ANALYTICS_PORT:?Set RUST_ANALYTICS_PORT}
+      PORT: ${RUST_ANALYTICS_PORT:?Set RUST_ANALYTICS_PORT}
 
     networks:
       - medtrack_net
 
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8000/health || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:${RUST_ANALYTICS_PORT}/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3

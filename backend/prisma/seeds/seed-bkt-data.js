@@ -130,7 +130,9 @@ async function main() {
     console.log('Next steps:');
     console.log('  1. Start backend: cd backend && pnpm start');
     console.log('  2. Run analytics test: node test-batch-with-auth.js');
-    console.log('  3. Check metrics: curl http://localhost:8000/metrics\n');
+    if (process.env.RUST_ANALYTICS_URL) {
+      console.log(`  3. Check metrics: curl ${process.env.RUST_ANALYTICS_URL}/metrics\n`);
+    }
 
   } catch (error) {
     console.error('❌ Error seeding data:', error);

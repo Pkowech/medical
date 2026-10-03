@@ -16,7 +16,7 @@
   },
   "scripts": {
     "postinstall": "prisma generate",
-    "build": "pnpm run generate:proto && node -e \"if (!require('fs').existsSync('src/generated/grpc/analytics.ts')) { throw new Error('Expected generated protobuf source src/generated/grpc/analytics.ts was not created'); }\" && nest build",
+    "build": "pnpm prisma generate && pnpm run generate:proto && node -e \"if (!require('fs').existsSync('src/generated/grpc/analytics.ts')) { throw new Error('Expected generated protobuf source src/generated/grpc/analytics.ts was not created'); }\" && nest build",
     "check": "pnpm tsc --noEmit && pnpm run validate:circular && pnpm run validate:swagger",
     "start": "node dist/src/main",
     "start:dev": "nest start --watch",

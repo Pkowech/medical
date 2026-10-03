@@ -31,6 +31,11 @@ EXPECTED_TOPICS = (
     "Pharmacogenetics",
     "Revision",
     "Final Examinations",
+    "Mathematics",
+    "Science",
+    "Medicine",
+    "Pharmacology",
+    "Anatomy",
 )
 
 EXPECTED_CORE_BOOK_KEYS = {
@@ -63,7 +68,7 @@ def readonly_database():
         BACKEND_ROOT / ".env"
     ).get("DATABASE_URL")
     if not dsn:
-        pytest.skip("DATABASE_URL is not configured")
+        pytest.fail("DATABASE_URL is not configured")
 
     try:
         connection = psycopg2.connect(
@@ -71,7 +76,7 @@ def readonly_database():
             options="-c default_transaction_read_only=on",
         )
     except psycopg2.OperationalError as error:
-        pytest.skip(f"The configured database is unavailable: {error}")
+        pytest.fail(f"The configured database is unavailable: {error}")
 
     try:
         yield connection
@@ -84,7 +89,7 @@ def test_ppb311_topics_and_r2_materials_are_attached_to_pharmacology(
 ):
     with readonly_database.cursor() as cursor:
         cursor.execute("SELECT current_database()")
-        assert cursor.fetchone()[0] == "medtrack"
+        assert cursor.fetchone()[0] == readonly_database.info.dbname
 
         cursor.execute(
             "SELECT id, title FROM courses WHERE id = %s",
@@ -160,8 +165,10 @@ def test_course_and_unit_navigation_preserve_topic_ids_and_open_materials():
     topic_service = frontend_file("src/features/courses/services/topicService.ts")
     admin_page = frontend_file("src/app/admin/content/page.tsx")
 
-    assert "parentUnitId || String(targetChapter.id)" in navigation
+    assert "if (parentUnitId && !topicIdFromUrl)" in navigation
     assert "parentUnitId && topicIdFromUrl" in navigation
+    assert "if (parentUnitId) return;" in navigation
+    assert "previousTopic?.nextTopicUnlocked || previousTopic?.masteryUnlocked" in navigation
     assert "useCourseNavigation(unitData?.chapters || [], unitId)" in unit_layout
     assert "/courses/${courseId}/units/${unitId}/topics/${topicId}" in topic_service
     assert "openMaterial(String(material.id))" in course_sidebar

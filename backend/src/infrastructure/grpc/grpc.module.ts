@@ -36,6 +36,18 @@ if (!protoPath) {
 const grpcImports = [] as any[];
 const enableGrpc = process.env.ENABLE_GRPC === 'true';
 
+const resolveGrpcTarget = (configuredUrl?: string): string => {
+  const candidate = (configuredUrl ?? '').trim().replace(/^https?:\/\//, '');
+
+  if (!candidate) {
+    throw new Error(
+      'ANALYTICS_GRPC_URL or RUST_ANALYTICS_GRPC_URL must be configured when ENABLE_GRPC=true',
+    );
+  }
+
+  return candidate;
+};
+
 if (enableGrpc) {
   grpcImports.push(
     ClientsModule.registerAsync([
@@ -44,10 +56,10 @@ if (enableGrpc) {
         imports: [ConfigModule],
         inject: [ConfigService],
         useFactory: (configService: ConfigService) => {
-          const grpcUrl =
+          const configuredUrl =
             configService.get<string>('ANALYTICS_GRPC_URL') ||
-            configService.get<string>('RUST_ANALYTICS_GRPC_URL') ||
-            'localhost:50051';
+            configService.get<string>('RUST_ANALYTICS_GRPC_URL');
+          const grpcUrl = resolveGrpcTarget(configuredUrl);
           const apiKey = configService.get<string>('RUST_ANALYTICS_API_KEY');
 
           if (!apiKey) {
@@ -69,7 +81,7 @@ if (enableGrpc) {
             options: {
               package: 'analytics',
               protoPath,
-              url: grpcUrl.replace(/^https?:\/\//, ''),
+              url: grpcUrl,
               loader: {
                 keepCase: false,
               },

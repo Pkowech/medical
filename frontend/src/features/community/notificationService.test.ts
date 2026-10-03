@@ -45,4 +45,53 @@ describe('NotificationService', () => {
       { id: '2', read: true, title: 'Notification' },
     ]);
   });
+
+  it('should preserve an existing title when metadata also has a title', async () => {
+    const notification = {
+      id: '1',
+      title: 'Existing title',
+      metadata: { title: 'Metadata title' },
+      read: false,
+    };
+    (apiClient.get as jest.Mock).mockResolvedValueOnce({ data: [notification] });
+
+    const notifications = await notificationService.getNotifications();
+
+    expect(notifications[0].title).toBe('Existing title');
+    expect(notifications[0].metadata).toEqual({ title: 'Metadata title' });
+  });
+
+  it('should preserve notification fields while applying the fallback title', async () => {
+    const notification = {
+      id: '2',
+      message: 'A course update is available',
+      read: true,
+      userId: 'user-1',
+    };
+    (apiClient.get as jest.Mock).mockResolvedValueOnce({ data: [notification] });
+
+    const notifications = await notificationService.getNotifications();
+
+    expect(notifications[0]).toEqual({
+      ...notification,
+      title: 'Notification',
+    });
+  });
+
+  it('should normalize notifications returned as a direct array', async () => {
+    (apiClient.get as jest.Mock).mockResolvedValueOnce([
+      { id: '3', metadata: { title: 'Direct response title' }, read: false },
+    ]);
+
+    const notifications = await notificationService.getNotifications();
+
+    expect(notifications).toEqual([
+      {
+        id: '3',
+        metadata: { title: 'Direct response title' },
+        read: false,
+        title: 'Direct response title',
+      },
+    ]);
+  });
 });

@@ -106,7 +106,9 @@ async function seedData() {
     console.log('Next steps:');
     console.log('  1. View data in Prisma Studio (already open at :51212)');
     console.log('  2. Run: node test-with-real-data.js');
-    console.log('  3. Check metrics: curl http://localhost:8000/metrics\n');
+    if (process.env.RUST_ANALYTICS_URL) {
+      console.log(`  3. Check metrics: curl ${process.env.RUST_ANALYTICS_URL}/metrics\n`);
+    }
 
   } catch (error) {
     console.error('❌ Error:', error.message);

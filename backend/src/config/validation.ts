@@ -99,11 +99,16 @@ export const validationSchema = Joi.object({
 
   // Analytics Service
   ANALYTICS_SERVICE_URL: Joi.string().uri().default(''),
-  ANALYTICS_GRPC_URL: Joi.string().default('localhost:50051'),
+  ANALYTICS_GRPC_URL: Joi.string().trim().allow('').optional(),
+  RUST_ANALYTICS_GRPC_URL: Joi.string().trim().allow('').optional(),
   ENABLE_GRPC: Joi.boolean().default(true),
   GOTENBERG_URL: Joi.string().uri().default(''),
-  RUST_ANALYTICS_URL: Joi.string().uri().default('http://rust-analytics:8000'),
-  RUST_ANALYTICS_API_KEY: Joi.string().optional(),
+  RUST_ANALYTICS_URL: Joi.string().uri().allow('').optional(),
+  RUST_ANALYTICS_API_KEY: Joi.string().when('ENABLE_GRPC', {
+    is: true,
+    then: Joi.required(),
+    otherwise: Joi.optional(),
+  }),
   RUST_HTTP_TIMEOUT_MS: Joi.number().min(1000).default(5000),
   RUST_HTTP_RETRIES: Joi.number().min(0).max(10).default(2),
   RUST_GRPC_TIMEOUT_MS: Joi.number().min(1000).default(5000),
@@ -178,6 +183,17 @@ export function validateConfig(config: Record<string, unknown>) {
     throw new Error(
       `Configuration validation failed:\n${errorMessages.join('\n')}\n\n` +
         'Please check your environment variables and ensure all required values are set.',
+    );
+  }
+
+  if (
+    value.ENABLE_GRPC &&
+    !value.ANALYTICS_GRPC_URL &&
+    !value.RUST_ANALYTICS_GRPC_URL
+  ) {
+    throw new Error(
+      'Configuration validation failed:\n' +
+        'ANALYTICS_GRPC_URL or RUST_ANALYTICS_GRPC_URL must be set when ENABLE_GRPC=true.',
     );
   }
 
