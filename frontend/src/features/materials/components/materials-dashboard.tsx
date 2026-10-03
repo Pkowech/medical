@@ -99,6 +99,8 @@ export default function MaterialsDashboard() {
   const {
     data: materialsData,
     isLoading,
+    isError: isMaterialsError,
+    error: materialsError,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
@@ -472,7 +474,7 @@ export default function MaterialsDashboard() {
             <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center dark:border-slate-700 dark:bg-slate-900">
               <h3 className="font-semibold text-slate-900 dark:text-white">No targeted review suggestions yet</h3>
               <p className="mx-auto mt-2 max-w-xl text-sm text-slate-500">
-                Recommendations appear when quiz results identify a topic below 70% and there is a material for that topic that you own or can access through sharing.
+                Recommendations appear when recorded quiz scores identify a topic below 70% and there is a matching course, unit, or topic resource that you own or can access through sharing.
               </p>
             </div>
           )}
@@ -483,6 +485,10 @@ export default function MaterialsDashboard() {
           {(!courseFilterInitialized || isLoading) && !allMaterials.length ? (
             <div className="flex justify-center py-20">
               <div className="animate-spin rounded-full h-12 w-12 border-4 border-slate-200 border-t-indigo-500" />
+            </div>
+          ) : isMaterialsError ? (
+            <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-200">
+              Could not load materials: {materialsError instanceof Error ? materialsError.message : 'Please try again later.'}
             </div>
           ) : allMaterials.length === 0 ? (
             // Strategic Empty State

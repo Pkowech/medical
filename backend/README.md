@@ -113,6 +113,12 @@ To enable Drive-backed materials:
 
 Only files in the configured Shared Drive are accepted. PDFs and native Google Docs, Sheets, and Slides are supported; Google-native documents are exported to PDF for the in-app reader. Existing R2 files are unchanged and should not be deleted as part of enabling this integration.
 
+### Personal Google Drive links
+
+Users can also connect their own Google account with the read-only Drive scope to link files shared with them, including folders under **Shared with me**. These links do not copy file contents into MedTrack storage. The user's encrypted refresh token is stored in `google_drive_connections`, and Drive files are read through that account when opened. Configure `GOOGLE_DRIVE_OAUTH_CLIENT_ID`, `GOOGLE_DRIVE_OAUTH_CLIENT_SECRET`, `GOOGLE_DRIVE_OAUTH_REDIRECT_URI` (the backend callback URL, including `/v1/materials/drive/oauth/callback`), `GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY` (base64-encoded 32-byte key), and `FRONTEND_URL`. Add the exact callback URL to the Google OAuth client's authorized redirect URIs and enable the Google Drive API. Run the new migration before deploying the OAuth flow.
+
+Drive-backed materials can be linked at course level (for example, a textbook), unit level, or topic level. Class sharing remains disabled unless explicitly enabled.
+
 When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
 
 If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:

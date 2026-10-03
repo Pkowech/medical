@@ -49,7 +49,7 @@ pub async fn calculate_course_progress(
 				AND p.material_id IS NULL
 		) unit_progress ON true
 		WHERE u.course_id = $2
-		GROUP BY u.id
+		GROUP BY u.id, unit_progress.is_completed
 		"#,
 	)
 	.bind(user_id)

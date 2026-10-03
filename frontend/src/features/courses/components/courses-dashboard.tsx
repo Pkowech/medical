@@ -118,6 +118,8 @@ export const CoursesDashboard = () => {
   const {
     data: infiniteData,
     isLoading: coursesLoading,
+    isError: coursesError,
+    error: coursesErrorDetails,
     fetchNextPage,
     hasNextPage,
   } = useInfiniteQuery<CoursesPageData, Error, InfiniteData<CoursesPageData>>({
@@ -375,7 +377,7 @@ export const CoursesDashboard = () => {
             </div>
             {activeTab === 'recommended' && (
               <p className="text-xs text-slate-500 dark:text-slate-400 ml-2 animate-in fade-in slide-in-from-left-2">
-                Recommended from categories you’re enrolled in, ranked by rating and enrollment. Featured courses appear when there are no category matches.
+                Uses subjects from your active or completed classes, then ranks by rating and learner count. Without matching class history, it suggests popular or featured courses.
               </p>
             )}
           </div>
@@ -472,7 +474,11 @@ export const CoursesDashboard = () => {
         )}
 
         {/* Content Grid */}
-        {coursesLoading ? (
+        {coursesError ? (
+          <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-200">
+            Could not load courses: {coursesErrorDetails instanceof Error ? coursesErrorDetails.message : 'Please try again later.'}
+          </div>
+        ) : coursesLoading ? (
           <div className="flex flex-col items-center justify-center py-20">
             <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent" />
             <p className="mt-4 text-slate-500 font-medium">Curating your courses...</p>
@@ -720,6 +726,11 @@ const CourseCard = ({ course, wide = false, onSelectCourse, onRemoveCourse, rout
           </div>
           <div className="space-y-4 p-6">
             <p className="line-clamp-2 min-h-10 text-sm text-slate-600 dark:text-slate-400">{course.description}</p>
+            {course.recommendationReason && (
+              <p className="rounded-lg bg-indigo-50 px-3 py-2 text-xs text-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200">
+                {course.recommendationReason}
+              </p>
+            )}
             <div className="flex items-center justify-between border-y border-slate-100 py-3 text-xs text-slate-500 dark:border-slate-700 dark:text-slate-400">
               <span>{course.estimatedHours ?? 0}h</span>
               <span>{course.enrollmentCount ?? 0} learners</span>

@@ -31,12 +31,8 @@ export interface HeaderProps {
   toggleTheme: () => void;
   user?: AppUser | null;
   notifications: Notification[];
-  searchQuery?: string; // Optional - managed locally in AppHeader
-  setSearchQuery?: (query: string) => void; // Optional
   notificationsOpen: boolean;
   setNotificationsOpen: (isOpen: boolean) => void;
-  selectedFilter?: string; // Optional
-  setSelectedFilter?: (filter: string) => void; // Optional
   onNotificationRefresh?: () => void; // Callback to refresh notifications
 }
 

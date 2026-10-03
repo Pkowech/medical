@@ -1272,12 +1272,12 @@ export class CoursesService {
   }
 
   /**
-   * Get recommended courses for a user.
-   * Strategy: AI Recommendations (Rust) -> Heuristic (Categories) -> Featured
+   * Recommends courses related to the learner's current classes.
+   * If there is no matching history, starts with popular published courses.
    */
   async getRecommendedCourses(userId: string, limit = 10): Promise<Course[]> {
     const cacheKey = this.generateKey(
-      'recommended',
+      'recommended-v2',
       `user:${userId}:limit:${limit}`,
     );
 
@@ -1290,19 +1290,19 @@ export class CoursesService {
       this.logger.warn('Redis get failed in getRecommendedCourses:', error);
     }
 
-    const aiRecommendations = this.getAiRecommendedCourses(userId, limit);
-
     try {
-      // Return category-based recommendations immediately; AI refreshes the cache for later visits.
       const userEnrollments = await this.prisma.courseEnrollment.findMany({
-        where: { userId },
+        where: {
+          userId,
+          status: { in: [EnrollmentStatus.active, EnrollmentStatus.completed] },
+        },
         include: { course: { include: { category: true } } },
       });
 
       const enrolledCategoryIds = userEnrollments
         .map((e): string | undefined => e.course.category?.id)
         .filter((id): id is string => !!id);
-      const enrolledCourseIds = userEnrollments.map((e) => e.courseId);
+      const enrolledCourseIds = userEnrollments.map((enrollment) => enrollment.courseId);
 
       const where: Prisma.CourseWhereInput = {
         status: CourseStatus.published,
@@ -1325,10 +1325,17 @@ export class CoursesService {
         take: limit,
       });
 
-      // 3. Last fallback: Featured courses
+      let usingFeaturedFallback = false;
       if (courses.length === 0) {
+        usingFeaturedFallback = true;
         courses = await this.prisma.course.findMany({
-          where: { isFeatured: true, status: CourseStatus.published },
+          where: {
+            isFeatured: true,
+            status: CourseStatus.published,
+            ...(enrolledCourseIds.length > 0 && {
+              id: { notIn: enrolledCourseIds },
+            }),
+          },
           include: {
             category: { select: { id: true, name: true, slug: true } },
             createdBy: {
@@ -1340,13 +1347,18 @@ export class CoursesService {
         });
       }
 
-      await this.cacheRecommended(cacheKey, courses);
-      void aiRecommendations.then(async aiCourses => {
-        if (aiCourses.length > 0) {
-          await this.cacheRecommended(cacheKey, aiCourses);
-        }
-      });
-      return courses;
+      const recommendations = courses.map((course) => ({
+        ...course,
+        recommendationReason:
+          usingFeaturedFallback
+            ? 'Featured course selected because there were no available matches in your class subjects.'
+            : enrolledCategoryIds.length === 0
+              ? 'Popular among learners and highly rated; you have no class-subject history yet.'
+              : `Related to ${course.category?.name ?? 'a subject'} from your current or completed classes.`,
+      })) as Course[];
+
+      await this.cacheRecommended(cacheKey, recommendations);
+      return recommendations;
     } catch (error) {
       this.logger.error('Error in getRecommendedCourses', {
         userId,
@@ -1354,49 +1366,6 @@ export class CoursesService {
         error: getErrorMessage(error),
       });
       throw error;
-    }
-  }
-
-  private async getAiRecommendedCourses(
-    userId: string,
-    limit: number,
-  ): Promise<Course[]> {
-    try {
-      const aiRecommendations =
-        await this.aiAnalyticsService.getRecommendationsAI(userId);
-      const courseIds = aiRecommendations
-        .map((recommendation: any) =>
-          recommendation.courseId ?? recommendation.course_id,
-        )
-        .filter((id): id is string => typeof id === 'string' && id.length > 0)
-        .slice(0, limit);
-
-      if (courseIds.length === 0) return [];
-
-      const courses = await this.prisma.course.findMany({
-        where: {
-          id: { in: courseIds },
-          status: CourseStatus.published,
-        },
-        include: {
-          category: { select: { id: true, name: true, slug: true } },
-          createdBy: {
-            select: { id: true, firstName: true, lastName: true },
-          },
-        },
-        take: limit,
-      });
-      const coursesById = new Map(courses.map((course) => [course.id, course]));
-      return courseIds.flatMap((id) => {
-        const course = coursesById.get(id);
-        return course ? [course] : [];
-      });
-    } catch (error) {
-      this.logger.warn('AI course recommendations refresh failed:', {
-        userId,
-        error: getErrorMessage(error),
-      });
-      return [];
     }
   }
 

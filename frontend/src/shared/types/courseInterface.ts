@@ -10,6 +10,7 @@ import type { ReadinessSignal } from '@/shared/types/mastery.types';
 export interface Course extends BaseEntity {
   name: string;
   title?: string;
+  recommendationReason?: string;
   description?: string;
   code?: string;
   categoryId: string;

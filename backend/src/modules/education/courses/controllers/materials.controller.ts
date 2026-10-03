@@ -153,6 +153,37 @@ export class MaterialsController {
     return this.materialsService.registerGoogleDriveMaterial({ ...dto, userId: user.id });
   }
 
+  @Post('drive/folder-preview')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Preview supported files in a configured Shared Drive folder' })
+  async previewDriveFolder(
+    @Body('folderUrl') folderUrl: string,
+    @GetUser() user: PrismaUser,
+  ) {
+    if (!folderUrl?.trim()) {
+      throw new BadRequestException('Enter a Google Drive folder URL.');
+    }
+    return this.materialsService.previewGoogleDriveFolder(folderUrl, user.id);
+  }
+
+  @Post('drive/folder-link')
+  @ApiOperation({ summary: 'Link selected Drive folder files to course units and topics' })
+  async importDriveFolder(
+    @Body('items')
+    items: Array<{
+      fileId: string;
+      title: string;
+      description?: string;
+      courseId: string;
+      unitId: string;
+      topicId?: string;
+      shareWithCourse?: boolean;
+    }>,
+    @GetUser() user: PrismaUser,
+  ) {
+    return this.materialsService.linkGoogleDriveFolderFiles(items, user.id);
+  }
+
   @Post('attach')
   @ApiOperation({ summary: 'Attach an existing R2 library material to a new topic/unit/course (zero re-upload)' })
   @ApiBody({

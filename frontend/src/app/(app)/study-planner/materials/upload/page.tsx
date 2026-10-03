@@ -5,11 +5,12 @@ import materialService from '@/features/courses/services/materialService';
 import { courseService } from '@/features/courses/services/courseService';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import type { Course, CourseUnit, Lesson } from '@/shared/types/courseInterface';
-import { FileUp, HardDrive, Link2 } from 'lucide-react';
+import type { Course, CourseUnit, Lesson, Topic } from '@/shared/types/courseInterface';
+import { FileUp, FolderOpen, HardDrive, Link2 } from 'lucide-react';
+import DriveFolderImport from '@/features/materials/components/DriveFolderImport';
 
-// Helper type to handle potential differences between CourseUnit and chapter structure
-type ExtendedUnit = CourseUnit & { lessons?: Lesson[], topics?: any[] };
+type ExtendedUnit = CourseUnit & { lessons?: Lesson[] };
+type ExtendedCourse = Course & { chapters?: ExtendedUnit[] };
 type TopicItem = { id: string | number; title: string };
 
 export default function UploadMaterialPage() {
@@ -17,7 +18,7 @@ export default function UploadMaterialPage() {
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [source, setSource] = useState<'upload' | 'drive'>('upload');
+  const [source, setSource] = useState<'upload' | 'drive' | 'folder'>('upload');
   const [driveUrl, setDriveUrl] = useState('');
   const [shareWithCourse, setShareWithCourse] = useState(false);
   
@@ -28,6 +29,10 @@ export default function UploadMaterialPage() {
   const [courses, setCourses] = useState<Course[]>([]);
   const [units, setUnits] = useState<ExtendedUnit[]>([]);
   const [topics, setTopics] = useState<TopicItem[]>([]);
+  const [isLoadingCourses, setIsLoadingCourses] = useState(true);
+  const [courseLoadError, setCourseLoadError] = useState('');
+  const [isLoadingUnits, setIsLoadingUnits] = useState(false);
+  const [unitLoadError, setUnitLoadError] = useState('');
 
   const [type, setType] = useState('pdf');
   const [isUploading, setIsUploading] = useState(false);
@@ -40,9 +45,11 @@ export default function UploadMaterialPage() {
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     'application/vnd.ms-powerpoint',
     'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-    'image/jpeg',
-    'image/png',
     'video/mp4',
+    'video/mpeg',
+    'video/quicktime',
+    'video/x-msvideo',
+    'video/webm',
   ];
 
   useEffect(() => {
@@ -53,6 +60,9 @@ export default function UploadMaterialPage() {
         setCourses(courseItems as Course[]);
       } catch (err) {
         console.warn('Failed to load courses for upload form', err);
+        setCourseLoadError('Courses could not be loaded. You can still save this material in My Drive.');
+      } finally {
+        setIsLoadingCourses(false);
       }
     };
 
@@ -60,25 +70,41 @@ export default function UploadMaterialPage() {
   }, []);
 
   useEffect(() => {
-    const loadUnits = async (courseId: string) => {
-      setUnitId('');
-      setTopicId('');
-      setUnits([]);
-      setTopics([]);
-      
-      if (!courseId) return;
-      
+    let cancelled = false;
+    setUnitId('');
+    setTopicId('');
+    setUnits([]);
+    setTopics([]);
+    setUnitLoadError('');
+
+    if (!selectedCourseId) {
+      setIsLoadingUnits(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const loadUnits = async () => {
       try {
-        const course = await courseService.getCourseById(courseId);
-        // Fallback to chapters if units are not present
-        const loadedUnits = course.units || (course as any).chapters || [];
-        setUnits(loadedUnits);
+        setIsLoadingUnits(true);
+        const course = await courseService.getCourseById(selectedCourseId);
+        const courseWithChapters = course as ExtendedCourse;
+        const loadedUnits = course.units || courseWithChapters.chapters || [];
+        if (!cancelled) setUnits(loadedUnits);
       } catch (err) {
-        console.warn('Failed to load units for course', courseId, err);
+        console.warn('Failed to load units for course', selectedCourseId, err);
+        if (!cancelled) {
+          setUnitLoadError('Units could not be loaded. Please try selecting the course again.');
+        }
+      } finally {
+        if (!cancelled) setIsLoadingUnits(false);
       }
     };
 
-    loadUnits(selectedCourseId);
+    void loadUnits();
+    return () => {
+      cancelled = true;
+    };
   }, [selectedCourseId]);
 
   useEffect(() => {
@@ -89,15 +115,18 @@ export default function UploadMaterialPage() {
 
     const selectedUnit = units.find(u => String(u.id) === unitId);
     if (selectedUnit) {
-      // Extract lessons or topics from the selected unit
       const availableTopics = selectedUnit.lessons || selectedUnit.topics || [];
-      setTopics(availableTopics.map((t: any) => ({ id: t.id, title: t.title || String(t.id) })));
+      setTopics(availableTopics.map((topic: Lesson | Topic) => ({
+        id: topic.id,
+        title: topic.title || String(topic.id),
+      })));
     }
   }, [unitId, units]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if ((selectedCourseId && !unitId) || (!selectedCourseId && unitId)) {
+    if (source === 'folder') return;
+    if (selectedCourseId && !unitId) {
       toast.error('Choose both a course and a unit, or leave both blank for My Drive');
       return;
     }
@@ -156,7 +185,7 @@ export default function UploadMaterialPage() {
 
     const formData = new FormData();
     formData.append('file', file as Blob);
-    formData.append('title', title);
+    formData.append('title', title.trim());
     formData.append('description', description);
     if (unitId) {
       formData.append('unitId', unitId);
@@ -184,9 +213,33 @@ export default function UploadMaterialPage() {
       router.push('/study-planner/materials');
     } catch (err) {
       console.error('Upload failed', err);
-      toast.error('Failed to upload material');
+      toast.error(err instanceof Error ? err.message : 'Failed to upload material');
     } finally {
       setIsUploading(false);
+    }
+  };
+
+  const handleFileChange = (selectedFile: File | null) => {
+    setFile(selectedFile);
+    if (!selectedFile) return;
+
+    const filename = selectedFile.name.toLowerCase();
+    if (selectedFile.type === 'application/pdf' || filename.endsWith('.pdf')) {
+      setType('pdf');
+    } else if (selectedFile.type.startsWith('video/') || /\.(mp4|mpeg|mpg|mov|avi|webm)$/.test(filename)) {
+      setType('video');
+    } else if (
+      selectedFile.type === 'application/vnd.ms-powerpoint' ||
+      selectedFile.type === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' ||
+      /\.(ppt|pptx)$/.test(filename)
+    ) {
+      setType('slide');
+    } else {
+      setType('notes');
+    }
+
+    if (!title.trim()) {
+      setTitle(selectedFile.name.replace(/\.[^.]+$/, ''));
     }
   };
 
@@ -213,9 +266,21 @@ export default function UploadMaterialPage() {
             >
               <HardDrive className="h-4 w-4" /> Google Drive
             </button>
+            <button
+              type="button"
+              aria-pressed={source === 'folder'}
+              onClick={() => setSource('folder')}
+              className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium ${source === 'folder' ? 'bg-white text-blue-700 shadow-sm dark:bg-slate-700 dark:text-blue-300' : 'text-slate-600 dark:text-slate-300'}`}
+            >
+              <FolderOpen className="h-4 w-4" /> Import folder
+            </button>
           </div>
         </div>
 
+        {source === 'folder' ? (
+          <DriveFolderImport courses={courses} isLoadingCourses={isLoadingCourses} />
+        ) : (
+          <>
         <div>
           <label htmlFor="title" className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
             Title <span className="text-red-500">*</span>
@@ -256,6 +321,7 @@ export default function UploadMaterialPage() {
               id="course-select"
               value={selectedCourseId}
               onChange={e => setSelectedCourseId(e.target.value)}
+              aria-busy={isLoadingCourses}
               className="block w-full border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-900 dark:text-white px-3 py-2 rounded-md focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="">My Drive (not assigned to a course)</option>
@@ -265,6 +331,12 @@ export default function UploadMaterialPage() {
                 </option>
               ))}
             </select>
+            {isLoadingCourses && (
+              <p className="mt-1 text-xs text-gray-500 dark:text-slate-400" role="status">Loading available courses…</p>
+            )}
+            {courseLoadError && (
+              <p className="mt-1 text-xs text-amber-700 dark:text-amber-300" role="status">{courseLoadError}</p>
+            )}
           </div>
 
           <div>
@@ -275,17 +347,23 @@ export default function UploadMaterialPage() {
               id="unit-select"
               value={unitId}
               onChange={e => setUnitId(e.target.value)}
-              disabled={!selectedCourseId || units.length === 0}
+              disabled={!selectedCourseId || isLoadingUnits || units.length === 0}
               required={Boolean(selectedCourseId)}
+              aria-busy={isLoadingUnits}
               className="block w-full border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-900 dark:text-white px-3 py-2 rounded-md focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:bg-gray-100 dark:disabled:bg-slate-900"
             >
-              <option value="">{units.length === 0 && selectedCourseId ? 'No units found' : '-- Select a Unit --'}</option>
+              <option value="">
+                {isLoadingUnits ? 'Loading units…' : units.length === 0 && selectedCourseId ? 'No units found' : '-- Select a Unit --'}
+              </option>
               {units.map(u => (
                 <option key={u.id} value={String(u.id)}>
                   {u.title || String(u.id)}
                 </option>
               ))}
             </select>
+            {unitLoadError && (
+              <p className="mt-1 text-xs text-amber-700 dark:text-amber-300" role="alert">{unitLoadError}</p>
+            )}
           </div>
 
           <div>
@@ -340,8 +418,8 @@ export default function UploadMaterialPage() {
             >
               <option value="pdf">PDF Document</option>
               <option value="video">Video</option>
-              <option value="image">Image</option>
-              <option value="doc">Word/Text Document</option>
+              <option value="slide">Presentation</option>
+              <option value="notes">Word/Text Notes</option>
             </select>
           </div>}
 
@@ -349,13 +427,13 @@ export default function UploadMaterialPage() {
             <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">File <span className="text-red-500">*</span></label>
             <input
               type="file"
-              onChange={e => setFile(e.target.files ? e.target.files[0] : null)}
+              onChange={e => handleFileChange(e.target.files?.[0] ?? null)}
               className="block w-full text-sm text-gray-500 dark:text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-blue-900/30 dark:file:text-blue-400"
               aria-label="Select file to upload"
-              accept=".pdf,.doc,.docx,.ppt,.pptx,.jpg,.jpeg,.png,.mp4"
+              accept=".pdf,.doc,.docx,.ppt,.pptx,.mp4,.mpeg,.mpg,.mov,.avi,.webm"
               required
             />
-            <div className="text-xs text-gray-500 dark:text-slate-500 mt-2">Max size: 50MB. Supported: PDF, DOC, PPT, JPG, PNG, MP4.</div>
+            <div className="text-xs text-gray-500 dark:text-slate-500 mt-2">Max size: 50MB. Supported: PDF, DOC, PPT, and common video formats. Title and material type are suggested from the selected file.</div>
           </div> : <div>
             <label htmlFor="drive-url" className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
               Shared Drive file URL <span className="text-red-500">*</span>
@@ -387,13 +465,21 @@ export default function UploadMaterialPage() {
             )}
             <button
               type="submit"
-              disabled={isUploading || !selectedCourseId || (source === 'upload' ? !file : !driveUrl.trim() || !unitId)}
+              disabled={
+                isUploading ||
+                !title.trim() ||
+                (source === 'upload'
+                  ? !file || Boolean(selectedCourseId && !unitId)
+                  : !driveUrl.trim() || !selectedCourseId || !unitId)
+              }
               className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm shadow-blue-500/30"
             >
               {isUploading ? (source === 'drive' ? 'Attaching…' : 'Uploading…') : (source === 'drive' ? 'Attach from Drive' : 'Upload Material')}
             </button>
           </div>
         </div>
+          </>
+        )}
       </form>
     </div>
   );

@@ -995,6 +995,123 @@ export class MaterialsService {
     return material;
   }
 
+  async previewGoogleDriveFolder(folderUrl: string, userId: string) {
+    const roles = await this.prisma.userRole.findMany({
+      where: { userId },
+      select: { role: { select: { name: true } } },
+    });
+    const canBrowseSharedDrive = roles.some(({ role }) =>
+      role.name === RoleName.admin || role.name === RoleName.instructor,
+    );
+    if (!canBrowseSharedDrive) {
+      throw new ForbiddenException('Only instructors can browse the course Shared Drive.');
+    }
+    return this.googleDrive.listSharedDriveFolder(folderUrl);
+  }
+
+  async linkGoogleDriveFolderFiles(
+    items: Array<{
+      fileId: string;
+      title: string;
+      description?: string;
+      courseId: string;
+      unitId: string;
+      topicId?: string;
+      shareWithCourse?: boolean;
+    }>,
+    userId: string,
+  ) {
+    if (!Array.isArray(items) || items.length === 0) {
+      throw new BadRequestException('Select at least one supported Drive file to link.');
+    }
+    if (items.length > 200) {
+      throw new BadRequestException('Link no more than 200 files at a time.');
+    }
+
+    const seenFileIds = new Set<string>();
+    const results: Array<{
+      fileId: string;
+      title: string;
+      status: 'linked' | 'already-linked' | 'failed';
+      materialId?: string;
+      error?: string;
+    }> = [];
+
+    for (const item of items) {
+      if (
+        !item.fileId ||
+        !item.title?.trim() ||
+        !item.courseId ||
+        !item.unitId ||
+        seenFileIds.has(item.fileId)
+      ) {
+        results.push({
+          fileId: item.fileId || '',
+          title: item.title || '',
+          status: 'failed',
+          error: 'Each file needs a unique ID, title, course, and unit.',
+        });
+        continue;
+      }
+      seenFileIds.add(item.fileId);
+
+      try {
+        const existing = await this.prisma.material.findFirst({
+          where: {
+            userId,
+            metadata: { path: ['driveFileId'], equals: item.fileId },
+          },
+          select: { id: true, title: true },
+        });
+        if (existing) {
+          results.push({
+            fileId: item.fileId,
+            title: existing.title,
+            status: 'already-linked',
+            materialId: existing.id,
+          });
+          continue;
+        }
+
+        const material = await this.registerGoogleDriveMaterial({
+          url: `https://drive.google.com/file/d/${encodeURIComponent(item.fileId)}/view`,
+          title: item.title.trim(),
+          description: item.description,
+          courseId: item.courseId,
+          unitId: item.unitId,
+          topicId: item.topicId,
+          shareWithCourse: item.shareWithCourse === true,
+          userId,
+        });
+        results.push({
+          fileId: item.fileId,
+          title: material.title,
+          status: 'linked',
+          materialId: material.id,
+        });
+      } catch (error) {
+        this.logger.warn('Drive folder item link failed', {
+          fileId: item.fileId,
+          userId,
+          error: getErrorMessage(error),
+        });
+        results.push({
+          fileId: item.fileId,
+          title: item.title,
+          status: 'failed',
+          error: getErrorMessage(error),
+        });
+      }
+    }
+
+    return {
+      linked: results.filter(({ status }) => status === 'linked').length,
+      alreadyLinked: results.filter(({ status }) => status === 'already-linked').length,
+      failed: results.filter(({ status }) => status === 'failed').length,
+      results,
+    };
+  }
+
   async setCourseSharing(
     materialId: string,
     userId: string,
@@ -1166,6 +1283,7 @@ export class MaterialsService {
     courseId?: string;
     topicId?: string;
     topicIds?: string[];
+    unitIds?: string[];
   }) {
     try {
       const {
@@ -1181,6 +1299,7 @@ export class MaterialsService {
         courseId,
         topicId,
         topicIds,
+        unitIds,
       } = options;
 
       const skip = (page - 1) * limit;
@@ -1257,6 +1376,9 @@ export class MaterialsService {
       }
       if (topicIds?.length) {
         where.topicId = { in: topicIds };
+      }
+      if (unitIds?.length) {
+        where.unitId = { in: unitIds };
       }
 
       if (courseId) {
@@ -1817,7 +1939,7 @@ export class MaterialsService {
           select: {
             id: true,
             name: true,
-            unit: { select: { courseId: true } },
+            unitId: true,
           },
         },
       },
@@ -1826,7 +1948,7 @@ export class MaterialsService {
 
     const topicScores = new Map<
       string,
-      { title: string; scores: number[] }
+      { title: string; unitId: string; scores: number[] }
     >();
     for (const record of progress) {
       const topic = record.topic;
@@ -1856,6 +1978,7 @@ export class MaterialsService {
 
       const current = topicScores.get(topic.id) ?? {
         title: topic.name,
+        unitId: topic.unitId,
         scores: [],
       };
       current.scores.push(...scores);
@@ -1880,13 +2003,21 @@ export class MaterialsService {
       scope: 'recommended',
       userId,
       topicIds: weakTopics.map((topic) => topic.id),
+      unitIds: Array.from(new Set(weakTopics.map((topic) => topic.unitId))),
     });
     const weakTopicById = new Map(weakTopics.map((topic) => [topic.id, topic]));
+    const weakTopicsByUnitId = new Map<string, typeof weakTopics>();
+    for (const topic of weakTopics) {
+      const topicsInUnit = weakTopicsByUnitId.get(topic.unitId) ?? [];
+      topicsInUnit.push(topic);
+      weakTopicsByUnitId.set(topic.unitId, topicsInUnit);
+    }
     const usedTopicIds = new Set<string>();
 
     return accessibleMaterials.items.flatMap((material) => {
       const topicId = material.topicId;
-      const topic = topicId ? weakTopicById.get(topicId) : undefined;
+      const topic = (topicId ? weakTopicById.get(topicId) : undefined)
+        ?? (material.unitId ? weakTopicsByUnitId.get(material.unitId)?.[0] : undefined);
       if (!topic || usedTopicIds.has(topic.id)) return [];
       usedTopicIds.add(topic.id);
 

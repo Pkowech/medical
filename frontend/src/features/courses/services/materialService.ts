@@ -1,6 +1,33 @@
 import { apiService } from '@/features/auth/services/apiClient';
 import { Material } from '@/shared/types/materialInterface';
 
+export interface DriveFolderPreview {
+  folderId: string;
+  folderName: string;
+  files: Array<{
+    id: string;
+    name: string;
+    mimeType: string;
+    size: number;
+    webViewLink?: string;
+    folderPath: string;
+    supported: boolean;
+  }>;
+}
+
+export interface DriveFolderImportResult {
+  linked: number;
+  alreadyLinked: number;
+  failed: number;
+  results: Array<{
+    fileId: string;
+    title: string;
+    status: 'linked' | 'already-linked' | 'failed';
+    materialId?: string;
+    error?: string;
+  }>;
+}
+
 const materialService = {
   async getMaterials(filters?: { unitId?: string; type?: string }): Promise<Material[]> {
     const response = await apiService.get<Material[]>('/materials', {
@@ -20,15 +47,10 @@ const materialService = {
     sortOrder?: 'asc' | 'desc';
     unitId?: string;
   }): Promise<{ items: Material[]; total: number; page: number; pageSize: number }> {
-    try {
-      const response = await apiService.get<{ items: Material[]; total: number; page: number; pageSize: number }>('/materials/paginated', {
-        params,
-      });
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching paginated materials:', error);
-      return { items: [], total: 0, page: params.page, pageSize: params.limit };
-    }
+    const response = await apiService.get<{ items: Material[]; total: number; page: number; pageSize: number }>('/materials/paginated', {
+      params,
+    });
+    return response.data;
   },
 
   async getRecommendedMaterials() {
@@ -120,6 +142,31 @@ const materialService = {
     shareWithCourse?: boolean;
   }): Promise<Material> {
     const response = await apiService.post<Material>('/materials/drive', input);
+    return response.data;
+  },
+
+  async previewGoogleDriveFolder(folderUrl: string): Promise<DriveFolderPreview> {
+    const response = await apiService.post<DriveFolderPreview>('/materials/drive/folder-preview', {
+      folderUrl,
+    });
+    return response.data;
+  },
+
+  async linkGoogleDriveFolder(input: {
+    items: Array<{
+      fileId: string;
+      title: string;
+      description?: string;
+      courseId: string;
+      unitId: string;
+      topicId?: string;
+      shareWithCourse?: boolean;
+    }>;
+  }): Promise<DriveFolderImportResult> {
+    const response = await apiService.post<DriveFolderImportResult>(
+      '/materials/drive/folder-link',
+      input,
+    );
     return response.data;
   },
 

@@ -367,6 +367,7 @@ model User {
   userActivities          UserActivity[]
   userBadges              UserBadge[]              @relation("UserUserBadges")
   userFlashcardProgresses UserFlashcardProgress[]
+  googleDriveConnection GoogleDriveConnection?
   analytics               UserLearningAnalytics?
   userQuizProgress        UserQuizProgress[]
   UserResponse            UserResponse[]
@@ -382,6 +383,17 @@ model User {
   @@index([createdAt])
   @@index([fts], type: Gin)
   @@map("users")
+}
+
+model GoogleDriveConnection {
+  id                    String   @id @default(uuid())
+  userId                String   @unique @map("user_id")
+  encryptedRefreshToken String   @map("encrypted_refresh_token") @db.Text
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("google_drive_connections")
 }
 
 model UserSkillState {

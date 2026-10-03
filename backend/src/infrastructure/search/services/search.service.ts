@@ -231,7 +231,7 @@ export class SearchService {
         similarity(title, $2)::float8 as trgm_relevance,
         ts_headline('english', coalesce(content, description, ''), ${tsqueryCall}, 
           'StartSel=<mark>, StopSel=</mark>, MaxWords=35, MinWords=15, ShortWord=3, HighlightAll=FALSE') as snippet,
-        COUNT(*)::int OVER() as total_count
+        COUNT(*) OVER()::int as total_count
       FROM "global_search_index"
       WHERE ((fts @@ ${tsqueryCall})
       OR (title % $2))

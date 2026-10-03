@@ -8,6 +8,24 @@ import { ConfigService } from '@nestjs/config';
 import { google, drive_v3 } from 'googleapis';
 
 const MAX_DRIVE_MATERIAL_BYTES = 100 * 1024 * 1024;
+const MAX_FOLDER_IMPORT_FILES = 500;
+
+export interface SharedDriveFolderFile {
+  id: string;
+  name: string;
+  mimeType: string;
+  size: number;
+  webViewLink?: string;
+  folderPath: string;
+  supported: boolean;
+}
+
+const SUPPORTED_DRIVE_FILE_TYPES = new Set([
+  'application/pdf',
+  'application/vnd.google-apps.document',
+  'application/vnd.google-apps.spreadsheet',
+  'application/vnd.google-apps.presentation',
+]);
 
 @Injectable()
 export class GoogleDriveService {
@@ -29,12 +47,101 @@ export class GoogleDriveService {
       throw new BadRequestException('Only Google Drive or Google Docs URLs are supported.');
     }
 
-    const pathId = url.pathname.match(/\/file\/d\/([^/]+)|\/document\/d\/([^/]+)|\/spreadsheets\/d\/([^/]+)|\/presentation\/d\/([^/]+)/);
+    const pathId = url.pathname.match(/\/folders\/([^/]+)|\/file\/d\/([^/]+)|\/document\/d\/([^/]+)|\/spreadsheets\/d\/([^/]+)|\/presentation\/d\/([^/]+)/);
     const fileId = pathId?.slice(1).find(Boolean) || url.searchParams.get('id');
     if (!fileId || !/^[A-Za-z0-9_-]{10,}$/.test(fileId)) {
       throw new BadRequestException('The URL does not contain a valid Drive file ID.');
     }
     return fileId;
+  }
+
+  async listSharedDriveFolder(input: string): Promise<{
+    folderId: string;
+    folderName: string;
+    files: SharedDriveFolderFile[];
+  }> {
+    const driveId = this.config.get<string>('GOOGLE_DRIVE_SHARED_DRIVE_ID');
+    if (!driveId) {
+      throw new ServiceUnavailableException('Google Shared Drive integration is not configured.');
+    }
+
+    const folderId = this.extractFileId(input);
+    try {
+      const drive = this.getClient();
+      const rootResponse = await drive.files.get({
+        fileId: folderId,
+        supportsAllDrives: true,
+        fields: 'id,name,mimeType,driveId,trashed',
+      });
+      const root = rootResponse.data;
+      if (
+        root.trashed ||
+        root.driveId !== driveId ||
+        root.mimeType !== 'application/vnd.google-apps.folder'
+      ) {
+        throw new BadRequestException(
+          'Choose a folder in the configured MedTrack Shared Drive.',
+        );
+      }
+      if (!root.id || !root.name) {
+        throw new BadRequestException('Google Drive did not return the folder details.');
+      }
+
+      const files: SharedDriveFolderFile[] = [];
+      const visitedFolders = new Set<string>([root.id]);
+      const walkFolder = async (parentId: string, path: string[]): Promise<void> => {
+        let pageToken: string | undefined;
+        do {
+          const response: drive_v3.Schema$FileList = (await drive.files.list({
+            q: `'${parentId}' in parents and trashed = false`,
+            corpora: 'drive',
+            driveId,
+            includeItemsFromAllDrives: true,
+            supportsAllDrives: true,
+            pageSize: 1000,
+            pageToken,
+            fields: 'nextPageToken,files(id,name,mimeType,size,driveId,webViewLink,trashed)',
+          })).data;
+
+          for (const entry of response.files ?? []) {
+            if (entry.trashed || !entry.id || !entry.name || entry.driveId !== driveId) continue;
+            if (entry.mimeType === 'application/vnd.google-apps.folder') {
+              if (visitedFolders.has(entry.id)) continue;
+              visitedFolders.add(entry.id);
+              await walkFolder(entry.id, [...path, entry.name]);
+              continue;
+            }
+
+            files.push({
+              id: entry.id,
+              name: entry.name,
+              mimeType: entry.mimeType ?? 'application/octet-stream',
+              size: Number(entry.size || 0),
+              webViewLink: entry.webViewLink ?? undefined,
+              folderPath: path.join('/'),
+              supported: SUPPORTED_DRIVE_FILE_TYPES.has(entry.mimeType ?? ''),
+            });
+            if (files.length > MAX_FOLDER_IMPORT_FILES) {
+              throw new BadRequestException(
+                `This folder contains more than ${MAX_FOLDER_IMPORT_FILES} files. Import a smaller subfolder at a time.`,
+              );
+            }
+          }
+          pageToken = response.nextPageToken ?? undefined;
+        } while (pageToken);
+      };
+
+      await walkFolder(root.id, []);
+      return { folderId: root.id, folderName: root.name, files };
+    } catch (error) {
+      if (error instanceof BadRequestException || error instanceof ServiceUnavailableException) {
+        throw error;
+      }
+      this.logger.error('Could not list Google Drive folder', error);
+      throw new BadRequestException(
+        'MedTrack cannot read this folder. Confirm it is in the configured Shared Drive and shared with the MedTrack service account.',
+      );
+    }
   }
 
   async getSharedDriveFile(input: string): Promise<drive_v3.Schema$File> {

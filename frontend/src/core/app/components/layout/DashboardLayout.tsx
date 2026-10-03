@@ -71,7 +71,11 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
     const coursePathSegments = pathname?.split('/').filter(Boolean) ?? [];
     const isCoursePage = coursePathSegments[0] === 'courses' && coursePathSegments.length > 2;
-    const isMaterialViewPage = pathname?.startsWith('/study-planner/materials/');
+    const isMaterialViewPage =
+        coursePathSegments[0] === 'study-planner' &&
+        coursePathSegments[1] === 'materials' &&
+        coursePathSegments.length === 3 &&
+        coursePathSegments[2] !== 'upload';
     const isFullHeightPage = isCoursePage || isMaterialViewPage;
 
     return (
@@ -98,11 +102,6 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                         notificationsOpen={notificationsOpen}
                         setNotificationsOpen={setNotificationsOpen}
                         onNotificationRefresh={refreshNotifications}
-                        // Passing default implementations for simple props to avoid errors if not provided
-                        searchQuery=""
-                        setSearchQuery={() => { }}
-                        selectedFilter="all"
-                        setSelectedFilter={() => { }}
                     />
 
                     {/* content area */}
