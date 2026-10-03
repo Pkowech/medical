@@ -1,7 +1,8 @@
-use crate::domain::models::quiz::QuizAttempt;
 /// Postgres implementation of QuizRepository
 /// Manages persistence of quiz attempts and assessment data
+
 use crate::domain::repositories::QuizRepository;
+use crate::domain::models::quiz::QuizAttempt;
 use crate::shared::error::AnalyticsError;
 use sqlx::{Pool, Postgres, Row};
 use std::sync::Arc;
@@ -26,14 +27,14 @@ impl QuizRepository for PostgresQuizRepository {
     ) -> Result<Vec<QuizAttempt>, AnalyticsError> {
         let mut query_str = 
             "SELECT quiz_id, score, completed_at FROM quiz_attempts WHERE user_id = $1 ORDER BY completed_at DESC".to_string();
-
+        
         let mut param_index = 2;
-
+        
         if limit.is_some() {
             query_str.push_str(&format!(" LIMIT ${}", param_index));
             param_index += 1;
         }
-
+        
         if offset.is_some() {
             query_str.push_str(&format!(" OFFSET ${}", param_index));
         }
@@ -47,17 +48,17 @@ impl QuizRepository for PostgresQuizRepository {
             query = query.bind(o);
         }
 
-        let rows = query.fetch_all(&*self.pool).await.map_err(|e| {
-            AnalyticsError::DatabaseError(format!("Failed to fetch quiz history: {}", e))
-        })?;
+        let rows = query
+            .fetch_all(&*self.pool)
+            .await
+            .map_err(|e| AnalyticsError::DatabaseError(format!("Failed to fetch quiz history: {}", e)))?;
 
         let attempts = rows
             .into_iter()
             .map(|row| {
                 let quiz_id: String = row.try_get("quiz_id").unwrap_or_default();
                 let score: Option<f64> = row.try_get("score").unwrap_or(None);
-                let completed_at: Option<chrono::NaiveDateTime> =
-                    row.try_get("completed_at").unwrap_or(None);
+                let completed_at: Option<chrono::NaiveDateTime> = row.try_get("completed_at").unwrap_or(None);
 
                 QuizAttempt {
                     quiz_id,
@@ -117,7 +118,7 @@ impl QuizRepository for PostgresQuizRepository {
             AND correct = true
             ORDER BY attempt_date DESC
             LIMIT $3
-            "#,
+            "#
         )
         .bind(user_id)
         .bind(skill_id)
@@ -137,7 +138,7 @@ impl QuizRepository for PostgresQuizRepository {
             )
             ORDER BY attempt_date DESC
             LIMIT $3
-            "#,
+            "#
         )
         .bind(user_id)
         .bind(skill_id)
@@ -151,27 +152,25 @@ impl QuizRepository for PostgresQuizRepository {
 
     async fn get_average_quiz_score(&self, user_id: &str) -> Result<f32, AnalyticsError> {
         let avg_opt: Option<f64> = sqlx::query_scalar::<_, Option<f64>>(
-            "SELECT AVG(CAST(score AS FLOAT)) FROM quiz_attempts WHERE user_id = $1",
+            "SELECT AVG(CAST(score AS FLOAT)) FROM quiz_attempts WHERE user_id = $1"
         )
         .bind(user_id)
         .fetch_one(&*self.pool)
         .await
-        .map_err(|e| {
-            AnalyticsError::DatabaseError(format!("Failed to fetch average score: {}", e))
-        })?;
+        .map_err(|e| AnalyticsError::DatabaseError(format!("Failed to fetch average score: {}", e)))?;
 
         let avg = avg_opt.unwrap_or(0.0) as f32;
         Ok(avg)
     }
 
     async fn count_quiz_attempts(&self, user_id: &str) -> Result<i64, AnalyticsError> {
-        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM quiz_attempts WHERE user_id = $1")
-            .bind(user_id)
-            .fetch_one(&*self.pool)
-            .await
-            .map_err(|e| {
-                AnalyticsError::DatabaseError(format!("Failed to count quiz attempts: {}", e))
-            })
+        sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM quiz_attempts WHERE user_id = $1"
+        )
+        .bind(user_id)
+        .fetch_one(&*self.pool)
+        .await
+        .map_err(|e| AnalyticsError::DatabaseError(format!("Failed to count quiz attempts: {}", e)))
     }
 }
 
@@ -186,3 +185,4 @@ mod tests {
         // Test would require test database setup
     }
 }
+

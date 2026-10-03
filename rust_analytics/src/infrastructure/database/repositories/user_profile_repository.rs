@@ -1,12 +1,13 @@
 /// Postgres implementation of UserProfileRepository
 /// Manages persistence of user profile data
+
 use crate::domain::repositories::UserProfileRepository;
-#[cfg(feature = "ml")]
-use crate::modules::analytics::core::feature_extraction;
 use crate::shared::error::AnalyticsError;
-use serde_json::Value as JsonValue;
 use sqlx::{Pool, Postgres, Row};
 use std::sync::Arc;
+#[cfg(feature = "ml")]
+use crate::modules::analytics::core::feature_extraction;
+use serde_json::Value as JsonValue;
 
 // Define UserProfile locally if not available in domain::models
 #[derive(Debug, Clone)]
@@ -37,7 +38,7 @@ impl PostgresUserProfileRepository {
             INSERT INTO user_profiles (user_id, learning_style, preferred_language, timezone)
             VALUES ($1, $2, $3, $4)
             RETURNING user_id, learning_style, preferred_language, timezone
-            "#,
+            "#
         )
         .bind(&user_profile.user_id)
         .bind(&user_profile.learning_style)
@@ -45,9 +46,9 @@ impl PostgresUserProfileRepository {
         .bind(&user_profile.timezone)
         .fetch_one(&*self.pool)
         .await
-        .map_err(|e| {
-            AnalyticsError::DatabaseError(format!("Failed to create user profile: {}", e))
-        })?;
+        .map_err(|e| AnalyticsError::DatabaseError(
+            format!("Failed to create user profile: {}", e)
+        ))?;
 
         Ok(UserProfile {
             user_id: row.try_get("user_id").unwrap_or_default(),
@@ -63,7 +64,7 @@ impl PostgresUserProfileRepository {
             SELECT user_id, learning_style, preferred_language, timezone
             FROM user_profiles
             WHERE user_id = $1
-            "#,
+            "#
         )
         .bind(user_id)
         .fetch_one(&*self.pool)
@@ -94,7 +95,7 @@ impl PostgresUserProfileRepository {
             SET learning_style = $2, preferred_language = $3, timezone = $4
             WHERE user_id = $1
             RETURNING user_id, learning_style, preferred_language, timezone
-            "#,
+            "#
         )
         .bind(&user_profile.user_id)
         .bind(&user_profile.learning_style)
@@ -102,9 +103,9 @@ impl PostgresUserProfileRepository {
         .bind(&user_profile.timezone)
         .fetch_one(&*self.pool)
         .await
-        .map_err(|e| {
-            AnalyticsError::DatabaseError(format!("Failed to update user profile: {}", e))
-        })?;
+        .map_err(|e| AnalyticsError::DatabaseError(
+            format!("Failed to update user profile: {}", e)
+        ))?;
 
         Ok(UserProfile {
             user_id: row.try_get("user_id").unwrap_or_default(),
@@ -115,34 +116,23 @@ impl PostgresUserProfileRepository {
     }
 }
 
+
 #[async_trait::async_trait]
 impl UserProfileRepository for PostgresUserProfileRepository {
-    #[cfg(feature = "ml")]
-    async fn get_user_features(
-        &self,
-        user_id: &str,
-    ) -> Result<crate::modules::analytics::core::feature_extraction::UserFeatures, AnalyticsError>
-    {
+#[cfg(feature = "ml")]
+    async fn get_user_features(&self, user_id: &str) -> Result<crate::modules::analytics::core::feature_extraction::UserFeatures, AnalyticsError> {
         match feature_extraction::extract_user_features(user_id.to_string(), &*self.pool).await {
             Ok(features) => Ok(features),
-            Err(e) => Err(AnalyticsError::DatabaseError(format!(
-                "Failed to extract user features: {}",
-                e
-            ))),
+            Err(e) => Err(AnalyticsError::DatabaseError(format!("Failed to extract user features: {}", e))),
         }
     }
 
-    async fn get_user_preferences(
-        &self,
-        user_id: &str,
-    ) -> Result<serde_json::Value, AnalyticsError> {
+    async fn get_user_preferences(&self, user_id: &str) -> Result<serde_json::Value, AnalyticsError> {
         let row_opt = sqlx::query("SELECT preferences FROM users WHERE id = $1")
             .bind(user_id)
             .fetch_optional(&*self.pool)
             .await
-            .map_err(|e| {
-                AnalyticsError::DatabaseError(format!("Failed to fetch user preferences: {}", e))
-            })?;
+            .map_err(|e| AnalyticsError::DatabaseError(format!("Failed to fetch user preferences: {}", e)))?;
 
         if let Some(row) = row_opt {
             let pref: JsonValue = row.try_get("preferences").unwrap_or(JsonValue::Null);
@@ -153,17 +143,8 @@ impl UserProfileRepository for PostgresUserProfileRepository {
     }
 
     #[cfg(feature = "ml")]
-    async fn get_learning_history(
-        &self,
-        user_id: &str,
-    ) -> Result<
-        Vec<crate::modules::analytics::core::feature_extraction::LearningHistoryItem>,
-        AnalyticsError,
-    > {
-        let history = sqlx::query_as::<
-            _,
-            crate::modules::analytics::core::feature_extraction::LearningHistoryItem,
-        >(
+    async fn get_learning_history(&self, user_id: &str) -> Result<Vec<crate::modules::analytics::core::feature_extraction::LearningHistoryItem>, AnalyticsError> {
+        let history = sqlx::query_as::<_, crate::modules::analytics::core::feature_extraction::LearningHistoryItem>(
             r#"
             SELECT 
                 qa.quiz_id as material_id, 
@@ -179,7 +160,7 @@ impl UserProfileRepository for PostgresUserProfileRepository {
             WHERE qa.user_id = $1
             ORDER BY qa.started_at DESC
             LIMIT 50
-            "#,
+            "#
         )
         .bind(user_id)
         .fetch_all(&*self.pool)
@@ -258,3 +239,4 @@ mod tests {
         // assert!(matches!(error, Err(AnalyticsError::NotFound(_))));
     }
 }
+

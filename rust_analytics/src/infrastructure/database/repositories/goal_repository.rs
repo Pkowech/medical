@@ -1,7 +1,8 @@
-use crate::domain::models::{Goal, UpcomingDeadline};
 /// Postgres implementation of GoalRepository
 /// Manages persistence of learning goals and milestone data
+
 use crate::domain::repositories::GoalRepository;
+use crate::domain::models::{Goal, UpcomingDeadline};
 use crate::domain::value_objects::ProgressStatus;
 use crate::shared::error::AnalyticsError;
 use chrono::NaiveDate;
@@ -37,29 +38,31 @@ impl GoalRepository for PostgresGoalRepository {
                 COALESCE(streak_count, 0) as streak_count
             FROM learning_goals
             WHERE user_id = $1
-            "#,
+            "#
         )
         .bind(user_id)
         .fetch_all(&*self.pool)
         .await
-        .map_err(|e| AnalyticsError::DatabaseError(format!("Failed to fetch user goals: {}", e)))?;
+        .map_err(|e| AnalyticsError::DatabaseError(
+            format!("Failed to fetch user goals: {}", e)
+        ))?;
 
         let goals = rows
             .into_iter()
-            .map(|row| Goal {
-                id: row.try_get("id").unwrap_or_default(),
-                user_id: row.try_get("user_id").unwrap_or_default(),
-                title: row.try_get("title").unwrap_or_default(),
-                status: row.try_get("status").unwrap_or(ProgressStatus::NotStarted),
-                category: row.try_get("category").unwrap_or_default(),
-                priority: row.try_get::<i32, _>("priority").unwrap_or(0).to_string(),
-                target_date: row.try_get("target_date").ok(),
-                completed_at: row.try_get("completed_at").ok(),
-                created_at: row
-                    .try_get("created_at")
-                    .unwrap_or_else(|_| chrono::Utc::now().naive_utc()),
-                start_date: row.try_get("start_date").ok(),
-                streak_count: row.try_get("streak_count").unwrap_or(0),
+            .map(|row| {
+                Goal {
+                    id: row.try_get("id").unwrap_or_default(),
+                    user_id: row.try_get("user_id").unwrap_or_default(),
+                    title: row.try_get("title").unwrap_or_default(),
+                    status: row.try_get("status").unwrap_or(ProgressStatus::NotStarted),
+                    category: row.try_get("category").unwrap_or_default(),
+                    priority: row.try_get::<i32, _>("priority").unwrap_or(0).to_string(),
+                    target_date: row.try_get("target_date").ok(),
+                    completed_at: row.try_get("completed_at").ok(),
+                    created_at: row.try_get("created_at").unwrap_or_else(|_| chrono::Utc::now().naive_utc()),
+                    start_date: row.try_get("start_date").ok(),
+                    streak_count: row.try_get("streak_count").unwrap_or(0),
+                }
             })
             .collect();
 
@@ -87,32 +90,32 @@ impl GoalRepository for PostgresGoalRepository {
                 COALESCE(streak_count, 0) as streak_count
             FROM learning_goals
             WHERE user_id = $1 AND status::text = $2
-            "#,
+            "#
         )
         .bind(user_id)
         .bind(status)
         .fetch_all(&*self.pool)
         .await
-        .map_err(|e| {
-            AnalyticsError::DatabaseError(format!("Failed to fetch goals by status: {}", e))
-        })?;
+        .map_err(|e| AnalyticsError::DatabaseError(
+            format!("Failed to fetch goals by status: {}", e)
+        ))?;
 
         let goals = rows
             .into_iter()
-            .map(|row| Goal {
-                id: row.try_get("id").unwrap_or_default(),
-                user_id: row.try_get("user_id").unwrap_or_default(),
-                title: row.try_get("title").unwrap_or_default(),
-                status: row.try_get("status").unwrap_or(ProgressStatus::NotStarted),
-                category: row.try_get("category").unwrap_or_default(),
-                priority: row.try_get::<i32, _>("priority").unwrap_or(0).to_string(),
-                target_date: row.try_get("target_date").ok(),
-                completed_at: row.try_get("completed_at").ok(),
-                created_at: row
-                    .try_get("created_at")
-                    .unwrap_or_else(|_| chrono::Utc::now().naive_utc()),
-                start_date: row.try_get("start_date").ok(),
-                streak_count: row.try_get("streak_count").unwrap_or(0),
+            .map(|row| {
+                Goal {
+                    id: row.try_get("id").unwrap_or_default(),
+                    user_id: row.try_get("user_id").unwrap_or_default(),
+                    title: row.try_get("title").unwrap_or_default(),
+                    status: row.try_get("status").unwrap_or(ProgressStatus::NotStarted),
+                    category: row.try_get("category").unwrap_or_default(),
+                    priority: row.try_get::<i32, _>("priority").unwrap_or(0).to_string(),
+                    target_date: row.try_get("target_date").ok(),
+                    completed_at: row.try_get("completed_at").ok(),
+                    created_at: row.try_get("created_at").unwrap_or_else(|_| chrono::Utc::now().naive_utc()),
+                    start_date: row.try_get("start_date").ok(),
+                    streak_count: row.try_get("streak_count").unwrap_or(0),
+                }
             })
             .collect();
 
@@ -137,23 +140,20 @@ impl GoalRepository for PostgresGoalRepository {
               AND status::text != 'completed'
             ORDER BY target_date ASC
             LIMIT 10
-            "#,
+            "#
         )
         .bind(user_id)
         .fetch_all(&*self.pool)
         .await
-        .map_err(|e| {
-            AnalyticsError::DatabaseError(format!("Failed to fetch upcoming deadlines: {}", e))
-        })?;
+        .map_err(|e| AnalyticsError::DatabaseError(
+            format!("Failed to fetch upcoming deadlines: {}", e)
+        ))?;
 
         let deadlines = rows
             .into_iter()
             .map(|row| {
-                let target_date = row
-                    .try_get::<NaiveDate, _>("target_date")
-                    .unwrap_or(chrono::Local::now().date_naive() + chrono::Duration::days(7));
-                let days_remaining =
-                    (target_date - chrono::Local::now().date_naive()).num_days() as i32;
+                let target_date = row.try_get::<NaiveDate, _>("target_date").unwrap_or(chrono::Local::now().date_naive() + chrono::Duration::days(7));
+                let days_remaining = (target_date - chrono::Local::now().date_naive()).num_days() as i32;
                 UpcomingDeadline {
                     goal_id: row.try_get("id").unwrap_or_default(),
                     title: row.try_get("title").unwrap_or_default(),
@@ -221,3 +221,4 @@ mod tests {
         // Requires test database
     }
 }
+

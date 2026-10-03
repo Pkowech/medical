@@ -65,12 +65,13 @@ impl ActivityRepository for PostgresActivityRepository {
         &self,
         user_id: &str,
     ) -> Result<(i32, i32), AnalyticsError> {
-        let total: i64 =
-            sqlx::query_scalar("SELECT COUNT(*) FROM course_enrollments WHERE user_id = $1")
-                .bind(user_id)
-                .fetch_one(&*self.pool)
-                .await
-                .unwrap_or(0);
+        let total: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM course_enrollments WHERE user_id = $1",
+        )
+        .bind(user_id)
+        .fetch_one(&*self.pool)
+        .await
+        .unwrap_or(0);
 
         let completed: i64 = sqlx::query_scalar(
             "SELECT COUNT(*) FROM course_enrollments WHERE user_id = $1 AND status::text = 'completed'"

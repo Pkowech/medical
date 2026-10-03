@@ -1,25 +1,26 @@
-pub mod activity_repository;
-pub mod course_repository;
-pub mod goal_repository;
-pub mod material_repository;
-pub mod path_repository;
-pub mod quiz_repository;
-pub mod recommendation_repository;
 /// Infrastructure layer repository implementations
 /// Concrete database implementations of domain repository traits
+
 pub mod skill_state_repository;
+pub mod quiz_repository;
+pub mod course_repository;
+pub mod material_repository;
+pub mod activity_repository;
+pub mod goal_repository;
 pub mod user_profile_repository;
+pub mod path_repository;
+pub mod recommendation_repository;
 
 // Re-export implementations
-pub use activity_repository::PostgresActivityRepository;
-pub use course_repository::PostgresCourseRepository;
-pub use goal_repository::PostgresGoalRepository;
-pub use material_repository::PostgresMaterialRepository;
-pub use path_repository::PostgresPathRepository;
-pub use quiz_repository::PostgresQuizRepository;
-pub use recommendation_repository::PostgresRecommendationRepository;
 pub use skill_state_repository::PostgresSkillStateRepository;
+pub use quiz_repository::PostgresQuizRepository;
+pub use course_repository::PostgresCourseRepository;
+pub use material_repository::PostgresMaterialRepository;
+pub use activity_repository::PostgresActivityRepository;
+pub use goal_repository::PostgresGoalRepository;
 pub use user_profile_repository::PostgresUserProfileRepository;
+pub use path_repository::PostgresPathRepository;
+pub use recommendation_repository::PostgresRecommendationRepository;
 
 use sqlx::{Pool, Postgres};
 use std::sync::Arc;
@@ -72,3 +73,4 @@ impl RepositoryFactory {
         Arc::new(PostgresUserProfileRepository::new(self.pool.clone()))
     }
 }
+
