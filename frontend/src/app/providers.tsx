@@ -9,10 +9,16 @@ import React, {
   useEffect,
 } from 'react';
 // AuthProvider removed — using Zustand `useAuthStore` as single source of truth
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import SessionWrapper from '@/features/auth/components/SessionWrapper';
+import { useAuthStore } from '@/features/auth/store/useAuthStore';
 import { triggerNotificationsRefresh } from '@/features/community/notificationEvents';
+import {
+  getPersistentQueryCacheKey,
+  persistPersistentQueryCache,
+  restorePersistentQueryCache,
+} from '@/lib/core/queryCachePersistence';
 
 // Theme context interface
 interface ThemeContextType {
@@ -139,6 +145,42 @@ const SimpleThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 // Export canonical ThemeProvider alias for other imports
 export const ThemeProvider = SimpleThemeProvider;
 
+function PersistentQueryCache() {
+  const client = useQueryClient();
+  const userId = useAuthStore(state => state.user?.id);
+
+  useEffect(() => {
+    client.clear();
+    const cacheKey = userId ? getPersistentQueryCacheKey(userId) : undefined;
+    if (cacheKey) restorePersistentQueryCache(client, cacheKey);
+
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    const unsubscribe = client.getQueryCache().subscribe(event => {
+      if (
+        !cacheKey ||
+        event.type !== 'updated' ||
+        event.query.meta?.persist !== true
+      ) {
+        return;
+      }
+
+      if (timeout) clearTimeout(timeout);
+      timeout = setTimeout(
+        () => persistPersistentQueryCache(client, cacheKey),
+        250,
+      );
+    });
+
+    return () => {
+      unsubscribe();
+      if (timeout) clearTimeout(timeout);
+      if (cacheKey) persistPersistentQueryCache(client, cacheKey);
+    };
+  }, [client, userId]);
+
+  return null;
+}
+
 // Providers wrapper for theme and auth
 export function Providers({ children }: { children: ReactNode }) {
   const [client] = useState(
@@ -248,7 +290,10 @@ export function Providers({ children }: { children: ReactNode }) {
   return (
     <SimpleThemeProvider>
       <QueryClientProvider client={client}>
-        <SessionWrapper>{children}</SessionWrapper>
+        <SessionWrapper>
+          <PersistentQueryCache />
+          {children}
+        </SessionWrapper>
         <ReactQueryDevtools initialIsOpen={false} />
       </QueryClientProvider>
     </SimpleThemeProvider>

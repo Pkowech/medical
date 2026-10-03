@@ -19,7 +19,7 @@ tonic = "0.14.2"
 tonic-prost = "0.14.2"
 
 # Async runtime
-tokio = { version = "1.40", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1.40", features = ["macros", "rt-multi-thread", "signal"] }
 async-trait = "0.1.77"
 futures-util = "0.3.31"
 

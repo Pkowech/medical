@@ -804,8 +804,9 @@ pub async fn run() -> std::io::Result<()> {
         )
     })?;
     let analytics_service = MyAnalyticsService::new(grpc_pool);
+    let (grpc_shutdown_tx, grpc_shutdown_rx) = tokio::sync::oneshot::channel();
 
-    tokio::spawn(async move {
+    let grpc_server = tokio::spawn(async move {
         println!("gRPC server listening on {}", grpc_addr);
         let auth_interceptor = move |request: tonic::Request<()>| {
             let supplied_key = request
@@ -827,9 +828,10 @@ pub async fn run() -> std::io::Result<()> {
                 analytics_service,
                 auth_interceptor,
             ))
-            .serve(grpc_addr)
+            .serve_with_shutdown(grpc_addr, async {
+                let _ = grpc_shutdown_rx.await;
+            })
             .await
-            .unwrap();
     });
 
     // Actix-web Server
@@ -852,7 +854,7 @@ pub async fn run() -> std::io::Result<()> {
     let http_addr = format!("{}:{}", http_host, http_port);
     println!("HTTP server address: {}", http_addr);
 
-    HttpServer::new(move || {
+    let http_server = HttpServer::new(move || {
         println!("Creating new HTTP application instance...");
         #[allow(unused_mut)]
         let mut app = App::new()
@@ -954,6 +956,41 @@ pub async fn run() -> std::io::Result<()> {
         app
     })
     .bind(&http_addr)?
-    .run()
-    .await
+    .run();
+    let http_handle = http_server.handle();
+    let mut http_server = tokio::spawn(http_server);
+
+    let shutdown_result = tokio::select! {
+        result = &mut http_server => match result {
+            Ok(result) => result,
+            Err(error) => Err(std::io::Error::other(error)),
+        },
+        signal_result = tokio::signal::ctrl_c() => {
+            match signal_result {
+                Ok(()) => {
+                    println!("Shutdown signal received; stopping HTTP and gRPC servers...");
+                    http_handle.stop(true).await;
+                    match http_server.await {
+                        Ok(result) => result,
+                        Err(error) => Err(std::io::Error::other(error)),
+                    }
+                }
+                Err(error) => {
+                    http_handle.stop(false).await;
+                    let _ = http_server.await;
+                    Err(std::io::Error::other(error))
+                }
+            }
+        }
+    };
+
+    let _ = grpc_shutdown_tx.send(());
+    let grpc_result = match grpc_server.await {
+        Ok(Ok(())) => Ok(()),
+        Ok(Err(error)) => Err(std::io::Error::other(error)),
+        Err(error) => Err(std::io::Error::other(error)),
+    };
+
+    shutdown_result?;
+    grpc_result
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { syncService } from '@/lib/core/offline/syncService';
 import { initializeOfflineQueue } from '@/features/learning-management/services/offlineProgressSync';
 
@@ -10,22 +10,25 @@ export function useConnectivity() {
   const [failedChanges, setFailedChanges] = useState(0);
   const [isFlushing, setIsFlushing] = useState(false);
   const [statusError, setStatusError] = useState<string | undefined>();
+  const [latestFailure, setLatestFailure] = useState<string | undefined>();
+
+  const refreshStatus = useCallback(async () => {
+    const status = await syncService.getSyncStatus();
+    setPendingChanges(status.pendingChanges);
+    setFailedChanges(status.failedChanges);
+    setIsFlushing(status.isFlushing);
+    setStatusError(status.statusError);
+    setLatestFailure(status.latestFailure);
+    if (status.isOnline !== isOnline) setIsOnline(status.isOnline);
+    if (status.isOnline && status.readyToSync && !status.isFlushing) {
+      void syncService.syncOutbox().catch(error => {
+        setStatusError(error instanceof Error ? error.message : String(error));
+      });
+    }
+  }, [isOnline]);
 
   useEffect(() => {
     let disposed = false;
-    const refreshStatus = async () => {
-      const status = await syncService.getSyncStatus();
-      if (disposed) return;
-      setPendingChanges(status.pendingChanges);
-      setFailedChanges(status.failedChanges);
-      setIsFlushing(status.isFlushing);
-      setStatusError(status.statusError);
-      if (status.isOnline !== isOnline) setIsOnline(status.isOnline);
-      if (status.isOnline && status.readyToSync && !status.isFlushing) {
-        void syncService.syncOutbox();
-      }
-    };
-
     void initializeOfflineQueue()
       .then(refreshStatus)
       .catch(error => {
@@ -38,7 +41,11 @@ export function useConnectivity() {
     const handleOnline = () => {
       setIsOnline(true);
       // Trigger sync when coming back online
-      void syncService.syncOutbox();
+      void syncService.syncOutbox().catch(error => {
+        if (!disposed) {
+          setStatusError(error instanceof Error ? error.message : String(error));
+        }
+      });
     };
     const handleOffline = () => setIsOnline(false);
 
@@ -55,7 +62,7 @@ export function useConnectivity() {
       window.removeEventListener('offline', handleOffline);
       clearInterval(intervalId);
     };
-  }, [isOnline]);
+  }, [isOnline, refreshStatus]);
 
   return {
     isOnline,
@@ -63,7 +70,22 @@ export function useConnectivity() {
     failedChanges,
     isFlushing,
     statusError,
-    triggerSync: () => syncService.syncOutbox(),
-    retryFailed: () => syncService.retryAllFailedItems(),
+    latestFailure,
+    retryFailed: async () => {
+      try {
+        await syncService.retryAllFailedItems();
+        await refreshStatus();
+      } catch (error) {
+        setStatusError(error instanceof Error ? error.message : String(error));
+      }
+    },
+    triggerSync: async () => {
+      try {
+        await syncService.syncOutbox();
+        await refreshStatus();
+      } catch (error) {
+        setStatusError(error instanceof Error ? error.message : String(error));
+      }
+    },
   };
 }

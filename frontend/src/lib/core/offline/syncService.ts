@@ -88,6 +88,7 @@ class SyncService {
     failedChanges: number;
     isFlushing: boolean;
     readyToSync: boolean;
+    latestFailure?: string;
     statusError?: string;
   }> {
     try {
@@ -102,6 +103,7 @@ class SyncService {
         failedChanges,
         isFlushing: this.isFlushing, // Expose flush lock status
         readyToSync: pendingItems.some(item => (item.nextAttemptAt ?? 0) <= Date.now()),
+        latestFailure: items.find(item => item.status === 'failed')?.lastError,
       };
     } catch (error) {
       console.warn('Failed to get sync status from IndexedDB. Connection may be closing.', error);
@@ -112,6 +114,7 @@ class SyncService {
         failedChanges: 0,
         isFlushing: this.isFlushing,
         readyToSync: false,
+        latestFailure: undefined,
         statusError: error instanceof Error ? error.message : String(error),
       };
     }

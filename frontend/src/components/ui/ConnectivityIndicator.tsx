@@ -13,6 +13,7 @@ export function ConnectivityIndicator() {
     isFlushing,
     statusError,
     retryFailed,
+    latestFailure,
   } = useConnectivity();
   const [showSuccess, setShowSuccess] = useState(false);
   const [prevFlushing, setPrevFlushing] = useState(isFlushing);
@@ -84,7 +85,9 @@ export function ConnectivityIndicator() {
       {statusError && (
         <>
           <AlertCircle className="w-4 h-4" />
-          <span className="text-sm font-medium">Offline storage is unavailable</span>
+          <span className="text-sm font-medium" title={statusError}>
+            Sync unavailable
+          </span>
         </>
       )}
 
@@ -98,6 +101,12 @@ export function ConnectivityIndicator() {
             type="button"
             className="rounded bg-white/20 px-2 py-1 text-xs font-semibold hover:bg-white/30"
             onClick={() => void retryFailed()}
+            title={latestFailure || 'Retry failed changes'}
+            aria-label={
+              latestFailure
+                ? `Retry failed changes. Latest error: ${latestFailure}`
+                : 'Retry failed changes'
+            }
           >
             Retry
           </button>
