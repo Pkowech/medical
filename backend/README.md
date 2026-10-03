@@ -94,6 +94,8 @@ The [backend Dockerfile](./Dockerfile) builds both services into one image. Conf
 
 Keep `ENABLE_GRPC=true`. The image starts Rust analytics first and configures the backend to call it at `127.0.0.1:50051`; do not expose port `50051` publicly. Render should route HTTP to the backend on its `PORT`. The frontend can remain on Vercel, and managed database, Redis, and file-storage services can remain external.
 
+The Node backend uses up to 3 PostgreSQL connections by default, and Rust analytics uses up to 2. Set `DATABASE_POOL_MAX` and `RUST_ANALYTICS_DB_MAX_CONNECTIONS` to lower or raise these per-process limits according to the database plan's connection cap and the number of running instances.
+
 ### Google Shared Drive course materials
 
 New public/library uploads continue to use the configured R2/S3 storage provider. Instructors can also attach an existing file from the institution's Shared Drive without copying its bytes into R2. Drive-backed materials are streamed through the authenticated materials preview endpoint; only course creators, assigned instructors, admins, active/completed course enrollees, and active members of an active study group explicitly linked to that course can read them.

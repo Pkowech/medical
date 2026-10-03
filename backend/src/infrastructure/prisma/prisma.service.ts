@@ -33,8 +33,14 @@ export class PrismaService
     poolUrl.searchParams.delete('sslmode');
     const poolConnectionString = poolUrl.toString();
 
+    const poolMax = Number(process.env.DATABASE_POOL_MAX ?? 3);
+    if (!Number.isInteger(poolMax) || poolMax < 1) {
+      throw new Error('DATABASE_POOL_MAX must be a positive integer');
+    }
+
     const poolConfig: ConstructorParameters<typeof Pool>[0] = {
       connectionString: poolConnectionString,
+      max: poolMax,
     };
 
     if (shouldUseSsl) {
