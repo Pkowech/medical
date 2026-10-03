@@ -60,5 +60,5 @@ def test_local_material_reader_renders_article_content():
     """Verifies LocalMaterialReader presents inline text/HTML lesson articles."""
     material_reader = read_frontend("src/features/student/components/LocalMaterialReader.tsx")
 
-    assert "material" in material_reader
-    assert "content" in material_reader
+    assert 'accept=".pdf,.txt,.md"' in material_reader
+    assert "<pre>{fileContent}</pre>" in material_reader

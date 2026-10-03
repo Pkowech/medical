@@ -8,6 +8,7 @@ export function useConnectivity() {
   );
   const [pendingChanges, setPendingChanges] = useState(0);
   const [failedChanges, setFailedChanges] = useState(0);
+  const [retryableFailedChanges, setRetryableFailedChanges] = useState(0);
   const [isFlushing, setIsFlushing] = useState(false);
   const [statusError, setStatusError] = useState<string | undefined>();
   const [latestFailure, setLatestFailure] = useState<string | undefined>();
@@ -16,6 +17,7 @@ export function useConnectivity() {
     const status = await syncService.getSyncStatus();
     setPendingChanges(status.pendingChanges);
     setFailedChanges(status.failedChanges);
+    setRetryableFailedChanges(status.retryableFailedChanges);
     setIsFlushing(status.isFlushing);
     setStatusError(status.statusError);
     setLatestFailure(status.latestFailure);
@@ -68,12 +70,21 @@ export function useConnectivity() {
     isOnline,
     pendingChanges,
     failedChanges,
+    retryableFailedChanges,
     isFlushing,
     statusError,
     latestFailure,
     retryFailed: async () => {
       try {
         await syncService.retryAllFailedItems();
+        await refreshStatus();
+      } catch (error) {
+        setStatusError(error instanceof Error ? error.message : String(error));
+      }
+    },
+    discardFailed: async () => {
+      try {
+        await syncService.discardAllFailedItems();
         await refreshStatus();
       } catch (error) {
         setStatusError(error instanceof Error ? error.message : String(error));

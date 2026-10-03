@@ -1,4 +1,10 @@
-import { initDB, QuizQuestion, ReadingMaterial, SyncQueueItem } from './db';
+import {
+  initDB,
+  LocalFileMetadata,
+  QuizQuestion,
+  ReadingMaterial,
+  SyncQueueItem,
+} from './db';
 
 class OfflineService {
   private db: Awaited<ReturnType<typeof initDB>> | null = null;
@@ -42,6 +48,19 @@ class OfflineService {
     const db = await this.initialize();
     const tx = db.transaction('readingMaterials', 'readonly');
     return tx.store.get(id);
+  }
+
+  async saveLocalFileMetadata(metadata: LocalFileMetadata): Promise<void> {
+    const db = await this.initialize();
+    const tx = db.transaction('localFileMetadata', 'readwrite');
+    await tx.store.put(metadata);
+    await tx.done;
+  }
+
+  async getLocalFileMetadata(hash: string): Promise<LocalFileMetadata | undefined> {
+    const db = await this.initialize();
+    const tx = db.transaction('localFileMetadata', 'readonly');
+    return tx.store.get(hash);
   }
 
   // Sync queue methods

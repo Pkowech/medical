@@ -3,6 +3,7 @@ import { signOut, getSession } from 'next-auth/react';
 import { ApiError, ApiResponse, RequestOptions } from '@/shared/types';
 import { errorService } from '@/app/services/error.service';
 import { useAuthStore } from '@/features/auth/store/useAuthStore';
+import { isOfflineQueueableRequest } from '@/lib/core/offline/offlineQueuePolicy';
 
 // Enhanced error classification
 type ErrorType = 'network' | 'timeout' | 'auth' | 'validation' | 'server' | 'unknown';
@@ -141,15 +142,16 @@ class ApiService {
         // --- OFFLINE SYNC INTEGRATION START ---
         // Identify if this is a mutation (POST, PUT, PATCH, DELETE) that failed due to network
         // Note: 503 is also often a temporary server issue worth queuing
-        const isMutation = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(
-          originalRequest.method?.toUpperCase() || ''
+        const isQueueableRequest = isOfflineQueueableRequest(
+          originalRequest.method,
+          originalRequest.url,
         );
         const isNetworkOrServerTemp =
           errorType === 'network' ||
           errorType === 'timeout' ||
           (axios.isAxiosError(error) && error.response?.status === 503);
 
-        if (isMutation && isNetworkOrServerTemp) {
+        if (isQueueableRequest && isNetworkOrServerTemp) {
           try {
             // Lazy load syncService to separate imports slightly (optional but safe)
             const { syncService } = await import('@/lib/core/offline/syncService');
@@ -160,7 +162,7 @@ class ApiService {
             // Queue request
             await syncService.addToOutbox(
               originalRequest.url || '',
-              (originalRequest.method?.toUpperCase() || 'POST') as 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
+              'POST',
               originalRequest.data
                 ? typeof originalRequest.data === 'string'
                   ? JSON.parse(originalRequest.data)

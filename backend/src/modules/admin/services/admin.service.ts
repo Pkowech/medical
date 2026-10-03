@@ -4,6 +4,13 @@ import { RedisService } from '#infrastructure/redis/redis.service';
 import { BaseAnalyticsService } from '#common/services/base-analytics.service';
 import { CreateUserDto, UpdateUserDto } from '#common/dto';
 import { getErrorMessage, getErrorStack } from '#common/utils/error.utils';
+import { Prisma, RoleName } from '@prisma/client';
+
+interface AdminUserFilters {
+  search?: string;
+  role?: string;
+  status?: string;
+}
 
 @Injectable()
 export class AdminService extends BaseAnalyticsService {
@@ -72,22 +79,67 @@ export class AdminService extends BaseAnalyticsService {
     }
   }
 
-  async getUsers(page: number = 1, limit: number = 10) {
+  async getUsers(
+    page: number = 1,
+    limit: number = 10,
+    filters: AdminUserFilters = {},
+  ) {
     const skip = (page - 1) * limit;
+    const search = filters.search?.trim().slice(0, 100);
+    const where: Prisma.UserWhereInput = {};
+
+    if (search) {
+      where.OR = [
+        { email: { contains: search, mode: 'insensitive' } },
+        { username: { contains: search, mode: 'insensitive' } },
+        { firstName: { contains: search, mode: 'insensitive' } },
+        { lastName: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    if (filters.role && Object.values(RoleName).includes(filters.role as RoleName)) {
+      where.userRoles = { some: { role: { name: filters.role as RoleName } } };
+    }
+
+    if (filters.status === 'active') {
+      where.isActive = true;
+      where.isLocked = false;
+    } else if (filters.status === 'inactive') {
+      where.isActive = false;
+      where.isLocked = false;
+    } else if (filters.status === 'suspended') {
+      where.isLocked = true;
+    }
+
     const [users, total] = await Promise.all([
       this.prisma.user.findMany({
+        where,
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
-        include: {
+        select: {
+          id: true,
+          email: true,
+          username: true,
+          firstName: true,
+          lastName: true,
+          isActive: true,
+          isLocked: true,
+          createdAt: true,
+          lastLogin: true,
           userRoles: {
-            include: {
-              role: true,
+            select: {
+              role: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
             },
           },
         },
       }),
-      this.prisma.user.count(),
+      this.prisma.user.count({ where }),
     ]);
 
     return {

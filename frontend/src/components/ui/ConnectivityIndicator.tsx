@@ -10,9 +10,11 @@ export function ConnectivityIndicator() {
     isOnline,
     pendingChanges,
     failedChanges,
+    retryableFailedChanges,
     isFlushing,
     statusError,
     retryFailed,
+    discardFailed,
     latestFailure,
   } = useConnectivity();
   const [showSuccess, setShowSuccess] = useState(false);
@@ -94,21 +96,35 @@ export function ConnectivityIndicator() {
       {!statusError && failedChanges > 0 && (
         <>
           <AlertCircle className="w-4 h-4" />
-          <span className="text-sm font-medium">
+          <span className="text-sm font-medium" title={latestFailure}>
             {failedChanges} change{failedChanges === 1 ? '' : 's'} need attention
           </span>
+          {retryableFailedChanges > 0 && (
+            <button
+              type="button"
+              className="rounded bg-white/20 px-2 py-1 text-xs font-semibold hover:bg-white/30"
+              onClick={() => void retryFailed()}
+              title={latestFailure || 'Retry failed changes'}
+              aria-label={
+                latestFailure
+                  ? `Retry failed changes. Latest error: ${latestFailure}`
+                  : 'Retry failed changes'
+              }
+            >
+              Retry ({retryableFailedChanges})
+            </button>
+          )}
           <button
             type="button"
             className="rounded bg-white/20 px-2 py-1 text-xs font-semibold hover:bg-white/30"
-            onClick={() => void retryFailed()}
-            title={latestFailure || 'Retry failed changes'}
-            aria-label={
-              latestFailure
-                ? `Retry failed changes. Latest error: ${latestFailure}`
-                : 'Retry failed changes'
-            }
+            onClick={() => {
+              if (window.confirm('Discard all failed offline changes from this device?')) {
+                void discardFailed();
+              }
+            }}
+            title="Permanently remove failed changes stored on this device"
           >
-            Retry
+            Clear failed
           </button>
         </>
       )}

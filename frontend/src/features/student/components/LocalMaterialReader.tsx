@@ -3,53 +3,76 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import useMaterialProgressTracker from '@/features/learning-management/hooks/useMaterialProgressTracker';
-import { apiService as api } from '@/features/auth/services/apiClient';
 import PDFViewer from '@/shared/components/pdf/PDFViewer';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
 import { Upload } from 'lucide-react';
-import { Material, AppFile } from '@/shared/types/materialInterface';
-import offlineSync from '@/features/learning-management/services/offlineProgressSync'; // Import offlineSync
+import type { LocalFileMetadata } from '@/lib/core/offline/db';
+import { offlineService } from '@/lib/core/offline/offlineService';
 
 export function LocalMaterialReader() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileContent, setFileContent] = useState<string | null>(null);
   const [fileUrl, setFileUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [registeredMaterialId, setRegisteredMaterialId] = useState<string | null>(null);
-  const [registeredFileHash, setRegisteredFileHash] = useState<string | null>(null);
+  const [metadataError, setMetadataError] = useState<string | null>(null);
+  const [localFileMetadata, setLocalFileMetadata] = useState<LocalFileMetadata | null>(null);
   const [unitIdInput, setUnitIdInput] = useState<string>('');
   const viewerRef = useRef<HTMLDivElement | null>(null);
+  const fileSelectionIdRef = useRef(0);
   const params = useParams();
   const unitIdFromRoute = params?.unitId as string | undefined;
   const chosenUnitId = unitIdInput || unitIdFromRoute || undefined;
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) {
-      setSelectedFile(file);
-      setError(null);
-      // For now, we'll just show the file name.
-      // In the next step, we will add logic to read and display the content.
-      setFileContent(`File selected: ${file.name}`);
-      if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
-        const url = URL.createObjectURL(file);
-        // revoke previously created object URL
-        if (fileUrl) URL.revokeObjectURL(fileUrl);
-        setFileUrl(url);
-      } else {
-        setFileUrl(null);
-        // try reading text files
-        if (file.type === 'text/plain' || file.name.endsWith('.md') || file.name.endsWith('.txt')) {
-          const reader = new FileReader();
-          reader.onload = e => {
-            const text = e?.target?.result;
-            setFileContent(typeof text === 'string' ? text : JSON.stringify(text ?? ''));
-          };
-          reader.onerror = () => setError('Failed to read file');
-          reader.readAsText(file);
-        }
+    if (!file) return;
+    const fileSelectionId = ++fileSelectionIdRef.current;
+
+    setSelectedFile(file);
+    setError(null);
+    setMetadataError(null);
+    setLocalFileMetadata(null);
+    setFileContent(`File selected: ${file.name}`);
+
+    const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+    if (isPdf) {
+      setFileUrl(URL.createObjectURL(file));
+    } else {
+      setFileUrl(null);
+      if (file.type === 'text/plain' || /\.(md|txt)$/i.test(file.name)) {
+        const reader = new FileReader();
+        reader.onload = e => {
+          const text = e?.target?.result;
+          setFileContent(typeof text === 'string' ? text : JSON.stringify(text ?? ''));
+        };
+        reader.onerror = () => setError('Failed to read file');
+        reader.readAsText(file);
+      }
+    }
+
+    try {
+      const buffer = await file.arrayBuffer();
+      const digest = await crypto.subtle.digest('SHA-256', buffer);
+      const hash = Array.from(new Uint8Array(digest))
+        .map(byte => byte.toString(16).padStart(2, '0'))
+        .join('');
+      const metadata: LocalFileMetadata = {
+        id: hash,
+        filename: file.name,
+        mimetype: file.type || 'application/octet-stream',
+        size: file.size,
+        hash,
+      };
+      await offlineService.saveLocalFileMetadata(metadata);
+      if (fileSelectionIdRef.current === fileSelectionId) {
+        setLocalFileMetadata(metadata);
+      }
+    } catch (metadataSaveError) {
+      console.error('Failed to save local file metadata on this device.', metadataSaveError);
+      if (fileSelectionIdRef.current === fileSelectionId) {
+        setMetadataError('File opened, but its metadata could not be saved on this device.');
       }
     }
   };
@@ -58,7 +81,7 @@ export function LocalMaterialReader() {
     return () => {
       if (fileUrl) URL.revokeObjectURL(fileUrl);
     };
-  }, []);
+  }, [fileUrl]);
 
 
 
@@ -86,7 +109,6 @@ export function LocalMaterialReader() {
 
   const { startTracking, stopTracking, isTracking, elapsedSeconds, currentPercent } =
     useMaterialProgressTracker({
-      materialId: registeredMaterialId || undefined,
       unitId: chosenUnitId,
       computePercent,
       intervalMs: 30000,
@@ -102,8 +124,9 @@ export function LocalMaterialReader() {
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="text-sm text-muted-foreground">
-          Select a local file (PDF, text) to track your reading progress. The file content stays on
-          your device.
+          Select a local PDF or text file to read it offline. Its filename, type, size, and SHA-256
+          fingerprint are saved in this device&apos;s IndexedDB only. The file itself is not copied
+          there, so select it again after refreshing or reopening the app.
         </p>
         <div className="flex w-full max-w-sm items-center space-x-2">
           <Input type="file" onChange={handleFileChange} accept=".pdf,.txt,.md" />
@@ -118,6 +141,17 @@ export function LocalMaterialReader() {
           />
         </div>
         {error && <p className="text-sm text-red-600">{error}</p>}
+        {metadataError && <p className="text-sm text-red-600">{metadataError}</p>}
+        {localFileMetadata && (
+          <div className="rounded-md border p-3 text-sm" aria-live="polite">
+            <p>File details saved on this device only.</p>
+            <p>{localFileMetadata.filename}</p>
+            <p>
+              {localFileMetadata.mimetype} · {localFileMetadata.size} bytes
+            </p>
+            <p className="break-all">SHA-256: {localFileMetadata.hash}</p>
+          </div>
+        )}
         {(fileContent || fileUrl) && (
           <Card className="mt-4">
             <CardHeader>
@@ -169,35 +203,6 @@ export function LocalMaterialReader() {
                   setError('Please select a file first.');
                   return;
                 }
-                // compute hash and register local material if not already registered
-                try {
-                  const buffer = await selectedFile.arrayBuffer();
-                  const digest = await crypto.subtle.digest('SHA-256', buffer);
-                  const hashArray = Array.from(new Uint8Array(digest));
-                  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-
-                  // register local material
-                  const res = await api.post<{
-                    material: Material;
-                    fileRecord: AppFile;
-                  }>('/materials/local/register', {
-                    hash: hashHex,
-                    filename: selectedFile.name,
-                    mimetype: selectedFile.type || 'application/octet-stream',
-                    size: selectedFile.size,
-                    unitId: chosenUnitId || undefined,
-                  });
-
-                  // res.data might include created material
-                  if (res?.data?.material?.id) {
-                    // Persist registered material and file hash so tracker can send progress
-                    setRegisteredMaterialId(res.data.material.id);
-                    setRegisteredFileHash(hashHex);
-                  }
-                } catch (err) {
-                  console.error('Failed to register local material', err);
-                }
-                // start tracking
                 startTracking();
               }}
               disabled={!selectedFile}
@@ -208,33 +213,7 @@ export function LocalMaterialReader() {
             <Button
               onClick={async () => {
                 await stopTracking();
-                const payload = {
-                  hash: registeredFileHash || undefined,
-                  materialId: registeredMaterialId || undefined,
-                  percent: currentPercent ?? 0,
-                  timeSpentSeconds: elapsedSeconds,
-                  lastPage: localPdfCurrentPage,
-                  unitId: chosenUnitId || undefined,
-                };
-                try {
-                  await api.post('/materials/local/progress', payload);
-                } catch (err) {
-                  console.error('Failed to register local progress, adding to offline queue', err);
-                  offlineSync.addToQueue({
-                    materialId: payload.materialId,
-                    unitId: payload.unitId,
-                    percent: payload.percent,
-                    page: payload.lastPage,
-                    timeSpentMinutes: payload.timeSpentSeconds
-                      ? Math.floor(payload.timeSpentSeconds / 60)
-                      : 0,
-                    xapiStatement: {
-                      payloadFor: 'local-progress',
-                      hash: payload.hash,
-                      timeSpentSeconds: payload.timeSpentSeconds,
-                    },
-                  });
-                }
+                setError(null);
               }}
               variant="secondary"
             >

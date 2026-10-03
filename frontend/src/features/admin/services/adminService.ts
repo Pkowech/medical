@@ -2,20 +2,83 @@ import { apiService } from '@/features/auth/services/apiClient';
 import {
   User,
   UserResponse,
-  UsersListResponse,
-  GetRolesResponse,
 } from '@/shared/types/authInterface';
 import { RoleEntity } from '@/shared/types/systemInterface';
 import { SystemAnalytics } from '@/shared/types/analyticsInterface';
 
+export interface AdminUsersPage {
+  users: User[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+export interface AdminUserFilters {
+  search?: string;
+  role?: string;
+  status?: string;
+}
+
 export class AdminService {
   private readonly baseUrl = '/admin';
 
-  async getUsers(page = 1, limit = 10): Promise<UsersListResponse['data']> {
-    const response = await apiService.get<UsersListResponse>(
-      `${this.baseUrl}/users?page=${page}&limit=${limit}`
-    );
-    return this.unwrapPayload<UsersListResponse['data']>(response.data);
+  async getUsers(
+    page = 1,
+    limit = 10,
+    filters: AdminUserFilters = {},
+  ): Promise<AdminUsersPage> {
+    const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+    if (filters.search?.trim()) params.set('search', filters.search.trim());
+    if (filters.role && filters.role !== 'all') params.set('role', filters.role);
+    if (filters.status && filters.status !== 'all') params.set('status', filters.status);
+
+    const response = await apiService.get<unknown>(`${this.baseUrl}/users?${params.toString()}`);
+    let payload: unknown = response;
+    let paginationValue: unknown;
+    let usersValue: unknown[] | undefined;
+
+    for (let depth = 0; depth < 5; depth += 1) {
+      if (Array.isArray(payload)) {
+        usersValue = payload;
+        break;
+      }
+      if (!payload || typeof payload !== 'object') break;
+
+      const record = payload as Record<string, unknown>;
+      paginationValue ??= record.pagination ?? record.meta;
+      if (Array.isArray(record.users)) {
+        usersValue = record.users;
+        break;
+      }
+      if (record.data === undefined || record.data === payload) break;
+      payload = record.data;
+    }
+
+    if (!usersValue) {
+      throw new Error('The admin users response did not contain a user list.');
+    }
+
+    const pagination =
+      paginationValue && typeof paginationValue === 'object'
+        ? (paginationValue as Record<string, unknown>)
+        : {};
+
+    const total = this.toNumber(pagination.total, usersValue.length);
+    const currentPage = this.toNumber(pagination.page, page);
+    const currentLimit = this.toNumber(pagination.limit, limit);
+
+    return {
+      users: usersValue.map(user => this.normalizeAdminUser(user)),
+      pagination: {
+        page: currentPage,
+        limit: currentLimit,
+        total,
+        totalPages: this.toNumber(pagination.totalPages, Math.ceil(total / currentLimit)),
+      },
+    };
   }
 
   async getUser(id: string): Promise<User> {
@@ -38,24 +101,23 @@ export class AdminService {
   }
 
   async getRoles(page = 1, limit = 10): Promise<RoleEntity[]> {
-    const response = await apiService.get<GetRolesResponse>(
+    const response = await apiService.get<unknown>(
       `${this.baseUrl}/roles?page=${page}&limit=${limit}`
     );
 
-    const payload = this.unwrapPayload<unknown>(response.data);
+    let payload: unknown = response;
+    for (let depth = 0; depth < 5; depth += 1) {
+      if (Array.isArray(payload)) return payload as RoleEntity[];
+      if (!payload || typeof payload !== 'object') break;
 
-    // Support multiple backend shapes: { roles: [...] } or { data: [...] } or direct array
-    if (Array.isArray(payload)) {
-      return payload as RoleEntity[];
+      const record = payload as Record<string, unknown>;
+      if (Array.isArray(record.roles)) return record.roles as RoleEntity[];
+      if (Array.isArray(record.data)) return record.data as RoleEntity[];
+      if (record.data === undefined || record.data === payload) break;
+      payload = record.data;
     }
 
-    if (payload && typeof payload === 'object') {
-      const p = payload as Record<string, unknown>;
-      if (Array.isArray(p.roles as unknown[])) return p.roles as unknown as RoleEntity[];
-      if (Array.isArray(p.data as unknown[])) return p.data as unknown as RoleEntity[];
-    }
-
-    return [];
+    throw new Error('The admin roles response did not contain a role list.');
   }
 
   async getRole(id: string): Promise<RoleEntity> {
@@ -126,6 +188,72 @@ export class AdminService {
     }
 
     return payload as T;
+  }
+
+  private toNumber(value: unknown, fallback: number): number {
+    return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+  }
+
+  private normalizeAdminUser(value: unknown): User {
+    if (!value || typeof value !== 'object') {
+      throw new Error('The admin users response contains an invalid user record.');
+    }
+
+    const user = value as Record<string, unknown>;
+    if (typeof user.id !== 'string' || typeof user.email !== 'string') {
+      throw new Error('The admin users response contains a user without an ID or email.');
+    }
+
+    const nestedRoles = Array.isArray(user.userRoles)
+      ? user.userRoles
+          .map(userRole =>
+            userRole && typeof userRole === 'object'
+              ? (userRole as { role?: { name?: unknown } }).role?.name
+              : undefined
+          )
+          .filter((role): role is string => typeof role === 'string')
+      : [];
+    const roles = Array.isArray(user.roles)
+      ? user.roles.filter((role): role is string => typeof role === 'string')
+      : nestedRoles;
+    const role = typeof user.role === 'string' ? user.role : roles[0] ?? 'student';
+    const firstName = typeof user.firstName === 'string' ? user.firstName : '';
+    const lastName = typeof user.lastName === 'string' ? user.lastName : '';
+    const fullName =
+      typeof user.fullName === 'string'
+        ? user.fullName
+        : `${firstName} ${lastName}`.trim() || user.email;
+    const status =
+      typeof user.status === 'string'
+        ? user.status
+        : user.isLocked === true
+          ? 'suspended'
+          : user.isActive === false
+            ? 'inactive'
+            : 'active';
+
+    return {
+      ...user,
+      id: user.id,
+      email: user.email,
+      username: typeof user.username === 'string' ? user.username : '',
+      firstName,
+      lastName,
+      fullName,
+      role: role as User['role'],
+      roles: roles as User['roles'],
+      permissions: Array.isArray(user.permissions) ? user.permissions : [],
+      isEmailVerified: user.isEmailVerified === true,
+      isActive: user.isActive !== false,
+      status: status as User['status'],
+      createdAt: typeof user.createdAt === 'string' ? user.createdAt : '',
+      lastLoginAt:
+        typeof user.lastLoginAt === 'string'
+          ? user.lastLoginAt
+          : typeof user.lastLogin === 'string'
+            ? user.lastLogin
+            : undefined,
+    };
   }
 
   private normalizeSystemAnalytics(

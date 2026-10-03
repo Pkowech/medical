@@ -2,6 +2,7 @@ import { useAuthStore } from '@/features/auth/store/useAuthStore';
 import { getSession } from 'next-auth/react';
 import { initDB, SyncQueueItem } from './db';
 import { normalizeApiUrl } from './normalizeApiUrl';
+import { isOfflineQueueableRequest } from './offlineQueuePolicy';
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
@@ -86,6 +87,7 @@ class SyncService {
     isOnline: boolean;
     pendingChanges: number;
     failedChanges: number;
+    retryableFailedChanges: number;
     isFlushing: boolean;
     readyToSync: boolean;
     latestFailure?: string;
@@ -94,16 +96,21 @@ class SyncService {
     try {
       const items = await this.getQueueItems();
       const pendingItems = items.filter(item => item.status !== 'failed');
-      const failedChanges = items.filter(item => item.status === 'failed').length;
+      const failedItems = items.filter(item => item.status === 'failed');
+      const failedChanges = failedItems.length;
+      const retryableFailedChanges = failedItems.filter(item =>
+        isOfflineQueueableRequest(item.method, item.url),
+      ).length;
       const count = pendingItems.length;
       return {
         lastSyncTimestamp: Date.now(), // This should ideally come from actual last sync, but for now, current time
         isOnline: typeof navigator !== 'undefined' ? navigator.onLine : false,
         pendingChanges: count,
         failedChanges,
+        retryableFailedChanges,
         isFlushing: this.isFlushing, // Expose flush lock status
         readyToSync: pendingItems.some(item => (item.nextAttemptAt ?? 0) <= Date.now()),
-        latestFailure: items.find(item => item.status === 'failed')?.lastError,
+        latestFailure: failedItems.sort((a, b) => b.createdAt - a.createdAt)[0]?.lastError,
       };
     } catch (error) {
       console.warn('Failed to get sync status from IndexedDB. Connection may be closing.', error);
@@ -112,6 +119,7 @@ class SyncService {
         isOnline: typeof navigator !== 'undefined' ? navigator.onLine : false,
         pendingChanges: 0,
         failedChanges: 0,
+        retryableFailedChanges: 0,
         isFlushing: this.isFlushing,
         readyToSync: false,
         latestFailure: undefined,
@@ -185,6 +193,16 @@ class SyncService {
       const sessionToken = session?.user?.accessToken;
 
       for (const item of pendingItems) {
+        if (!isOfflineQueueableRequest(item.method, item.url)) {
+          await db.put(SYNC_STORE_NAME, {
+            ...item,
+            status: 'failed',
+            lastError: 'This action is not safe to replay automatically. Please perform it again while online.',
+            nextAttemptAt: undefined,
+          });
+          continue;
+        }
+
         try {
           await this.renewLease(db, lockOwner);
 
@@ -417,6 +435,11 @@ class SyncService {
     const item = await db.get(SYNC_STORE_NAME, id);
 
     if (item) {
+      if (!isOfflineQueueableRequest(item.method, item.url)) {
+        throw new Error(
+          'This action cannot be retried automatically. Please perform it again while online.',
+        );
+      }
       await db.put(SYNC_STORE_NAME, {
         ...item,
         status: 'pending',
@@ -435,7 +458,7 @@ class SyncService {
     const items = await this.getQueueItems();
     const tx = db.transaction(SYNC_STORE_NAME, 'readwrite');
     for (const item of items) {
-      if (item.status === 'failed') {
+      if (item.status === 'failed' && isOfflineQueueableRequest(item.method, item.url)) {
         await tx.store.put({
           ...item,
           status: 'pending',
@@ -447,6 +470,18 @@ class SyncService {
     }
     await tx.done;
     await this.syncOutbox();
+  }
+
+  async discardAllFailedItems(): Promise<void> {
+    const db = await this.getDb();
+    const tx = db.transaction(SYNC_STORE_NAME, 'readwrite');
+    const items = await tx.store.getAll();
+    for (const item of items) {
+      if (item.status === 'failed') {
+        await tx.store.delete(item.id);
+      }
+    }
+    await tx.done;
   }
 }
 

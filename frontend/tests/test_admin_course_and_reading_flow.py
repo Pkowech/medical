@@ -198,11 +198,12 @@ class TestStudentTopicReadingPage:
         viewer = fe("src/features/materials/components/PDFMaterialViewer.tsx")
         assert "PDFMaterialViewer" in viewer or "pdf" in viewer.lower()
 
-    def test_local_material_reader_renders_content_field(self):
-        """LocalMaterialReader displays the material.content field."""
+    def test_local_material_reader_accepts_local_files_and_saves_metadata(self):
+        """LocalMaterialReader displays picked files and stores their metadata locally."""
         reader = fe("src/features/student/components/LocalMaterialReader.tsx")
-        assert "material" in reader
-        assert "content"  in reader
+        assert 'accept=".pdf,.txt,.md"' in reader
+        assert "<pre>{fileContent}</pre>" in reader
+        assert "offlineService.saveLocalFileMetadata(metadata)" in reader
 
     def test_notes_panel_embedded_in_unit_layout(self):
         """UnitLayout.tsx embeds NotesPanel as a companion to lesson content."""

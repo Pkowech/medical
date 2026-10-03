@@ -299,7 +299,12 @@ function LoginContent() {
           path is still the onSubmit handler below, which preventDefaults
           and hands off to NextAuth's signIn().
         */}
-      <form className="mt-8 space-y-6" method="post" onSubmit={handleSubmit}>
+      <form
+        className="mt-8 space-y-6"
+        method="post"
+        autoComplete="on"
+        onSubmit={handleSubmit}
+      >
         <div className="space-y-4">
           <div>
             <label
@@ -320,6 +325,7 @@ function LoginContent() {
                 id="identifier"
                 name="identifier"
                 type="text"
+                autoComplete="username"
                 required
                 value={identifier}
                 onChange={handleChange}
@@ -363,6 +369,7 @@ function LoginContent() {
                 id="password"
                 name="password"
                 type={showPassword ? 'text' : 'password'}
+                autoComplete="current-password"
                 required
                 value={password}
                 onChange={handleChange}

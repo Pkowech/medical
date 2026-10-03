@@ -14,6 +14,7 @@ import {
   ApiOperation,
   ApiResponse,
   ApiBearerAuth,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '#modules/auth/guards/jwt-auth.guard';
 import { RoleGuard } from '#common/guards/roles.guard';
@@ -50,10 +51,22 @@ export class AdminController {
   @Get('users')
   @Action('read')
   @ApiOperation({ summary: 'Get all users (paginated)' })
-  async getUsers(@Query() pagination: PaginationDto) {
-    const page = pagination.page && !isNaN(Number(pagination.page)) ? Number(pagination.page) : 1;
-    const limit = pagination.limit && !isNaN(Number(pagination.limit)) ? Number(pagination.limit) : 10;
-    return this.adminService.getUsers(page, limit);
+  @ApiQuery({ name: 'search', required: false, type: String })
+  @ApiQuery({ name: 'role', required: false, type: String })
+  @ApiQuery({ name: 'status', required: false, enum: ['active', 'inactive', 'suspended'] })
+  async getUsers(
+    @Query() pagination: PaginationDto,
+    @Query('search') search?: string,
+    @Query('role') role?: string,
+    @Query('status') status?: string,
+  ) {
+    const requestedPage = Number(pagination.page);
+    const requestedLimit = Number(pagination.limit);
+    const page = Number.isFinite(requestedPage) ? Math.max(1, Math.floor(requestedPage)) : 1;
+    const limit = Number.isFinite(requestedLimit)
+      ? Math.min(100, Math.max(1, Math.floor(requestedLimit)))
+      : 10;
+    return this.adminService.getUsers(page, limit, { search, role, status });
   }
 
   @Get('users/:id')

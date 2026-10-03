@@ -47,6 +47,7 @@ const SimpleThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const [theme, setThemeState] = useState<Theme>('system');
   const [colorScheme, setColorScheme] = useState<'light' | 'dark'>('light');
+  const [themeInitialized, setThemeInitialized] = useState(false);
 
   // Initialize theme synchronously on first paint (useLayoutEffect)
   useLayoutEffect(() => {
@@ -68,10 +69,13 @@ const SimpleThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setColorScheme(resolved);
       document.documentElement.classList.toggle('dark', resolved === 'dark');
     }
+    setThemeInitialized(true);
   }, []);
 
   // Effect: react to theme state changes and persist
   useEffect(() => {
+    if (!themeInitialized) return;
+
     try {
       // resolve color scheme
       let resolved: 'light' | 'dark';
@@ -97,7 +101,7 @@ const SimpleThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } catch {
       // ignore storage errors
     }
-  }, [theme]);
+  }, [theme, themeInitialized]);
 
   // Listen for system preference changes when in 'system' mode
   useEffect(() => {

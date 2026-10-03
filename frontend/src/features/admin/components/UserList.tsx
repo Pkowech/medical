@@ -16,14 +16,45 @@ import { Button } from '@/shared/components/ui/button';
 import { Badge } from '@/shared/components/ui/badge';
 import { Edit, Trash2 } from 'lucide-react';
 import { Progress } from '@/shared/components/ui/progress';
+import { Input } from '@/shared/components/ui/input';
 
 interface UserListProps {
   users: User[];
+  search: string;
+  roleFilter: string;
+  statusFilter: string;
+  roleOptions: string[];
+  page: number;
+  totalPages: number;
+  totalUsers: number;
+  loading: boolean;
+  deletingUserId?: string;
+  onSearchChange: (search: string) => void;
+  onRoleFilterChange: (role: string) => void;
+  onStatusFilterChange: (status: string) => void;
+  onPageChange: (page: number) => void;
   onEdit: (user: User) => void;
   onDelete: (userId: string) => void;
 }
 
-export const UserList: React.FC<UserListProps> = ({ users, onEdit, onDelete }) => {
+export const UserList: React.FC<UserListProps> = ({
+  users,
+  search,
+  roleFilter,
+  statusFilter,
+  roleOptions,
+  page,
+  totalPages,
+  totalUsers,
+  loading,
+  deletingUserId,
+  onSearchChange,
+  onRoleFilterChange,
+  onStatusFilterChange,
+  onPageChange,
+  onEdit,
+  onDelete,
+}) => {
   const formatLastUpdated = (timestamp?: string | number): string => {
     if (!timestamp) return 'N/A';
     const ts = typeof timestamp === 'string' ? Date.parse(timestamp) : timestamp;
@@ -43,10 +74,47 @@ export const UserList: React.FC<UserListProps> = ({ users, onEdit, onDelete }) =
     <Card>
       <CardHeader>
         <CardTitle>All Users</CardTitle>
+        <div className="grid gap-3 md:grid-cols-[minmax(16rem,1fr)_12rem_12rem]">
+          <Input
+            type="search"
+            value={search}
+            onChange={event => onSearchChange(event.target.value)}
+            placeholder="Search name, email, or username"
+            aria-label="Search users"
+          />
+          <select
+            value={roleFilter}
+            onChange={event => onRoleFilterChange(event.target.value)}
+            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+            aria-label="Filter users by role"
+          >
+            <option value="all">All roles</option>
+            {roleOptions.map(role => (
+              <option key={role} value={role}>
+                {role}
+              </option>
+            ))}
+          </select>
+          <select
+            value={statusFilter}
+            onChange={event => onStatusFilterChange(event.target.value)}
+            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+            aria-label="Filter users by status"
+          >
+            <option value="all">All statuses</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+            <option value="suspended">Suspended</option>
+          </select>
+        </div>
       </CardHeader>
       <CardContent>
         {users.length === 0 ? (
-          <p className="text-muted-foreground text-center">No users found.</p>
+          <p className="text-muted-foreground text-center">
+            {search || roleFilter !== 'all' || statusFilter !== 'all'
+              ? 'No users match these filters.'
+              : 'No users found.'}
+          </p>
         ) : (
           <div className="overflow-x-auto">
             <Table>
@@ -111,7 +179,13 @@ export const UserList: React.FC<UserListProps> = ({ users, onEdit, onDelete }) =
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
-                      <Button variant="destructive" size="sm" onClick={() => onDelete(user.id)}>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => onDelete(user.id)}
+                        disabled={deletingUserId === user.id}
+                        aria-label={`Delete ${user.fullName || user.email}`}
+                      >
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </TableCell>
@@ -121,6 +195,30 @@ export const UserList: React.FC<UserListProps> = ({ users, onEdit, onDelete }) =
             </Table>
           </div>
         )}
+        <div className="mt-4 flex items-center justify-between gap-3 text-sm text-muted-foreground">
+          <span>{loading ? 'Updating results...' : `${totalUsers} users`}</span>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page <= 1}
+              onClick={() => onPageChange(page - 1)}
+            >
+              Previous
+            </Button>
+            <span aria-live="polite">
+              Page {page} of {Math.max(totalPages, 1)}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page >= totalPages}
+              onClick={() => onPageChange(page + 1)}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
       </CardContent>
     </Card>
   );

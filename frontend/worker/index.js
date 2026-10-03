@@ -1,6 +1,13 @@
 const DB_NAME = 'medical-education-db';
 const LOCK_NAME = 'outbox';
 const MAX_ATTEMPTS = 3;
+const QUEUEABLE_POST_PATHS = new Set([
+  '/progress/sync',
+  '/progress/log',
+  '/progress/statements',
+  '/learning/progress',
+  '/quizzes/submit',
+]);
 const OBSOLETE_CACHES = new Set([
   'api-data-cache',
   'sync-requests-cache',
@@ -31,6 +38,22 @@ self.addEventListener('activate', event => {
     ),
   );
 });
+
+function isQueueableRequest(item) {
+  if (item.method?.toUpperCase() !== 'POST') return false;
+
+  try {
+    const pathname = new URL(item.url, self.location.origin).pathname
+      .replace(/^\/api\/backend(?=\/|$)/, '')
+      .replace(/^\/v1(?=\/|$)/, '');
+    return (
+      QUEUEABLE_POST_PATHS.has(pathname) ||
+      /^\/progress\/materials\/[^/]+\/read$/.test(pathname)
+    );
+  } catch {
+    return false;
+  }
+}
 
 function requestResult(request) {
   return new Promise((resolve, reject) => {
@@ -73,6 +96,15 @@ async function flushOutbox() {
     for (const item of items) {
       if (item.status === 'failed' || item.attempts >= MAX_ATTEMPTS) continue;
       if ((item.nextAttemptAt || 0) > Date.now()) continue;
+      if (!isQueueableRequest(item)) {
+        await updateItem(database, item.id, {
+          ...item,
+          status: 'failed',
+          lastError: 'This action is not safe to replay automatically. Please perform it again while online.',
+          nextAttemptAt: undefined,
+        });
+        continue;
+      }
       await renewLock(database, owner);
 
       const url = normalizeUrl(item.url, item.type);

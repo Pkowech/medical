@@ -22,6 +22,14 @@ export interface ReadingMaterial {
   lastUpdated: number;
 }
 
+export interface LocalFileMetadata {
+  id: string;
+  filename: string;
+  mimetype: string;
+  size: number;
+  hash: string;
+}
+
 export interface SyncQueueItem {
   id: string;
   type?: 'quiz_submission' | 'progress_log';
@@ -58,6 +66,10 @@ interface MedicalEducationDB extends DBSchema {
     value: ReadingMaterial;
     indexes: { 'by-topic': string };
   };
+  localFileMetadata: {
+    key: string;
+    value: LocalFileMetadata;
+  };
   syncQueue: {
     key: string;
     value: SyncQueueItem;
@@ -78,7 +90,7 @@ interface MedicalEducationDB extends DBSchema {
 }
 
 const DB_NAME = 'medical-education-db';
-const DB_VERSION = 5;
+const DB_VERSION = 6;
 let databasePromise: Promise<IDBPDatabase<MedicalEducationDB>> | undefined;
 
 export function initDB(): Promise<IDBPDatabase<MedicalEducationDB>> {
@@ -123,6 +135,10 @@ export function initDB(): Promise<IDBPDatabase<MedicalEducationDB>> {
 
       if (!db.objectStoreNames.contains('queryCache')) {
         db.createObjectStore('queryCache', { keyPath: 'key' });
+      }
+
+      if (!db.objectStoreNames.contains('localFileMetadata')) {
+        db.createObjectStore('localFileMetadata', { keyPath: 'id' });
       }
     },
     blocked() {

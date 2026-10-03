@@ -17,7 +17,7 @@
     "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,css,scss,md}\"",
     "type-check": "tsc --noEmit",
     "test": "jest",
-    "e2e": "python -m pytest tests/test_courses_e2e.py",
+    "e2e": "python -m pytest tests/test_courses_e2e.py tests/test_frontend_storage_flows.py",
     "test:watch": "jest --watch",
     "test:ci": "jest --ci --coverage --watchAll=false",
     "health-check": "node scripts/health-check.js",
