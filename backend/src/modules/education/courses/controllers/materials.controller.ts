@@ -14,7 +14,9 @@ import {
   BadRequestException,
   Res,
   StreamableFile,
+  Logger,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { MaterialsService } from '../services/materials.service';
@@ -37,7 +39,12 @@ import { ThrottlerGuard } from '@nestjs/throttler';
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
 export class MaterialsController {
-  constructor(private readonly materialsService: MaterialsService) {}
+  private readonly logger = new Logger(MaterialsController.name);
+
+  constructor(
+    private readonly materialsService: MaterialsService,
+    private readonly configService: ConfigService,
+  ) {}
 
   @Post('upload')
   @UseGuards(ThrottlerGuard)
@@ -58,11 +65,11 @@ export class MaterialsController {
         },
         courseId: {
           type: 'string',
-          description: 'Required together with unitId for course materials. Omit all placement IDs for a personal library upload.',
+          description: 'Optional course placement. A course alone is appropriate for course-level resources such as textbooks.',
         },
         unitId: {
           type: 'string',
-          description: 'Required together with courseId for course materials.',
+          description: 'Optional unit placement within the selected course.',
         },
         topicId: {
           type: 'string',
@@ -143,8 +150,8 @@ export class MaterialsController {
       url: string;
       title: string;
       description?: string;
-      courseId: string;
-      unitId: string;
+      courseId?: string;
+      unitId?: string;
       topicId?: string;
       shareWithCourse?: boolean;
     },
@@ -153,9 +160,51 @@ export class MaterialsController {
     return this.materialsService.registerGoogleDriveMaterial({ ...dto, userId: user.id });
   }
 
+  @Get('drive/connection')
+  @ApiOperation({ summary: 'Check whether the signed-in user connected Google Drive' })
+  async getDriveConnection(@GetUser() user: PrismaUser) {
+    return this.materialsService.getGoogleDriveConnectionStatus(user.id);
+  }
+
+  @Get('drive/oauth-url')
+  @ApiOperation({ summary: 'Start read-only Google Drive authorization' })
+  getDriveAuthorizationUrl(@GetUser() user: PrismaUser) {
+    return {
+      authorizationUrl: this.materialsService.getGoogleDriveAuthorizationUrl(user.id),
+    };
+  }
+
+  @Delete('drive/connection')
+  @HttpCode(204)
+  @ApiOperation({ summary: 'Disconnect Google Drive from the signed-in account' })
+  async disconnectDrive(@GetUser() user: PrismaUser): Promise<void> {
+    await this.materialsService.disconnectGoogleDrive(user.id);
+  }
+
+  @Get('drive/oauth/callback')
+  @Public()
+  @ApiOperation({ summary: 'Complete Google Drive authorization' })
+  async completeDriveAuthorization(
+    @Query('code') code: string,
+    @Query('state') state: string,
+    @Query('error') oauthError: string,
+    @Res() response: Response,
+  ): Promise<void> {
+    try {
+      if (oauthError || !code || !state) {
+        throw new BadRequestException('Google Drive authorization was not completed.');
+      }
+      await this.materialsService.completeGoogleDriveAuthorization(code, state);
+      this.redirectAfterDriveAuthorization(response, true);
+    } catch {
+      this.logger.warn('Google Drive authorization failed.');
+      this.redirectAfterDriveAuthorization(response, false);
+    }
+  }
+
   @Post('drive/folder-preview')
   @HttpCode(200)
-  @ApiOperation({ summary: 'Preview supported files in a configured Shared Drive folder' })
+  @ApiOperation({ summary: 'Preview supported files in a folder the signed-in Google account can access' })
   async previewDriveFolder(
     @Body('folderUrl') folderUrl: string,
     @GetUser() user: PrismaUser,
@@ -174,14 +223,28 @@ export class MaterialsController {
       fileId: string;
       title: string;
       description?: string;
-      courseId: string;
-      unitId: string;
+      courseId?: string;
+      unitId?: string;
       topicId?: string;
       shareWithCourse?: boolean;
     }>,
     @GetUser() user: PrismaUser,
   ) {
     return this.materialsService.linkGoogleDriveFolderFiles(items, user.id);
+  }
+
+  private redirectAfterDriveAuthorization(response: Response, connected: boolean): void {
+    const frontendUrl = this.configService.get<string>('FRONTEND_URL');
+    if (!frontendUrl) {
+      response.status(500).send('Google Drive authorization completed, but FRONTEND_URL is not configured.');
+      return;
+    }
+    const redirectUrl = new URL('/study-planner/materials/upload', frontendUrl);
+    redirectUrl.searchParams.set(
+      connected ? 'driveConnected' : 'driveError',
+      connected ? '1' : 'authorization_failed',
+    );
+    response.redirect(redirectUrl.toString());
   }
 
   @Post('attach')
@@ -195,8 +258,8 @@ export class MaterialsController {
         title:           { type: 'string' },
         description:     { type: 'string' },
         topicId:         { type: 'string', description: 'Optional topic within the selected unit.' },
-        unitId:          { type: 'string', description: 'Required together with courseId for course materials.' },
-        courseId:        { type: 'string', description: 'Required together with unitId for course materials.' },
+        unitId:          { type: 'string', description: 'Optional unit placement within the course.' },
+        courseId:        { type: 'string', description: 'Optional course placement.' },
         type:            { type: 'string' },
       },
     },

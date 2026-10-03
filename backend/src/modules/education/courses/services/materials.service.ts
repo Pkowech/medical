@@ -682,8 +682,8 @@ export class MaterialsService {
       }
 
       await this.validateMaterialPlacement(courseId, unitId, topicId);
-      if (shareWithCourse && (!courseId || !unitId)) {
-        throw new BadRequestException('Assign a course and unit before sharing this material with a class.');
+      if (shareWithCourse && !courseId) {
+        throw new BadRequestException('Assign a course before sharing this material with a class.');
       }
 
       // Calculate file hash for deduplication (streaming-friendly)
@@ -944,20 +944,23 @@ export class MaterialsService {
     url: string;
     title: string;
     description?: string;
-    courseId: string;
-    unitId: string;
+    courseId?: string;
+    unitId?: string;
     topicId?: string;
     userId: string;
     shareWithCourse?: boolean;
   }): Promise<Material> {
-    await this.validateMaterialPlacement(dto.courseId, dto.unitId, dto.topicId);
-    const unit = await this.prisma.unit.findUniqueOrThrow({
-      where: { id: dto.unitId },
-      select: { id: true },
-    });
-
-    await this.assertCanManageCourseMaterials(dto.courseId, dto.userId);
-    const driveFile = await this.googleDrive.getSharedDriveFile(dto.url);
+    const courseId = dto.courseId?.trim() || undefined;
+    const unitId = dto.unitId?.trim() || undefined;
+    const topicId = dto.topicId?.trim() || undefined;
+    await this.validateMaterialPlacement(courseId, unitId, topicId);
+    if (dto.shareWithCourse && !courseId) {
+      throw new BadRequestException('Assign a course before sharing this material with a class.');
+    }
+    if (courseId) {
+      await this.assertCanManageCourseMaterials(courseId, dto.userId);
+    }
+    const driveFile = await this.googleDrive.getSharedDriveFile(dto.url, dto.userId);
     const mimeType = driveFile.mimeType || '';
     const supportedGoogleDocs = new Set([
       'application/vnd.google-apps.document',
@@ -968,22 +971,24 @@ export class MaterialsService {
       throw new BadRequestException('Drive materials currently support PDF, Google Docs, Sheets, and Slides files.');
     }
 
+    const personalDriveConnection = await this.googleDrive.isUserConnected(dto.userId);
     const material = await this.prisma.material.create({
       data: {
         title: dto.title.trim() || driveFile.name || 'Drive material',
         description: dto.description,
         type: MaterialType.pdf,
-        courseId: dto.courseId,
-        unitId: unit.id,
-        topicId: dto.topicId,
+        courseId,
+        unitId,
+        topicId,
         userId: dto.userId,
         category: 'Course Material',
         content: null,
         metadata: {
           sourceProvider: 'google-drive',
           driveFileId: driveFile.id,
-          driveId: driveFile.driveId,
+          driveId: driveFile.driveId ?? null,
           driveMimeType: mimeType,
+          ...(personalDriveConnection ? { driveAuthUserId: dto.userId } : {}),
           isExternal: true,
           shareWithCourse: dto.shareWithCourse === true,
         },
@@ -996,17 +1001,23 @@ export class MaterialsService {
   }
 
   async previewGoogleDriveFolder(folderUrl: string, userId: string) {
-    const roles = await this.prisma.userRole.findMany({
-      where: { userId },
-      select: { role: { select: { name: true } } },
-    });
-    const canBrowseSharedDrive = roles.some(({ role }) =>
-      role.name === RoleName.admin || role.name === RoleName.instructor,
-    );
-    if (!canBrowseSharedDrive) {
-      throw new ForbiddenException('Only instructors can browse the course Shared Drive.');
-    }
-    return this.googleDrive.listSharedDriveFolder(folderUrl);
+    return this.googleDrive.listSharedDriveFolder(folderUrl, userId);
+  }
+
+  getGoogleDriveConnectionStatus(userId: string) {
+    return this.googleDrive.getConnectionStatus(userId);
+  }
+
+  getGoogleDriveAuthorizationUrl(userId: string) {
+    return this.googleDrive.getAuthorizationUrl(userId);
+  }
+
+  completeGoogleDriveAuthorization(code: string, state: string) {
+    return this.googleDrive.completeAuthorization(code, state);
+  }
+
+  disconnectGoogleDrive(userId: string) {
+    return this.googleDrive.disconnectUser(userId);
   }
 
   async linkGoogleDriveFolderFiles(
@@ -1014,8 +1025,8 @@ export class MaterialsService {
       fileId: string;
       title: string;
       description?: string;
-      courseId: string;
-      unitId: string;
+      courseId?: string;
+      unitId?: string;
       topicId?: string;
       shareWithCourse?: boolean;
     }>,
@@ -1041,15 +1052,16 @@ export class MaterialsService {
       if (
         !item.fileId ||
         !item.title?.trim() ||
-        !item.courseId ||
-        !item.unitId ||
+        (item.unitId && !item.courseId) ||
+        (item.topicId && !item.unitId) ||
+        (item.shareWithCourse && !item.courseId) ||
         seenFileIds.has(item.fileId)
       ) {
         results.push({
           fileId: item.fileId || '',
           title: item.title || '',
           status: 'failed',
-          error: 'Each file needs a unique ID, title, course, and unit.',
+          error: 'Each file needs a unique ID and title; unit/topic placement must be nested in a course.',
         });
         continue;
       }
@@ -1128,10 +1140,14 @@ export class MaterialsService {
           select: { courseId: true },
         }))?.courseId
       : undefined);
-    if (!courseId || !material.unitId) {
-      throw new BadRequestException('Assign this material to a course and unit before sharing it with a class.');
+    if (!courseId) {
+      throw new BadRequestException('Assign this material to a course before sharing it with a class.');
     }
-    await this.validateMaterialPlacement(courseId, material.unitId, material.topicId || undefined);
+    await this.validateMaterialPlacement(
+      courseId,
+      material.unitId ?? undefined,
+      material.topicId ?? undefined,
+    );
 
     if (material.userId !== userId) {
       await this.assertCanManageCourseMaterials(courseId, userId);
@@ -1155,10 +1171,22 @@ export class MaterialsService {
     topicId?: string,
   ): Promise<void> {
     if (!courseId && !unitId && !topicId) return;
-    if (!courseId || !unitId) {
+    if (!courseId) {
       throw new BadRequestException(
-        'Course materials must be assigned to a course and unit. Topic placement is optional.',
+        'Assign a course before placing this material in a unit or topic.',
       );
+    }
+
+    const course = await this.prisma.course.findUnique({
+      where: { id: courseId },
+      select: { id: true },
+    });
+    if (!course) throw new NotFoundException('Course not found');
+    if (!unitId) {
+      if (topicId) {
+        throw new BadRequestException('Choose a unit before assigning a topic.');
+      }
+      return;
     }
 
     const unit = await this.prisma.unit.findUnique({
@@ -2152,8 +2180,11 @@ export class MaterialsService {
       if (metadata.sourceProvider === 'google-drive') {
         const driveFileId = typeof metadata.driveFileId === 'string' ? metadata.driveFileId : '';
         const driveMimeType = typeof metadata.driveMimeType === 'string' ? metadata.driveMimeType : '';
+        const driveAuthUserId = typeof metadata.driveAuthUserId === 'string'
+          ? metadata.driveAuthUserId
+          : undefined;
         if (!driveFileId || !driveMimeType) throw new NotFoundException('Drive material metadata is incomplete.');
-        const content = await this.googleDrive.downloadFile(driveFileId, driveMimeType);
+        const content = await this.googleDrive.downloadFile(driveFileId, driveMimeType, driveAuthUserId);
         const sourceName = material.title.replace(/\.pdf$/i, '');
         return { content, mimeType: 'application/pdf', fileName: `${sourceName}.pdf` };
       }

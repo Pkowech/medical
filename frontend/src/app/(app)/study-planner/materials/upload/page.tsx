@@ -33,6 +33,8 @@ export default function UploadMaterialPage() {
   const [courseLoadError, setCourseLoadError] = useState('');
   const [isLoadingUnits, setIsLoadingUnits] = useState(false);
   const [unitLoadError, setUnitLoadError] = useState('');
+  const [driveConnected, setDriveConnected] = useState(false);
+  const [isCheckingDriveConnection, setIsCheckingDriveConnection] = useState(true);
 
   const [type, setType] = useState('pdf');
   const [isUploading, setIsUploading] = useState(false);
@@ -68,6 +70,45 @@ export default function UploadMaterialPage() {
 
     loadCourses();
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    materialService.getGoogleDriveConnectionStatus()
+      .then(status => {
+        if (!cancelled) setDriveConnected(status.connected);
+      })
+      .catch(err => {
+        console.warn('Could not check personal Google Drive connection', err);
+      })
+      .finally(() => {
+        if (!cancelled) setIsCheckingDriveConnection(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('driveConnected') === '1') {
+      setSource('folder');
+      toast.success('Personal Google Drive connected.');
+      router.replace('/study-planner/materials/upload', { scroll: false });
+    } else if (params.get('driveError')) {
+      setSource('folder');
+      toast.error('Google Drive connection was not completed.');
+      router.replace('/study-planner/materials/upload', { scroll: false });
+    }
+  }, [router]);
+
+  const handleConnectDrive = async () => {
+    try {
+      const authorizationUrl = await materialService.getGoogleDriveAuthorizationUrl();
+      window.location.assign(authorizationUrl);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not start Google Drive connection.');
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -126,16 +167,12 @@ export default function UploadMaterialPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (source === 'folder') return;
-    if (selectedCourseId && !unitId) {
-      toast.error('Choose both a course and a unit, or leave both blank for My Drive');
+    if (unitId && !selectedCourseId) {
+      toast.error('Choose a course before assigning a unit');
       return;
     }
-    if (source === 'drive' && (!selectedCourseId || !unitId)) {
-      toast.error('Choose a course and unit for a Shared Drive material');
-      return;
-    }
-    if (shareWithCourse && (!selectedCourseId || !unitId)) {
-      toast.error('Choose a course and unit before sharing with a class');
+    if (shareWithCourse && !selectedCourseId) {
+      toast.error('Choose a course before sharing with a class');
       return;
     }
 
@@ -155,7 +192,7 @@ export default function UploadMaterialPage() {
           topicId: topicId || undefined,
           shareWithCourse,
         });
-        toast.success('Drive material attached to the unit');
+        toast.success('Drive material linked.');
         router.push('/study-planner/materials');
       } catch (err) {
         console.error('Drive material registration failed', err);
@@ -348,7 +385,6 @@ export default function UploadMaterialPage() {
               value={unitId}
               onChange={e => setUnitId(e.target.value)}
               disabled={!selectedCourseId || isLoadingUnits || units.length === 0}
-              required={Boolean(selectedCourseId)}
               aria-busy={isLoadingUnits}
               className="block w-full border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-900 dark:text-white px-3 py-2 rounded-md focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:bg-gray-100 dark:disabled:bg-slate-900"
             >
@@ -365,6 +401,27 @@ export default function UploadMaterialPage() {
               <p className="mt-1 text-xs text-amber-700 dark:text-amber-300" role="alert">{unitLoadError}</p>
             )}
           </div>
+
+          {source === 'drive' && (
+            <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-900 dark:bg-blue-950/30">
+              <p className="text-sm text-blue-800 dark:text-blue-200">
+                {isCheckingDriveConnection
+                  ? 'Checking personal Google Drive connection…'
+                  : driveConnected
+                    ? 'Personal Google Drive is connected with read-only access.'
+                    : 'To link a file shared with your personal Google account, connect Drive first.'}
+              </p>
+              {!driveConnected && !isCheckingDriveConnection && (
+                <button
+                  type="button"
+                  onClick={handleConnectDrive}
+                  className="mt-2 rounded-md border border-blue-300 px-3 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-100 dark:border-blue-800 dark:text-blue-300 dark:hover:bg-blue-900/40"
+                >
+                  Connect personal Google Drive
+                </button>
+              )}
+            </div>
+          )}
 
           <div>
             <label htmlFor="topic-select" className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
@@ -385,14 +442,14 @@ export default function UploadMaterialPage() {
               ))}
             </select>
             <p className="mt-1 text-xs text-gray-500 dark:text-slate-500">
-              Assign both a course and unit to organize this material in a class. Leave both blank to keep it in My Drive. Topic placement is optional.
+              Assign a course for course-level resources such as textbooks. Add a unit or topic for more specific material. Leave placement blank for My Drive.
             </p>
           </div>
-          <label className={`flex items-start gap-3 rounded-lg border p-3 ${selectedCourseId && unitId ? 'cursor-pointer border-blue-200 bg-white dark:border-blue-900 dark:bg-slate-900' : 'cursor-not-allowed border-gray-200 opacity-60 dark:border-slate-700'}`}>
+          <label className={`flex items-start gap-3 rounded-lg border p-3 ${selectedCourseId ? 'cursor-pointer border-blue-200 bg-white dark:border-blue-900 dark:bg-slate-900' : 'cursor-not-allowed border-gray-200 opacity-60 dark:border-slate-700'}`}>
             <input
               type="checkbox"
               checked={shareWithCourse}
-              disabled={!selectedCourseId || !unitId}
+              disabled={!selectedCourseId}
               onChange={(event) => setShareWithCourse(event.target.checked)}
               className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
             />
@@ -451,8 +508,17 @@ export default function UploadMaterialPage() {
               />
             </div>
             <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-              The file must be in the institution’s MedTrack Shared Drive. Enrolled students can view it in the course reader; the file is not copied to R2.
+              Drive files remain in Drive; MedTrack stores a link and reads it through your connected Google account. Course-level textbooks are supported.
             </p>
+            {!driveConnected && !isCheckingDriveConnection && (
+              <button
+                type="button"
+                onClick={handleConnectDrive}
+                className="mt-2 rounded-md border border-blue-200 px-3 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-50 dark:border-blue-900 dark:text-blue-300 dark:hover:bg-slate-800"
+              >
+                Connect personal Google Drive
+              </button>
+            )}
           </div>}
         </div>
 
@@ -469,8 +535,8 @@ export default function UploadMaterialPage() {
                 isUploading ||
                 !title.trim() ||
                 (source === 'upload'
-                  ? !file || Boolean(selectedCourseId && !unitId)
-                  : !driveUrl.trim() || !selectedCourseId || !unitId)
+                ? !file || Boolean(unitId && !selectedCourseId)
+                : !driveUrl.trim() || !selectedCourseId)
               }
               className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm shadow-blue-500/30"
             >

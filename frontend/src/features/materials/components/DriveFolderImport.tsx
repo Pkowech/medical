@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useMemo, useRef, useState } from 'react';
-import { CheckCircle2, FileText, FolderOpen, LoaderCircle, Upload } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { CheckCircle2, FileText, FolderOpen, LoaderCircle, Unplug, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import materialService, {
@@ -41,6 +41,15 @@ const findMatchingValue = <T,>(
     if (match) return match;
   }
   return undefined;
+};
+
+const handleConnect = async () => {
+  try {
+    const authorizationUrl = await materialService.getGoogleDriveAuthorizationUrl();
+    window.location.assign(authorizationUrl);
+  } catch (error) {
+    toast.error(error instanceof Error ? error.message : 'Could not start Google Drive connection.');
+  }
 };
 
 const matchTopicFromFileName = (
@@ -91,6 +100,42 @@ export default function DriveFolderImport({
   const [linkProgress, setLinkProgress] = useState({ completed: 0, total: 0 });
   const [shareWithCourse, setShareWithCourse] = useState(false);
   const [importResult, setImportResult] = useState<DriveFolderImportResult | null>(null);
+  const [driveConnected, setDriveConnected] = useState(false);
+  const [isCheckingConnection, setIsCheckingConnection] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    materialService.getGoogleDriveConnectionStatus()
+      .then(status => {
+        if (!cancelled) setDriveConnected(status.connected);
+      })
+      .catch(error => {
+        if (!cancelled) {
+          toast.error(error instanceof Error ? error.message : 'Could not check Google Drive connection.');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setIsCheckingConnection(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleDisconnect = async () => {
+    if (!window.confirm('Disconnect Google Drive? Drive links you own may stop opening in MedTrack.')) {
+      return;
+    }
+    try {
+      await materialService.disconnectGoogleDrive();
+      setDriveConnected(false);
+      setPreview(null);
+      setSelectedFileIds(new Set());
+      toast.success('Google Drive disconnected.');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Could not disconnect Google Drive.');
+    }
+  };
 
   const groups = useMemo(() => {
     if (!preview) return [];
@@ -144,6 +189,10 @@ export default function DriveFolderImport({
   };
 
   const handlePreview = async () => {
+    if (!driveConnected) {
+      toast.error('Connect your Google account before browsing its Drive folders.');
+      return;
+    }
     if (!folderUrl.trim()) {
       toast.error('Paste a Google Drive folder link first.');
       return;
@@ -245,6 +294,7 @@ export default function DriveFolderImport({
 
   const handleCourseChange = async (folderPath: string, courseId: string) => {
     updatePlacement(folderPath, { courseId, unitId: '', topicId: '' });
+    if (!courseId) setShareWithCourse(false);
     setFileTopics(previous => {
       const next = { ...previous };
       for (const file of groups.find(group => group.folderPath === folderPath)?.files ?? []) {
@@ -285,10 +335,14 @@ export default function DriveFolderImport({
   const selectedFiles = preview?.files.filter(
     file => selectedFileIds.has(file.id) && file.supported,
   ) ?? [];
-  const invalidSelectedFiles = groups.filter(group =>
-    group.files.some(file => selectedFileIds.has(file.id) && file.supported) &&
-    (!placements[group.folderPath]?.courseId || !placements[group.folderPath]?.unitId),
-  );
+  const invalidSelectedFiles = groups.filter(group => {
+    const placement = placements[group.folderPath];
+    const selected = group.files.filter(file => selectedFileIds.has(file.id) && file.supported);
+    return selected.length > 0 && (
+      (Boolean(placement?.unitId) && !placement?.courseId) ||
+      (selected.some(file => Boolean(fileTopics[file.id])) && !placement?.unitId)
+    );
+  });
   const importDisabled =
     isLinking ||
     selectedFiles.length === 0 ||
@@ -354,7 +408,7 @@ export default function DriveFolderImport({
           </div>
         </div>
         <label htmlFor="drive-folder-url" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
-          Shared Drive folder link
+          Google Drive folder link
         </label>
         <div className="flex flex-col gap-3 sm:flex-row">
           <input
@@ -368,7 +422,7 @@ export default function DriveFolderImport({
           <button
             type="button"
             onClick={handlePreview}
-            disabled={isPreviewing || isLoadingCourses || courses.length === 0}
+            disabled={isPreviewing || isCheckingConnection || !driveConnected || isLoadingCourses}
             className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isPreviewing ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <FolderOpen className="h-4 w-4" />}
@@ -376,8 +430,35 @@ export default function DriveFolderImport({
           </button>
         </div>
         <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-          The folder must be in the configured MedTrack Shared Drive and contain no more than 500 files. Only PDFs and Google Docs, Sheets, and Slides can be linked.
+          Files stay in your Google Drive. Only PDFs and Google Docs, Sheets, and Slides can be linked; scan up to 500 files per folder.
         </p>
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-slate-50 p-3 dark:bg-slate-800/70">
+          <p className="text-sm text-slate-700 dark:text-slate-300" role="status">
+            {isCheckingConnection
+              ? 'Checking Google Drive connection…'
+              : driveConnected
+                ? 'Personal Google Drive connected (read-only)'
+                : 'Connect Google Drive to browse folders shared with your account.'}
+          </p>
+          {driveConnected ? (
+            <button
+              type="button"
+              onClick={handleDisconnect}
+              className="inline-flex items-center gap-2 rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-white dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-900"
+            >
+              <Unplug className="h-4 w-4" /> Disconnect
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleConnect}
+              disabled={isCheckingConnection}
+              className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+            >
+              Connect Google Drive
+            </button>
+          )}
+        </div>
       </div>
 
       {preview && (
@@ -393,6 +474,7 @@ export default function DriveFolderImport({
               <input
                 type="checkbox"
                 checked={shareWithCourse}
+                disabled={selectedFiles.length === 0 || selectedFiles.some(file => !placements[file.folderPath]?.courseId)}
                 onChange={event => setShareWithCourse(event.target.checked)}
                 className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
               />
@@ -430,7 +512,7 @@ export default function DriveFolderImport({
                           onChange={event => void handleCourseChange(group.folderPath, event.target.value)}
                           className="mt-1 block w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
                         >
-                          <option value="">Choose course…</option>
+                          <option value="">My Drive — no course</option>
                           {courses.map(course => (
                             <option key={course.id} value={course.id}>
                               {course.code ? `${course.code} — ` : ''}{course.title || course.name}
@@ -499,7 +581,7 @@ export default function DriveFolderImport({
                           </label>
                         )}
                       </div>
-                      {file.supported && placement.courseId && placement.unitId && (
+                      {file.supported && (placement.courseId || !placement.unitId) && (
                         <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" aria-label="Mapped" />
                       )}
                       {!file.supported && <span className="shrink-0 text-xs text-slate-400">Not supported</span>}

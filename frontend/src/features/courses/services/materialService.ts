@@ -136,13 +136,27 @@ const materialService = {
     url: string;
     title: string;
     description?: string;
-    courseId: string;
-    unitId: string;
+    courseId?: string;
+    unitId?: string;
     topicId?: string;
     shareWithCourse?: boolean;
   }): Promise<Material> {
     const response = await apiService.post<Material>('/materials/drive', input);
     return response.data;
+  },
+
+  async getGoogleDriveConnectionStatus(): Promise<{ connected: boolean }> {
+    const response = await apiService.get<{ connected: boolean }>('/materials/drive/connection');
+    return response.data;
+  },
+
+  async getGoogleDriveAuthorizationUrl(): Promise<string> {
+    const response = await apiService.get<{ authorizationUrl: string }>('/materials/drive/oauth-url');
+    return response.data.authorizationUrl;
+  },
+
+  async disconnectGoogleDrive(): Promise<void> {
+    await apiService.delete('/materials/drive/connection');
   },
 
   async previewGoogleDriveFolder(folderUrl: string): Promise<DriveFolderPreview> {
@@ -157,8 +171,8 @@ const materialService = {
       fileId: string;
       title: string;
       description?: string;
-      courseId: string;
-      unitId: string;
+      courseId?: string;
+      unitId?: string;
       topicId?: string;
       shareWithCourse?: boolean;
     }>;

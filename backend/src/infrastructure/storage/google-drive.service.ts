@@ -1,14 +1,19 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   Logger,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { createCipheriv, createDecipheriv, createHmac, randomBytes, timingSafeEqual } from 'crypto';
 import { google, drive_v3 } from 'googleapis';
+import { PrismaService } from '#infrastructure/prisma/prisma.service';
 
 const MAX_DRIVE_MATERIAL_BYTES = 100 * 1024 * 1024;
 const MAX_FOLDER_IMPORT_FILES = 500;
+const DRIVE_READONLY_SCOPE = 'https://www.googleapis.com/auth/drive.readonly';
+const OAUTH_STATE_MAX_AGE_MS = 10 * 60 * 1000;
 
 export interface SharedDriveFolderFile {
   id: string;
@@ -32,7 +37,80 @@ export class GoogleDriveService {
   private readonly logger = new Logger(GoogleDriveService.name);
   private driveClient?: drive_v3.Drive;
 
-  constructor(private readonly config: ConfigService) {}
+  constructor(
+    private readonly config: ConfigService,
+    private readonly prisma: PrismaService,
+  ) {}
+
+  async getConnectionStatus(userId: string): Promise<{ connected: boolean }> {
+    const connection = await this.prisma.googleDriveConnection.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+    return { connected: Boolean(connection) };
+  }
+
+  async isUserConnected(userId: string): Promise<boolean> {
+    const status = await this.getConnectionStatus(userId);
+    return status.connected;
+  }
+
+  getAuthorizationUrl(userId: string): string {
+    this.getEncryptionKey();
+    const payload = Buffer.from(JSON.stringify({
+      userId,
+      issuedAt: Date.now(),
+      nonce: randomBytes(16).toString('hex'),
+    })).toString('base64url');
+    const signature = createHmac('sha256', this.getStateSecret())
+      .update(payload)
+      .digest('base64url');
+    return this.getOAuthClient().generateAuthUrl({
+      access_type: 'offline',
+      prompt: 'consent',
+      scope: [DRIVE_READONLY_SCOPE],
+      state: `${payload}.${signature}`,
+    });
+  }
+
+  async completeAuthorization(code: string, state: string): Promise<string> {
+    const userId = this.verifyOAuthState(state);
+    const oauthClient = this.getOAuthClient();
+    const { tokens } = await oauthClient.getToken(code);
+    const previous = await this.prisma.googleDriveConnection.findUnique({
+      where: { userId },
+      select: { encryptedRefreshToken: true },
+    });
+    const refreshToken = tokens.refresh_token
+      ?? (previous ? this.decryptRefreshToken(previous.encryptedRefreshToken) : undefined);
+    if (!refreshToken) {
+      throw new BadRequestException(
+        'Google did not grant offline Drive access. Reconnect and approve the requested access.',
+      );
+    }
+
+    await this.prisma.googleDriveConnection.upsert({
+      where: { userId },
+      create: { userId, encryptedRefreshToken: this.encryptRefreshToken(refreshToken) },
+      update: { encryptedRefreshToken: this.encryptRefreshToken(refreshToken) },
+    });
+    return userId;
+  }
+
+  async disconnectUser(userId: string): Promise<void> {
+    const connection = await this.prisma.googleDriveConnection.findUnique({
+      where: { userId },
+      select: { encryptedRefreshToken: true },
+    });
+    if (!connection) return;
+    try {
+      const refreshToken = this.decryptRefreshToken(connection.encryptedRefreshToken);
+      await this.getOAuthClient().revokeToken(refreshToken);
+    } catch {
+      this.logger.warn('Google Drive token revocation failed; removing the local connection anyway');
+    }
+    await this.prisma.googleDriveConnection.deleteMany({ where: { userId } });
+  }
 
   extractFileId(input: string): string {
     let url: URL;
@@ -55,19 +133,18 @@ export class GoogleDriveService {
     return fileId;
   }
 
-  async listSharedDriveFolder(input: string): Promise<{
+  async listSharedDriveFolder(input: string, userId: string): Promise<{
     folderId: string;
     folderName: string;
     files: SharedDriveFolderFile[];
   }> {
-    const driveId = this.config.get<string>('GOOGLE_DRIVE_SHARED_DRIVE_ID');
-    if (!driveId) {
-      throw new ServiceUnavailableException('Google Shared Drive integration is not configured.');
-    }
-
     const folderId = this.extractFileId(input);
     try {
-      const drive = this.getClient();
+      const { drive, personal } = await this.getDriveClient(userId, true);
+      const driveId = personal ? undefined : this.config.get<string>('GOOGLE_DRIVE_SHARED_DRIVE_ID');
+      if (!personal && !driveId) {
+        throw new ServiceUnavailableException('Google Shared Drive integration is not configured.');
+      }
       const rootResponse = await drive.files.get({
         fileId: folderId,
         supportsAllDrives: true,
@@ -76,11 +153,13 @@ export class GoogleDriveService {
       const root = rootResponse.data;
       if (
         root.trashed ||
-        root.driveId !== driveId ||
+        (!personal && root.driveId !== driveId) ||
         root.mimeType !== 'application/vnd.google-apps.folder'
       ) {
         throw new BadRequestException(
-          'Choose a folder in the configured MedTrack Shared Drive.',
+          personal
+            ? 'Choose a folder that your connected Google account can access.'
+            : 'Choose a folder in the configured MedTrack Shared Drive.',
         );
       }
       if (!root.id || !root.name) {
@@ -94,8 +173,7 @@ export class GoogleDriveService {
         do {
           const response: drive_v3.Schema$FileList = (await drive.files.list({
             q: `'${parentId}' in parents and trashed = false`,
-            corpora: 'drive',
-            driveId,
+            ...(personal ? { corpora: 'user' as const } : { corpora: 'drive' as const, driveId }),
             includeItemsFromAllDrives: true,
             supportsAllDrives: true,
             pageSize: 1000,
@@ -104,7 +182,7 @@ export class GoogleDriveService {
           })).data;
 
           for (const entry of response.files ?? []) {
-            if (entry.trashed || !entry.id || !entry.name || entry.driveId !== driveId) continue;
+            if (entry.trashed || !entry.id || !entry.name || (!personal && entry.driveId !== driveId)) continue;
             if (entry.mimeType === 'application/vnd.google-apps.folder') {
               if (visitedFolders.has(entry.id)) continue;
               visitedFolders.add(entry.id);
@@ -139,27 +217,31 @@ export class GoogleDriveService {
       }
       this.logger.error('Could not list Google Drive folder', error);
       throw new BadRequestException(
-        'MedTrack cannot read this folder. Confirm it is in the configured Shared Drive and shared with the MedTrack service account.',
+        'MedTrack cannot read this folder. Confirm it is shared with your connected Google account.',
       );
     }
   }
 
-  async getSharedDriveFile(input: string): Promise<drive_v3.Schema$File> {
-    const driveId = this.config.get<string>('GOOGLE_DRIVE_SHARED_DRIVE_ID');
-    if (!driveId) {
-      throw new ServiceUnavailableException('Google Shared Drive integration is not configured.');
-    }
-
+  async getSharedDriveFile(input: string, userId?: string): Promise<drive_v3.Schema$File> {
     const fileId = this.extractFileId(input);
     try {
-      const response = await this.getClient().files.get({
+      const { drive, personal } = await this.getDriveClient(userId);
+      const driveId = personal ? undefined : this.config.get<string>('GOOGLE_DRIVE_SHARED_DRIVE_ID');
+      if (!personal && !driveId) {
+        throw new ServiceUnavailableException('Google Shared Drive integration is not configured.');
+      }
+      const response = await drive.files.get({
         fileId,
         supportsAllDrives: true,
         fields: 'id,name,mimeType,size,driveId,webViewLink,trashed',
       });
       const file = response.data;
-      if (file.trashed || file.driveId !== driveId) {
-        throw new BadRequestException('The file must be in the configured MedTrack Shared Drive and not in trash.');
+      if (file.trashed || (!personal && file.driveId !== driveId)) {
+        throw new BadRequestException(
+          personal
+            ? 'The file is not accessible to your connected Google account.'
+            : 'The file must be in the configured MedTrack Shared Drive and not in trash.',
+        );
       }
       if (!file.id || !file.name || !file.mimeType) {
         throw new BadRequestException('Google Drive did not return the required file details.');
@@ -172,22 +254,28 @@ export class GoogleDriveService {
     } catch (error) {
       if (error instanceof BadRequestException || error instanceof ServiceUnavailableException) throw error;
       this.logger.error('Could not access Google Drive file', error);
-      throw new BadRequestException('MedTrack cannot access this file. Confirm it is in the configured Shared Drive and shared with the MedTrack service account.');
+      throw new BadRequestException(
+        'MedTrack cannot access this file. Confirm it is shared with your connected Google account.',
+      );
     }
   }
 
-  async downloadFile(fileId: string, mimeType: string): Promise<Buffer> {
+  async downloadFile(fileId: string, mimeType: string, userId?: string): Promise<Buffer> {
     try {
-      const driveId = this.config.get<string>('GOOGLE_DRIVE_SHARED_DRIVE_ID');
-      if (!driveId) throw new ServiceUnavailableException('Google Shared Drive integration is not configured.');
-      const drive = this.getClient();
+      const { drive, personal } = await this.getDriveClient(userId, Boolean(userId));
+      const driveId = personal ? undefined : this.config.get<string>('GOOGLE_DRIVE_SHARED_DRIVE_ID');
+      if (!personal && !driveId) throw new ServiceUnavailableException('Google Shared Drive integration is not configured.');
       const file = await drive.files.get({
         fileId,
         supportsAllDrives: true,
         fields: 'id,size,driveId,trashed',
       });
-      if (file.data.trashed || file.data.driveId !== driveId) {
-        throw new BadRequestException('The Drive file is no longer available in the configured Shared Drive.');
+      if (file.data.trashed || (!personal && file.data.driveId !== driveId)) {
+        throw new BadRequestException(
+          personal
+            ? 'The Drive file is no longer accessible to the connected Google account.'
+            : 'The Drive file is no longer available in the configured Shared Drive.',
+        );
       }
       if (Number(file.data.size || 0) > MAX_DRIVE_MATERIAL_BYTES) {
         throw new BadRequestException('Drive materials must be 100 MB or smaller.');
@@ -227,7 +315,30 @@ export class GoogleDriveService {
     }
   }
 
-  private getClient(): drive_v3.Drive {
+  private async getDriveClient(
+    userId?: string,
+    requirePersonal = false,
+  ): Promise<{ drive: drive_v3.Drive; personal: boolean }> {
+    if (userId) {
+      const connection = await this.prisma.googleDriveConnection.findUnique({
+        where: { userId },
+        select: { encryptedRefreshToken: true },
+      });
+      if (connection) {
+        const oauthClient = this.getOAuthClient();
+        oauthClient.setCredentials({
+          refresh_token: this.decryptRefreshToken(connection.encryptedRefreshToken),
+        });
+        return { drive: google.drive({ version: 'v3', auth: oauthClient }), personal: true };
+      }
+    }
+    if (requirePersonal) {
+      throw new BadRequestException('Connect your Google Drive account before browsing folders.');
+    }
+    return { drive: this.getInstitutionalClient(), personal: false };
+  }
+
+  private getInstitutionalClient(): drive_v3.Drive {
     if (this.driveClient) return this.driveClient;
     const rawCredentials = this.config.get<string>('GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON');
     if (!rawCredentials) {
@@ -247,5 +358,91 @@ export class GoogleDriveService {
     });
     this.driveClient = google.drive({ version: 'v3', auth });
     return this.driveClient;
+  }
+
+  private getOAuthClient(): InstanceType<typeof google.auth.OAuth2> {
+    const clientId = this.config.get<string>('GOOGLE_DRIVE_OAUTH_CLIENT_ID');
+    const clientSecret = this.config.get<string>('GOOGLE_DRIVE_OAUTH_CLIENT_SECRET');
+    const redirectUri = this.config.get<string>('GOOGLE_DRIVE_OAUTH_REDIRECT_URI');
+    if (!clientId || !clientSecret || !redirectUri) {
+      throw new ServiceUnavailableException('Personal Google Drive OAuth is not configured.');
+    }
+    return new google.auth.OAuth2(clientId, clientSecret, redirectUri);
+  }
+
+  private getStateSecret(): string {
+    const secret = this.config.get<string>('JWT_SECRET');
+    if (!secret) throw new ServiceUnavailableException('OAuth state signing is not configured.');
+    return secret;
+  }
+
+  private verifyOAuthState(state: string): string {
+    const [payload, signature, extra] = state.split('.');
+    if (!payload || !signature || extra) throw new BadRequestException('Google OAuth state is invalid.');
+    const expected = createHmac('sha256', this.getStateSecret()).update(payload).digest();
+    let actual: Buffer;
+    try {
+      actual = Buffer.from(signature, 'base64url');
+    } catch {
+      throw new BadRequestException('Google OAuth state is invalid.');
+    }
+    if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) {
+      throw new ForbiddenException('Google OAuth state validation failed.');
+    }
+
+    try {
+      const decoded = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as {
+        userId?: string;
+        issuedAt?: number;
+      };
+      if (
+        !decoded.userId ||
+        typeof decoded.issuedAt !== 'number' ||
+        Date.now() - decoded.issuedAt > OAUTH_STATE_MAX_AGE_MS ||
+        decoded.issuedAt > Date.now() + 30_000
+      ) {
+        throw new Error('expired');
+      }
+      return decoded.userId;
+    } catch {
+      throw new BadRequestException('Google OAuth state is invalid or expired.');
+    }
+  }
+
+  private encryptRefreshToken(refreshToken: string): string {
+    const iv = randomBytes(12);
+    const cipher = createCipheriv('aes-256-gcm', this.getEncryptionKey(), iv);
+    const encrypted = Buffer.concat([cipher.update(refreshToken, 'utf8'), cipher.final()]);
+    return [iv, cipher.getAuthTag(), encrypted].map(value => value.toString('base64url')).join('.');
+  }
+
+  private decryptRefreshToken(encryptedToken: string): string {
+    try {
+      const [ivValue, tagValue, encryptedValue] = encryptedToken.split('.');
+      if (!ivValue || !tagValue || !encryptedValue) throw new Error('Invalid token format');
+      const decipher = createDecipheriv(
+        'aes-256-gcm',
+        this.getEncryptionKey(),
+        Buffer.from(ivValue, 'base64url'),
+      );
+      decipher.setAuthTag(Buffer.from(tagValue, 'base64url'));
+      return Buffer.concat([
+        decipher.update(Buffer.from(encryptedValue, 'base64url')),
+        decipher.final(),
+      ]).toString('utf8');
+    } catch {
+      throw new ServiceUnavailableException('Stored Google Drive credentials cannot be decrypted.');
+    }
+  }
+
+  private getEncryptionKey(): Buffer {
+    const encodedKey = this.config.get<string>('GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY');
+    const key = encodedKey ? Buffer.from(encodedKey, 'base64') : Buffer.alloc(0);
+    if (key.length !== 32) {
+      throw new ServiceUnavailableException(
+        'GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY must be a base64-encoded 32-byte key.',
+      );
+    }
+    return key;
   }
 }
