@@ -646,9 +646,10 @@ export class QuizService {
       }
 
       await this.progressService.updateProgress(userId, activeQuiz.id, {
-        // Assuming updateProgress can take a partial DTO
         isPassed,
         completionPercentage: scorePercentage,
+        bestScore: scorePercentage,
+        totalAttempts: existingAttempts + 1,
       });
 
       await this.analyticsService.generateAnalytics(userId, activeQuiz.id);

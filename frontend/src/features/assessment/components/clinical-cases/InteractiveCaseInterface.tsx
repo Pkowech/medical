@@ -122,6 +122,7 @@ export function InteractiveCaseInterface({ caseId, onComplete: _onComplete }: In
   const [sectionStartTime, setSectionStartTime] = useState<number>(Date.now());
   const [loading, setLoading] = useState(true);
   const [showFeedback, setShowFeedback] = useState<Record<string, boolean>>({});
+  const [isCompleting, setIsCompleting] = useState(false);
 
   useEffect(() => {
     loadCase();
@@ -153,9 +154,9 @@ export function InteractiveCaseInterface({ caseId, onComplete: _onComplete }: In
 
   const startNewAttempt = async () => {
     try {
-      const response = await apiService.post<CaseAttempt>('/clinical-cases/attempts', {
-        case_id: caseId,
-      });
+      const response = await apiService.post<CaseAttempt>(
+        `/clinical-cases/${caseId}/start`,
+      );
       const newAttempt = response.data;
       setAttempt(newAttempt);
       setCurrentSection(newAttempt.progress.current_section);
@@ -175,10 +176,10 @@ export function InteractiveCaseInterface({ caseId, onComplete: _onComplete }: In
       const response = await apiService.patch<CaseAttempt>(
         `/clinical-cases/attempts/${attempt.id}/progress`,
         {
-          current_section: currentSection,
-          decision_point_id: decisionPointId,
-          selected_option_id: selectedOptionIds[0], // For now, handle single selection
-          time_spent: timeSpent,
+          currentSection,
+          decisionPointId,
+          selectedOptionId: selectedOptionIds[0],
+          timeSpent,
         }
       );
 
@@ -200,6 +201,25 @@ export function InteractiveCaseInterface({ caseId, onComplete: _onComplete }: In
     } catch (error) {
       console.error('Failed to submit decision:', error);
       toast.error('Failed to submit decision');
+    }
+  };
+
+  const completeAttempt = async () => {
+    if (!attempt || attempt.status !== 'inProgress' || isCompleting) return;
+
+    try {
+      setIsCompleting(true);
+      const response = await apiService.post<CaseAttempt>(
+        `/clinical-cases/attempts/${attempt.id}/complete`,
+      );
+      setAttempt(response.data);
+      _onComplete?.(response.data);
+      toast.success('Clinical case completed.');
+    } catch (error) {
+      console.error('Failed to complete clinical case:', error);
+      toast.error('Failed to complete clinical case.');
+    } finally {
+      setIsCompleting(false);
     }
   };
 
@@ -308,6 +328,15 @@ export function InteractiveCaseInterface({ caseId, onComplete: _onComplete }: In
           <Progress value={progress} className="h-2" />
         </CardHeader>
       </Card>
+
+      {attempt.status === 'completed' && (
+        <Card>
+          <CardContent className="flex items-center gap-3 p-4 text-green-800">
+            <CheckCircle className="h-5 w-5" />
+            <p>This clinical case has been completed.</p>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Patient Information Sidebar */}
@@ -512,6 +541,17 @@ export function InteractiveCaseInterface({ caseId, onComplete: _onComplete }: In
                   </Card>
                 ))}
               </CardContent>
+              {attempt.status === 'inProgress' && (
+                <div className="border-t p-4">
+                  <Button
+                    onClick={() => void completeAttempt()}
+                    disabled={isCompleting}
+                    className="w-full"
+                  >
+                    {isCompleting ? 'Completing case…' : 'Complete case'}
+                  </Button>
+                </div>
+              )}
             </Card>
           )}
         </div>

@@ -17,7 +17,7 @@ interface Question {
 interface QuizPanelProps {
   lessonId?: string | number;
   lessonTitle?: string;
-  scope?: 'unit' | 'topic';
+  scope?: 'unit' | 'topic' | 'assessment';
   onTopicCompleted?: () => void;
   onTopicProgressUpdated?: () => void | Promise<void>;
   onNextTopic?: (topicId: string) => void;
@@ -149,7 +149,7 @@ export const QuizPanel = ({
           })),
         );
         result = topicResult;
-      } else if (scope === 'unit' && lessonId) {
+      } else if ((scope === 'unit' || scope === 'assessment') && lessonId) {
         const unitResult = await quizService.submitUnitQuiz(
           lessonId,
           questions.map(question => ({
@@ -182,7 +182,7 @@ export const QuizPanel = ({
       trackAction(XAPI_VERBS.COMPLETED, {
         id: `${URLS.BASE}/quizzes/${lessonId || 'general'}`,
           definition: {
-          name: { 'en-US': `${scope === 'topic' ? 'Topic Mastery Quiz' : 'Unit Quiz'}: ${lessonTitle || (scope === 'topic' ? 'Topic' : 'Unit')}` },
+          name: { 'en-US': `${scope === 'topic' ? 'Topic Mastery Quiz' : scope === 'assessment' ? 'Assessment' : 'Unit Quiz'}: ${lessonTitle || (scope === 'topic' ? 'Topic' : scope === 'assessment' ? 'Assessment' : 'Unit')}` },
           type: 'http://adlnet.gov/expapi/activities/assessment',
         }
       }, {
@@ -242,7 +242,11 @@ export const QuizPanel = ({
         {passed ? (
           <div className="bg-green-50 dark:bg-green-900/20 border border-green-100 dark:border-green-800/30 p-4 rounded-lg mb-8">
             <p className="text-green-800 dark:text-green-300 font-medium">
-              {scope === 'topic' ? "Congratulations! You've mastered this topic." : 'You passed the unit quiz.'}
+              {scope === 'topic'
+                ? "Congratulations! You've mastered this topic."
+                : scope === 'assessment'
+                  ? 'You passed the assessment.'
+                  : 'You passed the unit quiz.'}
             </p>
           </div>
         ) : (
@@ -269,7 +273,9 @@ export const QuizPanel = ({
           }}
           className="px-8 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20"
         >
-          {finalResult?.nextTopicId && onNextTopic ? 'Next Topic' : `Return to ${scope === 'topic' ? 'Topic' : 'Unit'}`}
+          {finalResult?.nextTopicId && onNextTopic
+            ? 'Next Topic'
+            : `Return to ${scope === 'topic' ? 'Topic' : scope === 'assessment' ? 'Assessment' : 'Unit'}`}
         </button>
       </div>
     );
@@ -281,7 +287,11 @@ export const QuizPanel = ({
     <div className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm rounded-xl p-6 shadow-sm border border-gray-200 dark:border-slate-700/50 mt-6 animate-in slide-in-from-bottom-4 duration-500">
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-          {scope === 'topic' ? 'Topic Mastery Quiz' : 'Unit Quiz'}
+          {scope === 'topic'
+            ? 'Topic Mastery Quiz'
+            : scope === 'assessment'
+              ? 'Assessment'
+              : 'Unit Quiz'}
         </h3>
         <span className="text-sm font-medium text-slate-500 bg-slate-100 dark:bg-slate-700 px-3 py-1 rounded-full">
           Question {currentQuestionIndex + 1} of {questions.length}

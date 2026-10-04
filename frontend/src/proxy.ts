@@ -60,8 +60,16 @@ const publicPathRoots = [
   '/unauthorized',
 ];
 
+const marketingPathRoots = ['/', '/about', '/contact', '/features', '/pricing'];
+
 function isPublicPath(pathname: string): boolean {
   return publicPathRoots.some(
+    path => pathname === path || (path !== '/' && pathname.startsWith(`${path}/`))
+  );
+}
+
+function isMarketingPath(pathname: string): boolean {
+  return marketingPathRoots.some(
     path => pathname === path || (path !== '/' && pathname.startsWith(`${path}/`))
   );
 }
@@ -107,10 +115,15 @@ export default withAuth(
 
     const isPublic = isPublicPath(pathname);
 
-    // If it's a public path, allow access. If user is authenticated, redirect to dashboard.
+    // Keep marketing pages for guests; authenticated users belong in the app.
     if (isPublic) {
-      if (hasValidToken && (pathname.startsWith('/login') || pathname.startsWith('/register'))) {
-        log('Authenticated user redirected from auth pages to dashboard');
+      if (
+        hasValidToken &&
+        (isMarketingPath(pathname) ||
+          pathname.startsWith('/login') ||
+          pathname.startsWith('/register'))
+      ) {
+        log('Authenticated user redirected from marketing or auth pages to dashboard');
         return NextResponse.redirect(new URL('/dashboard', req.url));
       }
       return NextResponse.next();

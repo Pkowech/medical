@@ -13,39 +13,24 @@ class LearningPathService {
   }
 
   async getRecommendedPaths(limit: number = 5): Promise<LearningPath[]> {
-    try {
-      const response = await apiService.get<ApiResponse<LearningPath[]>>(
-        `${LEARNING_PATH_BASE_URL}/discovery/personalized?limit=${limit}`
-      );
-      return response.data?.data || (Array.isArray(response.data) ? response.data : []);
-    } catch (error) {
-      console.warn('Failed to fetch recommended paths', error);
-      return [];
-    }
+    const response = await apiService.get<ApiResponse<LearningPath[]>>(
+      `${LEARNING_PATH_BASE_URL}/discovery/personalized?limit=${limit}`
+    );
+    return response.data?.data || (Array.isArray(response.data) ? response.data : []);
   }
 
   async getTrendingPaths(limit: number = 5): Promise<LearningPath[]> {
-    try {
-      const response = await apiService.get<ApiResponse<LearningPath[]>>(
-        `${LEARNING_PATH_BASE_URL}/discovery/trending?limit=${limit}`
-      );
-      return response.data?.data || (Array.isArray(response.data) ? response.data : []);
-    } catch (error) {
-      console.warn('Failed to fetch trending paths', error);
-      return [];
-    }
+    const response = await apiService.get<ApiResponse<LearningPath[]>>(
+      `${LEARNING_PATH_BASE_URL}/discovery/trending?limit=${limit}`
+    );
+    return response.data?.data || (Array.isArray(response.data) ? response.data : []);
   }
 
   async getCollaborativePaths(limit: number = 5): Promise<LearningPath[]> {
-    try {
-      const response = await apiService.get<ApiResponse<LearningPath[]>>(
-        `${LEARNING_PATH_BASE_URL}/discovery/collaborative?limit=${limit}`
-      );
-      return response.data?.data || (Array.isArray(response.data) ? response.data : []);
-    } catch (error) {
-       console.warn('Failed to fetch collaborative paths', error);
-      return [];
-    }
+    const response = await apiService.get<ApiResponse<LearningPath[]>>(
+      `${LEARNING_PATH_BASE_URL}/discovery/collaborative?limit=${limit}`
+    );
+    return response.data?.data || (Array.isArray(response.data) ? response.data : []);
   }
 
   async deleteLearningPath(learningPathId: string): Promise<void> {

@@ -110,9 +110,13 @@ export class AssessmentProgressService {
     this.eventEmitter.emit('assessment.completed', {
       userId,
       assessmentId,
-      score: progressData.bestScore ?? 0,
-      maxScore: 100,
-      timestamp: new Date(),
+      attemptData: {
+        score: result.bestScore ?? 0,
+        passed: result.isPassed,
+        progressPercentage: result.completionPercentage,
+        timeSpentMinutes: 0,
+        timestamp: new Date().toISOString(),
+      },
     });
 
     return result;

@@ -91,7 +91,7 @@ pub async fn get_recommendations_ai(
             Recommendation {
                 path_id: path.path_id,
                 title: path.title,
-                description: path.description.unwrap_or_default(),
+                description: path.description,
                 score: final_score,
                 reason,
             }
@@ -318,7 +318,7 @@ fn score_learning_path(path: LearningPathCandidate, profile: &UserProfile) -> Le
     LearningPathScore {
         path_id: path.id,
         title: path.title,
-        description: path.description,
+        description: path.description.unwrap_or_default(),
         difficulty_match,
         topic_relevance,
         ability_match,
@@ -494,7 +494,7 @@ pub async fn get_recommendations_for_gaps(
             recommendations.push(Recommendation {
                 path_id: path.id,
                 title: path.title,
-                description: path.description.unwrap_or_default(),
+                description: String::new(),
                 score,
                 reason: format!("Directly addresses your gap in: {}", gap),
             });

@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { getErrorMessage } from '../../../../common/utils/error.utils';
 import { PrismaService } from '../../../../infrastructure/prisma/prisma.service';
 import { AiAnalyticsService } from '#modules/ai-analytics/services/ai-analytics.service';
@@ -26,6 +27,7 @@ export class ClinicalCasesService {
     private readonly prisma: PrismaService,
     private readonly aiAnalyticsService: AiAnalyticsService,
     private readonly searchSync: GlobalSearchSyncService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async create(
@@ -470,6 +472,16 @@ export class ClinicalCasesService {
           analytics,
         } as any,
       } as any));
+
+      this.eventEmitter.emit('clinical-case.completed', {
+        userId,
+        caseId: attempt.clinicalCaseId,
+        attemptData: {
+          score: Number(updatedAttempt.score ?? 0),
+          percentage: Number(updatedAttempt.percentage ?? 0),
+          completed: true,
+        },
+      });
 
       this.logger.log('Case attempt completed', { attemptId, userId });
       return updatedAttempt;

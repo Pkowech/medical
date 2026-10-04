@@ -583,8 +583,8 @@ const progressService = {
     notes?: string;
     quizScores?: QuizScores;
   }): Promise<void> {
-    if (!progress.courseId && !progress.unitId && !progress.topicId && !progress.materialId) {
-      throw new Error('Progress updates require a course, unit, topic, or material ID.');
+    if (!progress.topicId && !progress.materialId) {
+      throw new Error('Progress updates require a topic or material ID.');
     }
 
     try {
@@ -596,10 +596,8 @@ const progressService = {
         },
       });
     } catch (error) {
-      // Handle 409 Conflict - server has newer data (offline sync handled by sync service)
       if (((error as { response?: { status?: number } })?.response?.status) === 409) {
-        console.warn('Conflict detected: server has newer progress data, skipping update');
-        return; // Non-fatal - let sync queue handle it
+        console.warn('Progress sync conflict: server has newer data.');
       }
       console.error('Error updating content progress:', formatError(error));
       throw error;

@@ -272,8 +272,8 @@ export class ProgressController {
       return this.progressService.updateUnitMaterialTopicProgress(req.user.id, {
         ...progress,
         status: progress.status || 'completed',
-        progressPercentage: progress.progressPercentage || 100,
-        timeSpent: progress.timeSpentMinutes || progress.timeSpent || 0,
+        progressPercentage: progress.progressPercentage ?? 100,
+        timeSpent: progress.timeSpentMinutes ?? progress.timeSpent ?? 0,
         clientTimestamp,
       });
     }

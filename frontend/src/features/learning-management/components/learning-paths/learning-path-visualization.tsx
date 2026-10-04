@@ -342,7 +342,10 @@ export const LearningPathVisualization: React.FC<LearningPathVisualizationProps>
     switch (module.type) {
       case 'course': router.push(`/courses/${module.resourceId}`); break;
       case 'assessment': router.push(`/assessment/${module.resourceId}`); break;
-      case 'clinicalCase': router.push(`/clinical-cases/${module.resourceId}`); break;
+      case 'clinical_case':
+      case 'clinicalCase':
+        router.push(`/clinical-cases/${module.resourceId}`);
+        break;
       default: toast.info(`Navigation for type '${module.type}' is not yet implemented.`);
     }
   };

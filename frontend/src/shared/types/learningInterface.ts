@@ -2,7 +2,7 @@ export interface PathModule {
   id: string;
   title: string;
   description: string;
-  type: 'course' | 'assessment' | 'clinicalCase' | 'resource' | 'milestone' | 'custom';
+  type: 'course' | 'assessment' | 'clinical_case' | 'clinicalCase' | 'resource' | 'milestone' | 'custom';
   resourceId?: string;
   estimatedHours?: number;
   isRequired: boolean;

@@ -1,7 +1,6 @@
-import { LearningRecommendation } from '@/shared/types/analyticsInterface';
-import { toast } from 'sonner';
 import { apiService } from '@/features/auth/services/apiClient';
 import { ApiResponse } from '@/shared/types/base-responseInterface';
+import { LearningPath } from '@/shared/types/learningInterface';
 
 // const AI_ANALYTICS_BASE_URL = '/ai-analytics';
 
@@ -9,21 +8,15 @@ import { ApiResponse } from '@/shared/types/base-responseInterface';
  * Fetches personalized learning path recommendations for the authenticated user.
  */
 export const getLearningPathRecommendations = async (): Promise<
-  LearningRecommendation[]
+  LearningPath[]
 > => {
-  try {
-    const response = await apiService.get<ApiResponse<LearningRecommendation[]>>(
-      '/learning-paths/discovery/personalized'
-    );
-    const data = (response.data as any)?.data ?? response.data ?? [];
-    return Array.isArray(data) ? data : [];
-  } catch (error) {
-    const err = error instanceof Error ? error : new Error(String(error));
-    console.error(
-      'Error fetching learning path recommendations:',
-      err.message,
-      err.stack
-    );
-    return [];
+  const response = await apiService.get<ApiResponse<LearningPath[]> | LearningPath[]>(
+    '/learning-paths/discovery/personalized'
+  );
+  const payload = response.data;
+  const paths = Array.isArray(payload) ? payload : payload.data;
+  if (!Array.isArray(paths)) {
+    throw new Error('The learning-path recommendations response was invalid.');
   }
+  return paths;
 };

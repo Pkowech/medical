@@ -12,9 +12,9 @@ import { Lightbulb, BookOpen, Target, Clock, Flame, FlaskConical } from 'lucide-
 import { useSession } from 'next-auth/react';
 import type {
   UserAnalytics,
-  LearningRecommendation,
   PerformanceData,
 } from '@/shared/types/analyticsInterface';
+import type { LearningPath } from '@/shared/types/learningInterface';
 import { userService } from '@/features/profile/services/userService';
 import { getLearningPathRecommendations } from '@/features/learning-management/services/learningManagementService';
 import { PerformanceAnalyticsContent } from '@/features/assessment/components/PerformanceAnalytics'; // Renamed to avoid conflict
@@ -69,7 +69,7 @@ export default function AnalyticsDashboard() {
     data: learningPathRecommendations,
     isLoading: isLoadingLearningPathRecommendations,
     error: errorLearningPathRecommendations,
-  } = useQuery<LearningRecommendation[]>({
+  } = useQuery<LearningPath[]>({
     queryKey: ['learningPathRecommendations', userId],
     queryFn: async () => (await getLearningPathRecommendations()) ?? [],
     enabled: !!userId,

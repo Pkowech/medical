@@ -103,14 +103,14 @@ class QuizProgressIntegrationService {
    */
   private async syncQuizToProgress(event: QuizCompletionEvent): Promise<void> {
     try {
-      await progressService.updateUnitProgress(
-        event.topicId,
-        'completed',
-        event.score,
-        0,
-        `Quiz completed with score: ${event.score}%`,
-        { [event.topicId]: event.score } // Store score by topic for recommendations
-      );
+      await progressService.updateContentProgress({
+        topicId: event.topicId,
+        status: event.score >= 70 ? 'completed' : 'inProgress',
+        progressPercentage: event.score,
+        timeSpentMinutes: 0,
+        notes: `Quiz completed with score: ${event.score}%`,
+        quizScores: { [event.topicId]: event.score },
+      });
     } catch (error) {
       console.error('Error syncing quiz to progress:', error);
       throw error;

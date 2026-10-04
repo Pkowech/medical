@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Sparkles,
   TrendingUp,
@@ -15,6 +16,8 @@ import {
 } from 'lucide-react';
 
 import type { RecommendationScore, TrendingPath } from '@/shared/types/recommendationInterface';
+import type { LearningPath } from '@/shared/types/learningInterface';
+import { learningPathService } from '@/features/learning-management/services/learningPathService';
 
 interface LearningPathRecommendationsProps {
   userId?: string;
@@ -23,150 +26,67 @@ interface LearningPathRecommendationsProps {
   showCollaborative?: boolean;
 }
 
-// Safely coerce an unknown value (from API responses) into a display string.
-// Avoids @typescript-eslint/no-base-to-string, which flags String(unknown)
-// because objects would stringify to "[object Object]".
-const toDisplayString = (value: unknown, fallback = ''): string => {
-  if (typeof value === 'string') return value;
-  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
-  return fallback;
-};
-
 export const LearningPathRecommendations: React.FC<LearningPathRecommendationsProps> = ({
   userId,
   limit = 6,
   showTrending = true,
   showCollaborative = true,
 }) => {
+  const router = useRouter();
   const [personalizedRecs, setPersonalizedRecs] = useState<RecommendationScore[]>([]);
   const [collaborativeRecs, setCollaborativeRecs] = useState<RecommendationScore[]>([]);
   const [trendingPaths, setTrendingPaths] = useState<TrendingPath[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'personalized' | 'collaborative' | 'trending'>(
     'personalized'
   );
 
   useEffect(() => {
-    fetchRecommendations();
-  }, [userId, limit]);
+    void fetchRecommendations();
+  }, [userId, limit, showCollaborative, showTrending]);
 
   const fetchRecommendations = async () => {
     try {
       setLoading(true);
-
-      // Fetch personalized recommendations
-      const personalizedResponse = await fetch(
-        `/api/learning-paths/recommendations?limit=${limit}`
+      setLoadError(null);
+      const [personalized, collaborative, trending] = await Promise.all([
+        learningPathService.getRecommendedPaths(limit),
+        showCollaborative
+          ? learningPathService.getCollaborativePaths(Math.ceil(limit / 2))
+          : Promise.resolve([]),
+        showTrending
+          ? learningPathService.getTrendingPaths(Math.ceil(limit / 2))
+          : Promise.resolve([]),
+      ]);
+      const toRecommendation = (path: LearningPath): RecommendationScore => ({
+        pathId: path.id,
+        score: 0,
+        reasons: [],
+        confidence: 0,
+        learningPath: path,
+      });
+      setPersonalizedRecs(personalized.map(toRecommendation));
+      setCollaborativeRecs(collaborative.map(toRecommendation));
+      setTrendingPaths(
+        trending.map(path => ({
+          id: path.id,
+          pathId: path.id,
+          title: path.title,
+          description: path.description,
+          difficulty: path.difficulty,
+          category: path.category,
+          analytics: {
+            userRatings: path.analytics.userRatings,
+            totalEnrollments: path.analytics.totalEnrollments,
+            completionRate: path.analytics.completionRate,
+          },
+          estimatedDurationWeeks: path.estimatedDurationWeeks,
+        })),
       );
-      if (personalizedResponse.ok) {
-        const personalizedData = await personalizedResponse.json();
-        if (Array.isArray(personalizedData)) {
-          const enrichedPersonalized = await Promise.all(
-            personalizedData.map(async (raw: unknown) => {
-              const item = raw as Record<string, unknown>;
-              const rec: RecommendationScore = {
-                pathId: toDisplayString(item.path_id ?? item.pathId),
-                score: Number(item.score ?? 0),
-                reasons: Array.isArray(item.reasons) ? item.reasons.map(String) : [],
-                confidence: Number(item.confidence ?? 0),
-                estimatedCompletionTime: Number(item.estimated_completion_time ?? item.estimatedCompletionTime ?? 0),
-              };
-              try {
-                const pathResponse = await fetch(`/api/learning-paths/${rec.pathId}`);
-                if (pathResponse.ok) {
-                  const pathData = await pathResponse.json();
-                  return { ...rec, learningPath: pathData };
-                }
-                return rec;
-              } catch {
-                return rec;
-              }
-            })
-          );
-          setPersonalizedRecs(enrichedPersonalized);
-        } else {
-          setPersonalizedRecs([]);
-        }
-      }
-      // Fetch collaborative recommendations if enabled
-      if (showCollaborative) {
-        const collaborativeResponse = await fetch(
-          `/api/learning-paths/recommendations/collaborative?limit=${Math.ceil(limit / 2)}`
-        );
-        if (collaborativeResponse.ok) {
-          const collaborativeData = await collaborativeResponse.json();
-          if (Array.isArray(collaborativeData)) {
-            const enrichedCollaborative = await Promise.all(
-              collaborativeData.map(async (raw: unknown) => {
-                const item = raw as Record<string, unknown>;
-                const rec: RecommendationScore = {
-                  pathId: toDisplayString(item.path_id ?? item.pathId),
-                  score: Number(item.score ?? 0),
-                  reasons: Array.isArray(item.reasons) ? item.reasons.map(String) : [],
-                  confidence: Number(item.confidence ?? 0),
-                  estimatedCompletionTime: Number(item.estimated_completion_time ?? item.estimatedCompletionTime ?? 0),
-                };
-                try {
-                  const pathResponse = await fetch(`/api/learning-paths/${rec.pathId}`);
-                  if (pathResponse.ok) {
-                    const pathData = await pathResponse.json();
-                    return { ...rec, learningPath: pathData };
-                  }
-                  return rec;
-                } catch {
-                  return rec;
-                }
-              })
-            );
-            setCollaborativeRecs(enrichedCollaborative);
-          } else {
-            setCollaborativeRecs([]);
-          }
-        }
-      }
-
-      // Fetch trending paths if enabled
-      if (showTrending) {
-        const trendingResponse = await fetch(
-          `/api/learning-paths/trending?limit=${Math.ceil(limit / 2)}`
-        );
-        if (trendingResponse.ok) {
-          const trendingData = await trendingResponse.json();
-          if (Array.isArray(trendingData)) {
-            // Normalize backend trending path shape to our TrendingPath type
-            const mapped: TrendingPath[] = trendingData.map((p: unknown) => {
-              const rec = p as Record<string, unknown>;
-              const analyticsRaw = (rec.analytics as Record<string, unknown> | undefined) ?? {};
-              const analyticsRatings = (analyticsRaw.user_ratings as Record<string, unknown> | undefined) ??
-                (analyticsRaw.userRatings as Record<string, unknown> | undefined) ?? {};
-
-              return {
-                id: toDisplayString(rec.path_id ?? rec.id),
-                pathId: toDisplayString(rec.path_id ?? rec.id),
-                title: toDisplayString(rec.title),
-                description: toDisplayString(rec.description),
-                difficulty: toDisplayString(rec.difficulty),
-                category: toDisplayString(rec.category),
-                analytics: {
-                  userRatings: {
-                    average: Number(analyticsRatings.average ?? analyticsRatings.averag ?? analyticsRatings.avg ?? 0),
-                    count: Number(analyticsRatings.count ?? 0),
-                  },
-                  totalEnrollments: Number(analyticsRaw.total_enrollments ?? analyticsRaw.totalEnrollments ?? 0),
-                  completionRate: Number(analyticsRaw.completion_rate ?? analyticsRaw.completionRate ?? 0),
-                },
-                estimatedDurationWeeks: Number(rec.estimated_duration_weeks ?? rec.estimatedDurationWeeks ?? 0),
-                popularity: Number(rec.popularity ?? rec.popularity_score ?? 0) || undefined,
-              };
-            });
-            setTrendingPaths(mapped);
-          } else {
-            setTrendingPaths([]);
-          }
-        }
-      }
     } catch (error) {
       console.error('Error fetching recommendations:', error);
+      setLoadError('Learning path recommendations could not be loaded.');
     } finally {
       setLoading(false);
     }
@@ -186,12 +106,6 @@ export const LearningPathRecommendations: React.FC<LearningPathRecommendationsPr
       default:
         return 'bg-gray-100 text-gray-800';
     }
-  };
-
-  const getConfidenceColor = (confidence: number) => {
-    if (confidence >= 0.8) return 'text-green-600';
-    if (confidence >= 0.6) return 'text-yellow-600';
-    return 'text-gray-600';
   };
 
   const renderRecommendationCard = (
@@ -231,8 +145,8 @@ export const LearningPathRecommendations: React.FC<LearningPathRecommendationsPr
               </span>
             </div>
 
-            {type === 'personalized' && (
-              <div className={`text-sm font-medium ${getConfidenceColor(rec.confidence)}`}>
+            {type === 'personalized' && rec.score > 0 && (
+              <div className="text-sm font-medium text-blue-600">
                 {Math.round(rec.score)}% match
               </div>
             )}
@@ -283,7 +197,7 @@ export const LearningPathRecommendations: React.FC<LearningPathRecommendationsPr
         </div>
 
         {/* Confidence indicator */}
-        {type === 'personalized' && (
+        {type === 'personalized' && rec.confidence > 0 && (
           <div className="mb-4">
             <div className="flex items-center justify-between text-sm text-gray-600 mb-1">
               <span>Recommendation confidence</span>
@@ -305,7 +219,10 @@ export const LearningPathRecommendations: React.FC<LearningPathRecommendationsPr
         )}
 
         {/* Action button */}
-        <button className="w-full flex items-center justify-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+        <button
+          onClick={() => router.push(`/learning-paths/${path.id}`)}
+          className="w-full flex items-center justify-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+        >
           <BookOpen className="w-4 h-4" />
           <span>View Learning Path</span>
           <ChevronRight className="w-4 h-4" />
@@ -362,7 +279,13 @@ export const LearningPathRecommendations: React.FC<LearningPathRecommendationsPr
         </div>
       </div>
 
-      <button className="w-full flex items-center justify-center space-x-2 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors">
+      <button
+        onClick={() => {
+          const pathId = path.pathId || path.id;
+          if (pathId) router.push(`/learning-paths/${pathId}`);
+        }}
+        className="w-full flex items-center justify-center space-x-2 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors"
+      >
         <BookOpen className="w-4 h-4" />
         <span>Join the Trend</span>
         <ChevronRight className="w-4 h-4" />
@@ -378,6 +301,11 @@ export const LearningPathRecommendations: React.FC<LearningPathRecommendationsPr
           <h2 className="text-2xl font-bold text-gray-900">Recommended for You</h2>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {loadError && (
+            <div role="alert" className="col-span-full rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">
+              {loadError}
+            </div>
+          )}
           {[...Array(6)].map((_, i) => (
             <div key={i} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
               <div className="animate-pulse space-y-4">

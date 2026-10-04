@@ -26,7 +26,7 @@ class QuizService {
 
   async getQuestionsForLesson(
     lessonId: string | number,
-    scope: 'unit' | 'topic',
+    scope: 'unit' | 'topic' | 'assessment',
   ): Promise<unknown[]> {
     const response = await apiService.get<unknown[]>(
       `${this.baseUrl}/${scope}/${lessonId}`,
