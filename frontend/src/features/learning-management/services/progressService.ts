@@ -105,12 +105,36 @@ const asNumber = (value: unknown): number | undefined =>
 const asRecord = (value: unknown): UnknownRecord | undefined =>
   typeof value === 'object' && value !== null ? (value as UnknownRecord) : undefined;
 
+const normalizeDashboardActivity = (item: RawActivity): ProgressActivity => {
+  const details = asRecord(item.details);
+  const metadata = asRecord(item.metadata);
+  const durationMinutes =
+    asNumber(item.durationMinutes) ??
+    (details ? asNumber(details.studyTimeDeltaMinutes) ?? asNumber(details.timeSpent) : undefined) ??
+    (metadata ? asNumber(metadata.duration) : undefined);
+  const score = asNumber(item.score) ?? (details ? asNumber(details.score) : undefined);
+
+  return {
+    id: asString(item.id, '') || asString(item._id, '') || generateId(),
+    type: asString(item.type, '') || asString(item.kind, '') || 'activity',
+    title: asString(item.title, '') || asString(item.description, '') || 'Activity',
+    date:
+      asString(item.date, '') ||
+      asString(item.createdAt, '') ||
+      asString(item.timestamp, '') ||
+      new Date().toISOString(),
+    durationMinutes,
+    score,
+  };
+};
+
 const generateId = (): string => `${Math.random().toString(36).slice(2)}${Date.now()}`;
 
 interface DashboardApiResponse {
   overview?: UnknownRecord;
   courses?: RawCourseProgress[];
   activities?: RawActivity[];
+  weeklyStudyTime?: Array<{ date: string; minutes: number }> | null;
   achievements?: Achievement[];
   peerComparison?: PeerComparison;
   deadlines?: UnknownRecord[];
@@ -323,7 +347,9 @@ const progressService = {
       stats.streak = stats.streak ?? (statsRecord['streakDays'] as number | undefined) ?? (statsRecord['currentStreak'] as number | undefined) ?? 0;
       
       const enrolledUnitsRaw: UnknownRecord[] = Array.isArray(enrolledUnitsRes) ? (enrolledUnitsRes as UnknownRecord[]) : [];
-      const recentActivities = Array.isArray(activitiesData) ? (activitiesData as ProgressActivity[]) : [];
+      const recentActivities = Array.isArray(activitiesData)
+        ? activitiesData.map(activity => normalizeDashboardActivity(activity as RawActivity))
+        : [];
       const achievements = Array.isArray(achievementsData) ? (achievementsData as Achievement[]) : [];
       const dueReviews = Array.isArray(dueReviewsData) ? (dueReviewsData as UnknownRecord[]) : [];
       const mastery = masteryRes?.data || {};
@@ -422,6 +448,11 @@ const progressService = {
           overallProgress,
           coursesCompleted: stats.coursesCompleted || 0,
           totalCourses: stats.totalCourses || 0,
+          totalStudyTime: typeof stats.totalStudyTime === 'number' ? stats.totalStudyTime : 0,
+          studyHours:
+            typeof stats.totalStudyTime === 'number'
+              ? Math.round((stats.totalStudyTime / 60) * 10) / 10
+              : 0,
           averageScore: Math.round(averageMastery),
           streak: stats.streak || 0,
           lastActivity: stats.lastActivity || new Date().toISOString(),
@@ -494,12 +525,19 @@ const progressService = {
             type,
           } as Deadline;
         }) : [],
-        weeklyProgress: Array(7).fill(0).map((_, i) => {
-          const d = new Date();
-          d.setDate(d.getDate() - (6 - i));
+        weeklyProgress: Array.from({ length: 7 }, (_, i) => {
+          const studyDay = dashboardData.weeklyStudyTime?.[i];
+          const [year, month, day] = (studyDay?.date ?? '').split('-').map(Number);
+          const d = studyDay && year && month && day
+            ? new Date(year, month - 1, day)
+            : new Date();
+          if (!studyDay) d.setDate(d.getDate() - (6 - i));
           return {
             day: d.toLocaleString('default', { weekday: 'short' }),
-            hours: 0,
+            hours:
+              typeof studyDay?.minutes === 'number'
+                ? Math.round((studyDay.minutes / 60) * 10) / 10
+                : 0,
             target: 4
           };
         }),

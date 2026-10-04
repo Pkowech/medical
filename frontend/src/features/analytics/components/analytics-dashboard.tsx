@@ -83,7 +83,7 @@ export default function AnalyticsDashboard() {
   } = useQuery<PerformanceData | null>({
     queryKey: ['performanceData', userId, 'summary'],
     queryFn: async () => {
-      const res = await fetch('/api/assessment-progress/summary', {
+      const res = await fetch('/api/backend/assessment-progress/summary', {
         headers: {
           Authorization: `Bearer ${session?.user?.accessToken}`,
         },
@@ -187,11 +187,19 @@ export default function AnalyticsDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  {userAnalytics?.metrics.quizzesTaken
-                    ? `${userAnalytics.averageScore.toFixed(1)}%`
-                    : 'No scores yet'}
+                  {isLoadingPerformanceData
+                    ? 'Loading…'
+                    : errorPerformanceData
+                      ? 'Unavailable'
+                      : performanceData && (performanceData.totalAttempts ?? 0) > 0
+                        ? `${performanceData.overallScore.toFixed(1)}%`
+                        : 'No scores yet'}
                 </div>
-                <p className="text-xs text-muted-foreground">Across all assessments</p>
+                <p className="text-xs text-muted-foreground">
+                  {errorPerformanceData
+                    ? 'Assessment average could not be loaded'
+                    : 'Average across completed assessments'}
+                </p>
               </CardContent>
             </Card>
             <Card>

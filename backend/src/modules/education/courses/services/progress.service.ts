@@ -288,6 +288,7 @@ export class ProgressService {
               materialId,
               topicId,
               timeSpent,
+              studyTimeDeltaMinutes: timeSpent ?? 0,
               progressPercentage,
             },
           },
@@ -982,6 +983,74 @@ export class ProgressService {
     });
   }
 
+  async getWeeklyStudyTime(
+    userId: string,
+  ): Promise<Array<{ date: string; minutes: number }>> {
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+    const startDate = new Date(today);
+    startDate.setUTCDate(startDate.getUTCDate() - 6);
+
+    const activities = await this.prisma.userActivity.findMany({
+      where: {
+        userId,
+        type: UserActivityType.LEARNING,
+        createdAt: { gte: startDate },
+      },
+      select: { id: true, createdAt: true, details: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    const minutesByDate = new Map<string, number>();
+    const legacyMinutesByContentAndDate = new Map<string, number>();
+
+    for (const activity of activities) {
+      const date = activity.createdAt.toISOString().slice(0, 10);
+      const details =
+        activity.details &&
+        typeof activity.details === 'object' &&
+        !Array.isArray(activity.details)
+          ? (activity.details as Record<string, unknown>)
+          : {};
+
+      if (typeof details.studyTimeDeltaMinutes === 'number') {
+        minutesByDate.set(
+          date,
+          (minutesByDate.get(date) ?? 0) + Math.max(0, details.studyTimeDeltaMinutes),
+        );
+        continue;
+      }
+
+      // Older progress events stored cumulative session minutes; use the
+      // greatest value per content/day rather than summing repeated snapshots.
+      const contentId =
+        details.materialId ??
+        details.topicId ??
+        details.unitId ??
+        details.courseId ??
+        activity.id;
+      const duration = details.timeSpent;
+      if (typeof duration !== 'number' || duration <= 0) continue;
+
+      const key = `${date}:${String(contentId)}`;
+      legacyMinutesByContentAndDate.set(
+        key,
+        Math.max(legacyMinutesByContentAndDate.get(key) ?? 0, duration),
+      );
+    }
+
+    for (const [key, minutes] of legacyMinutesByContentAndDate) {
+      const date = key.slice(0, 10);
+      minutesByDate.set(date, (minutesByDate.get(date) ?? 0) + minutes);
+    }
+
+    return Array.from({ length: 7 }, (_, index) => {
+      const date = new Date(startDate);
+      date.setUTCDate(startDate.getUTCDate() + index);
+      const key = date.toISOString().slice(0, 10);
+      return { date: key, minutes: minutesByDate.get(key) ?? 0 };
+    });
+  }
+
   getUserAchievements(): any[] {
     // Assuming an Achievement model or similar for achievements
     // For now, returning a mock or empty array if no Achievement model exists
@@ -1206,7 +1275,7 @@ export class ProgressService {
         totalLearningPaths: analytics?.pathStats?.totalLearningPaths || 0,
         completedLearningPaths:
           analytics?.pathStats?.completedLearningPaths || 0,
-        totalStudyTime: analytics?.userLearningSummary?.totalStudyTime || total,
+        totalStudyTime: total,
         averageCourseProgress:
           analytics?.courseStats?.averageCourseProgress || 0,
         averagePathProgress: analytics?.pathStats?.averagePathProgress || 0,

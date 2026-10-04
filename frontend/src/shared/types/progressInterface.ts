@@ -137,6 +137,8 @@ export interface ProgressStats {
   lastActivity: string | null;
   totalSessions?: number;
   totalTime?: number;
+  totalStudyTime?: number;
+  studyHours?: number;
   averageScore?: number;
   progressTrends?: any[];
   performanceMetrics?: any;
@@ -558,6 +560,5 @@ export interface FlashcardStatistics {
   sessions: number;
   avgTimePerCard: string;
 }
-
 
 

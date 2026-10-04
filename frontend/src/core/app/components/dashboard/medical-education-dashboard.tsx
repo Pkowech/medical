@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import {
   BookOpen,
@@ -39,6 +40,8 @@ import { GoalsProgressWidget } from '@/features/learning-management/components/g
 import useSchedule from '@/features/learning-management/study/hooks/useSchedule';
 import CalendarGrid from '@/features/learning-management/components/schedule/CalendarGrid';
 import { Event } from '@/features/learning-management/study/services/scheduleService';
+import apiService from '@/features/auth/services/apiClient';
+import type { PerformanceData } from '@/shared/types/analyticsInterface';
 
 const MedicalEducationDashboard = () => {
   const { user } = useAuthStore();
@@ -105,6 +108,20 @@ const MedicalEducationDashboard = () => {
     error, 
     refetch,
   } = useProgress();
+  const {
+    data: performanceSummary,
+    isLoading: isPerformanceSummaryLoading,
+    error: performanceSummaryError,
+  } = useQuery<PerformanceData>({
+    queryKey: ['dashboardAssessmentSummary', user?.id],
+    queryFn: async () => {
+      const response = await apiService.get<PerformanceData>('/assessment-progress/summary');
+      return response.data;
+    },
+    enabled: !!user?.id,
+    staleTime: 60_000,
+    throwOnError: false,
+  });
 
   // Use real data from backend
   const data = rawData || null;
@@ -156,6 +173,7 @@ const MedicalEducationDashboard = () => {
     streak?: number;
     quizzesCompleted?: number;
     studyHours?: number;
+    totalStudyTime?: number;
     studyHoursChange?: number;
     lastActivity?: string | null;
   };
@@ -174,15 +192,35 @@ const MedicalEducationDashboard = () => {
 
   const counters = {
     courses: stats.coursesCompleted || 0,
-    score: stats.averageScore ? Number(stats.averageScore.toFixed(1)) : 0,
-    hours: stats.studyHours || (data as unknown as { studySessions?: Array<{ durationHours?: number }> }).studySessions
-      ? Number(((data as unknown as { studySessions?: Array<{ durationHours?: number }> }).studySessions!.reduce((acc: number, session: { durationHours?: number }) => acc + (session.durationHours || 0), 0)).toFixed(1))
+    score: performanceSummary?.totalAttempts
+      ? Number(performanceSummary.overallScore.toFixed(1))
       : 0,
+    hours: stats.studyHours ?? 0,
   };
+  const assessmentScoresByMonth = (performanceSummary?.learningTrends || []).reduce<
+    Record<string, { year: number; month: number; total: number; count: number }>
+  >((monthlyScores, trend) => {
+    const date = new Date(trend.date);
+    if (!Number.isFinite(date.getTime()) || !Number.isFinite(trend.score)) return monthlyScores;
+    const key = `${date.getFullYear()}-${date.getMonth()}`;
+    const current = monthlyScores[key] || {
+      year: date.getFullYear(),
+      month: date.getMonth(),
+      total: 0,
+      count: 0,
+    };
+    monthlyScores[key] = { ...current, total: current.total + trend.score, count: current.count + 1 };
+    return monthlyScores;
+  }, {});
+  const assessmentTrends = Object.values(assessmentScoresByMonth)
+    .sort((left, right) => left.year - right.year || left.month - right.month)
+    .slice(-6)
+    .map(month => ({
+      label: new Date(month.year, month.month, 1).toLocaleString('default', { month: 'short' }),
+      value: Math.round(month.total / month.count),
+    }));
   const trendPoints = selectedTrendMetric === 'score'
-    ? (data.performanceTrends || [])
-        .filter(point => point.scoreCount === undefined ? point.score > 0 : point.scoreCount > 0)
-        .map(point => ({ label: point.month, value: point.score }))
+    ? assessmentTrends
     : (data.weeklyProgress || []).map(point => ({ label: point.day, value: point.hours }));
   const hasTrendData = selectedTrendMetric === 'score'
     ? trendPoints.length > 0
@@ -437,16 +475,30 @@ const MedicalEducationDashboard = () => {
           <StatCard
             icon={ClipboardList}
             title="Quizzes"
-            value={stats.quizzesCompleted || 0}
-            subtitle="Completed"
+            value={isPerformanceSummaryLoading
+              ? '…'
+              : performanceSummaryError
+                ? '—'
+                : performanceSummary?.totalAttempts ?? 0}
+            subtitle={performanceSummaryError ? 'Unavailable' : 'Completed'}
             colorClass="bg-slate-700"
             onClick={() => router.push('/quiz/history')}
           />
           <StatCard
             icon={Target}
             title="Avg Score"
-            value={`${stats.averageScore || 0}%`}
-            subtitle="Efficacy"
+            value={isPerformanceSummaryLoading
+              ? 'Loading…'
+              : performanceSummaryError
+                ? 'Unavailable'
+                : performanceSummary?.totalAttempts
+                  ? `${performanceSummary.overallScore.toFixed(1)}%`
+                  : '—'}
+            subtitle={performanceSummaryError
+              ? 'Could not load results'
+              : performanceSummary?.totalAttempts
+                ? `${performanceSummary.totalAttempts} completed assessments`
+                : 'No completed assessments'}
             colorClass="bg-emerald-500"
             onClick={() => router.push('/progress')}
           />
@@ -462,7 +514,7 @@ const MedicalEducationDashboard = () => {
             icon={Clock}
             title="Study Time"
             value={`${stats.studyHours || 0}h`}
-            subtitle="This Month"
+            subtitle="All time"
             colorClass="bg-purple-500"
             onClick={() => router.push('/study-planner')}
           />
@@ -777,7 +829,9 @@ const MedicalEducationDashboard = () => {
               <BarChart3 className="h-8 w-8 text-slate-300 dark:text-slate-600" />
               <p className="text-sm font-medium">
                 {selectedTrendMetric === 'score'
-                  ? 'Assessment trends will appear after you complete a quiz.'
+                  ? performanceSummaryError
+                    ? 'Assessment trends are currently unavailable.'
+                    : 'Assessment trends will appear after you complete a quiz.'
                   : 'Study-hour trends will appear after you log study time.'}
               </p>
             </div>

@@ -24,6 +24,8 @@ export default function useMaterialProgressTracker(options: Options) {
   computePercentRef.current = computePercent;
   const lastPercentRef = useRef<number>(0);
   const lastSyncTimeRef = useRef<number>(0);
+  const lastReportedMinutesRef = useRef(0);
+  const isSendingRef = useRef(false);
   const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
   const [currentPercent, setCurrentPercent] = useState<number>(0);
 
@@ -41,6 +43,7 @@ export default function useMaterialProgressTracker(options: Options) {
   // Internal helper to send progress
   const sendProgress = useCallback(async (percent: number, elapsedMinutes: number) => {
     const now = Date.now();
+    if (isSendingRef.current) return;
     // Throttling: Ensure at least 15s between syncs even for significant deltas
     if (percent >= 100 && lastPercentRef.current >= 100) {
       return;
@@ -48,8 +51,10 @@ export default function useMaterialProgressTracker(options: Options) {
     if (now - lastSyncTimeRef.current < 15000 && percent < 100) {
       return;
     }
-    lastPercentRef.current = percent;
+    isSendingRef.current = true;
     lastSyncTimeRef.current = now;
+    const unreportedMinutes = Math.max(0, elapsedMinutes - lastReportedMinutesRef.current);
+    let progressSaved = !(materialId || topicId);
 
     if (materialId || topicId) {
       try {
@@ -60,8 +65,9 @@ export default function useMaterialProgressTracker(options: Options) {
           courseId,
           status: percent >= 100 ? 'completed' : 'inProgress',
           progressPercentage: percent,
-          timeSpentMinutes: elapsedMinutes,
+          timeSpentMinutes: unreportedMinutes,
         });
+        progressSaved = true;
       } catch (err) {
         console.error('Failed to send material progress', err);
         try {
@@ -71,14 +77,21 @@ export default function useMaterialProgressTracker(options: Options) {
             courseId: courseId || undefined,
             materialId: materialId || undefined,
             percent,
-            timeSpentMinutes: elapsedMinutes,
+            timeSpentMinutes: unreportedMinutes,
             status: percent >= 100 ? 'completed' : 'inProgress',
           });
+          progressSaved = true;
         } catch (queueError) {
           console.error('Failed to queue material progress for offline sync', queueError);
           toast.error('Material progress could not be saved.');
         }
       }
+      if (progressSaved) {
+        lastReportedMinutesRef.current = elapsedMinutes;
+      }
+    }
+    if (progressSaved) {
+      lastPercentRef.current = percent;
     }
 
     if (materialId) {
@@ -99,6 +112,7 @@ export default function useMaterialProgressTracker(options: Options) {
         console.error('Failed to track material progress in xAPI', err);
       }
     }
+    isSendingRef.current = false;
   }, [courseId, materialId, topicId, trackAction, unitId, XAPI_VERBS]);
 
   const computeCurrentPercent = useCallback((): number => {
@@ -130,6 +144,7 @@ export default function useMaterialProgressTracker(options: Options) {
     setElapsedSeconds(0);
     lastPercentRef.current = initialPercent;
     lastSyncTimeRef.current = Date.now(); // Mark start time as "last sync" to delay first interval sync
+    lastReportedMinutesRef.current = 0;
 
     // Repeating updates (every 1s for UI smoothness, but sync happens less frequently)
     intervalRef.current = window.setInterval(async () => {
@@ -168,7 +183,7 @@ export default function useMaterialProgressTracker(options: Options) {
     }
     const elapsedMin = Math.max(
       0,
-      Math.round((Date.now() - (timeStartedRef.current || Date.now())) / 60000)
+      Math.round((Date.now() - (timeStartedRef.current || Date.now())) / 60000),
     );
     const p = computeCurrentPercent();
     await sendProgress(p >= 100 ? 100 : p, elapsedMin);
@@ -177,12 +192,12 @@ export default function useMaterialProgressTracker(options: Options) {
     setElapsedSeconds(0);
   }, [computeCurrentPercent, sendProgress]);
 
-  // auto-cleanup on unmount
+  // Flush the final unreported duration when the reader unmounts.
   useEffect(() => {
     return () => {
-      if (intervalRef.current) window.clearInterval(intervalRef.current);
+      void stopTracking();
     };
-  }, []);
+  }, [stopTracking]);
 
   return {
     isTracking,
