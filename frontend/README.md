@@ -104,17 +104,37 @@ not persisted in Cache Storage. On activation, the worker removes legacy runtime
 caches that may have stored API responses. If a navigation cannot be loaded while offline,
 the service worker serves `public/offline.html`.
 
-Supported quiz submissions and progress updates are stored in the
-`medical-education-db` IndexedDB `syncQueue` store and sent through the
-same-origin `/api/backend` proxy when connectivity returns. Temporary failures
-use bounded retries; failed records remain available for manual retry from the
-connectivity indicator. Existing progress records in
-`medtrackhub-offline-progress` are copied to the unified queue during app
-startup, then removed from the legacy queue only after the copy succeeds.
+Students can explicitly download a topic's authorized PDF previews and practice
+quiz content from its topic page. These downloads are stored per user in the
+`medical-education-db` IndexedDB database; they are not copied back to Drive or
+shared with other students. Topic downloads expire after 30 days and access is
+rechecked when the student reconnects. PDFs and saved quizzes are available from
+the topic page or the Offline downloads page; the standalone
+`public/offline.html` fallback also lists saved topics when the app cannot load.
 
-This does not currently guarantee that course pages, PDFs, or all learning
-materials can be opened offline. Users should open/download required materials
-while connected until explicit course-download support is implemented.
+Separately, opening a topic while online starts a temporary background cache of
+its PDFs and practice quiz to help with short connection interruptions. The
+topic page indicates whether preparation is complete or partial. This temporary
+copy is removed when the student leaves the topic; it is not listed as a saved
+download. Students should use Download for offline when they need the topic to
+remain available later. Content that has not finished caching cannot be read
+offline, and non-PDF materials and video streams are not included. Temporary
+copies also expire after 24 hours if the browser closes before cleanup runs.
+
+Offline quiz attempts are provisional formative practice. They are queued in
+IndexedDB and sent through the same-origin `/api/backend` proxy when connectivity
+returns. The server validates the submitted questions and options against the
+current topic, calculates the score, and stores the attempt idempotently.
+Validated offline attempts do not count toward mastery or unlocks. Temporary
+failures are retried, and failed attempts can be retried from Offline downloads.
+High-stakes assessments should be completed online.
+
+Signing out clears that user's local offline study cache, including unsynced
+practice attempts, to avoid leaving personal study data on a shared device.
+Browser storage is not a secure vault against someone with access to the device.
+Existing progress records in `medtrackhub-offline-progress` are copied to the
+unified queue during app startup, then removed from the legacy queue only after
+the copy succeeds.
 
 The service worker is registered by the root application component. When a new
 worker is waiting, the app shows an update prompt; accepting it activates the

@@ -6,6 +6,9 @@ const QUEUEABLE_POST_PATHS = new Set([
   '/quizzes/submit',
 ]);
 
+const OFFLINE_PRACTICE_ATTEMPT_PATH =
+  /^\/quizzes\/topic\/[^/]+\/offline-attempts$/;
+
 export function isOfflineQueueableRequest(method?: string, url?: string): boolean {
   if (method?.toUpperCase() !== 'POST' || !url) return false;
 
@@ -22,6 +25,7 @@ export function isOfflineQueueableRequest(method?: string, url?: string): boolea
 
   return (
     QUEUEABLE_POST_PATHS.has(pathname) ||
+    OFFLINE_PRACTICE_ATTEMPT_PATH.test(pathname) ||
     /^\/progress\/materials\/[^/]+\/read$/.test(pathname)
   );
 }

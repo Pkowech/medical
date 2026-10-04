@@ -1,130 +1,550 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#1e40af">
-    <title>Offline - MedTrack Hub</title>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#1e40af" />
+    <title>Offline downloads · MedTrack Hub</title>
     <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-            margin: 0;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            background-color: #f5f5f5;
-            color: #333;
-        }
-
-        .container {
-            max-width: 600px;
-            text-align: center;
-            padding: 40px;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
-
-        h1 {
-            color: #2563eb;
-            margin-bottom: 20px;
-        }
-
-        p {
-            margin-bottom: 20px;
-            line-height: 1.6;
-        }
-
-        .icon {
-            font-size: 64px;
-            margin-bottom: 20px;
-        }
-
-        .button {
-            background-color: #2563eb;
-            color: white;
-            padding: 12px 24px;
-            border-radius: 6px;
-            text-decoration: none;
-            font-weight: 500;
-            transition: background-color 0.2s;
-        }
-
-        .button:hover {
-            background-color: #1d4ed8;
-        }
-
-        .status {
-            margin-top: 20px;
-            padding: 10px;
-            border-radius: 4px;
-            background-color: #fee2e2;
-            color: #dc2626;
-        }
+      :root { color-scheme: light; font-family: system-ui, sans-serif; color: #172033; background: #f3f6fb; }
+      * { box-sizing: border-box; }
+      body { margin: 0; padding: 1rem; }
+      main { max-width: 850px; margin: 2rem auto; }
+      header, article, .panel { background: white; border: 1px solid #dbe2ec; border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; }
+      h1, h2, h3, p { margin-top: 0; }
+      p, .muted { color: #526176; }
+      button, .button { border: 1px solid #bac7d8; background: #fff; border-radius: 7px; color: #173a75; cursor: pointer; display: inline-block; font: inherit; font-weight: 600; padding: .55rem .8rem; text-decoration: none; }
+      button:hover, .button:hover { background: #edf4ff; }
+      button:disabled { cursor: wait; opacity: .6; }
+      .row { align-items: center; display: flex; flex-wrap: wrap; gap: .6rem; justify-content: space-between; }
+      .stack { display: grid; gap: .75rem; }
+      .status { border-radius: 7px; margin: 1rem 0; padding: .8rem 1rem; background: #eef2f7; }
+      .status.error { color: #991b1b; background: #fee2e2; }
+      .status.good { color: #166534; background: #dcfce7; }
+      .pdf-frame { border: 1px solid #dbe2ec; border-radius: 8px; height: min(70vh, 850px); width: 100%; }
+      fieldset { border: 1px solid #dbe2ec; border-radius: 8px; margin: .8rem 0; padding: 1rem; }
+      legend { font-weight: 700; padding: 0 .3rem; }
+      label.option { align-items: flex-start; display: flex; gap: .55rem; padding: .4rem 0; }
+      .small { font-size: .85rem; }
+      [hidden] { display: none !important; }
+      @media (max-width: 560px) { main { margin: .5rem auto; } .row { align-items: flex-start; flex-direction: column; } }
     </style>
-</head>
-<body>
-    <div class="container">
-        <div class="icon">📶</div>
-        <h1>Page Unavailable</h1>
-        <p>This page could not be loaded. Previously saved learning content may still be available on this device.</p>
-        <p>Queued progress will sync when the app is open and your connection is restored.</p>
-        <button class="button" type="button" onclick="window.location.reload()">Try Again</button>
-        <div class="status" id="status" aria-live="polite">Reconnecting automatically when this page is reachable...</div>
-    </div>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1 id="page-title">Offline downloads</h1>
+        <p>Personal copies stored on this device. Offline quiz attempts are provisional and do not count toward mastery or unlocks.</p>
+        <p id="connectivity" class="status" role="status" aria-live="polite">Checking connection…</p>
+        <button id="retry" type="button">Try online page again</button>
+      </header>
+
+      <section id="library" aria-label="Saved topics" class="stack"></section>
+
+      <section id="topic-view" class="panel" hidden>
+        <div class="row">
+          <div>
+            <h2 id="topic-title"></h2>
+            <p id="topic-description" class="muted"></p>
+          </div>
+          <button id="back-to-library" type="button">All downloads</button>
+        </div>
+        <section class="stack">
+          <h3>Saved PDFs</h3>
+          <div id="pdf-list" class="stack"></div>
+          <div id="pdf-reader" hidden></div>
+        </section>
+        <section class="panel" aria-labelledby="practice-title">
+          <h3 id="practice-title">Practice quiz</h3>
+          <p class="small muted">Answers are saved on this device and validated by the server after reconnection. They are not secure assessment results.</p>
+          <div id="quiz-content"></div>
+        </section>
+      </section>
+
+      <section id="attempts" class="stack" aria-label="Practice sync status"></section>
+    </main>
 
     <script>
-        const status = document.getElementById('status');
-        let recoveryInProgress = false;
+      (() => {
+        const DB_NAME = 'medical-education-db';
+        const USER_KEY = 'medtrack-offline-user';
+        const library = document.getElementById('library');
+        const topicView = document.getElementById('topic-view');
+        const connectivity = document.getElementById('connectivity');
+        const attemptsView = document.getElementById('attempts');
+        let database;
+        let activeUserId;
+        let currentBundle;
+        let currentQuiz;
+        let currentAttemptId;
+        let currentAnswers = {};
+        let pdfObjectUrl;
 
-        function updateStatus(message, backgroundColor, color) {
-            status.textContent = message;
-            status.style.backgroundColor = backgroundColor;
-            status.style.color = color;
-        }
-
-        async function retryPageWhenReachable() {
-            if (recoveryInProgress) return;
-            recoveryInProgress = true;
-
-            const controller = new AbortController();
-            const timeout = window.setTimeout(() => controller.abort(), 5000);
-            try {
-                const response = await fetch(window.location.href, {
-                    method: 'GET',
-                    cache: 'no-store',
-                    credentials: 'same-origin',
-                    signal: controller.signal
-                });
-                if (response.ok) {
-                    await response.body?.cancel();
-                    updateStatus('Connection restored. Reloading this page...', '#dcfce7', '#16a34a');
-                    window.location.reload();
-                } else {
-                    await response.body?.cancel();
-                    updateStatus('Still unable to reach this page. Retrying automatically...', '#fee2e2', '#dc2626');
-                }
-            } catch {
-                updateStatus('Still unable to reach this page. Retrying automatically...', '#fee2e2', '#dc2626');
-            } finally {
-                window.clearTimeout(timeout);
-                recoveryInProgress = false;
-            }
-        }
-
-        window.addEventListener('online', retryPageWhenReachable);
-        window.addEventListener('offline', () => {
-            updateStatus(
-                'Connection lost. Retrying automatically when it returns...',
-                '#fee2e2',
-                '#dc2626'
-            );
+        const requestValue = request => new Promise((resolve, reject) => {
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
         });
-        void retryPageWhenReachable();
-        window.setInterval(retryPageWhenReachable, 10000);
+        const transactionDone = transaction => new Promise((resolve, reject) => {
+          transaction.oncomplete = resolve;
+          transaction.onabort = () => reject(transaction.error);
+          transaction.onerror = () => reject(transaction.error);
+        });
+        const scopedId = (userId, topicId) => `${userId}:${topicId}`;
+        const materialKey = (userId, topicId, materialId) => `${userId}:${topicId}:${materialId}`;
+        const formatSize = bytes => {
+          if (bytes < 1024) return `${bytes} B`;
+          const units = ['KB', 'MB', 'GB'];
+          let size = bytes / 1024;
+          let unit = 0;
+          while (size >= 1024 && unit < units.length - 1) { size /= 1024; unit += 1; }
+          return `${size.toFixed(size >= 10 ? 0 : 1)} ${units[unit]}`;
+        };
+        const message = (text, kind = '') => {
+          connectivity.textContent = text;
+          connectivity.className = `status ${kind}`;
+        };
+        const showError = error => {
+          console.error('[OfflineFallback]', error);
+          message(error instanceof Error ? error.message : String(error), 'error');
+        };
+        const makeButton = (text, onClick) => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.textContent = text;
+          button.addEventListener('click', onClick);
+          return button;
+        };
+        const makeCard = (title, details) => {
+          const card = document.createElement('article');
+          const heading = document.createElement('h3');
+          const description = document.createElement('p');
+          heading.textContent = title;
+          description.className = 'small muted';
+          description.textContent = details;
+          card.append(heading, description);
+          return card;
+        };
+
+        async function openDatabase() {
+          return new Promise((resolve, reject) => {
+            const request = indexedDB.open(DB_NAME);
+            request.onupgradeneeded = event => {
+              if (event.oldVersion === 0) request.transaction.abort();
+            };
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => {
+              if (request.error?.name === 'AbortError') resolve(undefined);
+              else reject(request.error || new Error('Offline database could not be opened.'));
+            };
+          });
+        }
+
+        async function allForUser(storeName) {
+          if (!database.objectStoreNames.contains(storeName)) return [];
+          const transaction = database.transaction(storeName, 'readonly');
+          const store = transaction.objectStore(storeName);
+          const result = store.indexNames.contains('by-user')
+            ? await requestValue(store.index('by-user').getAll(activeUserId))
+            : [];
+          await transactionDone(transaction);
+          return result;
+        }
+
+        async function getRecord(storeName, id) {
+          if (!database.objectStoreNames.contains(storeName)) return undefined;
+          const transaction = database.transaction(storeName, 'readonly');
+          const value = await requestValue(transaction.objectStore(storeName).get(id));
+          await transactionDone(transaction);
+          return value;
+        }
+
+        async function removeBundle(bundle) {
+          const transaction = database.transaction(
+            ['offlineTopics', 'offlineTopicMaterials', 'offlineTopicQuizzes'],
+            'readwrite',
+          );
+          transaction.objectStore('offlineTopics').delete(bundle.id);
+          transaction.objectStore('offlineTopicQuizzes').delete(bundle.id);
+          for (const id of bundle.materialIds || []) {
+            transaction.objectStore('offlineTopicMaterials').delete(
+              materialKey(bundle.userId, bundle.topicId, id),
+            );
+          }
+          await transactionDone(transaction);
+        }
+
+        async function loadLibrary() {
+          topicView.hidden = true;
+          library.hidden = false;
+          library.replaceChildren();
+          attemptsView.replaceChildren();
+          if (!database || !activeUserId) {
+            library.append(makeCard('No offline downloads found', 'Sign in on this device and save a topic while online.'));
+            return;
+          }
+
+          const bundles = await allForUser('offlineTopics');
+          const validBundles = [];
+          for (const bundle of bundles) {
+            if (bundle.expiresAt <= Date.now()) await removeBundle(bundle);
+            else if (bundle.cacheMode !== 'session') validBundles.push(bundle);
+          }
+          if (!validBundles.length) {
+            library.append(makeCard('No offline downloads found', 'Open a course topic while online and choose Download for offline.'));
+          }
+
+          for (const bundle of validBundles) {
+            const card = makeCard(
+              bundle.title,
+              `${bundle.materialIds.length} PDF${bundle.materialIds.length === 1 ? '' : 's'} · ${formatSize(bundle.totalBytes)} · expires ${new Date(bundle.expiresAt).toLocaleDateString()}`,
+            );
+            const actions = document.createElement('div');
+            actions.className = 'row';
+            const open = makeButton('Open saved topic', () => openTopic(bundle));
+            const remove = makeButton('Remove download', async () => {
+              try { await removeBundle(bundle); await loadLibrary(); }
+              catch (error) { showError(error); }
+            });
+            actions.append(open, remove);
+            card.append(actions);
+            library.append(card);
+          }
+          await renderAttempts();
+        }
+
+        async function renderAttempts() {
+          attemptsView.replaceChildren();
+          const heading = document.createElement('h2');
+          heading.textContent = 'Practice sync';
+          attemptsView.append(heading);
+          for (const attempt of await allForUser('offlinePracticeAttempts')) {
+            const statusText = attempt.status === 'synced'
+              ? `Server-validated practice score: ${attempt.score ?? 0}%`
+              : attempt.status === 'failed'
+                ? `Sync failed${attempt.lastError ? `: ${attempt.lastError}` : ''}`
+                : attempt.status === 'draft'
+                  ? 'Draft saved on this device'
+                  : 'Provisional · waiting to sync';
+            const card = makeCard('Topic practice', statusText);
+            if (attempt.status !== 'synced') {
+              const note = document.createElement('p');
+              note.className = 'small muted';
+              note.textContent = 'Offline answers are untrusted until the server validates them; they do not count toward mastery or unlocks.';
+              card.append(note);
+            }
+            if (attempt.status === 'failed' && navigator.onLine) {
+              card.append(makeButton('Retry sync', () => queueForSync(attempt)));
+            }
+            attemptsView.append(card);
+          }
+        }
+
+        async function openTopic(bundle) {
+          currentBundle = bundle;
+          library.hidden = true;
+          topicView.hidden = false;
+          document.getElementById('topic-title').textContent = bundle.title;
+          document.getElementById('topic-description').textContent = bundle.description || '';
+          await renderPdfList();
+          await renderQuiz();
+        }
+
+        async function renderPdfList() {
+          const pdfList = document.getElementById('pdf-list');
+          const reader = document.getElementById('pdf-reader');
+          pdfList.replaceChildren();
+          reader.replaceChildren();
+          reader.hidden = true;
+          if (pdfObjectUrl) URL.revokeObjectURL(pdfObjectUrl);
+          pdfObjectUrl = undefined;
+          for (const materialId of currentBundle.materialIds || []) {
+            const material = await getRecord(
+              'offlineTopicMaterials',
+              materialKey(activeUserId, currentBundle.topicId, materialId),
+            );
+            if (!material) continue;
+            const row = document.createElement('div');
+            row.className = 'row';
+            const title = document.createElement('span');
+            title.textContent = `${material.title} · ${formatSize(material.size)}`;
+            row.append(title, makeButton('Read PDF', () => openPdf(material)));
+            pdfList.append(row);
+          }
+          if (!pdfList.childElementCount) {
+            pdfList.append(makeCard('No PDFs saved', 'This topic may contain only a practice quiz.'));
+          }
+        }
+
+        function openPdf(material) {
+          const reader = document.getElementById('pdf-reader');
+          if (pdfObjectUrl) URL.revokeObjectURL(pdfObjectUrl);
+          pdfObjectUrl = URL.createObjectURL(material.content);
+          const heading = document.createElement('h3');
+          heading.textContent = material.title;
+          const frame = document.createElement('iframe');
+          frame.className = 'pdf-frame';
+          frame.title = material.title;
+          frame.src = pdfObjectUrl;
+          const close = makeButton('Close PDF', () => {
+            reader.hidden = true;
+            reader.replaceChildren();
+            URL.revokeObjectURL(pdfObjectUrl);
+            pdfObjectUrl = undefined;
+          });
+          reader.replaceChildren(heading, close, frame);
+          reader.hidden = false;
+        }
+
+        async function renderQuiz() {
+          const container = document.getElementById('quiz-content');
+          container.replaceChildren();
+          currentQuiz = await getRecord('offlineTopicQuizzes', scopedId(activeUserId, currentBundle.topicId));
+          if (!currentQuiz?.questions?.length) {
+            container.append(makeCard('No practice quiz saved', 'No offline practice questions were available when this topic was downloaded.'));
+            return;
+          }
+          const drafts = (await allForUser('offlinePracticeAttempts'))
+            .filter(attempt => attempt.topicId === currentBundle.topicId && attempt.status === 'draft')
+            .sort((left, right) => right.lastUpdated - left.lastUpdated);
+          const draft = drafts[0];
+          currentAttemptId = draft?.id || crypto.randomUUID();
+          currentAnswers = Object.fromEntries(
+            (draft?.responses || []).map(response => [response.questionId, response.selectedAnswers]),
+          );
+
+          const form = document.createElement('form');
+          form.className = 'stack';
+          for (const question of currentQuiz.questions) {
+            const fieldset = document.createElement('fieldset');
+            fieldset.dataset.questionId = question.id;
+            const legend = document.createElement('legend');
+            legend.textContent = question.text;
+            fieldset.append(legend);
+            for (const option of question.options) {
+              const label = document.createElement('label');
+              label.className = 'option';
+              const input = document.createElement('input');
+              input.type = question.type === 'multiple_select' ? 'checkbox' : 'radio';
+              input.name = question.id;
+              input.value = option.id;
+              input.checked = (currentAnswers[question.id] || []).includes(option.id);
+              const text = document.createElement('span');
+              text.textContent = option.text;
+              label.append(input, text);
+              fieldset.append(label);
+            }
+            form.append(fieldset);
+          }
+          const submit = document.createElement('button');
+          submit.type = 'submit';
+          submit.textContent = 'Save provisional practice attempt';
+          form.append(submit);
+          const feedback = document.createElement('p');
+          feedback.className = 'status';
+          feedback.setAttribute('role', 'status');
+          form.addEventListener('change', () => {
+            currentAnswers = {};
+            for (const question of currentQuiz.questions) {
+              const fieldset = form.querySelector(`[data-question-id="${CSS.escape(question.id)}"]`);
+              const selected = [...fieldset.querySelectorAll('input:checked')].map(input => input.value);
+              if (selected.length) currentAnswers[question.id] = selected;
+            }
+            void saveDraft().catch(showError);
+          });
+          form.addEventListener('submit', async event => {
+            event.preventDefault();
+            try {
+              const responses = Object.entries(currentAnswers).map(([questionId, selectedAnswers]) => ({
+                questionId,
+                selectedAnswers,
+              }));
+              if (responses.length !== currentQuiz.questions.length) {
+                feedback.textContent = 'Answer each question before saving this attempt.';
+                return;
+              }
+              const now = Date.now();
+              const attempt = {
+                id: currentAttemptId,
+                userId: activeUserId,
+                topicId: currentBundle.topicId,
+                responses,
+                status: 'pending',
+                createdAt: now,
+                lastUpdated: now,
+              };
+              await queueForSync(attempt);
+              feedback.textContent = 'Attempt saved provisionally. It will be validated when online.';
+              await renderAttempts();
+            } catch (error) {
+              showError(error);
+            }
+          });
+          container.append(form, feedback);
+        }
+
+        async function saveDraft() {
+          if (!database || !activeUserId || !currentBundle) return;
+          const now = Date.now();
+          const transaction = database.transaction('offlinePracticeAttempts', 'readwrite');
+          transaction.objectStore('offlinePracticeAttempts').put({
+            id: currentAttemptId,
+            userId: activeUserId,
+            topicId: currentBundle.topicId,
+            responses: Object.entries(currentAnswers).map(([questionId, selectedAnswers]) => ({
+              questionId,
+              selectedAnswers,
+            })),
+            status: 'draft',
+            createdAt: now,
+            lastUpdated: now,
+          });
+          await transactionDone(transaction);
+        }
+
+        async function queueForSync(attempt) {
+          if (!database || !activeUserId) throw new Error('Offline cache is not available.');
+          const now = Date.now();
+          const item = {
+            id: attempt.id,
+            type: 'offline_practice_submission',
+            userId: activeUserId,
+            url: `/api/backend/quizzes/topic/${encodeURIComponent(attempt.topicId)}/offline-attempts`,
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: { attemptId: attempt.id, responses: attempt.responses },
+            createdAt: attempt.createdAt || now,
+            timestamp: now,
+            lastUpdated: now,
+            attempts: 0,
+            status: 'pending',
+          };
+          const transaction = database.transaction(
+            ['offlinePracticeAttempts', 'syncQueue'],
+            'readwrite',
+          );
+          transaction.objectStore('offlinePracticeAttempts').put({ ...attempt, status: 'pending', lastUpdated: now });
+          transaction.objectStore('syncQueue').put(item);
+          await transactionDone(transaction);
+          if ('serviceWorker' in navigator) {
+            void navigator.serviceWorker.ready.then(registration =>
+              registration.sync?.register('sync-outbox'),
+            ).catch(error => console.error('[OfflineFallback] Could not register background sync:', error));
+          }
+          if (navigator.onLine) await syncAttempt(item);
+          await renderAttempts();
+        }
+
+        async function syncAttempt(item) {
+          try {
+            const response = await fetch(normalizeUrl(item.url), {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'same-origin',
+              cache: 'no-store',
+              body: JSON.stringify(item.body),
+            });
+            if (response.ok) {
+              const receipt = await response.json();
+              if (receipt.attemptId !== item.id || receipt.formative !== true || typeof receipt.score !== 'number') {
+                throw new Error('The server returned an invalid practice-attempt receipt.');
+              }
+              await updateAttempt(item.id, { status: 'synced', score: receipt.score, lastError: undefined });
+              await updateQueue(item.id, undefined);
+            } else if ([400, 403, 404, 422].includes(response.status)) {
+              const errorText = `Sync rejected (${response.status}).`;
+              await updateAttempt(item.id, { status: 'failed', lastError: errorText });
+              await updateQueue(item.id, { ...item, status: 'failed', lastError: errorText });
+            } else if (response.status === 401) {
+              await updateAttempt(item.id, { status: 'pending', lastError: 'Sign in online to sync this attempt.' });
+            } else {
+              const errorText = `Server error ${response.status}.`;
+              await updateAttempt(item.id, { status: 'pending', lastError: errorText });
+            }
+          } catch (error) {
+            const errorText = error instanceof Error ? error.message : String(error);
+            await updateAttempt(item.id, { status: 'pending', lastError: errorText });
+          }
+        }
+
+        function normalizeUrl(url) {
+          const parsed = new URL(url, location.origin);
+          if (parsed.pathname.startsWith('/api/backend/')) return `${parsed.pathname}${parsed.search}`;
+          return `/api/backend${parsed.pathname}${parsed.search}`;
+        }
+
+        async function updateAttempt(id, changes) {
+          const transaction = database.transaction('offlinePracticeAttempts', 'readwrite');
+          const store = transaction.objectStore('offlinePracticeAttempts');
+          const attempt = await requestValue(store.get(id));
+          if (attempt) store.put({ ...attempt, ...changes, lastUpdated: Date.now() });
+          await transactionDone(transaction);
+        }
+
+        async function updateQueue(id, item) {
+          const transaction = database.transaction('syncQueue', 'readwrite');
+          const store = transaction.objectStore('syncQueue');
+          if (item) store.put(item);
+          else store.delete(id);
+          await transactionDone(transaction);
+        }
+
+        async function flushPendingAttempts() {
+          if (!database || !activeUserId || !navigator.onLine) return;
+          const transaction = database.transaction('syncQueue', 'readonly');
+          const items = await requestValue(transaction.objectStore('syncQueue').getAll());
+          await transactionDone(transaction);
+          for (const item of items) {
+            if (
+              item.type === 'offline_practice_submission' &&
+              item.userId === activeUserId &&
+              item.status !== 'failed'
+            ) {
+              await syncAttempt(item);
+            }
+          }
+          await renderAttempts();
+        }
+
+        function topicIdFromPath() {
+          const match = location.pathname.match(/\/courses\/[^/]+\/units\/[^/]+\/topics\/([^/]+)\/?$/);
+          return match ? decodeURIComponent(match[1]) : undefined;
+        }
+
+        async function initialize() {
+          try {
+            activeUserId = localStorage.getItem(USER_KEY) || undefined;
+            database = await openDatabase();
+            if (!database) {
+              message('No offline database was found on this device.');
+              library.append(makeCard('No offline downloads found', 'Sign in on this device and save a topic while online.'));
+              return;
+            }
+            const requestedTopicId = topicIdFromPath();
+            if (requestedTopicId && activeUserId) {
+              const bundle = await getRecord('offlineTopics', scopedId(activeUserId, requestedTopicId));
+              if (bundle && bundle.expiresAt > Date.now()) await openTopic(bundle);
+              else await loadLibrary();
+            } else {
+              await loadLibrary();
+            }
+            await flushPendingAttempts();
+          } catch (error) {
+            showError(error);
+          }
+        }
+
+        document.getElementById('retry').addEventListener('click', () => location.reload());
+        document.getElementById('back-to-library').addEventListener('click', () => void loadLibrary());
+        window.addEventListener('online', () => {
+          message('Connection restored. Syncing practice attempts…', 'good');
+          void flushPendingAttempts().then(() => {
+            message('Connection restored. Retry the page to return to MedTrack Hub.', 'good');
+          }).catch(showError);
+        });
+        window.addEventListener('offline', () => message('Offline. Showing content saved on this device.'));
+        message(navigator.onLine ? 'Connection available.' : 'Offline. Showing content saved on this device.');
+        void initialize();
+      })();
     </script>
-</body>
-</html> 
+  </body>
+</html>

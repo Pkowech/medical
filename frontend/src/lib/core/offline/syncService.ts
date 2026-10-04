@@ -42,11 +42,15 @@ class SyncService {
     headers?: Record<string, string>,
     lastUpdated?: number,
     id?: string,
+    userId?: string,
+    type?: SyncQueueItem['type'],
   ): Promise<void> {
     const now = Date.now();
     const db = await this.getDb();
     const item: SyncQueueItem = {
       id: id || crypto.randomUUID(),
+      type,
+      userId,
       url: this.normalizeUrl(url),
       method,
       headers,
@@ -264,6 +268,30 @@ class SyncService {
           }
 
           if (response.ok) {
+            if (item.type === 'offline_practice_submission') {
+              const receipt = (await response.clone().json()) as {
+                attemptId?: unknown;
+                score?: unknown;
+                formative?: unknown;
+              };
+              if (
+                receipt.attemptId !== item.id ||
+                typeof receipt.score !== 'number' ||
+                receipt.formative !== true
+              ) {
+                throw new Error('The server returned an invalid practice-attempt receipt');
+              }
+              const attempt = await db.get('offlinePracticeAttempts', item.id);
+              if (attempt) {
+                await db.put('offlinePracticeAttempts', {
+                  ...attempt,
+                  status: 'synced',
+                  score: receipt.score,
+                  lastError: undefined,
+                  lastUpdated: Date.now(),
+                });
+              }
+            }
             // Success: mark as synced and delete
             // Using atomic operations to avoid transaction timeouts
             await db.delete(SYNC_STORE_NAME, item.id);
@@ -292,6 +320,7 @@ class SyncService {
               lastError: `${response.status} Client Error - Payload or Endpoint invalid`,
               nextAttemptAt: undefined,
             });
+            await this.updateOfflinePracticeAttempt(db, item, 'failed', `${response.status} Client Error`);
           } else {
             // Other errors (5xx, 3xx, etc.): STOP flush and keep item queued
             const errorMsg = `Server error ${response.status}`;
@@ -309,6 +338,12 @@ class SyncService {
                   ? undefined
                   : Date.now() + Math.min(60_000, 5_000 * 2 ** (attempts - 1)),
             });
+            await this.updateOfflinePracticeAttempt(
+              db,
+              item,
+              attempts >= MAX_SYNC_ATTEMPTS ? 'failed' : 'pending',
+              errorMsg,
+            );
             return; // BREAK - stop processing to preserve causal order
           }
 
@@ -334,6 +369,12 @@ class SyncService {
                 ? undefined
                 : Date.now() + Math.min(60_000, 5_000 * 2 ** (attempts - 1)),
           });
+          await this.updateOfflinePracticeAttempt(
+            db,
+            item,
+            attempts >= MAX_SYNC_ATTEMPTS ? 'failed' : 'pending',
+            errorMsg,
+          );
           
           return; // BREAK - stop processing on network errors
         }
@@ -353,6 +394,39 @@ class SyncService {
       }
       // Always release the lock
       this.isFlushing = false;
+    }
+  }
+
+  async retryQueueItem(id: string): Promise<void> {
+    const db = await this.getDb();
+    const item = await db.get(SYNC_STORE_NAME, id);
+    if (!item || item.status !== 'failed') return;
+    await db.put(SYNC_STORE_NAME, {
+      ...item,
+      status: 'pending',
+      attempts: 0,
+      lastError: undefined,
+      nextAttemptAt: undefined,
+    });
+    await this.updateOfflinePracticeAttempt(db, item, 'pending');
+    await this.syncOutbox();
+  }
+
+  private async updateOfflinePracticeAttempt(
+    db: Awaited<ReturnType<typeof initDB>>,
+    item: SyncQueueItem,
+    status: 'pending' | 'failed',
+    lastError?: string,
+  ): Promise<void> {
+    if (item.type !== 'offline_practice_submission') return;
+    const attempt = await db.get('offlinePracticeAttempts', item.id);
+    if (attempt) {
+      await db.put('offlinePracticeAttempts', {
+        ...attempt,
+        status,
+        lastError,
+        lastUpdated: Date.now(),
+      });
     }
   }
 

@@ -4,7 +4,7 @@
  */
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -17,14 +17,14 @@ import { Badge } from '@/shared/components/ui/badge';
 import { Progress } from '@/shared/components/ui/progress';
 import {
   CheckCircle,
-  XCircle,
   Brain,
   Award,
   ArrowRight,
-  Clock,
 } from 'lucide-react';
 import { apiService } from '@/features/auth/services/apiClient';
 import { toast } from 'sonner';
+import { v4 as uuidv4 } from 'uuid';
+import { offlineService } from '@/lib/core/offline/offlineService';
 
 interface QuizOption {
   id: string;
@@ -46,6 +46,7 @@ interface TopicQuizProps {
   topicId: string;
   unitId: string;
   courseId: string;
+  userId: string;
   isOpen: boolean;
   onClose: () => void;
   onComplete?: (result: {
@@ -62,6 +63,7 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
   topicId,
   unitId,
   courseId,
+  userId,
   isOpen,
   onClose,
   onComplete,
@@ -76,17 +78,54 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
   const [score, setScore] = useState(0);
   const [feedback, setFeedback] = useState<string>('');
   const [nextTopicId, setNextTopicId] = useState<string | undefined>();
+  const [isOffline, setIsOffline] = useState(false);
+  const [isProvisional, setIsProvisional] = useState(false);
+  const [attemptId, setAttemptId] = useState(() => uuidv4());
+
+  React.useEffect(() => {
+    const updateConnection = () => setIsOffline(!navigator.onLine);
+    updateConnection();
+    window.addEventListener('online', updateConnection);
+    window.addEventListener('offline', updateConnection);
+    return () => {
+      window.removeEventListener('online', updateConnection);
+      window.removeEventListener('offline', updateConnection);
+    };
+  }, []);
 
   // Load quiz questions
   React.useEffect(() => {
     if (isOpen && questions.length === 0) {
       loadQuizQuestions();
     }
-  }, [isOpen]);
+  }, [isOpen, userId, topicId]);
 
   const loadQuizQuestions = async () => {
     try {
       setIsLoading(true);
+      if (!navigator.onLine) {
+        const cachedQuiz = userId
+          ? await offlineService.getOfflineTopicQuiz(userId, topicId)
+          : undefined;
+        if (!cachedQuiz) {
+          throw new Error('This topic quiz has not been downloaded for offline use.');
+        }
+        setQuestions(cachedQuiz.questions);
+        const savedDraft = userId
+          ? (await offlineService.getOfflinePracticeAttempts(userId))
+              .filter(attempt => attempt.topicId === topicId && attempt.status === 'draft')
+              .sort((left, right) => right.lastUpdated - left.lastUpdated)[0]
+          : undefined;
+        if (savedDraft) {
+          setAttemptId(savedDraft.id);
+          setSelectedAnswers(
+            Object.fromEntries(
+              savedDraft.responses.map(response => [response.questionId, response.selectedAnswers]),
+            ),
+          );
+        }
+        return;
+      }
       const response = await apiService.get<QuizQuestion[]>(
         `/quizzes/topic/${topicId}`
       );
@@ -96,7 +135,21 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
       }
     } catch (error) {
       console.error('Error loading quiz:', error);
-      toast.error('Failed to load quiz questions');
+      const status = (error as { status?: number; rawResponse?: { statusCode?: number } })
+        ?.status ?? (error as { rawResponse?: { statusCode?: number } })?.rawResponse?.statusCode;
+      if (userId && status !== 401 && status !== 403 && status !== 404) {
+        try {
+          const cachedQuiz = await offlineService.getOfflineTopicQuiz(userId, topicId);
+          if (cachedQuiz) {
+            setQuestions(cachedQuiz.questions);
+            toast.info('Using the practice quiz saved on this device.');
+            return;
+          }
+        } catch (cacheError) {
+          console.error('[OfflineQuiz] Could not load the saved practice quiz:', cacheError);
+        }
+      }
+      toast.error(error instanceof Error ? error.message : 'Failed to load quiz questions');
     } finally {
       setIsLoading(false);
     }
@@ -107,19 +160,32 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
   const hasCurrentAnswer = Boolean(selectedAnswers[currentQuestion?.id]?.length);
 
   const handleAnswerSelect = (optionId: string, isMultiSelect: boolean) => {
-    setSelectedAnswers(prev => {
-      const current = prev[currentQuestion.id] || [];
-      if (isMultiSelect) {
-        return {
-          ...prev,
+    const current = selectedAnswers[currentQuestion.id] || [];
+    const updatedAnswers = isMultiSelect
+      ? {
+          ...selectedAnswers,
           [currentQuestion.id]: current.includes(optionId)
             ? current.filter(id => id !== optionId)
             : [...current, optionId],
-        };
-      } else {
-        return { ...prev, [currentQuestion.id]: [optionId] };
-      }
-    });
+        }
+      : { ...selectedAnswers, [currentQuestion.id]: [optionId] };
+    setSelectedAnswers(updatedAnswers);
+    if (isOffline && userId) {
+      void offlineService
+        .saveOfflinePracticeAttempt({
+          id: attemptId,
+          userId,
+          topicId,
+          responses: Object.entries(updatedAnswers).map(([questionId, selectedAnswers]) => ({
+            questionId,
+            selectedAnswers,
+          })),
+          status: 'draft',
+          createdAt: Date.now(),
+          lastUpdated: Date.now(),
+        })
+        .catch(error => console.error('[OfflineQuiz] Failed to save a draft answer:', error));
+    }
   };
 
   const handleSubmitQuiz = async () => {
@@ -129,6 +195,26 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
         questionId: qId,
         selectedAnswers: answers,
       }));
+
+      if (isOffline) {
+        if (!userId) {
+          throw new Error('Sign in online once before taking this offline quiz.');
+        }
+        const now = Date.now();
+        await offlineService.queueOfflinePracticeAttempt({
+          id: attemptId,
+          userId,
+          topicId,
+          responses,
+          status: 'pending',
+          createdAt: now,
+          lastUpdated: now,
+        });
+        setIsProvisional(true);
+        setQuizCompleted(true);
+        toast.success('Practice attempt saved on this device; it will be validated when online.');
+        return;
+      }
 
       const response = await apiService.post<{
         score: number;
@@ -207,50 +293,64 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Award className="w-6 h-6 text-yellow-500" />
-              Quiz Complete!
+              {isProvisional ? 'Practice Saved' : 'Quiz Complete!'}
             </DialogTitle>
-            <DialogDescription>Your topic quiz results are ready.</DialogDescription>
+            <DialogDescription>
+              {isProvisional
+                ? 'This offline attempt is provisional and does not count toward mastery or topic unlocks.'
+                : 'Your topic quiz results are ready.'}
+            </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-6">
-            <div className="text-center space-y-4">
-              <div className={`text-5xl font-bold ${score >= 70 ? 'text-green-600' : 'text-orange-600'}`}>
-                {score}%
+            {isProvisional ? (
+              <div className="space-y-6">
+                <p className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                  Answers are saved on this device. They will be checked by the server when your
+                  connection returns. You can review sync status in Offline downloads.
+                </p>
+                <Button onClick={onClose} className="w-full">Close</Button>
               </div>
-              <p className="text-slate-600 dark:text-slate-400">
-                {score >= 90
-                  ? '🎉 Excellent! You mastered this topic!'
-                  : score >= 70
-                  ? '👍 Good job! You understand the key concepts.'
-                  : '📚 Keep practicing! Review the materials and try again.'}
-              </p>
-            </div>
+            ) : (
+              <div className="space-y-6">
+                <div className="text-center space-y-4">
+                  <div className={`text-5xl font-bold ${score >= 70 ? 'text-green-600' : 'text-orange-600'}`}>
+                    {score}%
+                  </div>
+                  <p className="text-slate-600 dark:text-slate-400">
+                    {score >= 90
+                      ? '🎉 Excellent! You mastered this topic!'
+                      : score >= 70
+                        ? '👍 Good job! You understand the key concepts.'
+                        : '📚 Keep practicing! Review the materials and try again.'}
+                  </p>
+                </div>
 
-            {feedback && (
-              <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
-                <h4 className="font-semibold text-slate-900 dark:text-white mb-2">Feedback</h4>
-                <p className="text-slate-700 dark:text-slate-300 text-sm">{feedback}</p>
+                {feedback && (
+                  <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <h4 className="font-semibold text-slate-900 dark:text-white mb-2">Feedback</h4>
+                    <p className="text-slate-700 dark:text-slate-300 text-sm">{feedback}</p>
+                  </div>
+                )}
+
+                <div className="flex gap-3">
+                  <Button variant="outline" onClick={onClose} className="flex-1">
+                    Close
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      if (nextTopicId && onNextTopic) {
+                        onNextTopic(nextTopicId);
+                      } else {
+                        window.location.reload();
+                      }
+                    }}
+                    className="flex-1"
+                  >
+                    {nextTopicId && onNextTopic ? 'Next Topic' : 'Retake Quiz'}
+                  </Button>
+                </div>
               </div>
             )}
-
-            <div className="flex gap-3">
-              <Button variant="outline" onClick={onClose} className="flex-1">
-                Close
-              </Button>
-              <Button
-                onClick={() => {
-                  if (nextTopicId && onNextTopic) {
-                    onNextTopic(nextTopicId);
-                  } else {
-                    window.location.reload();
-                  }
-                }}
-                className="flex-1"
-              >
-                {nextTopicId && onNextTopic ? 'Next Topic' : 'Retake Quiz'}
-              </Button>
-            </div>
-          </div>
         </DialogContent>
       </Dialog>
     );
@@ -289,6 +389,11 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
         </DialogHeader>
 
         <div className="space-y-6">
+            {isOffline && (
+              <p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                Offline practice only. Your attempt will be provisional until the server validates it.
+              </p>
+            )}
           {/* Progress Bar */}
           <div className="space-y-2">
             <Progress value={progress} className="h-2" />
@@ -365,7 +470,7 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
                 disabled={isSubmitting || !hasCurrentAnswer}
                 className="flex-1"
               >
-                {isSubmitting ? 'Submitting...' : 'Submit Quiz'}
+                {isSubmitting ? 'Saving...' : isOffline ? 'Save Practice Attempt' : 'Submit Quiz'}
               </Button>
             )}
           </div>

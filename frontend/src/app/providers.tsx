@@ -20,6 +20,7 @@ import {
   persistPersistentQueryCache,
   restorePersistentQueryCache,
 } from '@/lib/core/queryCachePersistence';
+import { OfflineSessionManager } from '@/lib/core/offline/OfflineSessionManager';
 
 // Theme context interface
 interface ThemeContextType {
@@ -324,6 +325,7 @@ export function Providers({ children }: { children: ReactNode }) {
       <QueryClientProvider client={client}>
         <SessionWrapper>
           <PersistentQueryCache />
+          <OfflineSessionManager />
           {children}
         </SessionWrapper>
         <ReactQueryDevtools initialIsOpen={false} />

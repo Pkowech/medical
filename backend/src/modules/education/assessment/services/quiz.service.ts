@@ -3,8 +3,10 @@ import {
   Logger,
   NotFoundException,
   BadRequestException,
+  ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from '#infrastructure/prisma/prisma.service';
+import { Prisma } from '@prisma/client';
 import { RedisService } from '#infrastructure/redis/redis.service';
 import { AssessmentProgressService } from './assessment-progress.service';
 import { AssessmentAnalyticsService } from '#modules/ai-analytics/services/assessment-analytics.service';
@@ -770,6 +772,132 @@ export class QuizService {
       this.logger.error(`Error submitting topic quiz: ${String(error)}`);
       throw error;
     }
+  }
+
+  async syncOfflinePracticeAttempt(
+    userId: string,
+    topicId: string,
+    attemptId: string,
+    responses: Array<{ questionId: string; selectedAnswers: string[] }>,
+  ): Promise<{ attemptId: string; score: number; validatedAt: Date; formative: true }> {
+    if (typeof attemptId !== 'string' || !attemptId.trim()) {
+      throw new BadRequestException('An offline attempt ID is required');
+    }
+    if (!Array.isArray(responses) || responses.length === 0) {
+      throw new BadRequestException('At least one practice response is required');
+    }
+    if (responses.some(response => !response || typeof response !== 'object' || Array.isArray(response))) {
+      throw new BadRequestException('Practice responses must be objects');
+    }
+
+    const questionIds = responses.map((response) => response.questionId);
+    if (
+      questionIds.some((questionId) => typeof questionId !== 'string' || !questionId) ||
+      new Set(questionIds).size !== questionIds.length
+    ) {
+      throw new BadRequestException('Practice responses contain invalid or duplicate question IDs');
+    }
+
+    const questions = await this.prisma.question.findMany({
+      where: {
+        topicIds: { has: topicId },
+      },
+      select: {
+        id: true,
+        points: true,
+        options: { select: { id: true, isCorrect: true } },
+      },
+    });
+    if (
+      questions.length !== questionIds.length ||
+      questions.some(question => !questionIds.includes(question.id))
+    ) {
+      throw new BadRequestException(
+        'A practice attempt must answer every current question for this topic',
+      );
+    }
+
+    const questionById = new Map(questions.map((question) => [question.id, question]));
+    const normalizedResponses = responses.map((response) => {
+      if (
+        !Array.isArray(response.selectedAnswers) ||
+        response.selectedAnswers.some((optionId) => typeof optionId !== 'string') ||
+        new Set(response.selectedAnswers).size !== response.selectedAnswers.length
+      ) {
+        throw new BadRequestException('Practice response contains invalid or duplicate options');
+      }
+      const question = questionById.get(response.questionId);
+      if (!question) {
+        throw new BadRequestException('A submitted question does not belong to this topic');
+      }
+      const optionIds = new Set(question.options.map((option) => option.id));
+      if (response.selectedAnswers.some((optionId) => !optionIds.has(optionId))) {
+        throw new BadRequestException('A selected option does not belong to its question');
+      }
+      return {
+        questionId: response.questionId,
+        selectedAnswers: [...response.selectedAnswers].sort(),
+      };
+    });
+
+    let earnedPoints = 0;
+    let totalPoints = 0;
+    for (const response of normalizedResponses) {
+      const question = questionById.get(response.questionId)!;
+      const correctOptionIds = question.options
+        .filter((option) => option.isCorrect)
+        .map((option) => option.id)
+        .sort();
+      const points = question.points || 1;
+      totalPoints += points;
+      if (
+        correctOptionIds.length === response.selectedAnswers.length &&
+        correctOptionIds.every((optionId, index) => optionId === response.selectedAnswers[index])
+      ) {
+        earnedPoints += points;
+      }
+    }
+    const score = totalPoints > 0 ? Math.round((earnedPoints / totalPoints) * 100) : 0;
+
+    const attempt = await this.prisma.offlinePracticeAttempt.upsert({
+      where: { id: attemptId },
+      create: {
+        id: attemptId,
+        userId,
+        topicId,
+        responses: normalizedResponses as Prisma.InputJsonValue,
+        score,
+      },
+      update: {},
+      select: { id: true, userId: true, topicId: true, responses: true, score: true, validatedAt: true },
+    });
+
+    const storedResponses = attempt.responses as typeof normalizedResponses;
+    const storedAnswerKey = JSON.stringify(
+      storedResponses
+        .map((response) => ({
+          questionId: response.questionId,
+          selectedAnswers: [...response.selectedAnswers].sort(),
+        }))
+        .sort((left, right) => left.questionId.localeCompare(right.questionId)),
+    );
+    const requestedAnswerKey = JSON.stringify(
+      [...normalizedResponses].sort((left, right) => left.questionId.localeCompare(right.questionId)),
+    );
+    if (
+      attempt.userId !== userId ||
+      attempt.topicId !== topicId ||
+      storedAnswerKey !== requestedAnswerKey
+    ) {
+      throw new ConflictException('This offline attempt ID is already associated with another submission');
+    }
+
+    return {
+      attemptId: attempt.id,
+      score: attempt.score,
+      validatedAt: attempt.validatedAt,
+      formative: true,
+    };
   }
 
   /**

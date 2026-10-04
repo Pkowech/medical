@@ -8,6 +8,8 @@ const QUEUEABLE_POST_PATHS = new Set([
   '/learning/progress',
   '/quizzes/submit',
 ]);
+const OFFLINE_PRACTICE_ATTEMPT_PATH =
+  /^\/quizzes\/topic\/[^/]+\/offline-attempts$/;
 const OBSOLETE_CACHES = new Set([
   'api-data-cache',
   'sync-requests-cache',
@@ -48,6 +50,7 @@ function isQueueableRequest(item) {
       .replace(/^\/v1(?=\/|$)/, '');
     return (
       QUEUEABLE_POST_PATHS.has(pathname) ||
+      OFFLINE_PRACTICE_ATTEMPT_PATH.test(pathname) ||
       /^\/progress\/materials\/[^/]+\/read$/.test(pathname)
     );
   } catch {
@@ -60,6 +63,22 @@ function requestResult(request) {
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
   });
+}
+
+async function markPracticeAttempt(database, id, status, score, lastError) {
+  const transaction = database.transaction('offlinePracticeAttempts', 'readwrite');
+  const store = transaction.objectStore('offlinePracticeAttempts');
+  const attempt = await requestResult(store.get(id));
+  if (attempt) {
+    store.put({
+      ...attempt,
+      status,
+      ...(score === undefined ? {} : { score }),
+      lastError,
+      lastUpdated: Date.now(),
+    });
+  }
+  await transactionDone(transaction);
 }
 
 function transactionDone(transaction) {
@@ -129,11 +148,42 @@ async function flushOutbox() {
         });
 
         if (response.ok) {
+          if (item.type === 'offline_practice_submission') {
+            let receipt;
+            try {
+              receipt = await response.clone().json();
+            } catch {
+              await markPracticeAttempt(database, item.id, 'failed', undefined, 'Invalid server receipt');
+              await updateItem(database, item.id, {
+                ...item,
+                status: 'failed',
+                lastError: 'The server returned an invalid practice-attempt receipt.',
+                nextAttemptAt: undefined,
+              });
+              continue;
+            }
+            if (
+              receipt?.attemptId !== item.id ||
+              typeof receipt.score !== 'number' ||
+              receipt.formative !== true
+            ) {
+              await markPracticeAttempt(database, item.id, 'failed', undefined, 'Invalid server receipt');
+              await updateItem(database, item.id, {
+                ...item,
+                status: 'failed',
+                lastError: 'The server returned an invalid practice-attempt receipt.',
+                nextAttemptAt: undefined,
+              });
+              continue;
+            }
+            await markPracticeAttempt(database, item.id, 'synced', receipt.score);
+          }
           await updateItem(database, item.id, undefined);
           continue;
         }
 
         if ([400, 403, 404, 422].includes(response.status)) {
+          await markPracticeAttempt(database, item.id, 'failed', undefined, `Client error ${response.status}`);
           await updateItem(database, item.id, {
             ...item,
             status: 'failed',
@@ -155,7 +205,7 @@ async function flushOutbox() {
         await recordRetry(database, item, `Server error ${response.status}`);
         throw new Error(`Outbox request failed (${response.status})`);
       } catch (error) {
-        if (error instanceof TypeError || error?.name === 'AbortError') {
+          if (error instanceof TypeError || error?.name === 'AbortError') {
           await recordRetry(database, item, error.message || 'Request timed out');
         }
         throw error;
@@ -210,9 +260,10 @@ async function updateItem(database, id, value) {
 
 async function recordRetry(database, item, errorMessage) {
   const attempts = (item.attempts || 0) + 1;
+  const status = attempts >= MAX_ATTEMPTS ? 'failed' : 'pending';
   await updateItem(database, item.id, {
     ...item,
-    status: attempts >= MAX_ATTEMPTS ? 'failed' : 'pending',
+    status,
     attempts,
     lastError: errorMessage,
     nextAttemptAt:

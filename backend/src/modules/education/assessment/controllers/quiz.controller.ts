@@ -55,6 +55,25 @@ export class QuizController {
     return this.quizService.submitTopicQuiz(userId, topicId, body.responses || []);
   }
 
+  @Post('topic/:topicId/offline-attempts')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Sync a formative offline topic-practice attempt' })
+  async syncOfflinePracticeAttempt(
+    @Request() req: any,
+    @Param('topicId') topicId: string,
+    @Body() body: {
+      attemptId: string;
+      responses: Array<{ questionId: string; selectedAnswers: string[] }>;
+    },
+  ) {
+    return this.quizService.syncOfflinePracticeAttempt(
+      req.user.id,
+      topicId,
+      body.attemptId,
+      body.responses,
+    );
+  }
+
   @Post('unit/:unitId/generate')
   @ApiOperation({ summary: 'Generate a quiz for a unit' })
   async generateUnitQuiz(@Request() req: any, @Param('unitId') unitId: string) {

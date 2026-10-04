@@ -39,6 +39,17 @@ class ApiService {
     return ApiService.instance;
   }
 
+  private async clearOfflineCacheForCurrentUser(): Promise<void> {
+    const userId = useAuthStore.getState().user?.id;
+    if (!userId) return;
+    try {
+      const { offlineService } = await import('@/lib/core/offline/offlineService');
+      await offlineService.clearUserOfflineContent(userId);
+    } catch (error) {
+      console.error('[Auth] Could not clear offline study content during sign-out:', error);
+    }
+  }
+
   /**
    * Classify error type for better handling and logging
    */
@@ -243,6 +254,7 @@ class ApiService {
               console.error('[Token Refresh] Token refresh failed, signing out');
 
               // Clear store immediately to prevent other parallel requests from using the stale token
+              await this.clearOfflineCacheForCurrentUser();
               useAuthStore.getState().clearUser();
               
               // Use Promise.race to add timeout to signOut
@@ -271,6 +283,7 @@ class ApiService {
 
             if (!this.isSigningOut) {
               this.isSigningOut = true;
+              await this.clearOfflineCacheForCurrentUser();
               useAuthStore.getState().clearUser();
               
               // Use Promise.race to add timeout to signOut

@@ -32,7 +32,7 @@ export interface LocalFileMetadata {
 
 export interface SyncQueueItem {
   id: string;
-  type?: 'quiz_submission' | 'progress_log';
+  type?: 'quiz_submission' | 'progress_log' | 'offline_practice_submission';
   data?: unknown;
   url: string;
   method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
@@ -53,6 +53,71 @@ export interface PersistedQueryCacheEntry {
   version: number;
   savedAt: number;
   state: unknown;
+}
+
+export interface OfflineQuizOption {
+  id: string;
+  text: string;
+}
+
+export interface OfflineQuizQuestion {
+  id: string;
+  text: string;
+  type: 'multiple_choice' | 'multiple_select' | 'true_false';
+  difficulty: 'easy' | 'medium' | 'hard';
+  options: OfflineQuizOption[];
+  explanation?: string;
+  points: number;
+}
+
+export interface OfflineTopicBundle {
+  id: string;
+  userId: string;
+  courseId: string;
+  unitId: string;
+  topicId: string;
+  title: string;
+  description?: string;
+  cacheMode?: 'download' | 'session';
+  sessionId?: string;
+  isComplete?: boolean;
+  materialIds: string[];
+  downloadedAt: number;
+  expiresAt: number;
+  totalBytes: number;
+}
+
+export interface OfflineTopicMaterial {
+  id: string;
+  userId: string;
+  topicId: string;
+  materialId: string;
+  title: string;
+  description?: string;
+  mimeType: 'application/pdf';
+  size: number;
+  content: Blob;
+  cachedAt: number;
+}
+
+export interface OfflineTopicQuiz {
+  id: string;
+  userId: string;
+  topicId: string;
+  questions: OfflineQuizQuestion[];
+  cachedAt: number;
+}
+
+export interface OfflinePracticeAttempt {
+  id: string;
+  userId: string;
+  topicId: string;
+  responses: Array<{ questionId: string; selectedAnswers: string[] }>;
+  status: 'draft' | 'pending' | 'synced' | 'failed';
+  score?: number;
+  lastError?: string;
+  createdAt: number;
+  lastUpdated: number;
 }
 
 interface MedicalEducationDB extends DBSchema {
@@ -87,10 +152,30 @@ interface MedicalEducationDB extends DBSchema {
     key: string;
     value: PersistedQueryCacheEntry;
   };
+  offlineTopics: {
+    key: string;
+    value: OfflineTopicBundle;
+    indexes: { 'by-user': string };
+  };
+  offlineTopicMaterials: {
+    key: string;
+    value: OfflineTopicMaterial;
+    indexes: { 'by-user': string; 'by-topic': string };
+  };
+  offlineTopicQuizzes: {
+    key: string;
+    value: OfflineTopicQuiz;
+    indexes: { 'by-user': string };
+  };
+  offlinePracticeAttempts: {
+    key: string;
+    value: OfflinePracticeAttempt;
+    indexes: { 'by-user': string; 'by-status': OfflinePracticeAttempt['status'] };
+  };
 }
 
 const DB_NAME = 'medical-education-db';
-const DB_VERSION = 6;
+const DB_VERSION = 7;
 let databasePromise: Promise<IDBPDatabase<MedicalEducationDB>> | undefined;
 
 export function initDB(): Promise<IDBPDatabase<MedicalEducationDB>> {
@@ -139,6 +224,28 @@ export function initDB(): Promise<IDBPDatabase<MedicalEducationDB>> {
 
       if (!db.objectStoreNames.contains('localFileMetadata')) {
         db.createObjectStore('localFileMetadata', { keyPath: 'id' });
+      }
+
+      if (!db.objectStoreNames.contains('offlineTopics')) {
+        const topics = db.createObjectStore('offlineTopics', { keyPath: 'id' });
+        topics.createIndex('by-user', 'userId');
+      }
+
+      if (!db.objectStoreNames.contains('offlineTopicMaterials')) {
+        const materials = db.createObjectStore('offlineTopicMaterials', { keyPath: 'id' });
+        materials.createIndex('by-user', 'userId');
+        materials.createIndex('by-topic', 'topicId');
+      }
+
+      if (!db.objectStoreNames.contains('offlineTopicQuizzes')) {
+        const quizzes = db.createObjectStore('offlineTopicQuizzes', { keyPath: 'id' });
+        quizzes.createIndex('by-user', 'userId');
+      }
+
+      if (!db.objectStoreNames.contains('offlinePracticeAttempts')) {
+        const attempts = db.createObjectStore('offlinePracticeAttempts', { keyPath: 'id' });
+        attempts.createIndex('by-user', 'userId');
+        attempts.createIndex('by-status', 'status');
       }
     },
     blocked() {

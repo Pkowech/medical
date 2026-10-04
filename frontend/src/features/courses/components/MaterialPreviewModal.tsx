@@ -14,8 +14,9 @@ import { VideoPlayer } from './VideoPlayer';
 import PDFViewer from '@/shared/components/pdf/PDFViewer';
 import materialService from '@/features/courses/services/materialService';
 import useMaterialProgressTracker from '@/features/learning-management/hooks/useMaterialProgressTracker';
-import { Material } from '@/shared/types/materialInterface';
+import { Material, MaterialType } from '@/shared/types/materialInterface';
 import URLS from '@/lib/urls';
+import { offlineService } from '@/lib/core/offline/offlineService';
 
 interface MaterialPreviewModalProps {
   materialId: string | null;
@@ -24,6 +25,9 @@ interface MaterialPreviewModalProps {
   materials?: Array<{ id: string | number }>;
   onNavigate?: (id: string) => void;
   inline?: boolean;
+  topicId?: string;
+  userId?: string;
+  fallbackMaterial?: Material;
 }
 
 export const MaterialPreviewModal = ({
@@ -33,6 +37,9 @@ export const MaterialPreviewModal = ({
   materials = [],
   onNavigate,
   inline = false,
+  topicId,
+  userId,
+  fallbackMaterial,
 }: MaterialPreviewModalProps) => {
   const [material, setMaterial] = useState<Material | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -50,7 +57,35 @@ export const MaterialPreviewModal = ({
         setPreviewError(null);
         setPdfCurrentPage(1);
         setPdfNumPages(null);
+        const loadCachedPdf = async () => {
+          if (!userId || !topicId) return false;
+          const cached = await offlineService.getOfflineMaterial(userId, topicId, materialId);
+          if (!cached) return false;
+          const data: Material = fallbackMaterial ?? {
+            id: cached.materialId,
+            materialId: cached.materialId,
+            title: cached.title,
+            description: cached.description || '',
+            contentType: MaterialType.DOCUMENT,
+            content: '',
+            type: 'pdf',
+            topicId,
+            createdAt: new Date(cached.cachedAt).toISOString(),
+            updatedAt: new Date(cached.cachedAt).toISOString(),
+          };
+          const buffer = await cached.content.arrayBuffer();
+          setMaterial(data);
+          setPdfContent(new Uint8Array(buffer));
+          return true;
+        };
+
         try {
+          if (!navigator.onLine) {
+            if (await loadCachedPdf()) return;
+            setPreviewError('This PDF is not saved on this device for offline use.');
+            return;
+          }
+
           const data = await materialService.getMaterialWithFileUrl(materialId);
           setMaterial(data);
           const isPdf =
@@ -62,7 +97,22 @@ export const MaterialPreviewModal = ({
           }
         } catch (error) {
           console.error('Error fetching material for preview:', error);
-          setPreviewError('Unable to load this material preview.');
+          const status = (error as { status?: number; rawResponse?: { statusCode?: number } })
+            ?.status ?? (error as { rawResponse?: { statusCode?: number } })?.rawResponse?.statusCode;
+          if (status === 403 || status === 404) {
+            if (userId && topicId) {
+              await offlineService.removeOfflineTopicMaterial(userId, topicId, materialId);
+            }
+            setPreviewError(
+              status === 403
+                ? 'Access to this material has been revoked.'
+                : 'This material is no longer available.',
+            );
+          } else if (status === 401) {
+            setPreviewError('Sign in again while online to access this material.');
+          } else if (!(await loadCachedPdf())) {
+            setPreviewError('Unable to load this material preview.');
+          }
         } finally {
           setIsLoading(false);
         }
@@ -71,7 +121,7 @@ export const MaterialPreviewModal = ({
     } else if (!isOpen) {
       setMaterial(null);
     }
-  }, [isOpen, materialId]);
+  }, [isOpen, materialId, topicId, userId, fallbackMaterial]);
 
   const computePercent = useCallback(() => {
     if (material?.type === 'pdf' && pdfNumPages && pdfNumPages > 0) {

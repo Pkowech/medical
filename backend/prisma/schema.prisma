@@ -84,6 +84,22 @@ model UserActivity {
   @@map("user_activities")
 }
 
+model OfflinePracticeAttempt {
+  id          String   @id
+  userId      String   @map("user_id")
+  topicId     String   @map("topic_id")
+  responses   Json
+  score       Int
+  validatedAt DateTime @default(now()) @map("validated_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  topic       Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([topicId])
+  @@map("offline_practice_attempts")
+}
+
 model AnalyticsEvent {
   id        String   @id
   userId    String   @map("user_id")
@@ -350,6 +366,7 @@ model User {
   predictionValidations   PredictionValidation[]
   questionFlags           QuestionFlag[]
   quizAttempts            QuizAttempt[]
+  offlinePracticeAttempts OfflinePracticeAttempt[]
   rapidReviewSessions     RapidReviewSession[]
   recommendations         Recommendation[]
   scheduleEvents          ScheduleEvent[]
@@ -740,6 +757,7 @@ model Topic {
   learningGoals     LearningGoal[]
   materials         Material[]
   quizzes           Quiz[]
+  offlinePracticeAttempts OfflinePracticeAttempt[]
   skillTrajectories SkillTrajectory[]
   studySessions     StudySession[]
   progress          Progress[]

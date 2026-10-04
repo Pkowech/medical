@@ -11,6 +11,7 @@ import {
 } from '@/shared/types/authInterface';
 import { ApiResponse, Session } from '@/shared/types';
 import { hasPermission, hasAnyPermission, Role } from '@/lib/auth/roles';
+import { offlineService } from '@/lib/core/offline/offlineService';
 
 type GenericRecord = Record<string, unknown>;
 
@@ -86,6 +87,16 @@ class AuthService {
 
   async logout(): Promise<void> {
     try {
+      const userId = useAuthStore.getState().user?.id;
+      if (userId) {
+        try {
+          await offlineService.clearUserOfflineContent(userId);
+        } catch (error) {
+          console.error('[AuthService] Failed to clear this user’s offline study cache:', error);
+          offlineService.clearActiveOfflineUserId(userId);
+        }
+      }
+
       // Do not block local sign-out on a slow or sleeping backend.
       void apiService.post('/auth/sessions/logout', {}).catch(error => {
         console.warn('[AuthService] Backend logout failed:', error);

@@ -14,6 +14,7 @@ import {
   MessageSquare,
   Clock,
   HelpCircle,
+  HardDriveDownload,
 } from 'lucide-react';
 
 import { NavigationItem } from '@/shared/types/navigationInterface';
@@ -30,6 +31,12 @@ const navigationConfig: NavigationItem[] = [
     label: 'Courses',
     href: '/courses',
     icon: GraduationCap,
+  },
+  {
+    id: 'offline-downloads',
+    label: 'Offline downloads',
+    href: '/offline',
+    icon: HardDriveDownload,
   },
   {
     id: 'learning-paths',

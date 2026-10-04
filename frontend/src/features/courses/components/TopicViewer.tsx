@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   FileText,
@@ -13,11 +13,15 @@ import {
   AlertCircle,
   Lightbulb,
   BookOpen,
+  WifiOff,
+  HardDriveDownload,
 } from 'lucide-react';
+import { useSession } from 'next-auth/react';
+import { apiService } from '@/features/auth/services/apiClient';
 import { topicService, Topic } from '@/features/courses/services/topicService';
 import materialService from '@/features/courses/services/materialService';
 import progressService from '@/features/learning-management/services/progressService';
-import { Material } from '@/shared/types/materialInterface';
+import { Material, MaterialType } from '@/shared/types/materialInterface';
 import { usePageHeader } from '@/core/providers/HeaderContext';
 import { useCourseProgressStore } from '@/features/courses/hooks/useCourseProgressStore';
 import { MaterialPreviewModal } from './MaterialPreviewModal';
@@ -26,11 +30,112 @@ import { Button } from '@/shared/components/ui/button';
 import { Badge } from '@/shared/components/ui/badge';
 import { toast } from 'sonner';
 import { Brain } from 'lucide-react';
+import { offlineService } from '@/lib/core/offline/offlineService';
+import type { OfflineQuizQuestion, OfflineTopicBundle } from '@/lib/core/offline/db';
 
 interface TopicViewerProps {
   courseId: string;
   unitId: string;
   topicId: string;
+}
+
+type TopicQuizResponseQuestion = {
+  id: string;
+  text: string;
+  type?: string;
+  difficulty?: string;
+  options?: Array<{ id: string; text: string }>;
+  explanation?: string | null;
+  points?: number;
+};
+
+function isPdfMaterial(material: Material): boolean {
+  const driveMimeType = material.metadata?.driveMimeType?.toLowerCase();
+  const fileMimeType = material.file?.mimetype?.toLowerCase();
+  const previewMimeType = material.previewFile?.mimetype?.toLowerCase();
+  return (
+    material.type?.toLowerCase() === 'pdf' ||
+    material.contentType?.toLowerCase() === 'application/pdf' ||
+    driveMimeType === 'application/pdf' ||
+    fileMimeType === 'application/pdf' ||
+    previewMimeType === 'application/pdf'
+  );
+}
+
+async function prepareTopicOfflineContent(
+  topic: Topic,
+  materials: Material[],
+  userId: string,
+  courseId: string,
+  unitId: string,
+  materialsMetadataComplete: boolean,
+  cacheMode: 'download' | 'session',
+  sessionId?: string,
+): Promise<{ bundle: OfflineTopicBundle; complete: boolean }> {
+  const pdfMaterials = materials.filter(isPdfMaterial);
+  const [quizResult, ...materialResults] = await Promise.allSettled([
+    apiService.get<TopicQuizResponseQuestion[]>(`/quizzes/topic/${encodeURIComponent(topic.id)}`),
+    ...pdfMaterials.map(async material => {
+      const bytes = await materialService.getMaterialPreviewContent(material.id);
+      const copy = new Uint8Array(bytes.byteLength);
+      copy.set(bytes);
+      return {
+        materialId: material.id,
+        title: material.title,
+        description: material.description,
+        content: new Blob([copy.buffer], { type: 'application/pdf' }),
+      };
+    }),
+  ]);
+
+  const downloadedMaterials = materialResults.flatMap(result =>
+    result.status === 'fulfilled' ? [result.value] : [],
+  );
+  const questions: OfflineQuizQuestion[] =
+    quizResult.status === 'fulfilled'
+      ? quizResult.value.data.map(question => ({
+          id: question.id,
+          text: question.text,
+          type:
+            question.type === 'multiple_select' || question.type === 'true_false'
+              ? question.type
+              : 'multiple_choice',
+          difficulty:
+            question.difficulty === 'easy' || question.difficulty === 'hard'
+              ? question.difficulty
+              : 'medium',
+          options: (question.options || []).map(option => ({ id: option.id, text: option.text })),
+          explanation: question.explanation || undefined,
+          points: question.points || 1,
+        }))
+      : [];
+  const complete =
+    materialsMetadataComplete &&
+    quizResult.status === 'fulfilled' &&
+    materialResults.every(result => result.status === 'fulfilled');
+
+  if (downloadedMaterials.length === 0 && questions.length === 0) {
+    throw new Error('No topic PDFs or practice questions could be cached.');
+  }
+  if (cacheMode === 'download' && !complete) {
+    throw new Error('Some topic content could not be downloaded.');
+  }
+
+  const bundle = await offlineService.cacheTopicBundle({
+    userId,
+    courseId,
+    unitId,
+    topicId: topic.id,
+    title: topic.title,
+    description: topic.description,
+    cacheMode,
+    sessionId,
+    isComplete: complete,
+    preserveCachedQuiz: quizResult.status === 'rejected',
+    materials: downloadedMaterials,
+    questions,
+  });
+  return { bundle, complete };
 }
 
 const MATERIAL_ICONS: Record<string, React.ReactNode> = {
@@ -57,6 +162,7 @@ const getMaterialColor = (type: string): string => {
 
 export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topicId }) => {
   const router = useRouter();
+  const { data: session } = useSession();
   const { setHeader } = usePageHeader();
   const { toggleBookmark, bookmarks, markLessonComplete, progress } = useCourseProgressStore();
 
@@ -67,15 +173,47 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
   const [showMaterialModal, setShowMaterialModal] = useState(false);
   const [showQuiz, setShowQuiz] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [offlineUserId, setOfflineUserId] = useState<string>();
+  const [offlineBundle, setOfflineBundle] = useState<OfflineTopicBundle>();
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [isOffline, setIsOffline] = useState(false);
+  const [materialsLoaded, setMaterialsLoaded] = useState(false);
+  const [materialsMetadataComplete, setMaterialsMetadataComplete] = useState(true);
+  const [offlineBundleLoaded, setOfflineBundleLoaded] = useState(false);
+  const [sessionCacheStatus, setSessionCacheStatus] = useState<
+    'idle' | 'preparing' | 'ready' | 'partial' | 'unavailable'
+  >('idle');
+  const sessionCacheRequestRef = useRef<string | undefined>(undefined);
+  const sessionCachePromiseRef = useRef<Promise<unknown> | null>(null);
+  const sessionCacheIdRef = useRef(
+    typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+  );
 
   const isBookmarked = bookmarks.includes(topicId);
   const isCompleted = progress[topicId];
 
   // Fetch topic data
   useEffect(() => {
+    const userId = session?.user?.id || offlineService.getActiveOfflineUserId();
+    setOfflineUserId(userId);
+    const updateOfflineStatus = () => setIsOffline(!navigator.onLine);
+    updateOfflineStatus();
+    window.addEventListener('online', updateOfflineStatus);
+    window.addEventListener('offline', updateOfflineStatus);
+
     const fetchTopic = async () => {
       try {
         setIsLoading(true);
+        setMaterialsLoaded(false);
+        setMaterialsMetadataComplete(true);
+        setOfflineBundleLoaded(false);
+        sessionCacheRequestRef.current = undefined;
+        setTopic(null);
+        setMaterials([]);
+        setOfflineBundle(undefined);
+        setSessionCacheStatus('idle');
         setLoadError(null);
         const topicData = await topicService.getTopicById(courseId, unitId, topicId);
         setTopic(topicData);
@@ -96,8 +234,15 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
             const mats = await materialService.getMaterialsByTopicId(topicId);
             setMaterials(mats || []);
           } catch (err) {
+            setMaterialsMetadataComplete(false);
             console.warn('Could not fetch materials:', err);
           }
+        }
+        setMaterialsLoaded(true);
+
+        if (userId) {
+          const bundle = await offlineService.getOfflineTopicBundle(userId, topicId);
+          setOfflineBundle(bundle);
         }
       } catch (error) {
         console.error('Error fetching topic:', error);
@@ -108,20 +253,197 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
         };
         const status = details?.status ?? details?.rawResponse?.statusCode;
         const message = details?.message ?? details?.rawResponse?.message;
+        if (userId && status !== 401 && status !== 403 && status !== 404) {
+          try {
+            const [bundle, cachedMaterials, cachedQuiz] = await Promise.all([
+              offlineService.getOfflineTopicBundle(userId, topicId),
+              offlineService.getOfflineTopicMaterials(userId, topicId),
+              offlineService.getOfflineTopicQuiz(userId, topicId),
+            ]);
+            if (bundle && cachedQuiz) {
+              const cachedTopic: Topic = {
+                id: bundle.topicId,
+                unitId: bundle.unitId,
+                courseId: bundle.courseId,
+                title: bundle.title,
+                description: bundle.description,
+              };
+              setTopic(cachedTopic);
+              setMaterials(
+                cachedMaterials.map(material => ({
+                  id: material.materialId,
+                  materialId: material.materialId,
+                  title: material.title,
+                  description: material.description || '',
+                  contentType: MaterialType.DOCUMENT,
+                  content: '',
+                  type: 'pdf',
+                  courseId: bundle.courseId,
+                  unitId: bundle.unitId,
+                  topicId: bundle.topicId,
+                  createdAt: new Date(material.cachedAt).toISOString(),
+                  updatedAt: new Date(material.cachedAt).toISOString(),
+                })),
+              );
+              setMaterialsLoaded(true);
+              setOfflineBundle(bundle);
+              if (bundle.cacheMode === 'session' && bundle.sessionId) {
+                sessionCacheIdRef.current = bundle.sessionId;
+              }
+              setHeader({
+                title: bundle.title,
+                description: bundle.description || 'Learning material',
+                icon: '📖',
+              });
+              return;
+            }
+          } catch (cacheError) {
+            console.error('[OfflineCache] Failed to open the cached topic:', cacheError);
+          }
+        } else if (userId && (status === 403 || status === 404)) {
+          await offlineService.removeOfflineTopic(userId, topicId);
+          setOfflineBundle(undefined);
+        }
+        setMaterialsLoaded(true);
         setLoadError(
           status === 403
             ? message || 'Pass the previous topic quiz to unlock this topic.'
-            : 'Failed to load topic',
+            : status === 404
+              ? 'This topic is no longer available.'
+              : status === 401
+                ? 'Sign in again while online to access this topic.'
+                : 'Failed to load topic',
         );
       } finally {
+        setOfflineBundleLoaded(true);
         setIsLoading(false);
       }
     };
 
     if (topicId) {
-      fetchTopic();
+      void fetchTopic();
     }
-  }, [topicId, setHeader]);
+    return () => {
+      window.removeEventListener('online', updateOfflineStatus);
+      window.removeEventListener('offline', updateOfflineStatus);
+    };
+  }, [courseId, unitId, topicId, setHeader, session?.user?.id]);
+
+  const downloadTopicForOffline = async () => {
+    if (!topic || !offlineUserId) {
+      toast.error('Sign in online before downloading offline materials.');
+      return;
+    }
+
+    setIsDownloading(true);
+    try {
+      await sessionCachePromiseRef.current?.catch(() => undefined);
+      const { bundle } = await prepareTopicOfflineContent(
+        topic,
+        materials,
+        offlineUserId,
+        courseId,
+        unitId,
+        materialsMetadataComplete,
+        'download',
+      );
+      setOfflineBundle(bundle);
+      toast.success(`Available offline (${formatOfflineSize(bundle.totalBytes)})`);
+    } catch (error) {
+      console.error('[OfflineCache] Failed to download this topic:', error);
+      toast.error('Could not download this topic. Check your connection and access, then try again.');
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isOffline) {
+      sessionCacheRequestRef.current = undefined;
+      return;
+    }
+    if (!topic || !offlineUserId || !materialsLoaded || !offlineBundleLoaded) return;
+    if (offlineBundle?.cacheMode !== 'session' && offlineBundle) {
+      setSessionCacheStatus('ready');
+      return;
+    }
+    if (
+      offlineBundle?.cacheMode === 'session' &&
+      offlineBundle.expiresAt > Date.now() &&
+      offlineBundle.isComplete !== false &&
+      offlineBundle.sessionId === sessionCacheIdRef.current
+    ) {
+      setSessionCacheStatus('ready');
+      return;
+    }
+
+    const requestKey = `${offlineUserId}:${topicId}`;
+    if (sessionCacheRequestRef.current === requestKey) return;
+    sessionCacheRequestRef.current = requestKey;
+    setSessionCacheStatus('preparing');
+    const cachePromise = prepareTopicOfflineContent(
+      topic,
+      materials,
+      offlineUserId,
+      courseId,
+      unitId,
+      materialsMetadataComplete,
+      'session',
+      sessionCacheIdRef.current,
+    );
+    sessionCachePromiseRef.current = cachePromise;
+    void cachePromise.then(({ bundle, complete }) => {
+      if (sessionCacheRequestRef.current !== requestKey) return;
+      setOfflineBundle(bundle);
+      setSessionCacheStatus(complete ? 'ready' : 'partial');
+    }).catch(error => {
+      console.warn('[OfflineCache] Could not prepare this topic for interruptions:', error);
+      if (sessionCacheRequestRef.current === requestKey) {
+        setSessionCacheStatus('unavailable');
+      }
+    });
+  }, [
+    courseId,
+    isOffline,
+    materials,
+    materialsLoaded,
+    materialsMetadataComplete,
+    offlineBundle,
+    offlineBundleLoaded,
+    offlineUserId,
+    topic,
+    topicId,
+    unitId,
+  ]);
+
+  useEffect(() => {
+    const sessionId = sessionCacheIdRef.current;
+    return () => {
+      if (offlineUserId) {
+        const pendingCache = sessionCachePromiseRef.current;
+        void (async () => {
+          await pendingCache?.catch(() => undefined);
+          await offlineService.removeSessionOfflineTopic(offlineUserId, topicId, sessionId);
+        })().catch(error => {
+            console.warn('[OfflineCache] Could not clear temporary topic content:', error);
+          });
+      }
+    };
+  }, [offlineUserId, topicId]);
+
+  const removeTopicFromOffline = async () => {
+    if (!offlineUserId) return;
+    try {
+      await offlineService.removeOfflineTopic(offlineUserId, topicId);
+      setOfflineBundle(undefined);
+      toast.success('Topic removed from offline downloads.');
+    } catch (error) {
+      console.error('[OfflineCache] Failed to remove this topic:', error);
+      toast.error('Could not remove this topic from offline downloads.');
+    }
+  };
+
+  const offlinePdfCount = materials.filter(isPdfMaterial).length;
 
   const handleOpenMaterial = (materialId: string) => {
     setSelectedMaterialId(materialId);
@@ -130,6 +452,13 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
 
   const handleCloseMaterial = async () => {
     setShowMaterialModal(false);
+    if (offlineUserId) {
+      try {
+        setOfflineBundle(await offlineService.getOfflineTopicBundle(offlineUserId, topicId));
+      } catch (error) {
+        console.error('[OfflineCache] Could not refresh the saved-topic status:', error);
+      }
+    }
     
     // Track material as viewed
     if (selectedMaterialId) {
@@ -251,6 +580,35 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
 
       {/* Main Content */}
       <div className="max-w-5xl mx-auto px-4 md:px-8 py-8 space-y-8">
+        {isOffline && (
+          <div
+            role="status"
+            className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"
+          >
+            <WifiOff className="h-4 w-4 shrink-0" />
+            Offline mode: showing this device&apos;s saved topic content. Quiz attempts remain
+            provisional until they sync.
+          </div>
+        )}
+        {!isOffline &&
+          (sessionCacheStatus === 'preparing' ||
+            sessionCacheStatus === 'partial' ||
+            sessionCacheStatus === 'unavailable' ||
+            offlineBundle?.cacheMode === 'session') && (
+            <div
+              role="status"
+              className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900"
+            >
+              {sessionCacheStatus === 'preparing'
+                ? 'Preparing this topic for connection interruptions. Keep this page open until preparation finishes.'
+                : sessionCacheStatus === 'partial'
+                  ? 'Some content is ready for interruptions, but not all PDFs or quiz content could be cached. Check your connection.'
+                  : sessionCacheStatus === 'unavailable'
+                    ? 'Automatic interruption protection is unavailable. Use “Download for offline” to save this topic and check for any errors.'
+                    : 'This topic is ready for brief interruptions. Its temporary cache is cleared when you leave; use “Download for offline” to keep it.'}
+            </div>
+          )}
+
         {/* Topic Description */}
         {topic.description && (
           <div className="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border border-slate-200 dark:border-slate-700">
@@ -347,13 +705,37 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
             <ChevronLeft className="w-4 h-4" />
             Back to Unit
           </Button>
-          <Button
-            onClick={() => setShowQuiz(true)}
-            className="flex items-center gap-2"
-          >
-            <Brain className="w-4 h-4" />
-            {isCompleted ? 'Retake Topic Quiz' : 'Take Topic Quiz'}
-          </Button>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            {offlineBundle && offlineBundle.cacheMode !== 'session' ? (
+              <Button
+                variant="outline"
+                onClick={() => void removeTopicFromOffline()}
+                className="flex items-center gap-2"
+              >
+                <HardDriveDownload className="h-4 w-4" />
+                Available offline · {formatOfflineSize(offlineBundle.totalBytes)} · Remove
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                onClick={() => void downloadTopicForOffline()}
+                disabled={isDownloading || isOffline || (!offlinePdfCount && !topic)}
+                className="flex items-center gap-2"
+              >
+                <Download className="h-4 w-4" />
+                {isDownloading
+                  ? 'Downloading…'
+                  : `Download for offline${offlinePdfCount ? ` · ${offlinePdfCount} PDF${offlinePdfCount === 1 ? '' : 's'}${getEstimatedPdfSize(materials)}` : ' · practice quiz'}`}
+              </Button>
+            )}
+            <Button
+              onClick={() => setShowQuiz(true)}
+              className="flex items-center gap-2"
+            >
+              <Brain className="w-4 h-4" />
+              {isCompleted ? 'Retake Topic Quiz' : 'Take Topic Quiz'}
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -362,6 +744,7 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
         topicId={topicId}
         unitId={unitId}
         courseId={courseId}
+        userId={offlineUserId || ''}
         isOpen={showQuiz}
         onClose={() => setShowQuiz(false)}
         onNextTopic={(nextTopicId) => {
@@ -381,6 +764,9 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
       {/* Material Preview Modal */}
       <MaterialPreviewModal
         materialId={selectedMaterialId}
+        topicId={topicId}
+        userId={offlineUserId}
+        fallbackMaterial={materials.find(material => material.id === selectedMaterialId)}
         isOpen={showMaterialModal}
         onClose={handleCloseMaterial}
         materials={materials}
@@ -389,3 +775,40 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
     </div>
   );
 };
+
+function formatOfflineSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  const units = ['KB', 'MB', 'GB'];
+  let size = bytes / 1024;
+  let unitIndex = 0;
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex += 1;
+  }
+  return `${size.toFixed(size >= 10 ? 0 : 1)} ${units[unitIndex]}`;
+}
+
+function getEstimatedPdfSize(materials: Material[]): string {
+  const pdfs = materials.filter(material =>
+    material.type?.toLowerCase() === 'pdf' ||
+    material.contentType?.toLowerCase() === 'application/pdf' ||
+    material.metadata?.driveMimeType?.toLowerCase() === 'application/pdf' ||
+    material.file?.mimetype?.toLowerCase() === 'application/pdf' ||
+    material.previewFile?.mimetype?.toLowerCase() === 'application/pdf',
+  );
+  const sizes = pdfs.map(material => {
+    const match = material.size?.trim().match(/^([\d,.]+)\s*(B|KB|KIB|MB|MIB|GB|GIB)?$/i);
+    if (!match) return undefined;
+    const size = Number(match[1].replace(/,/g, ''));
+    if (!Number.isFinite(size)) return undefined;
+    const unit = (match[2] || 'B').toUpperCase();
+    const multiplier =
+      unit === 'KB' || unit === 'KIB' ? 1024 :
+      unit === 'MB' || unit === 'MIB' ? 1024 ** 2 :
+      unit === 'GB' || unit === 'GIB' ? 1024 ** 3 : 1;
+    return size * multiplier;
+  });
+  return sizes.some(size => size === undefined)
+    ? ' · size calculated as files download'
+    : ` · ~${formatOfflineSize(sizes.reduce<number>((sum, size) => sum + (size ?? 0), 0))}`;
+}
