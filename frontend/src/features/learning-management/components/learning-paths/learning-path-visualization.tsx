@@ -43,11 +43,27 @@ const toDisplayString = (value: unknown, fallback = ''): string => {
   return fallback;
 };
 
+const unwrapApiPayload = (value: unknown): unknown => {
+  if (typeof value !== 'object' || value === null) return value;
+  const outerData = (value as Record<string, unknown>).data;
+  if (typeof outerData !== 'object' || outerData === null) return outerData ?? value;
+  const innerData = (outerData as Record<string, unknown>).data;
+  return innerData ?? outerData;
+};
+
+const normalizeJsonArray = (value: unknown): unknown[] => {
+  if (Array.isArray(value)) return value;
+  if (typeof value === 'object' && value !== null) {
+    return Object.values(value);
+  }
+  return [];
+};
+
 type PhaseStatus = 'completed' | 'inProgress' | 'notStarted';
-type ModuleStatus = 'completed' | 'inProgress' | 'notStarted' | 'skipped';
+type ModuleStatus = 'completed' | 'inProgress' | 'notStarted' | 'skipped' | 'failed';
 
 const PHASE_STATUSES: readonly PhaseStatus[] = ['completed', 'inProgress', 'notStarted'];
-const MODULE_STATUSES: readonly ModuleStatus[] = ['completed', 'inProgress', 'notStarted', 'skipped'];
+const MODULE_STATUSES: readonly ModuleStatus[] = ['completed', 'inProgress', 'notStarted', 'skipped', 'failed'];
 
 const toPhaseStatus = (value: unknown, fallback: PhaseStatus = 'notStarted'): PhaseStatus =>
   (PHASE_STATUSES as readonly unknown[]).includes(value) ? (value as PhaseStatus) : fallback;
@@ -68,14 +84,22 @@ export const LearningPathVisualization: React.FC<LearningPathVisualizationProps>
   const router = useRouter();
 
   useEffect(() => {
-    fetchLearningPath();
-    fetchProgress();
+    const loadPath = async () => {
+      setLoading(true);
+      const path = await fetchLearningPath();
+      if (path) {
+        await fetchProgress(path);
+      } else {
+        setLoading(false);
+      }
+    };
+    void loadPath();
   }, [pathId]);
 
-  const fetchLearningPath = async () => {
+  const fetchLearningPath = async (): Promise<LearningPath | null> => {
     try {
       const response = await apiService.get<unknown>(`/learning-paths/${pathId}`);
-      const raw = response?.data ?? response;
+      const raw = unwrapApiPayload(response);
       const rawObj = raw as Record<string, unknown>;
       const analyticsObj = (rawObj.analytics as Record<string, unknown> | undefined) ?? {};
       const createdByObj = (rawObj.createdBy as Record<string, unknown> | undefined) ?? (rawObj.created_by as Record<string, unknown> | undefined) ?? {};
@@ -164,42 +188,40 @@ export const LearningPathVisualization: React.FC<LearningPathVisualizationProps>
       };
       
       setLearningPath(normalized);
+      return normalized;
     } catch (error) {
       console.error('Error fetching learning path:', error);
       toast.error('Failed to load learning path details');
+      return null;
     }
   };
 
-  const fetchProgress = async () => {
+  const fetchProgress = async (path: LearningPath) => {
     try {
       const response = await apiService.get<unknown>(`/learning-paths/${pathId}/progress`);
-      const raw = response?.data ?? response;
+      const raw = unwrapApiPayload(response);
       const rawObj = raw as Record<string, unknown>;
 
       if (!rawObj) return;
 
-      const phaseProgressRaw = Array.isArray(rawObj.phaseProgress)
-        ? (rawObj.phaseProgress as unknown[])
-        : Array.isArray(rawObj.phase_progress)
-        ? (rawObj.phase_progress as unknown[])
-        : [];
-      const moduleProgressRaw = Array.isArray(rawObj.moduleProgress)
-        ? (rawObj.moduleProgress as unknown[])
-        : Array.isArray(rawObj.module_progress)
-        ? (rawObj.module_progress as unknown[])
-        : [];
-      const milestonesAchievedRaw = Array.isArray(rawObj.milestonesAchieved)
-        ? (rawObj.milestonesAchieved as unknown[])
-        : Array.isArray(rawObj.milestones_achieved)
-        ? (rawObj.milestones_achieved as unknown[])
-        : [];
+      const phaseProgressRaw = normalizeJsonArray(
+        rawObj.phaseProgress ?? rawObj.phase_progress,
+      );
+      const moduleProgressRaw = normalizeJsonArray(
+        rawObj.moduleProgress ?? rawObj.module_progress,
+      );
+      const milestonesAchievedRaw = normalizeJsonArray(
+        rawObj.milestonesAchieved ?? rawObj.milestones_achieved,
+      );
 
       const normalized: LearningPathProgress = {
         id: toDisplayString(rawObj.id),
         status: toDisplayString(rawObj.status, 'notStarted'),
         startedAt: toDisplayString(rawObj.startedAt ?? rawObj.started_at, new Date().toISOString()),
         lastAccessedAt: toDisplayString(rawObj.lastAccessedAt ?? rawObj.last_accessed_at, new Date().toISOString()),
-        learningPath: learningPath!, 
+        totalTimeSpentMinutes: Number(rawObj.totalTimeSpentMinutes ?? rawObj.total_time_spent_minutes ?? 0),
+        streakDays: Number(rawObj.streakDays ?? rawObj.streak_days ?? 0),
+        learningPath: path,
         overallProgressPercentage: Number(rawObj.overallProgressPercentage ?? rawObj.overall_progress_percentage ?? 0),
         currentPhaseIndex: Number(rawObj.currentPhaseIndex ?? rawObj.current_phase_index ?? 0),
         currentModuleIndex: Number(rawObj.currentModuleIndex ?? rawObj.current_module_index ?? 0),
@@ -223,7 +245,7 @@ export const LearningPathVisualization: React.FC<LearningPathVisualizationProps>
           return {
             moduleId: toDisplayString(moduleItem.moduleId ?? moduleItem.module_id),
             phaseId: toDisplayString(moduleItem.phaseId ?? moduleItem.phase_id),
-            status: String(moduleItem.status ?? 'notStarted') as ModuleStatus,
+            status: toModuleStatus(moduleItem.status),
             progressPercentage: Number(moduleItem.progressPercentage ?? moduleItem.progress_percentage ?? 0),
             timeSpentMinutes: Number(moduleItem.timeSpentMinutes ?? moduleItem.time_spent_minutes ?? 0),
             bestScore: typeof bestScoreRaw === 'number' ? bestScoreRaw : undefined,
@@ -246,6 +268,23 @@ export const LearningPathVisualization: React.FC<LearningPathVisualizationProps>
     }
   };
 
+  useEffect(() => {
+    if (!learningPath) return;
+
+    const refreshProgress = () => {
+      if (document.visibilityState === 'visible') {
+        void fetchProgress(learningPath);
+      }
+    };
+
+    window.addEventListener('focus', refreshProgress);
+    document.addEventListener('visibilitychange', refreshProgress);
+    return () => {
+      window.removeEventListener('focus', refreshProgress);
+      document.removeEventListener('visibilitychange', refreshProgress);
+    };
+  }, [learningPath, pathId]);
+
   const getModuleProgress = (moduleId: string): ModuleProgress | undefined => {
     return (progress?.moduleProgress || []).find(mp => mp.moduleId === moduleId);
   };
@@ -253,6 +292,14 @@ export const LearningPathVisualization: React.FC<LearningPathVisualizationProps>
   const getPhaseProgress = (phaseId: string): PhaseProgress | undefined => {
     return (progress?.phaseProgress || []).find(pp => pp.phaseId === phaseId);
   };
+
+  const activePhaseIndex = (() => {
+    const phases = progress?.phaseProgress || [];
+    const inProgressIndex = phases.findIndex(phase => phase.status === 'inProgress');
+    return inProgressIndex >= 0
+      ? inProgressIndex
+      : phases.findIndex(phase => phase.status !== 'completed');
+  })();
 
   const isMilestoneAchieved = (milestoneId: string): boolean => {
     return (progress?.milestonesAchieved || []).some(ma => ma.milestoneId === milestoneId) || false;
@@ -283,6 +330,7 @@ export const LearningPathVisualization: React.FC<LearningPathVisualizationProps>
     inProgress: { color: 'text-sky-500', bg: 'bg-sky-50 dark:bg-sky-500/10', border: 'border-sky-200 dark:border-sky-500/20' },
     notStarted: { color: 'text-neutral-400', bg: 'bg-neutral-50 dark:bg-neutral-500/5', border: 'border-neutral-200 dark:border-neutral-700' },
     skipped: { color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-500/10', border: 'border-amber-200 dark:border-amber-500/20' },
+    failed: { color: 'text-rose-500', bg: 'bg-rose-50 dark:bg-rose-500/10', border: 'border-rose-200 dark:border-rose-500/20' },
   };
 
   const handleModuleClick = (module: PathModule, phase: PathPhase) => {
@@ -381,7 +429,7 @@ export const LearningPathVisualization: React.FC<LearningPathVisualizationProps>
 
               {(learningPath.pathStructure?.phases || []).map((phase, idx) => {
                 const phaseProgress = getPhaseProgress(phase.id);
-                const isActive = progress?.currentPhaseIndex === idx;
+                const isActive = activePhaseIndex === idx;
                 const isCompleted = phaseProgress?.status === 'completed';
 
                 return (
@@ -478,7 +526,7 @@ export const LearningPathVisualization: React.FC<LearningPathVisualizationProps>
                               const moduleProgress = getModuleProgress(module.id);
                               const isUnlocked = isModuleUnlocked(module, phase);
                               const Icon = getModuleIcon(module.type);
-                              const status = statusMap[moduleProgress?.status || 'notStarted'];
+                              const status = statusMap[toModuleStatus(moduleProgress?.status)];
 
                               return (
                                 <motion.div
@@ -562,11 +610,21 @@ export const LearningPathVisualization: React.FC<LearningPathVisualizationProps>
               <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-1">
                   <p className="text-3xl font-black text-white">{(progress?.phaseProgress || []).filter(p => p.status === 'completed').length}</p>
-                  <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Phases Don</p>
+                  <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Phases completed</p>
                 </div>
                 <div className="space-y-1">
                   <p className="text-3xl font-black text-white">{(progress?.moduleProgress || []).filter(m => m.status === 'completed').length}</p>
-                  <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Modules Don</p>
+                  <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Modules completed</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-3xl font-black text-white">
+                    {Math.floor((progress?.totalTimeSpentMinutes ?? 0) / 60)}h
+                  </p>
+                  <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Path study time</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-3xl font-black text-white">{progress?.streakDays ?? 0}</p>
+                  <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Path streak days</p>
                 </div>
               </div>
             </div>

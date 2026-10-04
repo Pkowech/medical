@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/features/auth/store/useAuthStore';
 import progressService from '../../services/progressService';
 import apiService from '@/features/auth/services/apiClient';
@@ -13,6 +14,7 @@ import type {
 
 export const useStudy = () => {
   const { user } = useAuthStore();
+  const queryClient = useQueryClient();
   const [sessions, setSessions] = useState<StudySessionInternal[]>([]);
   const [stats, setStats] = useState<StudyStats>({
     totalSessions: 0,
@@ -72,13 +74,14 @@ export const useStudy = () => {
     notes?: string,
     activities: StudySessionActivity[] = [],
     durationSeconds?: number,
-  ): Promise<void> => {
+  ): Promise<StudySession> => {
     try {
-        await apiService.put(`/study/session/${sessionId}/end`, {
+        const response = await apiService.put<StudySession>(`/study/session/${sessionId}/end`, {
             activities,
             notes,
             durationSeconds,
         });
+        const endedSession = response.data;
 
         // Update local state
         setSessions(prev =>
@@ -86,22 +89,33 @@ export const useStudy = () => {
               session.id === sessionId
                 ? {
                     ...session,
-                    endTime: new Date(),
-                    duration: durationSeconds !== undefined
+                    endTime: endedSession.endTime
+                      ? new Date(endedSession.endTime)
+                      : new Date(),
+                    duration: endedSession.duration ?? (durationSeconds !== undefined
                       ? durationSeconds / 60
                       : session.startTime
                         ? (Date.now() - new Date(session.startTime).getTime()) / 1000 / 60
-                        : 0,
-                    notes,
+                        : 0),
+                    notes: endedSession.notes ?? notes,
                   }
                 : session
             )
           );
+        if (user?.id) {
+          void queryClient.invalidateQueries({
+            queryKey: ['userProgress', user.id],
+          });
+          void queryClient.invalidateQueries({
+            queryKey: ['userLearningStreak', user.id],
+          });
+        }
+        return endedSession;
     } catch (error) {
         console.error('Failed to end study session:', error);
       throw error;
     }
-  }, []);
+  }, [queryClient, user?.id]);
 
   const getStudyStats = useCallback(async (): Promise<StudyStats> => {
     if (!user?.id) return statsRef.current;

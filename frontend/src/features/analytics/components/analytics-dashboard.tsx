@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui
 import { BarChart } from '@/shared/components/charts/BarChart';
 import { LineChart } from '@/shared/components/charts/LineChart';
 // PieChart not used
-import { Lightbulb, BookOpen, Target, Clock, FlaskConical } from 'lucide-react';
+import { Lightbulb, BookOpen, Target, Clock, Flame, FlaskConical } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import type {
   UserAnalytics,
@@ -19,6 +19,7 @@ import { userService } from '@/features/profile/services/userService';
 import { getLearningPathRecommendations } from '@/features/learning-management/services/learningManagementService';
 import { PerformanceAnalyticsContent } from '@/features/assessment/components/PerformanceAnalytics'; // Renamed to avoid conflict
 import { usePageHeader } from '@/core/providers/HeaderContext';
+import { useLearningStreak } from '@/shared/hooks/useProgress';
 
 function AnalyticsErrorCard({ title, message }: { title: string; message: string }) {
   return (
@@ -37,6 +38,11 @@ export default function AnalyticsDashboard() {
   const { data: session } = useSession() || {};
   const { setHeader } = usePageHeader();
   const userId = session?.user?.id;
+  const {
+    streak: learningStreak,
+    isLoading: isLoadingLearningStreak,
+    error: learningStreakError,
+  } = useLearningStreak();
 
   useEffect(() => {
     setHeader({
@@ -224,12 +230,18 @@ export default function AnalyticsDashboard() {
             </Card>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Study Streak</CardTitle>
-                <Clock className="h-4 w-4 text-muted-foreground" />
+                <CardTitle className="text-sm font-medium">Learning Streak</CardTitle>
+                <Flame className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{userAnalytics?.metrics.streak || 0}</div>
-                <p className="text-xs text-muted-foreground">Consecutive study days</p>
+                <div className="text-2xl font-bold">
+                  {isLoadingLearningStreak ? '…' : typeof learningStreak === 'number' ? learningStreak : '—'}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {learningStreakError
+                    ? `Learning streak unavailable: ${learningStreakError.message}`
+                    : 'Consecutive days with learning activity'}
+                </p>
               </CardContent>
             </Card>
           </div>

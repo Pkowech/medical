@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect } from 'react';
 import {
   Menu,
   Bell,
@@ -14,12 +14,9 @@ import { useLayoutStore } from '@/core/stores/useLayoutStore';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { HeaderProps } from '@/shared/types/navigationInterface';
 
-// Local types to avoid `any`
-type Activity = { date?: string; createdAt?: string; timestamp?: string; time?: string; datetime?: string; startedAt?: string };
-
 import { useRouter } from 'next/navigation';
 import { markNotificationAsRead } from '@/features/community/notificationService';
-import { useProgress } from '@/shared/hooks/useProgress';
+import { useLearningStreak } from '@/shared/hooks/useProgress';
 import { usePageHeader } from '@/core/providers/HeaderContext';
 import { UserMenu } from './UserMenu';
 
@@ -37,57 +34,8 @@ export const AppHeader: React.FC<HeaderProps> = ({
 
   const { logout } = useAuth();
   const router = useRouter();
-  const { progressData, isLoading: progressLoading } = useProgress(); // RQ hook: Handles loading/error internally
-  const [streak, setStreak] = useState<number | null>(null);
-
-  // Compute a local fallback streak from recent activities when backend streak isn't available.
-  const computeLocalStreak = (activities?: Activity[]): number => {
-    if (!activities || activities.length === 0) return 0;
-
-    // Normalize timestamps to Date objects and a set of unique day strings
-    const daySet = new Set<string>();
-    activities.forEach((a: Activity) => {
-      const dStr = a.date || a.createdAt || a.timestamp || a.time || a.datetime || a.startedAt;
-      if (!dStr) return;
-      const d = new Date(dStr);
-      if (isNaN(d.getTime())) return;
-      daySet.add(d.toDateString());
-    });
-
-    if (daySet.size === 0) return 0;
-
-    // Start from today and count consecutive days backwards
-    let streakCount = 0;
-    const today = new Date();
-    for (let i = 0; ; i++) {
-      const check = new Date(today);
-      check.setDate(today.getDate() - i);
-      const key = check.toDateString();
-      if (daySet.has(key)) {
-        streakCount++;
-      } else {
-        break;
-      }
-      // safety cap to avoid infinite loop
-      if (streakCount > 365) break;
-    }
-
-    return streakCount;
-  };
-
-  // Update streak when progressData changes: prefer backend stats.streak, otherwise local calc
-  useEffect(() => {
-    const backendStreak = (progressData as { stats?: { streak?: number } } | undefined)?.stats?.streak ?? null;
-    if (typeof backendStreak === 'number' && backendStreak > 0) {
-      setStreak(backendStreak);
-      return;
-    }
-
-    // compute fallback from recent activities
-    const activities = (progressData?.recentActivities as Activity[] | undefined) || (progressData?.recentActivity as Activity[] | undefined) || [];
-    const local = computeLocalStreak(activities);
-    setStreak(local > 0 ? local : backendStreak === 0 ? 0 : null);
-  }, [progressData]);
+  const { streak, longestStreak, isLoading: isStreakLoading, error: streakError } =
+    useLearningStreak();
 
   const unreadCount = notifications.filter(n => !n.read).length;
   const notificationsMenuRef = useRef<HTMLDivElement>(null);
@@ -185,17 +133,20 @@ export const AppHeader: React.FC<HeaderProps> = ({
                 - shows streak when available
                 - shows a small dash when no streak */}
             <div className="hidden lg:flex items-center shrink-0">
-              {progressLoading ? (
+              {isStreakLoading ? (
                 <div className="animate-pulse bg-gray-200 dark:bg-gray-700 w-16 h-6 rounded-full" />
               ) : (
-                <div className="items-center gap-1.5 px-3 py-1 bg-orange-50/50 dark:bg-orange-500/10 rounded-full border border-orange-100 dark:border-orange-500/20 flex shadow-sm">
+                <div
+                  className="items-center gap-1.5 px-3 py-1 bg-orange-50/50 dark:bg-orange-500/10 rounded-full border border-orange-100 dark:border-orange-500/20 flex shadow-sm"
+                  title={
+                    typeof streak === 'number' && typeof longestStreak === 'number'
+                      ? `Current learning streak: ${streak} days. Longest: ${longestStreak} days.`
+                      : streakError?.message ?? 'Learning streak unavailable'
+                  }
+                >
                   <Flame className="w-4 h-4 text-orange-600 dark:text-orange-400" />
                   <span className="text-xs font-bold text-orange-700 dark:text-orange-300">
-                    {(streak ?? 0) > 0
-                      ? `${streak}d`
-                      : progressData?.recentActivities && progressData.recentActivities.length > 0
-                        ? '1d'
-                        : '—'}
+                    {typeof streak === 'number' ? `${streak}d` : '—'}
                   </span>
                 </div>
               )}
@@ -205,7 +156,7 @@ export const AppHeader: React.FC<HeaderProps> = ({
           {/* Right controls - Notifications, User Menu and Theme */}
           <div className="flex items-center space-x-1 sm:space-x-2 shrink-0">
             {/* Notifications */}
-            <div className="relative hidden sm:block">
+            <div className="relative">
               <button
                 ref={notificationsButtonRef}
                 type="button"
@@ -362,7 +313,7 @@ export const AppHeader: React.FC<HeaderProps> = ({
             <button
               type="button"
               onClick={toggleTheme}
-              className="hidden sm:inline-flex p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              className="inline-flex p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
               aria-label="Toggle theme"
               title="Toggle theme"
             >

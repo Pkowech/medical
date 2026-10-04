@@ -20,17 +20,33 @@ interface FormErrors {
   password?: string;
 }
 
+function getSafeCallbackUrl(requestedCallbackUrl: string | null): string {
+  if (!requestedCallbackUrl) return '/dashboard';
+
+  try {
+    const resolvedUrl = new URL(requestedCallbackUrl, window.location.origin);
+    if (resolvedUrl.origin === window.location.origin) {
+      return `${resolvedUrl.pathname}${resolvedUrl.search}${resolvedUrl.hash}`;
+    }
+  } catch {
+    console.warn('[Login] Ignoring invalid callback URL');
+  }
+
+  return '/dashboard';
+}
+
 function LoginContent() {
-  const { login, isAuthenticated } = useAuth();
+  const { login, isAuthenticated, signIn: nextAuthSignIn } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const requestedCallbackUrl = searchParams.get('callbackUrl');
 
   // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated) {
-      router.replace('/dashboard');
+      router.replace(getSafeCallbackUrl(requestedCallbackUrl));
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, requestedCallbackUrl, router]);
 
   const [error, setError] = useState('');
   const [canRetry, setCanRetry] = useState(false);
@@ -42,6 +58,7 @@ function LoginContent() {
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [socialLoading, setSocialLoading] = useState<'google' | 'github' | null>(null);
   const [formErrors, setFormErrors] = useState<FormErrors>({});
   const [formTouched, setFormTouched] = useState({
     identifier: false,
@@ -52,6 +69,23 @@ function LoginContent() {
 
   // Determine if identifier is an email
   const isEmail = identifier.includes('@');
+
+  const handleProviderSignIn = async (provider: 'google' | 'github') => {
+    setError('');
+    setSuccess('');
+    setSocialLoading(provider);
+
+    try {
+      await nextAuthSignIn(provider, {
+        callbackUrl: getSafeCallbackUrl(requestedCallbackUrl),
+      });
+    } catch (err) {
+      console.error(`[Login] ${provider} sign-in failed:`, err);
+      setError(`Could not continue with ${provider === 'google' ? 'Google' : 'GitHub'}. Please try again.`);
+    } finally {
+      setSocialLoading(null);
+    }
+  };
 
   // Validate form fields
   const validateField = (name: string, value: string) => {
@@ -178,18 +212,7 @@ function LoginContent() {
 
         // Keep same-origin callback URLs as client-side paths. Passing the
         // complete deployment URL can make Next.js perform a full reload.
-        const requestedCallbackUrl = searchParams?.get('callbackUrl');
-        let callbackUrl = '/dashboard';
-        if (requestedCallbackUrl) {
-          try {
-            const resolvedUrl = new URL(requestedCallbackUrl, window.location.origin);
-            if (resolvedUrl.origin === window.location.origin) {
-              callbackUrl = `${resolvedUrl.pathname}${resolvedUrl.search}${resolvedUrl.hash}`;
-            }
-          } catch {
-            console.warn('[Login] Ignoring invalid callback URL');
-          }
-        }
+        const callbackUrl = getSafeCallbackUrl(requestedCallbackUrl);
 
         // Reload through the browser so the session cookie written by
         // NextAuth is included in the first protected dashboard request.
@@ -451,6 +474,37 @@ function LoginContent() {
               {loading && <FaSpinner className="animate-spin mr-2" />}
               {loading ? 'Signing in...' : 'Sign in'}
             </>
+          </button>
+        </div>
+
+        <div className="relative my-6">
+          <div className="absolute inset-0 flex items-center" aria-hidden="true">
+            <div className="w-full border-t border-gray-300 dark:border-slate-700" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase tracking-[0.2em] text-gray-500 dark:text-slate-400">
+            <span className="bg-white px-2 dark:bg-slate-900">Or continue with</span>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <button
+            type="button"
+            onClick={() => void handleProviderSignIn('google')}
+            disabled={loading || socialLoading !== null}
+            className="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
+          >
+            <span aria-hidden="true">G</span>
+            {socialLoading === 'google' ? 'Connecting...' : 'Google'}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => void handleProviderSignIn('github')}
+            disabled={loading || socialLoading !== null}
+            className="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
+          >
+            <span aria-hidden="true">GH</span>
+            {socialLoading === 'github' ? 'Connecting...' : 'GitHub'}
           </button>
         </div>
 

@@ -48,10 +48,6 @@ class LearningPathService {
     }
   }
 
-  async completeLearningPath(learningPathId: string): Promise<void> {
-    await apiService.post(`${LEARNING_PATH_BASE_URL}/${learningPathId}/complete`);
-  }
-
   async deleteLearningPath(learningPathId: string): Promise<void> {
     await apiService.delete(`${LEARNING_PATH_BASE_URL}/${learningPathId}`);
   }

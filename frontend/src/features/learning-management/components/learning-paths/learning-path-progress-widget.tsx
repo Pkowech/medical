@@ -54,17 +54,6 @@ export const LearningPathProgressWidget: React.FC = () => {
     }
   };
 
-  const handleCompleteLearningPath = async (learningPathId: string) => {
-    try {
-      await learningPathService.completeLearningPath(learningPathId);
-      toast.success('Learning path marked as complete!');
-      fetchPathProgress(); // Re-fetch to update UI
-    } catch (error) {
-      toast.error('Failed to mark learning path as complete.');
-      console.error('Error completing learning path:', error);
-    }
-  };
-
   const handleDeleteLearningPath = async () => {
     if (pathToDelete) {
       try {
@@ -88,6 +77,8 @@ export const LearningPathProgressWidget: React.FC = () => {
         return 'text-green-600 bg-green-100';
       case 'paused':
         return 'text-yellow-600 bg-yellow-100';
+      case 'failed':
+        return 'text-red-600 bg-red-100';
       default:
         return 'text-gray-600 bg-gray-100';
     }
@@ -159,12 +150,28 @@ export const LearningPathProgressWidget: React.FC = () => {
         </div>
       ) : (
         <div className="space-y-4">
-          {pathProgress.map(progress => (
-            <Link
-              key={progress.id}
-              href={`/learning-paths/${progress.learningPath.id}`}
-              className="block p-4 border border-gray-200 rounded-lg hover:border-blue-300 hover:shadow-sm transition-all"
-            >
+          {pathProgress.map(progress => {
+            const moduleProgress = Array.isArray(progress.moduleProgress)
+              ? progress.moduleProgress
+              : [];
+            const totalModules =
+              progress.learningPath.pathStructure?.phases?.reduce(
+                (total, phase) => total + phase.modules.length,
+                0,
+              ) ?? moduleProgress.length;
+            const completedModules = moduleProgress.filter(
+              module => module.status === 'completed',
+            ).length;
+            const achievedMilestones = Array.isArray(progress.milestonesAchieved)
+              ? progress.milestonesAchieved
+              : [];
+
+            return (
+              <Link
+                key={progress.id}
+                href={`/learning-paths/${progress.learningPath.id}`}
+                className="block p-4 border border-gray-200 rounded-lg hover:border-blue-300 hover:shadow-sm transition-all"
+              >
               <div className="flex items-start justify-between mb-3">
                 <div className="flex-1">
                   <h4 className="font-medium text-gray-900 mb-1">{progress.learningPath.title}</h4>
@@ -195,20 +202,6 @@ export const LearningPathProgressWidget: React.FC = () => {
                     <CheckCircle className="w-5 h-5 text-green-600" />
                   ) : (
                     <Play className="w-5 h-5 text-blue-600" />
-                  )}
-
-                  {progress.status !== 'completed' && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={e => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        handleCompleteLearningPath(progress.learningPath.id);
-                      }}
-                    >
-                      Mark Complete
-                    </Button>
                   )}
 
                   <AlertDialog open={isDeleteDialogOpen && pathToDelete === progress.learningPath.id} onOpenChange={setIsDeleteDialogOpen}>
@@ -246,7 +239,9 @@ export const LearningPathProgressWidget: React.FC = () => {
               <div className="mb-3">
                 <div className="flex items-center justify-between text-sm text-gray-600 mb-1">
                   <span>Progress</span>
-                  <span>{Math.round(progress.overallProgressPercentage)}%</span>
+                  <span>
+                    {completedModules}/{totalModules} modules · {Math.round(progress.overallProgressPercentage)}%
+                  </span>
                 </div>
                 <div className="w-full h-2">
                   <ProgressBar
@@ -257,17 +252,18 @@ export const LearningPathProgressWidget: React.FC = () => {
                 </div>
               </div>
 
-              {progress.milestonesAchieved.length > 0 && (
+              {achievedMilestones.length > 0 && (
                 <div className="flex items-center space-x-2 text-sm text-gray-600">
                   <Award className="w-4 h-4 text-yellow-600" />
                   <span>
-                    {progress.milestonesAchieved.length} of{' '}
+                    {achievedMilestones.length} of{' '}
                     {progress.learningPath.milestones?.length || 0} milestones achieved
                   </span>
                 </div>
               )}
-            </Link>
-          ))}
+              </Link>
+            );
+          })}
 
           <div className="pt-2 border-t border-gray-100">
             <Link

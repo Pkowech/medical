@@ -140,8 +140,10 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-var(--header-height))] overflow-hidden rounded-lg bg-card shadow-lg">
-      <div className="flex w-1/3 min-w-72 flex-col border-r border-border">
+    <div className="flex h-[calc(100dvh-10rem)] min-h-[24rem] w-full min-w-0 overflow-hidden rounded-lg bg-card shadow-lg">
+      <div
+        className={`${selectedConversation ? 'hidden' : 'flex'} min-h-0 min-w-0 w-full flex-col border-r border-border md:flex md:w-1/3 md:min-w-72 md:max-w-sm`}
+      >
         <div className="border-b border-border p-3">
           <label className="flex items-center gap-2 rounded-md border border-input px-3">
             <Search className="h-4 w-4 text-muted-foreground" />
@@ -191,11 +193,13 @@ export default function ChatPage() {
           currentUserId={currentUserId}
         />
       </div>
-      <div className="flex-1">
+      <div className={`${selectedConversation ? 'flex' : 'hidden'} min-h-0 min-w-0 flex-1 md:flex`}>
         {selectedConversation ? (
           <MessageView
             messages={messages}
             currentUserId={currentUserId}
+            conversationTitle={selectedConversation.participants.map(p => p.name).join(', ')}
+            onBack={() => setSelectedConversation(null)}
             onSendMessage={async content => {
               if (selectedConversation?.id) {
                 try {

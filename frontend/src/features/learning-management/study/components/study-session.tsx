@@ -15,6 +15,7 @@ import { Textarea } from '@/shared/components/ui/textarea';
 import { ScrollArea } from '@/shared/components/ui/scroll-area';
 import { Play, Pause, Square, BookOpen, Sparkles, ScrollText } from 'lucide-react';
 import type { StudySessionActivity } from '@/shared/types/studyInterface';
+import { toast } from 'sonner';
 interface StudySessionProps {
   topicId?: string;
   onSessionEnd: () => void;
@@ -33,6 +34,7 @@ export const StudySession: React.FC<StudySessionProps> = ({ topicId, onSessionEn
   const [showEndDialog, setShowEndDialog] = useState(false);
   const [notes, setNotes] = useState('');
   const [sessionError, setSessionError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     let timer: number | undefined;
@@ -77,19 +79,29 @@ export const StudySession: React.FC<StudySessionProps> = ({ topicId, onSessionEn
   };
 
   const handleEndSession = async () => {
-    if (!sessionId) return;
+    if (!sessionId || isSaving) return;
 
     try {
+      setIsSaving(true);
+      setSessionError(null);
       const sessionActivities: StudySessionActivity[] = activities.map(activity => ({
         type: activity.type,
         duration: activity.durationMinutes,
         timestamp: activity.timestamp.toISOString(),
       }));
-      await endSession(sessionId, notes, sessionActivities, elapsedTime);
+      const endedSession = await endSession(sessionId, notes, sessionActivities, elapsedTime);
+      if (endedSession.isValid) {
+        toast.success('Study session saved and counted toward your learning progress.');
+      } else {
+        toast.info(endedSession.invalidReason || 'This session was too short to count toward learning progress or streaks.');
+      }
+      setShowEndDialog(false);
       onSessionEnd();
     } catch (error) {
       console.error('Error ending session:', error);
       setSessionError('Could not save this session. Please try again.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -227,7 +239,9 @@ export const StudySession: React.FC<StudySessionProps> = ({ topicId, onSessionEn
             <Button variant="outline" onClick={() => setShowEndDialog(false)}>
               Cancel
             </Button>
-            <Button onClick={handleEndSession}>End Session</Button>
+            <Button onClick={handleEndSession} disabled={isSaving}>
+              {isSaving ? 'Saving…' : 'End Session'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

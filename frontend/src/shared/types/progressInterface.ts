@@ -143,6 +143,13 @@ export interface ProgressStats {
   engagementMetrics?: any;
 }
 
+export interface LearningStreakSummary {
+  userId: string;
+  currentStreak: number;
+  longestStreak: number;
+  lastActivityDate: string | null;
+}
+
 /**
  * Study session statistics
  * DEPRECATED: Use ProgressStats instead - both define the same aggregated metrics
@@ -551,7 +558,6 @@ export interface FlashcardStatistics {
   sessions: number;
   avgTimePerCard: string;
 }
-
 
 
 

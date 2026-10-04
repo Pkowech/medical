@@ -18,6 +18,7 @@ import type {
   UnitProgressSummary,
   RecommendedPathSummary,
   ExtendedProgressStats,
+  LearningStreakSummary,
 } from '@/shared/types/progressInterface';
 import { toast } from 'sonner';
 
@@ -713,19 +714,15 @@ const progressService = {
   /**
    * Get user streak information
    */
-  async getUserStreaks(userId: string): Promise<{ userId: string; currentStreak: number; longestStreak: number; lastActivityDate: string | null }> {
+  async getUserStreaks(userId: string): Promise<LearningStreakSummary> {
     try {
-      const response = await api.get(`/progress/streaks/${userId}`);
-      return response.data as { userId: string; currentStreak: number; longestStreak: number; lastActivityDate: string | null };
+      const response = await api.get<LearningStreakSummary>(
+        `/progress/streaks/${userId}`,
+      );
+      return response.data;
     } catch (error) {
       console.error('Error fetching user streaks:', error);
-      // Return default/placeholder streak data
-      return {
-        userId,
-        currentStreak: 0,
-        longestStreak: 0,
-        lastActivityDate: null,
-      };
+      throw error;
     }
   },
 

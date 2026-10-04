@@ -104,7 +104,6 @@ const MedicalEducationDashboard = () => {
     isLoading, 
     error, 
     refetch,
-    streak: hookStreak 
   } = useProgress();
 
   // Use real data from backend
@@ -172,11 +171,6 @@ const MedicalEducationDashboard = () => {
     studyHoursChange: 0,
     lastActivity: null,
   });
-
-  // Use hook streak as priority
-  if (typeof hookStreak === 'number' && hookStreak > 0) {
-    stats.streak = hookStreak;
-  }
 
   const counters = {
     courses: stats.coursesCompleted || 0,
@@ -1209,8 +1203,7 @@ const MedicalEducationDashboard = () => {
                 <X className="w-5 h-5 dark:text-slate-400" />
               </button>
             </div>
-            <StudySession 
-              topicId="general-study" 
+            <StudySession
               onSessionEnd={() => {
                 setShowStudySession(false);
                 handleRefetch();

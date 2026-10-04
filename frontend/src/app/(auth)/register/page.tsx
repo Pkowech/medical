@@ -16,7 +16,7 @@ export default function RegisterPage() {
   const router = useRouter();
   const { toast } = useToast();
   const { register, isLoading } = useAuthStore();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, signIn: nextAuthSignIn } = useAuth();
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -130,6 +130,20 @@ export default function RegisterPage() {
     }));
   };
 
+  const handleProviderSignIn = async (provider: 'google' | 'github') => {
+    try {
+      await nextAuthSignIn(provider, { callbackUrl: '/dashboard' });
+    } catch (error) {
+      console.error(`[Register] ${provider} sign-in failed:`, error);
+      toast({
+        title: 'Unable to continue',
+        description: `Could not continue with ${provider === 'google' ? 'Google' : 'GitHub'} right now. Please try again.`,
+        variant: 'destructive',
+        duration: 5000,
+      });
+    }
+  };
+
   return (
     <AuthForm
       title="Sign Up"
@@ -139,12 +153,43 @@ export default function RegisterPage() {
       submitText="Create Account"
       noValidate
       footer={
-        <p className="text-center text-sm text-gray-600 dark:text-gray-400">
-          Already have an account?{' '}
-          <Link href="/login" className="text-blue-600 hover:text-blue-700 font-medium dark:text-blue-400 dark:hover:text-blue-300">
-            Sign in
-          </Link>
-        </p>
+        <>
+          <div className="relative my-6">
+            <div className="absolute inset-0 flex items-center" aria-hidden="true">
+              <div className="w-full border-t border-gray-300 dark:border-slate-700" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase tracking-[0.2em] text-gray-500 dark:text-slate-400">
+              <span className="bg-white px-2 dark:bg-slate-900">Or continue with</span>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <button
+              type="button"
+              onClick={() => void handleProviderSignIn('google')}
+              className="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
+            >
+              <span aria-hidden="true">G</span>
+              Google
+            </button>
+
+            <button
+              type="button"
+              onClick={() => void handleProviderSignIn('github')}
+              className="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
+            >
+              <span aria-hidden="true">GH</span>
+              GitHub
+            </button>
+          </div>
+
+          <p className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
+            Already have an account?{' '}
+            <Link href="/login" className="text-blue-600 hover:text-blue-700 font-medium dark:text-blue-400 dark:hover:text-blue-300">
+              Sign in
+            </Link>
+          </p>
+        </>
       }
     >
       <div className="space-y-4">

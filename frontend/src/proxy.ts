@@ -41,6 +41,40 @@ const protectedRoutes: Record<string, string> = {
   '/content/moderate': 'moderate_content',
 };
 
+const publicPathRoots = [
+  '/',
+  '/about',
+  '/contact',
+  '/features',
+  '/pricing',
+  '/privacy',
+  '/terms',
+  '/login',
+  '/register',
+  '/forgot-password',
+  '/reset-password',
+  '/verify-email',
+  '/resend-verification',
+  '/error',
+  '/auth/error',
+  '/unauthorized',
+];
+
+function isPublicPath(pathname: string): boolean {
+  return publicPathRoots.some(
+    path => pathname === path || (path !== '/' && pathname.startsWith(`${path}/`))
+  );
+}
+
+function redirectToLogin(req: NextRequest): NextResponse {
+  const loginUrl = new URL('/login', req.url);
+  loginUrl.searchParams.set(
+    'callbackUrl',
+    `${req.nextUrl.pathname}${req.nextUrl.search}`
+  );
+  return NextResponse.redirect(loginUrl);
+}
+
 // Debug logger
 function log(message: string, data?: unknown) {
   if (process.env.NODE_ENV === 'development') {
@@ -71,11 +105,10 @@ export default withAuth(
     // Check token validity: must have token AND accessToken AND no error
     const hasValidToken = Boolean(token && customToken?.accessToken && !customToken?.error);
 
-    const publicPaths = ['/login', '/register', '/forgot-password', '/auth/error', '/unauthorized'];
-    const isPublicPath = publicPaths.some(path => pathname.startsWith(path));
+    const isPublic = isPublicPath(pathname);
 
     // If it's a public path, allow access. If user is authenticated, redirect to dashboard.
-    if (isPublicPath) {
+    if (isPublic) {
       if (hasValidToken && (pathname.startsWith('/login') || pathname.startsWith('/register'))) {
         log('Authenticated user redirected from auth pages to dashboard');
         return NextResponse.redirect(new URL('/dashboard', req.url));
@@ -91,7 +124,7 @@ export default withAuth(
         hasAccessToken: Boolean(customToken?.accessToken),
         error: customToken?.error,
       });
-      return NextResponse.redirect(new URL('/login', req.url));
+      return redirectToLogin(req);
     }
 
     const userRole = token?.role as Role | undefined;
@@ -145,13 +178,15 @@ export default withAuth(
     return NextResponse.next();
   },
   {
+    pages: {
+      signIn: '/login',
+    },
     callbacks: {
       authorized: ({ token, req }) => {
         const { pathname } = req.nextUrl;
-        const publicPaths = ['/login', '/register', '/forgot-password', '/auth/error', '/unauthorized'];
-        
+
         // Always allow public paths
-        if (publicPaths.some(path => pathname.startsWith(path))) {
+        if (isPublicPath(pathname)) {
           return true;
         }
 

@@ -68,7 +68,7 @@ export interface LearningPath {
 export interface ModuleProgress {
   moduleId: string;
   phaseId: string;
-  status: 'notStarted' | 'inProgress' | 'completed' | 'skipped';
+  status: 'notStarted' | 'inProgress' | 'completed' | 'skipped' | 'failed';
   progressPercentage: number;
   timeSpentMinutes: number;
   bestScore?: number;
@@ -88,8 +88,10 @@ export interface LearningPathProgress {
   status: string;
   startedAt: string;
   lastAccessedAt: string;
+  totalTimeSpentMinutes?: number;
+  streakDays?: number;
   learningPath: LearningPath;
-  milestonesAchieved: {
+  milestonesAchieved?: {
     milestoneId: string;
     achievedAt: string;
   }[];

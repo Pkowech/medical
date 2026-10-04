@@ -1,17 +1,21 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Message } from '@/shared/types/chatInterface'; // Assuming you have a types/chat.ts for Message interface
-import { Send, Paperclip } from 'lucide-react';
+import { Message } from '@/shared/types/chatInterface';
+import { ArrowLeft, Send } from 'lucide-react';
 
 interface MessageViewProps {
   messages: Message[];
   onSendMessage: (content: string) => void;
   currentUserId: string;
+  conversationTitle?: string;
+  onBack?: () => void;
 }
 
 export const MessageView: React.FC<MessageViewProps> = ({
   messages,
   onSendMessage,
   currentUserId,
+  conversationTitle,
+  onBack,
 }) => {
   const [newMessage, setNewMessage] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -31,28 +35,46 @@ export const MessageView: React.FC<MessageViewProps> = ({
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      handleSendMessage();
-    }
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    handleSendMessage();
   };
 
   return (
-    <div className="flex flex-col h-full bg-white rounded-lg shadow-md">
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+    <div className="flex h-full min-h-0 min-w-0 flex-col bg-white shadow-md">
+      {onBack && (
+        <div className="flex min-w-0 items-center gap-3 border-b border-gray-200 px-3 py-2 md:hidden">
+          <button
+            type="button"
+            onClick={onBack}
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-gray-700 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            aria-label="Back to conversations"
+          >
+            <ArrowLeft className="h-5 w-5" aria-hidden="true" />
+          </button>
+          {conversationTitle && (
+            <h2 className="min-w-0 truncate font-semibold text-gray-900">
+              {conversationTitle}
+            </h2>
+          )}
+        </div>
+      )}
+      <div className="min-h-0 min-w-0 flex-1 space-y-4 overflow-y-auto p-3 sm:p-4">
         {messages.map(message => (
           <div
             key={message.id}
-            className={`flex ${message.sender.id === currentUserId ? 'justify-end' : 'justify-start'}`}
+            className={`flex min-w-0 ${message.sender.id === currentUserId ? 'justify-end' : 'justify-start'}`}
           >
             <div
-              className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+              className={`max-w-[85%] break-words rounded-lg px-3 py-2 sm:max-w-[75%] sm:px-4 lg:max-w-md ${
                 message.sender.id === currentUserId
                   ? 'bg-blue-500 text-white rounded-br-none'
                   : 'bg-gray-200 text-gray-800 rounded-bl-none'
               }`}
             >
-              <p className="text-sm">{message.content}</p>
+              <p className="whitespace-pre-wrap text-sm [overflow-wrap:anywhere]">
+                {message.content}
+              </p>
               <span className="text-xs opacity-75 mt-1 block">
                 {new Date(message.timestamp).toLocaleTimeString()}
               </span>
@@ -61,29 +83,27 @@ export const MessageView: React.FC<MessageViewProps> = ({
         ))}
         <div ref={messagesEndRef} />
       </div>
-      <div className="border-t border-gray-200 p-4 flex items-center">
+      <form
+        onSubmit={handleSubmit}
+        className="flex min-w-0 items-center gap-2 border-t border-gray-200 p-3 sm:p-4"
+      >
         <input
           type="text"
-          className="flex-1 border border-gray-300 rounded-full px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="min-w-0 flex-1 rounded-full border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
           placeholder="Type your message..."
+          aria-label="Type your message"
           value={newMessage}
           onChange={e => setNewMessage(e.target.value)}
-          onKeyPress={handleKeyPress}
         />
         <button
-          onClick={handleSendMessage}
-          className="ml-3 p-2 bg-blue-500 text-white rounded-full hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          type="submit"
+          disabled={!newMessage.trim()}
+          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
           aria-label="Send message"
         >
-          <Send className="h-5 w-5" />
+          <Send className="h-5 w-5" aria-hidden="true" />
         </button>
-        <button
-          className="ml-2 p-2 bg-gray-200 text-gray-600 rounded-full hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400"
-          aria-label="Attach file"
-        >
-          <Paperclip className="h-5 w-5" />
-        </button>
-      </div>
+      </form>
     </div>
   );
 };
