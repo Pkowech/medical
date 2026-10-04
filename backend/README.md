@@ -105,7 +105,7 @@ pnpm run test:cov
 
 The [backend Dockerfile](./Dockerfile) builds both services into one image. Configure the Render web service with the repository root (`.`) as its root directory and `backend/Dockerfile` as its Dockerfile path. Set the service environment variables required by the backend and Rust analytics, including `DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET`, `JWT_REFRESH_SECRET`, and `RUST_ANALYTICS_API_KEY`.
 
-Keep `ENABLE_GRPC=true`. The image starts Rust analytics first and configures the backend to call it at `127.0.0.1:50051`; do not expose port `50051` publicly. Render should route HTTP to the backend on its `PORT`. The frontend can remain on Vercel, and managed database, Redis, and file-storage services can remain external.
+Keep `ENABLE_GRPC=true`. The image starts Rust analytics first and configures the backend to call it at `127.0.0.1:50051`; do not expose port `50051` publicly. Render should route HTTP to the backend on its `PORT`. The frontend can remain on Vercel, and managed database, Redis, and file-storage services can remain external. For Google sign-in, configure `GOOGLE_CLIENT_ID` on the backend; the frontend also needs the matching Google client ID and its OAuth client secret.
 
 The Node backend uses up to 3 PostgreSQL connections by default, and Rust analytics uses up to 2. Set `DATABASE_POOL_MAX` and `RUST_ANALYTICS_DB_MAX_CONNECTIONS` to lower or raise these per-process limits according to the database plan's connection cap and the number of running instances. The maximum across this combined service is 5 connections per instance, so account for every running instance and any other app using the same database.
 

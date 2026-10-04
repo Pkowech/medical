@@ -21,6 +21,7 @@ import { apiService } from '@/features/auth/services/apiClient';
 import { topicService, Topic } from '@/features/courses/services/topicService';
 import materialService from '@/features/courses/services/materialService';
 import progressService from '@/features/learning-management/services/progressService';
+import offlineProgressSync from '@/features/learning-management/services/offlineProgressSync';
 import { Material, MaterialType } from '@/shared/types/materialInterface';
 import { usePageHeader } from '@/core/providers/HeaderContext';
 import { useCourseProgressStore } from '@/features/courses/hooks/useCourseProgressStore';
@@ -176,6 +177,7 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
   const [offlineUserId, setOfflineUserId] = useState<string>();
   const [offlineBundle, setOfflineBundle] = useState<OfflineTopicBundle>();
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isMarkingComplete, setIsMarkingComplete] = useState(false);
   const [isOffline, setIsOffline] = useState(false);
   const [materialsLoaded, setMaterialsLoaded] = useState(false);
   const [materialsMetadataComplete, setMaterialsMetadataComplete] = useState(true);
@@ -463,15 +465,30 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
     // Track material as viewed
     if (selectedMaterialId) {
       try {
-        await progressService.updateUnitProgress(
-          selectedMaterialId,
-          'completed',
-          100,
-          0,
-          `Studied material in topic ${topicId}`
-        );
+        await progressService.updateContentProgress({
+          courseId,
+          unitId,
+          topicId,
+          materialId: selectedMaterialId,
+          status: 'completed',
+          progressPercentage: 100,
+        });
       } catch (error) {
         console.error('Error tracking material progress:', error);
+        try {
+          await offlineProgressSync.addToQueue({
+            courseId,
+            unitId,
+            topicId,
+            materialId: selectedMaterialId,
+            percent: 100,
+            status: 'completed',
+          });
+          toast.info('Material progress saved offline and will sync when connected.');
+        } catch (queueError) {
+          console.error('Failed to queue material progress for sync:', queueError);
+          toast.error('Material progress could not be saved.');
+        }
       }
     }
     
@@ -483,9 +500,56 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
     toast.success(isBookmarked ? 'Removed from bookmarks' : 'Added to bookmarks');
   };
 
-  const handleMarkComplete = () => {
+  const handleMarkComplete = async () => {
+    setIsMarkingComplete(true);
+    try {
+      await progressService.updateContentProgress({
+        courseId,
+        unitId,
+        topicId,
+        status: 'completed',
+        progressPercentage: 100,
+      });
+      markLessonComplete(topicId);
+      toast.success('Topic marked as complete!');
+    } catch (error) {
+      console.error('Error saving topic completion:', error);
+      try {
+        await offlineProgressSync.addToQueue({
+          courseId,
+          unitId,
+          topicId,
+          percent: 100,
+          status: 'completed',
+        });
+        markLessonComplete(topicId);
+        toast.info('Topic completion saved offline and will sync when connected.');
+      } catch (queueError) {
+        console.error('Failed to queue topic completion for sync:', queueError);
+        toast.error('Topic completion could not be saved.');
+      }
+    } finally {
+      setIsMarkingComplete(false);
+    }
+  };
+
+  const handleTopicQuizComplete = async (result: {
+    masteryUnlocked: boolean;
+    score: number;
+  }) => {
+    if (!result.masteryUnlocked) {
+      toast.error(`You scored ${result.score}%. At least 70% is required to pass.`);
+      return;
+    }
+    await progressService.updateContentProgress({
+      courseId,
+      unitId,
+      topicId,
+      status: 'completed',
+      progressPercentage: 100,
+    });
     markLessonComplete(topicId);
-    toast.success('Topic marked as complete!');
+    toast.success(`Topic mastered with ${result.score}%`);
   };
 
   const handleGoBack = () => {
@@ -706,6 +770,17 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
             Back to Unit
           </Button>
           <div className="flex flex-col gap-2 sm:flex-row">
+            {!isCompleted && (
+              <Button
+                variant="outline"
+                onClick={() => void handleMarkComplete()}
+                disabled={isMarkingComplete}
+                className="flex items-center gap-2"
+              >
+                <CheckCircle className="w-4 h-4" />
+                {isMarkingComplete ? 'Saving…' : 'Mark topic complete'}
+              </Button>
+            )}
             {offlineBundle && offlineBundle.cacheMode !== 'session' ? (
               <Button
                 variant="outline"
@@ -751,14 +826,7 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
           setShowQuiz(false);
           router.push(`/courses/${courseId}/units/${unitId}/topics/${nextTopicId}`);
         }}
-        onComplete={(result) => {
-          if (result.masteryUnlocked) {
-            markLessonComplete(topicId);
-            toast.success(`Topic mastered with ${result.score}%`);
-          } else {
-            toast.error(`You scored ${result.score}%. At least 70% is required to pass.`);
-          }
-        }}
+        onComplete={handleTopicQuizComplete}
       />
 
       {/* Material Preview Modal */}

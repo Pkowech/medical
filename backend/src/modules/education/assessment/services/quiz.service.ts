@@ -348,6 +348,37 @@ export class QuizService {
     return questions;
   }
 
+  async getQuestionsByAssessmentId(
+    assessmentId: string,
+  ): Promise<PublicQuizQuestion[]> {
+    const quiz = await this.prisma.quiz.findFirst({
+      where: { id: assessmentId, isPublished: true },
+      include: {
+        questions: {
+          orderBy: { order: 'asc' },
+          include: {
+            question: {
+              include: {
+                options: {
+                  select: { id: true, text: true, order: true },
+                  orderBy: { order: 'asc' },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!quiz) {
+      throw new NotFoundException(
+        `Published assessment ${assessmentId} not found`,
+      );
+    }
+
+    return quiz.questions.map(({ question }) => question);
+  }
+
   @ApiOperation({ summary: 'Get questions for a topic' })
   @ApiResponse({ status: 200, description: 'Topic questions retrieved successfully' })
   async getQuestionsByTopic(topicId: string): Promise<PublicQuizQuestion[]> {

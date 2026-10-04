@@ -54,7 +54,7 @@ impl RecommendationService {
             .recommendations
             .into_iter()
             .map(|r| RecommendationItem {
-                id: r.material_id,
+                id: r.path_id,
                 title: r.title,
                 description: r.description,
                 r#type: "learning_path".to_string(),

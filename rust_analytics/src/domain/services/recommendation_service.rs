@@ -3,7 +3,9 @@ use sqlx::{Pool, Postgres};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Recommendation {
-    pub material_id: String,
+    pub path_id: String,
+    pub title: String,
+    pub description: String,
     pub score: f64,
     pub reason: String,
 }
@@ -22,7 +24,9 @@ pub async fn get_recommendations_ai(
     let out: Vec<Recommendation> = recs
         .into_iter()
         .map(|r| Recommendation {
-            material_id: r.material_id,
+            path_id: r.path_id,
+            title: r.title,
+            description: r.description,
             score: r.score,
             reason: r.reason,
         })

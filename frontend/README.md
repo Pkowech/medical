@@ -90,6 +90,11 @@ with a password manager or a cryptographically secure random generator, and
 store it only in Vercel Environment Variables. Do not commit production values
 to source files.
 
+Google sign-in also requires `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in
+the frontend's server-side environment. Configure the same `GOOGLE_CLIENT_ID`
+on the backend so it can verify ID tokens issued for that OAuth client. Keep
+the client secret and all production values out of source control.
+
 ## Learn More
 
 - [Project Documentation](../docs/)

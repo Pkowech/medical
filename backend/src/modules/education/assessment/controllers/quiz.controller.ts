@@ -43,6 +43,14 @@ export class QuizController {
     return this.quizService.getQuestionsByTopic(topicId);
   }
 
+  @Get('assessment/:assessmentId')
+  @ApiOperation({ summary: 'Get questions for a learning-path assessment' })
+  async getQuestionsByAssessment(
+    @Param('assessmentId') assessmentId: string,
+  ) {
+    return this.quizService.getQuestionsByAssessmentId(assessmentId);
+  }
+
   @Post('topic/:topicId/submit')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Submit a topic quiz' })
