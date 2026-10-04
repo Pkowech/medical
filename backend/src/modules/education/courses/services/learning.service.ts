@@ -142,18 +142,8 @@ export class LearningService {
         return;
       }
 
-      await this.prisma.learningPathProgress.create({
-        data: {
-          userId,
-          learningPathId: pathId,
-          overallProgressPercentage: 0,
-          totalTimeSpentMinutes: 0,
-          status: ProgressStatus.notStarted,
-          lastAccessedAt: new Date(),
-          moduleProgress: {},
-          phaseProgress: {},
-          milestonesAchieved: [],
-        },
+      await this.learningPathProgressService.startLearningPath(userId, {
+        learningPathId: pathId,
       });
 
       this.eventEmitter.emit('learning-path.enrolled', {
@@ -181,7 +171,7 @@ export class LearningService {
     userId: string,
     data: ProgressUpdateData,
   ): Promise<ProgressResponse> {
-    const { courseId, learningPathId, progressData, completed } = data;
+    const { courseId, learningPathId, progressData } = data;
     const progress = progressData?.percentage ?? 0;
 
     if (progress < 0 || progress > 100) {
@@ -218,17 +208,6 @@ export class LearningService {
           };
         }
 
-        this.eventEmitter.emit('course.progress.updated', {
-          userId,
-          courseId,
-          progressData: data,
-        });
-
-        this.eventEmitter.emit('learning-path.progress.updated', {
-          userId,
-          learningPathId,
-          progressData: data,
-        });
       } else if (learningPathId) {
         result = await this.updateLearningPathProgress(
           userId,
@@ -239,22 +218,6 @@ export class LearningService {
         throw new BadRequestException(
           'Either courseId or learningPathId must be provided',
         );
-      }
-
-      if (completed || progress === 100) {
-        if (courseId) {
-          this.eventEmitter.emit('course.completed', {
-            userId,
-            courseId,
-            completionData: data,
-          });
-        } else if (learningPathId) {
-          this.eventEmitter.emit('learning-path.completed', {
-            userId,
-            learningPathId,
-            completionData: data,
-          });
-        }
       }
 
       return result!;
@@ -400,56 +363,35 @@ export class LearningService {
     learningPathId: string,
     data: ProgressUpdateData,
   ): Promise<ProgressResponse> {
-    const pathProgress = await this.prisma.learningPathProgress.upsert({
-      where: { userId_learningPathId: { userId, learningPathId } },
-      update: {
-        overallProgressPercentage: data.progressData.percentage,
-        totalTimeSpentMinutes: data.progressData.timeSpent
-          ? { increment: data.progressData.timeSpent }
-          : undefined,
-        lastAccessedAt: new Date(),
-        completedAt: data.completed
-          ? data.completedAt || new Date()
-          : undefined,
-        status:
-          data.status ||
-          (data.progressData.percentage === 100
-            ? ProgressStatus.completed
-            : ProgressStatus.inProgress),
+    const moduleId = data.moduleId;
+    if (!moduleId) {
+      throw new BadRequestException(
+        'moduleId is required when updating learning-path progress; path progress is derived from its modules',
+      );
+    }
+
+    const pathProgress = await this.learningPathProgressService.updateProgress(
+      userId,
+      learningPathId,
+      {
+        moduleId,
+        phaseId: data.phaseId,
+        moduleStatus:
+          data.completed || data.progressData.percentage === 100
+            ? 'completed'
+            : 'inProgress',
+        progressPercentage: data.progressData.percentage,
+        timeSpentMinutes:
+          data.progressData.timeSpentMinutes ?? data.progressData.timeSpent,
+        score: data.progressData.score,
       },
-      create: {
-        userId,
-        learningPathId,
-        overallProgressPercentage: data.progressData.percentage,
-        totalTimeSpentMinutes: data.progressData.timeSpent || 0,
-        completedAt: data.completed
-          ? data.completedAt || new Date()
-          : undefined,
-        status:
-          data.status ||
-          (data.progressData.percentage === 100
-            ? ProgressStatus.completed
-            : ProgressStatus.inProgress),
-        lastAccessedAt: new Date(),
-        moduleProgress: {},
-        phaseProgress: {},
-        milestonesAchieved: [],
-      },
-      include: {
-        learningPath: {
-          select: {
-            title: true,
-            estimatedDurationWeeks: true,
-          },
-        },
-      },
-    });
+    );
 
     return {
       type: 'learningPath',
-      currentValue: pathProgress.overallProgressPercentage || 0,
+      currentValue: pathProgress.overallProgressPercentage,
       targetValue: 100,
-      percentageComplete: pathProgress.overallProgressPercentage || 0,
+      percentageComplete: pathProgress.overallProgressPercentage,
       data: pathProgress,
     };
   }

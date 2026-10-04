@@ -97,6 +97,16 @@ to source files.
 - [Contributing Guide](../docs/CONTRIBUTING.md)
 ## Progressive Web App and offline behavior
 
+Storage boundary: student-owned materials should remain in the student's Google
+Drive and be linked privately; Drive links store metadata in MedTrack but do not
+copy file bytes to R2. Only instructors and admins can upload files into or
+delete files from the MedTrack-managed library. The Google Drive connection is
+read-only, so users must upload personal files to Google Drive separately before
+linking them. Students may organize their own Drive links under courses in which
+they are enrolled, including units and topics; this assignment is private to the
+student and does not share the file with classmates. Only course instructors
+and admins can share materials with an enrolled class.
+
 The production service worker caches versioned Next.js static assets and selected
 same-origin public image, icon, and font files. API routes, including `/api/auth`
 and `/api/backend`, are network-only so authenticated responses and mutations are

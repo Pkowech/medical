@@ -22,6 +22,8 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { MaterialsService } from '../services/materials.service';
 import { MaterialType, User as PrismaUser, File } from '@prisma/client';
 import { JwtAuthGuard } from '#modules/auth/guards/jwt-auth.guard';
+import { RequireRole } from '#modules/auth/decorators/require-role.decorator';
+import { Role } from '#modules/auth/constants/role.constants';
 import { GetUser } from '#common/decorators/get-user.decorator';
 import { Public } from '#common/decorators/public.decorator';
 import {
@@ -47,6 +49,7 @@ export class MaterialsController {
   ) {}
 
   @Post('upload')
+  @RequireRole([Role.instructor, Role.admin])
   @UseGuards(ThrottlerGuard)
   @UseInterceptors(
     FileInterceptor('file', {
@@ -248,6 +251,7 @@ export class MaterialsController {
   }
 
   @Post('attach')
+  @RequireRole([Role.instructor, Role.admin])
   @ApiOperation({ summary: 'Attach an existing R2 library material to a new topic/unit/course (zero re-upload)' })
   @ApiBody({
     schema: {
@@ -350,15 +354,20 @@ export class MaterialsController {
   @ApiQuery({ name: 'unitId', required: false })
   @ApiQuery({ name: 'topicId', required: false })
   @ApiQuery({ name: 'type', required: false })
-  @ApiQuery({ name: 'userId', required: false })
   async findAll(
+    @GetUser() user: PrismaUser,
     @Query('courseId') courseId?: string,
     @Query('unitId') unitId?: string,
     @Query('topicId') topicId?: string,
     @Query('type') type?: MaterialType,
-    @Query('userId') userId?: string,
   ) {
-    return this.materialsService.findAll({ courseId, unitId, topicId, type, userId });
+    return this.materialsService.findAll({
+      courseId,
+      unitId,
+      topicId,
+      type,
+      userId: user.id,
+    });
   }
 
   // Moving static and prefixed routes before parameterized routes to avoid conflicts
@@ -564,13 +573,15 @@ export class MaterialsController {
 
 
   @Delete('files/:fileId')
+  @RequireRole([Role.instructor, Role.admin])
   @ApiOperation({ summary: 'Delete a file' })
-  async deleteFile(@Param('fileId') fileId: string) {
-    await this.materialsService.deleteFile(fileId);
+  async deleteFile(@Param('fileId') fileId: string, @GetUser() user: PrismaUser) {
+    await this.materialsService.deleteFile(fileId, user.id);
     return { success: true };
   }
 
   @Post('convert')
+  @RequireRole([Role.instructor, Role.admin])
   @UseInterceptors(
     FileInterceptor('file', {
       limits: { fileSize: 50 * 1024 * 1024 },

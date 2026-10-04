@@ -24,6 +24,7 @@ import {
 } from '@prisma/client';
 import { PathStructure } from '../../../../common/dto/learning.dto';
 import { LearningAnalyticsService } from '../../../ai-analytics/services/learning-analytics.service';
+import { LearningPathProgressService } from './learning-path-progress.service';
 
 @Injectable()
 export class LearningPathsService {
@@ -33,6 +34,7 @@ export class LearningPathsService {
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
     private readonly learningAnalyticsService: LearningAnalyticsService,
+    private readonly learningPathProgressService: LearningPathProgressService,
   ) {}
 
   async create(
@@ -267,18 +269,8 @@ export class LearningPathsService {
         return;
       }
 
-      await this.prisma.learningPathProgress.create({
-        data: {
-          userId,
-          learningPathId: pathId,
-          overallProgressPercentage: 0,
-          totalTimeSpentMinutes: 0,
-          status: ProgressStatus.notStarted,
-          lastAccessedAt: new Date(),
-          moduleProgress: {},
-          phaseProgress: {},
-          milestonesAchieved: [],
-        },
+      await this.learningPathProgressService.startLearningPath(userId, {
+        learningPathId: pathId,
       });
 
       this.eventEmitter.emit('learning-path.enrolled', {

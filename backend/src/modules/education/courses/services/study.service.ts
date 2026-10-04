@@ -1,6 +1,12 @@
 import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from '#infrastructure/prisma/prisma.service';
-import { Topic, StudySession, User, Progress } from '@prisma/client';
+import {
+  Topic,
+  StudySession,
+  User,
+  Progress,
+  UserActivityType,
+} from '@prisma/client';
 import { BadRequestException } from '@nestjs/common/exceptions/bad-request.exception';
 import { ProgressService } from '../services/progress.service';
 import { StudyAnalyticsService } from '#modules/ai-analytics/services/study-analytics.service';
@@ -243,6 +249,11 @@ export class StudyService {
     });
 
     if (!session) throw new NotFoundException('Study session not found');
+    if (session.endTime) {
+      return this.prisma.studySession.findUniqueOrThrow({
+        where: { id: session.id },
+      });
+    }
 
     const endTime = new Date();
     const wallDurationSeconds = Math.max(
@@ -254,30 +265,6 @@ export class StudyService {
         ? Math.min(Math.max(0, durationSeconds), wallDurationSeconds)
         : wallDurationSeconds;
     const duration = Math.round(activeDurationSeconds / 60);
-
-    if (session.topic) {
-      await this.updateTopicProgress({
-        ...session,
-        topic: session.topic,
-        activities: activities as any,
-      });
-
-      try {
-        if (session.topic.unitId) {
-          const progressUpdateDto: ProgressUpdateDto = {
-            courseId: session.topic.unit.courseId,
-            unitId: session.topic.unitId,
-            timeSpent: duration,
-          };
-          await this.progressService.updateUnitMaterialTopicProgress(
-            session.userId,
-            progressUpdateDto,
-          );
-        }
-      } catch (_error) {
-        // Non-blocking
-      }
-    }
 
     const focusScore = wallDurationSeconds > 0
       ? Math.round((activeDurationSeconds / wallDurationSeconds) * 100)
@@ -301,6 +288,41 @@ export class StudyService {
     const learningGain = isValid
       ? Math.max(0, (focusScore - 50) / 50) // Normalized 0–1 relative to 50% baseline
       : 0;
+
+    if (isValid) {
+      if (session.topic) {
+        await this.updateTopicProgress({
+          ...session,
+          topic: session.topic,
+          activities: activities as any,
+        });
+      }
+
+      if (session.topic?.unitId) {
+        const progressUpdateDto: ProgressUpdateDto = {
+          courseId: session.topic.unit.courseId,
+          unitId: session.topic.unitId,
+          timeSpent: duration,
+        };
+        await this.progressService.updateUnitMaterialTopicProgress(
+          session.userId,
+          progressUpdateDto,
+        );
+      } else {
+        await this.prisma.userActivity.create({
+          data: {
+            userId: session.userId,
+            type: UserActivityType.LEARNING,
+            description: `Completed a ${duration}-minute study session`,
+            details: {
+              sessionId: session.id,
+              topicId: session.topicId,
+              duration,
+            },
+          },
+        });
+      }
+    }
 
     return this.prisma.studySession.update({
       where: { id: sessionId },
@@ -485,36 +507,6 @@ export class StudyService {
       avgFocusScore: Math.round(avgFocusScore),
       period,
     };
-  }
-
-  private calculateCurrentStreak(dates: Date[]): number {
-    if (dates.length === 0) {
-      return 0;
-    }
-
-    // Get unique days sorted descending
-    const uniqueDays = [...new Set(dates.map((d) => d.toDateString()))].sort(
-      (a, b) => new Date(b).getTime() - new Date(a).getTime(),
-    );
-
-    let streak = 0;
-    const today = new Date().toDateString();
-
-    for (let i = 0; i < uniqueDays.length; i++) {
-      const dayDiff = Math.floor(
-        (new Date(today).getTime() - new Date(uniqueDays[i]).getTime()) /
-          (1000 * 60 * 60 * 24),
-      );
-
-      // Allow streak to increase if days are consecutive (0 = today, 1 = yesterday, etc.)
-      if (dayDiff <= i) {
-        streak++;
-      } else {
-        break;
-      }
-    }
-
-    return streak;
   }
 
   async trackActivity(

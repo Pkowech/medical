@@ -5,9 +5,11 @@ import materialService from '@/features/courses/services/materialService';
 import { courseService } from '@/features/courses/services/courseService';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import type { Course, CourseUnit, Lesson, Topic } from '@/shared/types/courseInterface';
+import type { Course, CourseEnrollment, CourseUnit, Lesson, Topic } from '@/shared/types/courseInterface';
 import { FileUp, FolderOpen, HardDrive, Link2 } from 'lucide-react';
 import DriveFolderImport from '@/features/materials/components/DriveFolderImport';
+import { usePermissions } from '@/features/auth/hooks/usePermissions';
+import { Role } from '@/shared/enums/role.enum';
 
 type ExtendedUnit = CourseUnit & { lessons?: Lesson[] };
 type ExtendedCourse = Course & { chapters?: ExtendedUnit[] };
@@ -15,10 +17,14 @@ type TopicItem = { id: string | number; title: string };
 
 export default function UploadMaterialPage() {
   const router = useRouter();
+  const { allRoles } = usePermissions();
+  const canManagePlatformLibrary = allRoles.some(
+    role => role === Role.instructor || role === Role.admin,
+  );
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [source, setSource] = useState<'upload' | 'drive' | 'folder'>('upload');
+  const [source, setSource] = useState<'upload' | 'drive' | 'folder'>('drive');
   const [driveUrl, setDriveUrl] = useState('');
   const [shareWithCourse, setShareWithCourse] = useState(false);
   
@@ -35,6 +41,16 @@ export default function UploadMaterialPage() {
   const [unitLoadError, setUnitLoadError] = useState('');
   const [driveConnected, setDriveConnected] = useState(false);
   const [isCheckingDriveConnection, setIsCheckingDriveConnection] = useState(true);
+
+  useEffect(() => {
+    setSource(canManagePlatformLibrary ? 'upload' : 'drive');
+    if (!canManagePlatformLibrary) {
+      setSelectedCourseId('');
+      setUnitId('');
+      setTopicId('');
+      setShareWithCourse(false);
+    }
+  }, [canManagePlatformLibrary]);
 
   const [type, setType] = useState('pdf');
   const [isUploading, setIsUploading] = useState(false);
@@ -57,19 +73,33 @@ export default function UploadMaterialPage() {
   useEffect(() => {
     const loadCourses = async () => {
       try {
-        const res = await courseService.getPublishedCourses({ page: 1, limit: 50 });
-        const courseItems = res.items || [];
-        setCourses(courseItems as Course[]);
+        const publishedCourses = await courseService.getPublishedCourses({ page: 1, limit: 100 });
+        if (canManagePlatformLibrary) {
+          setCourses(publishedCourses.items || []);
+        } else {
+          const [active, completed] = await Promise.all([
+            courseService.getEnrolledCourses({ status: 'active', page: 1, limit: 100 }),
+            courseService.getEnrolledCourses({ status: 'completed', page: 1, limit: 100 }),
+          ]);
+          const enrolledCourseIds = new Set(
+            [...active.items, ...completed.items]
+              .filter((enrollment: CourseEnrollment) =>
+                enrollment.status === 'active' || enrollment.status === 'completed',
+              )
+              .map(enrollment => enrollment.courseId),
+          );
+          setCourses((publishedCourses.items || []).filter(course => enrolledCourseIds.has(course.id)));
+        }
       } catch (err) {
         console.warn('Failed to load courses for upload form', err);
-        setCourseLoadError('Courses could not be loaded. You can still save this material in My Drive.');
+        setCourseLoadError('Courses could not be loaded. You can still link this material privately without a course.');
       } finally {
         setIsLoadingCourses(false);
       }
     };
 
-    loadCourses();
-  }, []);
+    void loadCourses();
+  }, [canManagePlatformLibrary]);
 
   useEffect(() => {
     let cancelled = false;
@@ -166,12 +196,17 @@ export default function UploadMaterialPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const canAssignCourse = canManagePlatformLibrary || source === 'drive';
     if (source === 'folder') return;
-    if (unitId && !selectedCourseId) {
+    if (source === 'upload' && !canManagePlatformLibrary) {
+      toast.error('Only instructors can upload files to the MedTrack library. Use Google Drive for personal files.');
+      return;
+    }
+    if (canAssignCourse && unitId && !selectedCourseId) {
       toast.error('Choose a course before assigning a unit');
       return;
     }
-    if (shareWithCourse && !selectedCourseId) {
+    if (canManagePlatformLibrary && shareWithCourse && !selectedCourseId) {
       toast.error('Choose a course before sharing with a class');
       return;
     }
@@ -187,10 +222,10 @@ export default function UploadMaterialPage() {
           url: driveUrl.trim(),
           title: title.trim(),
           description: description.trim() || undefined,
-          courseId: selectedCourseId,
-          unitId,
-          topicId: topicId || undefined,
-          shareWithCourse,
+          courseId: canAssignCourse ? selectedCourseId : undefined,
+          unitId: canAssignCourse ? unitId : undefined,
+          topicId: canAssignCourse ? topicId || undefined : undefined,
+          shareWithCourse: canManagePlatformLibrary && shareWithCourse,
         });
         toast.success('Drive material linked.');
         router.push('/study-planner/materials');
@@ -282,19 +317,23 @@ export default function UploadMaterialPage() {
 
   return (
     <div className="max-w-2xl mx-auto py-8 px-4">
-      <h1 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">Upload Material</h1>
+      <h1 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">
+        {canManagePlatformLibrary ? 'Upload Material' : 'Add Personal Study Material'}
+      </h1>
       <form onSubmit={handleSubmit} className="space-y-6 bg-white dark:bg-slate-900 p-6 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm" aria-label="Upload material form">
         <div>
           <span className="mb-2 block text-sm font-medium text-gray-700 dark:text-slate-300">Material source</span>
           <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1 dark:border-slate-700 dark:bg-slate-800" role="group" aria-label="Material source">
-            <button
-              type="button"
-              aria-pressed={source === 'upload'}
-              onClick={() => setSource('upload')}
-              className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium ${source === 'upload' ? 'bg-white text-blue-700 shadow-sm dark:bg-slate-700 dark:text-blue-300' : 'text-slate-600 dark:text-slate-300'}`}
-            >
-              <FileUp className="h-4 w-4" /> Upload to library
-            </button>
+            {canManagePlatformLibrary && (
+              <button
+                type="button"
+                aria-pressed={source === 'upload'}
+                onClick={() => setSource('upload')}
+                className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium ${source === 'upload' ? 'bg-white text-blue-700 shadow-sm dark:bg-slate-700 dark:text-blue-300' : 'text-slate-600 dark:text-slate-300'}`}
+              >
+                <FileUp className="h-4 w-4" /> Upload to library
+              </button>
+            )}
             <button
               type="button"
               aria-pressed={source === 'drive'}
@@ -315,7 +354,11 @@ export default function UploadMaterialPage() {
         </div>
 
         {source === 'folder' ? (
-          <DriveFolderImport courses={courses} isLoadingCourses={isLoadingCourses} />
+          <DriveFolderImport
+            courses={courses}
+            isLoadingCourses={isLoadingCourses}
+            allowCourseSharing={canManagePlatformLibrary}
+          />
         ) : (
           <>
         <div>
@@ -348,8 +391,12 @@ export default function UploadMaterialPage() {
         </div>
 
         <div className="bg-blue-50 dark:bg-blue-900/10 p-4 rounded-lg border border-blue-100 dark:border-blue-800/30 space-y-4">
-          <h3 className="text-sm font-semibold text-blue-800 dark:text-blue-300 uppercase tracking-wider">Placement</h3>
+          <h3 className="text-sm font-semibold text-blue-800 dark:text-blue-300 uppercase tracking-wider">
+            {canManagePlatformLibrary ? 'Placement' : source === 'drive' ? 'Private course assignment' : 'Personal storage'}
+          </h3>
           
+          {canManagePlatformLibrary || source === 'drive' ? (
+            <>
           <div>
             <label htmlFor="course-select" className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
               Course <span className="text-gray-400">(optional)</span>
@@ -361,7 +408,11 @@ export default function UploadMaterialPage() {
               aria-busy={isLoadingCourses}
               className="block w-full border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-900 dark:text-white px-3 py-2 rounded-md focus:ring-blue-500 focus:border-blue-500"
             >
-              <option value="">My Drive (not assigned to a course)</option>
+              <option value="">
+                {source === 'upload'
+                  ? 'MedTrack library (not assigned to a course)'
+                  : 'Personal Drive (not assigned to a course)'}
+              </option>
               {courses.map(c => (
                 <option key={c.id} value={c.id}>
                   {c.title || c.name}
@@ -401,6 +452,13 @@ export default function UploadMaterialPage() {
               <p className="mt-1 text-xs text-amber-700 dark:text-amber-300" role="alert">{unitLoadError}</p>
             )}
           </div>
+            </>
+          ) : (
+            <p className="text-sm text-blue-800 dark:text-blue-200">
+              Personal files stay in your Google Drive. MedTrack stores a private link only; uploading
+              to the MedTrack library and sharing with classmates is reserved for instructors.
+            </p>
+          )}
 
           {source === 'drive' && (
             <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-900 dark:bg-blue-950/30">
@@ -423,7 +481,8 @@ export default function UploadMaterialPage() {
             </div>
           )}
 
-          <div>
+          {(canManagePlatformLibrary || source === 'drive') && (
+            <div>
             <label htmlFor="topic-select" className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
               Topic / Lesson (optional)
             </label>
@@ -442,9 +501,13 @@ export default function UploadMaterialPage() {
               ))}
             </select>
             <p className="mt-1 text-xs text-gray-500 dark:text-slate-500">
-              Assign a course for course-level resources such as textbooks. Add a unit or topic for more specific material. Leave placement blank for My Drive.
+            {canManagePlatformLibrary
+              ? 'Assign a course for course-level resources such as textbooks. Add a unit or topic for more specific material. Leave placement blank for your library.'
+              : 'Choose a course you are enrolled in to organize this personal Drive link. It remains private to you and is not shared with classmates.'}
             </p>
-          </div>
+            </div>
+          )}
+          {canManagePlatformLibrary && <>
           <label className={`flex items-start gap-3 rounded-lg border p-3 ${selectedCourseId ? 'cursor-pointer border-blue-200 bg-white dark:border-blue-900 dark:bg-slate-900' : 'cursor-not-allowed border-gray-200 opacity-60 dark:border-slate-700'}`}>
             <input
               type="checkbox"
@@ -460,6 +523,12 @@ export default function UploadMaterialPage() {
               </span>
             </span>
           </label>
+          </>}
+          {!canManagePlatformLibrary && source === 'drive' && (
+            <p className="text-sm text-blue-800 dark:text-blue-200">
+              Course assignment is for your own organization only. The Drive file stays in your account, and classmates cannot access this link through MedTrack.
+            </p>
+          )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -508,7 +577,9 @@ export default function UploadMaterialPage() {
               />
             </div>
             <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-              Drive files remain in Drive; MedTrack stores a link and reads it through your connected Google account. Course-level textbooks are supported.
+              {canManagePlatformLibrary
+                ? 'Drive files remain in Drive; MedTrack stores a link and reads it through your connected Google account. Course-level textbooks are supported.'
+                : 'Your file stays in your Google Drive. MedTrack saves a private reference and reads it through your connected account; no file copy is uploaded to R2.'}
             </p>
             {!driveConnected && !isCheckingDriveConnection && (
               <button
@@ -536,7 +607,7 @@ export default function UploadMaterialPage() {
                 !title.trim() ||
                 (source === 'upload'
                 ? !file || Boolean(unitId && !selectedCourseId)
-                : !driveUrl.trim() || !selectedCourseId)
+                : !driveUrl.trim())
               }
               className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm shadow-blue-500/30"
             >

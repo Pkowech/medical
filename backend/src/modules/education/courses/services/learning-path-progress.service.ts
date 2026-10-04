@@ -4,12 +4,14 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '#infrastructure/prisma/prisma.service';
 import {
   LearningPathProgress,
   LearningPathMilestone,
   Prisma,
   ProgressStatus,
+  UserActivityType,
 } from '@prisma/client';
 import {
   LearningPathStartDto,
@@ -22,9 +24,17 @@ import {
   MilestoneAchieved,
   LearningPathAnalytics,
 } from '#common/dto/progress.dto';
+import {
+  normalizeProgressArray,
+  mapProgressByKey,
+} from '../utils/path-progress-normalizer';
+
 @Injectable()
 export class LearningPathProgressService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly eventEmitter: EventEmitter2,
+  ) {}
 
   async startLearningPath(
     userId: string,
@@ -52,29 +62,8 @@ export class LearningPathProgressService {
       );
     }
 
-    const pathStructure =
-      learningPath.pathStructure as unknown as PathStructure;
-    const phases = pathStructure.phases || [];
-    const phaseProgress: PhaseProgress[] = phases.map((phase: Phase) => ({
-      phaseId: phase.id,
-      title: phase.title,
-      status: 'notStarted',
-      progressPercentage: 0,
-      modulesCompleted: [] as string[],
-      modules: [] as { id: string; status: string }[],
-      completed: false,
-      currentModuleId: phase.modules[0]?.id,
-    }));
-
-    const moduleProgress: ModuleProgress[] = phases.flatMap((phase: Phase) =>
-      phase.modules.map((module: Module) => ({
-        moduleId: module.id,
-        phaseId: phase.id,
-        status: 'notStarted',
-        progressPercentage: 0,
-        timeSpentMinutes: 0,
-        attempts: 0,
-      })),
+    const { phaseProgress, moduleProgress } = this.createProgressStructure(
+      learningPath.pathStructure,
     );
 
     const progress = await this.prisma.learningPathProgress.create({
@@ -124,69 +113,151 @@ export class LearningPathProgressService {
       throw new NotFoundException('Learning path progress not found');
     }
 
+    const initialStructure = this.createProgressStructure(
+      progress.learningPath.pathStructure,
+    );
+    const existingModules = mapProgressByKey<ModuleProgress>(
+      progress.moduleProgress,
+      'moduleId',
+    );
+    const existingPhases = mapProgressByKey<PhaseProgress>(
+      progress.phaseProgress,
+      'phaseId',
+    );
+    progress.moduleProgress = initialStructure.moduleProgress.map((module) => ({
+      ...module,
+      ...existingModules[module.moduleId],
+    })) as unknown as Prisma.JsonArray;
+    progress.phaseProgress = initialStructure.phaseProgress.map((phase) => ({
+      ...phase,
+      ...existingPhases[phase.phaseId],
+    })) as unknown as Prisma.JsonArray;
+
     const now = new Date();
+    const wasCompleted = progress.status === ProgressStatus.completed;
     let progressChanged = false;
+    let newlyAchievedMilestones: LearningPathMilestone[] = [];
 
-    if (dto.moduleId) {
-      const moduleProgress =
-        progress.moduleProgress as unknown as ModuleProgress[];
-      const m = moduleProgress.find((x) => x.moduleId === dto.moduleId);
-      if (m) {
-        if (dto.moduleStatus) {
-          if (dto.moduleStatus === 'notStarted') {
-            m.status = 'notStarted';
-          } else if (dto.moduleStatus === 'inProgress') {
-            m.status = 'inProgress';
-          } else {
-            m.status = dto.moduleStatus;
-          }
-        }
-        if (dto.progressPercentage !== undefined) {
-          m.progressPercentage = dto.progressPercentage;
-        }
-        if (dto.timeSpentMinutes) {
-          m.timeSpentMinutes = (m.timeSpentMinutes ?? 0) + dto.timeSpentMinutes;
-          progress.totalTimeSpentMinutes += dto.timeSpentMinutes;
-        }
-        if (dto.score !== undefined) {
-          m.best_score = Math.max(m.best_score || 0, dto.score);
-        }
-        if (dto.notes) {
-          m.notes = dto.notes;
-        }
-        m.attempts = (m.attempts || 0) + 1;
-        progressChanged = true;
+    if (!dto.moduleId) {
+      throw new BadRequestException(
+        'moduleId is required when updating learning-path progress',
+      );
+    }
 
-        await this.updatePhaseProgress(
-          progress,
-          dto.phaseId || this.getPhaseIdForModule(progress, dto.moduleId),
-        );
+    const moduleProgress = normalizeProgressArray<ModuleProgress>(
+      progress.moduleProgress,
+    );
+    const m = moduleProgress.find((x) => x.moduleId === dto.moduleId);
+    if (!m) {
+      throw new NotFoundException(
+        `Module ${dto.moduleId} is not part of learning path ${learningPathId}`,
+      );
+    }
+    if (dto.phaseId && dto.phaseId !== m.phaseId) {
+      throw new BadRequestException(
+        `Module ${dto.moduleId} does not belong to phase ${dto.phaseId}`,
+      );
+    }
+    if (dto.moduleStatus) {
+      if (dto.moduleStatus === 'notStarted') {
+        m.status = 'notStarted';
+      } else if (dto.moduleStatus === 'inProgress') {
+        m.status = 'inProgress';
+      } else {
+        m.status = dto.moduleStatus;
       }
     }
+    if (dto.progressPercentage !== undefined) {
+      m.progressPercentage = dto.progressPercentage;
+    }
+    if (dto.timeSpentMinutes) {
+      m.timeSpentMinutes = (m.timeSpentMinutes ?? 0) + dto.timeSpentMinutes;
+      progress.totalTimeSpentMinutes += dto.timeSpentMinutes;
+    }
+    if (dto.score !== undefined) {
+      m.best_score = Math.max(m.best_score || 0, dto.score);
+    }
+    if (dto.notes) {
+      m.notes = dto.notes;
+    }
+    m.attempts = (m.attempts || 0) + 1;
+    progressChanged = true;
+
+    await this.updatePhaseProgress(
+      progress,
+      dto.phaseId || this.getPhaseIdForModule(progress, dto.moduleId),
+    );
 
     if (progressChanged) {
       progress.overallProgressPercentage =
         this.calculateOverallProgress(progress);
       progress.lastAccessedAt = now;
       this.updateStreak(progress);
-      await this.checkMilestoneAchievements(progress);
+      newlyAchievedMilestones =
+        await this.checkMilestoneAchievements(progress);
       this.addStudySession(progress, dto.timeSpentMinutes || 0, dto.moduleId);
+      if (progress.overallProgressPercentage >= 100) {
+        progress.overallProgressPercentage = 100;
+        progress.status = ProgressStatus.completed;
+        progress.completedAt ??= now;
+      } else {
+        progress.status = ProgressStatus.inProgress;
+        progress.completedAt = null;
+      }
     }
 
-    return this.prisma.learningPathProgress.update({
-      where: { id: progress.id },
-      data: {
-        overallProgressPercentage: progress.overallProgressPercentage,
-        lastAccessedAt: progress.lastAccessedAt,
-        moduleProgress: progress.moduleProgress || Prisma.DbNull,
-        phaseProgress: progress.phaseProgress || Prisma.DbNull,
-        totalTimeSpentMinutes: progress.totalTimeSpentMinutes,
-        streakDays: progress.streakDays,
-        lastActivityDate: progress.lastActivityDate,
-        milestonesAchieved: progress.milestonesAchieved || Prisma.DbNull,
-        analytics: progress.analytics || Prisma.DbNull,
-      },
+    const updatedProgress = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.learningPathProgress.update({
+        where: { id: progress.id },
+        data: {
+          overallProgressPercentage: progress.overallProgressPercentage,
+          status: progress.status,
+          completedAt: progress.completedAt,
+          lastAccessedAt: progress.lastAccessedAt,
+          moduleProgress: progress.moduleProgress || Prisma.DbNull,
+          phaseProgress: progress.phaseProgress || Prisma.DbNull,
+          totalTimeSpentMinutes: progress.totalTimeSpentMinutes,
+          streakDays: progress.streakDays,
+          lastActivityDate: progress.lastActivityDate,
+          milestonesAchieved: progress.milestonesAchieved || Prisma.DbNull,
+          analytics: progress.analytics || Prisma.DbNull,
+        },
+      });
+      await tx.userActivity.create({
+        data: {
+          userId,
+          type: UserActivityType.LEARNING,
+          description: `Studied learning path module: ${dto.moduleId}`,
+          details: {
+            learningPathId,
+            moduleId: dto.moduleId,
+            progressPercentage: progress.overallProgressPercentage,
+            timeSpentMinutes: dto.timeSpentMinutes ?? 0,
+          },
+        },
+      });
+      return updated;
     });
+    for (const milestone of newlyAchievedMilestones) {
+      this.eventEmitter.emit('integration.milestone-achieved', {
+        userId,
+        pathId: learningPathId,
+        milestoneId: milestone.id,
+        achievedAt: now,
+      });
+    }
+    if (!wasCompleted && updatedProgress.status === ProgressStatus.completed) {
+      this.eventEmitter.emit('learning-path.completed', {
+        userId,
+        learningPathId,
+        completionData: {
+          progressPercentage: updatedProgress.overallProgressPercentage,
+          status: updatedProgress.status,
+          completedAt: updatedProgress.completedAt,
+        },
+      });
+    }
+    return updatedProgress;
   }
 
   async getProgress(
@@ -203,6 +274,36 @@ export class LearningPathProgressService {
     return progress;
   }
 
+  private createProgressStructure(pathStructure: unknown): {
+    phaseProgress: PhaseProgress[];
+    moduleProgress: ModuleProgress[];
+  } {
+    const phases =
+      (pathStructure as PathStructure | null)?.phases ?? [];
+    return {
+      phaseProgress: phases.map((phase: Phase) => ({
+        phaseId: phase.id,
+        title: phase.title,
+        status: 'notStarted',
+        progressPercentage: 0,
+        modulesCompleted: [],
+        modules: [],
+        completed: false,
+        currentModuleId: phase.modules[0]?.id,
+      })),
+      moduleProgress: phases.flatMap((phase: Phase) =>
+        phase.modules.map((module: Module) => ({
+          moduleId: module.id,
+          phaseId: phase.id,
+          status: 'notStarted',
+          progressPercentage: 0,
+          timeSpentMinutes: 0,
+          attempts: 0,
+        })),
+      ),
+    };
+  }
+
   async getUserProgress(userId: string): Promise<LearningPathProgress[]> {
     return this.prisma.learningPathProgress.findMany({
       where: { userId },
@@ -217,15 +318,17 @@ export class LearningPathProgressService {
   ): Promise<any> {
     const progress = await this.getProgress(userId, learningPathId);
 
-    const moduleProgressArray =
-      progress.moduleProgress as unknown as ModuleProgress[];
+    const moduleProgressArray = normalizeProgressArray<ModuleProgress>(
+      progress.moduleProgress,
+    );
     const totalModules = moduleProgressArray.length;
     const completedModules = moduleProgressArray.filter(
       (m) => m.status === 'completed',
     ).length;
 
-    const phaseProgressArray =
-      progress.phaseProgress as unknown as PhaseProgress[];
+    const phaseProgressArray = normalizeProgressArray<PhaseProgress>(
+      progress.phaseProgress,
+    );
     const totalPhases = phaseProgressArray.length;
     const completedPhases = phaseProgressArray.filter(
       (p) => p.status === 'completed',
@@ -306,16 +409,21 @@ export class LearningPathProgressService {
     if (!phaseId) {
       return;
     }
-    const phaseProgress = progress.phaseProgress as unknown as PhaseProgress[];
-    const phase = phaseProgress.find((p) => p.phaseId === phaseId);
+    const phaseProgress = normalizeProgressArray<PhaseProgress>(
+      progress.phaseProgress,
+    );
+    const phase = phaseProgress.find((p: PhaseProgress) => p.phaseId === phaseId);
     if (!phase) {
-      return;
+     return;
     }
 
-    const moduleProgress =
-      progress.moduleProgress as unknown as ModuleProgress[];
-    const inPhase = moduleProgress.filter((m) => m.phaseId === phaseId);
-    const completed = inPhase.filter((m) => m.status === 'completed');
+    const moduleProgress = normalizeProgressArray<ModuleProgress>(
+      progress.moduleProgress,
+    );
+    const inPhase = moduleProgress.filter(
+     (m: ModuleProgress) => m.phaseId === phaseId,
+    );
+    const completed = inPhase.filter((m: ModuleProgress) => m.status === 'completed');
     const total = inPhase.length;
 
     phase.progressPercentage = total > 0 ? (completed.length / total) * 100 : 0;
@@ -336,14 +444,15 @@ export class LearningPathProgressService {
   }
 
   private calculateOverallProgress(progress: LearningPathProgress): number {
-    const moduleProgress =
-      progress.moduleProgress as unknown as ModuleProgress[];
+    const moduleProgress = normalizeProgressArray<ModuleProgress>(
+      progress.moduleProgress,
+    );
     const total = moduleProgress.length;
     if (total === 0) {
       return 0;
     }
     const sum = moduleProgress.reduce(
-      (s, m) => s + (m.progressPercentage || 0),
+      (s: number, m: ModuleProgress) => s + (m.progressPercentage || 0),
       0,
     );
     return Math.round(sum / total);
@@ -362,6 +471,8 @@ export class LearningPathProgressService {
     );
     if (daysDiff === 1) {
       progress.streakDays = (progress.streakDays || 0) + 1;
+    } else if (daysDiff === 0) {
+      progress.streakDays = Math.max(progress.streakDays || 0, 1);
     } else if (daysDiff > 1) {
       progress.streakDays = 1;
     }
@@ -370,13 +481,15 @@ export class LearningPathProgressService {
 
   private async checkMilestoneAchievements(
     progress: LearningPathProgress,
-  ): Promise<void> {
+  ): Promise<LearningPathMilestone[]> {
     const milestones = await this.prisma.learningPathMilestone.findMany({
       where: { learningPathId: progress.learningPathId, status: 'active' },
     });
 
-    const milestonesAchieved =
-      progress.milestonesAchieved as unknown as MilestoneAchieved[];
+    const milestonesAchieved = normalizeProgressArray<MilestoneAchieved>(
+      progress.milestonesAchieved,
+    );
+    const newlyAchieved: LearningPathMilestone[] = [];
 
     for (const milestone of milestones) {
       const already = milestonesAchieved.some(
@@ -392,8 +505,12 @@ export class LearningPathProgressService {
           achieved_at: new Date(),
           notes: `Milestone achieved: ${milestone.title}`,
         });
+        newlyAchieved.push(milestone);
       }
     }
+    progress.milestonesAchieved =
+      milestonesAchieved as unknown as Prisma.JsonArray;
+    return newlyAchieved;
   }
 
   private evaluateMilestoneCriteria(
@@ -407,8 +524,8 @@ export class LearningPathProgressService {
 
     switch (c['type']) {
       case 'phase_completion':
-        return (p.phaseProgress as unknown as PhaseProgress[]).some(
-          (x) =>
+        return normalizeProgressArray<PhaseProgress>(p.phaseProgress).some(
+          (x: PhaseProgress) =>
             x.phaseId === (c['conditions'] as Prisma.JsonObject)['phase_id'] &&
             x.status === 'completed',
         );
@@ -508,9 +625,24 @@ export class LearningPathProgressService {
     const enrollmentCount = await this.prisma.learningPathProgress.count({
       where: { learningPathId },
     });
+    const learningPath = await this.prisma.learningPath.findUnique({
+      where: { id: learningPathId },
+      select: { analytics: true },
+    });
+    if (!learningPath) {
+      throw new NotFoundException('Learning path not found');
+    }
+    const analytics =
+      learningPath.analytics &&
+      typeof learningPath.analytics === 'object' &&
+      !Array.isArray(learningPath.analytics)
+        ? (learningPath.analytics as Prisma.JsonObject)
+        : {};
     await this.prisma.learningPath.update({
       where: { id: learningPathId },
-      data: { analytics: { update: { total_enrollments: enrollmentCount } } },
+      data: {
+        analytics: { ...analytics, total_enrollments: enrollmentCount },
+      },
     });
   }
 
@@ -546,14 +678,27 @@ export class LearningPathProgressService {
       avgWeeks = totalWeeks / completedProgresses.length;
     }
 
+    const learningPath = await this.prisma.learningPath.findUnique({
+      where: { id: learningPathId },
+      select: { analytics: true },
+    });
+    if (!learningPath) {
+      throw new NotFoundException('Learning path not found');
+    }
+    const analytics =
+      learningPath.analytics &&
+      typeof learningPath.analytics === 'object' &&
+      !Array.isArray(learningPath.analytics)
+        ? (learningPath.analytics as Prisma.JsonObject)
+        : {};
+
     await this.prisma.learningPath.update({
       where: { id: learningPathId },
       data: {
         analytics: {
-          update: {
-            completion_rate: completionRate,
-            average_completion_time_weeks: avgWeeks,
-          },
+          ...analytics,
+          completion_rate: completionRate,
+          average_completion_time_weeks: avgWeeks,
         },
       },
     });

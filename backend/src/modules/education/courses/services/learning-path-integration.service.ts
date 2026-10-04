@@ -35,6 +35,10 @@ import {
   ExtendedMilestone,
 } from '#common/dto';
 import { LearningPathRecommendationsService } from '../../../ai-analytics/services/learning-path-recommendations.service';
+import {
+  mapProgressByKey,
+  normalizeProgressArray,
+} from '../utils/path-progress-normalizer';
 
 @Injectable()
 export class LearningPathIntegrationService {
@@ -63,13 +67,6 @@ export class LearningPathIntegrationService {
         courseId,
       );
 
-      if (pathProgresses.length === 0) {
-        this.logger.debug(
-          `No learning paths found containing course ${courseId} for user ${userId}`,
-        );
-        return;
-      }
-
       const syncPromises = [
         ...pathProgresses.map((pathProgress) =>
           this.updatePathProgressFromCourse(
@@ -81,7 +78,7 @@ export class LearningPathIntegrationService {
         this.updateGoalsFromCourseProgress(userId, courseId, progressData),
       ];
 
-      await Promise.allSettled(syncPromises);
+      await Promise.all(syncPromises);
 
       this.eventEmitter.emit('integration.course-progress-synced', {
         userId,
@@ -123,13 +120,6 @@ export class LearningPathIntegrationService {
         assessmentId,
       );
 
-      if (pathProgresses.length === 0) {
-        this.logger.debug(
-          `No learning paths found containing assessment ${assessmentId} for user ${userId}`,
-        );
-        return;
-      }
-
       const syncPromises = [
         ...pathProgresses.map((pathProgress) =>
           this.updatePathProgressFromAssessment(
@@ -145,9 +135,11 @@ export class LearningPathIntegrationService {
         ),
       ];
 
-      await Promise.allSettled(syncPromises);
+      await Promise.all(syncPromises);
 
-      await this.checkAndUpdateMilestones(pathProgresses);
+      if (pathProgresses.length > 0) {
+        await this.checkAndUpdateMilestones(pathProgresses);
+      }
 
       this.eventEmitter.emit('integration.assessment-synced', {
         userId,
@@ -189,13 +181,6 @@ export class LearningPathIntegrationService {
         caseId,
       );
 
-      if (pathProgresses.length === 0) {
-        this.logger.debug(
-          `No learning paths found containing clinical case ${caseId} for user ${userId}`,
-        );
-        return;
-      }
-
       const syncPromises = [
         ...pathProgresses.map((pathProgress) =>
           this.updatePathProgressFromClinicalCase(
@@ -207,9 +192,11 @@ export class LearningPathIntegrationService {
         this.updateGoalsFromClinicalCaseCompletion(userId, caseId, attemptData),
       ];
 
-      await Promise.allSettled(syncPromises);
+      await Promise.all(syncPromises);
 
-      await this.checkPhaseCompletion(pathProgresses);
+      if (pathProgresses.length > 0) {
+        await this.checkPhaseCompletion(pathProgresses);
+      }
 
       this.eventEmitter.emit('integration.clinical-case-synced', {
         userId,
@@ -366,17 +353,8 @@ export class LearningPathIntegrationService {
             );
             goalIds.push(goalId);
 
-            // Create ScheduleEvent for this milestone
-            const targetDate = this.calculateMilestoneTargetDate(
-              pathProgress,
-              milestone,
-            );
-            await this.createMilestoneScheduleEvent(
-              userId,
-              milestone,
-              pathProgress.learningPath.title,
-              targetDate,
-            );
+            // Scheduling is handled by the canonical goal event pipeline to avoid duplicate
+            // goal/milestone schedule entries for the same user and milestone.
           } catch (goalError) {
             this.logger.warn(
               `Failed to create goal for milestone ${milestone.id}:`,
@@ -410,6 +388,34 @@ export class LearningPathIntegrationService {
         `Failed to create goals from milestones: ${getErrorMessage(error)}`,
       );
     }
+  }
+
+  async syncMilestoneAchievement(
+    userId: string,
+    milestoneId: string,
+  ): Promise<void> {
+    const goals = await this.prisma.learningGoal.findMany({
+      where: {
+        userId,
+        metadata: {
+          path: ['milestoneId'],
+          equals: milestoneId,
+        },
+      },
+      select: { id: true, status: true },
+    });
+
+    await Promise.all(
+      goals
+        .filter((goal) => goal.status !== GoalStatus.completed)
+        .map((goal) =>
+          this.goalsService.update(
+            goal.id,
+            { status: GoalStatus.completed },
+            userId,
+          ),
+        ),
+    );
   }
 
   private async createMilestoneScheduleEvent(
@@ -1264,6 +1270,25 @@ export class LearningPathIntegrationService {
     }
   }
 
+  private toModuleProgressMap(
+    moduleProgress: unknown,
+  ): Record<string, ModuleProgress> {
+    return mapProgressByKey<ModuleProgress>(moduleProgress, 'moduleId');
+  }
+
+  private toPhaseProgressMap(
+    phaseProgress: unknown,
+  ): Record<string, Record<string, any>> {
+    const values = normalizeProgressArray<Record<string, any>>(phaseProgress);
+    return values.reduce((acc, progress) => {
+      const phaseId = progress?.phaseId ?? progress?.id;
+      if (phaseId !== undefined && phaseId !== null && phaseId !== '') {
+        acc[String(phaseId)] = progress;
+      }
+      return acc;
+    }, {} as Record<string, Record<string, any>>);
+  }
+
   private async checkPhaseCompletion(
     pathProgresses: PathProgressWithLearningPath[],
   ): Promise<void> {
@@ -1274,14 +1299,15 @@ export class LearningPathIntegrationService {
           continue;
         }
 
-        const phaseProgresses = pathProgress.phaseProgress || {};
+        const phaseProgresses = this.toPhaseProgressMap(pathProgress.phaseProgress);
+        const moduleProgresses = this.toModuleProgressMap(pathProgress.moduleProgress);
 
         for (const phase of pathStructure.phases) {
           const phaseProgress = phaseProgresses[phase.id];
           if (!phaseProgress?.completed) {
             const isPhaseCompleted = this.checkIfPhaseCompleted(
               phase,
-              pathProgress.moduleProgress || {},
+              moduleProgresses,
             );
 
             if (isPhaseCompleted) {
@@ -1312,8 +1338,10 @@ export class LearningPathIntegrationService {
   private getCompletedModulesCount(
     pathProgress: PathProgressWithMilestones,
   ): number {
-    const moduleProgress = pathProgress.moduleProgress || {};
-    return Object.values(moduleProgress).filter(
+    const moduleProgress = normalizeProgressArray<ModuleProgress>(
+      pathProgress.moduleProgress,
+    );
+    return moduleProgress.filter(
       (progress: ModuleProgress) => progress.status === 'completed',
     ).length;
   }

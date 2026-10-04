@@ -5,12 +5,92 @@ import { getErrorMessage, getErrorStack } from '#common/utils/error.utils';
 import { LearningPathIntegrationService } from './learning-path-integration.service';
 import { ProgressData } from '#common/dto';
 import { Prisma } from '@prisma/client';
+import { PrismaService } from '#infrastructure/prisma/prisma.service';
 
 @Injectable()
 export class LearningPathEventsService {
   private readonly logger = new Logger(LearningPathEventsService.name);
 
-  constructor(private integrationService: LearningPathIntegrationService) {}
+  constructor(
+    private readonly integrationService: LearningPathIntegrationService,
+    private readonly prisma: PrismaService,
+  ) {}
+
+  private async resolveGoalScheduleEvent(
+    userId: string,
+    goalId: string,
+  ) {
+    return this.prisma.scheduleEvent.findFirst({
+      where: {
+        userId,
+        metadata: {
+          path: ['goalId'],
+          equals: goalId,
+        },
+      },
+    });
+  }
+
+  private async resolveMilestoneScheduleEvent(
+    userId: string,
+    milestoneId: string,
+  ) {
+    return this.prisma.scheduleEvent.findFirst({
+      where: {
+        userId,
+        metadata: {
+          path: ['milestoneId'],
+          equals: milestoneId,
+        },
+      },
+    });
+  }
+
+  private async createGoalScheduleEvent(
+    userId: string,
+    goalId: string,
+    title: string,
+    targetDate?: Date | string | null,
+    metadata?: Prisma.JsonObject | null,
+  ): Promise<void> {
+    if (!targetDate) {
+      return;
+    }
+
+    const existing = await this.resolveGoalScheduleEvent(userId, goalId);
+    if (existing) {
+      return;
+    }
+
+    const eventDate = new Date(targetDate);
+    const startDate = new Date(eventDate);
+    startDate.setHours(9, 0, 0, 0);
+    const endDate = new Date(eventDate);
+    endDate.setHours(10, 0, 0, 0);
+
+    const milestoneId = metadata?.milestoneId as string | undefined;
+    const learningPathId = metadata?.learningPathId as string | undefined;
+
+    await this.prisma.scheduleEvent.create({
+      data: {
+        userId,
+        title: `Goal: ${title}`,
+        description: `Target date for goal: ${title}`,
+        date: startDate,
+        endDate,
+        type: milestoneId ? 'milestone' : 'goal',
+        status: 'pending',
+        category: 'academic',
+        metadata: {
+          goalId,
+          createdFromGoal: true,
+          goalTitle: title,
+          ...(milestoneId ? { milestoneId, learningPathMilestone: true } : {}),
+          ...(learningPathId ? { learningPathId } : {}),
+        },
+      },
+    });
+  }
 
   @OnEvent('course.progress.updated')
   async handleCourseProgressUpdated(payload: {
@@ -103,7 +183,7 @@ export class LearningPathEventsService {
       await this.integrationService.syncAssessmentResults(
         payload.userId,
         payload.assessmentId,
-        payload.attemptData as ProgressData,
+        payload.attemptData,
       );
     } catch (error) {
       this.logger.error(
@@ -127,7 +207,7 @@ export class LearningPathEventsService {
       await this.integrationService.syncClinicalCaseCompletion(
         payload.userId,
         payload.caseId,
-        payload.attemptData as ProgressData,
+        payload.attemptData,
       );
     } catch (error) {
       this.logger.error(
@@ -160,19 +240,71 @@ export class LearningPathEventsService {
     }
   }
 
-  @OnEvent('learning-path.milestone.achieved')
-  handleMilestoneAchieved(payload: {
+  @OnEvent('learning-goal.created')
+  async handleGoalCreated(payload: {
+    userId: string;
+    goalId: string;
+    data: {
+      title: string;
+      targetDate?: Date | string | null;
+      metadata?: Prisma.JsonObject | null;
+    };
+  }) {
+    this.logger.log(
+      `Handling goal creation for user ${payload.userId}, goal ${payload.goalId}`,
+    );
+
+    try {
+      await this.createGoalScheduleEvent(
+        payload.userId,
+        payload.goalId,
+        payload.data.title,
+        payload.data.targetDate,
+        payload.data.metadata ?? null,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Error handling goal creation: ${getErrorMessage(error)}`,
+        getErrorStack(error),
+      );
+    }
+  }
+
+  @OnEvent('integration.milestone-achieved')
+  async handleMilestoneAchieved(payload: {
     userId: string;
     pathId: string;
     milestoneId: string;
-    achievementData: Prisma.JsonObject;
+    achievedAt?: Date;
   }) {
     this.logger.log(
       `Handling milestone achievement for user ${payload.userId}, milestone ${payload.milestoneId}`,
     );
 
     try {
-      // Implementation depends on specific business logic
+      await this.integrationService.syncMilestoneAchievement(
+        payload.userId,
+        payload.milestoneId,
+      );
+
+      const milestoneEvent = await this.resolveMilestoneScheduleEvent(
+        payload.userId,
+        payload.milestoneId,
+      );
+
+      if (milestoneEvent) {
+        await this.prisma.scheduleEvent.update({
+          where: { id: milestoneEvent.id },
+          data: {
+            completed: true,
+            status: 'completed',
+            metadata: {
+              ...(milestoneEvent.metadata as Prisma.JsonObject | null),
+              achievedAt: (payload.achievedAt ?? new Date()).toISOString(),
+            },
+          },
+        });
+      }
     } catch (error) {
       this.logger.error(
         `Error handling milestone achievement: ${getErrorMessage(error)}`,
@@ -182,7 +314,7 @@ export class LearningPathEventsService {
   }
 
   @OnEvent('learning-goal.completed')
-  handleGoalCompleted(payload: {
+  async handleGoalCompleted(payload: {
     userId: string;
     goalId: string;
     completionData: Prisma.JsonObject;
@@ -192,7 +324,33 @@ export class LearningPathEventsService {
     );
 
     try {
-      // Implementation depends on specific business logic
+      const goal = await this.prisma.learningGoal.findUnique({
+        where: { id: payload.goalId },
+        select: { title: true, targetDate: true },
+      });
+
+      if (!goal) {
+        return;
+      }
+
+      const scheduleEvent = await this.resolveGoalScheduleEvent(
+        payload.userId,
+        payload.goalId,
+      );
+
+      if (scheduleEvent) {
+        await this.prisma.scheduleEvent.update({
+          where: { id: scheduleEvent.id },
+          data: {
+            completed: true,
+            status: 'completed',
+            metadata: {
+              ...(scheduleEvent.metadata as Prisma.JsonObject | null),
+              completedAt: (payload.completionData?.completedAt as Date | string | undefined)?.toString?.() ?? new Date().toISOString(),
+            },
+          },
+        });
+      }
     } catch (error) {
       this.logger.error(
         `Error handling goal completion: ${getErrorMessage(error)}`,

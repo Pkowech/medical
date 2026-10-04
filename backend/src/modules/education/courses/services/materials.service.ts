@@ -28,6 +28,7 @@ import {
   MaterialType,
   File,
   Prisma,
+  EnrollmentStatus,
   ProgressStatus,
   RoleName,
   MemberStatus,
@@ -447,14 +448,51 @@ export class MaterialsService {
     userId?: string;
   }): Promise<Material[]> {
     try {
+      const where: Prisma.MaterialWhereInput = {
+        courseId: options?.courseId,
+        unitId: options?.unitId,
+        topicId: options?.topicId,
+        type: options?.type,
+      };
+      if (options?.userId) {
+        const courseEnrollment = {
+          enrollments: {
+            some: {
+              userId: options.userId,
+              status: { in: [EnrollmentStatus.active, EnrollmentStatus.completed] },
+            },
+          },
+        };
+        const courseManagement = {
+          OR: [
+            { createdById: options.userId },
+            { instructors: { some: { userId: options.userId } } },
+          ],
+        };
+        where.AND = [
+          {
+            OR: [
+              { userId: options.userId },
+              { shares: { some: { userId: options.userId } } },
+              {
+                AND: [
+                  { metadata: { path: ['shareWithCourse'], not: false } },
+                  {
+                    OR: [
+                      { course: { is: courseEnrollment } },
+                      { unit: { is: { course: { is: courseEnrollment } } } },
+                      { course: { is: courseManagement } },
+                      { unit: { is: { course: { is: courseManagement } } } },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ];
+      }
       const materials = await this.prisma.material.findMany({
-        where: {
-          courseId: options?.courseId,
-          unitId: options?.unitId,
-          topicId: options?.topicId,
-          type: options?.type,
-          userId: options?.userId,
-        },
+        where,
         include: {
           unit: true,
           user: { select: { id: true, firstName: true, lastName: true } },
@@ -617,7 +655,7 @@ export class MaterialsService {
     try {
       const material = await this.prisma.material.findUnique({
         where: { id },
-        select: { userId: true },
+        select: { userId: true, fileId: true },
       });
 
       if (!material) {
@@ -630,6 +668,7 @@ export class MaterialsService {
           'You are not authorized to delete this material.',
         );
       }
+      if (material.fileId) await this.assertCanUploadToPlatformLibrary(userId);
 
       await this.prisma.material.delete({ where: { id } });
       this.logger.log('Material deleted', { materialId: id, userId });
@@ -653,6 +692,7 @@ export class MaterialsService {
     shareWithCourse = false,
   ): Promise<Material> {
     try {
+      await this.assertCanUploadToPlatformLibrary(userId);
       if (!file) {
         throw new BadRequestException('No file uploaded');
       }
@@ -682,6 +722,7 @@ export class MaterialsService {
       }
 
       await this.validateMaterialPlacement(courseId, unitId, topicId);
+      if (courseId) await this.assertCanManageCourseMaterials(courseId, userId);
       if (shareWithCourse && !courseId) {
         throw new BadRequestException('Assign a course before sharing this material with a class.');
       }
@@ -884,6 +925,7 @@ export class MaterialsService {
     description?: string;
     type?: MaterialType;
   }): Promise<Material> {
+    await this.assertCanUploadToPlatformLibrary(dto.userId);
     const source = await this.prisma.material.findUnique({
       where: { id: dto.sourceMaterialId },
       include: { file: true },
@@ -896,6 +938,9 @@ export class MaterialsService {
     }
 
     await this.validateMaterialPlacement(dto.courseId, dto.unitId, dto.topicId);
+    if (dto.courseId) {
+      await this.assertCanManageCourseMaterials(dto.courseId, dto.userId);
+    }
 
     const material = await this.prisma.material.create({
       data: {
@@ -956,6 +1001,12 @@ export class MaterialsService {
     await this.validateMaterialPlacement(courseId, unitId, topicId);
     if (dto.shareWithCourse && !courseId) {
       throw new BadRequestException('Assign a course before sharing this material with a class.');
+    }
+    if (courseId && dto.shareWithCourse) {
+      await this.assertCanUploadToPlatformLibrary(dto.userId);
+      await this.assertCanManageCourseMaterials(courseId, dto.userId);
+    } else if (courseId) {
+      await this.assertCanAssignPrivateDriveMaterial(courseId, dto.userId);
     }
     const driveFile = await this.googleDrive.getSharedDriveFile(dto.url, dto.userId);
     const mimeType = driveFile.mimeType || '';
@@ -1126,6 +1177,7 @@ export class MaterialsService {
     userId: string,
     shared: boolean,
   ): Promise<Material> {
+    await this.assertCanUploadToPlatformLibrary(userId);
     const material = await this.prisma.material.findUnique({
       where: { id: materialId },
     });
@@ -1146,9 +1198,7 @@ export class MaterialsService {
       material.topicId ?? undefined,
     );
 
-    if (material.userId !== userId) {
-      await this.assertCanManageCourseMaterials(courseId, userId);
-    }
+    await this.assertCanManageCourseMaterials(courseId, userId);
 
     const currentMetadata =
       material.metadata && typeof material.metadata === 'object' && !Array.isArray(material.metadata)
@@ -1210,6 +1260,18 @@ export class MaterialsService {
     }
   }
 
+  private async assertCanUploadToPlatformLibrary(userId: string): Promise<void> {
+    const roles = await this.prisma.userRole.findMany({
+      where: { userId },
+      select: { role: { select: { name: true } } },
+    });
+    if (!roles.some(({ role }) => role.name === RoleName.instructor || role.name === RoleName.admin)) {
+      throw new ForbiddenException(
+        'Only instructors can add or manage materials in the MedTrack library. Link personal files from Google Drive instead.',
+      );
+    }
+  }
+
   private async assertCanManageCourseMaterials(courseId: string, userId: string): Promise<void> {
     const [course, instructorAssignment, roles] = await Promise.all([
       this.prisma.course.findUnique({ where: { id: courseId }, select: { createdById: true } }),
@@ -1226,7 +1288,36 @@ export class MaterialsService {
 
     const isAdmin = roles.some(userRole => userRole.role.name === RoleName.admin);
     if (course.createdById !== userId && !instructorAssignment && !isAdmin) {
-      throw new ForbiddenException('Only this course’s instructors can attach Drive materials.');
+      throw new ForbiddenException('Only this course’s instructors can manage its materials.');
+    }
+  }
+
+  private async assertCanAssignPrivateDriveMaterial(courseId: string, userId: string): Promise<void> {
+    const [course, instructorAssignment, enrollment, roles] = await Promise.all([
+      this.prisma.course.findUnique({ where: { id: courseId }, select: { createdById: true } }),
+      this.prisma.courseInstructor.findUnique({
+        where: { courseId_userId: { courseId, userId } },
+        select: { id: true },
+      }),
+      this.prisma.courseEnrollment.findUnique({
+        where: { userId_courseId: { userId, courseId } },
+        select: { status: true },
+      }),
+      this.prisma.userRole.findMany({
+        where: { userId },
+        select: { role: { select: { name: true } } },
+      }),
+    ]);
+    if (!course) throw new NotFoundException('Course not found.');
+
+    const canManageCourse = course.createdById === userId ||
+      Boolean(instructorAssignment) ||
+      roles.some(({ role }) => role.name === RoleName.admin);
+    const isEnrolled = enrollment?.status === 'active' || enrollment?.status === 'completed';
+    if (!canManageCourse && !isEnrolled) {
+      throw new ForbiddenException(
+        'Enroll in this course before privately assigning your Google Drive material to it.',
+      );
     }
   }
 
@@ -1535,6 +1626,7 @@ export class MaterialsService {
 
   async convertToPdf(file: Express.Multer.File, userId: string) {
     try {
+      await this.assertCanUploadToPlatformLibrary(userId);
       const ext = file.originalname.split('.').pop() || '';
       if (!['ppt', 'pptx', 'odp'].includes(ext.toLowerCase())) {
         throw new BadRequestException(
@@ -1806,8 +1898,9 @@ export class MaterialsService {
     }
   }
 
-  async deleteFile(fileId: string): Promise<File> {
+  async deleteFile(fileId: string, userId: string): Promise<File> {
     try {
+      await this.assertCanUploadToPlatformLibrary(userId);
       const file = await this.prisma.file.findUnique({
         where: { id: fileId },
       });

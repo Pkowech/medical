@@ -635,6 +635,8 @@ export interface ProgressUpdateData {
   materialId?: string;
   topicId?: string;
   learningPathId?: string;
+  phaseId?: string;
+  moduleId?: string;
   progressData: ProgressData;
   completed: boolean;
   completedAt?: Date;

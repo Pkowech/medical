@@ -947,13 +947,22 @@ export class LearningAnalyticsService implements OnModuleInit {
             }),
           );
 
-          const mapped = (grpcResp.recommendations || [])
+          const mapped = (grpcResp.items || [])
             .slice(0, limit)
             .map((rec: any) => ({
-              pathId: rec.path_id || rec.id,
-              score: rec.score || 0.7,
-              reasons: rec.reasons || ['Recommended based on your profile'],
-              confidence: rec.confidence || 0.8,
+              pathId: rec.path_id || rec.id || rec.pathId,
+              score: typeof rec.score === 'number' ? rec.score : 0.7,
+              reasons: Array.isArray(rec.reasons)
+                ? rec.reasons
+                : rec.reason
+                  ? [rec.reason]
+                  : ['Recommended based on your profile'],
+              confidence:
+                typeof rec.confidence === 'number'
+                  ? rec.confidence
+                  : typeof rec.score === 'number'
+                    ? rec.score
+                    : 0.8,
             }));
 
           await this.redisService.set(
@@ -1089,12 +1098,13 @@ export class LearningAnalyticsService implements OnModuleInit {
         }),
       );
 
-      const mapped = (grpcResp.recommendations || []).map((rec: any) => ({
-        id: rec.material_id || rec.id,
-        type: rec.type || 'MATERIAL',
-        title: rec.title || 'Study Material',
-        priority: rec.priority || 'MEDIUM',
-      }));
+      const mapped = ((grpcResp?.items || grpcResp?.recommendations || []) as any[])
+        .map((rec: any) => ({
+          id: rec.material_id || rec.materialId || rec.id,
+          type: rec.type || 'MATERIAL',
+          title: rec.title || rec.recommendation || 'Study Material',
+          priority: rec.priority || 'MEDIUM',
+        }));
 
       await this.redisService.set(
         cacheKey,
@@ -1117,7 +1127,7 @@ export class LearningAnalyticsService implements OnModuleInit {
   async getTrendingPaths(
     limit: number = 5,
   ): Promise<Array<{ path_id: string; enrollments: number }>> {
-    const cacheKey = 'trending_paths:all';
+    const cacheKey = `trending_paths:${limit}`;
 
     try {
       const cached = await this.redisService.get<string>(cacheKey);

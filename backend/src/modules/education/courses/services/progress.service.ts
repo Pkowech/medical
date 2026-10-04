@@ -21,6 +21,7 @@ import { RedisService } from '#infrastructure/redis/redis.service';
 import { AiAnalyticsService } from '#modules/ai-analytics/services/ai-analytics.service';
 import { CourseAnalyticsService } from '#modules/ai-analytics/services/course-analytics.service';
 import { LearningAnalyticsService } from '#modules/ai-analytics/services/learning-analytics.service';
+import { calculateLearningStreaks } from '../utils/learning-streak';
 import {
   UserProgressDetails,
   OverallProgress,
@@ -302,6 +303,31 @@ export class ProgressService {
         topicId,
       });
 
+      if (courseId && updatedCourseProgress) {
+        const courseProgressPercentage =
+          updatedCourseProgress.progressPercentage;
+        const progressData = {
+          progressPercentage: courseProgressPercentage,
+          timeSpentMinutes: timeSpent ?? 0,
+          status: updatedCourseProgress.status,
+          completed: updatedCourseProgress.status === ProgressStatus.completed,
+          timestamp: new Date(),
+        };
+        if (progressData.completed) {
+          this.events.emit('course.completed', {
+            userId,
+            courseId,
+            completionData: progressData,
+          });
+        } else {
+          this.events.emit('course.progress.updated', {
+            userId,
+            courseId,
+            progressData,
+          });
+        }
+      }
+
       // Track analytics event (fire and forget)
       this.aiAnalyticsService
         .trackEvent(
@@ -443,6 +469,35 @@ export class ProgressService {
         occurredAt: new Date(),
       });
       await this.clearCache(userId, courseId);
+      const courseProgress = await this.calculateCourseProgress(
+        userId,
+        courseId,
+      );
+      if (courseProgress) {
+        const isCompleted = courseProgress.percentage >= 100;
+        const progressData = {
+          progressPercentage: Math.round(courseProgress.percentage),
+          timeSpentMinutes: 0,
+          status: isCompleted
+            ? ProgressStatus.completed
+            : ProgressStatus.inProgress,
+          completed: isCompleted,
+          timestamp: new Date(),
+        };
+        if (isCompleted) {
+          this.events.emit('course.completed', {
+            userId,
+            courseId,
+            completionData: progressData,
+          });
+        } else {
+          this.events.emit('course.progress.updated', {
+            userId,
+            courseId,
+            progressData,
+          });
+        }
+      }
       this.logger.log('Material marked as read successfully', {
         userId,
         materialId,
@@ -1287,19 +1342,16 @@ export class ProgressService {
     | undefined
   > {
     try {
-      // Fetch activities from last 90 days to calculate streaks
-      const recentActivities = await this.prisma.userActivity.findMany({
+      const learningActivities = await this.prisma.userActivity.findMany({
         where: {
           userId,
-          createdAt: {
-            gte: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000),
-          },
+          type: UserActivityType.LEARNING,
         },
         orderBy: { createdAt: 'desc' },
         select: { createdAt: true },
       });
 
-      if (recentActivities.length === 0) {
+      if (learningActivities.length === 0) {
         return {
           userId,
           currentStreak: 0,
@@ -1308,45 +1360,10 @@ export class ProgressService {
         };
       }
 
-      const lastActivityDate = recentActivities[0].createdAt;
-
-      // Get unique days sorted descending
-      const uniqueDays = [
-        ...new Set(recentActivities.map((a) => a.createdAt.toDateString())),
-      ].sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
-
-      // Calculate current streak
-      let currentStreak = 0;
-      const today = new Date().toDateString();
-      for (let i = 0; i < uniqueDays.length; i++) {
-        const dayDiff = Math.floor(
-          (new Date(today).getTime() - new Date(uniqueDays[i]).getTime()) /
-            (1000 * 60 * 60 * 24),
-        );
-        if (dayDiff <= i) {
-          currentStreak++;
-        } else {
-          break;
-        }
-      }
-
-      // Calculate longest streak (simple method: look for consecutive sequences)
-      let longestStreak = 1;
-      let tempStreak = 1;
-      for (let i = 1; i < uniqueDays.length; i++) {
-        const prevDate = new Date(uniqueDays[i - 1]);
-        const currDate = new Date(uniqueDays[i]);
-        const daysDiff = Math.floor(
-          (prevDate.getTime() - currDate.getTime()) / (1000 * 60 * 60 * 24),
-        );
-
-        if (daysDiff === 1) {
-          tempStreak++;
-          longestStreak = Math.max(longestStreak, tempStreak);
-        } else {
-          tempStreak = 1;
-        }
-      }
+      const lastActivityDate = learningActivities[0].createdAt;
+      const { currentStreak, longestStreak } = calculateLearningStreaks(
+        learningActivities.map((activity) => activity.createdAt),
+      );
 
       return {
         userId,

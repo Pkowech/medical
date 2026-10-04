@@ -87,23 +87,39 @@ export class LearningController {
     data: {
       courseId?: string;
       learningPathId?: string;
+      phaseId?: string;
+      moduleId?: string;
       progress: number;
       timeSpent: number;
       metadata?: Record<string, any>;
     },
     @Request() req: any,
   ) {
-    const { courseId, learningPathId, progress, timeSpent, metadata } = data;
+    const {
+      courseId,
+      learningPathId,
+      phaseId,
+      moduleId,
+      progress,
+      timeSpent,
+      metadata,
+    } = data;
+    const progressData = {
+      percentage: progress,
+      progressPercentage: progress,
+      timeSpent: timeSpent,
+      timeSpentMinutes: timeSpent,
+      completed: progress === 100,
+      timestamp: new Date(),
+    };
+
     return this.learningService.updateProgress(req.user.id, {
       userId: req.user.id,
       courseId,
       learningPathId,
-      progressData: {
-        progressPercentage: progress,
-        timeSpentMinutes: timeSpent,
-        completed: progress === 100,
-        timestamp: new Date(),
-      },
+      phaseId: phaseId ?? (typeof metadata?.phaseId === 'string' ? metadata.phaseId : undefined),
+      moduleId: moduleId ?? (typeof metadata?.moduleId === 'string' ? metadata.moduleId : undefined),
+      progressData,
       progress,
       timeSpent,
       completed: progress === 100,

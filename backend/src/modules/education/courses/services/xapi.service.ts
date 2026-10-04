@@ -5,6 +5,9 @@ import { MetricsService } from '#infrastructure/metrics/metrics.service';
 import { handleServiceError } from '#common/utils/error.utils';
 import { ProgressService } from './progress.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { UserActivityType } from '@prisma/client';
+
+type XapiRecord = Record<string, unknown>;
 
 @Injectable()
 export class XapiService {
@@ -32,7 +35,7 @@ export class XapiService {
       this.metricsService.recordXapiProcessed('success');
 
       // statement is expected to be a Tin Can/xAPI statement object
-      const verb = statement?.verb?.id || statement?.verb?.display || 'unknown';
+      const verb = this.normalizeVerb(statement?.verb);
       const actor = statement?.actor || { id: userId };
       const object = statement?.object;
       const result = statement?.result;
@@ -90,17 +93,21 @@ export class XapiService {
         }
       }
 
-      // Try to find materialId from object.id or context
-      let materialId: string | undefined;
-      if (object?.id && typeof object.id === 'string') {
-        // Object IDs may be in format '/api/materials/{id}' or 'urn:material:{id}' or similar
-        const match = object.id.match(
-          /materials\/(?<id>[0-9a-fA-F-]{36})|urn:material:(?<urn>[0-9a-fA-F-]{36})/,
-        );
-        if (match && (match.groups?.id || match.groups?.urn)) {
-          materialId = match.groups?.id || match.groups?.urn;
-        }
-      }
+      const objectId =
+        typeof object?.id === 'string' ? object.id : undefined;
+      const objectIds = objectId?.match(
+        /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi,
+      );
+      const candidateMaterialId = objectIds?.[objectIds.length - 1];
+      const material = candidateMaterialId
+        ? await this.prisma.material.findUnique({
+            where: { id: candidateMaterialId },
+            select: { id: true },
+          })
+        : null;
+      const materialId = material?.id;
+      const contextCourseId = this.getContextId(context, 'course-id');
+      const contextUnitId = this.getContextId(context, 'unit-id');
 
       let created;
       try {
@@ -135,40 +142,15 @@ export class XapiService {
         throw error;
       }
 
-      // Optional: map verbs to progress
-      if (
-        materialId &&
-        (verb.includes('view') ||
-          verb.includes('read') ||
-          verb.includes('watched'))
-      ) {
-        try {
-          // If result or context indicates percent, use that
-          const percent = result?.completion || result?.progress || undefined;
-          if (userId) {
-            if (percent && typeof percent === 'number') {
-              await this.progressService.updateUnitMaterialTopicProgress(
-                userId,
-                {
-                  materialId,
-                  status: percent >= 100 ? 'completed' : 'inProgress',
-                  progressPercentage: Math.round(percent),
-                  timeSpent: result?.timeSpent ?? 0,
-                } as any,
-              );
-            } else {
-              // Mark read if no percent but a view/read verb
-              await this.progressService.markMaterialAsRead(userId, materialId);
-            }
-          } else {
-            this.logger.warn('Skipping progress update; userId undefined');
-          }
-        } catch (err) {
-          this.logger.warn(
-            'Failed to map xAPI statement to progress',
-            (err as any)?.message || err,
-          );
-        }
+      if (userId && this.isLearningVerb(verb)) {
+        await this.recordLearningProgress({
+          userId,
+          verb,
+          materialId,
+          courseId: contextCourseId,
+          unitId: contextUnitId,
+          result,
+        });
       }
 
       // fire analytics hook
@@ -180,6 +162,174 @@ export class XapiService {
       this.metricsService.recordXapiProcessingFailure('processing_error');
       handleServiceError(error, this.logger, 'saveStatement');
     }
+  }
+
+  private normalizeVerb(verb: unknown): string {
+    if (typeof verb === 'string') {
+      return verb.split(/[/#]/).filter(Boolean).pop()?.toLowerCase() ?? '';
+    }
+    if (typeof verb !== 'object' || verb === null) {
+      return '';
+    }
+
+    const record = verb as XapiRecord;
+    const id = record['id'];
+    if (typeof id === 'string') {
+      return id.split(/[/#]/).filter(Boolean).pop()?.toLowerCase() ?? '';
+    }
+
+    const display = record['display'];
+    if (typeof display === 'object' && display !== null) {
+      const labels = display as XapiRecord;
+      const label = labels['en-US'] ?? labels['en'];
+      if (typeof label === 'string') {
+        return label.toLowerCase();
+      }
+    }
+
+    return '';
+  }
+
+  private getContextId(context: unknown, suffix: string): string | undefined {
+    const value = this.getContextValue(context, suffix);
+    return typeof value === 'string' ? value : undefined;
+  }
+
+  private getContextValue(context: unknown, suffix: string): unknown {
+    if (typeof context !== 'object' || context === null) {
+      return undefined;
+    }
+    const extensions = (context as XapiRecord)['extensions'];
+    if (typeof extensions !== 'object' || extensions === null) {
+      return undefined;
+    }
+
+    const entry = Object.entries(extensions as XapiRecord).find(
+      ([key]) => key.toLowerCase().endsWith(`/${suffix}`),
+    );
+    return entry?.[1];
+  }
+
+  private isLearningVerb(verb: string): boolean {
+    return [
+      'attempted',
+      'completed',
+      'experienced',
+      'passed',
+      'played',
+      'progressed',
+    ].includes(verb);
+  }
+
+  private async recordLearningProgress(input: {
+    userId: string;
+    verb: string;
+    materialId?: string;
+    courseId?: string;
+    unitId?: string;
+    result?: XapiRecord;
+  }): Promise<void> {
+    const { userId, verb, materialId, courseId, unitId, result } = input;
+    const material = materialId
+      ? await this.prisma.material.findUnique({
+          where: { id: materialId },
+          select: { id: true, topicId: true, unitId: true },
+        })
+      : null;
+    const resolvedUnitId = material?.unitId ?? unitId;
+    const unit = resolvedUnitId
+      ? await this.prisma.unit.findUnique({
+          where: { id: resolvedUnitId },
+          select: { id: true, courseId: true },
+        })
+      : null;
+    const resolvedCourseId = unit?.courseId ?? courseId;
+
+    if (
+      material &&
+      resolvedCourseId &&
+      ['completed', 'experienced', 'passed', 'played', 'progressed'].includes(
+        verb,
+      )
+    ) {
+      const extensions =
+        typeof result?.['extensions'] === 'object' &&
+        result['extensions'] !== null
+          ? (result['extensions'] as XapiRecord)
+          : {};
+      const progressValue = extensions[
+        Object.keys(extensions).find((key) => key.toLowerCase().endsWith('/progress')) ??
+          ''
+      ];
+      const isComplete =
+        ['completed', 'passed'].includes(verb) ||
+        result?.['completion'] === true ||
+        (typeof progressValue === 'number' && progressValue >= 100);
+
+      if (verb === 'experienced' || verb === 'played') {
+        await this.progressService.markMaterialAsRead(userId, material.id);
+        return;
+      }
+
+      const progressPercentage =
+        isComplete
+          ? 100
+          : typeof progressValue === 'number'
+            ? Math.min(100, Math.max(0, progressValue))
+            : 0;
+
+      await this.progressService.updateUnitMaterialTopicProgress(userId, {
+        courseId: resolvedCourseId,
+        unitId: resolvedUnitId,
+        materialId: material.id,
+        topicId: material.topicId ?? undefined,
+        status: isComplete ? 'completed' : 'inProgress',
+        progressPercentage,
+        timeSpent: 0,
+      });
+      return;
+    }
+
+    if (resolvedCourseId) {
+      const extensions = result?.['extensions'];
+      const progressValue = this.getContextValue(
+        { extensions },
+        'progress',
+      );
+      const numericProgress =
+        typeof progressValue === 'number'
+          ? progressValue
+          : progressValue === undefined
+            ? undefined
+            : Number(progressValue);
+      const isComplete =
+        ['completed', 'passed'].includes(verb) ||
+        result?.['completion'] === true;
+      await this.progressService.updateUnitMaterialTopicProgress(userId, {
+        courseId: resolvedCourseId,
+        status: isComplete ? 'completed' : 'inProgress',
+        progressPercentage: isComplete
+          ? 100
+          : numericProgress !== undefined && Number.isFinite(numericProgress)
+            ? Math.min(100, Math.max(0, numericProgress))
+            : 0,
+        timeSpent: 0,
+      });
+      return;
+    }
+
+    await this.prisma.userActivity.create({
+      data: {
+        userId,
+        type: UserActivityType.LEARNING,
+        description: `xAPI learning activity: ${verb}`,
+        details: {
+          source: 'xapi',
+          verb,
+          materialId,
+        },
+      },
+    });
   }
 
   // Health check: return current duplicate detection metrics

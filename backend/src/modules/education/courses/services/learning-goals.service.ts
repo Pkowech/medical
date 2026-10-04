@@ -149,7 +149,14 @@ export class LearningGoalsService {
       this.eventEmitter.emit('learning-goal.created', {
         goalId: goal.id,
         userId,
-        data: goal,
+        data: {
+          title: goal.title,
+          targetDate: goal.targetDate,
+          metadata: goal.metadata as Prisma.JsonObject | null,
+          category: goal.category,
+          type: goal.type,
+          status: goal.status,
+        },
       });
 
       await this.notificationsService.create(
