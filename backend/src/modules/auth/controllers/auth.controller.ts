@@ -27,6 +27,7 @@ import { JwtAuthGuard } from '#modules/auth/guards/jwt-auth.guard';
 import {
   RegisterDto,
   LoginDto,
+  GoogleAuthDto,
   AuthResponse,
   AuthUserDto,
   UserRolesDto,
@@ -81,6 +82,38 @@ export class AuthController {
       userAgent,
     );
     return ApiResponseDto.success(authResponse, 'User logged in successfully');
+  }
+
+  @Public()
+  @Post('google')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Sign in or sign up with Google' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    schema: {
+      allOf: [
+        { $ref: getSchemaPath(ApiResponseDto) },
+        {
+          properties: {
+            data: { $ref: getSchemaPath(AuthResponse) },
+          },
+        },
+      ],
+    },
+  })
+  async googleLogin(
+    @Body() googleAuthDto: GoogleAuthDto,
+    @Req() req: ExpressRequest,
+  ): Promise<ApiResponseDto<AuthResponse>> {
+    const authResponse = await this.authService.loginWithGoogle(
+      googleAuthDto,
+      req.ip,
+      req.headers['user-agent'],
+    );
+    return ApiResponseDto.success(
+      authResponse,
+      'User authenticated with Google successfully',
+    );
   }
 
   @Public()

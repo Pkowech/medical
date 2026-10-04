@@ -1,5 +1,5 @@
 /// Get Recommendations Use Case
-/// Retrieves learning material recommendations for a user.
+/// Retrieves personalized learning-path recommendations for a user.
 
 use crate::domain::repositories::RecommendationRepository;
 use crate::modules::analytics::recommendations::service::Recommendation as ModuleRecommendation;
@@ -16,7 +16,7 @@ pub struct GetRecommendationsRequest {
 /// Single recommendation item returned to caller
 #[derive(Debug, Clone)]
 pub struct RecommendationItem {
-    pub material_id: String,
+    pub path_id: String,
     pub score: f32,
     pub title: String,
     pub description: String,
@@ -60,10 +60,10 @@ impl GetRecommendationsUseCase {
         let proto_recs = recommendations
             .into_iter()
             .map(|rec| RecommendationItem {
-                material_id: rec.material_id,
+                path_id: rec.path_id,
                 score: rec.score as f32,
-                title: rec.reason.clone(),
-                description: String::new(),
+                title: rec.title,
+                description: rec.description,
             })
             .collect();
 

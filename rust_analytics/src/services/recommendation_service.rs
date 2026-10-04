@@ -41,8 +41,10 @@ impl RecommendationService {
 
         let repo = PostgresRecommendationRepository::new(Arc::new(self.pool.clone()));
         let use_case = GetRecommendationsUseCase::new(Arc::new(repo));
-
-        let app_req = AppGetRecommendationsRequest { user_id: user_id.clone(), limit: None };
+        let app_req = AppGetRecommendationsRequest {
+            user_id: user_id.clone(),
+            limit: None,
+        };
         let result = use_case
             .execute(app_req)
             .await
@@ -55,9 +57,9 @@ impl RecommendationService {
                 id: r.material_id,
                 title: r.title,
                 description: r.description,
-                r#type: "recommendation".to_string(),
+                r#type: "learning_path".to_string(),
                 score: r.score,
-                reason: String::new(),
+                reason: r.reason,
             })
             .collect();
 

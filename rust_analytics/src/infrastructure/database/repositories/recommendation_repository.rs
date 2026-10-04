@@ -1,5 +1,5 @@
 /// Postgres implementation of RecommendationRepository
-/// Uses recommendation tables to fetch and persist recommendation scores
+/// Provides personalized learning-path recommendations and persists explicit scores.
 
 use crate::domain::repositories::RecommendationRepository;
 use crate::modules::analytics::recommendations::service::Recommendation;
@@ -19,31 +19,16 @@ impl PostgresRecommendationRepository {
 
 #[async_trait::async_trait]
 impl RecommendationRepository for PostgresRecommendationRepository {
-    async fn get_recommendations(&self, _user_id: &str, limit: usize) -> Result<Vec<Recommendation>, AnalyticsError> {
-        let rows = sqlx::query(
-            r#"
-            SELECT r.item_id, r.score, m.title, m.description
-            FROM recommendation_scores r
-            JOIN materials m ON r.item_id = m.id
-            ORDER BY r.score DESC
-            LIMIT $1
-            "#
-        )
-        .bind(limit as i64)
-        .fetch_all(&*self.pool)
-        .await
-        .map_err(|e| AnalyticsError::DatabaseError(format!("Failed to fetch recommendations: {}", e)))?;
+    async fn get_recommendations(&self, user_id: &str, limit: usize) -> Result<Vec<Recommendation>, AnalyticsError> {
+        let recommendations =
+            crate::modules::analytics::recommendations::service::get_recommendations_ai(
+                user_id,
+                &self.pool,
+            )
+            .await
+            .map_err(AnalyticsError::DatabaseError)?;
 
-        let recs = rows
-            .into_iter()
-            .map(|row| Recommendation {
-                material_id: row.try_get("item_id").unwrap_or_default(),
-                score: row.try_get::<f64, _>("score").unwrap_or(0.0),
-                reason: row.try_get::<String, _>("title").unwrap_or_default(),
-            })
-            .collect();
-
-        Ok(recs)
+        Ok(recommendations.into_iter().take(limit).collect())
     }
 
     async fn store_recommendation_score(&self, _user_id: &str, material_id: &str, score: f64) -> Result<(), AnalyticsError> {
@@ -79,4 +64,3 @@ impl RecommendationRepository for PostgresRecommendationRepository {
         }
     }
 }
-

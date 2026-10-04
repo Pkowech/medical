@@ -18,6 +18,7 @@ export default function RegisterPage() {
   const { register, isLoading } = useAuthStore();
   const { isAuthenticated, signIn: nextAuthSignIn } = useAuth();
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [socialLoading, setSocialLoading] = useState(false);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -130,17 +131,33 @@ export default function RegisterPage() {
     }));
   };
 
-  const handleProviderSignIn = async (provider: 'google' | 'github') => {
+  const handleProviderSignIn = async () => {
+    if (!formData.acceptTerms) {
+      setFieldErrors(prev => ({
+        ...prev,
+        acceptTerms: 'Accept the Terms of Service to create an account with Google.',
+      }));
+      return;
+    }
+
+    setSocialLoading(true);
+    const secureCookie = window.location.protocol === 'https:' ? '; Secure' : '';
+    document.cookie = `google-signup-terms=1; Path=/; Max-Age=600; SameSite=Lax${secureCookie}`;
+
     try {
-      await nextAuthSignIn(provider, { callbackUrl: '/dashboard' });
+      await nextAuthSignIn('google', { callbackUrl: '/finish-setup' });
     } catch (error) {
-      console.error(`[Register] ${provider} sign-in failed:`, error);
+      document.cookie =
+        'google-signup-terms=; Path=/; Max-Age=0; SameSite=Lax';
+      console.error('[Register] Google sign-in failed:', error);
       toast({
         title: 'Unable to continue',
-        description: `Could not continue with ${provider === 'google' ? 'Google' : 'GitHub'} right now. Please try again.`,
+        description: 'Could not continue with Google right now. Please try again.',
         variant: 'destructive',
         duration: 5000,
       });
+    } finally {
+      setSocialLoading(false);
     }
   };
 
@@ -166,20 +183,12 @@ export default function RegisterPage() {
           <div className="space-y-3">
             <button
               type="button"
-              onClick={() => void handleProviderSignIn('google')}
-              className="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
+              onClick={() => void handleProviderSignIn()}
+              disabled={isLoading || socialLoading}
+              className="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
             >
               <span aria-hidden="true">G</span>
-              Google
-            </button>
-
-            <button
-              type="button"
-              onClick={() => void handleProviderSignIn('github')}
-              className="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
-            >
-              <span aria-hidden="true">GH</span>
-              GitHub
+              {socialLoading ? 'Connecting...' : 'Google'}
             </button>
           </div>
 

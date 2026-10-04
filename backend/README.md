@@ -32,6 +32,19 @@ For a comprehensive overview of the project's features, please refer to the [mai
 - **Health Checks**: @nestjs/terminus
 - **Containerization**: Docker
 
+## System architecture
+
+- **Frontend**: Next.js with TypeScript and Tailwind CSS, deployed separately
+  from the API.
+- **Backend**: NestJS with TypeScript; it serves the versioned `/v1` API and
+  owns authentication, application logic, and database access.
+- **Analytics**: Rust service, deployed alongside the backend and connected
+  privately over gRPC.
+- **Database**: PostgreSQL, accessed by the backend through Prisma and by the
+  analytics service through SQLx.
+- **Authentication**: NextAuth handles the frontend session; the backend
+  verifies Google ID tokens and issues the app's access and refresh tokens.
+
 ## 🚀 Quick Start
 
 ### Prerequisites
@@ -95,6 +108,21 @@ The [backend Dockerfile](./Dockerfile) builds both services into one image. Conf
 Keep `ENABLE_GRPC=true`. The image starts Rust analytics first and configures the backend to call it at `127.0.0.1:50051`; do not expose port `50051` publicly. Render should route HTTP to the backend on its `PORT`. The frontend can remain on Vercel, and managed database, Redis, and file-storage services can remain external.
 
 The Node backend uses up to 3 PostgreSQL connections by default, and Rust analytics uses up to 2. Set `DATABASE_POOL_MAX` and `RUST_ANALYTICS_DB_MAX_CONNECTIONS` to lower or raise these per-process limits according to the database plan's connection cap and the number of running instances. The maximum across this combined service is 5 connections per instance, so account for every running instance and any other app using the same database.
+
+### Production smoke checklist
+
+- Open the signed-out landing page and use the Features and Courses navigation
+  links; both should reach their landing-page sections without requiring login.
+- Open a protected app page while signed out; confirm it redirects to login and
+  returns to the requested page after authentication.
+- Check `GET /health` for the backend liveness response and `GET /health/full`
+  for database, Redis, memory, and disk status.
+- Confirm Google sign-in is configured in both deployments. Test existing-user
+  sign-in and new student signup with a verified Google email; new signup must
+  require accepting the Terms of Service.
+- Check the landing page and chat at 320, 375, 768, and 1280 CSS pixels. In
+  chat, verify conversation selection, the mobile back action, long messages,
+  and message sending.
 
 ### Google Shared Drive course materials
 

@@ -562,15 +562,34 @@ const progressService = {
     notes?: string,
     quizScores?: QuizScores
   ): Promise<void> {
+    await this.updateContentProgress({
+      unitId,
+      status,
+      progressPercentage: completionPercentage,
+      timeSpentMinutes,
+      notes,
+      quizScores,
+    });
+  },
+
+  async updateContentProgress(progress: {
+    courseId?: string | null;
+    unitId?: string | null;
+    topicId?: string | null;
+    materialId?: string | null;
+    status: 'notStarted' | 'inProgress' | 'completed' | 'failed';
+    progressPercentage?: number;
+    timeSpentMinutes?: number;
+    notes?: string;
+    quizScores?: QuizScores;
+  }): Promise<void> {
+    if (!progress.courseId && !progress.unitId && !progress.topicId && !progress.materialId) {
+      throw new Error('Progress updates require a course, unit, topic, or material ID.');
+    }
+
     try {
-      // Use the unified sync endpoint which accepts unit/material/topic updates
       await api.post<void>('/progress/sync', {
-        unitId,
-        status,
-        progressPercentage: completionPercentage,
-        timeSpentMinutes,
-        notes,
-        quizScores,
+        ...progress,
       }, {
         headers: {
           'X-Client-Timestamp': `${getClientTimestamp()}`, // Milliseconds for conflict resolution
@@ -582,7 +601,7 @@ const progressService = {
         console.warn('Conflict detected: server has newer progress data, skipping update');
         return; // Non-fatal - let sync queue handle it
       }
-      console.error('Error updating unit progress:', formatError(error));
+      console.error('Error updating content progress:', formatError(error));
       throw error;
     }
   },

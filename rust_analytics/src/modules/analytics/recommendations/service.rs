@@ -1,12 +1,14 @@
 use serde::{Deserialize, Serialize};
-use sqlx::{Pool, Postgres};
+use sqlx::{Pool, Postgres, Row};
 use std::collections::HashMap;
 use crate::config::AppConfig;
 use crate::observability::metrics as obs_metrics;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Recommendation {
-    pub material_id: String,
+    pub path_id: String,
+    pub title: String,
+    pub description: String,
     pub score: f64,
     pub reason: String,
 }
@@ -21,7 +23,7 @@ pub struct TrendingPath {
 pub struct UserProfile {
     #[allow(dead_code)]
     pub user_id: String,
-    pub completed_materials: usize,
+    pub completed_paths: usize,
     pub average_score: f64,
     #[allow(dead_code)]
     pub study_time_minutes: i32,
@@ -34,13 +36,22 @@ pub struct UserProfile {
 }
 
 #[derive(Debug, Clone)]
-struct MaterialScore {
-    material_id: String,
-    base_score: f64,
+struct LearningPathCandidate {
+    id: String,
+    title: String,
+    description: Option<String>,
+    difficulty: String,
+    topics: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+struct LearningPathScore {
+    path_id: String,
+    title: String,
+    description: String,
     difficulty_match: f64,
     topic_relevance: f64,
-    popularity: f64,
-    prerequisite_met: bool,
+    ability_match: f64,
 }
 
 /// Get AI-based personalized recommendations for a user
@@ -52,17 +63,17 @@ pub async fn get_recommendations_ai(
     // Step 1: Build comprehensive user profile
     let profile = build_user_profile(user_id, pool).await?;
 
-    // Step 2: Get candidate materials (not yet completed by user)
-    let candidates = get_candidate_materials(user_id, &profile, pool).await?;
+    // Step 2: Get published learning paths the user has not started.
+    let candidates = get_candidate_paths(user_id, pool).await?;
 
-    // Step 3: Score each candidate using multi-factor algorithm
-    let mut scored_materials: Vec<MaterialScore> = candidates
+    // Step 3: Score each learning path against this user's strengths, gaps, and level.
+    let mut scored_paths: Vec<LearningPathScore> = candidates
         .into_iter()
-        .map(|(id, difficulty, topics)| score_material(&id, &difficulty, &topics, &profile))
+        .map(|path| score_learning_path(path, &profile))
         .collect();
 
-    // Step 4: Sort by total score (weighted combination)
-    scored_materials.sort_by(|a, b| {
+    // Step 4: Rank by the user's personalized fit.
+    scored_paths.sort_by(|a, b| {
         let score_a = calculate_final_score(a);
         let score_b = calculate_final_score(b);
         score_b
@@ -70,15 +81,17 @@ pub async fn get_recommendations_ai(
             .unwrap_or(std::cmp::Ordering::Equal)
     });
 
-    // Step 5: Convert to recommendations with reasons
-    let recommendations: Vec<Recommendation> = scored_materials
+    // Step 5: Return actual learning path IDs and metadata to the API.
+    let recommendations: Vec<Recommendation> = scored_paths
         .into_iter()
         .take(10)
-        .map(|ms| {
-            let final_score = calculate_final_score(&ms);
-            let reason = generate_recommendation_reason(&ms, &profile);
+        .map(|path| {
+            let final_score = calculate_final_score(&path);
+            let reason = generate_recommendation_reason(&path, &profile);
             Recommendation {
-                material_id: ms.material_id,
+                path_id: path.path_id,
+                title: path.title,
+                description: path.description.unwrap_or_default(),
                 score: final_score,
                 reason,
             }
@@ -107,7 +120,7 @@ async fn build_user_profile(user_id: &str, pool: &Pool<Postgres>) -> Result<User
     .await
     .map_err(|e| format!("Failed to fetch user analytics: {}", e))?;
 
-    // Query completed learning paths count
+    // Count completed learning paths for profile metadata.
     let completed_count = sqlx::query_scalar!(
         r#"
         SELECT COUNT(*)::int as "count!"
@@ -221,7 +234,7 @@ async fn build_user_profile(user_id: &str, pool: &Pool<Postgres>) -> Result<User
 
     Ok(UserProfile {
         user_id: user_id.to_string(),
-        completed_materials: completed_count as usize,
+        completed_paths: completed_count as usize,
         average_score: avg_score,
         study_time_minutes: study_time,
         preferred_difficulty,
@@ -232,18 +245,18 @@ async fn build_user_profile(user_id: &str, pool: &Pool<Postgres>) -> Result<User
     })
 }
 
-/// Get candidate materials for recommendation
-async fn get_candidate_materials(
+/// Get published, unstarted learning paths to personalize recommendations from.
+async fn get_candidate_paths(
     user_id: &str,
-    _profile: &UserProfile,
     pool: &Pool<Postgres>,
-) -> Result<Vec<(String, String, Vec<String>)>, String> {
-    // Query learning paths not yet started by user
-    let paths = sqlx::query!(
+) -> Result<Vec<LearningPathCandidate>, String> {
+    let rows = sqlx::query(
         r#"
-        SELECT 
+        SELECT
             lp.id,
-            lp.difficulty::text as "difficulty!",
+            lp.title,
+            lp.description,
+            lp.difficulty::text AS difficulty,
             lp.path_structure
         FROM learning_paths lp
         WHERE lp.status = 'published'
@@ -252,34 +265,44 @@ async fn get_candidate_materials(
             WHERE lpp.learning_path_id = lp.id
             AND lpp.user_id = $1
         )
-        LIMIT 50
-        "#,
-        user_id
+        ORDER BY lp.title
+        LIMIT 100
+        "#
     )
+    .bind(user_id)
     .fetch_all(pool)
     .await
-    .map_err(|e| format!("Failed to fetch candidate materials: {}", e))?;
+    .map_err(|e| format!("Failed to fetch candidate learning paths: {}", e))?;
 
-    let candidates: Vec<(String, String, Vec<String>)> = paths
+    let candidates = rows
         .into_iter()
-        .map(|p| {
-            let topics = extract_topics_from_structure(&p.path_structure);
-            (p.id, p.difficulty, topics)
+        .map(|row| {
+            let title: String = row.try_get("title").unwrap_or_default();
+            let description: Option<String> = row.try_get("description").ok();
+            let path_structure: Option<serde_json::Value> =
+                row.try_get("path_structure").unwrap_or(None);
+            let mut topics = extract_topics_from_structure(&path_structure);
+            topics.push(title.clone());
+            if let Some(description) = description.as_deref() {
+                topics.push(description.to_string());
+            }
+
+            LearningPathCandidate {
+                id: row.try_get("id").unwrap_or_default(),
+                title,
+                description,
+                difficulty: row.try_get("difficulty").unwrap_or_default(),
+                topics,
+            }
         })
         .collect();
 
     Ok(candidates)
 }
 
-/// Score a material based on user profile
-fn score_material(
-    _material_id: &str,
-    difficulty: &str,
-    topics: &[String],
-    _profile: &UserProfile,
-) -> MaterialScore {
-    // Difficulty matching score (0-1)
-    let difficulty_match = match (_profile.preferred_difficulty.as_str(), difficulty) {
+/// Score a learning path using the learner's ability and demonstrated topic needs.
+fn score_learning_path(path: LearningPathCandidate, profile: &UserProfile) -> LearningPathScore {
+    let difficulty_match = match (profile.preferred_difficulty.as_str(), path.difficulty.as_str()) {
         ("beginner", "beginner") => 1.0,
         ("intermediate", "intermediate") => 1.0,
         ("advanced", "advanced") => 1.0,
@@ -289,25 +312,16 @@ fn score_material(
         _ => 0.5,
     };
 
-    // Topic relevance (based on recent activity and weaknesses)
-    let topic_relevance = calculate_topic_relevance(topics, _profile);
+    let topic_relevance = calculate_topic_relevance(&path.topics, profile);
+    let ability_match = (profile.average_score / 100.0).clamp(0.0, 1.0);
 
-    // Base score from user's general performance
-    let base_score = (_profile.average_score / 100.0).min(1.0).max(0.3);
-
-    // Popularity (simulated - in production, query from analytics)
-    let popularity = 0.7;
-
-    // Prerequisite check (simulated)
-    let prerequisite_met = _profile.completed_materials > 0;
-
-    MaterialScore {
-        material_id: _material_id.to_string(),
-        base_score,
+    LearningPathScore {
+        path_id: path.id,
+        title: path.title,
+        description: path.description,
         difficulty_match,
         topic_relevance,
-        popularity,
-        prerequisite_met,
+        ability_match,
     }
 }
 
@@ -322,13 +336,13 @@ fn calculate_topic_relevance(topics: &[String], profile: &UserProfile) -> f64 {
 
     // Higher score for topics in weaknesses (need improvement)
     for topic in topics {
-        if profile.weaknesses.iter().any(|w| w.contains(topic)) {
+        if profile.weaknesses.iter().any(|w| topics_match(w, topic)) {
             relevance += 0.9;
             matches += 1;
-        } else if profile.recent_topics.iter().any(|r| r.contains(topic)) {
+        } else if profile.recent_topics.iter().any(|r| topics_match(r, topic)) {
             relevance += 0.6;
             matches += 1;
-        } else if profile.strengths.iter().any(|s| s.contains(topic)) {
+        } else if profile.strengths.iter().any(|s| topics_match(s, topic)) {
             relevance += 0.3; // Lower priority for strengths
             matches += 1;
         }
@@ -341,47 +355,41 @@ fn calculate_topic_relevance(topics: &[String], profile: &UserProfile) -> f64 {
     }
 }
 
-/// Calculate final weighted score
-fn calculate_final_score(ms: &MaterialScore) -> f64 {
-    let mut score = 0.0;
-
-    // Weighted components
-    score += ms.base_score * 0.25; // 25% from user's general ability
-    score += ms.difficulty_match * 0.30; // 30% from difficulty matching
-    score += ms.topic_relevance * 0.35; // 35% from topic relevance
-    score += ms.popularity * 0.10; // 10% from popularity
-
-    // Penalty if prerequisites not met
-    if !ms.prerequisite_met {
-        score *= 0.7;
+fn topics_match(profile_topic: &str, path_topic: &str) -> bool {
+    let profile_topic = profile_topic.trim().to_lowercase();
+    let path_topic = path_topic.trim().to_lowercase();
+    if profile_topic.is_empty() || path_topic.is_empty() {
+        return false;
     }
+    profile_topic.contains(&path_topic) || path_topic.contains(&profile_topic)
+}
 
-    score.min(1.0)
+/// Combine user-level difficulty fit, topic relevance, and performance into one score.
+fn calculate_final_score(path: &LearningPathScore) -> f64 {
+    path.difficulty_match * 0.4
+        + path.topic_relevance * 0.5
+        + path.ability_match * 0.1
 }
 
 /// Generate human-readable reason for recommendation
-fn generate_recommendation_reason(ms: &MaterialScore, profile: &UserProfile) -> String {
+fn generate_recommendation_reason(path: &LearningPathScore, profile: &UserProfile) -> String {
     let mut reasons = Vec::new();
 
-    if ms.difficulty_match > 0.8 {
+    if path.difficulty_match > 0.8 {
         reasons.push(format!(
             "Perfect match for your {} level",
             profile.preferred_difficulty
         ));
     }
 
-    if ms.topic_relevance > 0.7 {
+    if path.topic_relevance > 0.7 {
         reasons.push("Addresses your identified learning gaps".to_string());
-    } else if ms.topic_relevance > 0.5 {
+    } else if path.topic_relevance > 0.5 {
         reasons.push("Aligns with your recent study topics".to_string());
     }
 
-    if ms.popularity > 0.8 {
-        reasons.push("Highly rated by similar learners".to_string());
-    }
-
-    if profile.average_score > 80.0 && ms.difficulty_match > 0.7 {
-        reasons.push("Recommended for high-performing learners".to_string());
+    if path.ability_match > 0.8 && path.difficulty_match > 0.7 {
+        reasons.push("Suitable for your demonstrated performance level".to_string());
     }
 
     if reasons.is_empty() {
@@ -484,7 +492,9 @@ pub async fn get_recommendations_for_gaps(
         for path in paths {
             let score = 0.95 - (idx as f64 * 0.05);
             recommendations.push(Recommendation {
-                material_id: path.id,
+                path_id: path.id,
+                title: path.title,
+                description: path.description.unwrap_or_default(),
                 score,
                 reason: format!("Directly addresses your gap in: {}", gap),
             });
@@ -523,4 +533,63 @@ pub async fn get_trending_paths(
     .map_err(|e| format!("Failed to fetch trending paths: {}", e))?;
 
     Ok(trending)
+}
+
+#[cfg(test)]
+mod personalized_path_tests {
+    use super::*;
+
+    fn profile_with_weakness(topic: &str) -> UserProfile {
+        UserProfile {
+            user_id: "learner".to_string(),
+            completed_paths: 1,
+            average_score: 75.0,
+            study_time_minutes: 120,
+            preferred_difficulty: "intermediate".to_string(),
+            learning_style: "visual".to_string(),
+            strengths: vec![],
+            weaknesses: vec![topic.to_string()],
+            recent_topics: vec![],
+        }
+    }
+
+    #[test]
+    fn prioritizes_paths_that_address_the_learners_gaps() {
+        let profile = profile_with_weakness("cardiology");
+        let gap_path = score_learning_path(
+            LearningPathCandidate {
+                id: "path-cardiology".to_string(),
+                title: "Cardiology foundations".to_string(),
+                description: Some("Core cardiac concepts".to_string()),
+                difficulty: "intermediate".to_string(),
+                topics: vec!["cardiology".to_string()],
+            },
+            &profile,
+        );
+        let unrelated_path = score_learning_path(
+            LearningPathCandidate {
+                id: "path-neurology".to_string(),
+                title: "Neurology foundations".to_string(),
+                description: None,
+                difficulty: "intermediate".to_string(),
+                topics: vec!["neurology".to_string()],
+            },
+            &profile,
+        );
+
+        assert!(calculate_final_score(&gap_path) > calculate_final_score(&unrelated_path));
+        assert_eq!(gap_path.path_id, "path-cardiology");
+        assert_eq!(gap_path.title, "Cardiology foundations");
+        assert_eq!(
+            generate_recommendation_reason(&gap_path, &profile),
+            "Perfect match for your intermediate level; Addresses your identified learning gaps"
+        );
+    }
+
+    #[test]
+    fn topic_matching_is_case_insensitive_and_rejects_empty_topics() {
+        assert!(topics_match("Cardiology", "cardiology foundations"));
+        assert!(!topics_match("", "cardiology"));
+        assert!(!topics_match("cardiology", ""));
+    }
 }

@@ -513,6 +513,22 @@ export class AuthResponse {
   }
 }
 
+export class GoogleAuthDto {
+  @ApiProperty({ description: 'Google OpenID Connect ID token' })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(4096)
+  idToken!: string;
+
+  @ApiPropertyOptional({
+    description: 'Whether the user accepted the terms before starting Google sign-up',
+    default: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  acceptTerms?: boolean;
+}
+
 // Define Login/Register DTOs LAST (no dependencies on auth response DTOs)
 export class RegisterDto {
   @ApiProperty({ description: 'User first name', example: 'John' })

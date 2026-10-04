@@ -1,7 +1,7 @@
 import { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import GoogleProvider from 'next-auth/providers/google';
-import GithubProvider from 'next-auth/providers/github';
+import { cookies } from 'next/headers';
 import {
   User,
   LoginResponsePayload,
@@ -90,6 +90,92 @@ async function refreshAccessToken(token: JWT): Promise<JWT> {
       error: 'RefreshAccessTokenError',
     };
   }
+}
+
+async function exchangeGoogleCredential(
+  idToken: string,
+  acceptTerms: boolean,
+): Promise<User> {
+  const raw =
+    process.env.BACKEND_URL ||
+    process.env.NEXT_PUBLIC_API_BASE_URL ||
+    process.env.NEXT_PUBLIC_API_URL ||
+    '';
+
+  if (!raw) {
+    throw new Error('Google sign-in is temporarily unavailable.');
+  }
+
+  let baseUrl = raw.trim();
+  if (!baseUrl.startsWith('http://') && !baseUrl.startsWith('https://')) {
+    baseUrl = `https://${baseUrl}`;
+  }
+  const baseWithoutTrailingSlash = baseUrl.replace(/\/+$/, '');
+  const apiBase = baseWithoutTrailingSlash.endsWith('/v1')
+    ? baseWithoutTrailingSlash
+    : `${baseWithoutTrailingSlash}/v1`;
+  const endpoint = new URL('auth/google', `${apiBase}/`).href;
+
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ idToken, acceptTerms }),
+    cache: 'no-store',
+  });
+  const responseData = (await response.json()) as LoginResponsePayload;
+
+  if (!response.ok) {
+    throw new Error(
+      typeof responseData.message === 'string'
+        ? responseData.message
+        : 'Google sign-in was rejected by the authentication service.',
+    );
+  }
+
+  const authData = responseData.data;
+  const authUser = authData?.user;
+  const roleData = authData?.roles;
+  const expiration = authData?.expiresAt
+    ? new Date(authData.expiresAt).getTime()
+    : Number.NaN;
+
+  if (
+    !authData ||
+    typeof authUser?.id !== 'string' ||
+    typeof authUser.email !== 'string' ||
+    typeof authData.accessToken !== 'string' ||
+    !authData.accessToken ||
+    !Number.isFinite(expiration) ||
+    typeof roleData?.role !== 'string'
+  ) {
+    throw new Error('Google sign-in returned incomplete account information.');
+  }
+
+  const role = roleData.role as Role;
+  const roles = Array.isArray(roleData.roles)
+    ? (roleData.roles.filter((value): value is Role => typeof value === 'string') as Role[])
+    : [role];
+  const permissions = Array.isArray(roleData.permissions)
+    ? (roleData.permissions.filter(
+        (value): value is Permission => typeof value === 'string',
+      ) as Permission[])
+    : [];
+
+  return {
+    id: authUser.id,
+    email: authUser.email,
+    username: typeof authUser.username === 'string' ? authUser.username : '',
+    firstName: typeof authUser.firstName === 'string' ? authUser.firstName : null,
+    lastName: typeof authUser.lastName === 'string' ? authUser.lastName : null,
+    role,
+    roles,
+    permissions,
+    isEmailVerified: authUser.isEmailVerified === true,
+    accessToken: authData.accessToken,
+    refreshToken:
+      typeof authData.refreshToken === 'string' ? authData.refreshToken : '',
+    accessTokenExpires: expiration,
+  };
 }
 
 export const authOptions: NextAuthOptions = {
@@ -311,21 +397,44 @@ export const authOptions: NextAuthOptions = {
       clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
       authorization: {
         params: {
-          prompt: 'consent',
-          access_type: 'offline',
+          prompt: 'select_account',
           response_type: 'code',
         },
       },
     }),
-
-    // GitHub Provider
-    GithubProvider({
-      clientId: process.env.GITHUB_ID || '',
-      clientSecret: process.env.GITHUB_SECRET || '',
-    }),
   ],
 
   callbacks: {
+    async signIn({ user, account }) {
+      if (account?.provider !== 'google') {
+        return true;
+      }
+
+      if (!account.id_token) {
+        return '/login?error=google-signin-failed';
+      }
+
+      const cookieStore = await cookies();
+      const acceptTerms = cookieStore.get('google-signup-terms')?.value === '1';
+
+      try {
+        const authenticatedUser = await exchangeGoogleCredential(
+          account.id_token,
+          acceptTerms,
+        );
+        Object.assign(user, authenticatedUser);
+        return true;
+      } catch (error) {
+        console.error(
+          '[NextAuth] Google account exchange failed:',
+          error instanceof Error ? error.message : 'Unknown authentication error',
+        );
+        return '/login?error=google-signin-failed';
+      } finally {
+        cookieStore.delete('google-signup-terms');
+      }
+    },
+
     async jwt({ token, user, account }): Promise<JWT> {
       if (account && user) {
         const sessionUser = user as User;

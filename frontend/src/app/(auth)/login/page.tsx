@@ -58,7 +58,7 @@ function LoginContent() {
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [socialLoading, setSocialLoading] = useState<'google' | 'github' | null>(null);
+  const [socialLoading, setSocialLoading] = useState<'google' | null>(null);
   const [formErrors, setFormErrors] = useState<FormErrors>({});
   const [formTouched, setFormTouched] = useState({
     identifier: false,
@@ -70,18 +70,18 @@ function LoginContent() {
   // Determine if identifier is an email
   const isEmail = identifier.includes('@');
 
-  const handleProviderSignIn = async (provider: 'google' | 'github') => {
+  const handleProviderSignIn = async () => {
     setError('');
     setSuccess('');
-    setSocialLoading(provider);
+    setSocialLoading('google');
 
     try {
-      await nextAuthSignIn(provider, {
+      await nextAuthSignIn('google', {
         callbackUrl: getSafeCallbackUrl(requestedCallbackUrl),
       });
     } catch (err) {
-      console.error(`[Login] ${provider} sign-in failed:`, err);
-      setError(`Could not continue with ${provider === 'google' ? 'Google' : 'GitHub'}. Please try again.`);
+      console.error('[Login] Google sign-in failed:', err);
+      setError('Could not continue with Google. Please try again.');
     } finally {
       setSocialLoading(null);
     }
@@ -113,6 +113,12 @@ function LoginContent() {
   };
 
   useEffect(() => {
+    if (searchParams.get('error') === 'google-signin-failed') {
+      setError(
+        'Google sign-in could not be completed. If you are creating an account, start from Sign up and accept the Terms of Service.'
+      );
+    }
+
     // Check if user was redirected from registration
     const registered = searchParams.get('registered');
     if (registered === 'true') {
@@ -489,22 +495,12 @@ function LoginContent() {
         <div className="space-y-3">
           <button
             type="button"
-            onClick={() => void handleProviderSignIn('google')}
+            onClick={() => void handleProviderSignIn()}
             disabled={loading || socialLoading !== null}
             className="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
           >
             <span aria-hidden="true">G</span>
             {socialLoading === 'google' ? 'Connecting...' : 'Google'}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => void handleProviderSignIn('github')}
-            disabled={loading || socialLoading !== null}
-            className="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
-          >
-            <span aria-hidden="true">GH</span>
-            {socialLoading === 'github' ? 'Connecting...' : 'GitHub'}
           </button>
         </div>
 

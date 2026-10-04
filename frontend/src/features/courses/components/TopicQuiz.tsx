@@ -55,7 +55,7 @@ interface TopicQuizProps {
     masteryUnlocked: boolean;
     nextTopicUnlocked: boolean;
     nextTopicId?: string;
-  }) => void;
+  }) => void | Promise<void>;
   onNextTopic?: (topicId: string) => void;
 }
 
@@ -235,13 +235,18 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
       setQuizCompleted(true);
 
       if (onComplete) {
-        onComplete({
-          score: result.score,
-          passed: result.passed,
-          masteryUnlocked: result.masteryUnlocked,
-          nextTopicUnlocked: result.nextTopicUnlocked,
-          nextTopicId: result.nextTopicId,
-        });
+        try {
+          await onComplete({
+            score: result.score,
+            passed: result.passed,
+            masteryUnlocked: result.masteryUnlocked,
+            nextTopicUnlocked: result.nextTopicUnlocked,
+            nextTopicId: result.nextTopicId,
+          });
+        } catch (progressError) {
+          console.error('Topic quiz was submitted, but progress sync failed:', progressError);
+          toast.error('Quiz submitted, but topic progress could not be saved.');
+        }
       }
 
       toast.success(`Quiz completed! Score: ${result.score}%`);

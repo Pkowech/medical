@@ -7,6 +7,8 @@ import type { SyncQueueItem } from '@/lib/core/offline/db';
 export type ProgressQueueItem = {
   id?: number | string;
   unitId?: string | null;
+  topicId?: string | null;
+  courseId?: string | null;
   materialId?: string | null;
   percent?: number;
   page?: number | null;
@@ -63,7 +65,7 @@ async function migrateLegacyQueue(): Promise<void> {
         lastError: legacyItem.lastError,
       };
 
-      if (legacyItem.syncStatus !== 'synced' && (legacyItem.unitId || legacyItem.materialId)) {
+      if (legacyItem.syncStatus !== 'synced' && (legacyItem.unitId || legacyItem.topicId || legacyItem.materialId)) {
         const progressItem: SyncQueueItem = {
           ...common,
           id: `legacy-progress-${id}`,
@@ -72,6 +74,8 @@ async function migrateLegacyQueue(): Promise<void> {
           headers: { 'Content-Type': 'application/json' },
           body: {
             unitId: legacyItem.unitId,
+            topicId: legacyItem.topicId,
+            courseId: legacyItem.courseId,
             materialId: legacyItem.materialId,
             status: legacyItem.status || 'inProgress',
             progressPercentage: legacyItem.percent,
@@ -151,12 +155,14 @@ export async function addToQueue(item: ProgressQueueItem): Promise<void> {
   const createdAt = item.createdAt ? new Date(item.createdAt).getTime() : Date.now();
   const commonHeaders = { 'Content-Type': 'application/json' };
 
-  if (item.unitId || item.materialId) {
+  if (item.unitId || item.topicId || item.materialId) {
     await syncService.addToOutbox(
       '/progress/sync',
       'POST',
       {
         unitId: item.unitId,
+        topicId: item.topicId,
+        courseId: item.courseId,
         materialId: item.materialId,
         status: item.status || 'inProgress',
         progressPercentage: item.percent,
@@ -189,6 +195,8 @@ export async function getAllQueueItems(): Promise<ProgressQueueItem[]> {
       return {
         id: item.id,
         unitId: typeof body?.unitId === 'string' ? body.unitId : undefined,
+        topicId: typeof body?.topicId === 'string' ? body.topicId : undefined,
+        courseId: typeof body?.courseId === 'string' ? body.courseId : undefined,
         materialId: typeof body?.materialId === 'string' ? body.materialId : undefined,
         percent: typeof body?.progressPercentage === 'number' ? body.progressPercentage : undefined,
         page: typeof body?.page === 'number' ? body.page : undefined,

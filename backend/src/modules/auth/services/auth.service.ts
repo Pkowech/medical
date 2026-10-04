@@ -4,11 +4,19 @@ import {
   BadRequestException,
   Logger,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '#infrastructure/prisma/prisma.service';
 import * as argon2 from 'argon2';
-import { CreateUserDto, LoginDto, RegisterDto } from '#common/dto/user.dto';
+import { randomBytes } from 'node:crypto';
+import { google } from 'googleapis';
+import {
+  CreateUserDto,
+  GoogleAuthDto,
+  LoginDto,
+  RegisterDto,
+} from '#common/dto/user.dto';
 import { TokenBlacklistService } from './token-blacklist.service';
 import { SecurityService } from './security.service';
 import { RefreshTokenService } from './refresh-token.service';
@@ -26,6 +34,15 @@ import { ConfigService } from '@nestjs/config';
 import { RoleLimitingService } from './role-limiting.service'; // Inject for guest rate limit
 import type { JwtPayload } from '#common/dto/security.dto';
 import { securityEventTypes } from '#common/dto/security.dto';
+
+interface GoogleIdentityPayload {
+  sub?: string;
+  email?: string;
+  email_verified?: boolean;
+  given_name?: string;
+  family_name?: string;
+  picture?: string;
+}
 
 /**
  * Authentication Service
@@ -147,17 +164,93 @@ export class AuthService {
   }
 
   /**
-   * Clears failed login attempts and unlocks account
+   * Creates the application session and records a successful authentication.
    */
-  private async clearFailedLoginAttempts(email: string): Promise<void> {
+  private async issueAuthResponse(
+    userId: string,
+    ipAddress?: string,
+    userAgent?: string,
+    deviceId?: string,
+  ): Promise<AuthResponse> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { userRoles: { include: { role: true } } },
+    });
+
+    if (!user) {
+      throw new NotFoundException('Authenticated user no longer exists');
+    }
+
+    const primaryRole = user.userRoles.reduce(
+      (highestRole: Role, userRole: any) => {
+        const currentRoleHierarchy =
+          roleHierarchy[userRole.role.name as Role];
+        const highestRoleHierarchy = roleHierarchy[highestRole];
+        return currentRoleHierarchy > highestRoleHierarchy
+          ? (userRole.role.name as Role)
+          : highestRole;
+      },
+      Role.student,
+    );
+    const allRoles = user.userRoles.map(
+      (userRole: any) => userRole.role.name as Role,
+    );
+    const permissions =
+      await this.permissionCalculationService.getEffectivePermissionsForRole(
+        primaryRole,
+      );
+    const payload: JwtPayload = {
+      sub: user.id,
+      email: user.email,
+      role: primaryRole,
+      roles: allRoles,
+      permissions,
+    };
+    const accessToken = await this.jwtService.signAsync(payload, {
+      secret: this.JWT_SECRET,
+      expiresIn: this.JWT_EXPIRES_IN as any,
+    });
+    const refreshToken = await this.refreshTokenService.createRefreshToken(
+      user.id,
+    );
+
     await this.prisma.user.update({
-      where: { email },
+      where: { id: user.id },
       data: {
+        lastLogin: new Date(),
         failedLoginAttempts: 0,
         isLocked: false,
         lockedUntil: null,
       },
     });
+    await this.auditLogService.log(
+      securityEventTypes.loginSuccess,
+      user.id,
+      ipAddress || 'unknown',
+      userAgent || 'unknown',
+      { deviceId, userRole: primaryRole },
+    );
+
+    return {
+      accessToken,
+      refreshToken,
+      expiresAt: new Date(
+        Date.now() + this.parseDurationToMilliseconds(this.JWT_EXPIRES_IN),
+      ),
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        username: user.username ?? '',
+        isEmailVerified: await this.securityService.isEmailVerified(user.id),
+      },
+      roles: {
+        role: primaryRole,
+        roles: allRoles,
+        permissions,
+      },
+    };
   }
 
   /**
@@ -393,98 +486,12 @@ export class AuthService {
         }
       }
 
-      // Clear failed login attempts on successful authentication
-      await this.clearFailedLoginAttempts(user.email);
-
-      // Get user role and permissions
-      const primaryRole = user.userRoles.reduce(
-        (highestRole: Role, userRole: any) => {
-          const currentRoleHierarchy =
-            roleHierarchy[userRole.role.name as Role];
-          const highestRoleHierarchy = roleHierarchy[highestRole];
-          return currentRoleHierarchy > highestRoleHierarchy
-            ? (userRole.role.name as Role)
-            : highestRole;
-        },
-        Role.student, // Default fallback instead of guest
-      );
-
-      const allRoles = user.userRoles.map(
-        (userRole: any) => userRole.role.name as Role,
-      );
-
-      const permissions =
-        await this.permissionCalculationService.getEffectivePermissionsForRole(
-          primaryRole,
-        );
-
-      // Create JWT payload
-      const payload: JwtPayload = {
-        sub: user.id,
-        email: user.email,
-        role: primaryRole,
-        roles: allRoles, // Add this line
-        permissions,
-      };
-
-      // Generate tokens
-      const accessToken = await this.jwtService.signAsync(payload, {
-        secret: this.JWT_SECRET,
-        expiresIn: this.JWT_EXPIRES_IN as any,
-      });
-
-      const refreshToken = await this.refreshTokenService.createRefreshToken(
+      return await this.issueAuthResponse(
         user.id,
+        ipAddress,
+        userAgent,
+        deviceId,
       );
-
-      // Update user login information
-      await this.prisma.user.update({
-        where: { id: user.id },
-        data: {
-          lastLogin: new Date(),
-          failedLoginAttempts: 0,
-          isLocked: false,
-          lockedUntil: null,
-        },
-      });
-
-      // Log successful login
-      await this.auditLogService.log(
-        securityEventTypes.loginSuccess,
-        user.id,
-        ipAddress || 'unknown',
-        userAgent || 'unknown',
-        { deviceId, userRole: primaryRole },
-      );
-
-      // Calculate token expiration
-      const expiresAt = new Date(
-        Date.now() + this.parseDurationToMilliseconds(this.JWT_EXPIRES_IN),
-      );
-
-      // Check email verification status
-      const isEmailVerified = await this.securityService.isEmailVerified(
-        user.id,
-      );
-
-      return {
-        accessToken,
-        refreshToken,
-        expiresAt,
-        user: {
-          id: user.id,
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          username: user.username ?? '',
-          isEmailVerified,
-        },
-        roles: {
-          role: primaryRole,
-          roles: allRoles,
-          permissions,
-        },
-      };
     } catch (error) {
       this.logger.error(`Login error: ${getErrorMessage(error)}`, {
         ...logContext,
@@ -500,6 +507,94 @@ export class AuthService {
 
       throw new UnauthorizedException('Authentication failed');
     }
+  }
+
+  async loginWithGoogle(
+    googleAuthDto: GoogleAuthDto,
+    ipAddress?: string,
+    userAgent?: string,
+  ): Promise<AuthResponse> {
+    const clientId = this.configService.get<string>('GOOGLE_CLIENT_ID');
+    if (!clientId) {
+      throw new ServiceUnavailableException(
+        'Google sign-in is not configured',
+      );
+    }
+
+    let googleProfile: GoogleIdentityPayload | undefined;
+    try {
+      const ticket = await new google.auth.OAuth2(clientId).verifyIdToken({
+        idToken: googleAuthDto.idToken,
+        audience: clientId,
+      });
+      googleProfile = ticket.getPayload() ?? undefined;
+    } catch {
+      throw new UnauthorizedException('Google credential is invalid or expired');
+    }
+
+    if (
+      !googleProfile?.sub ||
+      !googleProfile.email ||
+      googleProfile.email_verified !== true
+    ) {
+      throw new UnauthorizedException(
+        'Google must provide a verified email address',
+      );
+    }
+
+    const email = googleProfile.email.trim().toLowerCase();
+    let user = await this.prisma.user.findFirst({
+      where: { email: { equals: email, mode: 'insensitive' } },
+    });
+    let isNewUser = false;
+
+    if (!user) {
+      if (googleAuthDto.acceptTerms !== true) {
+        throw new BadRequestException(
+          'Accept the Terms of Service before creating an account with Google',
+        );
+      }
+
+      const createdUser = await this.usersService.create({
+        email,
+        password: randomBytes(32).toString('base64url'),
+        firstName: googleProfile.given_name,
+        lastName: googleProfile.family_name,
+        profileImage: googleProfile.picture,
+        role: Role.student,
+        acceptTerms: true,
+      });
+      user = await this.prisma.user.findUnique({
+        where: { id: createdUser.id },
+      });
+      if (!user) {
+        throw new NotFoundException(
+          'Google account was created but could not be loaded',
+        );
+      }
+      isNewUser = true;
+    }
+
+    if (
+      !user.isActive ||
+      (user.isLocked && user.lockedUntil && user.lockedUntil > new Date())
+    ) {
+      throw new UnauthorizedException(
+        'This account is unavailable. Contact support for help.',
+      );
+    }
+
+    await this.prisma.userSecuritySettings.upsert({
+      where: { userId: user.id },
+      update: { isEmailVerified: true },
+      create: {
+        userId: user.id,
+        isEmailVerified: true,
+        acceptTerms: isNewUser,
+      },
+    });
+
+    return this.issueAuthResponse(user.id, ipAddress, userAgent);
   }
 
   /**

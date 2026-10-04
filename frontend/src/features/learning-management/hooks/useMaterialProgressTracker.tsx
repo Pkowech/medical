@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import progressService from '@/features/learning-management/services/progressService';
-import api from '@/features/auth/services/apiClient';
 import offlineSync, {
   ProgressQueueItem,
 } from '@/features/learning-management/services/offlineProgressSync';
@@ -10,6 +9,7 @@ import { URLS } from '@/lib/urls';
 
 type Options = {
   materialId?: string;
+  topicId?: string | null;
   unitId?: string | null;
   courseId?: string | null;
   computePercent?: () => number; // optional callback to compute current progress percent (0-100)
@@ -17,7 +17,7 @@ type Options = {
 };
 
 export default function useMaterialProgressTracker(options: Options) {
-  const { materialId, unitId, courseId: _courseId, computePercent, intervalMs = 60000 } = options;
+  const { materialId, topicId, unitId, courseId, computePercent, intervalMs = 60000 } = options;
   const [isTracking, setIsTracking] = useState(false);
   const timeStartedRef = useRef<number | null>(null);
   const intervalRef = useRef<number | null>(null);
@@ -54,16 +54,16 @@ export default function useMaterialProgressTracker(options: Options) {
     lastSyncTimeRef.current = now;
 
     try {
-      if (unitId) {
-        await progressService.updateUnitProgress(
+      if (materialId || topicId) {
+        await progressService.updateContentProgress({
+          materialId,
+          topicId,
           unitId,
-          percent >= 100 ? 'completed' : 'inProgress',
-          percent,
-          elapsedMinutes
-        );
-      } else if (materialId && percent >= 100) {
-        // If no unit id, mark material as read (completion event)
-        await api.post(`/progress/materials/${materialId}/read`);
+          courseId,
+          status: percent >= 100 ? 'completed' : 'inProgress',
+          progressPercentage: percent,
+          timeSpentMinutes: elapsedMinutes,
+        });
       }
 
       // xAPI Progress/Completion tracking
@@ -85,17 +85,21 @@ export default function useMaterialProgressTracker(options: Options) {
     } catch (err) {
       console.error('Failed to send material progress', err);
       // Non-blocking; queue for offline sync
-      const queueItem: ProgressQueueItem = {
-        unitId: unitId || undefined,
-        materialId: materialId || undefined,
-        percent,
-        timeSpentMinutes: elapsedMinutes,
-        status: percent >= 100 ? 'completed' : 'inProgress',
-      };
-      await offlineSync.addToQueue(queueItem);
+      if (materialId || topicId) {
+        const queueItem: ProgressQueueItem = {
+          unitId: unitId || undefined,
+          topicId: topicId || undefined,
+          courseId: courseId || undefined,
+          materialId: materialId || undefined,
+          percent,
+          timeSpentMinutes: elapsedMinutes,
+          status: percent >= 100 ? 'completed' : 'inProgress',
+        };
+        await offlineSync.addToQueue(queueItem);
+      }
       // Only toast on severe errors, not on rate limiting which is handled by sync queue
     }
-  }, [materialId, unitId, trackAction, XAPI_VERBS]);
+  }, [courseId, materialId, topicId, trackAction, unitId, XAPI_VERBS]);
 
   const computeCurrentPercent = useCallback((): number => {
     const currentComputePercent = computePercentRef.current;
