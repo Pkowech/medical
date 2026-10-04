@@ -22,5 +22,5 @@ export const cacheKeys = {
   progressByUser: (userId: string) => `progress:user:${userId}`,
   progressByUserCourse: (userId: string, courseId: string) =>
     `progress:user:${userId}:course:${courseId}`,
-  progressOverall: (userId: string) => `progress:overall:${userId}`,
+  progressOverall: (userId: string) => `progress:overall:v2:${userId}`,
 } as const;

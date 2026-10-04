@@ -62,7 +62,6 @@ export class ProgressController {
       coursesResult,
       enrolledUnitsResult,
       activitiesResult,
-      weeklyStudyTimeResult,
       peerComparisonResult,
       streaksResult,
       deadlinesResult,
@@ -72,7 +71,6 @@ export class ProgressController {
       this.progressService.getCourseProgress(userId),
       this.progressService.getEnrolledUnitsDashboard(userId),
       this.progressService.getUserActivities(userId),
-      this.progressService.getWeeklyStudyTime(userId),
       this.progressService.getPeerComparison(userId),
       this.progressService.getUserStreaks(userId),
       this.studyService.getDeadlines(userId),
@@ -85,8 +83,8 @@ export class ProgressController {
       enrolledUnits: enrolledUnitsResult.status === 'fulfilled' ? enrolledUnitsResult.value : [],
       activities: activitiesResult.status === 'fulfilled' ? activitiesResult.value : [],
       weeklyStudyTime:
-        weeklyStudyTimeResult.status === 'fulfilled'
-          ? weeklyStudyTimeResult.value
+        overviewResult.status === 'fulfilled'
+          ? overviewResult.value?.stats?.weeklyStudyTime ?? null
           : null,
       achievements,
       peerComparison: peerComparisonResult.status === 'fulfilled' ? peerComparisonResult.value : null,

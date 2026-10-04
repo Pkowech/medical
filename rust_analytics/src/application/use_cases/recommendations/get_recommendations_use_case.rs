@@ -20,6 +20,7 @@ pub struct RecommendationItem {
     pub score: f32,
     pub title: String,
     pub description: String,
+    pub reason: String,
 }
 
 /// Response for recommendations
@@ -64,6 +65,7 @@ impl GetRecommendationsUseCase {
                 score: rec.score as f32,
                 title: rec.title,
                 description: rec.description,
+                reason: rec.reason,
             })
             .collect();
 

@@ -843,33 +843,6 @@ const progressService = {
     const localStreak = this.computeLocalStreak(recentActivities);
     const finalStreak = backendStreak || localStreak || 0;
 
-    const weeklyProgress = Array(7).fill(0).map((_, i) => {
-      const d = new Date();
-      d.setDate(d.getDate() - (6 - i));
-      const startOfDay = new Date(d);
-      startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(d);
-      endOfDay.setHours(23, 59, 59, 999);
-      
-      const daySessions = recentActivities.filter((s: ProgressActivity) => {
-        if (!s.date) return false;
-        const sd = new Date(s.date);
-        return sd >= startOfDay && sd <= endOfDay;
-      });
-      
-      const durationMinutes = daySessions.reduce(
-        (acc: number, s: ProgressActivity) => acc + (s.durationMinutes || 0),
-        0
-      );
-      const hours = Math.round((durationMinutes / 60) * 10) / 10;
-      
-      return {
-        day: d.toLocaleString('default', { weekday: 'short' }),
-        hours,
-        target: 4
-      };
-    });
-
     const enriched: ProgressData = {
       ...progressData,
       stats: {
@@ -878,7 +851,6 @@ const progressService = {
       } as ProgressStats,
       streak: finalStreak,
       studySessions: [], // Replaced by recentActivities logic
-      weeklyProgress,
       featuredSpecializations: [], // Fetched dynamically where needed
       pathProgress: [],
       unitProgress: [],

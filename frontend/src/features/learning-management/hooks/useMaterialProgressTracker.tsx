@@ -25,7 +25,7 @@ export default function useMaterialProgressTracker(options: Options) {
   const lastPercentRef = useRef<number>(0);
   const lastSyncTimeRef = useRef<number>(0);
   const lastReportedMinutesRef = useRef(0);
-  const isSendingRef = useRef(false);
+  const sendInFlightRef = useRef<Promise<void> | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
   const [currentPercent, setCurrentPercent] = useState<number>(0);
 
@@ -41,78 +41,97 @@ export default function useMaterialProgressTracker(options: Options) {
   }, [materialId]);
 
   // Internal helper to send progress
-  const sendProgress = useCallback(async (percent: number, elapsedMinutes: number) => {
-    const now = Date.now();
-    if (isSendingRef.current) return;
-    // Throttling: Ensure at least 15s between syncs even for significant deltas
-    if (percent >= 100 && lastPercentRef.current >= 100) {
-      return;
+  const sendProgress = useCallback(async (
+    percent: number,
+    elapsedMinutes: number,
+    force = false,
+  ) => {
+    while (sendInFlightRef.current) {
+      await sendInFlightRef.current;
     }
-    if (now - lastSyncTimeRef.current < 15000 && percent < 100) {
-      return;
-    }
-    isSendingRef.current = true;
-    lastSyncTimeRef.current = now;
-    const unreportedMinutes = Math.max(0, elapsedMinutes - lastReportedMinutesRef.current);
-    let progressSaved = !(materialId || topicId);
 
-    if (materialId || topicId) {
-      try {
-        await progressService.updateContentProgress({
-          materialId,
-          topicId,
-          unitId,
-          courseId,
-          status: percent >= 100 ? 'completed' : 'inProgress',
-          progressPercentage: percent,
-          timeSpentMinutes: unreportedMinutes,
-        });
-        progressSaved = true;
-      } catch (err) {
-        console.error('Failed to send material progress', err);
+    const now = Date.now();
+    // Throttling: Ensure at least 15s between syncs even for significant deltas
+    if (
+      percent >= 100 &&
+      lastPercentRef.current >= 100 &&
+      elapsedMinutes <= lastReportedMinutesRef.current
+    ) {
+      return;
+    }
+    if (!force && now - lastSyncTimeRef.current < 15000 && percent < 100) {
+      return;
+    }
+    let finishSend!: () => void;
+    const sendPromise = new Promise<void>(resolve => {
+      finishSend = resolve;
+    });
+    sendInFlightRef.current = sendPromise;
+    try {
+      lastSyncTimeRef.current = now;
+      const unreportedMinutes = Math.max(0, elapsedMinutes - lastReportedMinutesRef.current);
+      let progressSaved = !(materialId || topicId);
+
+      if (materialId || topicId) {
         try {
-          await offlineSync.addToQueue({
-            unitId: unitId || undefined,
-            topicId: topicId || undefined,
-            courseId: courseId || undefined,
-            materialId: materialId || undefined,
-            percent,
-            timeSpentMinutes: unreportedMinutes,
+          await progressService.updateContentProgress({
+            materialId,
+            topicId,
+            unitId,
+            courseId,
             status: percent >= 100 ? 'completed' : 'inProgress',
+            progressPercentage: percent,
+            timeSpentMinutes: unreportedMinutes,
           });
           progressSaved = true;
-        } catch (queueError) {
-          console.error('Failed to queue material progress for offline sync', queueError);
-          toast.error('Material progress could not be saved.');
+        } catch (err) {
+          console.error('Failed to send material progress', err);
+          try {
+            await offlineSync.addToQueue({
+              unitId: unitId || undefined,
+              topicId: topicId || undefined,
+              courseId: courseId || undefined,
+              materialId: materialId || undefined,
+              percent,
+              timeSpentMinutes: unreportedMinutes,
+              status: percent >= 100 ? 'completed' : 'inProgress',
+            });
+            progressSaved = true;
+          } catch (queueError) {
+            console.error('Failed to queue material progress for offline sync', queueError);
+            toast.error('Material progress could not be saved.');
+          }
+        }
+        if (progressSaved) {
+          lastReportedMinutesRef.current = elapsedMinutes;
         }
       }
       if (progressSaved) {
-        lastReportedMinutesRef.current = elapsedMinutes;
+        lastPercentRef.current = percent;
       }
-    }
-    if (progressSaved) {
-      lastPercentRef.current = percent;
-    }
 
-    if (materialId) {
-      try {
-        const verb = percent >= 100 ? XAPI_VERBS.COMPLETED : XAPI_VERBS.PROGRESSED;
-        await trackAction(verb, {
-          id: `${URLS.BASE}/materials/${materialId}`,
-          definition: {
-            name: { 'en-US': `Material ${materialId}` },
-            type: 'http://adlnet.gov/expapi/activities/media',
-          },
-        }, {
-          completion: percent >= 100,
-          score: { scaled: percent / 100 },
-          duration: `PT${elapsedMinutes}M`,
-        });
-      } catch (err) {
-        console.error('Failed to track material progress in xAPI', err);
+      if (materialId) {
+        try {
+          const verb = percent >= 100 ? XAPI_VERBS.COMPLETED : XAPI_VERBS.PROGRESSED;
+          await trackAction(verb, {
+            id: `${URLS.BASE}/materials/${materialId}`,
+            definition: {
+              name: { 'en-US': `Material ${materialId}` },
+              type: 'http://adlnet.gov/expapi/activities/media',
+            },
+          }, {
+            completion: percent >= 100,
+            score: { scaled: percent / 100 },
+            duration: `PT${unreportedMinutes}M`,
+          });
+        } catch (err) {
+          console.error('Failed to track material progress in xAPI', err);
+        }
       }
+    } finally {
+      sendInFlightRef.current = null;
+      finishSend();
     }
-    isSendingRef.current = false;
   }, [courseId, materialId, topicId, trackAction, unitId, XAPI_VERBS]);
 
   const computeCurrentPercent = useCallback((): number => {
@@ -186,7 +205,7 @@ export default function useMaterialProgressTracker(options: Options) {
       Math.round((Date.now() - (timeStartedRef.current || Date.now())) / 60000),
     );
     const p = computeCurrentPercent();
-    await sendProgress(p >= 100 ? 100 : p, elapsedMin);
+    await sendProgress(p >= 100 ? 100 : p, elapsedMin, true);
     setIsTracking(false);
     timeStartedRef.current = null;
     setElapsedSeconds(0);

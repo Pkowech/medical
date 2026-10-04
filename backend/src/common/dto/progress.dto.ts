@@ -781,6 +781,14 @@ export class UserStatsDto {
   @IsNumber()
   totalStudyTime!: number;
 
+  @ApiPropertyOptional({
+    description: 'Study time recorded for each of the previous seven days',
+    type: [Object],
+  })
+  @IsOptional()
+  @IsArray()
+  weeklyStudyTime?: Array<{ date: string; minutes: number }>;
+
   @ApiProperty()
   @IsNumber()
   averageCourseProgress!: number;

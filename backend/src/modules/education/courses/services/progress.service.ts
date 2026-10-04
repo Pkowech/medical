@@ -983,9 +983,12 @@ export class ProgressService {
     });
   }
 
-  async getWeeklyStudyTime(
+  async getStudyTimeSummary(
     userId: string,
-  ): Promise<Array<{ date: string; minutes: number }>> {
+  ): Promise<{
+    totalMinutes: number;
+    weeklyStudyTime: Array<{ date: string; minutes: number }>;
+  }> {
     const today = new Date();
     today.setUTCHours(0, 0, 0, 0);
     const startDate = new Date(today);
@@ -995,13 +998,16 @@ export class ProgressService {
       where: {
         userId,
         type: UserActivityType.LEARNING,
-        createdAt: { gte: startDate },
       },
       select: { id: true, createdAt: true, details: true },
       orderBy: { createdAt: 'asc' },
     });
     const minutesByDate = new Map<string, number>();
-    const legacyMinutesByContentAndDate = new Map<string, number>();
+    const legacySnapshots = new Map<
+      string,
+      { minutes: number; createdAt: Date }
+    >();
+    const studySessions = new Map<string, { date: string; minutes: number }>();
 
     for (const activity of activities) {
       const date = activity.createdAt.toISOString().slice(0, 10);
@@ -1020,35 +1026,62 @@ export class ProgressService {
         continue;
       }
 
-      // Older progress events stored cumulative session minutes; use the
-      // greatest value per content/day rather than summing repeated snapshots.
-      const contentId =
-        details.materialId ??
-        details.topicId ??
-        details.unitId ??
-        details.courseId ??
-        activity.id;
       const duration = details.timeSpent;
-      if (typeof duration !== 'number' || duration <= 0) continue;
+      const contentId = [
+        details.materialId,
+        details.topicId,
+        details.unitId,
+        details.courseId,
+      ].find((id): id is string => typeof id === 'string' && id.length > 0);
 
-      const key = `${date}:${String(contentId)}`;
-      legacyMinutesByContentAndDate.set(
-        key,
-        Math.max(legacyMinutesByContentAndDate.get(key) ?? 0, duration),
+      if (typeof duration === 'number' && duration > 0 && contentId) {
+        const contentKey = contentId;
+        const previous = legacySnapshots.get(contentKey);
+        const sessionRestarted =
+          previous !== undefined &&
+          activity.createdAt.getTime() - previous.createdAt.getTime() > 10 * 60 * 1000;
+        const delta =
+          previous === undefined || sessionRestarted || duration < previous.minutes
+            ? duration
+            : duration - previous.minutes;
+        minutesByDate.set(date, (minutesByDate.get(date) ?? 0) + delta);
+        legacySnapshots.set(contentKey, { minutes: duration, createdAt: activity.createdAt });
+        continue;
+      }
+
+      const sessionId = details.sessionId;
+      const sessionDuration = details.duration;
+      if (
+        typeof sessionId === 'string' &&
+        typeof sessionDuration === 'number' &&
+        sessionDuration > 0
+      ) {
+        const previous = studySessions.get(sessionId);
+        if (!previous || sessionDuration > previous.minutes) {
+          studySessions.set(sessionId, { date, minutes: sessionDuration });
+        }
+      }
+    }
+
+    for (const session of studySessions.values()) {
+      minutesByDate.set(
+        session.date,
+        (minutesByDate.get(session.date) ?? 0) + session.minutes,
       );
     }
 
-    for (const [key, minutes] of legacyMinutesByContentAndDate) {
-      const date = key.slice(0, 10);
-      minutesByDate.set(date, (minutesByDate.get(date) ?? 0) + minutes);
-    }
-
-    return Array.from({ length: 7 }, (_, index) => {
+    const totalMinutes = Array.from(minutesByDate.values()).reduce(
+      (total, minutes) => total + minutes,
+      0,
+    );
+    const weeklyStudyTime = Array.from({ length: 7 }, (_, index) => {
       const date = new Date(startDate);
       date.setUTCDate(startDate.getUTCDate() + index);
       const key = date.toISOString().slice(0, 10);
       return { date: key, minutes: minutesByDate.get(key) ?? 0 };
     });
+
+    return { totalMinutes, weeklyStudyTime };
   }
 
   getUserAchievements(): any[] {
@@ -1234,7 +1267,7 @@ export class ProgressService {
       const [
         totalCourses,
         completedCourses,
-        totalStudyTime,
+        studyTimeSummary,
         recentActivities,
         detailedAnalytics,
       ] = await Promise.all([
@@ -1242,10 +1275,7 @@ export class ProgressService {
         this.prisma.courseEnrollment.count({
           where: { userId, progressPercentage: { gte: 100 } },
         }),
-        this.prisma.progress.aggregate({
-          where: { userId },
-          _sum: { timeSpent: true },
-        }),
+        this.getStudyTimeSummary(userId),
         // Fetch activities for the last 30 days to allow streak calculation
         this.prisma.userActivity.findMany({
           where: {
@@ -1261,7 +1291,6 @@ export class ProgressService {
           .catch(() => undefined),
       ]);
 
-      const total = totalStudyTime._sum?.timeSpent || 0;
       const avg = this.calculateAverageSessionDuration(recentActivities);
 
       // Map from LearningAnalyticsService (authoritative gRPC data)
@@ -1275,7 +1304,8 @@ export class ProgressService {
         totalLearningPaths: analytics?.pathStats?.totalLearningPaths || 0,
         completedLearningPaths:
           analytics?.pathStats?.completedLearningPaths || 0,
-        totalStudyTime: total,
+        totalStudyTime: studyTimeSummary.totalMinutes,
+        weeklyStudyTime: studyTimeSummary.weeklyStudyTime,
         averageCourseProgress:
           analytics?.courseStats?.averageCourseProgress || 0,
         averagePathProgress: analytics?.pathStats?.averagePathProgress || 0,
