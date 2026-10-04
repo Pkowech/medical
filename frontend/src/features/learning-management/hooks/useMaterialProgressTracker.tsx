@@ -1,9 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import progressService from '@/features/learning-management/services/progressService';
-import offlineSync, {
-  ProgressQueueItem,
-} from '@/features/learning-management/services/offlineProgressSync';
+import offlineSync from '@/features/learning-management/services/offlineProgressSync';
 import { useXapi } from '@/lib/xapi/useXapi';
 import { URLS } from '@/lib/urls';
 
@@ -53,8 +51,8 @@ export default function useMaterialProgressTracker(options: Options) {
     lastPercentRef.current = percent;
     lastSyncTimeRef.current = now;
 
-    try {
-      if (materialId || topicId) {
+    if (materialId || topicId) {
+      try {
         await progressService.updateContentProgress({
           materialId,
           topicId,
@@ -64,10 +62,27 @@ export default function useMaterialProgressTracker(options: Options) {
           progressPercentage: percent,
           timeSpentMinutes: elapsedMinutes,
         });
+      } catch (err) {
+        console.error('Failed to send material progress', err);
+        try {
+          await offlineSync.addToQueue({
+            unitId: unitId || undefined,
+            topicId: topicId || undefined,
+            courseId: courseId || undefined,
+            materialId: materialId || undefined,
+            percent,
+            timeSpentMinutes: elapsedMinutes,
+            status: percent >= 100 ? 'completed' : 'inProgress',
+          });
+        } catch (queueError) {
+          console.error('Failed to queue material progress for offline sync', queueError);
+          toast.error('Material progress could not be saved.');
+        }
       }
+    }
 
-      // xAPI Progress/Completion tracking
-      if (materialId) {
+    if (materialId) {
+      try {
         const verb = percent >= 100 ? XAPI_VERBS.COMPLETED : XAPI_VERBS.PROGRESSED;
         await trackAction(verb, {
           id: `${URLS.BASE}/materials/${materialId}`,
@@ -80,24 +95,9 @@ export default function useMaterialProgressTracker(options: Options) {
           score: { scaled: percent / 100 },
           duration: `PT${elapsedMinutes}M`,
         });
+      } catch (err) {
+        console.error('Failed to track material progress in xAPI', err);
       }
-
-    } catch (err) {
-      console.error('Failed to send material progress', err);
-      // Non-blocking; queue for offline sync
-      if (materialId || topicId) {
-        const queueItem: ProgressQueueItem = {
-          unitId: unitId || undefined,
-          topicId: topicId || undefined,
-          courseId: courseId || undefined,
-          materialId: materialId || undefined,
-          percent,
-          timeSpentMinutes: elapsedMinutes,
-          status: percent >= 100 ? 'completed' : 'inProgress',
-        };
-        await offlineSync.addToQueue(queueItem);
-      }
-      // Only toast on severe errors, not on rate limiting which is handled by sync queue
     }
   }, [courseId, materialId, topicId, trackAction, unitId, XAPI_VERBS]);
 
