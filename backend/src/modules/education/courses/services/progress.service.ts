@@ -63,6 +63,10 @@ export class ProgressService {
     }
   }
 
+  async invalidateUserProgressCache(userId: string): Promise<void> {
+    await this.clearCache(userId);
+  }
+
   async updateUnitMaterialTopicProgress(
     userId: string,
     updateDto: ProgressUpdateDto,

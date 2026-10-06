@@ -324,7 +324,7 @@ export class StudyService {
       }
     }
 
-    return this.prisma.studySession.update({
+    const endedSession = await this.prisma.studySession.update({
       where: { id: sessionId },
       data: {
         endTime,
@@ -338,6 +338,8 @@ export class StudyService {
         quizAttemptIds,
       },
     });
+    await this.progressService.invalidateUserProgressCache(userId);
+    return endedSession;
   }
 
   private calculateFocusScore(activities: StudyActivity[]): number {
