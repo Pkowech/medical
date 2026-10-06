@@ -17,6 +17,7 @@ import {
   ClipboardList,
   AlertCircle,
   PlayCircle,
+  X,
   GraduationCap,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -796,45 +797,6 @@ const MedicalEducationDashboard = () => {
                 </div>
               </div>
             ))}
-          </div>
-        </div>
-
-        {/* Recent Materials */}
-        <div className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-gray-200 dark:border-slate-700/50">
-          <div className="mb-5 flex flex-col items-start gap-2 sm:mb-6 sm:flex-row sm:items-center sm:justify-between">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Recent Materials</h3>
-            <button 
-              onClick={() => router.push('/study-planner/materials')}
-              className="text-sm font-medium text-indigo-600 dark:text-blue-400 hover:text-indigo-700 dark:hover:text-blue-300"
-            >
-              Browse All Materials
-            </button>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {data.recentActivity
-              ?.filter((a: { type?: string }) => a.type === 'material')
-              .map((material: { id?: string; title?: string; date?: string; description?: string }) => (
-                <div
-                  key={material.id}
-                  onClick={() => router.push(`/study-planner/materials/${material.id}`)}
-                  className="bg-gray-50/50 dark:bg-slate-700/50 rounded-xl p-5 border border-gray-200 dark:border-slate-600/50 hover:shadow-lg dark:hover:border-indigo-500/50 transition-all duration-300 group cursor-pointer"
-                >
-                  <div className="flex items-center gap-3 mb-3">
-                    <div
-                      className={`w-10 h-10 rounded-lg bg-linear-to-br from-gray-500 to-gray-600 flex items-center justify-center`}
-                    >
-                      <FileText className="w-5 h-5 text-white" />
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-gray-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-blue-400 transition-colors">{material.title}</h4>
-                      <p className="text-xs text-gray-500 dark:text-slate-400">
-                        {material.date ? new Date(material.date).toLocaleDateString() : 'Unknown date'}
-                      </p>
-                    </div>
-                  </div>
-                  <p className="text-sm text-gray-600 dark:text-slate-400 line-clamp-2">{material.description}</p>
-                </div>
-              ))}
           </div>
         </div>
 
