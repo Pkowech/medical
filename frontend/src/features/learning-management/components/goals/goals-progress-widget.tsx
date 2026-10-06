@@ -95,19 +95,19 @@ export const GoalsProgressWidget: React.FC = () => {
 
   const getPriorityColor = (priority: string | undefined | null) => {
     if (!priority || typeof priority !== 'string') {
-      return 'text-gray-600 bg-gray-100';
+      return 'text-gray-600 bg-gray-100 dark:bg-slate-800 dark:text-slate-300';
     }
     switch (priority.toLowerCase()) {
       case 'critical':
-        return 'text-red-600 bg-red-100';
+        return 'text-red-600 bg-red-100 dark:bg-red-950/50 dark:text-red-300';
       case 'high':
-        return 'text-orange-600 bg-orange-100';
+        return 'text-orange-600 bg-orange-100 dark:bg-orange-950/50 dark:text-orange-300';
       case 'medium':
-        return 'text-yellow-600 bg-yellow-100';
+        return 'text-yellow-600 bg-yellow-100 dark:bg-yellow-950/50 dark:text-yellow-300';
       case 'low':
-        return 'text-green-600 bg-green-100';
+        return 'text-green-600 bg-green-100 dark:bg-green-950/50 dark:text-green-300';
       default:
-        return 'text-gray-600 bg-gray-100';
+        return 'text-gray-600 bg-gray-100 dark:bg-slate-800 dark:text-slate-300';
     }
   };
 
@@ -129,16 +129,16 @@ export const GoalsProgressWidget: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <div className="flex items-center space-x-3 mb-4">
-          <div className="p-2 bg-green-100 rounded-lg">
-            <Target className="w-5 h-5 text-green-600" />
+      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div className="mb-4 flex items-center space-x-3">
+          <div className="rounded-lg bg-green-100 p-2 dark:bg-green-950/50">
+            <Target className="h-5 w-5 text-green-600 dark:text-green-400" />
           </div>
-          <h3 className="text-lg font-semibold text-gray-900">Learning Goals</h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Learning Goals</h3>
         </div>
         <div className="animate-pulse space-y-4">
           {[...Array(3)].map((_, i) => (
-            <div key={i} className="h-16 bg-gray-100 rounded-lg"></div>
+            <div key={i} className="h-16 rounded-lg bg-gray-100 dark:bg-slate-800"></div>
           ))}
         </div>
       </div>
@@ -146,17 +146,17 @@ export const GoalsProgressWidget: React.FC = () => {
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-      <div className="flex items-center justify-between mb-4">
+    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center space-x-3">
-          <div className="p-2 bg-green-100 rounded-lg">
-            <Target className="w-5 h-5 text-green-600" />
+          <div className="rounded-lg bg-green-100 p-2 dark:bg-green-950/50">
+            <Target className="h-5 w-5 text-green-600 dark:text-green-400" />
           </div>
-          <h3 className="text-lg font-semibold text-gray-900">Learning Goals</h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Learning Goals</h3>
         </div>
         <Link
           href="/study-planner/goals"
-          className="text-green-600 hover:text-green-700 text-sm font-medium flex items-center space-x-1"
+          className="flex items-center space-x-1 text-sm font-medium text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300"
         >
           <span>View All</span>
           <ChevronRight className="w-4 h-4" />
@@ -165,25 +165,25 @@ export const GoalsProgressWidget: React.FC = () => {
 
       {/* Quick Stats */}
       {analytics && (
-        <div className="grid grid-cols-2 gap-4 text-center mt-6 pt-6 border-t border-gray-200">
+        <div className="mt-6 grid grid-cols-2 gap-4 border-t border-gray-200 pt-6 text-center dark:border-slate-700">
           <div>
-            <div className="text-2xl font-bold text-gray-900">{analytics.activeGoals}</div>
-            <div className="text-xs text-gray-500">Active Goals</div>
+            <div className="text-2xl font-bold text-gray-900 dark:text-white">{analytics.activeGoals}</div>
+            <div className="text-xs text-gray-500 dark:text-slate-400">Active Goals</div>
           </div>
           <div>
-            <div className="text-2xl font-bold text-gray-900">
+            <div className="text-2xl font-bold text-gray-900 dark:text-white">
               {Math.round(analytics.completionRate)}%
             </div>
-            <div className="text-xs text-gray-500">Completion Rate</div>
+            <div className="text-xs text-gray-500 dark:text-slate-400">Completion Rate</div>
           </div>
         </div>
       )}
 
       {goals.length === 0 ? (
         <div className="text-center py-8">
-          <Target className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-          <h4 className="text-lg font-medium text-gray-900 mb-2">No Active Goals</h4>
-          <p className="text-gray-500 mb-4">
+          <Target className="mx-auto mb-3 h-12 w-12 text-gray-400 dark:text-slate-500" />
+          <h4 className="mb-2 text-lg font-medium text-gray-900 dark:text-white">No Active Goals</h4>
+          <p className="mb-4 text-gray-500 dark:text-slate-400">
             Set learning goals to track your progress and stay motivated
           </p>
           <Link
@@ -201,18 +201,15 @@ export const GoalsProgressWidget: React.FC = () => {
             const isOverdue = daysRemaining < 0;
             const isDueSoon = daysRemaining <= 7 && daysRemaining >= 0;
 
-            const pct = Math.min(100, Math.max(0, Math.round(goal.progressPercentage / 10) * 10));
-            const widthClass = `w-[${pct}%]`;
-
             return (
               <div
                 key={goal.id}
-                className="p-4 border border-gray-200 rounded-lg hover:border-green-300 hover:shadow-sm transition-all"
+                className="rounded-lg border border-gray-200 p-4 transition-all hover:border-green-300 hover:shadow-sm dark:border-slate-700 dark:hover:border-green-800"
               >
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
-                    <h4 className="font-medium text-gray-900 mb-1">{goal.title}</h4>
-                    <div className="flex items-center space-x-2 text-sm text-gray-500">
+                    <h4 className="mb-1 font-medium text-gray-900 dark:text-white">{goal.title}</h4>
+                    <div className="flex items-center space-x-2 text-sm text-gray-500 dark:text-slate-400">
                       <span
                         className={`px-2 py-0.5 rounded-full text-xs font-medium ${getPriorityColor(goal.priority)}`}
                       >
@@ -224,30 +221,30 @@ export const GoalsProgressWidget: React.FC = () => {
 
                   <div className="flex items-center space-x-2">
                     {goal.streakCount > 0 && (
-                      <div className="flex items-center space-x-1 text-orange-600">
+                      <div className="flex items-center space-x-1 text-orange-600 dark:text-orange-400">
                         <Flame className="w-3 h-3" />
                         <span className="text-xs font-medium">{goal.streakCount}</span>
                       </div>
                     )}
 
                     {goal.status === 'completed' ? (
-                      <CheckCircle className="w-5 h-5 text-green-600" />
+                      <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
                     ) : isOverdue ? (
-                      <AlertCircle className="w-5 h-5 text-red-600" />
+                      <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
                     ) : isDueSoon ? (
-                      <Clock className="w-5 h-5 text-orange-600" />
+                      <Clock className="w-5 h-5 text-orange-600 dark:text-orange-400" />
                     ) : (
-                      <Target className="w-5 h-5 text-blue-600" />
+                      <Target className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                     )}
                   </div>
                 </div>
 
                 <div className="mb-3">
-                  <div className="flex items-center justify-between text-sm text-gray-600 mb-1">
+                  <div className="mb-1 flex items-center justify-between text-sm text-gray-600 dark:text-slate-300">
                     <span>Progress</span>
                     <span>{Math.round(goal.progressPercentage)}%</span>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div className="h-2 w-full rounded-full bg-gray-200 dark:bg-slate-700">
                     <div
                       className={`h-2 rounded-full transition-all duration-300 dynamic-width ${
                         goal.status === 'completed' ? 'bg-green-600' : 'bg-blue-600'
@@ -257,14 +254,18 @@ export const GoalsProgressWidget: React.FC = () => {
                 </div>
 
                 <div className="flex items-center justify-between text-sm">
-                  <div className="text-gray-600">
+                  <div className="text-gray-600 dark:text-slate-300">
                     <span className="font-medium">Target: </span>
                     {goal.targetCriteria?.targetValue || 0} {goal.targetCriteria?.unit || ''}
                   </div>
 
                   <div
                     className={`flex items-center space-x-1 ${
-                      isOverdue ? 'text-red-600' : isDueSoon ? 'text-orange-600' : 'text-gray-500'
+                      isOverdue
+                        ? 'text-red-600 dark:text-red-400'
+                        : isDueSoon
+                          ? 'text-orange-600 dark:text-orange-400'
+                          : 'text-gray-500 dark:text-slate-400'
                     }`}
                   >
                     <Calendar className="w-3 h-3" />
@@ -275,10 +276,10 @@ export const GoalsProgressWidget: React.FC = () => {
             );
           })}
 
-          <div className="pt-2 border-t border-gray-100">
+          <div className="border-t border-gray-100 pt-2 dark:border-slate-700">
             <Link
               href="/study-planner/goals"
-              className="flex items-center justify-center space-x-2 text-green-600 hover:text-green-700 text-sm font-medium py-2"
+              className="flex items-center justify-center space-x-2 py-2 text-sm font-medium text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300"
             >
               <TrendingUp className="w-4 h-4" />
               <span>Manage All Goals</span>
