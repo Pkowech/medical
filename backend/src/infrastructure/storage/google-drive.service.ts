@@ -361,8 +361,8 @@ export class GoogleDriveService {
   }
 
   private getOAuthClient(): InstanceType<typeof google.auth.OAuth2> {
-    const clientId = this.config.get<string>('GOOGLE_DRIVE_OAUTH_CLIENT_ID');
-    const clientSecret = this.config.get<string>('GOOGLE_DRIVE_OAUTH_CLIENT_SECRET');
+    const clientId = this.config.get<string>('GOOGLE_CLIENT_ID');
+    const clientSecret = this.config.get<string>('GOOGLE_CLIENT_SECRET');
     const redirectUri = this.config.get<string>('GOOGLE_DRIVE_OAUTH_REDIRECT_URI');
     if (!clientId || !clientSecret || !redirectUri) {
       throw new ServiceUnavailableException('Personal Google Drive OAuth is not configured.');

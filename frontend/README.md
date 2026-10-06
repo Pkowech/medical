@@ -90,10 +90,14 @@ with a password manager or a cryptographically secure random generator, and
 store it only in Vercel Environment Variables. Do not commit production values
 to source files.
 
-Google sign-in also requires `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in
-the frontend's server-side environment. Configure the same `GOOGLE_CLIENT_ID`
-on the backend so it can verify ID tokens issued for that OAuth client. Keep
-the client secret and all production values out of source control.
+Google sign-in and personal Drive links use the same OAuth client. Configure
+`GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in both the frontend's server-side
+environment and the backend environment. The backend uses the client ID to
+verify sign-in tokens and the client ID/secret for personal Drive OAuth.
+Configure the NextAuth callback URL
+(`https://<frontend-host>/api/auth/callback/google`) and the backend Drive
+callback URL in that client's authorized redirect URIs. Keep the client secret
+and all production values out of source control.
 
 ## Learn More
 
