@@ -10,34 +10,25 @@ import {
   BarChart3,
   Target,
   ChevronRight,
-  Brain,
   ArrowRight,
   XCircle,
-  Users,
   Calendar,
   BookMarked,
   ClipboardList,
   AlertCircle,
   PlayCircle,
-  X,
   GraduationCap,
-  FileText,
-  Star,
-  ChevronLeft,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { usePageHeader } from '@/core/providers/HeaderContext';
 import { useAuthStore } from '@/features/auth/store/useAuthStore';
-import { Deadline, CourseDisplayDataExtended, StatCardProps } from '@/shared/types';
+import { Deadline, CourseDisplayDataExtended } from '@/shared/types';
 import { StatCard } from '@/shared/components/ui/StatCard';
 import { Button } from '@/shared/components/ui/button';
 import { StudySession } from '@/features/learning-management/study/components/study-session';
 import { useStudy } from '@/features/learning-management/study/hooks/useStudy';
 import { useProgress } from '@/shared/hooks/useProgress';
 import { GoalsProgressWidget } from '@/features/learning-management/components/goals/goals-progress-widget';
-import useSchedule from '@/features/learning-management/study/hooks/useSchedule';
-import CalendarGrid from '@/features/learning-management/components/schedule/CalendarGrid';
-import { Event } from '@/features/learning-management/study/services/scheduleService';
 import apiService from '@/features/auth/services/apiClient';
 import type { PerformanceData } from '@/shared/types/analyticsInterface';
 
@@ -46,31 +37,9 @@ const MedicalEducationDashboard = () => {
   const { setHeader } = usePageHeader();
   const router = useRouter();
   const { getResumePoint } = useStudy();
-  // REMOVED: counters, activeInsight state (NOISE REDUCTION)
-  const [showQuickQuiz, setShowQuickQuiz] = useState(false);
-  const [showCalendar, setShowCalendar] = useState(false);
-  const [showAnalytics, setShowAnalytics] = useState(false);
   const [showStudySession, setShowStudySession] = useState(false);
   const [selectedStudyCourseId, setSelectedStudyCourseId] = useState<string | null>(null);
   const [selectedTrendMetric, setSelectedTrendMetric] = useState<'score' | 'hours'>('score');
-
-  // Calendar Hook (reusing the one from Schedule)
-  const {
-    filteredEvents,
-    isLoading: isCalendarLoading,
-    currentDate,
-    setCurrentDate,
-    view: calendarView,
-  } = useSchedule();
-
-  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
-
-  const navigateDate = (direction: 'prev' | 'next') => {
-    const newDate = new Date(currentDate);
-    newDate.setMonth(newDate.getMonth() + (direction === 'next' ? 1 : -1));
-    setCurrentDate(newDate);
-  };
-
 
   // Set page header for dashboard
   useEffect(() => {
@@ -188,13 +157,6 @@ const MedicalEducationDashboard = () => {
     lastActivity: null,
   });
 
-  const counters = {
-    courses: stats.coursesCompleted || 0,
-    score: performanceSummary?.totalAttempts
-      ? Number(performanceSummary.overallScore.toFixed(1))
-      : 0,
-    hours: stats.studyHours ?? 0,
-  };
   const assessmentScoresByMonth = (performanceSummary?.learningTrends || []).reduce<
     Record<string, { year: number; month: number; total: number; count: number }>
   >((monthlyScores, trend) => {
@@ -223,13 +185,6 @@ const MedicalEducationDashboard = () => {
   const hasTrendData = selectedTrendMetric === 'score'
     ? trendPoints.length > 0
     : trendPoints.some(point => point.value > 0);
-  const weeklyActivity = data.weeklyProgress || [];
-  const hasWeeklyActivity = weeklyActivity.some(day => day.hours > 0);
-  const peerComparison = data.peerComparison;
-  const peerProgressDifference = peerComparison
-    ? peerComparison.yourAverage - peerComparison.cohortAverage
-    : 0;
-  const hasOverallProgress = (stats.overallProgress ?? 0) > 0;
   const activeCourse = data.courseData?.find(course => course.progressPercentage < 100);
   const firstCourse = data.courseData?.[0];
   const displayCourse = activeCourse ?? firstCourse;
@@ -258,59 +213,6 @@ const MedicalEducationDashboard = () => {
     }
 
     router.push(`/courses/${displayCourse.id}`);
-  };
-
-  // StatCard component reserved for future use - can be uncommented when needed
-  // interface StatCardProps {
-  //   icon: React.ElementType;
-  //   title: string;
-  //   value: string | number;
-  //   subtitle: string;
-  //   trend?: number;
-  //   onClick?: () => void;
-  // }
-
-  const ProgressRing = ({ progress, size = 140 }: { progress: number; size?: number }) => {
-    const radius = (size - 16) / 2;
-    const circumference = 2 * Math.PI * radius;
-    const offset = circumference - (progress / 100) * circumference;
-
-    return (
-      <div className="relative">
-        <svg className="transform -rotate-90" width={size} height={size}>
-          <defs>
-            <linearGradient id="progressGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#3b82f6" />
-              <stop offset="100%" stopColor="#8b5cf6" />
-            </linearGradient>
-          </defs>
-          <circle
-            cx={size / 2}
-            cy={size / 2}
-            r={radius}
-            stroke="#e5e7eb"
-            strokeWidth="10"
-            fill="none"
-          />
-          <circle
-            cx={size / 2}
-            cy={size / 2}
-            r={radius}
-            stroke="url(#progressGrad)"
-            strokeWidth="10"
-            fill="none"
-            strokeDasharray={circumference}
-            strokeDashoffset={isNaN(offset) ? 0 : offset}
-            strokeLinecap="round"
-            className="transition-all duration-1000 ease-out"
-          />
-        </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-3xl font-bold text-gray-900 dark:text-white">{progress}%</span>
-          <span className="text-xs text-gray-500 dark:text-slate-400">Complete</span>
-        </div>
-      </div>
-    );
   };
 
   const getPriorityColor = (priority: string) => {
@@ -349,148 +251,9 @@ const MedicalEducationDashboard = () => {
     return `${diffDays}d ago`;
   };
 
-  // Quick Quiz Modal
-  const QuickQuizModal = () => (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-slate-800 rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-gray-200 dark:border-slate-700">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-2xl font-bold text-gray-900 dark:text-white">Quick Quiz Launch</h3>
-          <button
-            onClick={() => setShowQuickQuiz(false)}
-            className="p-2 hover:bg-gray-100 rounded-lg"
-            title="Close"
-            aria-label="Close Quick Quiz"
-          >
-            <X className="w-5 h-5" aria-hidden="true" />
-          </button>
-        </div>
-        <div className="space-y-4">
-          {data.courseData?.slice(0, 3).map((course: CourseDisplayDataExtended) => (
-            <button
-              key={course.id}
-              onClick={() => {
-                setShowQuickQuiz(false);
-                router.push(`/quiz/${course.id}`);
-              }}
-              className="w-full p-4 rounded-xl border-2 border-gray-100 dark:border-slate-700 hover:border-indigo-500 dark:hover:border-indigo-500 hover:bg-blue-50 dark:hover:bg-indigo-500/10 transition-all text-left group"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div
-                    className={`w-12 h-12 rounded-lg bg-linear-to-br ${course.color} flex items-center justify-center`}
-                  >
-                    <BookOpen className="w-6 h-6 text-white" />
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-gray-900 dark:text-white">{course.name}</h4>
-                    <p className="text-sm text-gray-500 dark:text-slate-400">10 questions • 15 minutes</p>
-                  </div>
-                </div>
-                <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-indigo-600 group-hover:translate-x-1 transition-all" />
-              </div>
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-
-  // Calendar View Modal
-  const CalendarModal = () => (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-slate-800 rounded-2xl max-w-5xl w-full p-6 shadow-2xl max-h-[90vh] overflow-y-auto border border-gray-200 dark:border-slate-700">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-4">
-            <div>
-              <h3 className="text-2xl font-bold text-gray-900 dark:text-white">Study Calendar</h3>
-              <p className="text-sm text-gray-500 dark:text-slate-400">
-                Manage your academic schedule and deadlines
-              </p>
-            </div>
-            
-            <div className="flex items-center gap-2 bg-gray-100 dark:bg-slate-700/50 p-1 rounded-lg ml-4">
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigateDate('prev')}>
-                <ChevronLeft className="w-4 h-4 text-gray-600 dark:text-slate-400" />
-              </Button>
-              <span className="text-sm font-semibold min-w-[120px] text-center text-gray-900 dark:text-white">
-                {currentDate.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
-              </span>
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigateDate('next')}>
-                <ChevronRight className="w-4 h-4 text-gray-600 dark:text-slate-400" />
-              </Button>
-            </div>
-          </div>
-          
-          <button
-            onClick={() => setShowCalendar(false)}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
-            title="Close"
-            aria-label="Close Calendar"
-          >
-            <X className="w-5 h-5 dark:text-slate-400" aria-hidden="true" />
-          </button>
-        </div>
-
-        {/* Reusing CalendarGrid from Schedule feature */}
-        {isCalendarLoading ? (
-          <div className="h-[400px] flex items-center justify-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-          </div>
-        ) : (
-          <div className="overflow-hidden rounded-xl border border-gray-100 dark:border-slate-700">
-            <CalendarGrid
-              currentDate={currentDate}
-              events={filteredEvents}
-              onOpenAddForDay={(day) => {
-                const year = currentDate.getFullYear();
-                const month = currentDate.getMonth();
-                const date = new Date(year, month, day);
-                // For now, redirect to schedule for adding events to keep things simple
-                router.push(`/study-planner/schedule?date=${date.toISOString()}`);
-                setShowCalendar(false);
-              }}
-              onSelectEvent={(ev) => {
-                setSelectedEvent(ev);
-                // Optionally show details or just redirect
-                router.push(`/study-planner/schedule?event=${ev.id}`);
-                setShowCalendar(false);
-              }}
-            />
-          </div>
-        )}
-        
-        <div className="mt-6 flex justify-end">
-          <Button 
-            onClick={() => {
-              router.push('/study-planner/schedule');
-              setShowCalendar(false);
-            }}
-            variant="outline"
-            className="gap-2"
-          >
-            <Calendar className="w-4 h-4" />
-            Open Full Schedule
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-
-  // FeatureCard component reserved for future use - can be uncommented when needed
-  // interface FeatureCardProps {
-  //   icon: React.ElementType;
-  //   title: string;
-  //   subtitle: string;
-  //   onClick: () => void;
-  //   badge?: string;
-  //   available?: boolean;
-  // }
-
-  // Note: Daily Flashcards widget now uses data.flashcards instead of a static question
-
   return (
     <div className="min-h-[calc(100dvh-4rem)] w-full min-w-0 bg-slate-50 dark:bg-slate-950 p-3 sm:p-4 md:p-6">
-      <div className="mx-auto w-full max-w-screen-2xl min-w-0 space-y-6">
+      <div className="mx-auto w-full max-w-screen-2xl min-w-0 space-y-4 sm:space-y-6">
         <section className="grid grid-cols-1 gap-4 lg:grid-cols-12" aria-label="Study overview">
           <div className="relative isolate overflow-hidden rounded-3xl border border-slate-800 bg-slate-950 p-6 text-white shadow-sm sm:p-8 lg:col-span-8">
             <div className="pointer-events-none absolute -right-16 -top-24 -z-10 h-72 w-72 rounded-full bg-indigo-500/20 blur-3xl" />
@@ -598,8 +361,8 @@ const MedicalEducationDashboard = () => {
           </div>
         </section>
 
-        {/* Progress at a glance */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        {/* Recent learning outcomes */}
+        <div className="grid grid-cols-2 gap-3 sm:gap-4">
           <StatCard
             icon={ClipboardList}
             title="Quizzes"
@@ -623,36 +386,20 @@ const MedicalEducationDashboard = () => {
                   ? `${performanceSummary.overallScore.toFixed(1)}%`
                   : '—'}
             subtitle={performanceSummaryError
-              ? 'Could not load results'
+              ? 'Unavailable'
               : performanceSummary?.totalAttempts
-                ? `${performanceSummary.totalAttempts} completed assessments`
-                : 'No completed assessments'}
+                ? `${performanceSummary.totalAttempts} assessments`
+                : 'No scores yet'}
             colorClass="bg-emerald-500"
             onClick={() => router.push('/progress')}
           />
-          <StatCard
-            icon={BookOpen}
-            title="Courses"
-            value={`${stats.coursesCompleted || 0}/${stats.totalCourses || 0}`}
-            subtitle="Progress"
-            colorClass="bg-indigo-500"
-            onClick={() => router.push('/courses')}
-          />
-          <StatCard
-            icon={Clock}
-            title="Study Time"
-            value={`${stats.studyHours || 0}h`}
-            subtitle="All time"
-            colorClass="bg-purple-500"
-            onClick={() => router.push('/study-planner')}
-          />
         </div>
 
-        <section aria-label="Quick study actions">
+        <section aria-label="Focused study activities">
           <div className="mb-3 flex items-end justify-between gap-4">
             <div>
-              <h2 className="text-lg font-semibold tracking-tight text-slate-900 dark:text-white">Make your next move</h2>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Choose a focused way to keep learning.</p>
+              <h2 className="text-lg font-semibold tracking-tight text-slate-900 dark:text-white">Choose a study activity</h2>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Take a short, focused step that supports your learning.</p>
             </div>
             <button
               type="button"
@@ -662,10 +409,10 @@ const MedicalEducationDashboard = () => {
               Open study planner <ArrowRight className="h-4 w-4" />
             </button>
           </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <button
               type="button"
-              onClick={() => setShowQuickQuiz(true)}
+              onClick={() => router.push('/quiz')}
               className="group flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-emerald-900"
             >
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400">
@@ -673,52 +420,21 @@ const MedicalEducationDashboard = () => {
               </span>
               <span>
                 <span className="block text-sm font-semibold text-slate-900 dark:text-white">Practice a quiz</span>
-                <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">Check your understanding</span>
+                <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">Strengthen recall and check understanding</span>
               </span>
               <ChevronRight className="ml-auto h-4 w-4 text-slate-400 transition group-hover:translate-x-0.5" />
             </button>
             <button
               type="button"
-              onClick={() => router.push('/flashcards')}
-              className="group flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-indigo-900"
-            >
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-400">
-                <BookMarked className="h-5 w-5" />
-              </span>
-              <span>
-                <span className="block text-sm font-semibold text-slate-900 dark:text-white">Review flashcards</span>
-                <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">{data.flashcards?.due || 0} cards due</span>
-              </span>
-              <ChevronRight className="ml-auto h-4 w-4 text-slate-400 transition group-hover:translate-x-0.5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedStudyCourseId(null);
-                setShowStudySession(true);
-              }}
-              className="group flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-rose-200 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-rose-900"
-            >
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-rose-600 dark:bg-rose-950/50 dark:text-rose-400">
-                <Clock className="h-5 w-5" />
-              </span>
-              <span>
-                <span className="block text-sm font-semibold text-slate-900 dark:text-white">Focus session</span>
-                <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">Log a study session</span>
-              </span>
-              <ChevronRight className="ml-auto h-4 w-4 text-slate-400 transition group-hover:translate-x-0.5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => router.push('/courses')}
+              onClick={() => router.push('/study-planner')}
               className="group flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-cyan-200 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-cyan-900"
             >
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-cyan-50 text-cyan-700 dark:bg-cyan-950/50 dark:text-cyan-400">
-                <BookOpen className="h-5 w-5" />
+                <Calendar className="h-5 w-5" />
               </span>
               <span>
-                <span className="block text-sm font-semibold text-slate-900 dark:text-white">Browse courses</span>
-                <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">Explore your learning</span>
+                <span className="block text-sm font-semibold text-slate-900 dark:text-white">Plan your next session</span>
+                <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">Set a realistic study goal</span>
               </span>
               <ChevronRight className="ml-auto h-4 w-4 text-slate-400 transition group-hover:translate-x-0.5" />
             </button>
@@ -853,18 +569,18 @@ const MedicalEducationDashboard = () => {
           <div className="absolute inset-x-0 top-44 border-t border-slate-100 dark:border-slate-700/30 z-0" />
           <div className="absolute inset-x-0 top-56 border-t border-slate-100 dark:border-slate-700/30 z-0" />
           
-          <div className="flex items-center justify-between mb-8 relative z-10">
-            <div>
+          <div className="relative z-10 mb-6 flex flex-col gap-3 sm:mb-8 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
               <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
                 <TrendingUp className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
                 Performance Trends
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Recorded assessment scores and study hours</p>
             </div>
-            <div className="flex bg-slate-100 dark:bg-slate-900/50 p-1 rounded-xl border border-slate-200 dark:border-slate-700/50">
+            <div className="flex w-fit max-w-full bg-slate-100 dark:bg-slate-900/50 p-1 rounded-xl border border-slate-200 dark:border-slate-700/50">
               <button
                 onClick={() => setSelectedTrendMetric('score')}
-                className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${selectedTrendMetric === 'score'
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 sm:px-4 ${selectedTrendMetric === 'score'
                   ? 'bg-white dark:bg-indigo-500 text-indigo-600 dark:text-white shadow-sm'
                   : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
                   }`}
@@ -873,7 +589,7 @@ const MedicalEducationDashboard = () => {
               </button>
               <button
                 onClick={() => setSelectedTrendMetric('hours')}
-                className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${selectedTrendMetric === 'hours'
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 sm:px-4 ${selectedTrendMetric === 'hours'
                   ? 'bg-white dark:bg-indigo-500 text-indigo-600 dark:text-white shadow-sm'
                   : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
                   }`}
@@ -941,57 +657,6 @@ const MedicalEducationDashboard = () => {
           </div>
         </div>
 
-        {/* Peer Comparison */}
-        {peerComparison && peerComparison.totalStudents > 1 ? (
-        <div className="bg-linear-to-br from-violet-600 to-purple-700 dark:from-violet-900 dark:to-purple-950 rounded-2xl p-6 shadow-lg text-white">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-2">
-              <Users className="w-6 h-6" />
-              <h3 className="text-xl font-bold">Peer Comparison</h3>
-            </div>
-            <span className="text-xs bg-white/20 px-3 py-1 rounded-full">Your Cohort</span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="bg-white/10 dark:bg-black/20 backdrop-blur-sm rounded-xl p-4 border border-white/20 dark:border-white/10">
-              <p className="text-sm text-white/80 mb-1">Your Course Progress</p>
-              <p className="text-3xl font-bold">{peerComparison.yourAverage}%</p>
-              <p className="mt-2 text-xs">
-                {peerProgressDifference === 0
-                  ? 'At the cohort average'
-                  : `${peerProgressDifference > 0 ? '+' : ''}${peerProgressDifference} points vs cohort`}
-              </p>
-            </div>
-
-            <div className="bg-white/10 dark:bg-black/20 backdrop-blur-sm rounded-xl p-4 border border-white/20 dark:border-white/10">
-              <p className="text-sm text-white/80 mb-1">Cohort Average</p>
-              <p className="text-3xl font-bold">{peerComparison.cohortAverage}%</p>
-              <p className="text-xs text-white/60 mt-2">{peerComparison.totalStudents} learners</p>
-            </div>
-
-            <div className="bg-white/10 dark:bg-black/20 backdrop-blur-sm rounded-xl p-4 border border-white/20 dark:border-white/10">
-              <p className="text-sm text-white/80 mb-1">Your Rank</p>
-              <p className="text-3xl font-bold">
-                {peerComparison.rank > 0 && peerComparison.rank <= peerComparison.totalStudents
-                  ? `#${peerComparison.rank}`
-                  : '—'}
-              </p>
-              <p className="text-xs text-white/60 mt-2">of {peerComparison.totalStudents} learners</p>
-            </div>
-
-            <div className="bg-white/10 dark:bg-black/20 backdrop-blur-sm rounded-xl p-4 border border-white/20 dark:border-white/10">
-              <p className="text-sm text-white/80 mb-1">Top Performer</p>
-              <p className="text-3xl font-bold">{peerComparison.topPerformer}%</p>
-              <p className="text-xs text-white/60 mt-2">Highest course progress</p>
-            </div>
-          </div>
-        </div>
-        ) : (
-          <div className="rounded-2xl border border-dashed border-slate-300 bg-white/70 p-6 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-400">
-            Peer comparison will appear when cohort data is available.
-          </div>
-        )}
-
         {/* Upcoming Deadlines */}
         <div className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-gray-200 dark:border-slate-700/50">
           <div className="flex items-center justify-between mb-4">
@@ -1000,7 +665,7 @@ const MedicalEducationDashboard = () => {
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Upcoming Deadlines</h3>
             </div>
             <button
-              onClick={() => setShowCalendar(true)}
+              onClick={() => router.push('/study-planner/schedule')}
               className="text-sm font-medium text-indigo-600 hover:text-indigo-700 flex items-center gap-1"
             >
               <Calendar className="w-4 h-4" />
@@ -1059,131 +724,9 @@ const MedicalEducationDashboard = () => {
           </div>
         </div>
 
-        {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Overall Progress */}
-          <div className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm rounded-2xl p-8 border border-gray-200 dark:border-slate-700/50 flex flex-col items-center">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">Overall Progress</h3>
-            <ProgressRing progress={stats.overallProgress || 0} />
-            <div className="mt-6 text-center">
-              <p className="text-sm text-gray-600 dark:text-slate-400">
-                {hasOverallProgress ? 'Progress across your enrolled units.' : 'Start a course to build your progress history.'}
-              </p>
-              <div className="flex items-center justify-center gap-2 mt-2">
-                <div className={`w-2 h-2 rounded-full ${hasOverallProgress ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
-                <span className={`text-xs font-medium ${hasOverallProgress ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400'}`}>
-                  {hasOverallProgress ? 'Progress recorded' : 'No progress recorded yet'}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Weekly Study Pattern - Interactive */}
-          <div className="lg:col-span-2 bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-gray-200 dark:border-slate-700/50">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">This Week's Activity</h3>
-              <button 
-                onClick={() => router.push('/analytics')}
-                className="text-sm font-medium text-cyan-600 dark:text-cyan-400 hover:text-cyan-500 dark:hover:text-cyan-300 flex items-center gap-1"
-              >
-                View Details <ArrowRight className="w-4 h-4" />
-              </button>
-            </div>
-            {hasWeeklyActivity ? (
-            <div className="flex items-end justify-between gap-2 h-48">
-              {weeklyActivity.map((day, i) => {
-                const hours = day.hours ?? 0;
-                const target = day.target ?? 4;
-                const percentage = (hours / 6) * 100;
-                const targetPercentage = (target / 6) * 100;
-                const isAboveTarget = hours >= target;
-
-                return (
-                  <div key={i} className="flex-1 flex flex-col items-center gap-2 group">
-                    <div className="relative w-full">
-                      {/* Target line */}
-                      <div
-                        className="absolute w-full border-t-2 border-dashed border-gray-300 left-0 dynamic-bottom"
-                        style={{ '--bottom': `${targetPercentage}%` } as React.CSSProperties}
-                      />
-                      {/* Actual bar */}
-                      <div
-                        className={`w-full rounded-t-lg transition-all hover:opacity-80 cursor-pointer dynamic-height ${isAboveTarget
-                          ? 'bg-linear-to-t from-green-500 to-emerald-400'
-                          : 'bg-linear-to-t from-indigo-500 to-cyan-400'
-                        }`}
-                        style={{ '--height': `${percentage}%` } as React.CSSProperties}
-                      >
-                        <div className="absolute -top-8 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900 text-white px-2 py-1 rounded text-xs whitespace-nowrap border border-slate-700">
-                          {hours}h / {target}h
-                        </div>
-                      </div>
-                    </div>
-                    <span className="text-xs font-medium text-slate-400">{day.day}</span>
-                    <span className="text-xs text-slate-500">{hours}h</span>
-                  </div>
-                );
-              })}
-            </div>
-            ) : (
-              <div className="h-48 flex items-center justify-center text-center text-sm text-slate-500 dark:text-slate-400">
-                No study hours logged this week yet.
-              </div>
-            )}
-            {hasWeeklyActivity && <div className="mt-4 flex items-center justify-center gap-4 text-xs">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-1 border-t-2 border-dashed border-slate-500"></div>
-                <span className="text-slate-400">Target</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded bg-emerald-500"></div>
-                <span className="text-slate-400">Above target</span>
-              </div>
-            </div>}
-          </div>
-        </div>
-
-        {/* Featured Specializations */}
-        {( (data as any).featuredSpecializations?.length || 0) > 0 && (
-          <div className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-gray-200 dark:border-slate-700/50">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-2">
-                <Star className="w-5 h-5 text-amber-500" />
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Featured Specializations</h3>
-              </div>
-              <button 
-                onClick={() => router.push('/learning-paths')}
-                className="text-sm font-medium text-indigo-600 dark:text-blue-400 hover:text-indigo-700 dark:hover:text-blue-300 flex items-center gap-1"
-              >
-                View Catalog <ArrowRight className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {((data as any).featuredSpecializations)?.map((spec: any) => (
-                <div
-                  key={spec.id}
-                  onClick={() => router.push(`/learning-paths?specialization=${spec.id}`)}
-                  className={`bg-linear-to-br ${spec.color} rounded-xl p-5 text-white hover:scale-[1.02] transition-transform cursor-pointer shadow-lg`}
-                >
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-md">
-                      {spec.icon === 'pill' ? <BookOpen className="w-5 h-5" /> : <Brain className="w-5 h-5" />}
-                    </div>
-                    <span className="px-2 py-1 bg-white/20 rounded-full text-xs font-semibold backdrop-blur-md">
-                      {spec.courseCount} Courses
-                    </span>
-                  </div>
-                  <h4 className="font-bold text-lg mb-2">{spec.title}</h4>
-                  <p className="text-white/80 text-sm line-clamp-2">{spec.description}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
         {/* Enrolled Units */}
         <div className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-gray-200 dark:border-slate-700/50">
-          <div className="flex items-center justify-between mb-6">
+          <div className="mb-5 flex flex-col items-start gap-2 sm:mb-6 sm:flex-row sm:items-center sm:justify-between">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Enrolled Units</h3>
             <button 
               onClick={() => router.push('/courses')}
@@ -1258,7 +801,7 @@ const MedicalEducationDashboard = () => {
 
         {/* Recent Materials */}
         <div className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-gray-200 dark:border-slate-700/50">
-          <div className="flex items-center justify-between mb-6">
+          <div className="mb-5 flex flex-col items-start gap-2 sm:mb-6 sm:flex-row sm:items-center sm:justify-between">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Recent Materials</h3>
             <button 
               onClick={() => router.push('/study-planner/materials')}
@@ -1295,46 +838,7 @@ const MedicalEducationDashboard = () => {
           </div>
         </div>
 
-        {/* Note: Quick Access Tools are now in the hero Quick Start section above */}
-
-        {/* Analytics Overview (Toggled) */}
-        {showAnalytics && (
-          <div className="bg-linear-to-br from-indigo-500 to-purple-600 rounded-2xl p-6 text-white shadow-xl">
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <h3 className="text-xl font-bold">Learning Analytics</h3>
-                <p className="text-indigo-100 text-sm">Quick insights into your performance</p>
-              </div>
-              <button
-                onClick={() => setShowAnalytics(false)}
-                className="bg-white text-indigo-600 px-4 py-2 rounded-lg font-semibold hover:bg-indigo-50 transition-all"
-              >
-                Close
-              </button>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-white/10 rounded-xl p-4">
-                <p className="text-sm text-white/80 mb-1">Completion Rate</p>
-                <p className="text-2xl font-bold">
-                  {Math.round(((stats.coursesCompleted || 0) / Math.max(1, (stats.totalCourses || 0))) * 100)}%
-                </p>
-              </div>
-              <div className="bg-white/10 rounded-xl p-4">
-                <p className="text-sm text-white/80 mb-1">Study Time</p>
-                <p className="text-2xl font-bold">{counters.hours}h</p>
-              </div>
-              <div className="bg-white/10 rounded-xl p-4">
-                <p className="text-sm text-white/80 mb-1">Avg Performance</p>
-                <p className="text-2xl font-bold">{counters.score}%</p>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
-
-      {/* Modals */}
-      {showQuickQuiz && <QuickQuizModal />}
-      {showCalendar && <CalendarModal />}
       
       {showStudySession && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { ReactNode, Suspense, useEffect } from 'react';
+import React, { ReactNode, Suspense, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { useLayoutStore } from '@/core/stores/useLayoutStore';
 import { useTheme } from '@/app/providers';
@@ -31,6 +31,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
     const { colorScheme, toggleTheme } = useTheme();
     const { sidebarOpen, setSidebarOpen, setNotificationsOpen, notificationsOpen } = useLayoutStore();
     const pathname = usePathname();
+    const contentScrollRef = useRef<HTMLDivElement>(null);
 
     // Notifications logic
     const { data, refetch } = useFetchNotifications();
@@ -60,6 +61,12 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
     useEffect(() => {
         setSidebarOpen(false);
     }, [pathname, setSidebarOpen]);
+
+    useEffect(() => {
+        if (!isLoading && pathname === '/dashboard' && contentScrollRef.current) {
+            contentScrollRef.current.scrollTop = 0;
+        }
+    }, [isLoading, pathname]);
 
     if (isLoading) {
         return (
@@ -105,10 +112,13 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                     />
 
                     {/* content area */}
-                    <div className={cn(
-                        'min-h-0 flex-1',
-                        isFullHeightPage ? 'overflow-hidden' : 'overflow-auto',
-                    )}>
+                    <div
+                        ref={contentScrollRef}
+                        className={cn(
+                            'min-h-0 flex-1',
+                            isFullHeightPage ? 'overflow-hidden' : 'overflow-auto',
+                        )}
+                    >
                         <div
                             className={cn(
                                 `w-full transition-all duration-300 pt-0`,
