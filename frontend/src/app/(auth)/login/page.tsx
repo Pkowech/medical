@@ -11,6 +11,7 @@ import {
   FaEnvelope,
   FaCheckCircle,
   FaExclamationCircle,
+  FaGoogle,
 } from 'react-icons/fa';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { AuthErrorCode, getAuthErrorDetails } from '@/features/auth/services/authErrors';
@@ -248,11 +249,11 @@ function LoginContent() {
 
   return (
     <div className="w-full space-y-8">
-      <div>
-        <h2 className="mt-2 text-center text-3xl font-extrabold text-gray-900 dark:text-white">
+      <div className="space-y-3">
+        <h2 className="text-center text-4xl font-black tracking-[-0.04em] text-slate-900 dark:text-white">
           Sign in to your account
         </h2>
-        <p className="mt-2 text-center text-sm text-gray-600 dark:text-slate-300">
+        <p className="text-center text-[1.05rem] font-medium text-slate-500 dark:text-slate-300">
           Enter your username or email to continue
         </p>
       </div>
@@ -334,20 +335,20 @@ function LoginContent() {
         autoComplete="on"
         onSubmit={handleSubmit}
       >
-        <div className="space-y-4">
+        <div className="space-y-5">
           <div>
             <label
               htmlFor="identifier"
-              className="block text-sm font-medium text-gray-700 mb-1 dark:text-slate-200"
+              className="mb-2 block text-[1.05rem] font-medium text-slate-700 dark:text-slate-200"
             >
               Username or Email
             </label>
             <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5">
                 {isEmail ? (
-                  <FaEnvelope className="h-5 w-5 text-gray-400 dark:text-slate-400" />
+                  <FaEnvelope className="h-5 w-5 text-slate-400 dark:text-slate-400" />
                 ) : (
-                  <FaUser className="h-5 w-5 text-gray-400 dark:text-slate-400" />
+                  <FaUser className="h-5 w-5 text-slate-400 dark:text-slate-400" />
                 )}
               </div>
               <input
@@ -369,11 +370,11 @@ function LoginContent() {
                     });
                   }
                 }}
-                className={`appearance-none block w-full pl-10 pr-3 py-2 border ${
+                className={`block w-full rounded-xl border bg-white py-3.5 pl-11 pr-3 text-[1.05rem] text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${
                   formErrors.identifier
-                    ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
-                    : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500 dark:border-slate-600 dark:bg-slate-800 dark:text-white dark:placeholder-slate-400'
-                } rounded-md placeholder-gray-500 text-gray-900 focus:outline-none sm:text-sm`}
+                    ? 'border-red-300 focus:border-red-500'
+                    : 'border-slate-300 focus:border-blue-500 dark:border-slate-600 dark:bg-slate-800 dark:text-white dark:placeholder:text-slate-400'
+                }`}
                 placeholder="Enter your username or email"
               />
             </div>
@@ -386,13 +387,13 @@ function LoginContent() {
           <div>
             <label
               htmlFor="password"
-              className="block text-sm font-medium text-gray-700 mb-1 dark:text-slate-200"
+              className="mb-2 block text-[1.05rem] font-medium text-slate-700 dark:text-slate-200"
             >
               Password
             </label>
             <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <FaLock className="h-5 w-5 text-gray-400 dark:text-slate-400" />
+              <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5">
+                <FaLock className="h-5 w-5 text-slate-400 dark:text-slate-400" />
               </div>
               <input
                 id="password"
@@ -413,22 +414,23 @@ function LoginContent() {
                     });
                   }
                 }}
-                className={`appearance-none block w-full pl-10 pr-10 py-2 border ${
+                className={`block w-full rounded-xl border bg-white py-3.5 pl-11 pr-11 text-[1.05rem] text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${
                   formErrors.password
-                    ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
-                    : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500 dark:border-slate-600 dark:bg-slate-800 dark:text-white dark:placeholder-slate-400'
-                } rounded-md placeholder-gray-500 text-gray-900 focus:outline-none sm:text-sm`}
+                    ? 'border-red-300 focus:border-red-500'
+                    : 'border-slate-300 focus:border-blue-500 dark:border-slate-600 dark:bg-slate-800 dark:text-white dark:placeholder:text-slate-400'
+                }`}
                 placeholder="Enter your password"
               />
               <button
                 type="button"
-                className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                className="absolute inset-y-0 right-0 flex items-center pr-3.5 text-slate-400 transition-colors hover:text-slate-600 dark:text-slate-300"
                 onClick={() => setShowPassword(!showPassword)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
               >
                 {showPassword ? (
-                  <FaEyeSlash className="h-5 w-5 text-gray-400 dark:text-slate-300" />
+                  <FaEyeSlash className="h-5 w-5" />
                 ) : (
-                  <FaEye className="h-5 w-5 text-gray-400 dark:text-slate-300" />
+                  <FaEye className="h-5 w-5" />
                 )}
               </button>
             </div>
@@ -440,28 +442,23 @@ function LoginContent() {
           </div>
         </div>
 
-        <div className="flex items-center justify-between">
-          <div className="flex items-center">
+        <div className="flex items-center justify-between gap-3">
+          <label htmlFor="rememberMe" className="flex cursor-pointer items-center gap-3">
             <input
               id="rememberMe"
               name="rememberMe"
               type="checkbox"
               checked={rememberMe}
               onChange={e => setRememberMe(e.target.checked)}
-              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded cursor-pointer dark:border-slate-600 dark:bg-slate-800"
+              className="h-5 w-5 cursor-pointer rounded-md border border-slate-300 bg-white accent-blue-600"
             />
-            <label
-              htmlFor="rememberMe"
-              className="ml-2 block text-sm text-gray-900 dark:text-slate-200"
-            >
-              Remember me
-            </label>
-          </div>
+            <span className="text-[1.05rem] text-slate-700 dark:text-slate-200">Remember me</span>
+          </label>
 
-          <div className="text-sm">
+          <div className="text-sm font-medium">
             <Link
               href="/forgot-password"
-              className="font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
+              className="text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
             >
               Forgot your password?
             </Link>
@@ -472,44 +469,43 @@ function LoginContent() {
           <button
             type="submit"
             disabled={loading}
-            className={`group relative w-full flex justify-center py-2.5 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors dark:focus:ring-offset-slate-900 ${
-              loading ? 'opacity-50 cursor-not-allowed' : ''
+            className={`group relative flex w-full justify-center rounded-xl border border-transparent bg-[#0d6efd] px-4 py-4 text-[1.15rem] font-bold text-white shadow-[0_10px_18px_rgba(13,110,253,0.25)] transition-colors hover:bg-[#0b5ed7] focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:ring-offset-2 dark:focus:ring-offset-slate-900 ${
+              loading ? 'cursor-not-allowed opacity-70' : ''
             }`}
           >
             <>
-              {loading && <FaSpinner className="animate-spin mr-2" />}
+              {loading && <FaSpinner className="mr-2 animate-spin" />}
               {loading ? 'Signing in...' : 'Sign in'}
             </>
           </button>
         </div>
 
-        <div className="relative my-6">
-          <div className="absolute inset-0 flex items-center" aria-hidden="true">
-            <div className="w-full border-t border-gray-300 dark:border-slate-700" />
-          </div>
-          <div className="relative flex justify-center text-xs uppercase tracking-[0.2em] text-gray-500 dark:text-slate-400">
-            <span className="bg-white px-2 dark:bg-slate-900">Or continue with</span>
-          </div>
+        <div className="my-5 flex items-center gap-4">
+          <div className="h-px flex-1 bg-slate-300" aria-hidden="true" />
+          <span className="text-[0.78rem] font-semibold uppercase tracking-[0.28em] text-slate-500 dark:text-slate-400">
+            Or continue with
+          </span>
+          <div className="h-px flex-1 bg-slate-300" aria-hidden="true" />
         </div>
 
-        <div className="space-y-3">
+        <div>
           <button
             type="button"
             onClick={() => void handleProviderSignIn()}
             disabled={loading || socialLoading !== null}
-            className="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
+            className="flex w-full items-center justify-center gap-3 rounded-xl border border-slate-300 bg-white px-4 py-3.5 text-[1.1rem] font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
           >
-            <span aria-hidden="true">G</span>
-            {socialLoading === 'google' ? 'Connecting...' : 'Google'}
+            <FaGoogle className="text-[1.7rem]" />
+            <span>{socialLoading === 'google' ? 'Connecting...' : 'Google'}</span>
           </button>
         </div>
 
         <div className="mt-6 text-center">
-          <p className="text-sm text-gray-600 dark:text-slate-300">
+          <p className="text-[1.05rem] text-slate-600 dark:text-slate-300">
             Don't have an account?{' '}
             <Link
               href="/register"
-              className="font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
+              className="font-bold text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
             >
               Sign up
             </Link>
