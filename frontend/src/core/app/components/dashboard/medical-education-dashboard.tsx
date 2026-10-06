@@ -4,7 +4,6 @@ import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import {
-  BookOpen,
   Clock,
   TrendingUp,
   BarChart3,
@@ -23,9 +22,8 @@ import {
 import { useRouter } from 'next/navigation';
 import { usePageHeader } from '@/core/providers/HeaderContext';
 import { useAuthStore } from '@/features/auth/store/useAuthStore';
-import { Deadline, CourseDisplayDataExtended } from '@/shared/types';
+import type { Deadline } from '@/shared/types';
 import { StatCard } from '@/shared/components/ui/StatCard';
-import { Button } from '@/shared/components/ui/button';
 import { StudySession } from '@/features/learning-management/study/components/study-session';
 import { useStudy } from '@/features/learning-management/study/hooks/useStudy';
 import { useProgress } from '@/shared/hooks/useProgress';
