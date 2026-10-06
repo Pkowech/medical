@@ -65,7 +65,9 @@ export const CoursesDashboard = () => {
     queryKey: ['course-progress-dashboard', user?.id],
     queryFn: () => courseService.getProgressDashboard(user!.id),
     enabled: Boolean(user?.id),
-    staleTime: 30_000,
+    staleTime: 2 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    meta: { persist: Boolean(user?.id) },
   });
   const activeUnits = progressDashboard?.enrolledUnits ?? [];
   const courseProgressById = new Map(
@@ -228,13 +230,17 @@ export const CoursesDashboard = () => {
   });
 
   const { data: courseStatisticsData } = useQuery({
-    queryKey: ['courseStatistics'],
+    queryKey: ['courseStatistics', user?.id],
     queryFn: () => courseService.getCourseStats().catch(() => ({
       totalEnrolled: 0,
       completed: 0,
       inProgress: 0,
       avgScore: 0,
     })),
+    enabled: Boolean(user?.id),
+    staleTime: 2 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    meta: { persist: Boolean(user?.id) },
   });
 
   const courseStatistics = (courseStatisticsData as CourseStatistics) || {
@@ -283,7 +289,7 @@ export const CoursesDashboard = () => {
       queryClient.invalidateQueries({ queryKey: ['courses'] }),
       queryClient.invalidateQueries({ queryKey: ['active-units'] }),
       queryClient.invalidateQueries({ queryKey: ['course-progress-dashboard'] }),
-      queryClient.invalidateQueries({ queryKey: ['courseStatistics'] }),
+      queryClient.invalidateQueries({ queryKey: ['courseStatistics', user?.id] }),
     ]);
     setActiveTab('enrolled');
     toast.success('Units added to My Learning.');
@@ -297,7 +303,7 @@ export const CoursesDashboard = () => {
       await courseService.unenrollFromCourse(course.id);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['courses'] }),
-        queryClient.invalidateQueries({ queryKey: ['courseStatistics'] }),
+        queryClient.invalidateQueries({ queryKey: ['courseStatistics', user?.id] }),
         queryClient.invalidateQueries({ queryKey: ['active-units'] }),
         queryClient.invalidateQueries({ queryKey: ['course-progress-dashboard'] }),
       ]);

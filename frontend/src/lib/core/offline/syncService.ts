@@ -155,6 +155,7 @@ class SyncService {
     let db: Awaited<ReturnType<typeof initDB>> | undefined;
     let lockOwner: string | undefined;
     let leaseTimer: ReturnType<typeof setInterval> | undefined;
+    let syncedActivity = false;
     try {
       db = await this.getDb();
 
@@ -295,6 +296,7 @@ class SyncService {
             // Success: mark as synced and delete
             // Using atomic operations to avoid transaction timeouts
             await db.delete(SYNC_STORE_NAME, item.id);
+            syncedActivity = true;
             console.warn(`✅ Synced item ${item.id} to ${item.url}`);
           } else if (response.status === 401) {
             await db.put(SYNC_STORE_NAME, {
@@ -394,6 +396,9 @@ class SyncService {
       }
       // Always release the lock
       this.isFlushing = false;
+      if (syncedActivity && typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('learning:offline-sync-complete'));
+      }
     }
   }
 

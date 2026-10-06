@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   ChevronLeft,
   ChevronRight,
@@ -30,6 +31,9 @@ import { useCourseNavigation } from '@/features/courses/hooks/useCourseNavigatio
 import { useXapi } from '@/lib/xapi/useXapi';
 import { MaterialPreviewModal } from '@/features/courses/components/MaterialPreviewModal';
 import { Button } from '@/shared/components/ui/button';
+import progressService from '@/features/learning-management/services/progressService';
+import offlineProgressSync from '@/features/learning-management/services/offlineProgressSync';
+import { toast } from 'sonner';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -71,6 +75,7 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
 
   // ── Page header ────────────────────────────────────────────────────────
   const { setHeader } = usePageHeader();
+  const queryClient = useQueryClient();
 
   // ── Progress store ─────────────────────────────────────────────────────
   const { progress, bookmarks, notes, markLessonComplete, toggleLessonComplete, toggleBookmark, saveNote } =
@@ -160,6 +165,63 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
   };
 
   const typedCurrentTopic = getCurrentTopic() as unknown as Lesson & { resources?: Material[] };
+  const refreshLearningCaches = async () => {
+    if (!user?.id) return;
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['userProgress', user.id] }),
+      queryClient.invalidateQueries({ queryKey: ['userLearningStreak', user.id] }),
+      queryClient.invalidateQueries({ queryKey: ['studyPlanner', user.id] }),
+      queryClient.invalidateQueries({ queryKey: ['course-progress-dashboard', user.id] }),
+      queryClient.invalidateQueries({ queryKey: ['courseStatistics', user.id] }),
+      queryClient.invalidateQueries({ queryKey: ['studyResume', user.id] }),
+      queryClient.invalidateQueries({ queryKey: ['courses'] }),
+      queryClient.invalidateQueries({ queryKey: ['unit'] }),
+    ]);
+  };
+  const handleToggleLessonComplete = async (key: string) => {
+    if (typedCurrentTopic?.id == null) {
+      toast.error('This topic cannot be updated because it has no topic ID.');
+      return;
+    }
+
+    const isComplete = Boolean(progress[key]);
+    const nextStatus: 'notStarted' | 'completed' = isComplete ? 'notStarted' : 'completed';
+    const progressPercentage = isComplete ? 0 : 100;
+    const update = {
+      courseId,
+      unitId,
+      topicId: String(typedCurrentTopic.id),
+      status: nextStatus,
+      progressPercentage,
+    };
+
+    try {
+      await progressService.updateContentProgress(update);
+    } catch (error) {
+      console.error('Failed to update topic progress:', error);
+      try {
+        await offlineProgressSync.addToQueue({
+          courseId: update.courseId,
+          unitId,
+          topicId: update.topicId,
+          percent: progressPercentage,
+          status: isComplete ? 'notStarted' : 'completed',
+        });
+        toggleLessonComplete(key);
+        toast.info('Topic progress saved offline and will sync when connected.');
+        return;
+      } catch (queueError) {
+        console.error('Failed to queue topic progress:', queueError);
+        toast.error('Topic progress could not be saved.');
+        return;
+      }
+    }
+
+    toggleLessonComplete(key);
+    await Promise.all([refreshLearningCaches(), refetchUnit()]).catch(error => {
+      console.error('Failed to refresh topic progress after saving:', error);
+    });
+  };
   const unitProgressPercentage = unitData?.chapters?.length
     ? Math.round(
         (unitData.chapters.filter(chapter => chapter.lessons[0]?.isCompleted).length /
@@ -431,7 +493,9 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
                   lessonId={typedCurrentTopic?.id}
                   lessonTitle={typedCurrentTopic?.title}
                   scope="topic"
-                  onTopicProgressUpdated={() => refetchUnit().then(() => undefined)}
+                  onTopicProgressUpdated={async () => {
+                    await Promise.all([refetchUnit(), refreshLearningCaches()]);
+                  }}
                   onTopicCompleted={() => {
                     markLessonComplete(lessonKey);
                     if (typedCurrentTopic?.id != null) {
@@ -465,7 +529,7 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
                   bookmarks={new Set(bookmarks)}
                   progress={progress}
                   toggleBookmark={toggleBookmark}
-                  toggleLessonComplete={toggleLessonComplete}
+                  toggleLessonComplete={handleToggleLessonComplete}
                   navigatePrev={() => { setHasSelectedTopic(true); navigatePrev(); }}
                   navigateNext={() => { setHasSelectedTopic(true); navigateNext(); }}
                   onOpenMasteryQuiz={() => toggleCoursePanel('quiz')}

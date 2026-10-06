@@ -144,21 +144,8 @@ interface DashboardApiResponse {
 
 const progressService = {
   async getProgressStats(userId: string): Promise<ProgressStats> {
-    try {
-      const response = await api.get<ProgressStats>(`/progress/overview/${userId}`);
-      return response.data as ProgressStats;
-    } catch (error) {
-      console.error('Error fetching progress stats:', formatError(error));
-
-      // Return placeholder data if API fails
-      return {
-        overallProgress: 48,
-        coursesCompleted: 7,
-        totalCourses: 15,
-        streak: 12,
-        lastActivity: new Date().toISOString(),
-      };
-    }
+    const response = await api.get<ProgressStats>(`/progress/overview/${userId}`);
+    return response.data;
   },
 
   async getUserProgress(userId: string): Promise<UnknownRecord[]> {
@@ -177,7 +164,7 @@ const progressService = {
       return response.data;
     } catch (error) {
       console.error('Error fetching course progress:', formatError(error));
-      return []; // Return empty array on error
+      throw error;
     }
   },
 
@@ -299,9 +286,17 @@ const progressService = {
       const dashboardRes = progressResult.status === 'fulfilled' ? progressResult.value : null;
       const masteryRes = masteryResult.status === 'fulfilled' ? masteryResult.value : null;
 
+      if (progressResult.status === 'rejected') {
+        throw progressResult.reason;
+      }
+      if (masteryResult.status === 'rejected') {
+        console.warn('Mastery data is currently unavailable:', formatError(masteryResult.reason));
+      }
+
       const dashboardData = dashboardRes?.data || {} as DashboardApiResponse;
       const {
         overview: overviewRes,
+        courses: coursesRes,
         activities: activitiesRes,
         achievements: achievementsRes,
         peerComparison: peerRes,
@@ -316,6 +311,7 @@ const progressService = {
       
       const overviewData = overviewRes;
       const activitiesData = activitiesRes;
+      const coursesData = Array.isArray(coursesRes) ? coursesRes : [];
       const achievementsData = achievementsRes;
       const peerData = peerRes;
       // streaksRes is the data
@@ -461,16 +457,20 @@ const progressService = {
         totalCourses: stats.totalCourses || 0,
         streak: stats.streak || 0,
         lastActivity: stats.lastActivity || null,
-        courseProgress: enrolledUnitsRaw.map(cp => ({
-          id: asString(cp.courseId, '') || generateId(),
-          unitId: asString(cp.unitId, ''),
-          title: asString(cp.unitTitle, '') || asString(cp.courseTitle, '') || 'Untitled Unit',
-          progressPercentage:
-            (typeof cp.progressPercentage === 'number' ? cp.progressPercentage : undefined) ??
-            0,
-          completed: cp.progressPercentage === 100,
-          nextTopicId: asString(cp.nextTopicId, '') || undefined,
-        })),
+        courseProgress: coursesData.flatMap(course => {
+          const courseId = asString(course.courseId, '') || asString(course.id, '');
+          if (!courseId) return [];
+          const progressPercentage = asNumber(course.progressPercentage)
+            ?? asNumber(course.progress)
+            ?? 0;
+          return [{
+            id: courseId,
+            title: asString(course.title, '') || asString(course.courseName, '') || 'Untitled Course',
+            progressPercentage,
+            completed: course.completed === true || progressPercentage >= 100,
+            lastAccessedAt: asString(course.lastAccessedAt, '') || undefined,
+          }];
+        }),
         recentActivities: Array.isArray(recentActivities) ? (recentActivities as unknown as ProgressActivity[]) : [],
         recentActivity: [],
         achievements: Array.isArray(achievements) ? achievements : [],
@@ -563,7 +563,8 @@ const progressService = {
         aiInsights: [],
       };
       
-      // Map courseData to the computed courseProgress array to feed the Dashboard
+      // Course-level progress comes from `courses`; use enrolled units only to
+      // attach a convenient next-unit hint for the dashboard.
       const courseProgressList: CourseProgress[] = result.courseProgress || [];
       result.courseData = courseProgressList.map((cp, idx) => {
          const colors = [
@@ -574,8 +575,8 @@ const progressService = {
          ];
          return {
            id: cp.id,
-           unitId: cp.unitId,
-           nextTopicId: cp.nextTopicId,
+           unitId: asString(enrolledUnitsRaw.find(unit => unit.courseId === cp.id)?.unitId, '') || undefined,
+           nextTopicId: asString(enrolledUnitsRaw.find(unit => unit.courseId === cp.id)?.nextTopicId, '') || undefined,
            name: cp.title,
            progressPercentage: cp.progressPercentage,
            color: colors[idx % colors.length] || 'from-gray-500 to-slate-600',
@@ -698,13 +699,11 @@ const progressService = {
    */
   async getUnitProgress(userId: string, courseId?: string): Promise<UnitProgressSummary[]> {
     try {
-      const response = await api.get<{ courseProgress?: UnitProgressSummary[] }>(
-        `/progress/overview/${userId}`
+      const response = await api.get<{ enrolledUnits?: UnitProgressSummary[] }>(
+        `/progress/dashboard/${userId}`
       );
-      // The backend returns the raw progress data inside courseProgress for this endpoint
-      let progressList = response.data?.courseProgress || [];
+      let progressList = response.data?.enrolledUnits || [];
       
-      // If courseId is passed, filter the list
       if (courseId) {
         progressList = progressList.filter(p => p.courseId === courseId);
       }
@@ -712,7 +711,7 @@ const progressService = {
       return Array.isArray(progressList) ? progressList : [];
     } catch (error) {
       console.error('Error fetching unit progress:', formatError(error));
-      return [];
+      throw error;
     }
   },
 

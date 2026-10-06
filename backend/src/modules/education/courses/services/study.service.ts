@@ -484,23 +484,33 @@ export class StudyService {
     userId: string,
     period: 'week' | 'month' | 'year' = 'month',
   ): Promise<any> {
-    const sessions = await this.getUserSessions(userId);
+    const now = new Date();
+    const startDate = new Date(now);
+    if (period === 'week') {
+      startDate.setDate(startDate.getDate() - 6);
+    } else if (period === 'month') {
+      startDate.setMonth(startDate.getMonth() - 1);
+    } else {
+      startDate.setFullYear(startDate.getFullYear() - 1);
+    }
+    startDate.setHours(0, 0, 0, 0);
 
-    const totalSessions = sessions.length;
-    const totalMinutes = sessions.reduce(
-      (sum, s) => sum + (s.duration ?? 0),
-      0,
-    );
+    const summary = await this.prisma.studySession.aggregate({
+      where: {
+        userId,
+        isValid: true,
+        endTime: { not: null },
+        startTime: { gte: startDate, lte: now },
+      },
+      _sum: { duration: true },
+      _avg: { duration: true, focusScore: true },
+      _count: { id: true },
+    });
+    const totalSessions = summary._count.id;
+    const totalMinutes = summary._sum.duration ?? 0;
     const totalHours = Math.round((totalMinutes / 60) * 10) / 10;
-    const avgSessionLength =
-      totalSessions > 0
-        ? Math.round((totalMinutes / totalSessions) * 10) / 10
-        : 0;
-    const avgFocusScore =
-      totalSessions > 0
-        ? sessions.reduce((sum, s) => sum + (s.focusScore ?? 0), 0) /
-          totalSessions
-        : 0;
+    const avgSessionLength = Math.round((summary._avg.duration ?? 0) * 10) / 10;
+    const avgFocusScore = Math.round(summary._avg.focusScore ?? 0);
 
     return {
       totalSessions,

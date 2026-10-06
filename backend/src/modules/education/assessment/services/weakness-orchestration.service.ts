@@ -294,14 +294,28 @@ export class WeaknessOrchestrationService {
       },
     });
 
-    return pending.map((p: any) => ({
-      id: p.id,
-      quizId: p.quiz.id,
-      quizTitle: p.quiz.title,
-      weaknessTopicId: p.topic.id,
-      weaknessTopicName: p.topic.name,
-      riskLevel: p.riskLevel,
-      detectedAt: p.detectedAt,
+    const masteryRecords = pending.length
+      ? await this.prisma.userSkillState.findMany({
+          where: {
+            userId,
+            skillId: { in: pending.map(quiz => quiz.weaknessTopicId) },
+          },
+          select: { skillId: true, pKnown: true },
+        })
+      : [];
+    const masteryByTopicId = new Map(
+      masteryRecords.map(record => [record.skillId, record.pKnown]),
+    );
+
+    return pending.map(quiz => ({
+      id: quiz.id,
+      quizId: quiz.quiz.id,
+      quizTitle: quiz.quiz.title,
+      weaknessTopicId: quiz.topic.id,
+      weaknessTopicName: quiz.topic.name,
+      oldMastery: masteryByTopicId.get(quiz.weaknessTopicId),
+      riskLevel: quiz.riskLevel,
+      detectedAt: quiz.detectedAt,
     }));
   }
 

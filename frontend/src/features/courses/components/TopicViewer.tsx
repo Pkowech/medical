@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import {
   FileText,
@@ -25,6 +26,7 @@ import offlineProgressSync from '@/features/learning-management/services/offline
 import { Material, MaterialType } from '@/shared/types/materialInterface';
 import { usePageHeader } from '@/core/providers/HeaderContext';
 import { useCourseProgressStore } from '@/features/courses/hooks/useCourseProgressStore';
+import { useAuthStore } from '@/features/auth/store/useAuthStore';
 import { MaterialPreviewModal } from './MaterialPreviewModal';
 import { TopicQuiz } from './TopicQuiz';
 import { Button } from '@/shared/components/ui/button';
@@ -163,9 +165,25 @@ const getMaterialColor = (type: string): string => {
 
 export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topicId }) => {
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const userId = useAuthStore(state => state.user?.id);
   const { data: session } = useSession();
   const { setHeader } = usePageHeader();
   const { toggleBookmark, bookmarks, markLessonComplete, progress } = useCourseProgressStore();
+
+  const refreshLearningCaches = async () => {
+    if (!userId) return;
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['userProgress', userId] }),
+      queryClient.invalidateQueries({ queryKey: ['userLearningStreak', userId] }),
+      queryClient.invalidateQueries({ queryKey: ['studyPlanner', userId] }),
+      queryClient.invalidateQueries({ queryKey: ['course-progress-dashboard', userId] }),
+      queryClient.invalidateQueries({ queryKey: ['courseStatistics', userId] }),
+      queryClient.invalidateQueries({ queryKey: ['studyResume', userId] }),
+      queryClient.invalidateQueries({ queryKey: ['courses'] }),
+      queryClient.invalidateQueries({ queryKey: ['unit'] }),
+    ]);
+  };
 
   const [topic, setTopic] = useState<Topic | null>(null);
   const [materials, setMaterials] = useState<Material[]>([]);
@@ -473,6 +491,7 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
           status: 'completed',
           progressPercentage: 100,
         });
+        await refreshLearningCaches();
       } catch (error) {
         console.error('Error tracking material progress:', error);
         try {
@@ -510,6 +529,7 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
         status: 'completed',
         progressPercentage: 100,
       });
+      await refreshLearningCaches();
       markLessonComplete(topicId);
       toast.success('Topic marked as complete!');
     } catch (error) {
@@ -548,6 +568,7 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
       status: 'completed',
       progressPercentage: 100,
     });
+    await refreshLearningCaches();
     markLessonComplete(topicId);
     toast.success(`Topic mastered with ${result.score}%`);
   };

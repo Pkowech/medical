@@ -14,18 +14,30 @@ import { Label } from '@/shared/components/ui/label';
 import { Textarea } from '@/shared/components/ui/textarea';
 import { ScrollArea } from '@/shared/components/ui/scroll-area';
 import { Play, Pause, Square, BookOpen, Sparkles, ScrollText } from 'lucide-react';
-import type { StudySessionActivity } from '@/shared/types/studyInterface';
+import type {
+  StudySession as StudySessionResponse,
+  StudySessionActivity,
+  StudySessionContext,
+} from '@/shared/types/studyInterface';
 import { toast } from 'sonner';
 interface StudySessionProps {
   topicId?: string;
-  onSessionEnd: () => void;
+  context?: StudySessionContext;
+  contextLabel?: string;
+  onSessionEnd: (session: StudySessionResponse) => void;
 }
 
 type Activity = { type: 'reading' | 'quiz' | 'notes'; durationMinutes: number; timestamp: Date };
 
 
-export const StudySession: React.FC<StudySessionProps> = ({ topicId, onSessionEnd }) => {
+export const StudySession: React.FC<StudySessionProps> = ({
+  topicId,
+  context,
+  contextLabel,
+  onSessionEnd,
+}) => {
   const { startSession, endSession } = useStudy();
+  const studyContext = context ?? (topicId ? { type: 'topic' as const, id: topicId } : undefined);
 
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isActive, setIsActive] = useState(false);
@@ -57,7 +69,7 @@ export const StudySession: React.FC<StudySessionProps> = ({ topicId, onSessionEn
 
     try {
       setSessionError(null);
-      const session = await startSession(topicId);
+      const session = await startSession(studyContext);
       if (session) {
         setSessionId(session.id);
         setIsActive(true);
@@ -90,13 +102,19 @@ export const StudySession: React.FC<StudySessionProps> = ({ topicId, onSessionEn
         timestamp: activity.timestamp.toISOString(),
       }));
       const endedSession = await endSession(sessionId, notes, sessionActivities, elapsedTime);
+      const durationLabel = `${endedSession.duration ?? Math.floor(elapsedTime / 60)} min`;
       if (endedSession.isValid) {
-        toast.success('Study session saved and counted toward your learning progress.');
+        toast.success(
+          `${durationLabel} study session saved${contextLabel ? ` for ${contextLabel}` : ''} and counted toward your learning progress.`,
+        );
       } else {
-        toast.info(endedSession.invalidReason || 'This session was too short to count toward learning progress or streaks.');
+        const reason = endedSession.invalidReason ? ` ${endedSession.invalidReason}.` : '';
+        toast.info(
+          `${durationLabel} study session saved${contextLabel ? ` for ${contextLabel}` : ''}, but was not counted toward progress or streaks.${reason}`,
+        );
       }
       setShowEndDialog(false);
-      onSessionEnd();
+      onSessionEnd(endedSession);
     } catch (error) {
       console.error('Error ending session:', error);
       setSessionError('Could not save this session. Please try again.');
@@ -128,7 +146,15 @@ export const StudySession: React.FC<StudySessionProps> = ({ topicId, onSessionEn
       <Card>
         <CardContent className="space-y-6">
           <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-semibold">{topicId ? 'Study Session' : 'Focus Session'}</h2>
+            <div>
+              <h2 className="text-2xl font-semibold">{studyContext ? 'Course study session' : 'General focus session'}</h2>
+              {contextLabel && (
+                <p className="mt-1 text-sm text-muted-foreground">{contextLabel}</p>
+              )}
+              <p className="mt-1 text-xs text-muted-foreground">
+                Sessions under 5 minutes are saved but do not count toward progress or streaks.
+              </p>
+            </div>
             <div className="text-3xl font-mono text-blue-600 dark:text-blue-400">
               {formatTime(elapsedTime)}
             </div>

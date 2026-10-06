@@ -19,6 +19,8 @@ export function useLearningStreak() {
     },
     enabled: !!user?.id,
     staleTime: 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    meta: { persist: Boolean(user?.id) },
   });
 
   return {
@@ -46,6 +48,8 @@ export function useProgress() {
     },
     enabled: !!user?.id,
     staleTime: 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    meta: { persist: Boolean(user?.id) },
   });
   const {
     streak,

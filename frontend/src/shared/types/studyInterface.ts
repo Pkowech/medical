@@ -9,6 +9,15 @@ export interface StudySessionInternal {
   notes?: string;
 }
 
+export interface StudySessionContext {
+  type: 'course' | 'unit' | 'topic' | 'material';
+  id: string;
+}
+
+export type StudyResumePoint =
+  | { type: 'topic'; id: string; title?: string; unitId: string; unitTitle?: string }
+  | { completed: true; message: string };
+
 /**
  * Backend API response type for study session (aligns with Prisma StudySession)
  * Contains all fields from backend StudySession model
@@ -51,6 +60,7 @@ export interface CourseProgressResponse {
   course?: { title?: string };
   title?: string;
   progressPercentage?: number;
+  lastAccessedAt?: string;
 }
 
 /**
@@ -60,8 +70,11 @@ export interface UnitProgressResponse {
   id?: string;
   unitId?: string;
   unit?: { title?: string; courseId?: string };
+  unitTitle?: string;
+  courseTitle?: string;
   title?: string;
   progressPercentage?: number;
+  lastAccessedAt?: string | null;
 }
 
 export interface ScheduleEvent {
