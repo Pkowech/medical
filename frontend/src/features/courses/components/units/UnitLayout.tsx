@@ -104,6 +104,11 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
     setSidebarCollapsed(false);
     setSelectedMaterialId(id);
   };
+  const openCoursePanel = (panelName: string) => {
+    setSelectedMaterialId(null);
+    setSidebarCollapsed(false);
+    toggleCoursePanel(panelName);
+  };
   const closeMaterial = () => {
     setSidebarCollapsed(false);
     setSelectedMaterialId(null);
@@ -406,7 +411,7 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
             currentLessonIndex={currentLessonIndex}
             navigateTo={selectTopic}
             progress={progress}
-            toggleCoursePanel={toggleCoursePanel}
+            toggleCoursePanel={openCoursePanel}
             openMaterial={openMaterial}
             allowCollapse={Boolean(selectedMaterialId)}
           />

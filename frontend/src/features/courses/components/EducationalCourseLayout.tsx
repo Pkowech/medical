@@ -82,6 +82,11 @@ export const EducationalCourseLayout = ({ courseId: propCourseId }: EducationalC
     setSidebarCollapsed(false);
     setSelectedMaterialId(null);
   };
+  const openCoursePanel = (panelName: string) => {
+    setSelectedMaterialId(null);
+    setSidebarCollapsed(false);
+    toggleCoursePanel(panelName);
+  };
 
   // --- DATA FETCHING & HOOKS ---
   const { data: courseData, isLoading: isCourseLoading, error: courseError, refetch: refetchCourse } = useCourseData(courseId);
@@ -247,7 +252,7 @@ export const EducationalCourseLayout = ({ courseId: propCourseId }: EducationalC
             currentLessonIndex={currentLessonIndex}
             navigateTo={navigateTo}
             progress={progress}
-            toggleCoursePanel={toggleCoursePanel}
+            toggleCoursePanel={openCoursePanel}
             openMaterial={openMaterial}
             allowCollapse={Boolean(selectedMaterialId)}
           />
