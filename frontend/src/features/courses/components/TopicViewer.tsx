@@ -29,6 +29,7 @@ import { useCourseProgressStore } from '@/features/courses/hooks/useCourseProgre
 import { useAuthStore } from '@/features/auth/store/useAuthStore';
 import { MaterialPreviewModal } from './MaterialPreviewModal';
 import { TopicQuiz } from './TopicQuiz';
+import { NotesPanel } from './NotesPanel';
 import { Button } from '@/shared/components/ui/button';
 import { Badge } from '@/shared/components/ui/badge';
 import { toast } from 'sonner';
@@ -173,7 +174,8 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
   const userId = useAuthStore(state => state.user?.id);
   const { data: session } = useSession();
   const { setHeader } = usePageHeader();
-  const { toggleBookmark, bookmarks, markLessonComplete, progress } = useCourseProgressStore();
+  const { toggleBookmark, bookmarks, markLessonComplete, progress, notes, saveNote } =
+    useCourseProgressStore();
   const { activeSession, recordCourseActivity, switchCourseTopic } = useCourseStudySession();
 
   const refreshLearningCaches = async () => {
@@ -196,6 +198,7 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
   const [selectedMaterialId, setSelectedMaterialId] = useState<string | null>(null);
   const [showMaterialModal, setShowMaterialModal] = useState(false);
   const [showQuiz, setShowQuiz] = useState(false);
+  const [showNotes, setShowNotes] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [offlineUserId, setOfflineUserId] = useState<string>();
   const [offlineBundle, setOfflineBundle] = useState<OfflineTopicBundle>();
@@ -663,6 +666,21 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
                 </div>
               )}
               <Button
+                variant={showNotes ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => {
+                  setSelectedMaterialId(null);
+                  setShowMaterialModal(false);
+                  setShowNotes(current => !current);
+                }}
+                aria-expanded={showNotes}
+                aria-controls="topic-notes"
+                className="flex-shrink-0"
+              >
+                <FileText className="mr-2 h-4 w-4" />
+                Notes
+              </Button>
+              <Button
                 variant={isBookmarked ? 'default' : 'outline'}
                 size="icon"
                 onClick={handleToggleBookmark}
@@ -705,6 +723,17 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
                     : 'This topic is ready for brief interruptions. Its temporary cache is cleared when you leave; use “Download for offline” to keep it.'}
             </div>
           )}
+
+        {showNotes && (
+          <section id="topic-notes" aria-label="Topic notes">
+            <NotesPanel
+              topicId={topicId}
+              lessonKey={`${topicId}-${topicId}`}
+              notes={notes}
+              saveNote={saveNote}
+            />
+          </section>
+        )}
 
         {/* Topic Description */}
         {topic.description && (

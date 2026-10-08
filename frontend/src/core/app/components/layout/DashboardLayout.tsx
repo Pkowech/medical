@@ -117,7 +117,9 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                         ref={contentScrollRef}
                         className={cn(
                             'min-h-0 flex-1 overscroll-y-contain',
-                            isFullHeightPage ? 'overflow-hidden' : 'overflow-auto',
+                            isFullHeightPage
+                                ? 'overflow-x-hidden overflow-y-auto lg:overflow-hidden'
+                                : 'overflow-auto',
                             !isQuizSessionPage && 'pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0',
                         )}
                     >
@@ -126,15 +128,20 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                                 `w-full transition-all duration-300 pt-0`,
                                 !isFocusedPage && "px-3 sm:px-4 md:px-6 lg:px-8 py-4 lg:py-6",
                                 isQuizSessionPage && 'h-full flex flex-col',
-                                isFullHeightPage && "h-full flex flex-col",
+                                isFullHeightPage && "lg:h-full lg:flex lg:flex-col",
                                 sidebarOpen && !isFullHeightPage && 'lg:pl-0'
                             )}
                         >
                             <main className={cn(
                                 'min-h-0 min-w-0 flex-1 py-2 transition-all duration-300',
-                                isFocusedPage && 'h-full py-0',
+                                isQuizSessionPage && 'h-full py-0',
+                                isFullHeightPage && 'lg:h-full lg:py-0',
                             )}>
-                                <div className={cn('min-h-0 space-y-6', isFullHeightPage && 'h-full space-y-0', isQuizSessionPage && 'h-full space-y-0')}>
+                                <div className={cn(
+                                    'min-h-0 space-y-6',
+                                    isFullHeightPage && 'lg:h-full lg:space-y-0',
+                                    isQuizSessionPage && 'h-full space-y-0',
+                                )}>
                                     <Suspense fallback={<LoadingSpinner />}>{children}</Suspense>
                                 </div>
                             </main>
