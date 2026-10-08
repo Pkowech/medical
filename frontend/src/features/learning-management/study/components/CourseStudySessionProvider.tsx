@@ -60,6 +60,15 @@ function formatElapsedTime(totalSeconds: number): string {
   return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 }
 
+function isNetworkUnavailable(error: unknown): boolean {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) return true;
+  if (typeof error !== 'object' || error === null || !('isAxiosError' in error)) {
+    return false;
+  }
+  return error.isAxiosError === true &&
+    (!('response' in error) || error.response === undefined);
+}
+
 export function CourseStudySessionProvider({ children }: { children: React.ReactNode }) {
   const { startSession, endSession } = useStudy();
   const userId = useAuthStore(state => state.user?.id);
@@ -315,7 +324,7 @@ export function CourseStudySessionProvider({ children }: { children: React.React
       setActiveSession(null);
       return ended;
     } catch (error) {
-      if (typeof navigator !== 'undefined' && !navigator.onLine && userId) {
+      if (isNetworkUnavailable(error) && userId) {
         try {
           const finalSegmentSeconds = Math.max(
             0,
