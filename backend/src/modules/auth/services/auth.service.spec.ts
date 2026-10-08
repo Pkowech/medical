@@ -136,6 +136,22 @@ describe('AuthService Google authentication', () => {
     });
   });
 
+  it('matches usernames case-insensitively during login', async () => {
+    await expect(
+      service.login({ username: 'NELSON', password: 'password' }),
+    ).rejects.toThrow(
+      'Username not found. Please sign up if you do not have an account.',
+    );
+
+    expect(prisma.user.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          username: { equals: 'NELSON', mode: 'insensitive' },
+        },
+      }),
+    );
+  });
+
   it('authenticates a matching verified email without creating another account', async () => {
     prisma.user.findFirst.mockResolvedValue(user);
 
@@ -159,9 +175,15 @@ describe('AuthService Google authentication', () => {
   it('requires terms acceptance before provisioning a new student account', async () => {
     prisma.user.findFirst.mockResolvedValue(null);
 
-    await expect(
-      service.loginWithGoogle({ idToken: 'google-id-token' }),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    try {
+      await service.loginWithGoogle({ idToken: 'google-id-token' });
+      throw new Error('Expected Google sign-up to require terms acceptance');
+    } catch (error) {
+      expect(error).toBeInstanceOf(BadRequestException);
+      expect((error as BadRequestException).getResponse()).toMatchObject({
+        code: 'GOOGLE_TERMS_REQUIRED',
+      });
+    }
     expect(usersService.create).not.toHaveBeenCalled();
   });
 

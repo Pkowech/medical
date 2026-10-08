@@ -313,6 +313,9 @@ model User {
   profileImage            String?                  @map("profile_image") @db.VarChar(2048)
   bio                     String?
   location                String?                  @db.VarChar(255)
+  careerStage             String?                  @map("career_stage") @db.VarChar(32)
+  healthcareField         String?                  @map("healthcare_field") @db.VarChar(80)
+  studyYear               Int?                     @map("study_year")
   yearOfExperience        Int?                     @map("year_of_experience")
   streakDays              Int                      @default(0) @map("streak_days")
   preferences             Json?

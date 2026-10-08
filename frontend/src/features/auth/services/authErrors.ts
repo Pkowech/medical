@@ -176,7 +176,11 @@ export function getAuthErrorDetails(
     const normalizedError = error.toLowerCase();
     let code = AuthErrorCode.VALIDATION_FAILED;
     let message = error;
-    if (
+    if (normalizedError.includes('username not found') || normalizedError.includes('no account found')) {
+      code = AuthErrorCode.INVALID_CREDENTIALS;
+    } else if (/^(incorrect|wrong) password/.test(normalizedError)) {
+      code = AuthErrorCode.INVALID_CREDENTIALS;
+    } else if (
       /(invalid|incorrect).*(email|username|password)|(email|username|password).*(invalid|incorrect)/.test(
         normalizedError
       )

@@ -34,6 +34,7 @@ import { ConfigService } from '@nestjs/config';
 import { RoleLimitingService } from './role-limiting.service'; // Inject for guest rate limit
 import type { JwtPayload } from '#common/dto/security.dto';
 import { securityEventTypes } from '#common/dto/security.dto';
+import { Prisma } from '@prisma/client';
 
 interface GoogleIdentityPayload {
   sub?: string;
@@ -244,6 +245,11 @@ export class AuthService {
         lastName: user.lastName,
         username: user.username ?? '',
         isEmailVerified: await this.securityService.isEmailVerified(user.id),
+        careerStage: user.careerStage,
+        healthcareField: user.healthcareField,
+        studyYear: user.studyYear,
+        yearOfExperience: user.yearOfExperience,
+        specialization: user.specialization,
       },
       roles: {
         role: primaryRole,
@@ -346,7 +352,14 @@ export class AuthService {
 
     try {
       // Find user by email or username
-      const whereClause = email ? { email } : { username };
+      const whereClause: Prisma.UserWhereInput = email
+        ? { email }
+        : {
+            username: {
+              equals: username ?? '',
+              mode: 'insensitive',
+            },
+          };
       const user = await this.prisma.user.findFirst({
         where: whereClause,
         include: {
@@ -367,7 +380,11 @@ export class AuthService {
           userAgent || 'unknown',
           { reason: 'USER_NOT_FOUND', identifier },
         );
-        throw new UnauthorizedException(ErrorMessages.auth.invalidCredentials);
+        throw new UnauthorizedException(
+          email
+            ? 'No account found for this email. Please sign up if you do not have an account.'
+            : 'Username not found. Please sign up if you do not have an account.',
+        );
       }
 
       // Check if account is locked
@@ -432,7 +449,7 @@ export class AuthService {
           );
         }
 
-        throw new UnauthorizedException(ErrorMessages.auth.invalidCredentials);
+        throw new UnauthorizedException('Incorrect password. Please try again.');
       }
 
       // Get security settings with error handling
@@ -551,7 +568,11 @@ export class AuthService {
     if (!user) {
       if (googleAuthDto.acceptTerms !== true) {
         throw new BadRequestException(
-          'Accept the Terms of Service before creating an account with Google',
+          {
+            code: 'GOOGLE_TERMS_REQUIRED',
+            message:
+              'Accept the Terms of Service before creating an account with Google',
+          },
         );
       }
 

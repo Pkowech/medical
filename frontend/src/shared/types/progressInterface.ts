@@ -356,6 +356,8 @@ export interface RecentActivityExtended extends RecentActivity {
 export interface CourseDisplayDataExtended extends CourseDisplayData {
   dueDate?: string;
   nextTopic?: string;
+  unitId?: string;
+  nextTopicId?: string;
   timeLeft?: string;
 }
 
@@ -560,5 +562,4 @@ export interface FlashcardStatistics {
   sessions: number;
   avgTimePerCard: string;
 }
-
 

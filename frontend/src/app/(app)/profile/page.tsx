@@ -10,6 +10,7 @@ import { userService } from '@/features/profile/services/userService';
 import { useRouter } from 'next/navigation';
 import { ProfileCompletenessBar } from '@/features/profile/components/ProfileCompletenessBar';
 import type { LocalUserProfile } from '@/shared/types/profileInterface';
+import { healthcareFieldLabel } from '@/shared/utils/healthcareProfile';
 
 export default function ProfilePage() {
   const { isLoading, session } = useRequireAuth();
@@ -21,8 +22,11 @@ export default function ProfilePage() {
     phoneNumber: '',
     bio: '',
     location: '',
+    careerStage: '',
+    healthcareField: '',
+    studyYear: null,
     specialization: '',
-    yearOfExperience: 0,
+    yearOfExperience: null,
     profileImage: undefined,
     coursesEnrolled: 0,
     coursesCompleted: 0,
@@ -52,8 +56,11 @@ export default function ProfilePage() {
             phoneNumber: userProfile.phoneNumber || '',
             bio: userProfile.bio || '',
             location: userProfile.location || '',
+            careerStage: userProfile.careerStage || '',
+            healthcareField: userProfile.healthcareField || '',
+            studyYear: userProfile.studyYear ?? null,
             specialization: userProfile.specialization || '',
-            yearOfExperience: userProfile.yearOfExperience ?? 0,
+            yearOfExperience: userProfile.yearOfExperience ?? null,
             profileImage: userProfile.profileImage && userProfile.profileImage.trim() !== ''
               ? userProfile.profileImage
               : (session.user.image && session.user.image.trim() !== '' ? session.user.image : undefined),
@@ -209,21 +216,43 @@ export default function ProfilePage() {
           <CardHeader>
             <CardTitle className="flex items-center text-gray-900 dark:text-white">
               <Award className="h-5 w-5 mr-3 text-purple-500" />
-              Academic Information
+              Healthcare Profile
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div>
-                <p className="text-xs font-semibold text-gray-400 dark:text-slate-500 uppercase tracking-wider">Specialization</p>
+                <p className="text-xs font-semibold text-gray-400 dark:text-slate-500 uppercase tracking-wider">Healthcare field</p>
+                <p className="text-base font-medium text-gray-900 dark:text-slate-200">
+                  {healthcareFieldLabel(profile.healthcareField) || 'Not set'}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-gray-400 dark:text-slate-500 uppercase tracking-wider">Current stage</p>
+                <p className="text-base font-medium text-gray-900 dark:text-slate-200">
+                  {profile.careerStage === 'student'
+                    ? 'Student or trainee'
+                    : profile.careerStage === 'professional'
+                      ? 'Healthcare professional'
+                      : 'Not set'}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-gray-400 dark:text-slate-500 uppercase tracking-wider">Specialty or area of interest</p>
                 <p className="text-base font-medium text-gray-900 dark:text-slate-200">{profile.specialization || 'Not set'}</p>
               </div>
               <div>
-                <p className="text-xs font-semibold text-gray-400 dark:text-slate-500 uppercase tracking-wider">Experience Level</p>
+                <p className="text-xs font-semibold text-gray-400 dark:text-slate-500 uppercase tracking-wider">
+                  {profile.careerStage === 'student' ? 'Year of study' : 'Professional experience'}
+                </p>
                 <p className="text-base font-medium text-gray-900 dark:text-slate-200">
-                  {profile.yearOfExperience !== undefined && profile.yearOfExperience !== null
-                    ? `${profile.yearOfExperience} Year${profile.yearOfExperience === 1 ? '' : 's'}`
-                    : 'Not set'}
+                  {profile.careerStage === 'student'
+                    ? profile.studyYear ? `Year ${profile.studyYear}` : 'Not set'
+                    : profile.careerStage === 'professional' &&
+                        profile.yearOfExperience !== null &&
+                        profile.yearOfExperience !== undefined
+                      ? `${profile.yearOfExperience} year${profile.yearOfExperience === 1 ? '' : 's'}`
+                      : 'Not set'}
                 </p>
               </div>
             </div>

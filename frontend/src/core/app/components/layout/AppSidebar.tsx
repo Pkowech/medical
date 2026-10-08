@@ -10,11 +10,18 @@ import { useLayoutStore } from '@/core/stores/useLayoutStore';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { UserMenu } from './UserMenu';
 import { useMediaQuery } from '@/shared/hooks/useMediaQuery';
+import { mobilePrimaryNavigation } from './mobileNavigationConfig';
+import { healthcareProfileLabel } from '@/shared/utils/healthcareProfile';
 
 export function Sidebar({ user, navigationItems }: SidebarProps) {
   const { sidebarOpen, setSidebarOpen, sidebarUserMenuOpen, setSidebarUserMenuOpen } = useLayoutStore();
   const isDesktop = useMediaQuery('(min-width: 1024px)');
   const { logout } = useAuth();
+  const visibleNavigationItems = isDesktop
+    ? navigationItems
+    : navigationItems.filter(
+        item => !mobilePrimaryNavigation.some(tab => tab.href === item.href),
+      );
 
   // Handle responsive behavior on window resize
   useEffect(() => {
@@ -41,6 +48,7 @@ export function Sidebar({ user, navigationItems }: SidebarProps) {
 
       {/* Sidebar (z-50) */}
       <nav
+        aria-label={isDesktop ? 'Main navigation' : 'More navigation'}
         className={cn(
           'fixed lg:static inset-y-0 left-0 z-50 w-72 max-w-[85vw] lg:max-w-none lg:w-64 flex flex-col border-r transition-transform duration-300 ease-in-out',
           'bg-white dark:bg-slate-900 border-gray-200 dark:border-slate-800',
@@ -68,8 +76,13 @@ export function Sidebar({ user, navigationItems }: SidebarProps) {
         </div>
 
         {/* Navigation - scrollable */}
-        <nav className="flex-1 min-h-0 px-3 py-4 space-y-1 overflow-y-auto">
-          {navigationItems.map(item => (
+        <div className="flex-1 min-h-0 px-3 py-4 space-y-1 overflow-y-auto">
+          {!isDesktop && (
+            <p className="px-4 pb-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-slate-400">
+              More
+            </p>
+          )}
+          {visibleNavigationItems.map(item => (
             <NavigationItemComponent
               key={item.id}
               item={item}
@@ -78,7 +91,7 @@ export function Sidebar({ user, navigationItems }: SidebarProps) {
               }}
             />
           ))}
-        </nav>
+        </div>
 
         {/* User Profile - fixed at bottom */}
         {user && (
@@ -93,7 +106,9 @@ export function Sidebar({ user, navigationItems }: SidebarProps) {
                 <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
                   {user.fullName || `${user.firstName} ${user.lastName}`}
                 </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">Medical Student</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                  {healthcareProfileLabel(user)}
+                </p>
               </div>
               {!isDesktop && (
                 <button

@@ -7,28 +7,8 @@ import { useAuthStore } from '@/features/auth/store/useAuthStore';
 import { userService } from '@/features/profile/services/userService';
 import { Loader2, ChevronLeft, ChevronRight, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
-
-const years = [
-  { label: '1st Year', value: 1 },
-  { label: '2nd Year', value: 2 },
-  { label: '3rd Year', value: 3 },
-  { label: '4th Year', value: 4 },
-  { label: '5th Year', value: 5 },
-  { label: 'Graduate', value: 6 },
-];
-
-const specialties = [
-  'General Medicine',
-  'Surgery',
-  'Pediatrics',
-  'Obstetrics & Gynecology',
-  'Psychiatry',
-  'Internal Medicine',
-  'Emergency Medicine',
-  'Other',
-];
-
-const preferencesList = ['Visual', 'Reading/Writing', 'Practice/Hands-on', 'Group Study', 'Solo Study'];
+import { useSession } from 'next-auth/react';
+import { healthcareFields } from '@/shared/utils/healthcareProfile';
 
 const tourSlides = [
   {
@@ -52,13 +32,17 @@ const tourSlides = [
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const { data: session, update: updateSession } = useSession();
   const { user, updateUser } = useAuthStore();
   const [step, setStep] = useState(0);
   const [profile, setProfile] = useState({
     name: '',
-    year: '',
+    careerStage: '' as 'student' | 'professional' | '',
+    healthcareField: '',
+    otherHealthcareField: '',
+    studyYear: '',
+    yearsExperience: '',
     specialty: '',
-    preference: '',
   });
   const [goals, setGoals] = useState({
     daily: '30',
@@ -70,22 +54,48 @@ export default function OnboardingPage() {
 
   useEffect(() => {
     if (user) {
+      const knownField = healthcareFields.find(
+        field =>
+          field.value === user.healthcareField ||
+          field.label.toLowerCase() === user.healthcareField?.toLowerCase(),
+      );
       setProfile(p => ({
         ...p,
         name: user.fullName || `${user.firstName || ''} ${user.lastName || ''}`.trim(),
+        careerStage: user.careerStage || '',
+        healthcareField: user.healthcareField
+          ? knownField ? knownField.value : 'other'
+          : '',
+        otherHealthcareField: user.healthcareField && !knownField
+          ? user.healthcareField
+          : '',
+        studyYear: user.studyYear ? String(user.studyYear) : '',
+        yearsExperience:
+          user.yearOfExperience !== null && user.yearOfExperience !== undefined
+            ? String(user.yearOfExperience)
+            : '',
         specialty: user.specialization || '',
-        year: user.yearOfExperience ? years.find(y => y.value === user.yearOfExperience)?.label || '' : '',
       }));
     }
   }, [user]);
 
   const handleSkip = () => {
-    toast.info('You can complete your profile later in settings.');
+    toast.info('You can finish your healthcare profile later from Profile > Edit Profile.');
     router.push('/dashboard');
   };
 
   const handleFinish = async () => {
     if (!user) return;
+    if (
+      !profile.careerStage ||
+      !profile.healthcareField ||
+      (profile.healthcareField === 'other' && !profile.otherHealthcareField.trim())
+    ) {
+      setStep(1);
+      toast.error('Complete your healthcare path details before finishing setup.');
+      return;
+    }
+    const careerStage = profile.careerStage;
     setLoading(true);
     try {
       // Save everything and mark onboarding as complete
@@ -95,25 +105,53 @@ export default function OnboardingPage() {
           daily: parseInt(goals.daily, 10),
           weekly: parseInt(goals.weekly, 10),
         },
-        learningPreference: profile.preference,
         onboardingCompleted: true,
       };
 
-      const yearVal = years.find(y => y.label === profile.year)?.value;
+      const healthcareField =
+        profile.healthcareField === 'other'
+          ? profile.otherHealthcareField.trim()
+          : profile.healthcareField;
+      const studyYear =
+        careerStage === 'student' && profile.studyYear
+          ? Number(profile.studyYear)
+          : null;
+      const yearsExperience =
+        careerStage === 'professional' && profile.yearsExperience
+          ? Number(profile.yearsExperience)
+          : null;
 
       await userService.updateUserProfile(user.id, {
-        specialization: profile.specialty,
-        yearOfExperience: yearVal,
-        preferences: updatedPreferences as any,
+        careerStage,
+        healthcareField,
+        studyYear,
+        yearOfExperience: yearsExperience,
+        specialization: profile.specialty.trim() || null,
+        preferences: updatedPreferences,
       });
 
       // Update local store
       updateUser({
         ...user,
-        specialization: profile.specialty,
-        yearOfExperience: yearVal,
-        preferences: updatedPreferences as any,
+        careerStage,
+        healthcareField,
+        studyYear,
+        yearOfExperience: yearsExperience,
+        specialization: profile.specialty.trim() || null,
+        preferences: updatedPreferences,
       });
+      if (session?.user) {
+        await updateSession({
+          user: {
+            ...session.user,
+            careerStage,
+            healthcareField,
+            studyYear,
+            yearOfExperience: yearsExperience,
+            specialization: profile.specialty.trim() || null,
+          },
+        });
+      }
 
       toast.success('Profile setup completed successfully!', {
         duration: 3000,
@@ -152,7 +190,7 @@ export default function OnboardingPage() {
           </div>
           <h1 className="text-3xl font-bold mb-4 text-slate-900 dark:text-white text-center">Welcome to MedTrack Hub!</h1>
           <p className="text-slate-600 dark:text-slate-400 mb-8 text-center leading-relaxed">
-            We&apos;re excited to help you master medicine. Let&apos;s personalize your experience to get the most out of your learning journey.
+            We&apos;re excited to support your healthcare learning and career. Let&apos;s personalize your experience.
           </p>
           <div className="w-full space-y-3">
             <Button
@@ -163,6 +201,7 @@ export default function OnboardingPage() {
               Start Personalization
             </Button>
             <Button
+              type="button"
               variant="ghost"
               className="w-full text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
               onClick={handleSkip}
@@ -182,7 +221,7 @@ export default function OnboardingPage() {
         <div className="w-full max-w-lg bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 p-8 flex flex-col">
           <div className="mb-8">
             <div className="flex justify-between items-center mb-2">
-              <h2 className="text-2xl font-bold text-slate-900 dark:text-white text-left">Academic Profile</h2>
+              <h2 className="text-2xl font-bold text-slate-900 dark:text-white text-left">Your Healthcare Path</h2>
               <span className="text-sm font-medium text-blue-600 dark:text-blue-400">Step 1 of 3</span>
             </div>
             <div className="w-full bg-slate-100 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
@@ -211,65 +250,117 @@ export default function OnboardingPage() {
             </div>
 
             <div>
-              <label htmlFor="year-of-study" className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Year of Study</label>
+              <label htmlFor="career-stage" className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Current stage</label>
               <select
-                id="year-of-study"
-                title="Year of Study"
+                id="career-stage"
+                title="Current stage"
                 className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
-                value={profile.year}
-                onChange={e => setProfile(p => ({ ...p, year: e.target.value }))}
+                value={profile.careerStage}
+                onChange={e =>
+                  setProfile(p => ({
+                    ...p,
+                    careerStage: e.target.value as 'student' | 'professional' | '',
+                  }))
+                }
                 required
               >
-                <option value="">Select current year</option>
-                {years.map(y => (
-                  <option key={y.value} value={y.label}>
-                    {y.label}
+                <option value="">Select your current stage</option>
+                <option value="student">Student or trainee</option>
+                <option value="professional">Qualified healthcare professional</option>
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="healthcare-field" className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                Healthcare field
+              </label>
+              <select
+                id="healthcare-field"
+                title="Healthcare field"
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                value={profile.healthcareField}
+                onChange={e => setProfile(p => ({ ...p, healthcareField: e.target.value }))}
+                required
+              >
+                <option value="">Select your field</option>
+                {healthcareFields.map(field => (
+                  <option key={field.value} value={field.value}>
+                    {field.label}
                   </option>
                 ))}
               </select>
             </div>
+
+            {profile.healthcareField === 'other' && (
+              <div>
+                <label htmlFor="other-healthcare-field" className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                  Your healthcare field
+                </label>
+                <input
+                  id="other-healthcare-field"
+                  type="text"
+                  maxLength={80}
+                  value={profile.otherHealthcareField}
+                  onChange={e => setProfile(p => ({ ...p, otherHealthcareField: e.target.value }))}
+                  required
+                  placeholder="Enter your field"
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                />
+              </div>
+            )}
+
+            {profile.careerStage === 'student' && (
+              <div>
+                <label htmlFor="study-year" className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                  Current year of study
+                </label>
+                <select
+                  id="study-year"
+                  value={profile.studyYear}
+                  onChange={e => setProfile(p => ({ ...p, studyYear: e.target.value }))}
+                  required
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                >
+                  <option value="">Select year</option>
+                  {Array.from({ length: 12 }, (_, index) => index + 1).map(year => (
+                    <option key={year} value={year}>Year {year}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {profile.careerStage === 'professional' && (
+              <div>
+                <label htmlFor="years-experience" className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                  Years of professional experience
+                </label>
+                <input
+                  id="years-experience"
+                  type="number"
+                  min="0"
+                  max="60"
+                  step="1"
+                  value={profile.yearsExperience}
+                  onChange={e => setProfile(p => ({ ...p, yearsExperience: e.target.value }))}
+                  required
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                />
+              </div>
+            )}
 
             <div>
               <label htmlFor="specialty" className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
-                Specialty Interest
+                Specialty or area of interest (optional)
               </label>
-              <select
+              <input
                 id="specialty"
-                title="Specialty Interest"
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                type="text"
+                maxLength={120}
                 value={profile.specialty}
                 onChange={e => setProfile(p => ({ ...p, specialty: e.target.value }))}
-                required
-              >
-                <option value="">Select specialty</option>
-                {specialties.map(s => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
-                Study Preference
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                {preferencesList.map(p => (
-                  <button
-                    key={p}
-                    type="button"
-                    onClick={() => setProfile(prev => ({ ...prev, preference: p }))}
-                    className={`px-3 py-2 text-sm rounded-lg border transition-all ${
-                      profile.preference === p
-                        ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-500 text-blue-700 dark:text-blue-400 font-medium'
-                        : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
-                    }`}
-                  >
-                    {p}
-                  </button>
-                ))}
-              </div>
+                placeholder="e.g. Cardiology, oncology pharmacy"
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+              />
             </div>
 
             <div className="pt-4 flex flex-col space-y-3">
@@ -280,7 +371,7 @@ export default function OnboardingPage() {
               >
                 Continue
               </Button>
-              <Button variant="ghost" className="text-slate-400" onClick={handleSkip}>
+              <Button type="button" variant="ghost" className="text-slate-400" onClick={handleSkip}>
                 Skip for now
               </Button>
             </div>
@@ -359,7 +450,7 @@ export default function OnboardingPage() {
 
             <div className="pt-6 flex flex-col space-y-3">
               <div className="flex gap-3">
-                <Button variant="outline" className="flex-1 rounded-xl py-6" onClick={prevStep}>
+                <Button type="button" variant="outline" className="flex-1 rounded-xl py-6" onClick={prevStep}>
                   Back
                 </Button>
                 <Button
@@ -369,7 +460,7 @@ export default function OnboardingPage() {
                   Continue
                 </Button>
               </div>
-              <Button variant="ghost" className="text-slate-400" onClick={handleSkip}>
+              <Button type="button" variant="ghost" className="text-slate-400" onClick={handleSkip}>
                 Skip for now
               </Button>
             </div>

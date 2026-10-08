@@ -3,22 +3,15 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { NavigationItem } from '@/shared/types/navigationInterface';
+import { mobilePrimaryNavigation } from './mobileNavigationConfig';
 
 interface MobileTabBarProps {
   navigationItems: NavigationItem[];
 }
 
-const primaryTabs = [
-  { href: '/dashboard', label: 'Home' },
-  { href: '/courses', label: 'Courses' },
-  { href: '/study-planner', label: 'Study' },
-  { href: '/progress', label: 'Progress' },
-  { href: '/profile', label: 'Profile' },
-];
-
 export function MobileTabBar({ navigationItems }: MobileTabBarProps) {
   const pathname = usePathname();
-  const availableTabs = primaryTabs.flatMap(tab => {
+  const availableTabs = mobilePrimaryNavigation.flatMap(tab => {
     const item = navigationItems.find(candidate => candidate.href === tab.href);
     return item ? [{ ...tab, item }] : [];
   });

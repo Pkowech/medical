@@ -9,7 +9,7 @@ import { HeaderProvider } from '@/core/providers/HeaderContext';
 import AppErrorBoundary from '@/features/security/components/AppErrorBoundary';
 import { LoadingSpinner } from '@/shared/components/ui/loading-spinner';
 import { useAuth } from '@/features/auth/hooks/useAuth';
-import { useContextAwareNavigation } from '@/features/auth/hooks/useContextAwareNavigation';
+import { usePermissions } from '@/features/auth/hooks/usePermissions';
 import { getDeadlines } from '@/core/app/services/dashboardService';
 import { Permission } from '@/lib/auth/roles';
 import type { User } from '@/shared/types/authInterface';
@@ -23,7 +23,7 @@ interface AppLayoutProps {
 
 const AppLayoutContent: React.FC<AppLayoutProps> = ({ children }) => {
   const { session, isLoading } = useAuth();
-  const { contextAwareNavigation } = useContextAwareNavigation();
+  const { filteredNavigation } = usePermissions();
   const [mounted, setMounted] = React.useState(false);
 
   React.useEffect(() => {
@@ -62,7 +62,7 @@ const AppLayoutContent: React.FC<AppLayoutProps> = ({ children }) => {
   return (
     <AppErrorBoundary>
       <CourseStudySessionProvider>
-        <DashboardLayout navigationItems={contextAwareNavigation} user={user}>
+        <DashboardLayout navigationItems={filteredNavigation} user={user}>
           {children}
         </DashboardLayout>
       </CourseStudySessionProvider>

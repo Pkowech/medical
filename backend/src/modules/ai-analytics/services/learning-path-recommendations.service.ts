@@ -85,21 +85,34 @@ export class LearningPathRecommendationsService {
   ): Promise<RecommendationScore[]> {
     const pathIds = rustRecs.map((r) => r.materialId || r.id).filter(Boolean);
 
-    // Fetch user specialization if userId is provided
+    // Fetch the learner's track and focus when available.
     let userSpecialization: string | null = null;
+    let userHealthcareField: string | null = null;
     if (userId) {
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
-        select: { specialization: true },
+        select: { specialization: true, healthcareField: true },
       });
       userSpecialization = user?.specialization || null;
+      userHealthcareField = user?.healthcareField || null;
     }
+    const fieldCategoryTerm = userHealthcareField?.replace(/[_-]/g, ' ') || '';
+    const fieldCategories = fieldCategoryTerm
+      ? await this.prisma.courseCategory.findMany({
+          where: {
+            name: { contains: fieldCategoryTerm, mode: 'insensitive' },
+          },
+          select: { id: true },
+        })
+      : [];
+    const fieldCategoryIds = fieldCategories.map(category => category.id);
 
     const paths = await this.prisma.learningPath.findMany({
       where: {
         OR: [
           { id: { in: pathIds } },
           userSpecialization ? { specialization: userSpecialization } : {},
+          fieldCategoryIds.length ? { categoryId: { in: fieldCategoryIds } } : {},
         ].filter((cond) => Object.keys(cond).length > 0),
         status: 'published',
       },
@@ -114,19 +127,30 @@ export class LearningPathRecommendationsService {
         rustRecs.find((r) => (r.materialId || r.id) === path.id) || {};
 
       const isSpecializationMatch =
-        userSpecialization && path.specialization === userSpecialization;
+        Boolean(userSpecialization && path.specialization === userSpecialization);
+      const isHealthcareFieldMatch = Boolean(
+        path.categoryId && fieldCategoryIds.includes(path.categoryId),
+      );
 
       return {
         pathId: path.id,
         score: isSpecializationMatch
           ? Math.max(rustRec.score || 0.5, 0.9)
-          : rustRec.score || 0.5,
+          : isHealthcareFieldMatch
+            ? Math.max(rustRec.score || 0.5, 0.85)
+              : rustRec.score || 0.5,
         reasons: [
           isSpecializationMatch
             ? `Matches your specialization: ${userSpecialization}`
-            : rustRec.reason || 'AI recommended based on your profile',
+            : isHealthcareFieldMatch
+              ? `Matches your healthcare field: ${userHealthcareField}`
+              : rustRec.reason || 'AI recommended based on your profile',
         ],
-        confidence: isSpecializationMatch ? 0.95 : rustRec.confidence || 0.7,
+        confidence: isSpecializationMatch
+          ? 0.95
+          : isHealthcareFieldMatch
+            ? 0.9
+            : rustRec.confidence || 0.7,
         estimatedCompletionTime: path.estimatedDurationWeeks || 4,
       };
     });

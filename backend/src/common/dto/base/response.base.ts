@@ -53,7 +53,16 @@ export class BaseUserResponseDto {
   @ApiPropertyOptional({ description: "User's physical location" })
   location?: string;
 
-  @ApiPropertyOptional({ description: 'Medical specialization' })
+  @ApiPropertyOptional({ description: 'Healthcare learning or professional stage' })
+  careerStage?: string;
+
+  @ApiPropertyOptional({ description: 'Healthcare field or profession' })
+  healthcareField?: string;
+
+  @ApiPropertyOptional({ description: 'Current year of study for learners' })
+  studyYear?: number;
+
+  @ApiPropertyOptional({ description: 'Specialty or area of interest' })
   specialization?: string;
 
   @ApiPropertyOptional({ description: 'Years of professional experience' })
@@ -138,8 +147,11 @@ export class BaseUserResponseDto {
       phoneNumber: user.phoneNumber || undefined,
       bio: user.bio || undefined,
       location: user.location || undefined,
+      careerStage: user.careerStage || undefined,
+      healthcareField: user.healthcareField || undefined,
+      studyYear: user.studyYear ?? undefined,
       specialization: user.specialization || undefined,
-      yearOfExperience: user.yearOfExperience || undefined,
+      yearOfExperience: user.yearOfExperience ?? undefined,
       streakDays: user.streakDays || 0,
       role: userRole,
       roles: sortedRoles.map((r: any) => r.name as RoleType),

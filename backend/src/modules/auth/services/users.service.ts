@@ -38,6 +38,9 @@ const userSelect = {
   profileImage: true,
   bio: true,
   location: true,
+  careerStage: true,
+  healthcareField: true,
+  studyYear: true,
   yearOfExperience: true,
   streakDays: true,
   preferences: true,
@@ -140,6 +143,9 @@ export class UsersService {
       location,
       specialization,
       yearOfExperience,
+      careerStage,
+      healthcareField,
+      studyYear,
       phoneNumber,
       profileImage,
     } = createUserDto;
@@ -191,6 +197,9 @@ export class UsersService {
           // Optional profile fields - include only if provided
           ...(bio && { bio }),
           ...(location && { location }),
+          ...(careerStage && { careerStage }),
+          ...(healthcareField && { healthcareField }),
+          ...(studyYear !== undefined && { studyYear }),
           ...(specialization && { specialization }),
           ...(yearOfExperience !== undefined && { yearOfExperience }),
           ...(phoneNumber && { phoneNumber }),
@@ -219,8 +228,11 @@ export class UsersService {
         id: user.id,
         bio: user.bio || 'null',
         location: user.location || 'null',
+        careerStage: user.careerStage || 'null',
+        healthcareField: user.healthcareField || 'null',
+        studyYear: user.studyYear ?? 'null',
         specialization: user.specialization || 'null',
-        yearOfExperience: user.yearOfExperience || 'null',
+        yearOfExperience: user.yearOfExperience ?? 'null',
         phoneNumber: user.phoneNumber || 'null',
         profileImage: user.profileImage || 'null',
       });
@@ -232,6 +244,9 @@ export class UsersService {
 
       return await this.mapUserToDto(user);
     } catch (error) {
+      if (this.isUsernameUniqueConstraintError(error)) {
+        throw new ConflictException('User with this username already exists');
+      }
       this.logger.error('User creation error:', {
         ...logContext,
         error: getErrorMessage(error),
@@ -316,14 +331,14 @@ export class UsersService {
 
   async findByUsername(username: string): Promise<UserWithRelations | null> {
     const cachedUser = await this.redisService.get<UserWithRelations>(
-      this.generateKey('username', username),
+      this.generateKey('username', username.toLowerCase()),
     );
     if (cachedUser) {
       return cachedUser;
     }
 
-    const user = await this.prisma.user.findUnique({
-      where: { username },
+    const user = await this.prisma.user.findFirst({
+      where: { username: { equals: username, mode: 'insensitive' } },
       select: userSelect,
     });
 
@@ -408,6 +423,12 @@ export class UsersService {
       prismaData.email = updateUserDto.email;
     }
     if (updateUserDto.username !== undefined) {
+      const existingUsername = await this.findByUsername(
+        updateUserDto.username,
+      );
+      if (existingUsername && existingUsername.id !== userId) {
+        throw new ConflictException('User with this username already exists');
+      }
       prismaData.username = updateUserDto.username;
     }
     if (updateUserDto.phoneNumber !== undefined) {
@@ -424,6 +445,15 @@ export class UsersService {
     }
     if (updateUserDto.location !== undefined) {
       prismaData.location = updateUserDto.location;
+    }
+    if (updateUserDto.careerStage !== undefined) {
+      prismaData.careerStage = updateUserDto.careerStage;
+    }
+    if (updateUserDto.healthcareField !== undefined) {
+      prismaData.healthcareField = updateUserDto.healthcareField;
+    }
+    if (updateUserDto.studyYear !== undefined) {
+      prismaData.studyYear = updateUserDto.studyYear;
     }
     if (updateUserDto.yearOfExperience !== undefined) {
       prismaData.yearOfExperience = updateUserDto.yearOfExperience;
@@ -461,6 +491,9 @@ export class UsersService {
       console.log(`[UsersService] updateProfile complete for ${userId}`);
       return await this.mapUserToDto(updatedUser as UserWithRelations);
     } catch (error) {
+      if (this.isUsernameUniqueConstraintError(error)) {
+        throw new ConflictException('User with this username already exists');
+      }
       console.error(
         `[UsersService] Database update error for ${userId}:`,
         error,
@@ -671,7 +704,7 @@ export class UsersService {
     );
     if (user.username) {
       await this.redisService.set(
-        this.generateKey('username', user.username),
+        this.generateKey('username', user.username.toLowerCase()),
         user,
         this.CACHE_TTL,
       );
@@ -682,9 +715,27 @@ export class UsersService {
     const keys = [
       this.generateKey('id', user.id),
       this.generateKey('email', user.email),
-      user.username && this.generateKey('username', user.username),
+      user.username &&
+        this.generateKey('username', user.username.toLowerCase()),
     ].filter(Boolean) as string[];
     await Promise.all(keys.map((k) => this.redisService.del(k)));
+  }
+
+  private isUsernameUniqueConstraintError(error: unknown): boolean {
+    if (
+      !(error instanceof Prisma.PrismaClientKnownRequestError) ||
+      error.code !== 'P2002'
+    ) {
+      return false;
+    }
+
+    const target = error.meta?.target;
+    const targetName = Array.isArray(target)
+      ? target.join(' ')
+      : typeof target === 'string'
+        ? target
+        : '';
+    return targetName.toLowerCase().includes('username');
   }
 
   private async generateUniqueUsername(email: string): Promise<string> {

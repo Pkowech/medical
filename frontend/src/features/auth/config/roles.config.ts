@@ -15,12 +15,12 @@ export const ROLE_CONFIGS: Record<UserRole, RoleConfig> = {
     color: 'gray',
   },
   student: {
-    label: 'Medical Student',
-    description: 'Access to all learning resources and progress tracking',
+    label: 'Healthcare Learner',
+    description: 'Access to healthcare learning resources and progress tracking',
     features: [
-      'Kenyan medical school curriculum access',
-      'Clinical case studies and MOH protocols',
-      'OSCE preparation materials',
+      'Healthcare course and learning-path access',
+      'Clinical and allied-health learning materials',
+      'Assessment and practical preparation',
       'Progress tracking and analytics',
       'Study group participation',
     ],
@@ -39,8 +39,8 @@ export const ROLE_CONFIGS: Record<UserRole, RoleConfig> = {
     color: 'orange',
   },
   instructor: {
-    label: 'Medical Educator',
-    description: 'Create and manage medical education content',
+    label: 'Healthcare Educator',
+    description: 'Create and manage healthcare education content',
     features: [
       'Create clinical cases and study materials',
       'Upload MOH protocol summaries',

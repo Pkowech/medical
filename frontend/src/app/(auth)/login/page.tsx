@@ -78,7 +78,9 @@ function LoginContent() {
 
     try {
       await nextAuthSignIn('google', {
-        callbackUrl: getSafeCallbackUrl(requestedCallbackUrl),
+        callbackUrl: `/google-consent?returnTo=${encodeURIComponent(
+          getSafeCallbackUrl(requestedCallbackUrl),
+        )}`,
       });
     } catch (err) {
       console.error('[Login] Google sign-in failed:', err);
@@ -116,7 +118,7 @@ function LoginContent() {
   useEffect(() => {
     if (searchParams.get('error') === 'google-signin-failed') {
       setError(
-        'Google sign-in could not be completed. If you are creating an account, start from Sign up and accept the Terms of Service.'
+        'Google sign-in could not be completed. Please try again.'
       );
     }
 
@@ -299,6 +301,17 @@ function LoginContent() {
                   </Link>
                 )}
               </p>
+              {/(username not found|no account found)/i.test(error) && (
+                <p className="mt-2 text-sm text-red-800 dark:text-red-200">
+                  Don't have an account?{' '}
+                  <Link
+                    href="/register"
+                    className="font-semibold underline hover:text-red-600 dark:hover:text-red-100"
+                  >
+                    Sign up
+                  </Link>
+                </p>
+              )}
               {canRetry && (
                 <button
                   type="button"
@@ -496,8 +509,11 @@ function LoginContent() {
             className="flex w-full items-center justify-center gap-3 rounded-xl border border-slate-300 bg-white px-4 py-3.5 text-[1.1rem] font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
           >
             <FaGoogle className="text-[1.7rem]" />
-            <span>{socialLoading === 'google' ? 'Connecting...' : 'Google'}</span>
+            <span>{socialLoading === 'google' ? 'Connecting...' : 'Continue with Google'}</span>
           </button>
+          <p className="mt-3 text-center text-xs text-slate-500 dark:text-slate-400">
+            New Google accounts will be asked to accept the Terms of Service and Privacy Policy after sign-in.
+          </p>
         </div>
 
         <div className="mt-6 text-center">

@@ -17,6 +17,10 @@ const isAbortError = (err: unknown): err is { name: string } =>
   'name' in err &&
   (err as { name: string }).name === 'AbortError';
 
+class GoogleTermsRequiredError extends Error {}
+
+const GOOGLE_PENDING_TOKEN_COOKIE = 'google-pending-id-token';
+
 // This function will handle token refreshing
 async function refreshAccessToken(token: JWT): Promise<JWT> {
   try {
@@ -125,6 +129,9 @@ async function exchangeGoogleCredential(
   const responseData = (await response.json()) as LoginResponsePayload;
 
   if (!response.ok) {
+    if (responseData.code === 'GOOGLE_TERMS_REQUIRED') {
+      throw new GoogleTermsRequiredError(responseData.message);
+    }
     throw new Error(
       typeof responseData.message === 'string'
         ? responseData.message
@@ -171,6 +178,17 @@ async function exchangeGoogleCredential(
     roles,
     permissions,
     isEmailVerified: authUser.isEmailVerified === true,
+    careerStage:
+      authUser.careerStage === 'student' || authUser.careerStage === 'professional'
+        ? authUser.careerStage
+        : null,
+    healthcareField:
+      typeof authUser.healthcareField === 'string' ? authUser.healthcareField : null,
+    studyYear: typeof authUser.studyYear === 'number' ? authUser.studyYear : null,
+    yearOfExperience:
+      typeof authUser.yearOfExperience === 'number' ? authUser.yearOfExperience : null,
+    specialization:
+      typeof authUser.specialization === 'string' ? authUser.specialization : null,
     accessToken: authData.accessToken,
     refreshToken:
       typeof authData.refreshToken === 'string' ? authData.refreshToken : '',
@@ -287,10 +305,10 @@ export const authOptions: NextAuthOptions = {
             }
 
             const errorMessage =
-              response.status === 401
-                ? 'Invalid username/email or password.'
-                : typeof responseData.message === 'string'
-                  ? responseData.message
+              typeof responseData.message === 'string'
+                ? responseData.message
+                : response.status === 401
+                  ? 'Invalid username/email or password.'
                   : 'Could not sign in. Check the details and try again.';
             let errorCode: AuthErrorCode = AuthErrorCode.INVALID_CREDENTIALS;
 
@@ -361,6 +379,17 @@ export const authOptions: NextAuthOptions = {
             role: (roles?.role as unknown as Role) || (user?.role as unknown as Role) || Role.guest,
             roles: (roles?.roles as Role[]) || (user?.roles as Role[]) || (user?.role ? [(user.role as unknown as Role)] : []),
             isEmailVerified: (user?.isEmailVerified as boolean) || false,
+            careerStage:
+              user?.careerStage === 'student' || user?.careerStage === 'professional'
+                ? user.careerStage
+                : null,
+            healthcareField:
+              typeof user?.healthcareField === 'string' ? user.healthcareField : null,
+            studyYear: typeof user?.studyYear === 'number' ? user.studyYear : null,
+            yearOfExperience:
+              typeof user?.yearOfExperience === 'number' ? user.yearOfExperience : null,
+            specialization:
+              typeof user?.specialization === 'string' ? user.specialization : null,
             permissions: ((roles?.permissions as string[]) || (user?.permissions as string[]) || []) as unknown as Permission[],
             accessToken: accessToken,
             refreshToken: refreshToken || '',
@@ -391,6 +420,37 @@ export const authOptions: NextAuthOptions = {
       },
     }),
 
+    CredentialsProvider({
+      id: 'google-consent',
+      name: 'Google account consent',
+      credentials: {
+        acceptTerms: { label: 'Accept terms', type: 'text' },
+      },
+      async authorize(credentials, request) {
+        if (credentials?.acceptTerms !== 'true') {
+          throw new Error('Accept the Terms of Service and Privacy Policy to continue.');
+        }
+
+        const cookieHeader = request.headers?.cookie ?? '';
+        const pendingToken = cookieHeader
+          .split(';')
+          .map((cookie: string) => cookie.trim())
+          .find((cookie: string) => cookie.startsWith(`${GOOGLE_PENDING_TOKEN_COOKIE}=`))
+          ?.slice(`${GOOGLE_PENDING_TOKEN_COOKIE}=`.length);
+
+        if (!pendingToken) {
+          throw new Error('Your Google sign-up session expired. Please try again.');
+        }
+
+        const user = await exchangeGoogleCredential(
+          decodeURIComponent(pendingToken),
+          true,
+        );
+        (await cookies()).delete(GOOGLE_PENDING_TOKEN_COOKIE);
+        return user;
+      },
+    }),
+
     // Google Provider
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID || '',
@@ -407,6 +467,9 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async signIn({ user, account }) {
       if (account?.provider !== 'google') {
+        if (account?.provider === 'google-consent') {
+          (await cookies()).delete(GOOGLE_PENDING_TOKEN_COOKIE);
+        }
         return true;
       }
 
@@ -414,28 +477,73 @@ export const authOptions: NextAuthOptions = {
         return '/login?error=google-signin-failed';
       }
 
-      const cookieStore = await cookies();
-      const acceptTerms = cookieStore.get('google-signup-terms')?.value === '1';
-
       try {
         const authenticatedUser = await exchangeGoogleCredential(
           account.id_token,
-          acceptTerms,
+          false,
         );
         Object.assign(user, authenticatedUser);
         return true;
       } catch (error) {
+        if (error instanceof GoogleTermsRequiredError) {
+          (await cookies()).set(
+            GOOGLE_PENDING_TOKEN_COOKIE,
+            account.id_token,
+            {
+              httpOnly: true,
+              secure: process.env.NODE_ENV === 'production',
+              sameSite: 'lax',
+              path: '/api/auth',
+              maxAge: 10 * 60,
+            },
+          );
+          return '/google-consent';
+        }
         console.error(
           '[NextAuth] Google account exchange failed:',
           error instanceof Error ? error.message : 'Unknown authentication error',
         );
         return '/login?error=google-signin-failed';
-      } finally {
-        cookieStore.delete('google-signup-terms');
       }
     },
 
-    async jwt({ token, user, account }): Promise<JWT> {
+    async jwt({ token, user, account, trigger, session }): Promise<JWT> {
+      if (trigger === 'update' && session?.user) {
+        const updatedUser = session.user;
+        if (
+          updatedUser.careerStage === 'student' ||
+          updatedUser.careerStage === 'professional' ||
+          updatedUser.careerStage === null
+        ) {
+          token.careerStage = updatedUser.careerStage;
+        }
+        if (
+          typeof updatedUser.healthcareField === 'string' ||
+          updatedUser.healthcareField === null
+        ) {
+          token.healthcareField = updatedUser.healthcareField;
+        }
+        if (
+          typeof updatedUser.studyYear === 'number' ||
+          updatedUser.studyYear === null
+        ) {
+          token.studyYear = updatedUser.studyYear;
+        }
+        if (
+          typeof updatedUser.yearOfExperience === 'number' ||
+          updatedUser.yearOfExperience === null
+        ) {
+          token.yearOfExperience = updatedUser.yearOfExperience;
+        }
+        if (
+          typeof updatedUser.specialization === 'string' ||
+          updatedUser.specialization === null
+        ) {
+          token.specialization = updatedUser.specialization;
+        }
+        return token;
+      }
+
       if (account && user) {
         const sessionUser = user as User;
         return {
@@ -449,6 +557,11 @@ export const authOptions: NextAuthOptions = {
           refreshToken: sessionUser.refreshToken ?? '',
           firstName: sessionUser.firstName,
           lastName: sessionUser.lastName,
+          careerStage: sessionUser.careerStage,
+          healthcareField: sessionUser.healthcareField,
+          studyYear: sessionUser.studyYear,
+          yearOfExperience: sessionUser.yearOfExperience,
+          specialization: sessionUser.specialization,
           error: undefined,
         };
       }
@@ -538,6 +651,18 @@ export const authOptions: NextAuthOptions = {
       session.user.permissions = (token.permissions as string[]) || [];
       session.user.firstName = (token.firstName as string) || '';
       session.user.lastName = (token.lastName as string) || '';
+      session.user.careerStage =
+        token.careerStage === 'student' || token.careerStage === 'professional'
+          ? token.careerStage
+          : null;
+      session.user.healthcareField =
+        typeof token.healthcareField === 'string' ? token.healthcareField : null;
+      session.user.studyYear =
+        typeof token.studyYear === 'number' ? token.studyYear : null;
+      session.user.yearOfExperience =
+        typeof token.yearOfExperience === 'number' ? token.yearOfExperience : null;
+      session.user.specialization =
+        typeof token.specialization === 'string' ? token.specialization : null;
       return session;
     },
 

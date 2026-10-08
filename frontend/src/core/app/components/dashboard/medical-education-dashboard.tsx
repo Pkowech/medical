@@ -192,6 +192,41 @@ const MedicalEducationDashboard = () => {
     ? displayCourse
     : data.courseData?.find(course => course.id === selectedStudyCourseId);
 
+  const openCourse = (course: {
+    id?: string;
+    unitId?: string;
+    nextTopicId?: string;
+  }) => {
+    if (course.id && course.unitId && course.nextTopicId) {
+      router.push(
+        `/courses/${course.id}/units/${course.unitId}/topics/${course.nextTopicId}`,
+      );
+      return;
+    }
+    if (course.id && course.unitId) {
+      router.push(`/courses/${course.id}/units/${course.unitId}`);
+      return;
+    }
+    if (course.id) {
+      router.push(`/courses/${course.id}`);
+      return;
+    }
+    router.push('/courses');
+  };
+
+  const handlePracticeQuiz = () => {
+    const hasRealUnit = (course: { unitId?: string }) =>
+      Boolean(course.unitId && !course.unitId.startsWith('placeholder-'));
+    const enrolledUnit =
+      data.courseData?.find(course => course.progressPercentage < 100 && hasRealUnit(course)) ??
+      data.courseData?.find(hasRealUnit);
+    if (enrolledUnit?.unitId) {
+      router.push(`/quiz/unit/${enrolledUnit.unitId}`);
+      return;
+    }
+    router.push('/courses');
+  };
+
   const handleContinueLearning = async () => {
     if (!displayCourse?.id) {
       router.push('/courses');
@@ -212,7 +247,7 @@ const MedicalEducationDashboard = () => {
       console.error('Failed to resume course from dashboard:', resumeError);
     }
 
-    router.push(`/courses/${displayCourse.id}`);
+    openCourse(displayCourse);
   };
 
   const getPriorityColor = (priority: string) => {
@@ -413,7 +448,7 @@ const MedicalEducationDashboard = () => {
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <button
               type="button"
-              onClick={() => router.push('/quiz')}
+              onClick={handlePracticeQuiz}
               className="group flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-emerald-900"
             >
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400">
@@ -739,16 +774,10 @@ const MedicalEducationDashboard = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {data.courseData
               ?.filter((course: { progressPercentage?: number }) => (course.progressPercentage ?? 0) < 100)
-              .map((course: { id?: string; unitId?: string; name?: string; progressPercentage?: number; color?: string; nextTopic?: string; timeLeft?: string; lastUpdated?: number }, index) => (
+              .map((course: { id?: string; unitId?: string; nextTopicId?: string; name?: string; progressPercentage?: number; color?: string; nextTopic?: string; timeLeft?: string; lastUpdated?: number }, index) => (
               <div
                 key={`${course.id ?? 'course'}-${course.unitId ?? index}`}
-                onClick={() => {
-                  if (course.unitId && !course.unitId.startsWith('placeholder-')) {
-                    router.push(`/courses/${course.id}/units/${course.unitId}`);
-                  } else {
-                    router.push(`/courses/${course.id}`);
-                  }
-                }}
+                onClick={() => openCourse(course)}
                 className="bg-gray-50/50 dark:bg-slate-700/50 rounded-xl p-5 border border-gray-200 dark:border-slate-600/50 hover:shadow-lg dark:hover:border-indigo-500/50 transition-all duration-300 group cursor-pointer"
               >
                 <div className="flex items-start justify-between mb-4">
@@ -759,6 +788,11 @@ const MedicalEducationDashboard = () => {
                     <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">Next: {course.nextTopic}</p>
                   </div>
                   <button
+                    type="button"
+                    onClick={event => {
+                      event.stopPropagation();
+                      openCourse(course);
+                    }}
                     className="p-2 rounded-lg bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-indigo-500/30 transition-colors"
                     title="Play Course"
                     aria-label="Play Course"

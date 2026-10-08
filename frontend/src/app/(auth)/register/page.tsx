@@ -132,23 +132,11 @@ export default function RegisterPage() {
   };
 
   const handleProviderSignIn = async () => {
-    if (!formData.acceptTerms) {
-      setFieldErrors(prev => ({
-        ...prev,
-        acceptTerms: 'Accept the Terms of Service to create an account with Google.',
-      }));
-      return;
-    }
-
     setSocialLoading(true);
-    const secureCookie = window.location.protocol === 'https:' ? '; Secure' : '';
-    document.cookie = `google-signup-terms=1; Path=/; Max-Age=600; SameSite=Lax${secureCookie}`;
 
     try {
-      await nextAuthSignIn('google', { callbackUrl: '/finish-setup' });
+      await nextAuthSignIn('google', { callbackUrl: '/google-consent' });
     } catch (error) {
-      document.cookie =
-        'google-signup-terms=; Path=/; Max-Age=0; SameSite=Lax';
       console.error('[Register] Google sign-in failed:', error);
       toast({
         title: 'Unable to continue',
@@ -188,8 +176,11 @@ export default function RegisterPage() {
               className="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
             >
               <span aria-hidden="true">G</span>
-              {socialLoading ? 'Connecting...' : 'Google'}
+              {socialLoading ? 'Connecting...' : 'Continue with Google'}
             </button>
+            <p className="text-center text-xs text-gray-500 dark:text-slate-400">
+              New Google accounts will be asked to accept the Terms of Service and Privacy Policy after sign-in.
+            </p>
           </div>
 
           <p className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
@@ -247,6 +238,7 @@ export default function RegisterPage() {
           error={fieldErrors.username}
           required
           placeholder="Create a username"
+          helperText="Uppercase and lowercase letters are treated the same."
         />
 
         <FormField
@@ -257,6 +249,7 @@ export default function RegisterPage() {
           value={formData.password}
           onChange={handleChange}
           error={fieldErrors.password}
+          showPasswordToggle
           required
           placeholder="Create a password"
           helperText="Must be at least 8 characters with uppercase, lowercase, number, and special character"
@@ -270,6 +263,7 @@ export default function RegisterPage() {
           value={formData.confirmPassword}
           onChange={handleChange}
           error={fieldErrors.confirmPassword}
+          showPasswordToggle
           required
           placeholder="Confirm your password"
         />

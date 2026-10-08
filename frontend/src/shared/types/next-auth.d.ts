@@ -20,6 +20,11 @@ declare module 'next-auth' {
     roles: Role[];
     permissions: string[];
     isEmailVerified: boolean;
+    careerStage?: 'student' | 'professional' | null;
+    healthcareField?: string | null;
+    studyYear?: number | null;
+    yearOfExperience?: number | null;
+    specialization?: string | null;
     accessToken?: string;
     accessTokenExpires?: number;
     refreshToken?: string;
@@ -45,6 +50,11 @@ declare module 'next-auth/jwt' {
     roles: Role[];
     permissions: string[];
     isEmailVerified: boolean;
+    careerStage?: 'student' | 'professional' | null;
+    healthcareField?: string | null;
+    studyYear?: number | null;
+    yearOfExperience?: number | null;
+    specialization?: string | null;
     accessToken?: string;
     accessTokenExpires?: number;
     refreshToken?: string;

@@ -4,6 +4,7 @@ import React, { useRef, useEffect } from 'react';
 import type { User as SharedUser } from '@/shared/types/authInterface';
 import Link from 'next/link';
 import { User, Settings, LogOut } from 'lucide-react';
+import { healthcareProfileLabel } from '@/shared/utils/healthcareProfile';
 
 interface UserMenuProps {
     user: Partial<SharedUser> | null | undefined;
@@ -56,6 +57,9 @@ export const UserMenu: React.FC<UserMenuProps> = ({
                 </p>
                 <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">
                     {user?.email}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-1">
+                    {healthcareProfileLabel(user ?? {})}
                 </p>
             </div>
 

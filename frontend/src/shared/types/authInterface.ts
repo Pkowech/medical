@@ -36,7 +36,7 @@ export interface AuthFormData {
   phoneNumber?: string;
   bio?: string;
   location?: string;
-  specialization?: string;
+  specialization?: string | null;
   yearOfExperience?: number | string;
 }
 
@@ -77,8 +77,11 @@ export interface User extends UserBase {
   accessToken?: string;
   accessTokenExpires?: number;
   refreshToken?: string;
-  specialization?: string;
-  yearOfExperience?: number;
+  specialization?: string | null;
+  careerStage?: 'student' | 'professional' | null;
+  healthcareField?: string | null;
+  studyYear?: number | null;
+  yearOfExperience?: number | null;
   institution?: string;
   courseProgress?: number; // Overall course progress percentage
   totalCourses?: number; // Total enrolled courses
@@ -96,11 +99,17 @@ export type UserMinimal = Pick<
 
 // User preferences and settings
 export interface UserPreferences {
-  theme: 'light' | 'dark' | 'system';
-  language: string;
-  timezone: string;
-  notifications: NotificationPreferences;
-  privacy: PrivacySettings;
+  theme?: 'light' | 'dark' | 'system';
+  language?: string;
+  timezone?: string;
+  notifications?: NotificationPreferences;
+  privacy?: PrivacySettings;
+  studyTargets?: {
+    daily: number;
+    weekly: number;
+  };
+  learningPreference?: string;
+  onboardingCompleted?: boolean;
 }
 
 export interface NotificationPreferences {
@@ -158,6 +167,9 @@ export interface RegisterDTO extends AuthRequestBase {
   bio?: string;
   location?: string;
   specialization?: string;
+  careerStage?: 'student' | 'professional';
+  healthcareField?: string;
+  studyYear?: number;
   yearOfExperience?: number;
 }
 
@@ -189,6 +201,7 @@ export interface LoginResponse {
 }
 export interface LoginResponsePayload {
   message?: string;
+  code?: string;
   data?: {
     user?: Record<string, unknown>;
     roles?: Record<string, unknown>;

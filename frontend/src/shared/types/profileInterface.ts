@@ -52,8 +52,11 @@ export interface UserProfileBase extends BaseEntity {
   profileImage?: string;
   bio?: string;
   location?: string;
-  specialization?: string;
-  yearOfExperience?: number;
+  careerStage?: 'student' | 'professional' | null;
+  healthcareField?: string | null;
+  studyYear?: number | null;
+  specialization?: string | null;
+  yearOfExperience?: number | null;
   isActive: boolean;
   isEmailVerified: boolean;
   twoFactorEnabled: boolean;
@@ -143,8 +146,11 @@ export interface LocalUserProfile {
   phoneNumber: string;
   bio: string;
   location: string;
+  careerStage: 'student' | 'professional' | '';
+  healthcareField: string;
+  studyYear: number | null;
   specialization: string;
-  yearOfExperience: number;
+  yearOfExperience: number | null;
   profileImage?: string;
   // Stats fields (read-only after fetch, for display)
   coursesEnrolled?: number;
@@ -164,8 +170,11 @@ export interface ProfileUpdateRequest {
   phoneNumber?: string;
   bio?: string;
   location?: string;
-  specialization?: string;
-  yearOfExperience?: number;
+  careerStage?: 'student' | 'professional' | null;
+  healthcareField?: string | null;
+  studyYear?: number | null;
+  specialization?: string | null;
+  yearOfExperience?: number | null;
   profileImage?: string;
 }
 

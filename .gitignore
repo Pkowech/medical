@@ -33,7 +33,7 @@ yarn-error.log*
 lerna-debug.log*
 .pnpm-debug.log*
 .vs
-history/
+/history/
 # 🗃️ Runtime data
 pids/
 *.pid

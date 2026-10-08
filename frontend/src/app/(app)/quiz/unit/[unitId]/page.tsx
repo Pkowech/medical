@@ -4,12 +4,14 @@ import { useRouter } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import { DynamicPageProps, resolveRouteParams } from '@/shared/types/nextPageProps';
 import { QuizPanel } from '@/features/courses/components/QuizPanel';
+import { unitService } from '@/features/courses/services/unitService';
 
 type UnitQuizPageProps = DynamicPageProps<{ unitId: string }>;
 
 export default function UnitQuizPage({ params }: UnitQuizPageProps) {
   const router = useRouter();
   const [unitId, setUnitId] = useState<string>('');
+  const [unitTitle, setUnitTitle] = useState('Unit quiz');
 
   useEffect(() => {
     let mounted = true;
@@ -21,6 +23,24 @@ export default function UnitQuizPage({ params }: UnitQuizPageProps) {
       mounted = false;
     };
   }, [params]);
+
+  useEffect(() => {
+    if (!unitId) return;
+
+    let mounted = true;
+    void unitService
+      .getUnitById(unitId)
+      .then(unit => {
+        if (mounted) setUnitTitle(unit.title || unit.name || 'Unit quiz');
+      })
+      .catch(error => {
+        console.error('Unable to load the unit title for its quiz:', error);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [unitId]);
 
   return (
     <main className="min-h-full bg-slate-50 p-4 pt-[calc(1rem+env(safe-area-inset-top))] dark:bg-slate-950 sm:p-6 sm:pt-[calc(1.5rem+env(safe-area-inset-top))] md:p-8 md:pt-[calc(2rem+env(safe-area-inset-top))]">
@@ -36,17 +56,17 @@ export default function UnitQuizPage({ params }: UnitQuizPageProps) {
           </button>
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-300">
-              Focus session
+              Unit quiz
             </p>
             <h1 className="text-lg font-semibold text-slate-900 dark:text-white">
-              Pharmacology unit
+              {unitTitle}
             </h1>
           </div>
         </header>
         {unitId ? (
           <QuizPanel
             lessonId={unitId}
-            lessonTitle="Pharmacology unit"
+            lessonTitle={unitTitle}
             scope="unit"
             immersive
             onReturn={() => router.back()}

@@ -8,6 +8,7 @@ import useRequireAuth from '@/features/auth/hooks/useRequireAuth';
 import { Camera, User, Award, AlertCircle } from 'lucide-react';
 import { userService } from '@/features/profile/services/userService';
 import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { FormFieldWithValidation } from '@/features/profile/components/FormFieldWithValidation';
 import { ProfileCompletenessBar } from '@/features/profile/components/ProfileCompletenessBar';
 import {
@@ -17,6 +18,7 @@ import {
 } from '@/features/profile/utils/profileValidation';
 import { useUnsavedChanges } from '@/features/profile/hooks/useUnsavedChanges';
 import type { LocalUserProfile } from '@/shared/types/profileInterface';
+import { healthcareFieldLabel } from '@/shared/utils/healthcareProfile';
 
 interface ValidationError {
   field?: string;
@@ -45,6 +47,7 @@ function isBackendError(
 
 export default function EditProfilePage() {
   const { isLoading: _isLoading, session } = useRequireAuth();
+  const { update: updateSession } = useSession();
   const router = useRouter();
 
   const [profile, setProfile] = useState<LocalUserProfile>({
@@ -52,8 +55,11 @@ export default function EditProfilePage() {
     lastName: '',
     email: '',
     bio: '',
+    careerStage: '',
+    healthcareField: '',
+    studyYear: null,
     specialization: '',
-    yearOfExperience: 0,
+    yearOfExperience: null,
     location: '',
     phoneNumber: '',
     profileImage: undefined,
@@ -92,8 +98,11 @@ export default function EditProfilePage() {
             lastName: userProfile.lastName || (session.user as { lastName?: string }).lastName || '',
             email: userProfile.email || session.user.email || '',
             bio: userProfile.bio || '',
+            careerStage: userProfile.careerStage || '',
+            healthcareField: userProfile.healthcareField || '',
+            studyYear: userProfile.studyYear ?? null,
             specialization: userProfile.specialization || '',
-            yearOfExperience: userProfile.yearOfExperience ?? 0,
+            yearOfExperience: userProfile.yearOfExperience ?? null,
             location: userProfile.location || '',
             phoneNumber: userProfile.phoneNumber || '',
             profileImage: userProfile.profileImage && userProfile.profileImage.trim() !== ''
@@ -211,11 +220,26 @@ export default function EditProfilePage() {
         bio: profile.bio || undefined,
         location: profile.location || undefined,
         phoneNumber: profile.phoneNumber || undefined,
-        specialization: profile.specialization || undefined,
-        yearOfExperience: typeof profile.yearOfExperience === 'number' ? profile.yearOfExperience : undefined,
+        careerStage: profile.careerStage || null,
+        healthcareField: profile.healthcareField || null,
+        studyYear: profile.careerStage === 'student' ? profile.studyYear : null,
+        specialization: profile.specialization || null,
+        yearOfExperience:
+          profile.careerStage === 'professional' ? profile.yearOfExperience : null,
       };
 
       await userService.updateUserProfile(session.user.id, updatePayload);
+      await updateSession({
+        user: {
+          ...session.user,
+          careerStage: profile.careerStage || null,
+          healthcareField: profile.healthcareField || null,
+          studyYear: profile.careerStage === 'student' ? profile.studyYear : null,
+          yearOfExperience:
+            profile.careerStage === 'professional' ? profile.yearOfExperience : null,
+          specialization: profile.specialization || null,
+        },
+      });
 
       setSaveMessage('Profile saved successfully');
       setFieldErrors({});
@@ -490,53 +514,114 @@ export default function EditProfilePage() {
         <CardHeader>
           <CardTitle className="text-gray-900 dark:text-white flex items-center gap-2">
             <Award className="h-5 w-5 text-purple-500" />
-            Academic & Professional Information
+            Healthcare Learning & Professional Information
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-            {/* Specialization */}
+            <div>
+              <label htmlFor="careerStage" className="mb-2 block text-sm font-medium text-gray-700 dark:text-slate-300">
+                Current stage
+              </label>
+              <select
+                id="careerStage"
+                name="careerStage"
+                value={profile.careerStage}
+                onChange={handleChange}
+                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+              >
+                <option value="">Not set</option>
+                <option value="student">Student or trainee</option>
+                <option value="professional">Qualified professional</option>
+              </select>
+            </div>
+
             <div>
               <FormFieldWithValidation
-                label="Specialization"
+                label="Healthcare field"
+                name="healthcareField"
+                value={healthcareFieldLabel(profile.healthcareField)}
+                onChange={handleChange}
+                placeholder="e.g., Nursing, Pharmacy, Medicine"
+                errors={fieldErrors.healthcareField}
+                helpText="Optional • the healthcare discipline you study or work in"
+                isValid={validationState.healthcareField}
+              />
+            </div>
+
+            <div>
+              <FormFieldWithValidation
+                label="Specialty or area of interest"
                 name="specialization"
                 value={profile.specialization || ''}
                 onChange={handleChange}
-                placeholder="e.g., Cardiology, Surgery"
+                placeholder="e.g., Cardiology, Oncology pharmacy"
                 errors={fieldErrors.specialization}
                 helpText="Optional • your area of focus"
                 isValid={validationState.specialization}
               />
             </div>
 
-            {/* Years of Experience */}
-            <div>
-              <FormFieldWithValidation
-                label="Years of Experience"
-                name="yearOfExperience"
-                value={profile.yearOfExperience?.toString() || ''}
-                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-                  const val = (e.target as HTMLInputElement).value;
-                  const numValue = val ? Math.max(0, Math.min(70, parseInt(val, 10))) : 0;
-                  setProfile(prev => ({ ...prev, yearOfExperience: numValue }));
-                  const fieldValidationErrors = validateField('yearOfExperience', numValue.toString());
-                  setValidationState(prev => ({
-                    ...prev,
-                    yearOfExperience: fieldValidationErrors.length === 0
-                  }));
-                  setFieldErrors(prev => {
-                    const copy = { ...prev };
-                    delete copy.yearOfExperience;
-                    return copy;
-                  });
-                }}
-                type="number"
-                placeholder="0-70 years"
-                errors={fieldErrors.yearOfExperience}
-                helpText="Optional • your years of professional experience (0-70)"
-                isValid={validationState.yearOfExperience}
-              />
-            </div>
+            {profile.careerStage === 'student' && (
+              <div>
+                <label htmlFor="studyYear" className="mb-2 block text-sm font-medium text-gray-700 dark:text-slate-300">
+                  Current year of study
+                </label>
+                <select
+                  id="studyYear"
+                  name="studyYear"
+                  value={profile.studyYear ?? ''}
+                  onChange={event =>
+                    setProfile(previous => ({
+                      ...previous,
+                      studyYear: event.target.value ? Number(event.target.value) : null,
+                    }))
+                  }
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+                >
+                  <option value="">Not set</option>
+                  {Array.from({ length: 12 }, (_, index) => index + 1).map(year => (
+                    <option key={year} value={year}>Year {year}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {profile.careerStage === 'professional' && (
+              <div>
+                <FormFieldWithValidation
+                  label="Years of professional experience"
+                  name="yearOfExperience"
+                  value={profile.yearOfExperience?.toString() || ''}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+                    const rawValue = e.target.value;
+                    const parsedValue = rawValue ? Number.parseInt(rawValue, 10) : null;
+                    const numValue = parsedValue === null
+                      ? null
+                      : Math.max(0, Math.min(60, parsedValue));
+                    setProfile(prev => ({ ...prev, yearOfExperience: numValue }));
+                    const fieldValidationErrors = validateField(
+                      'yearOfExperience',
+                      numValue?.toString() || '',
+                    );
+                    setValidationState(prev => ({
+                      ...prev,
+                      yearOfExperience: fieldValidationErrors.length === 0,
+                    }));
+                    setFieldErrors(prev => {
+                      const copy = { ...prev };
+                      delete copy.yearOfExperience;
+                      return copy;
+                    });
+                  }}
+                  type="number"
+                  placeholder="0-60 years"
+                  errors={fieldErrors.yearOfExperience}
+                  helpText="Optional • your years of professional experience"
+                  isValid={validationState.yearOfExperience}
+                />
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

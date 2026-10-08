@@ -191,7 +191,7 @@ export const AppHeader: React.FC<HeaderProps> = ({
                 <div
                   ref={notificationsMenuRef}
                   id="notifications-menu"
-                  className="notifications-menu fixed sm:absolute right-0 sm:mt-2 sm:w-80 bottom-0 sm:bottom-auto left-0 sm:left-auto w-full sm:rounded-radius-md bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-xl z-50"
+                  className="notifications-menu absolute right-0 top-full mt-2 w-[min(20rem,calc(100vw-1rem))] rounded-md border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-800 z-[60]"
                   role="region"
                   aria-label="Notifications list"
                 >
@@ -267,12 +267,6 @@ export const AppHeader: React.FC<HeaderProps> = ({
                     )}
                   </div>
                 </div>
-              )}
-              {notificationsOpen && (
-                <div
-                  className="sm:hidden fixed inset-0 z-40 bg-black bg-opacity-40"
-                  onClick={() => setNotificationsOpen(false)}
-                />
               )}
             </div>
 

@@ -38,15 +38,28 @@ export function validateField(name: string, value: string): string[] {
       break;
     }
     case 'specialization': {
-      if (value.trim().length > 100) {
-        errors.push('Specialization must be 100 characters or less');
+      if (value.trim().length > 120) {
+        errors.push('Specialty must be 120 characters or less');
+      }
+      break;
+    }
+    case 'healthcareField': {
+      if (value.trim().length > 80) {
+        errors.push('Healthcare field must be 80 characters or less');
       }
       break;
     }
     case 'yearOfExperience': {
       const num = parseInt(value, 10);
-      if (value.trim() && (isNaN(num) || num < 0 || num > 70)) {
-        errors.push('Experience must be between 0 and 70 years');
+      if (value.trim() && (isNaN(num) || num < 0 || num > 60)) {
+        errors.push('Experience must be between 0 and 60 years');
+      }
+      break;
+    }
+    case 'studyYear': {
+      const num = parseInt(value, 10);
+      if (value.trim() && (isNaN(num) || num < 1 || num > 12)) {
+        errors.push('Study year must be between 1 and 12');
       }
       break;
     }
@@ -68,7 +81,9 @@ export function validateProfile(profile: LocalUserProfile): ValidationResult {
     ['bio', profile.bio || ''],
     ['phoneNumber', profile.phoneNumber || ''],
     ['location', profile.location || ''],
+    ['healthcareField', profile.healthcareField || ''],
     ['specialization', profile.specialization || ''],
+    ['studyYear', profile.studyYear?.toString() || ''],
     ['yearOfExperience', profile.yearOfExperience?.toString() || ''],
   ];
 

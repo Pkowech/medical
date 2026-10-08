@@ -150,7 +150,9 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                     </div>
                 </div>
             </div>
-            {!isQuizSessionPage && <MobileTabBar navigationItems={navigationItems} />}
+            {!isQuizSessionPage && !sidebarOpen && (
+                <MobileTabBar navigationItems={navigationItems} />
+            )}
         </>
     );
 };

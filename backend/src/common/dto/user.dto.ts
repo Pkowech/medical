@@ -14,6 +14,7 @@ import {
   ValidateIf,
   ValidationArguments,
   IsNotEmpty,
+  IsIn,
   MaxLength,
   Min,
   Max,
@@ -235,6 +236,27 @@ export class CreateUserDto {
   @IsString()
   location?: string;
 
+  @ApiPropertyOptional({
+    description: 'Healthcare learning or professional stage',
+    enum: ['student', 'professional'],
+  })
+  @IsOptional()
+  @IsIn(['student', 'professional'])
+  careerStage?: string | null;
+
+  @ApiPropertyOptional({ description: 'Healthcare field or profession' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  healthcareField?: string | null;
+
+  @ApiPropertyOptional({ description: 'Current year of study for learners' })
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  @Max(12)
+  studyYear?: number | null;
+
   @ApiProperty({ description: 'Institution', required: false })
   @IsOptional()
   @IsString()
@@ -243,12 +265,12 @@ export class CreateUserDto {
   @ApiProperty({ description: 'Specialization', required: false })
   @IsOptional()
   @IsString()
-  specialization?: string;
+  specialization?: string | null;
 
   @ApiProperty({ description: 'Years of experience', required: false })
   @IsOptional()
   @IsNumber()
-  yearOfExperience?: number;
+  yearOfExperience?: number | null;
 
   @ApiProperty({ description: 'Terms of service acceptance' })
   @IsBoolean()
@@ -266,6 +288,27 @@ export class UpdateUserDto extends PartialType(CreateUserDto) {
   @IsString()
   location?: string;
 
+  @ApiPropertyOptional({
+    description: 'Healthcare learning or professional stage',
+    enum: ['student', 'professional'],
+  })
+  @IsOptional()
+  @IsIn(['student', 'professional'])
+  careerStage?: string | null;
+
+  @ApiPropertyOptional({ description: 'Healthcare field or profession' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  healthcareField?: string | null;
+
+  @ApiPropertyOptional({ description: 'Current year of study for learners' })
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  @Max(12)
+  studyYear?: number | null;
+
   @ApiPropertyOptional({ description: 'Phone number' })
   @IsOptional()
   @IsString()
@@ -276,15 +319,18 @@ export class UpdateUserDto extends PartialType(CreateUserDto) {
   @IsString()
   profileImage?: string;
 
-  @ApiPropertyOptional({ description: 'Medical specialization' })
+  @ApiPropertyOptional({ description: 'Specialty or area of interest' })
   @IsOptional()
   @IsString()
-  specialization?: string;
+  @MaxLength(120)
+  specialization?: string | null;
 
   @ApiPropertyOptional({ description: 'Years of professional experience' })
   @IsOptional()
   @IsNumber()
-  yearOfExperience?: number;
+  @Min(0)
+  @Max(60)
+  yearOfExperience?: number | null;
 }
 
 export class UpdateUserFeaturesDto {
@@ -481,6 +527,21 @@ export class AuthUserDto {
 
   @ApiProperty({ description: 'Is email verified' })
   isEmailVerified!: boolean;
+
+  @ApiPropertyOptional({ description: 'Healthcare learning or professional stage' })
+  careerStage?: string | null;
+
+  @ApiPropertyOptional({ description: 'Healthcare field or profession' })
+  healthcareField?: string | null;
+
+  @ApiPropertyOptional({ description: 'Current year of study for learners' })
+  studyYear?: number | null;
+
+  @ApiPropertyOptional({ description: 'Years of professional experience' })
+  yearOfExperience?: number | null;
+
+  @ApiPropertyOptional({ description: 'Specialty or area of interest' })
+  specialization?: string | null;
 }
 
 // Define AuthResponse THIRD (depends on AuthUserDto with lazy type resolution)

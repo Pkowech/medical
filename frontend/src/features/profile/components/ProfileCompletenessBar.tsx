@@ -25,8 +25,18 @@ function calculateCompleteness(profile: LocalUserProfile): {
     { label: 'Bio', filled: Boolean(profile.bio?.trim()), required: false },
     { label: 'Phone Number', filled: Boolean(profile.phoneNumber?.trim()), required: false },
     { label: 'Location', filled: Boolean(profile.location?.trim()), required: false },
+    { label: 'Healthcare field', filled: Boolean(profile.healthcareField?.trim()), required: false },
+    { label: 'Career stage', filled: Boolean(profile.careerStage), required: false },
     { label: 'Specialization', filled: Boolean(profile.specialization?.trim()), required: false },
-    { label: 'Experience', filled: (profile.yearOfExperience ?? 0) > 0, required: false },
+    ...(profile.careerStage === 'student'
+      ? [{ label: 'Year of study', filled: Boolean(profile.studyYear), required: false }]
+      : profile.careerStage === 'professional'
+        ? [{
+            label: 'Professional experience',
+            filled: profile.yearOfExperience !== null,
+            required: false,
+          }]
+        : []),
     { label: 'Profile Image', filled: Boolean(profile.profileImage), required: false },
   ];
 

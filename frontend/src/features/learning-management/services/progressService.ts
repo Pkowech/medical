@@ -567,6 +567,7 @@ const progressService = {
       // attach a convenient next-unit hint for the dashboard.
       const courseProgressList: CourseProgress[] = result.courseProgress || [];
       result.courseData = courseProgressList.map((cp, idx) => {
+         const enrolledUnit = enrolledUnitsRaw.find(unit => unit.courseId === cp.id);
          const colors = [
           'from-blue-500 to-indigo-600',
           'from-emerald-500 to-teal-600',
@@ -575,8 +576,8 @@ const progressService = {
          ];
          return {
            id: cp.id,
-           unitId: asString(enrolledUnitsRaw.find(unit => unit.courseId === cp.id)?.unitId, '') || undefined,
-           nextTopicId: asString(enrolledUnitsRaw.find(unit => unit.courseId === cp.id)?.nextTopicId, '') || undefined,
+           unitId: asString(enrolledUnit?.unitId, '') || undefined,
+           nextTopicId: asString(enrolledUnit?.nextTopicId, '') || undefined,
            name: cp.title,
            progressPercentage: cp.progressPercentage,
            color: colors[idx % colors.length] || 'from-gray-500 to-slate-600',
