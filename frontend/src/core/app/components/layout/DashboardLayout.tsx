@@ -9,6 +9,7 @@ import { NOTIFICATIONS_REFRESH_EVENT } from '@/features/community/notificationEv
 import { Sidebar } from '@/core/app/components/layout/AppSidebar';
 import { AppHeader } from '@/core/app/components/layout/AppHeader';
 import { AppFooter } from '@/core/app/components/layout/AppFooter';
+import { MobileTabBar } from '@/core/app/components/layout/MobileTabBar';
 import { LoadingSpinner } from '@/shared/components/ui/loading-spinner';
 import { usePathname } from 'next/navigation';
 import { NavigationItem } from '@/shared/types/navigationInterface';
@@ -84,51 +85,56 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         coursePathSegments.length === 3 &&
         coursePathSegments[2] !== 'upload';
     const isFullHeightPage = isCoursePage || isMaterialViewPage;
+    const isQuizSessionPage =
+        coursePathSegments[0] === 'quiz' && coursePathSegments[1] === 'unit';
+    const isFocusedPage = isFullHeightPage || isQuizSessionPage;
 
     return (
         <>
-            {/* Mobile overlay backdrop (z-40) */}
-            {sidebarOpen && (
-                <div
-                    className="lg:hidden fixed inset-0 z-40 bg-black bg-opacity-50"
-                    onClick={() => setSidebarOpen(false)}
-                    aria-hidden="true"
-                />
-            )}
-
             <div className="flex h-screen h-dvh overflow-hidden bg-gray-50 dark:bg-gray-900">
-                {!isFullHeightPage && <Sidebar theme={colorScheme} user={user} navigationItems={navigationItems} />}
+                {!isQuizSessionPage && (
+                    <div className={cn(isFullHeightPage && 'lg:hidden')}>
+                        <Sidebar theme={colorScheme} user={user} navigationItems={navigationItems} />
+                    </div>
+                )}
 
                 {/* Main app column (center) */}
                 <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-                    <AppHeader
-                        theme={colorScheme}
-                        toggleTheme={toggleTheme}
-                        user={user}
-                        notifications={notifications}
-                        notificationsOpen={notificationsOpen}
-                        setNotificationsOpen={setNotificationsOpen}
-                        onNotificationRefresh={refreshNotifications}
-                    />
+                    {!isQuizSessionPage && (
+                        <AppHeader
+                            theme={colorScheme}
+                            toggleTheme={toggleTheme}
+                            user={user}
+                            notifications={notifications}
+                            notificationsOpen={notificationsOpen}
+                            setNotificationsOpen={setNotificationsOpen}
+                            onNotificationRefresh={refreshNotifications}
+                        />
+                    )}
 
                     {/* content area */}
                     <div
                         ref={contentScrollRef}
                         className={cn(
-                            'min-h-0 flex-1',
+                            'min-h-0 flex-1 overscroll-y-contain',
                             isFullHeightPage ? 'overflow-hidden' : 'overflow-auto',
+                            !isQuizSessionPage && 'pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0',
                         )}
                     >
                         <div
                             className={cn(
                                 `w-full transition-all duration-300 pt-0`,
-                                !isFullHeightPage && "px-3 sm:px-4 md:px-6 lg:px-8 py-4 lg:py-6",
+                                !isFocusedPage && "px-3 sm:px-4 md:px-6 lg:px-8 py-4 lg:py-6",
+                                isQuizSessionPage && 'h-full flex flex-col',
                                 isFullHeightPage && "h-full flex flex-col",
                                 sidebarOpen && !isFullHeightPage && 'lg:pl-0'
                             )}
                         >
-                            <main className={cn('min-h-0 min-w-0 flex-1 py-2 transition-all duration-300', isFullHeightPage && 'h-full py-0')}>
-                                <div className={cn('min-h-0 space-y-6', isFullHeightPage && 'h-full space-y-0')}>
+                            <main className={cn(
+                                'min-h-0 min-w-0 flex-1 py-2 transition-all duration-300',
+                                isFocusedPage && 'h-full py-0',
+                            )}>
+                                <div className={cn('min-h-0 space-y-6', isFullHeightPage && 'h-full space-y-0', isQuizSessionPage && 'h-full space-y-0')}>
                                     <Suspense fallback={<LoadingSpinner />}>{children}</Suspense>
                                 </div>
                             </main>
@@ -137,6 +143,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                     </div>
                 </div>
             </div>
+            {!isQuizSessionPage && <MobileTabBar navigationItems={navigationItems} />}
         </>
     );
 };

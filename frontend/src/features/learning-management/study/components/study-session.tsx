@@ -310,6 +310,7 @@ export const StudySession: React.FC<StudySessionProps> = ({
               onClick={() => addActivity('reading')}
               disabled={!sessionId}
               title="Add Reading Activity"
+              aria-label="Add reading activity"
               className="h-10 w-10"
             >
               <BookOpen className="h-5 w-5" />
@@ -320,6 +321,7 @@ export const StudySession: React.FC<StudySessionProps> = ({
               onClick={() => addActivity('quiz')}
               disabled={!sessionId}
               title="Add Quiz Activity"
+              aria-label="Add quiz activity"
               className="h-10 w-10"
             >
               <Sparkles className="h-5 w-5" />
@@ -330,6 +332,7 @@ export const StudySession: React.FC<StudySessionProps> = ({
               onClick={() => addActivity('notes')}
               disabled={!sessionId}
               title="Add Notes Activity"
+              aria-label="Add notes activity"
               className="h-10 w-10"
             >
               <ScrollText className="h-5 w-5" />

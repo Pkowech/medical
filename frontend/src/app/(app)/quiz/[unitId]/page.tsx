@@ -9,7 +9,7 @@ import { Card } from '@/shared/components/ui/card';
 import { Alert, AlertDescription } from '@/shared/components/ui/alert';
 import { WifiOff, ArrowLeft, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { DynamicPageProps } from '@/shared/types/nextPageProps';
+import { DynamicPageProps, resolveRouteParams } from '@/shared/types/nextPageProps';
 
 type QuizPageProps = DynamicPageProps<{ unitId: string }>;
 
@@ -20,15 +20,15 @@ export default function QuizPage({ params }: QuizPageProps) {
 
   React.useEffect(() => {
     let mounted = true;
-    (async () => {
-      const { unitId } = await params;
-      if (mounted) setUnitId(unitId);
-    })();
+    void resolveRouteParams(params).then(({ unitId: resolvedUnitId }) => {
+      if (mounted) setUnitId(resolvedUnitId);
+    });
     return () => { mounted = false; };
   }, [params]);
 
   React.useEffect(() => {
-    if (unitId) router.replace(`/quiz/unit/${unitId}`);
+    if (!unitId) return;
+    router.replace(`/quiz/unit/${unitId}`);
   }, [router, unitId]);
 
   const {

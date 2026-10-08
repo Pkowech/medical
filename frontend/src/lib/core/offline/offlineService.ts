@@ -4,6 +4,7 @@ import {
   QuizQuestion,
   ReadingMaterial,
   OfflinePracticeAttempt,
+  OfflineStudySession,
   OfflineQuizQuestion,
   OfflineTopicBundle,
   OfflineTopicMaterial,
@@ -116,6 +117,22 @@ class OfflineService {
       await tx.store.put(item);
     }
     await tx.done;
+  }
+
+  async saveOfflineStudySession(session: OfflineStudySession): Promise<void> {
+    const db = await this.initialize();
+    await db.put('offlineStudySessions', session);
+  }
+
+  async getOfflineStudySession(userId: string): Promise<OfflineStudySession | undefined> {
+    const db = await this.initialize();
+    const sessions = await db.getAllFromIndex('offlineStudySessions', 'by-user', userId);
+    return sessions.sort((left, right) => right.updatedAt - left.updatedAt)[0];
+  }
+
+  async removeOfflineStudySession(sessionId: string): Promise<void> {
+    const db = await this.initialize();
+    await db.delete('offlineStudySessions', sessionId);
   }
 
   async cacheTopicBundle(input: {

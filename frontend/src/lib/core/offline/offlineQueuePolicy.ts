@@ -8,9 +8,11 @@ const QUEUEABLE_POST_PATHS = new Set([
 
 const OFFLINE_PRACTICE_ATTEMPT_PATH =
   /^\/quizzes\/topic\/[^/]+\/offline-attempts$/;
+const STUDY_SESSION_END_PATH = /^\/study\/session\/[^/]+\/end$/;
 
 export function isOfflineQueueableRequest(method?: string, url?: string): boolean {
-  if (method?.toUpperCase() !== 'POST' || !url) return false;
+  const normalizedMethod = method?.toUpperCase();
+  if (!normalizedMethod || !url) return false;
 
   let pathname: string;
   try {
@@ -22,6 +24,11 @@ export function isOfflineQueueableRequest(method?: string, url?: string): boolea
   pathname = pathname
     .replace(/^\/api\/backend(?=\/|$)/, '')
     .replace(/^\/v1(?=\/|$)/, '');
+
+  if (normalizedMethod === 'PUT') {
+    return STUDY_SESSION_END_PATH.test(pathname);
+  }
+  if (normalizedMethod !== 'POST') return false;
 
   return (
     QUEUEABLE_POST_PATHS.has(pathname) ||

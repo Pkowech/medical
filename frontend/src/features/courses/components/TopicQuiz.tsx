@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { apiService } from '@/features/auth/services/apiClient';
 import { toast } from 'sonner';
+import { useCourseStudySession } from '@/features/learning-management/study/components/CourseStudySessionProvider';
 import { v4 as uuidv4 } from 'uuid';
 import { offlineService } from '@/lib/core/offline/offlineService';
 
@@ -69,6 +70,7 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
   onComplete,
   onNextTopic,
 }) => {
+  const { recordCourseActivity } = useCourseStudySession();
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswers, setSelectedAnswers] = useState<Record<string, string[]>>({});
@@ -81,6 +83,10 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
   const [isOffline, setIsOffline] = useState(false);
   const [isProvisional, setIsProvisional] = useState(false);
   const [attemptId, setAttemptId] = useState(() => uuidv4());
+
+  React.useEffect(() => {
+    if (isOpen) recordCourseActivity('reading', courseId, topicId);
+  }, [courseId, isOpen, recordCourseActivity, topicId]);
 
   React.useEffect(() => {
     const updateConnection = () => setIsOffline(!navigator.onLine);
@@ -212,6 +218,7 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
         });
         setIsProvisional(true);
         setQuizCompleted(true);
+        recordCourseActivity('quiz', courseId, topicId);
         toast.success('Practice attempt saved on this device; it will be validated when online.');
         return;
       }
@@ -233,6 +240,7 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
       setFeedback(result?.feedback || '');
       setNextTopicId(result?.nextTopicId);
       setQuizCompleted(true);
+      recordCourseActivity('quiz', courseId, topicId, result.score);
 
       if (onComplete) {
         try {

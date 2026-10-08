@@ -35,6 +35,10 @@ import { toast } from 'sonner';
 import { Brain } from 'lucide-react';
 import { offlineService } from '@/lib/core/offline/offlineService';
 import type { OfflineQuizQuestion, OfflineTopicBundle } from '@/lib/core/offline/db';
+import {
+  StartCourseStudySessionButton,
+  useCourseStudySession,
+} from '@/features/learning-management/study/components/CourseStudySessionProvider';
 
 interface TopicViewerProps {
   courseId: string;
@@ -170,6 +174,13 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
   const { data: session } = useSession();
   const { setHeader } = usePageHeader();
   const { toggleBookmark, bookmarks, markLessonComplete, progress } = useCourseProgressStore();
+  const { activeSession, recordCourseActivity, switchCourseTopic } = useCourseStudySession();
+
+  useEffect(() => {
+    if (topic && activeSession?.courseId === courseId && activeSession.topicId !== topicId) {
+      switchCourseTopic(courseId, topicId, topic.title);
+    }
+  }, [activeSession?.courseId, activeSession?.topicId, courseId, switchCourseTopic, topic?.title, topicId]);
 
   const refreshLearningCaches = async () => {
     if (!userId) return;
@@ -466,6 +477,7 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
   const offlinePdfCount = materials.filter(isPdfMaterial).length;
 
   const handleOpenMaterial = (materialId: string) => {
+    recordCourseActivity('reading', courseId, topicId);
     setSelectedMaterialId(materialId);
     setShowMaterialModal(true);
   };
@@ -782,6 +794,11 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
 
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row gap-3 justify-between pt-4">
+          <StartCourseStudySessionButton
+            courseId={courseId}
+            topicId={topicId}
+            topicTitle={topic.title}
+          />
           <Button
             variant="outline"
             onClick={handleNavigateToUnit}
@@ -825,7 +842,10 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
               </Button>
             )}
             <Button
-              onClick={() => setShowQuiz(true)}
+              onClick={() => {
+                recordCourseActivity('reading', courseId, topicId);
+                setShowQuiz(true);
+              }}
               className="flex items-center gap-2"
             >
               <Brain className="w-4 h-4" />

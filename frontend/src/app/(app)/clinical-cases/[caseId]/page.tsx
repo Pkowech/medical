@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { InteractiveCaseInterface } from '@/features/assessment/components/clinical-cases/InteractiveCaseInterface';
-import { DynamicPageProps } from '@/shared/types/nextPageProps';
+import { DynamicPageProps, resolveRouteParams } from '@/shared/types/nextPageProps';
 
 type ClinicalCasePageProps = DynamicPageProps<{ caseId: string }>;
 
@@ -11,7 +11,7 @@ export default function ClinicalCaseDetailPage({ params }: ClinicalCasePageProps
 
   useEffect(() => {
     let mounted = true;
-    void params.then(({ caseId: id }) => {
+    void resolveRouteParams(params).then(({ caseId: id }) => {
       if (mounted) setCaseId(id);
     });
     return () => {

@@ -2,13 +2,13 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#1e40af" />
     <title>Offline downloads · MedTrack Hub</title>
     <style>
       :root { color-scheme: light; font-family: system-ui, sans-serif; color: #172033; background: #f3f6fb; }
       * { box-sizing: border-box; }
-      body { margin: 0; padding: 1rem; }
+      body { margin: 0; padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left)); }
       main { max-width: 850px; margin: 2rem auto; }
       header, article, .panel { background: white; border: 1px solid #dbe2ec; border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; }
       h1, h2, h3, p { margin-top: 0; }

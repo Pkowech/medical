@@ -32,7 +32,7 @@ export interface LocalFileMetadata {
 
 export interface SyncQueueItem {
   id: string;
-  type?: 'quiz_submission' | 'progress_log' | 'offline_practice_submission';
+  type?: 'quiz_submission' | 'progress_log' | 'offline_practice_submission' | 'study_session_end';
   data?: unknown;
   url: string;
   method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
@@ -120,6 +120,26 @@ export interface OfflinePracticeAttempt {
   lastUpdated: number;
 }
 
+export interface OfflineStudySession {
+  id: string;
+  userId: string;
+  courseId: string;
+  topicId: string;
+  topicTitle: string;
+  elapsedSeconds: number;
+  lastActivitySeconds: number;
+  isActive: boolean;
+  activities: Array<{
+    type: 'reading' | 'quiz' | 'notes';
+    duration: number;
+    timestamp: string;
+    score?: number;
+    metadata?: Record<string, unknown>;
+  }>;
+  notes: string;
+  updatedAt: number;
+}
+
 interface MedicalEducationDB extends DBSchema {
   quizQuestions: {
     key: string;
@@ -172,10 +192,15 @@ interface MedicalEducationDB extends DBSchema {
     value: OfflinePracticeAttempt;
     indexes: { 'by-user': string; 'by-status': OfflinePracticeAttempt['status'] };
   };
+  offlineStudySessions: {
+    key: string;
+    value: OfflineStudySession;
+    indexes: { 'by-user': string };
+  };
 }
 
 const DB_NAME = 'medical-education-db';
-const DB_VERSION = 7;
+const DB_VERSION = 8;
 let databasePromise: Promise<IDBPDatabase<MedicalEducationDB>> | undefined;
 
 export function initDB(): Promise<IDBPDatabase<MedicalEducationDB>> {
@@ -246,6 +271,11 @@ export function initDB(): Promise<IDBPDatabase<MedicalEducationDB>> {
         const attempts = db.createObjectStore('offlinePracticeAttempts', { keyPath: 'id' });
         attempts.createIndex('by-user', 'userId');
         attempts.createIndex('by-status', 'status');
+      }
+
+      if (!db.objectStoreNames.contains('offlineStudySessions')) {
+        const studySessions = db.createObjectStore('offlineStudySessions', { keyPath: 'id' });
+        studySessions.createIndex('by-user', 'userId');
       }
     },
     blocked() {

@@ -5,6 +5,7 @@ import { quizService } from '@/features/assessment/services/quiz';
 import { useXapi } from '@/lib/xapi/useXapi';
 import { URLS } from '@/lib/urls';
 import { CheckCircle, XCircle, AlertCircle, RefreshCw, Send } from 'lucide-react';
+import { useCourseStudySession } from '@/features/learning-management/study/components/CourseStudySessionProvider';
 
 interface Question {
   id: string;
@@ -17,23 +18,28 @@ interface Question {
 interface QuizPanelProps {
   lessonId?: string | number;
   lessonTitle?: string;
+  courseId?: string;
   scope?: 'unit' | 'topic' | 'assessment';
   onTopicCompleted?: () => void;
   onTopicProgressUpdated?: () => void | Promise<void>;
   onNextTopic?: (topicId: string) => void;
   onReturn?: () => void;
+  immersive?: boolean;
 }
 
 export const QuizPanel = ({
   lessonId,
   lessonTitle,
+  courseId,
   scope = 'unit',
   onTopicCompleted,
   onTopicProgressUpdated,
   onNextTopic,
   onReturn,
+  immersive = false,
 }: QuizPanelProps) => {
   const { trackAction, XAPI_VERBS } = useXapi();
+  const { activeSession, recordCourseActivity } = useCourseStudySession();
   const [questions, setQuestions] = useState<Question[]>([]);
   const [submittedAnswers, setSubmittedAnswers] = useState<Record<string, string[]>>({});
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -166,6 +172,14 @@ export const QuizPanel = ({
 
       setFinalResult(result);
       setQuizComplete(true);
+      if (scope !== 'assessment' && lessonId != null && activeSession) {
+        recordCourseActivity(
+          'quiz',
+          courseId ?? activeSession.courseId,
+          scope === 'topic' ? String(lessonId) : activeSession.topicId,
+          result.score,
+        );
+      }
       if (scope === 'topic' && lessonId) {
         try {
           if (result.masteryUnlocked) onTopicCompleted?.();
@@ -230,7 +244,7 @@ export const QuizPanel = ({
     const scorePercentage = finalResult?.score ?? Math.round((score / questions.length) * 100);
     const passed = finalResult?.passed ?? scorePercentage >= (scope === 'topic' ? 70 : 80);
     return (
-      <div className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm rounded-xl p-8 shadow-sm border border-gray-200 dark:border-slate-700/50 text-center animate-in fade-in zoom-in duration-500">
+      <div className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm rounded-xl p-8 shadow-sm border border-gray-200 dark:border-slate-700/50 text-center animate-in fade-in zoom-in duration-500 motion-reduce:animate-none">
         <div className={`w-20 h-20 mx-auto rounded-full flex items-center justify-center mb-6 ${passed ? 'bg-green-100 dark:bg-green-500/20' : 'bg-red-100 dark:bg-red-500/20'}`}>
           {passed ? <CheckCircle className="w-10 h-10 text-green-600" /> : <AlertCircle className="w-10 h-10 text-red-600" />}
         </div>
@@ -271,7 +285,7 @@ export const QuizPanel = ({
               (onReturn ?? (() => window.location.reload()))();
             }
           }}
-          className="px-8 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20"
+          className="min-h-12 px-8 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20 active:scale-[0.99] motion-reduce:transition-none"
         >
           {finalResult?.nextTopicId && onNextTopic
             ? 'Next Topic'
@@ -284,7 +298,11 @@ export const QuizPanel = ({
   const currentQuestion = questions[currentQuestionIndex];
 
   return (
-    <div className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm rounded-xl p-6 shadow-sm border border-gray-200 dark:border-slate-700/50 mt-6 animate-in slide-in-from-bottom-4 duration-500">
+    <div className={`${
+      immersive
+        ? 'mt-0 rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm backdrop-blur-sm dark:border-slate-700 dark:bg-slate-900/70 sm:p-6'
+        : 'mt-6 rounded-xl border border-gray-200 bg-white/80 p-6 shadow-sm backdrop-blur-sm dark:border-slate-700/50 dark:bg-slate-800/50'
+    } animate-in slide-in-from-bottom-4 duration-500 motion-reduce:animate-none`}>
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-lg font-bold text-gray-900 dark:text-white">
           {scope === 'topic'
@@ -297,6 +315,22 @@ export const QuizPanel = ({
           Question {currentQuestionIndex + 1} of {questions.length}
         </span>
       </div>
+
+      {immersive && (
+        <div
+          className="mb-5 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700"
+          role="progressbar"
+          aria-label="Quiz progress"
+          aria-valuemin={0}
+          aria-valuemax={questions.length}
+          aria-valuenow={currentQuestionIndex + 1}
+        >
+          <div
+            className="h-full rounded-full bg-blue-600 transition-[width] duration-300 motion-reduce:transition-none"
+            style={{ width: `${((currentQuestionIndex + 1) / questions.length) * 100}%` }}
+          />
+        </div>
+      )}
 
       <div className="space-y-6">
         <div className="p-6 bg-slate-50/50 dark:bg-slate-900/30 border border-slate-100 dark:border-slate-700/50 rounded-xl">
@@ -333,7 +367,8 @@ export const QuizPanel = ({
                   key={option.id}
                   onClick={() => handleOptionSelect(option.id)}
                   disabled={isSubmitted}
-                  className={`w-full flex items-center justify-between p-4 rounded-xl border ${borderClass} ${bgClass} transition-all duration-200 text-left group hover:shadow-md disabled:cursor-default`}
+                  aria-pressed={isSelected}
+                  className={`w-full min-h-14 flex items-center justify-between p-4 rounded-xl border ${borderClass} ${bgClass} transition-all duration-200 text-left group hover:shadow-md active:scale-[0.99] disabled:cursor-default motion-reduce:transition-none`}
                 >
                   <span className={`text-sm font-medium ${textClass}`}>{option.text}</span>
                   {isSubmitted && isCorrect && <CheckCircle className="w-5 h-5 text-green-500" />}
@@ -353,12 +388,12 @@ export const QuizPanel = ({
 
         {submissionError && <p role="alert" className="text-sm text-red-600">{submissionError}</p>}
 
-        <div className="flex gap-4">
+        <div className={`flex gap-4 ${immersive ? 'sticky bottom-0 -mx-4 mt-3 bg-gradient-to-t from-white via-white/95 to-transparent px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-4 dark:from-slate-900 dark:via-slate-900/95 sm:-mx-6 sm:px-6' : ''}`}>
           {!isSubmitted ? (
             <button
               onClick={handleSubmit}
               disabled={!selectedOption || isSubmitting}
-              className="flex-1 bg-blue-600 text-white font-bold py-4 rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="min-h-14 flex-1 bg-blue-600 text-white font-bold py-4 rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.99] motion-reduce:transition-none"
             >
               <Send className="w-4 h-4" />
               {isSubmitting ? 'Checking answer...' : 'Submit Answer'}
@@ -367,7 +402,7 @@ export const QuizPanel = ({
             <button
               onClick={handleNext}
               disabled={isSubmitting}
-              className="flex-1 bg-slate-900 dark:bg-blue-600 text-white font-bold py-4 rounded-xl hover:opacity-90 transition-all shadow-lg flex items-center justify-center gap-2"
+              className="min-h-14 flex-1 bg-slate-900 dark:bg-blue-600 text-white font-bold py-4 rounded-xl hover:opacity-90 transition-all shadow-lg flex items-center justify-center gap-2 active:scale-[0.99] motion-reduce:transition-none"
             >
               {isSubmitting
                 ? 'Saving results...'

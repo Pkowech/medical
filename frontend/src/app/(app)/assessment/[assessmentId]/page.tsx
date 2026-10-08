@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { QuizPanel } from '@/features/courses/components/QuizPanel';
-import { DynamicPageProps } from '@/shared/types/nextPageProps';
+import { DynamicPageProps, resolveRouteParams } from '@/shared/types/nextPageProps';
 
 type AssessmentPageProps = DynamicPageProps<{ assessmentId: string }>;
 
@@ -13,7 +13,7 @@ export default function AssessmentDetailPage({ params }: AssessmentPageProps) {
 
   useEffect(() => {
     let mounted = true;
-    void params.then(({ assessmentId: id }) => {
+    void resolveRouteParams(params).then(({ assessmentId: id }) => {
       if (mounted) setAssessmentId(id);
     });
     return () => {

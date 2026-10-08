@@ -87,7 +87,30 @@
   body {
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior-y: contain;
   }
+
+  button,
+  a,
+  [role='button'] {
+    touch-action: manipulation;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+.install-instructions-dialog::backdrop {
+  background: rgb(2 6 23 / 50%);
 }
 @utility dynamic-width {
   width: var(--width, 0%);
@@ -97,4 +120,3 @@
   background-image: linear-gradient(currentColor 1px, transparent 1px), linear-gradient(90deg, currentColor 1px, transparent 1px);
   background-size: var(--grid-size, 24px) var(--grid-size, 24px);
 }
-

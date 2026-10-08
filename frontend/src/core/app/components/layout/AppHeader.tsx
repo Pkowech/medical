@@ -19,6 +19,7 @@ import { markNotificationAsRead } from '@/features/community/notificationService
 import { useLearningStreak } from '@/shared/hooks/useProgress';
 import { usePageHeader } from '@/core/providers/HeaderContext';
 import { UserMenu } from './UserMenu';
+import { InstallAppButton } from './InstallAppButton';
 
 export const AppHeader: React.FC<HeaderProps> = ({
   theme,
@@ -86,7 +87,7 @@ export const AppHeader: React.FC<HeaderProps> = ({
   }, [headerUserMenuOpen, setHeaderUserMenuOpen]);
 
   return (
-    <header className="sticky top-0 z-50 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-gray-200 dark:border-slate-800 shadow-sm">
+    <header className="sticky top-0 z-50 bg-white/80 pt-[env(safe-area-inset-top)] shadow-sm backdrop-blur-md dark:bg-slate-900/80 border-b border-gray-200 dark:border-slate-800">
       {' '}
       {/* Header z-50 */}
       <div className="px-3 sm:px-4 md:px-6 lg:px-8 py-3 sm:py-4 transition-all duration-300">
@@ -155,6 +156,7 @@ export const AppHeader: React.FC<HeaderProps> = ({
 
           {/* Right controls - Notifications, User Menu and Theme */}
           <div className="flex items-center space-x-1 sm:space-x-2 shrink-0">
+            <InstallAppButton />
             {/* Notifications */}
             <div className="relative">
               <button

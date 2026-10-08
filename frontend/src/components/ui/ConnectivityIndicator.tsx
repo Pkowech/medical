@@ -4,8 +4,10 @@ import React, { useState, useEffect } from 'react';
 import { useConnectivity } from '@/lib/hooks/useConnectivity';
 import { WifiOff, RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
+import { usePathname } from 'next/navigation';
 
 export function ConnectivityIndicator() {
+  const pathname = usePathname();
   const {
     isOnline,
     pendingChanges,
@@ -65,7 +67,10 @@ export function ConnectivityIndicator() {
       aria-live="polite"
       aria-atomic="true"
       className={cn(
-        "fixed bottom-4 right-4 z-50 flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-3 rounded-full shadow-lg transition-all duration-300",
+        "fixed right-3 z-50 flex items-center gap-2 rounded-full px-3 py-2 shadow-lg transition-all duration-300 sm:right-4 sm:px-4 sm:py-3",
+        pathname?.startsWith('/quiz/unit/')
+          ? 'bottom-[calc(5rem+env(safe-area-inset-bottom))]'
+          : 'bottom-[calc(4.5rem+env(safe-area-inset-bottom))] lg:bottom-4',
         !isOnline && "bg-red-500 text-white",
         (statusError || failedChanges > 0) && "bg-amber-600 text-white",
         isOnline && failedChanges === 0 && !statusError && !showSuccess && "bg-blue-600 text-white",

@@ -34,6 +34,10 @@ import { Button } from '@/shared/components/ui/button';
 import progressService from '@/features/learning-management/services/progressService';
 import offlineProgressSync from '@/features/learning-management/services/offlineProgressSync';
 import { toast } from 'sonner';
+import {
+  StartCourseStudySessionButton,
+  useCourseStudySession,
+} from '@/features/learning-management/study/components/CourseStudySessionProvider';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -76,6 +80,7 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
   // ── Page header ────────────────────────────────────────────────────────
   const { setHeader } = usePageHeader();
   const queryClient = useQueryClient();
+  const { activeSession, recordCourseActivity, switchCourseTopic } = useCourseStudySession();
 
   // ── Progress store ─────────────────────────────────────────────────────
   const { progress, bookmarks, notes, markLessonComplete, toggleLessonComplete, toggleBookmark, saveNote } =
@@ -89,6 +94,13 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
   const isAdmin = Boolean(user?.role && instructorRoles.includes(user.role));
 
   const openMaterial = (id: string) => {
+    if (typedCurrentTopic?.id != null) {
+      recordCourseActivity(
+        'reading',
+        courseId,
+        activeSession?.topicId ?? String(typedCurrentTopic.id),
+      );
+    }
     setSidebarCollapsed(false);
     setSelectedMaterialId(id);
   };
@@ -165,6 +177,22 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
   };
 
   const typedCurrentTopic = getCurrentTopic() as unknown as Lesson & { resources?: Material[] };
+  useEffect(() => {
+    if (
+      typedCurrentTopic?.id != null &&
+      activeSession?.courseId === courseId &&
+      activeSession.topicId !== String(typedCurrentTopic.id)
+    ) {
+      switchCourseTopic(courseId, String(typedCurrentTopic.id), typedCurrentTopic.title);
+    }
+  }, [
+    activeSession?.courseId,
+    activeSession?.topicId,
+    courseId,
+    lessonKey,
+    switchCourseTopic,
+    typedCurrentTopic?.id,
+  ]);
   const refreshLearningCaches = async () => {
     if (!user?.id) return;
     await Promise.all([
@@ -411,13 +439,25 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
                 <Button
                   type="button"
                   variant={activeCoursePanel === 'unit-quiz' ? 'outline' : 'default'}
-                  onClick={() => toggleCoursePanel('unit-quiz')}
+                  onClick={() => {
+                    if (typedCurrentTopic?.id != null) {
+                      recordCourseActivity('reading', courseId, String(typedCurrentTopic.id));
+                    }
+                    toggleCoursePanel('unit-quiz');
+                  }}
                   aria-pressed={activeCoursePanel === 'unit-quiz'}
                   className="shrink-0"
                 >
                   <ClipboardCheck className="mr-2 h-4 w-4" />
                   {activeCoursePanel === 'unit-quiz' ? 'Back to Unit' : 'Unit Quiz'}
                 </Button>
+                {hasSelectedTopic && typedCurrentTopic?.id != null && courseId && (
+                  <StartCourseStudySessionButton
+                    courseId={courseId}
+                    topicId={String(typedCurrentTopic.id)}
+                    topicTitle={typedCurrentTopic.title}
+                  />
+                )}
               </div>
               <ProgressBar value={unitProgressPercentage} className="h-2" />
             </div>}
@@ -453,6 +493,7 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
                 <QuizPanel
                   lessonId={unitData.id}
                   lessonTitle={unitData.title}
+                  courseId={courseId}
                   scope="unit"
                   onReturn={() => toggleCoursePanel('unit-quiz')}
                 />
@@ -492,6 +533,7 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
                 <QuizPanel
                   lessonId={typedCurrentTopic?.id}
                   lessonTitle={typedCurrentTopic?.title}
+                  courseId={courseId}
                   scope="topic"
                   onTopicProgressUpdated={async () => {
                     await Promise.all([refetchUnit(), refreshLearningCaches()]);

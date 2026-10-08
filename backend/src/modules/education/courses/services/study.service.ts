@@ -290,24 +290,113 @@ export class StudyService {
       : 0;
 
     if (isValid) {
-      if (session.topic) {
+      const courseId = session.topic?.unit.courseId;
+      const activityTopicIds = Array.from(
+        new Set(
+          activities
+            .map(activity => activity.metadata?.topicId)
+            .filter((topicId): topicId is string => typeof topicId === 'string'),
+        ),
+      );
+      const activityTopics = courseId && activityTopicIds.length
+        ? await this.prisma.topic.findMany({
+            where: {
+              id: { in: activityTopicIds },
+              unit: { courseId },
+            },
+            include: { unit: true },
+          })
+        : [];
+
+      if (activityTopics.length > 0) {
+        const topicIds = new Set(activityTopics.map(topic => topic.id));
+        const durationsByTopic = new Map<string, number>();
+        const activitiesByTopic = new Map<string, StudyActivity[]>();
+        for (const activity of activities) {
+          const topicId = activity.metadata?.topicId;
+          if (typeof topicId !== 'string' || !topicIds.has(topicId)) continue;
+
+          const metadataSeconds = activity.metadata?.durationSeconds;
+          const activityMinutes = activity.duration || 0;
+          const seconds = typeof metadataSeconds === 'number' &&
+              Number.isFinite(metadataSeconds)
+            ? Math.max(0, metadataSeconds)
+            : Number.isFinite(activityMinutes)
+              ? Math.max(0, activityMinutes) * 60
+              : 0;
+          durationsByTopic.set(topicId, (durationsByTopic.get(topicId) ?? 0) + seconds);
+          activitiesByTopic.set(topicId, [
+            ...(activitiesByTopic.get(topicId) ?? []),
+            activity,
+          ]);
+        }
+
+        const totalSegmentSeconds = Array.from(durationsByTopic.values())
+          .reduce((total, seconds) => total + seconds, 0);
+        const segmentScale = totalSegmentSeconds > activeDurationSeconds && totalSegmentSeconds > 0
+          ? activeDurationSeconds / totalSegmentSeconds
+          : 1;
+        const topicMinutes = new Map<string, number>();
+        const minuteRemainders: Array<{ topicId: string; remainder: number }> = [];
+        let totalAllocatedMinutes = 0;
+        for (const [topicId, seconds] of durationsByTopic) {
+          const exactMinutes = (seconds * segmentScale) / 60;
+          const wholeMinutes = Math.floor(exactMinutes);
+          topicMinutes.set(topicId, wholeMinutes);
+          totalAllocatedMinutes += wholeMinutes;
+          minuteRemainders.push({ topicId, remainder: exactMinutes - wholeMinutes });
+        }
+        let remainingMinutes = Math.max(0, duration - totalAllocatedMinutes);
+        minuteRemainders.sort((left, right) => right.remainder - left.remainder);
+        for (let index = 0; remainingMinutes > 0 && minuteRemainders.length; index += 1) {
+          const topicId = minuteRemainders[index % minuteRemainders.length].topicId;
+          topicMinutes.set(topicId, (topicMinutes.get(topicId) ?? 0) + 1);
+          remainingMinutes -= 1;
+        }
+
+        const unitMinutes = new Map<string, number>();
+        for (const topic of activityTopics) {
+          const topicDuration = topicMinutes.get(topic.id) ?? 0;
+          if (topicDuration <= 0) continue;
+          const topicActivities = activitiesByTopic.get(topic.id) ?? [];
+          await this.updateTopicProgress({
+            ...session,
+            topicId: topic.id,
+            duration: topicDuration,
+            topic,
+            activities: topicActivities as any,
+          });
+          unitMinutes.set(
+            topic.unitId,
+            (unitMinutes.get(topic.unitId) ?? 0) + topicDuration,
+          );
+        }
+
+        for (const [unitId, timeSpent] of unitMinutes) {
+          if (courseId) {
+            await this.progressService.updateUnitMaterialTopicProgress(
+              session.userId,
+              { courseId, unitId, timeSpent },
+            );
+          }
+        }
+      } else if (session.topic) {
         await this.updateTopicProgress({
           ...session,
           topic: session.topic,
           activities: activities as any,
         });
-      }
-
-      if (session.topic?.unitId) {
-        const progressUpdateDto: ProgressUpdateDto = {
-          courseId: session.topic.unit.courseId,
-          unitId: session.topic.unitId,
-          timeSpent: duration,
-        };
-        await this.progressService.updateUnitMaterialTopicProgress(
-          session.userId,
-          progressUpdateDto,
-        );
+        if (session.topic.unitId) {
+          const progressUpdateDto: ProgressUpdateDto = {
+            courseId: session.topic.unit.courseId,
+            unitId: session.topic.unitId,
+            timeSpent: duration,
+          };
+          await this.progressService.updateUnitMaterialTopicProgress(
+            session.userId,
+            progressUpdateDto,
+          );
+        }
       } else {
         await this.prisma.userActivity.create({
           data: {

@@ -52,6 +52,7 @@ export interface StudySessionActivity {
   duration: number;
   timestamp: string;
   score?: number;
+  metadata?: Record<string, unknown>;
 }
 
 export interface CourseProgressResponse {

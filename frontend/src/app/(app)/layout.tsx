@@ -14,6 +14,7 @@ import { getDeadlines } from '@/core/app/services/dashboardService';
 import { Permission } from '@/lib/auth/roles';
 import type { User } from '@/shared/types/authInterface';
 import { handleUnknownError } from '@/app/services/error.service';
+import { CourseStudySessionProvider } from '@/features/learning-management/study/components/CourseStudySessionProvider';
 
 
 interface AppLayoutProps {
@@ -60,9 +61,11 @@ const AppLayoutContent: React.FC<AppLayoutProps> = ({ children }) => {
 
   return (
     <AppErrorBoundary>
-      <DashboardLayout navigationItems={contextAwareNavigation} user={user}>
-        {children}
-      </DashboardLayout>
+      <CourseStudySessionProvider>
+        <DashboardLayout navigationItems={contextAwareNavigation} user={user}>
+          {children}
+        </DashboardLayout>
+      </CourseStudySessionProvider>
     </AppErrorBoundary>
   );
 };
