@@ -77,7 +77,7 @@ export function CourseStudySessionProvider({ children }: { children: React.React
   const activeSessionRef = useRef(activeSession);
   const isStartingRef = useRef(false);
   const isEndingRef = useRef(false);
-  const restoredUserIdRef = useRef<string | undefined>();
+  const restoredUserIdRef = useRef<string | undefined>(undefined);
   activeSessionRef.current = activeSession;
 
   const persistOfflineSession = useCallback(async (session: ActiveCourseSession) => {

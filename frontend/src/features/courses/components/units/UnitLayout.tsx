@@ -180,6 +180,8 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
   useEffect(() => {
     if (
       typedCurrentTopic?.id != null &&
+      courseId &&
+      activeSession &&
       activeSession?.courseId === courseId &&
       activeSession.topicId !== String(typedCurrentTopic.id)
     ) {
@@ -188,6 +190,7 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
   }, [
     activeSession?.courseId,
     activeSession?.topicId,
+    activeSession,
     courseId,
     lessonKey,
     switchCourseTopic,

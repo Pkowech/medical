@@ -176,12 +176,6 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
   const { toggleBookmark, bookmarks, markLessonComplete, progress } = useCourseProgressStore();
   const { activeSession, recordCourseActivity, switchCourseTopic } = useCourseStudySession();
 
-  useEffect(() => {
-    if (topic && activeSession?.courseId === courseId && activeSession.topicId !== topicId) {
-      switchCourseTopic(courseId, topicId, topic.title);
-    }
-  }, [activeSession?.courseId, activeSession?.topicId, courseId, switchCourseTopic, topic?.title, topicId]);
-
   const refreshLearningCaches = async () => {
     if (!userId) return;
     await Promise.all([
@@ -208,6 +202,12 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
   const [isDownloading, setIsDownloading] = useState(false);
   const [isMarkingComplete, setIsMarkingComplete] = useState(false);
   const [isOffline, setIsOffline] = useState(false);
+
+  useEffect(() => {
+    if (topic && activeSession?.courseId === courseId && activeSession.topicId !== topicId) {
+      switchCourseTopic(courseId, topicId, topic.title);
+    }
+  }, [activeSession?.courseId, activeSession?.topicId, courseId, switchCourseTopic, topic?.title, topicId]);
   const [materialsLoaded, setMaterialsLoaded] = useState(false);
   const [materialsMetadataComplete, setMaterialsMetadataComplete] = useState(true);
   const [offlineBundleLoaded, setOfflineBundleLoaded] = useState(false);

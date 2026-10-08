@@ -3,7 +3,7 @@ import { ProtectedRoute } from '@/features/auth/components/ProtectedRoute';
 import { resolveRouteParams } from '@/shared/types/nextPageProps';
 
 type PageProps = {
-  params: Promise<{ courseId: string }> | { courseId: string };
+  params: Promise<{ courseId: string }>;
 };
 
 export default async function CoursePage({ params }: PageProps) {

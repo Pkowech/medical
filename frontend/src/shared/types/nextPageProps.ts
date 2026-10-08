@@ -1,9 +1,7 @@
 /**
- * Proper type definitions for Next.js 13+ App Router page component props.
+ * Type definitions for current Next.js App Router page component props.
  *
- * In Next.js 13+ with the app directory, route params are passed as Promises.
- * Some code paths and older app-router conventions still pass plain objects,
- * so we support both for compatibility across Next.js versions.
+ * Next.js passes dynamic route and search params as Promises.
  */
 
 export type MaybePromise<T> = T | Promise<T>;
@@ -13,15 +11,15 @@ export type MaybePromise<T> = T | Promise<T>;
  * @template T - The shape of params object (e.g., { unitId: string })
  */
 export interface DynamicPageProps<T extends Record<string, string | string[]>> {
-  params: MaybePromise<T>;
-  searchParams?: MaybePromise<Record<string, string | string[] | undefined>>;
+  params: Promise<T>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }
 
 /**
  * Page props for routes with only search params.
  */
 export interface SearchPageProps {
-  searchParams?: MaybePromise<Record<string, string | string[] | undefined>>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }
 
 export async function resolveRouteParams<T extends Record<string, string | string[]>>(
