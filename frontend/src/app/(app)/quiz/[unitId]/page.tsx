@@ -28,7 +28,7 @@ export default function QuizPage({ params }: QuizPageProps) {
   }, [params]);
 
   React.useEffect(() => {
-    if (unitId) router.replace(`/unit/${unitId}`);
+    if (unitId) router.replace(`/quiz/unit/${unitId}`);
   }, [router, unitId]);
 
   const {

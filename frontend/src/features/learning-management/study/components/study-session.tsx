@@ -13,7 +13,7 @@ import {
 import { Label } from '@/shared/components/ui/label';
 import { Textarea } from '@/shared/components/ui/textarea';
 import { ScrollArea } from '@/shared/components/ui/scroll-area';
-import { Play, Pause, Square, BookOpen, Sparkles, ScrollText } from 'lucide-react';
+import { Play, Pause, Square, BookOpen, Sparkles, ScrollText, Maximize2, Minimize2 } from 'lucide-react';
 import type {
   StudySession as StudySessionResponse,
   StudySessionActivity,
@@ -25,6 +25,7 @@ interface StudySessionProps {
   context?: StudySessionContext;
   contextLabel?: string;
   onSessionEnd: (session: StudySessionResponse) => void;
+  onSessionStarted?: () => void;
 }
 
 type Activity = { type: 'reading' | 'quiz' | 'notes'; durationMinutes: number; timestamp: Date };
@@ -35,6 +36,7 @@ export const StudySession: React.FC<StudySessionProps> = ({
   context,
   contextLabel,
   onSessionEnd,
+  onSessionStarted,
 }) => {
   const { startSession, endSession } = useStudy();
   const studyContext = context ?? (topicId ? { type: 'topic' as const, id: topicId } : undefined);
@@ -47,6 +49,9 @@ export const StudySession: React.FC<StudySessionProps> = ({
   const [notes, setNotes] = useState('');
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [sessionGoal, setSessionGoal] = useState('');
+  const [focusGoalMinutes, setFocusGoalMinutes] = useState(25);
+  const [isFocusMode, setIsFocusMode] = useState(false);
 
   useEffect(() => {
     let timer: number | undefined;
@@ -59,6 +64,21 @@ export const StudySession: React.FC<StudySessionProps> = ({
       if (timer) window.clearInterval(timer);
     };
   }, [isActive]);
+
+  useEffect(() => {
+    if (isActive && elapsedTime === focusGoalMinutes * 60) {
+      toast.success(`${focusGoalMinutes}-minute focus goal reached. Keep going or wrap up.`);
+    }
+  }, [elapsedTime, focusGoalMinutes, isActive]);
+
+  useEffect(() => {
+    if (!isFocusMode) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsFocusMode(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isFocusMode]);
 
   const handleStart = async () => {
     if (sessionId) {
@@ -73,6 +93,7 @@ export const StudySession: React.FC<StudySessionProps> = ({
       if (session) {
         setSessionId(session.id);
         setIsActive(true);
+        onSessionStarted?.();
       } else {
         setSessionError('Could not start this session. Please try again.');
       }
@@ -87,6 +108,7 @@ export const StudySession: React.FC<StudySessionProps> = ({
   };
 
   const handleStop = () => {
+    setIsFocusMode(false);
     setShowEndDialog(true);
   };
 
@@ -101,7 +123,11 @@ export const StudySession: React.FC<StudySessionProps> = ({
         duration: activity.durationMinutes,
         timestamp: activity.timestamp.toISOString(),
       }));
-      const endedSession = await endSession(sessionId, notes, sessionActivities, elapsedTime);
+      const sessionNotes = [
+        sessionGoal.trim() ? `Session goal: ${sessionGoal.trim()}` : '',
+        notes.trim(),
+      ].filter(Boolean).join('\n\n');
+      const endedSession = await endSession(sessionId, sessionNotes, sessionActivities, elapsedTime);
       const durationLabel = `${endedSession.duration ?? Math.floor(elapsedTime / 60)} min`;
       if (endedSession.isValid) {
         toast.success(
@@ -143,6 +169,54 @@ export const StudySession: React.FC<StudySessionProps> = ({
 
   return (
     <div>
+      {isFocusMode && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="focus-mode-title"
+          className="fixed inset-0 z-[60] flex min-h-screen flex-col items-center justify-center bg-slate-950 px-6 py-10 text-white"
+        >
+          <div className="absolute right-6 top-6">
+            <Button variant="outline" onClick={() => setIsFocusMode(false)} className="border-slate-700 bg-slate-900 text-white hover:bg-slate-800">
+              <Minimize2 className="mr-2 h-4 w-4" />
+              Exit focus mode
+            </Button>
+          </div>
+          <div className="w-full max-w-2xl text-center">
+            <p className="text-sm font-semibold uppercase tracking-[0.25em] text-indigo-300">Focus session</p>
+            <h2 id="focus-mode-title" className="mt-4 text-3xl font-semibold">One thing at a time.</h2>
+            {sessionGoal.trim() && (
+              <p className="mx-auto mt-4 max-w-xl text-lg text-slate-300">{sessionGoal.trim()}</p>
+            )}
+            <p className="mt-12 font-mono text-7xl font-semibold tabular-nums sm:text-8xl" aria-live="off">
+              {formatTime(Math.max(0, focusGoalMinutes * 60 - elapsedTime))}
+            </p>
+            <p className="mt-3 text-slate-400">
+              {elapsedTime >= focusGoalMinutes * 60
+                ? `${formatTime(elapsedTime)} focused · goal reached`
+                : `${formatTime(elapsedTime)} focused · ${focusGoalMinutes}-minute goal`}
+            </p>
+            <div className="mt-10 flex justify-center gap-3">
+              {isActive ? (
+                <Button variant="outline" onClick={handlePause} className="border-slate-700 bg-slate-900 text-white hover:bg-slate-800">
+                  <Pause className="mr-2 h-4 w-4" />
+                  Pause
+                </Button>
+              ) : (
+                <Button onClick={handleStart}>
+                  <Play className="mr-2 h-4 w-4" />
+                  Resume session
+                </Button>
+              )}
+              <Button variant="destructive" onClick={handleStop}>
+                <Square className="mr-2 h-4 w-4" />
+                End session
+              </Button>
+            </div>
+            <p className="mt-8 text-sm text-slate-500">Press Escape to leave focus mode. Your session timer keeps its place.</p>
+          </div>
+        </div>
+      )}
       <Card>
         <CardContent className="space-y-6">
           <div className="flex items-center justify-between">
@@ -159,6 +233,44 @@ export const StudySession: React.FC<StudySessionProps> = ({
               {formatTime(elapsedTime)}
             </div>
           </div>
+
+          {sessionGoal.trim() && (
+            <div className="rounded-lg border border-indigo-100 bg-indigo-50/70 px-4 py-3 text-sm text-indigo-950 dark:border-indigo-900 dark:bg-indigo-950/30 dark:text-indigo-100">
+              <span className="font-semibold">Session goal:</span> {sessionGoal.trim()}
+            </div>
+          )}
+
+          {!sessionId && (
+            <div className="space-y-3 rounded-xl border bg-muted/20 p-4">
+              <div className="space-y-2">
+                <Label htmlFor="study-session-goal">What will you accomplish?</Label>
+                <Textarea
+                  id="study-session-goal"
+                  value={sessionGoal}
+                  onChange={event => setSessionGoal(event.target.value)}
+                  placeholder="For example: explain the renin-angiotensin system from memory"
+                  className="min-h-20"
+                />
+              </div>
+              <div>
+                <Label>Focus interval</Label>
+                <div className="mt-2 flex gap-2">
+                  {[25, 50].map(minutes => (
+                    <Button
+                      key={minutes}
+                      type="button"
+                      size="sm"
+                      variant={focusGoalMinutes === minutes ? 'default' : 'outline'}
+                      aria-pressed={focusGoalMinutes === minutes}
+                      onClick={() => setFocusGoalMinutes(minutes)}
+                    >
+                      {minutes} minutes
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="flex justify-center gap-4">
             {!isActive ? (
@@ -179,6 +291,15 @@ export const StudySession: React.FC<StudySessionProps> = ({
               </>
             )}
           </div>
+
+          {sessionId && (
+            <div className="flex justify-center">
+              <Button variant="outline" onClick={() => setIsFocusMode(true)}>
+                <Maximize2 className="mr-2 h-4 w-4" />
+                Enter focus mode
+              </Button>
+            </div>
+          )}
 
           {sessionError && <p role="alert" className="text-center text-sm text-red-600">{sessionError}</p>}
 

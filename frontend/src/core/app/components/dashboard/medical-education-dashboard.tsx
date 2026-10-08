@@ -37,6 +37,7 @@ const MedicalEducationDashboard = () => {
   const router = useRouter();
   const { getResumePoint } = useStudy();
   const [showStudySession, setShowStudySession] = useState(false);
+  const [studySessionStarted, setStudySessionStarted] = useState(false);
   const [selectedStudyCourseId, setSelectedStudyCourseId] = useState<string | null>(null);
   const [selectedTrendMetric, setSelectedTrendMetric] = useState<'score' | 'hours'>('score');
 
@@ -347,6 +348,7 @@ const MedicalEducationDashboard = () => {
               type="button"
               onClick={() => {
                 setSelectedStudyCourseId(null);
+                setStudySessionStarted(false);
                 setShowStudySession(true);
               }}
               className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-left transition-colors hover:border-indigo-200 hover:bg-indigo-50 dark:border-slate-800 dark:bg-slate-950 dark:hover:border-indigo-900 dark:hover:bg-indigo-950/30"
@@ -805,13 +807,16 @@ const MedicalEducationDashboard = () => {
           <div className="bg-white dark:bg-slate-800 rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-gray-200 dark:border-slate-700">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-2xl font-bold text-gray-900 dark:text-white">Study Session</h3>
-              <button
-                onClick={() => setShowStudySession(false)}
-                className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
-                title="Close"
-              >
-                <X className="w-5 h-5 dark:text-slate-400" />
-              </button>
+              {!studySessionStarted && (
+                <button
+                  onClick={() => setShowStudySession(false)}
+                  className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                  title="Close"
+                  aria-label="Close study session setup"
+                >
+                  <X className="w-5 h-5 dark:text-slate-400" />
+                </button>
+              )}
             </div>
             <div className="mb-5">
               <label htmlFor="study-course-context" className="mb-2 block text-sm font-medium text-gray-700 dark:text-slate-300">
@@ -835,7 +840,9 @@ const MedicalEducationDashboard = () => {
             <StudySession
               context={selectedStudyCourse ? { type: 'course', id: selectedStudyCourse.id } : undefined}
               contextLabel={selectedStudyCourse?.name}
+              onSessionStarted={() => setStudySessionStarted(true)}
               onSessionEnd={() => {
+                setStudySessionStarted(false);
                 setShowStudySession(false);
                 handleRefetch();
               }} 
