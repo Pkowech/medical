@@ -436,7 +436,7 @@ export class AssessmentsService implements OnModuleInit {
     const responses = await this.prisma.userResponse.findMany({
       where: {
         userId,
-        questionId: { in: attempt.quiz.questions.map((q) => q.questionId) },
+        attemptId,
       },
     });
 
@@ -450,6 +450,7 @@ export class AssessmentsService implements OnModuleInit {
     const updatedAttempt = await this.prisma.quizAttempt.update({
       where: { id: attemptId },
       data: {
+        completedAt: new Date(),
         score: percentage,
         correctAnswers: responses.filter((r) => r.isCorrect).length,
         totalQuestions: maxPoints,
@@ -470,6 +471,11 @@ export class AssessmentsService implements OnModuleInit {
       isPassed: percentage >= (attempt.quiz.passingScore || 70),
     });
 
+    await this.analyticsService.recordCompletedAssessmentOutcome(
+      userId,
+      attempt.quizId,
+      percentage,
+    );
     await this.analyticsService.generateAnalytics(userId, attempt.quizId);
     await this.redisService.del(`assessment:${attempt.quizId}:${userId}`);
     return updatedAttempt;

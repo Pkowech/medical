@@ -56,3 +56,23 @@ pub fn update_p_known(p_known_prev: f64, is_correct: bool, params: &BKTParams) -
     // Apply the transit probability (learning).
     p_known_cond + (1.0 - p_known_cond) * p_transit
 }
+
+pub fn predict_next_correct(p_known: f64, params: &BKTParams) -> f64 {
+    p_known * (1.0 - params.p_slip) + (1.0 - p_known) * params.p_guess
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn next_answer_probability_depends_on_estimated_knowledge() {
+        let params = BKTParams::default();
+        let low_knowledge = predict_next_correct(0.0, &params);
+        let high_knowledge = predict_next_correct(1.0, &params);
+
+        assert!((low_knowledge - params.p_guess).abs() < f64::EPSILON);
+        assert!((high_knowledge - (1.0 - params.p_slip)).abs() < f64::EPSILON);
+        assert!(high_knowledge > low_knowledge);
+    }
+}

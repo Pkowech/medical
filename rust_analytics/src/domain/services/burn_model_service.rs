@@ -1,16 +1,18 @@
-use burn::tensor::backend::Backend;
-
-/// Wrapper for burn-based models. The original `predict_with_burn` call
-/// referenced in gRPC maps to `predict_with_saved_model` in `burn_model.rs`.
-pub fn predict_with_saved_model<B: Backend>(_user_id: &str, features: Vec<f32>, path: &str) -> (f32, String) {
-    // For now, delegate to modules implementation which provides `predict_with_saved_model`.
-    let res = crate::modules::analytics::models::burn_model::predict_with_saved_model::<B>(features, path);
-    // Return score and a made-up version string for compatibility
-    (res.get(0).cloned().unwrap_or(0.0), "v0".to_string())
+/// Predicts only from a trained, user-specific model artifact.
+pub fn predict_with_saved_model(
+    _user_id: &str,
+    features: Vec<f32>,
+    path: &str,
+) -> Result<(f32, String), String> {
+    let predictions =
+        crate::modules::analytics::models::burn_model::predict_with_saved_model(features, path)?;
+    let score = predictions
+        .first()
+        .copied()
+        .ok_or_else(|| "Trained model returned no prediction".to_string())?;
+    Ok((score, "saved-model".to_string()))
 }
 
-/// Async wrapper for predict_with_burn
-pub async fn predict_with_burn(_user_id: &str) -> Result<f32, Box<dyn std::error::Error>> {
-    // Placeholder implementation
-    Ok(0.5)
+pub async fn predict_with_burn(_user_id: &str) -> Result<f32, String> {
+    Err("Burn prediction requires a trained model and real feature vector".to_string())
 }

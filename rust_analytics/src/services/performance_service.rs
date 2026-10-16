@@ -87,12 +87,22 @@ impl PerformanceService {
         request: Request<crate::analytics_proto::PredictBurnRequest>
     ) -> Result<Response<crate::analytics_proto::PredictBurnResponse>, Status> {
         let r = request.into_inner();
-        
-        let model_path = format!("models/burn/{}.mdl", r.user_id);
+
+        let user_id = uuid::Uuid::parse_str(&r.user_id)
+            .map_err(|_| Status::invalid_argument("user_id must be a UUID"))?;
+        let model_path = format!("models/burn/{user_id}.mdl");
         let features_f32: Vec<f32> = r.features.iter().map(|v| *v as f32).collect();
-        // Note: Generic type NdArray might need import or full path
-        let (score, ver) = crate::domain::services::burn_model_service::predict_with_saved_model::<burn::backend::ndarray::NdArray<f32>>(&r.user_id, features_f32, &model_path);
-        Ok(Response::new(crate::analytics_proto::PredictBurnResponse { retention_score: score as f64, model_version: ver }))
+        let (score, version) =
+            crate::domain::services::burn_model_service::predict_with_saved_model(
+                &r.user_id,
+                features_f32,
+                &model_path,
+            )
+            .map_err(Status::failed_precondition)?;
+        Ok(Response::new(crate::analytics_proto::PredictBurnResponse {
+            retention_score: score as f64,
+            model_version: version,
+        }))
     }
 
     pub async fn update_bkt_skill_metrics(

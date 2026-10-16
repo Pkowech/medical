@@ -813,14 +813,14 @@ export class LearningAnalyticsService implements OnModuleInit {
           const mapped: PredictionResponseDto = {
             userId,
             type: PredictionType.successProbability,
-            probability: grpcResp.probability || 0.5,
-            confidence: grpcResp.confidence || 0.7,
-            factors: grpcResp.factors || ['feature_based_estimate'],
-            predictedSuccessRate: grpcResp.predicted_success_rate || 0.5,
-            recommendedStudyTime: grpcResp.recommended_study_time || 45,
+            probability: grpcResp.probability,
+            confidence: grpcResp.confidence,
+            factors: grpcResp.factors ?? [],
+            predictedSuccessRate: grpcResp.predicted_success_rate,
+            recommendedStudyTime: grpcResp.recommended_study_time,
             explanations: this.generateQualitativeExplanations(
               features,
-              grpcResp.probability || 0.5,
+              grpcResp.probability,
             ),
           };
 
@@ -858,18 +858,43 @@ export class LearningAnalyticsService implements OnModuleInit {
         success: false,
         timestamp: new Date(),
       });
-      // Return empty prediction on failure
-      return {
-        userId,
-        type: PredictionType.successProbability,
-        probability: 0.5,
-        confidence: 0.5,
-        factors: ['fallback_estimate'],
-        predictedSuccessRate: 0.5,
-        recommendedStudyTime: 45,
-        explanations: ['Insufficient data available for detailed explanation.'],
-      };
+      throw error;
     }
+  }
+
+  async getBktPredictions(userId: string) {
+    const states = await this.prisma.userSkillState.findMany({
+      where: { userId },
+      select: {
+        skillId: true,
+        pKnown: true,
+        attempts: true,
+        skill: { select: { name: true } },
+      },
+      orderBy: { pKnown: 'asc' },
+      take: 50,
+    });
+
+    const skills = await Promise.all(
+      states.map(async (state) => {
+        const result = await this.callGrpc(
+          this.analyticsServiceGrpc.predictBkt({
+            userId,
+            skillId: state.skillId,
+            featureVector: [],
+          }),
+        );
+        return {
+          skillId: state.skillId,
+          skillName: state.skill.name,
+          masteryProbability: result.p_known,
+          nextCorrectProbability: result.p_next_correct,
+          observedAttempts: state.attempts,
+        };
+      }),
+    );
+
+    return { userId, skills, generatedAt: new Date() };
   }
 
   /**

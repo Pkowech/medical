@@ -157,29 +157,23 @@ export class LearningController {
     return this.learningService.getLearningAnalytics(req.user.id);
   }
 
+  @Get('predictions/bkt')
+  @ApiOperation({
+    summary: 'Get Bayesian knowledge estimates for skills with recorded evidence',
+  })
+  @ApiResponse({ status: 200, description: 'Skill mastery estimates retrieved' })
+  async getBktPredictions(@Request() req: any) {
+    return this.learningService.getBktPredictions(req.user.id);
+  }
+
   @Get('predictions')
   @ApiOperation({
     summary:
-      'Get success rate predictions based on learning history (gRPC-based)',
-  })
-  @ApiQuery({
-    name: 'features',
-    required: false,
-    type: String,
-    description: 'Comma-separated feature values',
+      'Estimate performance from recent completed quiz scores',
   })
   @ApiResponse({ status: 200, description: 'Predictions retrieved' })
-  async getPredictions(
-    @Request() req: any,
-    @Query('features') features?: string,
-  ) {
-    const featureArray = features
-      ? features
-          .split(',')
-          .map((f) => parseFloat(f))
-          .filter((f) => !isNaN(f))
-      : undefined;
-    return this.learningService.getPredictions(req.user.id, featureArray);
+  async getPredictions(@Request() req: any) {
+    return this.learningService.getPredictions(req.user.id);
   }
 
   @Get('focus-recommendations')

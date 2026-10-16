@@ -9,6 +9,7 @@ import {
   ParseUUIDPipe,
   Query,
   ForbiddenException,
+  NotFoundException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -135,6 +136,33 @@ export class AssessmentProgressController {
   @ApiResponse({ status: 200, description: 'Quiz history and stats retrieved' })
   async getQuizHistory(@User('id') userId: string) {
     return this.analyticsService.getQuizHistory(userId);
+  }
+
+  @Get('predictions')
+  @ApiOperation({ summary: 'Get assessment estimates from recent quiz attempts' })
+  @ApiResponse({ status: 200, description: 'User assessment estimates' })
+  async getUserAssessmentPredictions(@User('id') userId: string) {
+    return this.analyticsService.getUserAssessmentPredictions(userId);
+  }
+
+  @Get('predictions/:assessmentId')
+  @ApiOperation({ summary: 'Get a personal estimate for one assessment' })
+  @ApiParam({ name: 'assessmentId', description: 'Assessment ID' })
+  @ApiResponse({ status: 200, description: 'Personal assessment estimate' })
+  async getUserAssessmentPrediction(
+    @User('id') userId: string,
+    @Param('assessmentId', ParseUUIDPipe) assessmentId: string,
+  ) {
+    const prediction = await this.analyticsService.getUserAssessmentPrediction(
+      userId,
+      assessmentId,
+    );
+    if (!prediction) {
+      throw new NotFoundException(
+        'Complete an attempt before requesting an assessment estimate',
+      );
+    }
+    return prediction;
   }
 
   @Get('study-materials')

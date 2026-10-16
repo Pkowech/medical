@@ -48,6 +48,7 @@ pub trait QuizRepository: Send + Sync {
     async fn get_quiz_attempt_history(
         &self,
         user_id: &str,
+        skill_id: Option<&str>,
         limit: Option<i32>,
         offset: Option<i32>,
     ) -> Result<Vec<crate::domain::models::quiz::QuizAttempt>, AnalyticsError>;

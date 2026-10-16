@@ -14,7 +14,7 @@ export const getAssessmentPrediction = async (
 ): Promise<AssessmentPrediction | null> => {
   try {
     const response = await apiService.get<ApiResponse<AssessmentPrediction>>(
-      `/assessment-progress/summary/assessment/${assessmentId}`
+      `/assessment-progress/predictions/${assessmentId}`
     );
     return response.data.data;
   } catch (error) {
@@ -27,31 +27,16 @@ export const getAssessmentPrediction = async (
 export const getAllAssessmentPredictions = async (
   _userId: string
 ): Promise<AssessmentPrediction[]> => {
-  console.warn(
-    'Using mock assessment predictions. Implement actual API call for getAllAssessmentPredictions.'
-  );
-  return Promise.resolve([
-    {
-      assessmentId: 'mock-assessment-1',
-      assessmentName: 'Pharmacology Basics Quiz',
-      predictedScore: 85.5,
-      confidence: 92.1,
-      recommendation: 'Focus on drug interactions and side effects.',
-      recommendedPreparation: ['Review Chapter 3', 'Practice Quiz 1'],
-      difficultyAreas: ['Drug Interactions'],
-      timeToReady: 7, // days
-    },
-    {
-      assessmentId: 'mock-assessment-2',
-      assessmentName: 'Clinical Diagnosis Case Study',
-      predictedScore: 72.0,
-      confidence: 78.5,
-      recommendation: 'Improve diagnostic reasoning by reviewing more case studies.',
-      recommendedPreparation: ['Case Study Workbook', 'Attend Clinical Rounds'],
-      difficultyAreas: ['Differential Diagnosis'],
-      timeToReady: 14, // days
-    },
-  ]);
+  try {
+    const response = await apiService.get<ApiResponse<AssessmentPrediction[]>>(
+      '/assessment-progress/predictions'
+    );
+    return response.data.data;
+  } catch (error) {
+    console.error('Error fetching assessment predictions:', error);
+    toast.error('Failed to load assessment predictions.');
+    return [];
+  }
 };
 
 /**
@@ -60,12 +45,10 @@ export const getAllAssessmentPredictions = async (
  */
 export const getBKTPrediction = async (
   _userId: string,
-  quizAttempts?: Array<{ isCorrect: boolean; timestamp?: string }>
 ): Promise<Record<string, unknown> | null> => {
   try {
-    const response = await apiService.post<ApiResponse<Record<string, unknown>>>(
-      '/learning/predictions',
-      { quizAttempts }
+    const response = await apiService.get<ApiResponse<Record<string, unknown>>>(
+      '/learning/predictions/bkt'
     );
     return response.data.data;
   } catch (error) {
@@ -80,17 +63,9 @@ export const getBKTPrediction = async (
  * Advanced predictions for complex pattern recognition
  */
 export const getBurnPrediction = async (_userId: string, features?: number[]): Promise<Record<string, unknown> | null> => {
-  try {
-    const response = await apiService.post<ApiResponse<Record<string, unknown>>>(
-      '/learning/predictions',
-      { features }
-    );
-    return response.data.data;
-  } catch (error) {
-    console.error('Error fetching Burn prediction:', error instanceof Error ? error.message : String(error));
-    toast.error('Failed to load Burn prediction.');
-    return null;
-  }
+  void features;
+  console.info('Burn-model estimates are unavailable until a trained model is installed.');
+  return null;
 };
 
 /**

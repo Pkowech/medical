@@ -51,29 +51,15 @@ export class AiAnalyticsService implements OnModuleInit {
 
   private analyticsServiceGrpc!: AnalyticsService;
 
-  // Helper to access the gRPC client as `any` to allow calling RPCs
-  // that may not be declared in the generated TypeScript interface.
+  // Some analytics RPCs have not yet been added to the generated client type.
   private grpc(): any {
     return this.analyticsServiceGrpc as any;
   }
 
-  // Accept a permissive observable/any so callers can use a casted `this.grpc()`
-  // (some RPCs may not exist on the generated AnalyticsService typing).
-  private async callGrpc<T = any>(obs: any): Promise<T> {
-    // Try to treat as an Observable first; fall back to Promise if needed.
-    try {
-      return await firstValueFrom(
-        (obs as Observable<T>).pipe(
-          timeout(this.grpcTimeoutMs),
-          retry(this.grpcRetries),
-        ),
-      );
-    } catch (_e) {
-      // If obs isn't an Observable, try awaiting it as a Promise-like value.
-      // This keeps runtime behavior flexible while avoiding compile-time errors.
-
-      return await obs;
-    }
+  private callGrpc<T>(call: Observable<T>): Promise<T> {
+    return firstValueFrom(
+      call.pipe(timeout(this.grpcTimeoutMs), retry(this.grpcRetries)),
+    );
   }
 
   constructor(
@@ -145,16 +131,13 @@ export class AiAnalyticsService implements OnModuleInit {
         await this.requestDeduplicationService.executeWithDedup(
           dedupKey,
           async () => {
-            // Try gRPC
-            try {
-              const grpcResponse = await this.callGrpc(
-                this.analyticsServiceGrpc.getRecommendations({
-                  userId: userId,
-                }),
-              );
+            const grpcResponse = await this.callGrpc(
+              this.analyticsServiceGrpc.getRecommendations({
+                userId: userId,
+              }),
+            );
 
-              // Map gRPC RecommendationItem -> local RecommendationItem shape
-              const items = (grpcResponse.items || []).map((i: any) => ({
+            const items = (grpcResponse.items || []).map((i: any) => ({
                 materialId: i.id ?? i.materialId ?? i.material_id ?? '',
                 material_id: i.id ?? i.materialId ?? i.material_id ?? '',
                 score: typeof i.score === 'number' ? i.score : 0,
@@ -162,37 +145,33 @@ export class AiAnalyticsService implements OnModuleInit {
                   typeof i.reason === 'string' ? i.reason : (i.reason ?? ''),
               })) as RecommendationItemDto[];
 
-              await this.performanceMetrics.recordMetric({
-                endpoint: ANALYTICS_METRICS_CONFIG.ENDPOINTS.RECOMMENDATIONS,
-                method: 'getRecommendationsAI',
-                provider: ANALYTICS_METRICS_CONFIG.PROVIDERS.GRPC,
-                userId,
-                responseTimeMs: Date.now() - startTime,
-                cacheHit: false,
-                success: true,
-                timestamp: new Date(),
-              });
+            await this.performanceMetrics.recordMetric({
+              endpoint: ANALYTICS_METRICS_CONFIG.ENDPOINTS.RECOMMENDATIONS,
+              method: 'getRecommendationsAI',
+              provider: ANALYTICS_METRICS_CONFIG.PROVIDERS.GRPC,
+              userId,
+              responseTimeMs: Date.now() - startTime,
+              cacheHit: false,
+              success: true,
+              timestamp: new Date(),
+            });
 
-              return items;
-            } catch (grpcError) {
-              this.logger.error(
-                `gRPC call for getRecommendations failed: ${typeof grpcError === 'object' && grpcError !== null && 'message' in grpcError ? (grpcError as any).message : String(grpcError)}`,
-              );
-              return [];
-            }
+            return items;
           },
         );
-      // Save to database
-      await this.prisma.learningSuggestion.deleteMany({ where: { userId } });
-      await this.prisma.learningSuggestion.createMany({
-        data: recommendations
-          .filter((rec) => rec.materialId)
-          .map((rec) => ({
-            userId,
-            materialId: rec.materialId!,
-            score: rec.score,
-            reason: rec.reason ?? '',
-          })),
+      const suggestionData = recommendations
+        .filter((rec) => rec.materialId)
+        .map((rec) => ({
+          userId,
+          materialId: rec.materialId!,
+          score: rec.score,
+          reason: rec.reason ?? '',
+        }));
+      await this.prisma.$transaction(async (tx) => {
+        await tx.learningSuggestion.deleteMany({ where: { userId } });
+        if (suggestionData.length > 0) {
+          await tx.learningSuggestion.createMany({ data: suggestionData });
+        }
       });
 
       // Cache result
@@ -240,7 +219,7 @@ export class AiAnalyticsService implements OnModuleInit {
         `Error in getRecommendationsAI: ${getErrorMessage(error)}`,
         getErrorStack(error),
       );
-      return [];
+      throw error;
     }
   }
 
@@ -369,18 +348,23 @@ export class AiAnalyticsService implements OnModuleInit {
     return results;
   }
 
-  private refreshBktSkillMetrics(): Promise<{
+  private async refreshBktSkillMetrics(): Promise<{
     success: boolean;
     message?: string;
   }> {
     try {
-      void this.callGrpc(this.analyticsServiceGrpc.updateBktSkillMetrics({}));
-      return Promise.resolve({ success: true });
+      const response = await this.callGrpc(
+        this.analyticsServiceGrpc.updateBktSkillMetrics({}),
+      );
+      return {
+        success: response.success,
+        message: response.message,
+      };
     } catch (error) {
-      return Promise.resolve({
+      return {
         success: false,
         message: getErrorMessage(error),
-      });
+      };
     }
   }
 
@@ -520,12 +504,7 @@ export class AiAnalyticsService implements OnModuleInit {
       this.logger.error(
         `Error predicting performance: ${getErrorMessage(error)}`,
       );
-      return {
-        predictedScore: 0,
-        confidenceInterval: [0, 0],
-        riskLevel: 'unknown',
-        successProbability: 0,
-      };
+      throw error;
     }
   }
 

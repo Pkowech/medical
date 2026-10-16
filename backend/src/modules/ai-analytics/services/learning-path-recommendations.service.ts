@@ -56,6 +56,7 @@ export class LearningPathRecommendationsService {
       const recommendations = await this.enrichRustRecommendations(
         rustRecommendations,
         limit,
+        userId,
       );
 
       // Cache the result
@@ -76,7 +77,7 @@ export class LearningPathRecommendationsService {
 
   /**
    * Enrich Rust recommendations with database metadata.
-   * Includes specialization-based matching logic.
+   * Includes healthcare-field and specialization matching logic.
    */
   private async enrichRustRecommendations(
     rustRecs: any[],

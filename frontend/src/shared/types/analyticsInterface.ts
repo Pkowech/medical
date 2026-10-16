@@ -84,11 +84,12 @@ export interface AssessmentPrediction {
   assessmentId: string;
   assessmentName: string;
   predictedScore: number;
-  confidence: number;
+  confidence?: number;
   recommendation: string;
   recommendedPreparation: string[];
   difficultyAreas: string[];
-  timeToReady: number;
+  timeToReady?: number;
+  sampleSize?: number;
 }
 
 export interface AssessmentAnalytics extends BaseAnalytics {

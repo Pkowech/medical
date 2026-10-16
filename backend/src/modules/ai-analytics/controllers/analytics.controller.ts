@@ -24,8 +24,6 @@ import { getUserPrimaryRole } from '#common/utils/role.util';
 import { PrismaService } from '#infrastructure/prisma/prisma.service';
 import { getErrorMessage } from '#common/utils/error.utils';
 import { UserAnalyticsService } from '../services/user-analytics.service';
-import { StudyAnalyticsService } from '../services/study-analytics.service';
-import { AssessmentAnalyticsService } from '../services/assessment-analytics.service';
 
 @ApiTags('Analytics')
 @Controller('analytics')
@@ -37,8 +35,6 @@ export class AnalyticsController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly userAnalyticsService: UserAnalyticsService,
-    private readonly studyAnalyticsService: StudyAnalyticsService,
-    private readonly assessmentAnalyticsService: AssessmentAnalyticsService,
   ) {}
 
   @Get('user/:userId')
@@ -170,69 +166,165 @@ export class AnalyticsController {
     this.logger.log(`Fetching user insights for ${userId}`);
 
     try {
-      const patterns = await this.studyAnalyticsService
-        .analyzeStudyPatterns(userId)
-        .catch(() => null);
+      const now = new Date();
+      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const [user, sessions, attempts, goalCount, completedGoalCount, nextGoal] =
+        await Promise.all([
+          this.prisma.user.findUnique({
+            where: { id: userId },
+            select: { streakDays: true },
+          }),
+          this.prisma.studySession.findMany({
+            where: {
+              userId,
+              isValid: true,
+              endTime: { not: null },
+              startTime: { gte: thirtyDaysAgo },
+            },
+            select: { startTime: true, duration: true },
+            orderBy: { startTime: 'desc' },
+            take: 500,
+          }),
+          this.prisma.quizAttempt.findMany({
+            where: { userId, completedAt: { not: null } },
+            select: {
+              score: true,
+              percentage: true,
+              quiz: {
+                select: {
+                  title: true,
+                  topic: { select: { name: true } },
+                },
+              },
+            },
+            orderBy: { completedAt: 'desc' },
+            take: 100,
+          }),
+          this.prisma.learningGoal.count({ where: { userId } }),
+          this.prisma.learningGoal.count({
+            where: { userId, completedAt: { not: null } },
+          }),
+          this.prisma.learningGoal.findFirst({
+            where: {
+              userId,
+              completedAt: null,
+              targetDate: { gte: now },
+            },
+            select: { targetDate: true },
+            orderBy: { targetDate: 'asc' },
+          }),
+        ]);
 
-      const avgDuration = patterns?.studyDuration?.averageDuration;
-      const morningCount = patterns?.preferredStudyTimes?.morning ?? 0;
-      const afternoonCount = patterns?.preferredStudyTimes?.afternoon ?? 0;
-      const eveningCount = patterns?.preferredStudyTimes?.evening ?? 0;
+      const sessionsByHour = new Map<string, number>();
+      const studyDays = new Set<string>();
+      let totalStudyMinutes = 0;
+      let weeklyStudyMinutes = 0;
+      let recentWeekSessions = 0;
+      for (const session of sessions) {
+        const minutes = Math.max(0, session.duration ?? 0);
+        totalStudyMinutes += minutes;
+        const dateKey = session.startTime.toISOString().slice(0, 10);
+        studyDays.add(dateKey);
+        if (session.startTime >= sevenDaysAgo) {
+          weeklyStudyMinutes += minutes;
+          recentWeekSessions += 1;
+        }
+        const hour = session.startTime.getUTCHours();
+        const period =
+          hour < 12 ? 'Morning (UTC)' : hour < 17 ? 'Afternoon (UTC)' : 'Evening (UTC)';
+        sessionsByHour.set(period, (sessionsByHour.get(period) ?? 0) + 1);
+      }
 
-      const bestTime =
-        eveningCount > morningCount && eveningCount > afternoonCount
-          ? 'Evening (6:00 PM - 9:00 PM)'
-          : afternoonCount > morningCount
-            ? 'Afternoon (2:00 PM - 5:00 PM)'
-            : 'Morning (8:00 AM - 11:00 AM)';
-
-      const optimalStudyTime = avgDuration
-        ? `${bestTime} (~${Math.round(avgDuration)} min sessions)`
-        : bestTime;
+      const averageDuration =
+        sessions.length > 0 ? totalStudyMinutes / sessions.length : 0;
+      const averageScore = (recentAttempts: typeof attempts) =>
+        recentAttempts.length > 0
+          ? recentAttempts.reduce(
+              (total, attempt) =>
+                total + (attempt.percentage > 0 ? attempt.percentage : attempt.score),
+              0,
+            ) / recentAttempts.length
+          : 0;
+      const recentScore = averageScore(attempts.slice(0, 5));
+      const priorScore = averageScore(attempts.slice(5, 10));
+      const topicScores = new Map<string, { total: number; count: number }>();
+      for (const attempt of attempts) {
+        const topic = attempt.quiz.topic?.name ?? attempt.quiz.title;
+        const score = attempt.percentage > 0 ? attempt.percentage : attempt.score;
+        const result = topicScores.get(topic) ?? { total: 0, count: 0 };
+        result.total += score;
+        result.count += 1;
+        topicScores.set(topic, result);
+      }
+      const rankedTopics = [...topicScores.entries()]
+        .map(([topic, result]) => ({
+          topic,
+          score: result.total / result.count,
+        }))
+        .sort((left, right) => left.score - right.score);
+      const improvementAreas = rankedTopics
+        .filter((item) => item.score < 70)
+        .slice(0, 3)
+        .map((item) => item.topic);
+      const strengths = rankedTopics
+        .filter((item) => item.score >= 80)
+        .sort((left, right) => right.score - left.score)
+        .slice(0, 3)
+        .map((item) => item.topic);
+      const optimalPeriod = [...sessionsByHour.entries()].sort(
+        (left, right) => right[1] - left[1],
+      )[0]?.[0];
+      const activeDays = studyDays.size;
+      const engagementScore = Math.round((activeDays / 30) * 100);
 
       return {
         userId,
-        learningPattern: 'mixed',
-        optimalStudyTime,
-        recommendedBreakFrequency: 45,
-        motivationFactors: ['Streak maintenance', 'Clinical case accuracy', 'Peer benchmarks'],
-        riskFactors: [],
-        engagementScore: 85,
-        learningVelocity: 78,
-        goalAchievementRate: 80,
-        strongestCategories: ['Cardiovascular System', 'Anatomy'],
-        improvementAreas: ['Pharmacokinetics', 'Renal Clearance'],
-        recommendedNextSteps: [
-          'Complete Cardiovascular Pharmacology high-yield quiz',
-          'Review renal physiological clearance pathways',
-        ],
-        strengths: ['Consistent daily study', 'High quiz pass rate'],
-        areasForImprovement: ['Pharmacokinetics problem sets'],
-        estimatedCompletionDate: new Date(
-          Date.now() + 14 * 24 * 60 * 60 * 1000,
-        ).toISOString(),
+        learningPattern:
+          activeDays >= 8
+            ? 'consistent'
+            : sessions.length > 0
+              ? 'intermittent'
+              : 'no_recorded_study',
+        optimalStudyTime: optimalPeriod
+          ? `${optimalPeriod}; average session ${Math.round(averageDuration)} minutes`
+          : 'Not enough completed study sessions to estimate',
+        recommendedBreakFrequency: null,
+        motivationFactors:
+          (user?.streakDays ?? 0) > 0
+            ? [`Maintain your current ${user?.streakDays}-day study streak`]
+            : [],
+        riskFactors:
+          sessions.length > 0 && recentWeekSessions === 0
+            ? ['No completed study sessions recorded in the past 7 days']
+            : [],
+        engagementScore,
+        learningVelocity:
+          attempts.length > 0 ? Math.round(recentScore) : null,
+        scoreTrend:
+          attempts.length >= 6 ? Math.round(recentScore - priorScore) : null,
+        goalAchievementRate:
+          goalCount > 0
+            ? Math.round((completedGoalCount / goalCount) * 100)
+            : null,
+        strongestCategories: strengths,
+        improvementAreas,
+        recommendedNextSteps: improvementAreas.map((topic) => {
+          const score = rankedTopics.find((item) => item.topic === topic)?.score ?? 0;
+          return `Review ${topic}; your recent quiz average is ${Math.round(score)}%.`;
+        }),
+        strengths,
+        areasForImprovement: improvementAreas,
+        estimatedCompletionDate: nextGoal?.targetDate?.toISOString() ?? null,
+        sampleSizes: {
+          completedSessions: sessions.length,
+          completedAssessments: attempts.length,
+          activeStudyDaysLast30: activeDays,
+        },
       };
     } catch (error) {
       this.logger.error(`Error in getUserInsights: ${getErrorMessage(error)}`);
-      return {
-        userId,
-        learningPattern: 'mixed',
-        optimalStudyTime: 'Morning (8:00 AM - 11:00 AM)',
-        recommendedBreakFrequency: 45,
-        motivationFactors: ['Streak maintenance'],
-        riskFactors: [],
-        engagementScore: 75,
-        learningVelocity: 70,
-        goalAchievementRate: 70,
-        strongestCategories: [],
-        improvementAreas: [],
-        recommendedNextSteps: ['Continue your current course modules'],
-        strengths: [],
-        areasForImprovement: [],
-        estimatedCompletionDate: new Date(
-          Date.now() + 30 * 24 * 60 * 60 * 1000,
-        ).toISOString(),
-      };
+      throw error;
     }
   }
 
@@ -244,13 +336,54 @@ export class AnalyticsController {
 
   @Get('progress')
   @ApiOperation({ summary: 'Get general progress data' })
-  getProgress() {
+  async getProgress(@CurrentUser() currentUser: User) {
+    const weekStart = new Date();
+    weekStart.setDate(weekStart.getDate() - 6);
+    weekStart.setHours(0, 0, 0, 0);
+    const [user, allStudyTime, weeklyStudyTime, enrollments, weeklySessions] =
+      await Promise.all([
+        this.prisma.user.findUnique({
+          where: { id: currentUser.id },
+          select: { streakDays: true },
+        }),
+        this.prisma.studySession.aggregate({
+          where: { userId: currentUser.id, isValid: true, endTime: { not: null } },
+          _sum: { duration: true },
+        }),
+        this.prisma.studySession.aggregate({
+          where: {
+            userId: currentUser.id,
+            isValid: true,
+            endTime: { not: null },
+            startTime: { gte: weekStart },
+          },
+          _sum: { duration: true },
+        }),
+        this.prisma.courseEnrollment.aggregate({
+          where: { userId: currentUser.id },
+          _avg: { progressPercentage: true },
+        }),
+        this.prisma.studySession.findMany({
+          where: {
+            userId: currentUser.id,
+            isValid: true,
+            endTime: { not: null },
+            startTime: { gte: weekStart },
+          },
+          select: { startTime: true },
+        }),
+      ]);
+    const activeStudyDaysThisWeek = new Set(
+      weeklySessions.map((session) => session.startTime.toISOString().slice(0, 10)),
+    ).size;
+
     return {
-      dailyStreak: 5,
-      weeklyGoal: 10,
-      weeklyProgress: 7,
-      totalHoursStudied: 24,
-      completionRate: 75,
+      dailyStreak: user?.streakDays ?? 0,
+      weeklyStudyMinutes: weeklyStudyTime._sum.duration ?? 0,
+      totalHoursStudied: Math.round(((allStudyTime._sum.duration ?? 0) / 60) * 10) / 10,
+      activeStudyDaysThisWeek,
+      courseCompletionRate:
+        Math.round((enrollments._avg.progressPercentage ?? 0) * 10) / 10,
     };
   }
 
@@ -259,13 +392,23 @@ export class AnalyticsController {
   @Roles(Role.admin)
   @ApiOperation({ summary: 'Get overall analytics metrics' })
   async getMetrics() {
-    const totalUsers = await this.prisma.user.count().catch(() => 0);
-    const totalCourses = await this.prisma.course.count().catch(() => 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const [totalUsers, totalCourses, activeToday, courseRating] =
+      await Promise.all([
+        this.prisma.user.count(),
+        this.prisma.course.count({ where: { status: 'published' } }),
+        this.prisma.user.count({ where: { lastLogin: { gte: today } } }),
+        this.prisma.course.aggregate({
+          where: { status: 'published', rating: { gt: 0 } },
+          _avg: { rating: true },
+        }),
+      ]);
     return {
       totalUsers,
       totalCourses,
-      activeToday: Math.min(totalUsers, 12),
-      averageRating: 4.8,
+      activeToday,
+      averageRating: Math.round((courseRating._avg.rating ?? 0) * 10) / 10,
     };
   }
 }

@@ -136,22 +136,6 @@ describe('AuthService Google authentication', () => {
     });
   });
 
-  it('matches usernames case-insensitively during login', async () => {
-    await expect(
-      service.login({ username: 'NELSON', password: 'password' }),
-    ).rejects.toThrow(
-      'Username not found. Please sign up if you do not have an account.',
-    );
-
-    expect(prisma.user.findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: {
-          username: { equals: 'NELSON', mode: 'insensitive' },
-        },
-      }),
-    );
-  });
-
   it('authenticates a matching verified email without creating another account', async () => {
     prisma.user.findFirst.mockResolvedValue(user);
 

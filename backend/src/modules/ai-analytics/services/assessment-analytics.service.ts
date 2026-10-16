@@ -18,6 +18,7 @@ import {
   ANALYTICS_METRICS_CONFIG,
 } from './analytics-cache.constants';
 import { PrismaService } from '#infrastructure/prisma/prisma.service';
+import { PredictionValidatorService } from './prediction-validator.service';
 import { QuizUtils } from '#common/utils/quiz.utils';
 import { v4 as uuidv4 } from 'uuid';
 import { Question, Prisma } from '@prisma/client';
@@ -59,6 +60,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
     private readonly performanceMetrics: PerformanceMetricsService,
     private readonly tracingService: DistributedTracingService,
     private readonly prisma: PrismaService,
+    private readonly predictionValidator: PredictionValidatorService,
   ) {}
 
   /**
@@ -584,6 +586,13 @@ export class AssessmentAnalyticsService implements OnModuleInit {
       });
 
       const result = { score: response.score };
+      if (skillId) {
+        await this.predictionValidator.recordPrediction(
+          userId,
+          skillId,
+          response.score,
+        );
+      }
       await this.redisService.set(
         cacheKey,
         JSON.stringify(result),
@@ -596,8 +605,106 @@ export class AssessmentAnalyticsService implements OnModuleInit {
           error,
         )}`,
       );
-      return { score: 0 };
+      throw error;
     }
+  }
+
+  async recordCompletedAssessmentOutcome(
+    userId: string,
+    assessmentId: string,
+    scorePercentage: number,
+  ): Promise<void> {
+    try {
+      await this.predictionValidator.recordActualOutcome(
+        userId,
+        assessmentId,
+        scorePercentage / 100,
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Could not record prediction outcome for assessment ${assessmentId}: ${getErrorMessage(error)}`,
+      );
+    }
+  }
+
+  async getUserAssessmentPredictions(userId: string) {
+    const attempts = await this.prisma.quizAttempt.findMany({
+      where: {
+        userId,
+        completedAt: { not: null },
+        quiz: { isPublished: true },
+      },
+      select: {
+        quizId: true,
+        score: true,
+        percentage: true,
+        quiz: {
+          select: {
+            title: true,
+            passingScore: true,
+            topic: { select: { name: true } },
+          },
+        },
+      },
+      orderBy: { completedAt: 'desc' },
+      take: 500,
+    });
+
+    const attemptsByQuiz = new Map<
+      string,
+      {
+        title: string;
+        topicName: string | null;
+        passingScore: number;
+        scores: number[];
+      }
+    >();
+
+    for (const attempt of attempts) {
+      const entry = attemptsByQuiz.get(attempt.quizId) ?? {
+        title: attempt.quiz.title,
+        topicName: attempt.quiz.topic?.name ?? null,
+        passingScore: attempt.quiz.passingScore ?? 70,
+        scores: [],
+      };
+      if (entry.scores.length < 5) {
+        const score =
+          attempt.percentage > 0 || attempt.score === 0
+            ? attempt.percentage
+            : attempt.score;
+        entry.scores.push(Math.min(100, Math.max(0, score)));
+      }
+      attemptsByQuiz.set(attempt.quizId, entry);
+    }
+
+    return [...attemptsByQuiz.entries()].map(([assessmentId, entry]) => {
+      const predictedScore =
+        entry.scores.reduce((sum, score) => sum + score, 0) /
+        entry.scores.length;
+      const belowPassingScore = predictedScore < entry.passingScore;
+      const studyTarget = entry.topicName ?? entry.title;
+
+      return {
+        assessmentId,
+        assessmentName: entry.title,
+        predictedScore,
+        sampleSize: entry.scores.length,
+        recommendation: belowPassingScore
+          ? `Review ${studyTarget}; your recent average is below the ${entry.passingScore}% passing score.`
+          : `Your recent average is above the passing score. Continue practicing ${studyTarget}.`,
+        recommendedPreparation: belowPassingScore
+          ? [`Review the course materials for ${studyTarget}.`]
+          : [],
+        difficultyAreas: belowPassingScore ? [studyTarget] : [],
+      };
+    });
+  }
+
+  async getUserAssessmentPrediction(userId: string, assessmentId: string) {
+    const prediction = (
+      await this.getUserAssessmentPredictions(userId)
+    ).find((item) => item.assessmentId === assessmentId);
+    return prediction ?? null;
   }
 
   /**

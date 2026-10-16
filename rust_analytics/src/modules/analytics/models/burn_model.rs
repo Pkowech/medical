@@ -32,30 +32,6 @@ impl<B: Backend> LinearModel<B> {
     }
 }
 
-// Function to perform a dummy prediction using the linear model
-pub fn predict_with_linear_model<B: Backend>(input_data: Vec<f32>) -> Vec<f32> {
-    // Instantiate the backend device to satisfy the generic parameter (no-op here)
-    let _device = B::Device::default();
-
-    // Deterministic weights (no training): small progressive coefficients
-    let weights: Vec<f32> = (0..input_data.len())
-        .map(|i| (i as f32 + 1.0) * 0.13_f32)
-        .collect();
-
-    // Simple linear combination + bias
-    let bias: f32 = 0.5;
-    let mut sum: f32 = 0.0;
-    for (x, w) in input_data.iter().zip(weights.iter()) {
-        sum += x * w;
-    }
-    let raw = sum + bias;
-
-    // Apply a sigmoid to map to (0,1) as a probability-like output
-    let prob = 1.0_f32 / (1.0_f32 + (-raw).exp());
-
-    vec![prob]
-}
-
 /// Train a simple linear model (weights + bias) using batch gradient descent.
 /// - `inputs`: Vec of feature vectors (n_samples x n_features)
 /// - `labels`: Vec of labels (n_samples)
@@ -66,15 +42,24 @@ pub fn train_linear_model(
     epochs: usize,
     lr: f32,
 ) -> Option<(Vec<f32>, f32)> {
-    if inputs.is_empty() || labels.is_empty() || inputs.len() != labels.len() {
+    if inputs.len() < 2
+        || inputs.len() != labels.len()
+        || inputs[0].is_empty()
+        || inputs.iter().any(|row| row.len() != inputs[0].len())
+        || inputs.iter().flatten().any(|value| !value.is_finite())
+        || labels
+            .iter()
+            .any(|label| !label.is_finite() || !(0.0..=1.0).contains(label))
+        || epochs == 0
+        || !lr.is_finite()
+        || lr <= 0.0
+    {
         return None;
     }
 
     let n_samples = inputs.len();
     let n_features = inputs[0].len();
-
-    // initialize weights and bias to small values
-    let mut weights = vec![0.1_f32; n_features];
+    let mut weights = vec![0.0_f32; n_features];
     let mut bias = 0.0_f32;
 
     for _ in 0..epochs {
@@ -82,13 +67,12 @@ pub fn train_linear_model(
         let mut db = 0.0_f32;
 
         for (x, &y) in inputs.iter().zip(labels.iter()) {
-            // linear prediction
-            let mut pred = bias;
+            let mut logit = bias;
             for i in 0..n_features {
-                pred += x[i] * weights[i];
+                logit += x[i] * weights[i];
             }
-
-            let err = pred - y;
+            let probability = 1.0 / (1.0 + (-logit).exp());
+            let err = probability - y;
             for i in 0..n_features {
                 dw[i] += err * x[i];
             }
@@ -100,6 +84,9 @@ pub fn train_linear_model(
             weights[i] -= lr * (dw[i] / n_samples as f32);
         }
         bias -= lr * (db / n_samples as f32);
+        if weights.iter().any(|weight| !weight.is_finite()) || !bias.is_finite() {
+            return None;
+        }
     }
 
     Some((weights, bias))
@@ -108,6 +95,12 @@ pub fn train_linear_model(
 /// Save weights and bias to a simple text file: one line bias, next line space-separated weights
 pub fn save_model(path: &str, weights: &[f32], bias: f32) -> std::io::Result<()> {
     use std::fs;
+    if weights.is_empty() || !bias.is_finite() || weights.iter().any(|weight| !weight.is_finite()) {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "Model parameters must be finite and include at least one weight",
+        ));
+    }
     let mut contents = format!("{}\n", bias);
     let w_strs: Vec<String> = weights.iter().map(|w| w.to_string()).collect();
     contents.push_str(&w_strs.join(" "));
@@ -119,13 +112,19 @@ pub fn load_model(path: &str) -> Option<(Vec<f32>, f32)> {
     use std::fs;
     let data = fs::read_to_string(path).ok()?;
     let mut lines = data.lines();
-    let bias_line = lines.next()?;
-    let bias: f32 = bias_line.trim().parse().ok()?;
-    let weights_line = lines.next().unwrap_or("");
+    let bias: f32 = lines.next()?.trim().parse().ok()?;
+    let weights_line = lines.next()?;
+    if lines.next().is_some() {
+        return None;
+    }
     let weights: Vec<f32> = weights_line
         .split_whitespace()
-        .filter_map(|s| s.parse::<f32>().ok())
-        .collect();
+        .map(str::parse::<f32>)
+        .collect::<Result<_, _>>()
+        .ok()?;
+    if weights.is_empty() || !bias.is_finite() || weights.iter().any(|weight| !weight.is_finite()) {
+        return None;
+    }
     Some((weights, bias))
 }
 
@@ -145,17 +144,54 @@ pub fn train_and_save(
     false
 }
 
-/// Predict using loaded model from `path`. Falls back to deterministic predictor if load fails.
-pub fn predict_with_saved_model<B: Backend>(input_data: Vec<f32>, path: &str) -> Vec<f32> {
-    if let Some((weights, bias)) = load_model(path) {
-        let mut sum = bias;
-        for (x, w) in input_data.iter().zip(weights.iter()) {
-            sum += x * w;
-        }
-        let prob = 1.0_f32 / (1.0_f32 + (-sum).exp());
-        return vec![prob];
+/// Predict with a trained model. Missing or incompatible models are explicit errors.
+pub fn predict_with_saved_model(input_data: Vec<f32>, path: &str) -> Result<Vec<f32>, String> {
+    if input_data.is_empty() || input_data.iter().any(|value| !value.is_finite()) {
+        return Err("Prediction features must be non-empty and finite".to_string());
     }
 
-    // fallback to deterministic implementation
-    predict_with_linear_model::<B>(input_data)
+    let (weights, bias) =
+        load_model(path).ok_or_else(|| format!("No trained model is available at {path}"))?;
+    if weights.len() != input_data.len() {
+        return Err(format!(
+            "Model expects {} features but received {}",
+            weights.len(),
+            input_data.len()
+        ));
+    }
+    let logit = input_data
+        .iter()
+        .zip(weights.iter())
+        .fold(bias, |sum, (feature, weight)| sum + feature * weight);
+    Ok(vec![1.0 / (1.0 + (-logit).exp())])
+}
+
+#[cfg(test)]
+mod tests {
+    use super::train_linear_model;
+
+    #[test]
+    fn logistic_training_learns_from_labeled_examples() {
+        let (weights, bias) =
+            train_linear_model(vec![vec![0.0], vec![1.0]], vec![0.0, 1.0], 1000, 0.1)
+                .expect("valid examples should train");
+        let predict = |feature: f32| 1.0 / (1.0 + (-(bias + weights[0] * feature)).exp());
+
+        assert!(predict(1.0) > predict(0.0));
+        assert!(weights[0].is_finite());
+        assert!(bias.is_finite());
+    }
+
+    #[test]
+    fn logistic_training_rejects_invalid_examples() {
+        assert!(train_linear_model(vec![vec![1.0], vec![2.0]], vec![0.0], 10, 0.1).is_none());
+        assert!(train_linear_model(
+            vec![vec![f32::INFINITY], vec![1.0]],
+            vec![0.0, 1.0],
+            10,
+            0.1
+        )
+        .is_none());
+        assert!(train_linear_model(vec![vec![1.0], vec![2.0]], vec![0.0, 2.0], 10, 0.1).is_none());
+    }
 }

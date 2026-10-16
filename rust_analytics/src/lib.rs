@@ -1,8 +1,6 @@
 use actix_web::{web, App, HttpResponse, HttpServer, Responder};
 use dotenvy::dotenv;
 #[cfg(feature = "ml")]
-use ndarray::array;
-#[cfg(feature = "ml")]
 use polars::frame::DataFrame;
 #[cfg(feature = "ml")]
 use polars::prelude::*;
@@ -65,6 +63,14 @@ pub struct UserIdRequest {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct UserSkillRequest {
+    #[serde(rename = "userId")]
+    pub user_id: String,
+    #[serde(rename = "skillId")]
+    pub skill_id: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct AssessmentIdRequest {
     pub assessment_id: String,
 }
@@ -81,9 +87,22 @@ pub struct UserIdsRequest {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TrainingDataRequest {
+    #[serde(rename = "userId")]
+    pub user_id: Option<String>,
     pub inputs: Vec<Vec<f64>>,
     pub labels: Vec<f64>,
 }
+
+const BURN_MODEL_FEATURE_NAMES: [&str; 8] = [
+    "completed_materials",
+    "average_score",
+    "study_time",
+    "difficulty_preference",
+    "learning_style",
+    "engagement_level",
+    "quiz_performance",
+    "material_interaction",
+];
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct KnowledgeGapsRequest {
@@ -116,63 +135,81 @@ pub struct ProgressRecordsRequest {
 pub struct PredictionRequest {
     #[serde(rename = "userId")]
     pub user_id: String,
+    #[serde(rename = "modelId")]
+    pub model_id: Option<String>,
     pub features: Vec<f64>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct PredictionResponse {
-    #[serde(rename = "userId")]
-    pub user_id: String,
-    #[serde(rename = "type")]
-    pub prediction_type: String, // Corresponds to PredictionType.successProbability
-    pub probability: f64,
-    pub confidence: f64,
-    pub factors: Vec<String>,
-    #[serde(rename = "predictedSuccessRate")]
-    pub predicted_success_rate: f64,
-    #[serde(rename = "recommendedStudyTime")]
-    pub recommended_study_time: i64,
-}
-
-fn calculate_variance(arr: &[f64]) -> f64 {
-    if arr.is_empty() {
-        return 0.0;
-    }
-    let mean: f64 = arr.iter().sum::<f64>() / arr.len() as f64;
-    let variance: f64 = arr.iter().map(|&v| (v - mean).powi(2)).sum::<f64>() / arr.len() as f64;
-    variance
 }
 
 // --- Handlers for NestJS calls (Actix-web) ---
 // ... (existing actix-web handlers) ...
 
 #[cfg(feature = "ml")]
-async fn predict_success_rate_handler(req: web::Json<PredictionRequest>) -> impl Responder {
-    let predicted_success_rate = if !req.features.is_empty() {
-        req.features[0].min(1.0).max(0.0)
-    } else {
-        0.5
+async fn predict_success_rate_handler(
+    pool: web::Data<Pool<Postgres>>,
+    req: web::Json<PredictionRequest>,
+) -> impl Responder {
+    let user_id = match uuid::Uuid::parse_str(&req.user_id) {
+        Ok(user_id) => user_id,
+        Err(_) => {
+            return HttpResponse::BadRequest()
+                .json(serde_json::json!({"error": "userId must be a UUID"}))
+        }
     };
+    if req.features.len() != BURN_MODEL_FEATURE_NAMES.len() {
+        return HttpResponse::BadRequest().json(serde_json::json!({
+            "error": format!("Exactly {} model features are required", BURN_MODEL_FEATURE_NAMES.len())
+        }));
+    }
 
-    let variance = if req.features.len() > 1 {
-        calculate_variance(&req.features)
-    } else {
-        0.1
+    let input = req.features.iter().map(|value| *value as f32).collect();
+    let model_id = match req.model_id.as_deref() {
+        Some(id) => match uuid::Uuid::parse_str(id) {
+            Ok(id) => Some(id),
+            Err(_) => {
+                return HttpResponse::BadRequest()
+                    .json(serde_json::json!({"error": "modelId must be a UUID"}))
+            }
+        },
+        None => None,
     };
-    let confidence = (1.0 - variance).min(0.95).max(0.5);
-
-    let resp = PredictionResponse {
-        user_id: req.user_id.clone(),
-        prediction_type: "successProbability".to_string(), // Corresponds to PredictionType.successProbability
-        probability: predicted_success_rate,
-        confidence,
-        factors: vec!["feature_based_estimate".to_string()],
-        predicted_success_rate,
-        recommended_study_time: ((30.0 + (1.0 - predicted_success_rate) * 60.0) as f64).round()
-            as i64,
+    let model_id = model_id.unwrap_or(user_id);
+    let model_path = match sqlx::query_scalar::<_, String>(
+        r#"SELECT path FROM ml_models
+           WHERE id = $1 AND is_active = TRUE AND "type" = $2"#,
+    )
+    .bind(model_id.to_string())
+    .bind("logistic_regression")
+    .fetch_optional(pool.get_ref())
+    .await
+    {
+        Ok(Some(path)) => path,
+        Ok(None) => {
+            return HttpResponse::ServiceUnavailable().json(serde_json::json!({
+                "error": "No active trained prediction model is registered for this user or modelId"
+            }))
+        }
+        Err(error) => {
+            eprintln!("Failed to resolve prediction model: {error}");
+            return HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Failed to resolve prediction model"
+            }));
+        }
     };
-
-    HttpResponse::Ok().json(resp)
+    match crate::modules::analytics::models::burn_model::predict_with_saved_model(input, &model_path) {
+        Ok(prediction) => HttpResponse::Ok().json(serde_json::json!({
+            "userId": user_id.to_string(),
+            "modelId": model_id.to_string(),
+            "predictionType": "trained_logistic_regression",
+            "probability": prediction[0],
+            "modelVersion": "saved-model"
+        })),
+        Err(error) => {
+            eprintln!("Success-rate prediction unavailable: {error}");
+            HttpResponse::ServiceUnavailable().json(serde_json::json!({
+                "error": "No compatible trained prediction model is available"
+            }))
+        }
+    }
 }
 
 #[cfg(feature = "ml")]
@@ -198,53 +235,112 @@ async fn train_model_handler(
     pool: web::Data<Pool<Postgres>>,
     req: web::Json<TrainingDataRequest>,
 ) -> impl Responder {
-    // Authentication is handled by middleware (JWT or x-api-key)
-    // Basic validation of payload
-    if req.inputs.is_empty() || req.labels.is_empty() {
+    if req.inputs.len() < 2
+        || req.inputs.len() != req.labels.len()
+        || req
+            .inputs
+            .iter()
+            .any(|features| features.len() != BURN_MODEL_FEATURE_NAMES.len())
+    {
         return HttpResponse::BadRequest().json(serde_json::json!({
             "code": "invalid_payload",
-            "message": "Training inputs and labels must be provided",
+            "message": format!(
+                "Training requires at least two labeled examples with exactly {} features",
+                BURN_MODEL_FEATURE_NAMES.len()
+            ),
         }));
     }
 
-    println!(
-        "Received training data: inputs count = {}, labels count = {}",
-        req.inputs.len(),
-        req.labels.len()
-    );
+    let user_id = match req.user_id.as_deref() {
+        Some(value) => match uuid::Uuid::parse_str(value) {
+            Ok(user_id) => Some(user_id),
+            Err(_) => {
+                return HttpResponse::BadRequest()
+                    .json(serde_json::json!({"error": "userId must be a UUID"}))
+            }
+        },
+        None => None,
+    };
+    let inputs: Vec<Vec<f32>> = req
+        .inputs
+        .iter()
+        .map(|features| features.iter().map(|value| *value as f32).collect())
+        .collect();
+    let labels: Vec<f32> = req.labels.iter().map(|label| *label as f32).collect();
+    let (weights, bias) =
+        match crate::modules::analytics::models::burn_model::train_linear_model(
+            inputs,
+            labels,
+            1000,
+            0.001,
+        ) {
+            Some(model) => model,
+            None => {
+                return HttpResponse::BadRequest().json(serde_json::json!({
+                    "code": "invalid_training_data",
+                    "message": "Features and labels must be finite and labels must be probabilities from 0 to 1",
+                }))
+            }
+        };
 
-    // Insert a record into ml_models to represent the training job (placeholder)
-    let id = format!(
-        "model_{}",
-        chrono::Utc::now().timestamp_nanos_opt().unwrap()
-    );
-    let name = format!(
-        "uploaded_model_{}",
-        chrono::Utc::now().format("%Y%m%d%H%M%S")
-    );
+    let model_id = user_id.unwrap_or_else(uuid::Uuid::new_v4);
+    let model_path = format!("models/burn/{model_id}.mdl");
+    if let Err(error) = std::fs::create_dir_all("models/burn") {
+        eprintln!("Failed to create model directory: {error}");
+        return HttpResponse::InternalServerError().json(serde_json::json!({
+            "error": "Failed to prepare model storage"
+        }));
+    }
+    if let Err(error) =
+        crate::modules::analytics::models::burn_model::save_model(&model_path, &weights, bias)
+    {
+        eprintln!("Failed to save trained model: {error}");
+        return HttpResponse::InternalServerError().json(serde_json::json!({
+            "error": "Failed to save trained model"
+        }));
+    }
+
+    let id = model_id.to_string();
+    let name = format!("trained_model_{model_id}");
     let insert = sqlx::query!(
         r#"
         INSERT INTO ml_models (id, name, version, "type", path, training_data_path, metrics, trained_at, is_active, created_at, updated_at)
         VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), $8, NOW(), NOW())
+        ON CONFLICT (id) DO UPDATE SET
+            name = EXCLUDED.name,
+            version = EXCLUDED.version,
+            "type" = EXCLUDED."type",
+            path = EXCLUDED.path,
+            training_data_path = EXCLUDED.training_data_path,
+            metrics = EXCLUDED.metrics,
+            trained_at = NOW(),
+            is_active = EXCLUDED.is_active,
+            updated_at = NOW()
         "#,
         id,
         name,
-        "v0",
-        "custom",
-        Option::<String>::None,
+        "1",
+        "logistic_regression",
+        Some(model_path.clone()),
         Option::<String>::None,
         Option::<serde_json::Value>::None,
-        false,
+        true,
     )
     .execute(pool.get_ref())
     .await;
 
     match insert {
-        Ok(_) => HttpResponse::Accepted()
-            .json(serde_json::json!({"message": "Model training job accepted", "modelId": id})),
+        Ok(_) => HttpResponse::Created().json(serde_json::json!({
+            "message": "Model trained and saved",
+            "modelId": id,
+            "userId": user_id.map(|id| id.to_string()),
+            "featureNames": BURN_MODEL_FEATURE_NAMES
+        })),
         Err(e) => {
-            eprintln!("Failed to enqueue model training record: {}", e);
-            HttpResponse::InternalServerError().json(serde_json::json!({"error": "Failed to enqueue training job", "details": format!("{}", e)}))
+            eprintln!("Failed to register trained model: {e}");
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Failed to register trained model"
+            }))
         }
     }
 }
@@ -437,77 +533,34 @@ async fn get_related_resources_handler(
 #[cfg(feature = "ml")]
 async fn predict_performance_handler(
     pool: web::Data<Pool<Postgres>>,
-    req: web::Json<UserIdRequest>,
+    req: web::Json<UserSkillRequest>,
 ) -> impl Responder {
-    println!("Predicting performance for user: {}", req.user_id);
-
-    // Extract features for the user
-    let user_features = match crate::modules::analytics::core::feature_extraction::extract_user_features(
-        req.user_id.clone(),
-        pool.get_ref(),
-    )
-    .await
-    {
-        Ok(features) => features,
-        Err(e) => {
-            eprintln!("Error extracting user features: {:?}", e);
-            return HttpResponse::InternalServerError().json(serde_json::json!({
-                "error": "Failed to extract user features",
-                "details": format!("{}", e)
-            }));
-        }
+    let skill_repo = crate::infrastructure::database::repositories::PostgresSkillStateRepository::new(
+        std::sync::Arc::new(pool.get_ref().clone()),
+    );
+    let quiz_repo = crate::infrastructure::database::repositories::quiz_repository::PostgresQuizRepository::new(
+        std::sync::Arc::new(pool.get_ref().clone()),
+    );
+    let use_case = crate::application::use_cases::performance::PredictPerformanceUseCase::new(
+        skill_repo,
+        quiz_repo,
+    );
+    let request = crate::application::use_cases::performance::PredictPerformanceRequest {
+        user_id: req.user_id.clone(),
+        skill_id: req.skill_id.clone(),
     };
 
-    // Convert UserFeatures struct to a feature vector (Array2<f64>)
-    let data = array![[
-        user_features.completed_materials as f64,
-        user_features.average_score,
-        user_features.study_time as f64,
-        user_features.difficulty_preference,
-        user_features.learning_style,
-        user_features.engagement_level,
-        user_features.quiz_performance,
-        user_features.material_interaction,
-    ]];
-
-    // Dummy targets for training. In a real scenario, you would have a proper training dataset.
-    let targets = array![10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0]; // Adjusted to match number of features
-
-    // The model needs more data points to be meaningful, so we'll duplicate the data for now.
-    let n_samples = data.shape()[0];
-    let n_features = data.shape()[1];
-    let mut new_data = ndarray::Array2::zeros((n_samples * 8, n_features));
-    for i in 0..8 {
-        let start = i * n_samples;
-        let end = start + n_samples;
-        new_data
-            .slice_mut(ndarray::s![start..end, ..])
-            .assign(&data);
-    }
-    let data = new_data;
-
-    match crate::modules::analytics::performance::prediction::predict_performance(&data, &targets) {
-        Ok(predictions) => {
-            // For simplicity, taking the first prediction and converting it to a score
-            let predicted_score = predictions.get(0).cloned().unwrap_or(0.0);
-            let confidence = 0.85; // Placeholder confidence
-
-            let resp = PredictionResponse {
-                user_id: req.user_id.clone(),
-                prediction_type: "linfa_prediction".to_string(),
-                probability: predicted_score / 100.0, // Assuming score is out of 100
-                confidence,
-                factors: vec!["dummy_features".to_string()],
-                predicted_success_rate: predicted_score / 100.0,
-                recommended_study_time: ((60.0 - predicted_score * 0.5) as f64).round() as i64, // Example calculation
-            };
-            HttpResponse::Ok().json(resp)
-        }
-        Err(e) => {
-            eprintln!("Error during linfa prediction: {:?}", e);
+    match use_case.execute(request).await {
+        Ok(prediction) => HttpResponse::Ok().json(serde_json::json!({
+            "userId": req.user_id,
+            "skillId": req.skill_id,
+            "predictedSuccessRate": prediction.score,
+            "method": "bkt_with_recent_quiz_history"
+        })),
+        Err(error) => {
+            eprintln!("Error predicting user performance: {error}");
             HttpResponse::InternalServerError().json(serde_json::json!({
-                "error": "Failed to predict performance",
-                "details": format!("{}", e)
+                "error": "Failed to predict user performance"
             }))
         }
     }
@@ -745,34 +798,58 @@ async fn get_user_engagement_handler(
 }
 
 #[cfg(feature = "ml")]
-async fn predict_with_burn_handler(req: web::Json<PredictionRequest>) -> impl Responder {
-    println!("Predicting with Burn model for user: {}", req.user_id);
-
-    // Dummy input data for the Burn model. In a real scenario, this would come from
-    // feature extraction or a database query based on req.userId.
-    let input_data = vec![1.0, 2.0, 3.0, 4.0, 5.0];
-
-    // Call the burn model's prediction function
-    // Note: The Backend type needs to be specified. For simplicity, we'll use the default CPU backend.
-    // In a real application, you might want to make this configurable or use a GPU backend.
-    let predictions = crate::modules::analytics::models::burn_model::predict_with_linear_model::<
-        burn::backend::NdArray<f32>,
-    >(input_data);
-
-    // For simplicity, taking the first prediction
-    let predicted_value = predictions.get(0).cloned().unwrap_or(0.0);
-
-    let resp = PredictionResponse {
-        user_id: req.user_id.clone(),
-        prediction_type: "burn_prediction".to_string(),
-        probability: predicted_value as f64,
-        confidence: 0.9, // Placeholder confidence
-        factors: vec!["burn_model_features".to_string()],
-        predicted_success_rate: predicted_value as f64,
-        recommended_study_time: (50.0 - predicted_value as f64 * 10.0).round() as i64, // Example calculation
+async fn predict_with_burn_handler(
+    pool: web::Data<Pool<Postgres>>,
+    req: web::Json<UserIdRequest>,
+) -> impl Responder {
+    let user_id = match uuid::Uuid::parse_str(&req.user_id) {
+        Ok(user_id) => user_id,
+        Err(_) => {
+            return HttpResponse::BadRequest()
+                .json(serde_json::json!({"error": "userId must be a UUID"}))
+        }
+    };
+    let features = match crate::modules::analytics::core::feature_extraction::extract_user_features(
+        user_id.to_string(),
+        pool.get_ref(),
+    )
+    .await
+    {
+        Ok(features) => features,
+        Err(error) => {
+            eprintln!("Failed to extract prediction features: {error}");
+            return HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Failed to extract prediction features"
+            }));
+        }
     };
 
-    HttpResponse::Ok().json(resp)
+    let input = vec![
+        features.completed_materials as f32,
+        features.average_score as f32,
+        features.study_time as f32,
+        features.difficulty_preference as f32,
+        features.learning_style as f32,
+        features.engagement_level as f32,
+        features.quiz_performance as f32,
+        features.material_interaction as f32,
+    ];
+    let model_path = format!("models/burn/{user_id}.mdl");
+    match crate::modules::analytics::models::burn_model::predict_with_saved_model(input, &model_path)
+    {
+        Ok(prediction) => HttpResponse::Ok().json(serde_json::json!({
+            "userId": user_id.to_string(),
+            "predictionType": "trained_logistic_regression",
+            "predictedSuccessRate": prediction[0],
+            "modelVersion": "saved-model"
+        })),
+        Err(error) => {
+            eprintln!("Burn model prediction unavailable: {error}");
+            HttpResponse::ServiceUnavailable().json(serde_json::json!({
+                "error": "No compatible trained prediction model is available"
+            }))
+        }
+    }
 }
 
 async fn health_check_handler() -> impl Responder {

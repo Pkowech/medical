@@ -15,7 +15,7 @@ export interface ValidationReport {
   precision: number;
   recall: number;
   calibrationError: number;
-  isAccurate: boolean;
+  isAccurate: boolean | null;
 }
 
 @Injectable()
@@ -74,7 +74,7 @@ export class PredictionValidatorService {
         precision: 0,
         recall: 0,
         calibrationError: 0,
-        isAccurate: true,
+        isAccurate: null,
       };
     }
 
@@ -162,6 +162,7 @@ export class PredictionValidatorService {
     topicId: string | undefined,
     predictedScore: number,
   ): Promise<void> {
+    this.assertProbability(predictedScore, 'predictedScore');
     await this.prisma.predictionValidation.create({
       data: {
         userId,
@@ -180,6 +181,7 @@ export class PredictionValidatorService {
     topicId: string,
     actualScore: number,
   ): Promise<void> {
+    this.assertProbability(actualScore, 'actualScore');
     // Find the most recent uncalibrated prediction for this user/topic
     const prediction = await this.prisma.predictionValidation.findFirst({
       where: {
@@ -199,6 +201,12 @@ export class PredictionValidatorService {
       where: { id: prediction.id },
       data: { actualScore },
     });
+  }
+
+  private assertProbability(value: number, name: string): void {
+    if (!Number.isFinite(value) || value < 0 || value > 1) {
+      throw new RangeError(`${name} must be a finite probability between 0 and 1`);
+    }
   }
 
   private async alertAdmin(report: ValidationReport): Promise<void> {
@@ -224,7 +232,7 @@ export class PredictionValidatorService {
             userId: admin.userId,
             message:
               `⚠️ Prediction accuracy has dropped below ${this.ACCURACY_THRESHOLD * 100}%. ` +
-              `F1 score: ${((2 * report.precision * report.recall) / (report.precision + report.recall)).toFixed(2)}. ` +
+              `F1 score: ${this.getF1Score(report.precision, report.recall).toFixed(2)}. ` +
               `Please review the prediction model.`,
             type: 'system_alert',
             priority: NotificationPriority.urgent,
@@ -247,5 +255,11 @@ export class PredictionValidatorService {
         `Failed to send admin alert: ${getErrorMessage(error)}`,
       );
     }
+  }
+
+  private getF1Score(precision: number, recall: number): number {
+    return precision + recall > 0
+      ? (2 * precision * recall) / (precision + recall)
+      : 0;
   }
 }

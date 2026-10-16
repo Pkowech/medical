@@ -69,6 +69,20 @@ function isNetworkUnavailable(error: unknown): boolean {
     (!('response' in error) || error.response === undefined);
 }
 
+function getHttpStatus(error: unknown): number | undefined {
+  if (typeof error !== 'object' || error === null) return undefined;
+  if ('status' in error && typeof error.status === 'number') {
+    return error.status;
+  }
+  if (!('response' in error)) return undefined;
+  const response = error.response;
+  if (typeof response === 'object' && response !== null &&
+      'status' in response && typeof response.status === 'number') {
+    return response.status;
+  }
+  return undefined;
+}
+
 export function CourseStudySessionProvider({ children }: { children: React.ReactNode }) {
   const { startSession, endSession } = useStudy();
   const userId = useAuthStore(state => state.user?.id);
@@ -292,6 +306,16 @@ export function CourseStudySessionProvider({ children }: { children: React.React
     if (!currentSession || isEndingRef.current) return null;
     isEndingRef.current = true;
     setIsEnding(true);
+    const clearLocalSession = async () => {
+      activeSessionRef.current = null;
+      setActiveSession(null);
+      try {
+        await offlineService.removeOfflineStudySession(currentSession.id);
+      } catch (cleanupError) {
+        console.error('Could not remove the ended offline study session:', cleanupError);
+        toast.warning('Session ended, but its saved offline copy could not be removed.');
+      }
+    };
     try {
       const finalSegmentSeconds = Math.max(
         0,
@@ -320,8 +344,7 @@ export function CourseStudySessionProvider({ children }: { children: React.React
       } else {
         toast.info(`Session saved but did not count toward progress. ${ended.invalidReason ?? ''}`);
       }
-      await offlineService.removeOfflineStudySession(currentSession.id);
-      setActiveSession(null);
+      await clearLocalSession();
       return ended;
     } catch (error) {
       if (isNetworkUnavailable(error) && userId) {
@@ -356,8 +379,7 @@ export function CourseStudySessionProvider({ children }: { children: React.React
             userId,
             'study_session_end',
           );
-          await offlineService.removeOfflineStudySession(currentSession.id);
-          setActiveSession(null);
+          await clearLocalSession();
           toast.success('Session and notes saved on this device. They will sync when you are back online.');
           return null;
         } catch (queueError) {
@@ -365,6 +387,12 @@ export function CourseStudySessionProvider({ children }: { children: React.React
           toast.error('Session is still saved locally, but could not be queued to sync.');
           return null;
         }
+      }
+      if (getHttpStatus(error) === 404) {
+        console.warn('The active course study session no longer exists on the server:', currentSession.id);
+        await clearLocalSession();
+        toast.info('This study session was already removed. You can continue studying.');
+        return null;
       }
       console.error('Failed to save course study session:', error);
       toast.error('Could not save the course study session. Please try again.');

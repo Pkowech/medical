@@ -426,6 +426,11 @@ export interface Specialization {
  */
 export interface ProgressData {
   overallProgress: number;
+  dailyStreak?: number;
+  weeklyStudyMinutes?: number;
+  totalHoursStudied?: number;
+  activeStudyDaysThisWeek?: number;
+  courseCompletionRate?: number;
   coursesCompleted?: number;
   totalCourses?: number;
   streak?: number;
@@ -562,4 +567,3 @@ export interface FlashcardStatistics {
   sessions: number;
   avgTimePerCard: string;
 }
-

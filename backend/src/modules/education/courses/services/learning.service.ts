@@ -570,50 +570,54 @@ export class LearningService {
    * Get predictions for user success in courses/paths
    * Uses learning-analytics service for ML-based predictions
    */
-  async getPredictions(userId: string, features?: number[]) {
+  async getPredictions(userId: string) {
     if (!userId) {
       throw new BadRequestException('User ID is required');
     }
 
-    try {
-      // Extract learning history features if not provided
-      let extractedFeatures = features || [];
-      if (!extractedFeatures.length) {
-        // Get default feature extraction with stub data if not provided
-        extractedFeatures =
-          await this.learningAnalyticsService.extractPredictionFeatures(
-            userId,
-            [],
-            0,
-            0.5,
-          );
-      }
+    const attempts = await this.prisma.quizAttempt.findMany({
+      where: { userId, completedAt: { not: null } },
+      select: { score: true, percentage: true },
+      orderBy: { completedAt: 'desc' },
+      take: 10,
+    });
+    const scores = attempts.map((attempt) =>
+      Math.max(
+        0,
+        Math.min(
+          1,
+          (attempt.percentage > 0 ? attempt.percentage : attempt.score) / 100,
+        ),
+      ),
+    );
+    const probability =
+      scores.length > 0
+        ? scores.reduce((sum, score) => sum + score, 0) / scores.length
+        : null;
 
-      // Get success rate prediction from analytics
-      const prediction = await this.learningAnalyticsService.predictSuccessRate(
-        userId,
-        extractedFeatures,
-      );
+    return {
+      userId,
+      prediction:
+        probability === null
+          ? null
+          : {
+              probability,
+              predictedSuccessRate: probability,
+              sampleSize: scores.length,
+              method: 'mean_of_recent_completed_quiz_scores',
+              factors: [
+                `Based on ${scores.length} completed quiz attempt${scores.length === 1 ? '' : 's'}`,
+              ],
+            },
+      generatedAt: new Date(),
+    };
+  }
 
-      return {
-        userId,
-        prediction,
-        generatedAt: new Date(),
-      };
-    } catch (error) {
-      this.logger.warn(`Error getting predictions for user ${userId}:`, error);
-      // Return graceful default prediction
-      return {
-        userId,
-        prediction: {
-          userId,
-          probability: 0.5,
-          confidence: 0.0,
-          factors: [],
-        },
-        generatedAt: new Date(),
-      };
+  async getBktPredictions(userId: string) {
+    if (!userId) {
+      throw new BadRequestException('User ID is required');
     }
+    return this.learningAnalyticsService.getBktPredictions(userId);
   }
 
   /**
