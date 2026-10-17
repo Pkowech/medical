@@ -59,12 +59,15 @@ class AuthService {
   //   // Similar interceptor setup for unauthenticatedAxiosInstance if needed
   // }
 
-  async login(credentials: LoginDTO): Promise<SignInResponse | undefined> {
+  async login(
+    credentials: LoginDTO & { twoFactorToken?: string }
+  ): Promise<SignInResponse | undefined> {
     try {
       const identifier = credentials.identifier || credentials.email;
       const result = await signIn('credentials', {
         identifier,
         password: credentials.password,
+        twoFactorToken: credentials.twoFactorToken,
         redirect: false,
       });
 

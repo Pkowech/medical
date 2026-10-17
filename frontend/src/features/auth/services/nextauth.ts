@@ -207,6 +207,7 @@ export const authOptions: NextAuthOptions = {
       credentials: {
         identifier: { label: 'Email or Username', type: 'text' },
         password: { label: 'Password', type: 'password' },
+        twoFactorToken: { label: 'Authenticator code', type: 'text' },
       },
       async authorize(credentials) {
         if (!credentials?.identifier || !credentials?.password) {
@@ -244,6 +245,9 @@ export const authOptions: NextAuthOptions = {
 
         const loginBody = {
           password: credentials.password,
+          ...(credentials.twoFactorToken
+            ? { twoFactorToken: credentials.twoFactorToken }
+            : {}),
           ...(String(credentials.identifier).includes('@')
             ? { email: credentials.identifier }
             : { username: credentials.identifier }),
@@ -313,6 +317,11 @@ export const authOptions: NextAuthOptions = {
                   : 'Could not sign in. Check the details and try again.';
             let errorCode: AuthErrorCode = AuthErrorCode.INVALID_CREDENTIALS;
 
+            if (/two-factor.*required|multi-factor.*required/i.test(errorMessage)) {
+              errorCode = AuthErrorCode.MFA_REQUIRED;
+            } else if (/invalid.*two-factor|invalid.*authenticator/i.test(errorMessage)) {
+              errorCode = AuthErrorCode.INVALID_MFA_CODE;
+            } else
             switch (errorMessage) {
               case AUTH_ERROR_MESSAGES[AuthErrorCode.INVALID_CREDENTIALS]:
                 errorCode = AuthErrorCode.INVALID_CREDENTIALS;

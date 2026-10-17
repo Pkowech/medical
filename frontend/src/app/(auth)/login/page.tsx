@@ -63,6 +63,8 @@ function LoginContent() {
   const [success, setSuccess] = useState('');
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
+  const [twoFactorToken, setTwoFactorToken] = useState('');
+  const [requiresMfa, setRequiresMfa] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [socialLoading, setSocialLoading] = useState<'google' | null>(null);
   const [formErrors, setFormErrors] = useState<FormErrors>({});
@@ -146,6 +148,8 @@ function LoginContent() {
     setError('');
     setCanRetry(false);
     setShowResendVerification(false);
+    setRequiresMfa(false);
+    setTwoFactorToken('');
 
     if (name === 'identifier') {
       setIdentifier(value);
@@ -206,11 +210,18 @@ function LoginContent() {
     setLoginAttempts(prev => prev + 1);
 
     try {
-      const result = await login(identifier, password);
+      const result = await login(identifier, password, twoFactorToken || undefined);
 
       if (result?.error) {
         const authError = getAuthErrorDetails(result.error, 'Could not sign in. Please try again.');
         setError(authError.message);
+        if (
+          authError.code === AuthErrorCode.MFA_REQUIRED ||
+          authError.code === AuthErrorCode.INVALID_MFA_CODE
+        ) {
+          setRequiresMfa(true);
+          if (authError.code === AuthErrorCode.INVALID_MFA_CODE) setTwoFactorToken('');
+        }
         setCanRetry(
           [
             AuthErrorCode.SERVICE_UNAVAILABLE,
@@ -369,6 +380,30 @@ function LoginContent() {
                   <FaUser className="h-5 w-5 text-slate-400 dark:text-slate-400" />
                 )}
               </div>
+              {requiresMfa && (
+                <div>
+                  <label
+                    htmlFor="two-factor-token"
+                    className="mb-2 block text-[1.05rem] font-medium text-slate-700 dark:text-slate-200"
+                  >
+                    Authenticator code
+                  </label>
+                  <input
+                    id="two-factor-token"
+                    name="twoFactorToken"
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    pattern="[0-9]{6}"
+                    maxLength={6}
+                    required
+                    value={twoFactorToken}
+                    onChange={event => setTwoFactorToken(event.target.value.replace(/\D/g, ''))}
+                    className="block w-full rounded-xl border border-slate-300 bg-white px-3 py-3.5 text-[1.05rem] text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+                    placeholder="Six-digit code"
+                  />
+                </div>
+              )}
               <input
                 id="identifier"
                 name="identifier"

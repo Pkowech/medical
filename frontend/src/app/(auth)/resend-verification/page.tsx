@@ -25,7 +25,7 @@ export default function ResendVerificationPage() {
       const response = await authService.resendVerificationEmail(email.trim());
       setMessage(
         response.message ??
-          'If an unverified account exists for this email, a verification link will be sent.',
+          'If an unverified account exists and email delivery is available, a verification link may be sent. This request cannot confirm account eligibility or delivery.',
       );
     } catch (requestError: unknown) {
       setError(

@@ -266,17 +266,6 @@ export class SecurityService {
   }
 
   async sendVerificationEmail(user: User): Promise<void> {
-    // In dev mode, just auto-verify without creating tokens
-    if (process.env.NODE_ENV !== 'production') {
-      this.logger.warn(`DEV MODE: Auto-verifying email for ${user.email}`);
-      await this.prisma.userSecuritySettings.upsert({
-        where: { userId: user.id },
-        update: { isEmailVerified: true },
-        create: { userId: user.id, isEmailVerified: true, acceptTerms: false },
-      });
-      return;
-    }
-
     const host = this.configService.get<string>('EMAIL_HOST');
     const userName = this.configService.get<string>('EMAIL_USER');
     const password = this.configService.get<string>('EMAIL_PASSWORD');
@@ -401,7 +390,12 @@ export class SecurityService {
     });
     if (settings?.isEmailVerified) return;
 
-    await this.sendVerificationEmail(user);
+    try {
+      await this.sendVerificationEmail(user);
+    } catch (error) {
+      if (!(error instanceof ServiceUnavailableException)) throw error;
+      this.logger.error('Could not send a requested verification email.');
+    }
   }
 
   async resendVerificationEmail(userId: string): Promise<void> {

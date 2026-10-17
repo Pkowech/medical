@@ -195,6 +195,10 @@ export function getAuthErrorDetails(
       code = AuthErrorCode.RATE_LIMIT_EXCEEDED;
     } else if (normalizedError.includes('multi-factor')) {
       code = AuthErrorCode.MFA_REQUIRED;
+    } else if (/two-factor.*required|mfa_required/.test(normalizedError)) {
+      code = AuthErrorCode.MFA_REQUIRED;
+    } else if (/invalid.*two-factor|invalid.*authenticator/.test(normalizedError)) {
+      code = AuthErrorCode.INVALID_MFA_CODE;
     } else if (normalizedError.includes('permission')) {
       code = AuthErrorCode.INSUFFICIENT_PERMISSIONS;
     } else if (normalizedError.includes('token') && normalizedError.includes('expired')) {

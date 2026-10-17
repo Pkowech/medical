@@ -183,7 +183,7 @@ export class SecurityController {
     await this.securityService.requestVerificationEmail(dto.email);
     return {
       message:
-        'If an unverified account exists for this email, a verification link will be sent.',
+        'If an unverified account exists and email delivery is available, a verification link may be sent. This request cannot confirm account eligibility or delivery.',
     };
   }
 

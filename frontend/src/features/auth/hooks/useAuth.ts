@@ -11,11 +11,16 @@ export const useAuth = () => {
   const isAuthenticated = status === 'authenticated';
 
   // Wrap authService methods so callers can use a single hook
-  const login = async (identifier: string, password: string) => {
+  const login = async (
+    identifier: string,
+    password: string,
+    twoFactorToken?: string
+  ) => {
     return authService.login({
       identifier,
       email: identifier,
       password,
+      twoFactorToken,
     });
   };
 

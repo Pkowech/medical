@@ -54,6 +54,10 @@ export class AdminSettingsService {
     const updated: AppSystemSettings = {
       ...current,
       ...update,
+      sessionTimeout:
+        update.sessionTimeout === undefined
+          ? current.sessionTimeout
+          : this.validateSessionTimeout(update.sessionTimeout),
       passwordPolicy: {
         ...current.passwordPolicy,
         ...update.passwordPolicy,
@@ -92,7 +96,14 @@ export class AdminSettingsService {
     }
   }
 
-  private asSettingsObject(value: Prisma.JsonValue | undefined): Record<string, unknown> {
+  private validateSessionTimeout(value: number): AppSystemSettings['sessionTimeout'] {
+    if (value === 15 || value === 30 || value === 60 || value === 120) {
+      return value;
+    }
+    throw new BadRequestException('Session timeout must be 15, 30, 60, or 120 minutes.');
+  }
+
+  private asSettingsObject(value: unknown): Record<string, unknown> {
     return value !== null && typeof value === 'object' && !Array.isArray(value)
       ? value as Record<string, unknown>
       : {};
