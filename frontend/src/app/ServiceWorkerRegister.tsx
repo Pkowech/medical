@@ -2,12 +2,14 @@
 
 import { useEffect, useRef, useState } from 'react';
 
+const showUpdateBanner = process.env.NEXT_PUBLIC_ENABLE_APP_UPDATE_BANNER === 'true';
+
 export function ServiceWorkerRegister() {
   const [waitingWorker, setWaitingWorker] = useState<ServiceWorker | null>(null);
   const activatingUpdate = useRef(false);
 
   useEffect(() => {
-    if (process.env.NODE_ENV !== 'production' || !('serviceWorker' in navigator)) return;
+    if (!showUpdateBanner || process.env.NODE_ENV !== 'production' || !('serviceWorker' in navigator)) return;
 
     let disposed = false;
     let registration: ServiceWorkerRegistration | undefined;
