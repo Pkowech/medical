@@ -10,11 +10,13 @@ import {
   AlertCircle,
   Search,
   Award,
-  X,
   type LucideIcon,
   Layers,
   ChevronRight,
   UserRound,
+  MoreVertical,
+  LogOut,
+  FolderOpen,
 } from 'lucide-react';
 import {
   useInfiniteQuery,
@@ -37,6 +39,21 @@ import {
 } from '@/shared/types/courseInterface';
 import { Progress } from '@/shared/components/ui/progress';
 import { UnitSelectionModal } from '@/features/courses/components/UnitSelectionModal';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/shared/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/shared/components/ui/dropdown-menu';
 
 interface CoursesPageData {
   courses: Course[];
@@ -59,6 +76,8 @@ export const CoursesDashboard = () => {
   });
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [unitSelectionCourse, setUnitSelectionCourse] = useState<Course | null>(null);
+  const [courseToUnenroll, setCourseToUnenroll] = useState<Course | null>(null);
+  const [isUnenrolling, setIsUnenrolling] = useState(false);
   const router = useRouter();
 
   const { data: progressDashboard } = useQuery({
@@ -299,10 +318,16 @@ export const CoursesDashboard = () => {
     );
   };
 
-  const unenrollFromCourse = async (course: Course) => {
-    const courseName = course.title || course.name;
-    if (!window.confirm(`Unenroll from ${courseName}? Your course progress will be kept.`)) return;
+  const requestCourseUnenrollment = (course: Course) => {
+    setCourseToUnenroll(course);
+  };
 
+  const unenrollFromCourse = async () => {
+    if (!courseToUnenroll) return;
+    const course = courseToUnenroll;
+    const courseName = course.title || course.name;
+
+    setIsUnenrolling(true);
     try {
       await courseService.unenrollFromCourse(course.id);
       await Promise.all([
@@ -312,52 +337,52 @@ export const CoursesDashboard = () => {
         queryClient.invalidateQueries({ queryKey: ['course-progress-dashboard'] }),
       ]);
       toast.success(`You are unenrolled from ${courseName}. Your progress was kept.`);
+      setCourseToUnenroll(null);
     } catch (error) {
       console.error('Failed to unenroll from course:', error);
       toast.error('Could not unenroll from this course.');
+    } finally {
+      setIsUnenrolling(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900/50 p-4 md:p-8">
-      <div className="max-w-7xl mx-auto space-y-8">
+    <div className="min-h-screen bg-[#f8f9fa] p-4 dark:bg-slate-950 md:p-8">
+      <div className="mx-auto flex max-w-7xl flex-col space-y-6">
         
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="order-1 grid grid-cols-2 gap-3 lg:grid-cols-4">
           <StatCard
             icon={BookOpen}
             title="My Units"
             value={activeUnits.length}
-            gradient="from-blue-500 to-indigo-600"
             description="Enrolled units"
           />
           <StatCard
             icon={CheckCircle}
             title="Completed Units"
             value={completedUnitCount}
-            gradient="from-emerald-500 to-teal-600"
             description="Units finished"
           />
           <StatCard
             icon={TrendingUp}
             title="In Progress"
             value={ongoingUnitCount}
-            gradient="from-amber-500 to-orange-600"
             description="Ongoing learning"
           />
           <StatCard
             icon={Award}
             title="Avg Score"
             value={`${courseStatistics.avgScore || 0}%`}
-            gradient="from-rose-500 to-pink-600"
             description="Average topic quiz score"
           />
         </div>
 
         {/* Search & Tabs Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white dark:bg-slate-800 p-6 rounded-3xl shadow-xl shadow-slate-200/50 dark:shadow-none border border-slate-100 dark:border-slate-700">
-          <div className="flex flex-col gap-4 flex-1">
-            <div className="flex items-center p-1 bg-slate-100 dark:bg-slate-900 rounded-2xl w-fit">
+        <div className="order-2 flex flex-col justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:flex-row sm:items-center">
+          <div className="flex min-w-0 flex-col gap-3">
+            <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-white">Classes</h1>
+            <div className="flex w-fit max-w-full items-center gap-1 overflow-x-auto rounded-full bg-slate-100 p-1 dark:bg-slate-800">
               <TabButton 
                 active={activeTab === 'enrolled'} 
                 onClick={() => {
@@ -365,7 +390,7 @@ export const CoursesDashboard = () => {
                   setFilters(prev => ({ ...prev, searchTerm: '' }));
                   setDebouncedSearchTerm('');
                 }}
-                label="My Learning"
+                label="My Classes"
                 icon={BookOpen}
               />
               <TabButton 
@@ -392,20 +417,20 @@ export const CoursesDashboard = () => {
             )}
           </div>
 
-          <form onSubmit={handleSearch} className="flex-1 max-w-md relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+          <form onSubmit={handleSearch} className="relative w-full sm:max-w-sm">
+            <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              placeholder="Search courses, topics, or specialties..."
+              placeholder="Search classes"
               value={filters.searchTerm}
               onChange={e => setFilters({ ...filters, searchTerm: e.target.value })}
-              className="w-full pl-12 pr-4 py-3 bg-slate-50 dark:bg-slate-900 border-none rounded-2xl focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-white"
+              className="w-full rounded-full border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:ring-blue-950"
             />
           </form>
         </div>
 
         {activeTab === 'enrolled' && (
-          <div className="space-y-8">
+          <div className="order-4 space-y-8">
             {[
               {
                 title: 'Ongoing Units',
@@ -485,18 +510,26 @@ export const CoursesDashboard = () => {
 
         {/* Content Grid */}
         {coursesError ? (
-          <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-200">
+          <div role="alert" className="order-3 rounded-xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-200">
             Could not load courses: {coursesErrorDetails instanceof Error ? coursesErrorDetails.message : 'Please try again later.'}
           </div>
         ) : coursesLoading ? (
-          <div className="flex flex-col items-center justify-center py-20">
+          <div className="order-3 flex flex-col items-center justify-center py-20">
             <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent" />
             <p className="mt-4 text-slate-500 font-medium">Curating your courses...</p>
           </div>
         ) : (
-          <div className="space-y-6">
+          <div className="order-3 space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">
+                {activeTab === 'enrolled' ? 'Enrolled classes' : activeTab === 'recommended' ? 'Recommended classes' : 'Explore classes'}
+              </h2>
+              <span className="text-sm text-slate-500 dark:text-slate-400">
+                {(infiniteData as any)?.pages?.flatMap((page: any) => page.courses)?.length ?? 0}
+              </span>
+            </div>
             {(infiniteData as any)?.pages?.flatMap((p: any) => p.courses)?.length > 0 ? (
-              <div className="grid grid-cols-1 gap-5 md:grid-cols-2 md:gap-6 xl:grid-cols-3">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 {(infiniteData as any).pages.flatMap((p: any) => p.courses).map((course: any) => (
                   <CourseCard 
                     key={course.unitId || course.id} 
@@ -508,10 +541,10 @@ export const CoursesDashboard = () => {
                             ?? 0,
                         }
                       : course}
-                    wide={activeTab === 'enrolled'}
+                    enrolledView={activeTab === 'enrolled'}
                     onSelectCourse={openCourseUnits}
 
-                    onUnenrollCourse={unenrollFromCourse}
+                    onUnenrollCourse={requestCourseUnenrollment}
                     router={router}
                     getResumePoint={getResumePoint}
                   />
@@ -569,6 +602,41 @@ export const CoursesDashboard = () => {
           onComplete={handleUnitsChanged}
         />
       )}
+      <Dialog
+        open={Boolean(courseToUnenroll)}
+        onOpenChange={open => {
+          if (!open && !isUnenrolling) setCourseToUnenroll(null);
+        }}
+      >
+        <DialogContent className="max-w-md rounded-2xl border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-900">
+          <DialogHeader className="text-left">
+            <DialogTitle className="text-lg text-slate-900 dark:text-white">Unenroll from this class?</DialogTitle>
+            <DialogDescription className="pt-2 leading-relaxed text-slate-600 dark:text-slate-300">
+              You’ll be unenrolled from <span className="font-semibold text-slate-900 dark:text-white">{courseToUnenroll?.title || courseToUnenroll?.name}</span>.
+              Your course progress will be kept, and you can enroll again later.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-2 gap-2 sm:space-x-0">
+            <button
+              type="button"
+              onClick={() => setCourseToUnenroll(null)}
+              disabled={isUnenrolling}
+              className="inline-flex h-10 items-center justify-center rounded-lg border border-slate-300 px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => void unenrollFromCourse()}
+              disabled={isUnenrolling}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-rose-600 px-4 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <LogOut className="h-4 w-4" />
+              {isUnenrolling ? 'Unenrolling…' : 'Unenroll'}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
@@ -582,14 +650,16 @@ interface TabButtonProps {
 
 const TabButton = ({ active, onClick, label, icon: Icon }: TabButtonProps) => (
   <button
+    type="button"
     onClick={onClick}
-    className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all ${
-      active 
-        ? 'bg-white dark:bg-slate-800 text-blue-600 shadow-md scale-105' 
-        : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+    aria-pressed={active}
+    className={`flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+      active
+        ? 'bg-white text-blue-700 shadow-sm dark:bg-slate-700 dark:text-blue-300'
+        : 'text-slate-600 hover:bg-white/70 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-700/70 dark:hover:text-white'
     }`}
   >
-    <Icon className={`w-4 h-4 ${active ? 'text-blue-600' : 'text-slate-400'}`} />
+    <Icon className={`h-4 w-4 ${active ? 'text-blue-600 dark:text-blue-300' : 'text-slate-400'}`} />
     {label}
   </button>
 );
@@ -598,35 +668,43 @@ interface StatCardProps {
   icon: LucideIcon;
   title: string;
   value: string | number;
-  gradient: string;
   description?: string;
 }
 
-const StatCard = ({ icon: Icon, title, value, gradient, description }: StatCardProps) => (
-  <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-sm group hover:shadow-md transition-all">
-    <div className={`w-12 h-12 rounded-2xl bg-linear-to-br ${gradient} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
-      <Icon className="w-6 h-6 text-white" />
+const StatCard = ({ icon: Icon, title, value, description }: StatCardProps) => (
+  <div className="flex min-w-0 items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:px-4">
+    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
+      <Icon className="h-4 w-4" />
+    </span>
+    <div className="min-w-0">
+      <p className="truncate text-xs font-medium text-slate-500 dark:text-slate-400">{title}</p>
+      <div className="flex items-baseline gap-2">
+        <p className="text-lg font-semibold leading-tight text-slate-900 dark:text-white">{value}</p>
+        {description && <p className="hidden truncate text-[11px] text-slate-500 dark:text-slate-400 sm:block">{description}</p>}
+      </div>
     </div>
-    <p className="text-slate-500 dark:text-slate-400 text-sm font-semibold uppercase tracking-wider">{title}</p>
-    <p className="text-3xl font-black text-slate-900 dark:text-white mt-1">{value}</p>
-    {description && (
-      <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold mt-2 uppercase tracking-tighter">{description}</p>
-    )}
   </div>
 );
 
 interface CourseCardProps {
   course: Course;
-  wide?: boolean;
+  enrolledView?: boolean;
   onSelectCourse: (course: Course) => void;
   onUnenrollCourse: (course: Course) => void;
   router: ReturnType<typeof useRouter>;
   getResumePoint: (courseId: string) => unknown;
 }
 
-const CourseCard = ({ course, wide = false, onSelectCourse, onUnenrollCourse, router, getResumePoint }: CourseCardProps) => {
-  const isEnrolled = course.isEnrolled;
-  const progress = course.progressPercentage ?? 0;
+const CourseCard = ({
+  course,
+  enrolledView = false,
+  onSelectCourse,
+  onUnenrollCourse,
+  router,
+  getResumePoint,
+}: CourseCardProps) => {
+  const isEnrolled = Boolean(course.isEnrolled);
+  const progress = Math.min(100, Math.max(0, Number(course.progressPercentage) || 0));
   const owner = getInstructorDisplayName(course.instructor ?? course.createdBy);
   const courseName = course.title || course.name;
   const bannerPalettes = [
@@ -650,160 +728,144 @@ const CourseCard = ({ course, wide = false, onSelectCourse, onUnenrollCourse, ro
     }
   };
 
+  const handleTitleClick = () => {
+    if (course.unitId) {
+      router.push(`/courses/${course.id}/units/${course.unitId}`);
+    } else if (enrolledView) {
+      onSelectCourse(course);
+    } else {
+      router.push(`/courses/${course.id}`);
+    }
+  };
+
   return (
-    <div 
-      onClick={() => {
-        if (course.unitId) {
-            router.push(`/courses/${course.id}/units/${course.unitId}`);
-        } else {
-            onSelectCourse(course);
-        }
-      }}
-      className={`group bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm hover:-translate-y-1 hover:shadow-xl transition-all cursor-pointer ${wide ? 'min-h-[25rem]' : ''}`}
-    >
-      {wide ? (
-        <>
-          <div className={`relative flex h-44 flex-col justify-between overflow-hidden bg-linear-to-br ${bannerPalettes[paletteIndex]} p-5 text-white`}>
-            <BookOpen className="absolute -right-3 -bottom-8 h-36 w-36 rotate-[-12deg] text-white/10" aria-hidden="true" />
-            <div className="relative flex items-start justify-between gap-3">
-              <span className="rounded-md bg-black/15 px-2.5 py-1 text-xs font-semibold tracking-wide text-white/90">
-                {course.code || 'Course'}
-              </span>
-              {Math.round(progress) >= 100 && <CheckCircle className="h-6 w-6 text-emerald-300" aria-label="Course complete" />}
-            </div>
-            <div className="relative">
-              <h3 className="line-clamp-2 text-2xl font-bold leading-tight">{courseName}</h3>
-              {course.description && <p className="mt-1 line-clamp-1 text-sm text-white/75">{course.description}</p>}
-            </div>
+    <article className="group flex min-h-[21rem] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md dark:border-slate-800 dark:bg-slate-900">
+      <div className={`relative flex h-36 flex-col justify-between overflow-hidden bg-linear-to-br ${bannerPalettes[paletteIndex]} px-5 py-4 text-white`}>
+        <BookOpen className="absolute -bottom-8 -right-4 h-36 w-36 rotate-[-12deg] text-white/10" aria-hidden="true" />
+        <div className="relative flex items-start justify-between gap-3">
+          <span className="rounded bg-black/15 px-2 py-1 text-xs font-medium tracking-wide text-white/90">
+            {course.code || 'Course'}
+          </span>
+          {isEnrolled && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  aria-label={`Class options for ${courseName}`}
+                  onClick={event => event.stopPropagation()}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-full text-white transition-colors hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                >
+                  <MoreVertical className="h-5 w-5" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-48">
+                <DropdownMenuItem
+                  onSelect={() => void openCourse()}
+                  className="cursor-pointer"
+                >
+                  <FolderOpen className="mr-2 h-4 w-4" />
+                  Open class
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onSelect={() => onUnenrollCourse(course)}
+                  className="cursor-pointer text-rose-600 focus:text-rose-700 dark:text-rose-400 dark:focus:text-rose-300"
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Unenroll from class
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
+        <div className="relative min-w-0">
+          <button
+            type="button"
+            onClick={handleTitleClick}
+            className="block max-w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+          >
+            <h3 className="line-clamp-2 text-xl font-semibold leading-tight">{courseName}</h3>
+          </button>
+          {Math.round(progress) >= 100 && isEnrolled && (
+            <span className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-emerald-100">
+              <CheckCircle className="h-3.5 w-3.5" />
+              Completed
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="flex flex-1 flex-col gap-4 p-4">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+            <UserRound className="h-4 w-4" />
+          </span>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-100">{owner}</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Instructor</p>
           </div>
+        </div>
 
-          <div className="space-y-4 p-5">
-            <div className="flex min-h-10 items-center gap-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-700 dark:bg-blue-900/40 dark:text-blue-200">
-                <UserRound className="h-4 w-4" />
-              </span>
-              <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Course instructor</p>
-                <p className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">{owner}</p>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs font-semibold text-slate-500 dark:text-slate-400">
+        {enrolledView && isEnrolled ? (
+          <>
+            {course.description && (
+              <p className="line-clamp-2 min-h-10 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
+                {course.description}
+              </p>
+            )}
+            <div className="mt-auto space-y-2">
+              <div className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-300">
                 <span>Course progress</span>
-                <span>{Math.round(progress)}%</span>
+                <span className="font-semibold">{Math.round(progress)}%</span>
               </div>
-              <Progress value={progress} className="h-2 bg-slate-100 dark:bg-slate-700" />
+              <Progress value={progress} className="h-1.5 bg-slate-100 dark:bg-slate-800" />
             </div>
-
-            <div className="flex items-center justify-between border-t border-slate-100 pt-3 text-xs text-slate-500 dark:border-slate-700 dark:text-slate-400">
-              <span>{course.estimatedHours ?? 0} study hours</span>
-              <span>{course.enrollmentCount ?? 0} learners</span>
-              <span className="inline-flex items-center gap-1">
-                {course.rating?.toFixed(1) ?? '—'} <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-              </span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={(event) => { event.stopPropagation(); void openCourse(); }}
-                className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2.5 text-sm font-bold text-white transition-colors hover:bg-blue-700"
-              >
-                {progress > 0 ? 'Continue class' : 'Open class'}
-                <ChevronRight className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  router.push(`/study-planner/materials?courseId=${encodeURIComponent(course.id)}&scope=enrolled`);
-                }}
-                className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700"
-              >
-                <Layers className="h-4 w-4" />
-                Materials
-              </button>
-            </div>
-            <button
-              type="button"
-              onClick={(event) => { event.stopPropagation(); void onUnenrollCourse(course); }}
-              className="inline-flex w-full items-center justify-center gap-1.5 text-xs font-medium text-slate-400 transition-colors hover:text-rose-600"
-            >
-              <X className="h-3.5 w-3.5" />
-              Unenroll from course
-            </button>
-          </div>
-        </>
-      ) : (
-        <>
-          <div className="relative flex h-40 flex-col justify-between bg-linear-to-br from-slate-700 to-slate-900 p-6">
-            <div className="text-xs font-semibold uppercase tracking-wider text-white/70">{course.code || 'Course'}</div>
-            <div>
-              <h3 className="line-clamp-2 text-xl font-black leading-tight text-white">{courseName}</h3>
-            </div>
-          </div>
-          <div className="space-y-4 p-6">
-            <p className="line-clamp-2 min-h-10 text-sm text-slate-600 dark:text-slate-400">{course.description}</p>
+          </>
+        ) : (
+          <>
+            <p className="line-clamp-2 min-h-10 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
+              {course.description || 'Explore course units and learning materials.'}
+            </p>
             {course.recommendationReason && (
-              <p className="rounded-lg bg-indigo-50 px-3 py-2 text-xs text-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200">
+              <p className="line-clamp-2 rounded-lg bg-indigo-50 px-3 py-2 text-xs text-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200">
                 {course.recommendationReason}
               </p>
             )}
-            <div className="flex items-center justify-between border-y border-slate-100 py-3 text-xs text-slate-500 dark:border-slate-700 dark:text-slate-400">
-              <span>{course.estimatedHours ?? 0}h</span>
-              <span>{course.enrollmentCount ?? 0} learners</span>
-              <span className="inline-flex items-center gap-1">
-                {course.rating?.toFixed(1) ?? '—'} <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-              </span>
-            </div>
-            {!course.unitId ? (
-          <button
-            onClick={(e) => { e.stopPropagation(); router.push(`/courses/${course.id}`); }}
-            className="w-full py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-black text-sm hover:scale-105 transition-transform flex items-center justify-center gap-2"
-          >
-            <Layers className="h-4 w-4" /> View Units
-          </button>
-        ) : (
-          <div className="space-y-2">
-          <button
-            onClick={async (e) => {
-              e.stopPropagation();
-              if (course.unitId) {
-                router.push(`/courses/${course.id}/units/${course.unitId}`);
-              } else {
-                const resume = await getResumePoint(course.id) as { type?: string; unitId?: string; id?: string } | null;
-                if (resume && resume.type === 'topic' && resume.unitId) {
-                  router.push(`/courses/${course.id}/units/${resume.unitId}/topics/${resume.id}`);
-                } else {
-                  // If no resume point, go to the course overview page (which lists units)
-                  router.push(`/courses/${course.id}`);
-                }
-              }
-            }}
-            className="w-full py-3 bg-blue-600 text-white rounded-2xl font-black text-sm hover:bg-blue-700 shadow-lg shadow-blue-200 dark:shadow-none"
-          >
-            {progress === 0 ? 'View course' : 'Continue learning'}
-          </button>
-          {isEnrolled && (
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                void onUnenrollCourse(course);
-              }}
-              className="inline-flex w-full items-center justify-center gap-2 py-2 text-sm font-semibold text-rose-600 transition-colors hover:text-rose-700 dark:text-rose-400 dark:hover:text-rose-300"
-            >
-              <X className="h-4 w-4" />
-              Unenroll from course
-            </button>
-          )}
-          </div>
+          </>
         )}
-          </div>
-        </>
-      )}
-    </div>
+
+        <div className="mt-auto flex items-center justify-between border-t border-slate-100 pt-3 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
+          <span>{course.estimatedHours ?? 0} study hours</span>
+          <span>{course.enrollmentCount ?? 0} learners</span>
+          <span className="inline-flex items-center gap-1">
+            {course.rating?.toFixed(1) ?? '—'}
+            <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+          </span>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2 border-t border-slate-100 px-4 py-3 dark:border-slate-800">
+        <button
+          type="button"
+          onClick={() => void openCourse()}
+          className="inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+        >
+          {isEnrolled && progress > 0 ? 'Continue learning' : isEnrolled ? 'Open class' : 'View class'}
+          <ChevronRight className="h-4 w-4" />
+        </button>
+        {isEnrolled && (
+          <button
+            type="button"
+            aria-label={`Open materials for ${courseName}`}
+            title="Course materials"
+            onClick={() => router.push(`/study-planner/materials?courseId=${encodeURIComponent(course.id)}&scope=enrolled`)}
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
+          >
+            <Layers className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+    </article>
   );
 };
 
