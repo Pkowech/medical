@@ -8,43 +8,49 @@ export const XAPI_VERBS = {
     id: 'http://adlnet.gov/expapi/verbs/launched',
     display: { 'en-US': 'launched' },
   },
-  
+
   /** User has initialized a learning component (e.g., entered a lesson/unit) */
   INITIALIZED: {
     id: 'http://adlnet.gov/expapi/verbs/initialized',
     display: { 'en-US': 'initialized' },
   },
-  
+
   /** User has completed a learning activity */
   COMPLETED: {
     id: 'http://adlnet.gov/expapi/verbs/completed',
     display: { 'en-US': 'completed' },
   },
-  
+
   /** User has experienced a learning object (e.g., viewed a material) */
   EXPERIENCED: {
     id: 'http://adlnet.gov/expapi/verbs/experienced',
     display: { 'en-US': 'experienced' },
   },
-  
+
+  /** User has downloaded a learning resource */
+  DOWNLOADED: {
+    id: 'http://adlnet.gov/expapi/verbs/downloaded',
+    display: { 'en-US': 'downloaded' },
+  },
+
   /** User has made progress in a learning activity */
   PROGRESSED: {
     id: 'http://adlnet.gov/expapi/verbs/progressed',
     display: { 'en-US': 'progressed' },
   },
-  
+
   /** User has attempted an assessment */
   ATTEMPTED: {
     id: 'http://adlnet.gov/expapi/verbs/attempted',
     display: { 'en-US': 'attempted' },
   },
-  
+
   /** User has passed an assessment */
   PASSED: {
     id: 'http://adlnet.gov/expapi/verbs/passed',
     display: { 'en-US': 'passed' },
   },
-  
+
   /** User has failed an assessment */
   FAILED: {
     id: 'http://adlnet.gov/expapi/verbs/failed',

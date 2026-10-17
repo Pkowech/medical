@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -17,6 +17,7 @@ import useMaterialProgressTracker from '@/features/learning-management/hooks/use
 import { Material, MaterialType } from '@/shared/types/materialInterface';
 import URLS from '@/lib/urls';
 import { offlineService } from '@/lib/core/offline/offlineService';
+import { useXapi } from '@/lib/xapi/useXapi';
 
 interface MaterialPreviewModalProps {
   materialId: string | null;
@@ -27,6 +28,7 @@ interface MaterialPreviewModalProps {
   inline?: boolean;
   topicId?: string;
   userId?: string;
+  studySessionId?: string;
   fallbackMaterial?: Material;
 }
 
@@ -39,6 +41,7 @@ export const MaterialPreviewModal = ({
   inline = false,
   topicId,
   userId,
+  studySessionId,
   fallbackMaterial,
 }: MaterialPreviewModalProps) => {
   const [material, setMaterial] = useState<Material | null>(null);
@@ -47,6 +50,16 @@ export const MaterialPreviewModal = ({
   const [pdfNumPages, setPdfNumPages] = useState<number | null>(null);
   const [pdfContent, setPdfContent] = useState<Uint8Array | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const trackedViewKeyRef = useRef<string | null>(null);
+  const xapiContext = useMemo(() => ({
+    extensions: {
+      [URLS.XAPI_EXTENSIONS.COURSE_ID]: material?.courseId,
+      [URLS.XAPI_EXTENSIONS.UNIT_ID]: material?.unitId,
+      [URLS.XAPI_EXTENSIONS.TOPIC_ID]: material?.topicId,
+      [URLS.XAPI_EXTENSIONS.STUDY_SESSION_ID]: studySessionId,
+    },
+  }), [material?.courseId, material?.topicId, material?.unitId, studySessionId]);
+  const { trackAction, XAPI_VERBS } = useXapi(xapiContext);
 
   useEffect(() => {
     if (isOpen && materialId) {
@@ -123,6 +136,25 @@ export const MaterialPreviewModal = ({
     }
   }, [isOpen, materialId, topicId, userId, fallbackMaterial]);
 
+  useEffect(() => {
+    if (!isOpen) {
+      trackedViewKeyRef.current = null;
+      return;
+    }
+    if (!material || String(material.id) !== String(materialId)) return;
+
+    const trackingKey = `${studySessionId ?? ''}:${material.id}`;
+    if (trackedViewKeyRef.current === trackingKey) return;
+    trackedViewKeyRef.current = trackingKey;
+    void trackAction(XAPI_VERBS.EXPERIENCED, {
+      id: `${URLS.BASE}/materials/${material.id}`,
+      definition: {
+        name: { 'en-US': material.title },
+        type: 'http://adlnet.gov/expapi/activities/media',
+      },
+    }, undefined, xapiContext);
+  }, [isOpen, material, materialId, studySessionId, trackAction, XAPI_VERBS, xapiContext]);
+
   const computePercent = useCallback(() => {
     if (material?.type === 'pdf' && pdfNumPages && pdfNumPages > 0) {
       return Math.round((pdfCurrentPage / pdfNumPages) * 100);
@@ -133,7 +165,11 @@ export const MaterialPreviewModal = ({
 
   const { startTracking, stopTracking } = useMaterialProgressTracker({
     materialId: material?.id,
+    topicId: material?.topicId,
     unitId: material?.unitId ? String(material.unitId) : undefined,
+    courseId: material?.courseId,
+    studySessionId,
+    materialTitle: material?.title,
     computePercent,
     intervalMs: 120000,
   });
@@ -152,6 +188,23 @@ export const MaterialPreviewModal = ({
   const navigateMaterial = (offset: number) => {
     const nextMaterial = materials[materialIndex + offset];
     if (nextMaterial) onNavigate?.(String(nextMaterial.id));
+  };
+
+  const trackDownload = () => {
+    if (!material) return;
+    void trackAction(XAPI_VERBS.DOWNLOADED, {
+      id: `${URLS.BASE}/materials/${material.id}`,
+      definition: {
+        name: { 'en-US': material.title },
+        type: 'http://adlnet.gov/expapi/activities/media',
+      },
+    }, undefined, xapiContext);
+  };
+
+  const downloadOriginal = () => {
+    if (!material?.fileUrl) return;
+    trackDownload();
+    window.open(material.fileUrl, '_blank', 'noopener,noreferrer');
   };
 
   const renderContent = () => {
@@ -279,7 +332,7 @@ export const MaterialPreviewModal = ({
               </>
             )}
             {material?.fileUrl && (
-              <Button type="button" variant="ghost" size="sm" onClick={() => window.open(material.fileUrl, '_blank')} title="Download">
+              <Button type="button" variant="ghost" size="sm" onClick={downloadOriginal} title="Download">
                 <Download className="h-4 w-4" />
               </Button>
             )}
@@ -359,7 +412,7 @@ export const MaterialPreviewModal = ({
               </>
             )}
             {material?.fileUrl && (
-              <Button variant="ghost" size="sm" onClick={() => window.open(material.fileUrl, '_blank')} title="Download">
+              <Button variant="ghost" size="sm" onClick={downloadOriginal} title="Download">
                 <Download className="h-4 w-4" />
               </Button>
             )}

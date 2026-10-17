@@ -68,7 +68,7 @@ export class MaterialsController {
         },
         courseId: {
           type: 'string',
-          description: 'Optional course placement. A course alone is appropriate for course-level resources such as textbooks.',
+          description: 'Required course placement. A course alone is appropriate for course-level resources such as textbooks.',
         },
         unitId: {
           type: 'string',
@@ -108,7 +108,7 @@ export class MaterialsController {
           description: 'Share this material with enrolled students in its course. Defaults to false.',
         },
       },
-      required: ['file', 'title'],
+      required: ['file', 'title', 'courseId'],
     },
   })
   async uploadFile(
@@ -148,12 +148,27 @@ export class MaterialsController {
 
   @Post('drive')
   @ApiOperation({ summary: 'Link a material from Google Drive to the signed-in user’s library' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        url: { type: 'string' },
+        title: { type: 'string' },
+        description: { type: 'string' },
+        courseId: { type: 'string', description: 'Required course placement.' },
+        unitId: { type: 'string', description: 'Optional unit within the course.' },
+        topicId: { type: 'string', description: 'Optional topic within the selected unit.' },
+        shareWithCourse: { type: 'boolean' },
+      },
+      required: ['url', 'title', 'courseId'],
+    },
+  })
   async registerDriveMaterial(
     @Body() dto: {
       url: string;
       title: string;
       description?: string;
-      courseId?: string;
+      courseId: string;
       unitId?: string;
       topicId?: string;
       shareWithCourse?: boolean;
@@ -219,14 +234,38 @@ export class MaterialsController {
   }
 
   @Post('drive/folder-link')
-  @ApiOperation({ summary: 'Link selected Drive folder files to course units and topics' })
+  @ApiOperation({ summary: 'Link selected Drive files to a course with optional unit/topic placement' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        items: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              fileId: { type: 'string' },
+              title: { type: 'string' },
+              description: { type: 'string' },
+              courseId: { type: 'string', description: 'Required course placement.' },
+              unitId: { type: 'string', description: 'Optional unit within the course.' },
+              topicId: { type: 'string', description: 'Optional topic within the selected unit.' },
+              shareWithCourse: { type: 'boolean' },
+            },
+            required: ['fileId', 'title', 'courseId'],
+          },
+        },
+      },
+      required: ['items'],
+    },
+  })
   async importDriveFolder(
     @Body('items')
     items: Array<{
       fileId: string;
       title: string;
       description?: string;
-      courseId?: string;
+      courseId: string;
       unitId?: string;
       topicId?: string;
       shareWithCourse?: boolean;
@@ -256,16 +295,16 @@ export class MaterialsController {
   @ApiBody({
     schema: {
       type: 'object',
-      required: ['sourceMaterialId', 'title'],
       properties: {
         sourceMaterialId: { type: 'string', description: 'ID of the existing material whose file to reuse' },
         title:           { type: 'string' },
         description:     { type: 'string' },
         topicId:         { type: 'string', description: 'Optional topic within the selected unit.' },
         unitId:          { type: 'string', description: 'Optional unit placement within the course.' },
-        courseId:        { type: 'string', description: 'Optional course placement.' },
+        courseId:        { type: 'string', description: 'Required course placement.' },
         type:            { type: 'string' },
       },
+      required: ['sourceMaterialId', 'title', 'courseId'],
     },
   })
   async attachExisting(
@@ -295,11 +334,27 @@ export class MaterialsController {
 
   @Post('external')
   @ApiOperation({ summary: 'Register an external resource (link, video, etc)' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string' },
+        url: { type: 'string' },
+        type: { type: 'string', enum: Object.values(MaterialType) },
+        courseId: { type: 'string', description: 'Required course placement.' },
+        unitId: { type: 'string', description: 'Optional unit within the course.' },
+        topicId: { type: 'string', description: 'Optional topic within the selected unit.' },
+        description: { type: 'string' },
+      },
+      required: ['title', 'url', 'type', 'courseId'],
+    },
+  })
   async registerExternalResource(
     @Body() dto: {
       title: string;
       url: string;
       type: MaterialType;
+      courseId: string;
       unitId?: string;
       topicId?: string;
       description?: string;
@@ -589,31 +644,60 @@ export class MaterialsController {
   )
   @ApiOperation({ summary: 'Convert a PPTX/slide file to PDF (async or sync)' })
   @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: { type: 'string', format: 'binary' },
+        courseId: { type: 'string', description: 'Required course placement.' },
+      },
+      required: ['file', 'courseId'],
+    },
+  })
   async convertToPdf(
     @UploadedFile() file: Express.Multer.File,
+    @Body('courseId') courseId: string,
     @GetUser() user: PrismaUser,
   ) {
     if (!file) {
       throw new BadRequestException('No file uploaded');
     }
-    return this.materialsService.convertToPdf(file, user.id);
+    if (!courseId?.trim()) {
+      throw new BadRequestException('Assign the converted material to a course.');
+    }
+    return this.materialsService.convertToPdf(file, user.id, courseId);
   }
 
   @Post('local/register')
   @ApiOperation({
     summary: 'Register a local file material (for mapping and tracking)',
   })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        hash: { type: 'string' },
+        filename: { type: 'string' },
+        mimetype: { type: 'string' },
+        size: { type: 'number' },
+        courseId: { type: 'string', description: 'Required course placement.' },
+        unitId: { type: 'string', description: 'Optional unit within the course.' },
+      },
+      required: ['hash', 'filename', 'mimetype', 'courseId'],
+    },
+  })
   async registerLocalMaterial(
     @Body('hash') hash: string,
     @Body('filename') filename: string,
     @Body('mimetype') mimetype: string,
     @Body('size') size: number,
+    @Body('courseId') courseId: string,
     @Body('unitId') unitId?: string,
     @GetUser() user?: PrismaUser,
   ) {
-    if (!hash || !filename || !mimetype) {
+    if (!hash || !filename || !mimetype || !courseId?.trim()) {
       throw new BadRequestException(
-        'hash, filename, and mimetype are required',
+        'hash, filename, mimetype, and courseId are required',
       );
     }
     return this.materialsService.registerLocalMaterial({
@@ -621,6 +705,7 @@ export class MaterialsController {
       filename,
       mimetype,
       size,
+      courseId,
       unitId,
       userId: user?.id,
     });

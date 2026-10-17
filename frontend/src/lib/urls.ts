@@ -46,6 +46,8 @@ export const URLS = {
   XAPI_EXTENSIONS: {
     COURSE_ID: `${BASE}/xapi/extensions/course-id`,
     UNIT_ID: `${BASE}/xapi/extensions/unit-id`,
+    TOPIC_ID: `${BASE}/xapi/extensions/topic-id`,
+    STUDY_SESSION_ID: `${BASE}/xapi/extensions/study-session-id`,
     PROGRESS: `${BASE}/xapi/extensions/progress`,
   },
   COURSE: (courseId: string) => `${BASE}/courses/${courseId}`,

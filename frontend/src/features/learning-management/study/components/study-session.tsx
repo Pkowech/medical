@@ -24,6 +24,8 @@ import type {
   StudySessionContext,
 } from '@/shared/types/studyInterface';
 import { toast } from 'sonner';
+import { useXapi } from '@/lib/xapi/useXapi';
+import { URLS } from '@/lib/urls';
 interface StudySessionProps {
   topicId?: string;
   context?: StudySessionContext;
@@ -48,6 +50,7 @@ export const StudySession: React.FC<StudySessionProps> = ({
   onSessionStarted,
 }) => {
   const { startSession, endSession } = useStudy();
+  const { trackAction, XAPI_VERBS } = useXapi();
   const userId = useAuthStore(state => state.user?.id);
   const studyContext = context ?? (topicId ? { type: 'topic' as const, id: topicId } : undefined);
   const studyCourseId = studyContext?.type === 'course' ? studyContext.id : undefined;
@@ -73,6 +76,46 @@ export const StudySession: React.FC<StudySessionProps> = ({
   const activeReadingRef = useRef<{ materialId: string; startedAtSeconds: number } | null>(null);
   const pauseStartedAtRef = useRef<number | null>(null);
   const pausedDurationMsRef = useRef(0);
+
+  const getSessionXapiContext = (activeSessionId: string, material?: Material) => {
+    const courseId = material?.courseId
+      ?? (studyContext?.type === 'course' ? studyContext.id : undefined);
+    const unitId = material?.unitId
+      ?? (studyContext?.type === 'unit' ? studyContext.id : undefined);
+    const topicId = material?.topicId
+      ?? (studyContext?.type === 'topic' ? studyContext.id : undefined);
+    const extensions: Record<string, unknown> = {
+      [URLS.XAPI_EXTENSIONS.STUDY_SESSION_ID]: activeSessionId,
+      [URLS.XAPI_EXTENSIONS.COURSE_ID]: courseId,
+      [URLS.XAPI_EXTENSIONS.UNIT_ID]: unitId,
+      [URLS.XAPI_EXTENSIONS.TOPIC_ID]: topicId,
+    };
+
+    return {
+      extensions,
+      ...(courseId
+        ? {
+            contextActivities: {
+              parent: [{
+                id: URLS.COURSE(courseId),
+                definition: {
+                  name: { 'en-US': `Course ${courseId}` },
+                  type: 'http://adlnet.gov/expapi/activities/course',
+                },
+              }],
+            },
+          }
+        : {}),
+    };
+  };
+
+  const studySessionXapiObject = (activeSessionId: string) => ({
+    id: `${URLS.BASE}/study-sessions/${activeSessionId}`,
+    definition: {
+      name: { 'en-US': contextLabel || 'Study session' },
+      type: 'http://adlnet.gov/expapi/activities/session',
+    },
+  });
 
   useEffect(() => {
     elapsedTimeRef.current = elapsedTime;
@@ -155,6 +198,12 @@ export const StudySession: React.FC<StudySessionProps> = ({
       if (session) {
         setSessionId(session.id);
         setIsActive(true);
+        void trackAction(
+          XAPI_VERBS.LAUNCHED,
+          studySessionXapiObject(session.id),
+          undefined,
+          getSessionXapiContext(session.id),
+        );
         onSessionStarted?.();
       } else {
         setSessionError('Could not start this session. Please try again.');
@@ -270,6 +319,15 @@ export const StudySession: React.FC<StudySessionProps> = ({
         sessionActivities,
         elapsedTime,
         getPausedDurationSeconds(),
+      );
+      void trackAction(
+        XAPI_VERBS.COMPLETED,
+        studySessionXapiObject(sessionId),
+        {
+          completion: true,
+          duration: `PT${elapsedTime}S`,
+        },
+        getSessionXapiContext(sessionId),
       );
       const durationLabel = `${endedSession.duration ?? Math.floor(elapsedTime / 60)} min`;
       if (endedSession.isValid) {
@@ -392,6 +450,7 @@ export const StudySession: React.FC<StudySessionProps> = ({
                 inline
                 topicId={courseMaterials.find(item => String(item.id) === selectedMaterialId)?.topicId}
                 userId={userId}
+                studySessionId={sessionId ?? undefined}
                 fallbackMaterial={courseMaterials.find(item => String(item.id) === selectedMaterialId)}
               />
             </div>
@@ -638,6 +697,7 @@ export const StudySession: React.FC<StudySessionProps> = ({
           onNavigate={openMaterial}
           topicId={courseMaterials.find(item => String(item.id) === selectedMaterialId)?.topicId}
           userId={userId}
+          studySessionId={sessionId ?? undefined}
           fallbackMaterial={courseMaterials.find(item => String(item.id) === selectedMaterialId)}
         />
       )}

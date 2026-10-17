@@ -98,7 +98,7 @@ export default function MaterialViewPage() {
             name: { 'en-US': data.title },
             type: 'http://adlnet.gov/expapi/activities/media',
           },
-        });
+        }, undefined, getMaterialXapiContext(data));
       } catch (err) {
         console.error('Error fetching material:', err);
         setError('Failed to load material. Please try again.');
@@ -131,9 +131,31 @@ export default function MaterialViewPage() {
   const { startTracking, stopTracking, isTracking } = useMaterialProgressTracker({
     materialId: material?.id,
     unitId: material?.unitId ? String(material.unitId) : undefined,
+    topicId: material?.topicId,
+    courseId: material?.courseId,
+    materialTitle: material?.title,
     computePercent,
     intervalMs: 30000,
   });
+
+  const getMaterialXapiContext = (currentMaterial: Material) => ({
+    extensions: {
+      [URLS.XAPI_EXTENSIONS.COURSE_ID]: currentMaterial.courseId,
+      [URLS.XAPI_EXTENSIONS.UNIT_ID]: currentMaterial.unitId,
+      [URLS.XAPI_EXTENSIONS.TOPIC_ID]: currentMaterial.topicId,
+    },
+  });
+
+  const trackMaterialDownload = () => {
+    if (!material) return;
+    void trackAction(XAPI_VERBS.DOWNLOADED, {
+      id: `${URLS.BASE}/materials/${material.id}`,
+      definition: {
+        name: { 'en-US': material.title },
+        type: 'http://adlnet.gov/expapi/activities/media',
+      },
+    }, undefined, getMaterialXapiContext(material));
+  };
 
   useEffect(() => {
     if (material && !isTracking) {
@@ -324,7 +346,15 @@ export default function MaterialViewPage() {
                   <Maximize2 className="mr-2 h-4 w-4" /> Focus
                 </Button>
                 {(material.fileUrl || material.url) && (
-                  <Button variant="outline" size="sm" onClick={() => window.open(material.fileUrl || material.url, '_blank', 'noopener,noreferrer')} className="rounded-lg">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      trackMaterialDownload();
+                      window.open(material.fileUrl || material.url, '_blank', 'noopener,noreferrer');
+                    }}
+                    className="rounded-lg"
+                  >
                     <Download className="mr-2 h-4 w-4" /> Download Original
                   </Button>
                 )}
@@ -368,7 +398,13 @@ export default function MaterialViewPage() {
                       </Button>
                       {(material.fileUrl || material.url) && (
                         <Button variant="outline" size="icon" asChild>
-                          <a href={material.fileUrl || material.url} target="_blank" rel="noopener noreferrer" aria-label="Open original file">
+                          <a
+                            href={material.fileUrl || material.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-label="Open original file"
+                            onClick={trackMaterialDownload}
+                          >
                             <ExternalLink className="h-4 w-4" />
                           </a>
                         </Button>

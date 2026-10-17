@@ -17,7 +17,11 @@ type DriveTopic = Topic & { slug?: string };
 type Placement = { courseId: string; unitId: string; topicId: string };
 
 const normalizeFolderName = (value: string) =>
-  value.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  value
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
 
 const unitList = (course?: DriveCourse): DriveUnit[] =>
   (course?.units || course?.chapters || []) as DriveUnit[];
@@ -28,15 +32,13 @@ const topicList = (unit?: DriveUnit) =>
 const findMatchingValue = <T,>(
   names: string[],
   values: T[],
-  getNames: (value: T) => Array<string | null | undefined>,
+  getNames: (value: T) => Array<string | null | undefined>
 ) => {
   for (const name of names) {
     const normalized = normalizeFolderName(name);
     if (!normalized) continue;
     const match = values.find(value =>
-      getNames(value).some(candidate =>
-        candidate && normalizeFolderName(candidate) === normalized,
-      ),
+      getNames(value).some(candidate => candidate && normalizeFolderName(candidate) === normalized)
     );
     if (match) return match;
   }
@@ -48,16 +50,15 @@ const handleConnect = async () => {
     const authorizationUrl = await materialService.getGoogleDriveAuthorizationUrl();
     window.location.assign(authorizationUrl);
   } catch (error) {
-    toast.error(error instanceof Error ? error.message : 'Could not start Google Drive connection.');
+    toast.error(
+      error instanceof Error ? error.message : 'Could not start Google Drive connection.'
+    );
   }
 };
 
-const matchTopicFromFileName = (
-  filename: string,
-  topics: Array<DriveTopic | Lesson>,
-) => {
+const matchTopicFromFileName = (filename: string, topics: Array<DriveTopic | Lesson>) => {
   const fileTitle = normalizeFolderName(
-    filename.replace(/\.[^.]+$/, '').replace(/^\s*\d+[\s.)-]*/, ''),
+    filename.replace(/\.[^.]+$/, '').replace(/^\s*\d+[\s.)-]*/, '')
   );
   if (!fileTitle) return undefined;
   const matches = topics.filter(topic => {
@@ -68,10 +69,7 @@ const matchTopicFromFileName = (
     ].filter((name): name is string => Boolean(name));
     return names.some(name => {
       const normalized = normalizeFolderName(name);
-      return normalized.length > 5 && (
-        normalized === fileTitle ||
-        fileTitle.includes(normalized)
-      );
+      return normalized.length > 5 && (normalized === fileTitle || fileTitle.includes(normalized));
     });
   });
   return matches.length === 1 ? matches[0] : undefined;
@@ -80,14 +78,12 @@ const matchTopicFromFileName = (
 interface DriveFolderImportProps {
   courses: Course[];
   isLoadingCourses: boolean;
-  allowCoursePlacement?: boolean;
   allowCourseSharing?: boolean;
 }
 
 export default function DriveFolderImport({
   courses,
   isLoadingCourses,
-  allowCoursePlacement = true,
   allowCourseSharing = true,
 }: DriveFolderImportProps) {
   const router = useRouter();
@@ -109,13 +105,16 @@ export default function DriveFolderImport({
 
   useEffect(() => {
     let cancelled = false;
-    materialService.getGoogleDriveConnectionStatus()
+    materialService
+      .getGoogleDriveConnectionStatus()
       .then(status => {
         if (!cancelled) setDriveConnected(status.connected);
       })
       .catch(error => {
         if (!cancelled) {
-          toast.error(error instanceof Error ? error.message : 'Could not check Google Drive connection.');
+          toast.error(
+            error instanceof Error ? error.message : 'Could not check Google Drive connection.'
+          );
         }
       })
       .finally(() => {
@@ -127,7 +126,9 @@ export default function DriveFolderImport({
   }, []);
 
   const handleDisconnect = async () => {
-    if (!window.confirm('Disconnect Google Drive? Drive links you own may stop opening in MedTrack.')) {
+    if (
+      !window.confirm('Disconnect Google Drive? Drive links you own may stop opening in MedTrack.')
+    ) {
       return;
     }
     try {
@@ -158,14 +159,17 @@ export default function DriveFolderImport({
     if (pending) return pending;
 
     setLoadingCourseIds(previous => new Set(previous).add(courseId));
-    const request = courseService.getCourseById(courseId)
+    const request = courseService
+      .getCourseById(courseId)
       .then(course => {
         const structure = course as DriveCourse;
         setCourseStructures(previous => ({ ...previous, [courseId]: structure }));
         return structure;
       })
       .catch(error => {
-        toast.error(error instanceof Error ? error.message : 'Could not load this course structure.');
+        toast.error(
+          error instanceof Error ? error.message : 'Could not load this course structure.'
+        );
         return null;
       })
       .finally(() => {
@@ -207,77 +211,72 @@ export default function DriveFolderImport({
       const result = await materialService.previewGoogleDriveFolder(folderUrl.trim());
       const nextPlacements: Record<string, Placement> = {};
       const nextFileTopics: Record<string, string> = {};
-      if (!allowCoursePlacement) {
-        for (const folderPath of new Set(result.files.map(file => file.folderPath))) {
-          nextPlacements[folderPath] = { courseId: '', unitId: '', topicId: '' };
+      const candidateCourses = new Map<
+        string,
+        { course: Course; segmentIndex: number; segments: string[] }
+      >();
+
+      for (const group of new Map(
+        result.files.map(file => [file.folderPath, file.folderPath])
+      ).values()) {
+        const pathSegments = [result.folderName, ...group.split('/').filter(Boolean)];
+        const match = findCourse(pathSegments);
+        if (match) {
+          candidateCourses.set(group, {
+            course: match.course,
+            segmentIndex: match.segmentIndex,
+            segments: pathSegments,
+          });
+        } else {
+          nextPlacements[group] = { courseId: '', unitId: '', topicId: '' };
         }
       }
-      const candidateCourses = new Map<string, { course: Course; segmentIndex: number; segments: string[] }>();
 
-      if (allowCoursePlacement) {
-        for (const group of new Map(
-          result.files.map(file => [file.folderPath, file.folderPath]),
-        ).values()) {
-          const pathSegments = [
-            result.folderName,
-            ...group.split('/').filter(Boolean),
-          ];
-          const match = findCourse(pathSegments);
-          if (match) {
-            candidateCourses.set(group, {
-              course: match.course,
-              segmentIndex: match.segmentIndex,
-              segments: pathSegments,
-            });
-          } else {
-            nextPlacements[group] = { courseId: '', unitId: '', topicId: '' };
+      const structuresByCourse = new Map<string, DriveCourse>();
+      await Promise.all(
+        Array.from(new Set(Array.from(candidateCourses.values(), value => value.course.id))).map(
+          async courseId => {
+            const structure = await loadCourseStructure(courseId);
+            if (structure) structuresByCourse.set(courseId, structure);
+          }
+        )
+      );
+
+      for (const [folderPath, candidate] of candidateCourses) {
+        const structure = structuresByCourse.get(candidate.course.id);
+        const laterSegments = candidate.segments.slice(candidate.segmentIndex + 1);
+        const matchedUnit = findMatchingValue(laterSegments, unitList(structure), unit => [
+          unit.slug,
+          unit.title,
+          unit.name,
+        ]);
+        let matchedFolderTopic: DriveTopic | Lesson | undefined;
+        if (matchedUnit) {
+          const unitIndex = laterSegments.findIndex(segment =>
+            [matchedUnit.slug, matchedUnit.title, matchedUnit.name].some(
+              name => name && normalizeFolderName(name) === normalizeFolderName(segment)
+            )
+          );
+          matchedFolderTopic = findMatchingValue(
+            laterSegments.slice(unitIndex + 1),
+            topicList(matchedUnit),
+            topic => [
+              (topic as DriveTopic).slug,
+              topic.title,
+              'name' in topic ? topic.name : undefined,
+            ]
+          );
+          for (const file of result.files.filter(item => item.folderPath === folderPath)) {
+            const matchedTopic =
+              matchedFolderTopic ?? matchTopicFromFileName(file.name, topicList(matchedUnit));
+            if (matchedTopic) nextFileTopics[file.id] = String(matchedTopic.id);
           }
         }
-
-        const structuresByCourse = new Map<string, DriveCourse>();
-        await Promise.all(
-          Array.from(new Set(Array.from(candidateCourses.values(), value => value.course.id)))
-            .map(async courseId => {
-              const structure = await loadCourseStructure(courseId);
-              if (structure) structuresByCourse.set(courseId, structure);
-            }),
-        );
-
-        for (const [folderPath, candidate] of candidateCourses) {
-          const structure = structuresByCourse.get(candidate.course.id);
-          const laterSegments = candidate.segments.slice(candidate.segmentIndex + 1);
-          const matchedUnit = findMatchingValue(laterSegments, unitList(structure), unit => [
-            unit.slug,
-            unit.title,
-            unit.name,
-          ]);
-          let matchedFolderTopic: DriveTopic | Lesson | undefined;
-          if (matchedUnit) {
-            const unitIndex = laterSegments.findIndex(segment =>
-              [matchedUnit.slug, matchedUnit.title, matchedUnit.name]
-                .some(name => name && normalizeFolderName(name) === normalizeFolderName(segment)),
-            );
-            matchedFolderTopic = findMatchingValue(
-              laterSegments.slice(unitIndex + 1),
-              topicList(matchedUnit),
-              topic => [
-                (topic as DriveTopic).slug,
-                topic.title,
-                'name' in topic ? topic.name : undefined,
-              ],
-            );
-            for (const file of result.files.filter(item => item.folderPath === folderPath)) {
-              const matchedTopic = matchedFolderTopic
-                ?? matchTopicFromFileName(file.name, topicList(matchedUnit));
-              if (matchedTopic) nextFileTopics[file.id] = String(matchedTopic.id);
-            }
-          }
-          nextPlacements[folderPath] = {
-            courseId: candidate.course.id,
-            unitId: matchedUnit ? String(matchedUnit.id) : '',
-            topicId: '',
-          };
-        }
+        nextPlacements[folderPath] = {
+          courseId: candidate.course.id,
+          unitId: matchedUnit ? String(matchedUnit.id) : '',
+          topicId: '',
+        };
       }
 
       setPreview(result);
@@ -343,21 +342,19 @@ export default function DriveFolderImport({
     });
   };
 
-  const selectedFiles = preview?.files.filter(
-    file => selectedFileIds.has(file.id) && file.supported,
-  ) ?? [];
+  const selectedFiles =
+    preview?.files.filter(file => selectedFileIds.has(file.id) && file.supported) ?? [];
   const invalidSelectedFiles = groups.filter(group => {
     const placement = placements[group.folderPath];
     const selected = group.files.filter(file => selectedFileIds.has(file.id) && file.supported);
-    return selected.length > 0 && (
-      (Boolean(placement?.unitId) && !placement?.courseId) ||
-      (selected.some(file => Boolean(fileTopics[file.id])) && !placement?.unitId)
+    return (
+      selected.length > 0 &&
+      (!placement?.courseId ||
+        (Boolean(placement?.unitId) && !placement?.courseId) ||
+        (selected.some(file => Boolean(fileTopics[file.id])) && !placement?.unitId))
     );
   });
-  const importDisabled =
-    isLinking ||
-    selectedFiles.length === 0 ||
-    invalidSelectedFiles.length > 0;
+  const importDisabled = isLinking || selectedFiles.length === 0 || invalidSelectedFiles.length > 0;
 
   const handleImport = async () => {
     if (importDisabled) return;
@@ -366,12 +363,12 @@ export default function DriveFolderImport({
     setLinkProgress({ completed: 0, total: selectedFiles.length });
     try {
       const items = selectedFiles.map(file => ({
-          fileId: file.id,
-          title: file.name.replace(/\.[^.]+$/, ''),
-          courseId: allowCoursePlacement ? placements[file.folderPath]?.courseId : undefined,
-          unitId: allowCoursePlacement ? placements[file.folderPath]?.unitId : undefined,
-          topicId: allowCoursePlacement ? fileTopics[file.id] || undefined : undefined,
-          shareWithCourse: allowCourseSharing && shareWithCourse,
+        fileId: file.id,
+        title: file.name.replace(/\.[^.]+$/, ''),
+        courseId: placements[file.folderPath]?.courseId ?? '',
+        unitId: placements[file.folderPath]?.unitId || undefined,
+        topicId: fileTopics[file.id] || undefined,
+        shareWithCourse: allowCourseSharing && shareWithCourse,
       }));
       const results: DriveFolderImportResult['results'] = [];
       for (let offset = 0; offset < items.length; offset += 200) {
@@ -392,10 +389,14 @@ export default function DriveFolderImport({
       };
       setImportResult(result);
       if (result.failed === 0) {
-        toast.success(`${result.linked} linked from Drive; ${result.alreadyLinked} already linked.`);
+        toast.success(
+          `${result.linked} linked from Drive; ${result.alreadyLinked} already linked.`
+        );
         router.push('/study-planner/materials');
       } else {
-        toast.error(`${result.failed} file${result.failed === 1 ? '' : 's'} could not be linked. Review the results below.`);
+        toast.error(
+          `${result.failed} file${result.failed === 1 ? '' : 's'} could not be linked. Review the results below.`
+        );
       }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Drive folder link failed.');
@@ -413,16 +414,21 @@ export default function DriveFolderImport({
           </div>
           <div>
             <h2 className="font-semibold text-slate-900 dark:text-white">
-              {allowCourseSharing ? 'Link a Year or subject folder' : 'Link a personal Drive folder'}
+              {allowCourseSharing
+                ? 'Link a Year or subject folder'
+                : 'Link a personal Drive folder'}
             </h2>
             <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
               {allowCourseSharing
-                ? 'Preview files, then optionally place folders at course, unit, or topic level. Course codes are matched automatically; review unit and topic suggestions before linking.'
-                : 'Link personal Drive files and optionally organize them under a course you are enrolled in. These links remain private to you and are not copied to MedTrack storage.'}
+                ? 'Preview files and assign each folder to a course. Course codes are matched automatically; review optional unit and topic suggestions before linking.'
+                : 'Link personal Drive files to a course you are enrolled in. These links remain private to you and are not copied to MedTrack storage.'}
             </p>
           </div>
         </div>
-        <label htmlFor="drive-folder-url" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+        <label
+          htmlFor="drive-folder-url"
+          className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300"
+        >
           Google Drive folder link
         </label>
         <div className="flex flex-col gap-3 sm:flex-row">
@@ -437,15 +443,20 @@ export default function DriveFolderImport({
           <button
             type="button"
             onClick={handlePreview}
-            disabled={isPreviewing || isCheckingConnection || !driveConnected || (allowCoursePlacement && isLoadingCourses)}
+            disabled={isPreviewing || isCheckingConnection || !driveConnected || isLoadingCourses}
             className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {isPreviewing ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <FolderOpen className="h-4 w-4" />}
+            {isPreviewing ? (
+              <LoaderCircle className="h-4 w-4 animate-spin" />
+            ) : (
+              <FolderOpen className="h-4 w-4" />
+            )}
             {isPreviewing ? 'Scanning folder…' : 'Preview files'}
           </button>
         </div>
         <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-          Files stay in your Google Drive. Only PDFs and Google Docs, Sheets, and Slides can be linked; scan up to 500 files per folder.
+          Files stay in your Google Drive. Only PDFs and Google Docs, Sheets, and Slides can be
+          linked; scan up to 500 files per folder.
         </p>
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-slate-50 p-3 dark:bg-slate-800/70">
           <p className="text-sm text-slate-700 dark:text-slate-300" role="status">
@@ -482,28 +493,40 @@ export default function DriveFolderImport({
             <div>
               <h3 className="font-semibold text-slate-900 dark:text-white">{preview.folderName}</h3>
               <p className="text-sm text-slate-500 dark:text-slate-400">
-                {preview.files.filter(file => file.supported).length} supported of {preview.files.length} files · {selectedFiles.length} selected
+                {preview.files.filter(file => file.supported).length} supported of{' '}
+                {preview.files.length} files · {selectedFiles.length} selected
               </p>
             </div>
-            {allowCourseSharing && <label className="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
-              <input
-                type="checkbox"
-                checked={shareWithCourse}
-                disabled={selectedFiles.length === 0 || selectedFiles.some(file => !placements[file.folderPath]?.courseId)}
-                onChange={event => setShareWithCourse(event.target.checked)}
-                className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-              />
-              Share these Drive links with enrolled students
-            </label>}
+            {allowCourseSharing && (
+              <label className="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+                <input
+                  type="checkbox"
+                  checked={shareWithCourse}
+                  disabled={
+                    selectedFiles.length === 0 ||
+                    selectedFiles.some(file => !placements[file.folderPath]?.courseId)
+                  }
+                  onChange={event => setShareWithCourse(event.target.checked)}
+                  className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                />
+                Share these Drive links with enrolled students
+              </label>
+            )}
           </div>
 
           {groups.map(group => {
-            const placement = placements[group.folderPath] ?? { courseId: '', unitId: '', topicId: '' };
+            const placement = placements[group.folderPath] ?? {
+              courseId: '',
+              unitId: '',
+              topicId: '',
+            };
             const structure = courseStructures[placement.courseId];
             const availableUnits = unitList(structure);
             const selectedUnit = availableUnits.find(unit => String(unit.id) === placement.unitId);
             const availableTopics = topicList(selectedUnit);
-            const groupHasSelectedFiles = group.files.some(file => selectedFileIds.has(file.id) && file.supported);
+            const groupHasSelectedFiles = group.files.some(
+              file => selectedFileIds.has(file.id) && file.supported
+            );
 
             return (
               <section
@@ -516,35 +539,55 @@ export default function DriveFolderImport({
                       <FolderOpen className="mr-2 inline h-4 w-4 text-amber-500" />
                       {group.folderPath || '(files directly in selected folder)'}
                     </h4>
-                    <span className="shrink-0 text-xs text-slate-500">{group.files.length} files</span>
+                    <span className="shrink-0 text-xs text-slate-500">
+                      {group.files.length} files
+                    </span>
                   </div>
-                  {allowCoursePlacement && groupHasSelectedFiles && (
+                  {groupHasSelectedFiles && (
                     <div className="mt-3 grid gap-3 md:grid-cols-2">
                       <label className="text-xs font-medium text-slate-600 dark:text-slate-300">
                         Course
                         <select
                           value={placement.courseId}
-                          onChange={event => void handleCourseChange(group.folderPath, event.target.value)}
+                          onChange={event =>
+                            void handleCourseChange(group.folderPath, event.target.value)
+                          }
+                          required
                           className="mt-1 block w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
                         >
-                          <option value="">My Drive — no course</option>
+                          <option value="">Select a course (required)</option>
                           {courses.map(course => (
                             <option key={course.id} value={course.id}>
-                              {course.code ? `${course.code} — ` : ''}{course.title || course.name}
+                              {course.code ? `${course.code} — ` : ''}
+                              {course.title || course.name}
                             </option>
                           ))}
                         </select>
+                        {!placement.courseId && (
+                          <span
+                            role="alert"
+                            className="mt-1 block text-xs text-red-600 dark:text-red-400"
+                          >
+                            Choose a course before importing selected files from this folder.
+                          </span>
+                        )}
                       </label>
                       <label className="text-xs font-medium text-slate-600 dark:text-slate-300">
                         Unit
                         <select
                           value={placement.unitId}
-                          disabled={!placement.courseId || loadingCourseIds.has(placement.courseId) || availableUnits.length === 0}
+                          disabled={
+                            !placement.courseId ||
+                            loadingCourseIds.has(placement.courseId) ||
+                            availableUnits.length === 0
+                          }
                           onChange={event => handleUnitChange(group.folderPath, event.target.value)}
                           className="mt-1 block w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-900 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
                         >
                           <option value="">
-                            {loadingCourseIds.has(placement.courseId) ? 'Loading units…' : 'Choose unit…'}
+                            {loadingCourseIds.has(placement.courseId)
+                              ? 'Loading units…'
+                              : 'Choose unit…'}
                           </option>
                           {availableUnits.map(unit => (
                             <option key={unit.id} value={String(unit.id)}>
@@ -569,10 +612,14 @@ export default function DriveFolderImport({
                       />
                       <FileText className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-100">{file.name}</p>
+                        <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-100">
+                          {file.name}
+                        </p>
                         <p className="text-xs text-slate-500">
                           {file.size ? `${(file.size / (1024 * 1024)).toFixed(1)} MB · ` : ''}
-                          {file.supported ? file.mimeType.replace('application/vnd.google-apps.', 'Google ') : 'Unsupported file type'}
+                          {file.supported
+                            ? file.mimeType.replace('application/vnd.google-apps.', 'Google ')
+                            : 'Unsupported file type'}
                         </p>
                         {file.supported && placement.unitId && (
                           <label className="mt-2 block max-w-lg text-xs font-medium text-slate-600 dark:text-slate-300">
@@ -580,16 +627,20 @@ export default function DriveFolderImport({
                             <select
                               value={fileTopics[file.id] ?? ''}
                               disabled={isLinking || availableTopics.length === 0}
-                              onChange={event => setFileTopics(previous => ({
-                                ...previous,
-                                [file.id]: event.target.value,
-                              }))}
+                              onChange={event =>
+                                setFileTopics(previous => ({
+                                  ...previous,
+                                  [file.id]: event.target.value,
+                                }))
+                              }
                               className="mt-1 block w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-900 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
                             >
                               <option value="">No topic / unit-level material</option>
                               {availableTopics.map(topic => (
                                 <option key={topic.id} value={String(topic.id)}>
-                                  {topic.title || ('name' in topic ? topic.name : undefined) || String(topic.id)}
+                                  {topic.title ||
+                                    ('name' in topic ? topic.name : undefined) ||
+                                    String(topic.id)}
                                 </option>
                               ))}
                             </select>
@@ -597,9 +648,14 @@ export default function DriveFolderImport({
                         )}
                       </div>
                       {file.supported && (placement.courseId || !placement.unitId) && (
-                        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" aria-label="Mapped" />
+                        <CheckCircle2
+                          className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500"
+                          aria-label="Mapped"
+                        />
                       )}
-                      {!file.supported && <span className="shrink-0 text-xs text-slate-400">Not supported</span>}
+                      {!file.supported && (
+                        <span className="shrink-0 text-xs text-slate-400">Not supported</span>
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -608,26 +664,41 @@ export default function DriveFolderImport({
           })}
 
           {invalidSelectedFiles.length > 0 && (
-            <p role="status" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
-              Choose a course before assigning a unit, and a unit before assigning a topic. Course-level and private My Drive links do not need a unit. Course codes such as PPA 511 match regardless of spaces or letter case; map unknown unit/topic codes here.
+            <p
+              role="status"
+              className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-950/30 dark:text-amber-200"
+            >
+              Choose a course before assigning a unit, and a unit before assigning a topic.
+              Course-level and private My Drive links do not need a unit. Course codes such as PPA
+              511 match regardless of spaces or letter case; map unknown unit/topic codes here.
             </p>
           )}
           {importResult && importResult.results.some(result => result.status === 'failed') && (
-            <div role="status" className="rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-900 dark:bg-red-950/30">
+            <div
+              role="status"
+              className="rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-900 dark:bg-red-950/30"
+            >
               <p className="font-medium text-red-800 dark:text-red-200">
-                Linked {importResult.linked}; already linked {importResult.alreadyLinked}; failed {importResult.failed}.
+                Linked {importResult.linked}; already linked {importResult.alreadyLinked}; failed{' '}
+                {importResult.failed}.
               </p>
               <ul className="mt-2 space-y-1 text-sm text-red-700 dark:text-red-300">
-                {importResult.results.filter(result => result.status === 'failed').map(result => (
-                  <li key={result.fileId}>{result.title}: {result.error}</li>
-                ))}
+                {importResult.results
+                  .filter(result => result.status === 'failed')
+                  .map(result => (
+                    <li key={result.fileId}>
+                      {result.title}: {result.error}
+                    </li>
+                  ))}
               </ul>
             </div>
           )}
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Files stay in Google Drive; MedTrack stores references and reads them through the configured Drive connection. Nothing is copied to MedTrack storage. Links remain private in MedTrack by default; sharing is optional.
+              Files stay in Google Drive; MedTrack stores references and reads them through the
+              configured Drive connection. Nothing is copied to MedTrack storage. Links remain
+              private in MedTrack by default; sharing is optional.
             </p>
             <button
               type="button"
@@ -635,7 +706,11 @@ export default function DriveFolderImport({
               disabled={importDisabled}
               className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {isLinking ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+              {isLinking ? (
+                <LoaderCircle className="h-4 w-4 animate-spin" />
+              ) : (
+                <Upload className="h-4 w-4" />
+              )}
               {isLinking
                 ? `Linking ${linkProgress.completed} of ${linkProgress.total}…`
                 : `Link ${selectedFiles.length} Drive file${selectedFiles.length === 1 ? '' : 's'}`}

@@ -136,7 +136,7 @@ const materialService = {
     url: string;
     title: string;
     description?: string;
-    courseId?: string;
+    courseId: string;
     unitId?: string;
     topicId?: string;
     shareWithCourse?: boolean;
@@ -171,7 +171,7 @@ const materialService = {
       fileId: string;
       title: string;
       description?: string;
-      courseId?: string;
+      courseId: string;
       unitId?: string;
       topicId?: string;
       shareWithCourse?: boolean;

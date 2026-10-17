@@ -10,12 +10,23 @@ type Options = {
   topicId?: string | null;
   unitId?: string | null;
   courseId?: string | null;
+  studySessionId?: string | null;
+  materialTitle?: string;
   computePercent?: () => number; // optional callback to compute current progress percent (0-100)
   intervalMs?: number; // how often to send updates
 };
 
 export default function useMaterialProgressTracker(options: Options) {
-  const { materialId, topicId, unitId, courseId, computePercent, intervalMs = 60000 } = options;
+  const {
+    materialId,
+    topicId,
+    unitId,
+    courseId,
+    studySessionId,
+    materialTitle,
+    computePercent,
+    intervalMs = 60000,
+  } = options;
   const [isTracking, setIsTracking] = useState(false);
   const timeStartedRef = useRef<number | null>(null);
   const intervalRef = useRef<number | null>(null);
@@ -116,13 +127,20 @@ export default function useMaterialProgressTracker(options: Options) {
           await trackAction(verb, {
             id: `${URLS.BASE}/materials/${materialId}`,
             definition: {
-              name: { 'en-US': `Material ${materialId}` },
+              name: { 'en-US': materialTitle || `Material ${materialId}` },
               type: 'http://adlnet.gov/expapi/activities/media',
             },
           }, {
             completion: percent >= 100,
             score: { scaled: percent / 100 },
             duration: `PT${unreportedMinutes}M`,
+          }, {
+            extensions: {
+              [URLS.XAPI_EXTENSIONS.COURSE_ID]: courseId,
+              [URLS.XAPI_EXTENSIONS.UNIT_ID]: unitId,
+              [URLS.XAPI_EXTENSIONS.TOPIC_ID]: topicId,
+              [URLS.XAPI_EXTENSIONS.STUDY_SESSION_ID]: studySessionId,
+            },
           });
         } catch (err) {
           console.error('Failed to track material progress in xAPI', err);
@@ -132,7 +150,7 @@ export default function useMaterialProgressTracker(options: Options) {
       sendInFlightRef.current = null;
       finishSend();
     }
-  }, [courseId, materialId, topicId, trackAction, unitId, XAPI_VERBS]);
+  }, [courseId, materialId, materialTitle, studySessionId, topicId, trackAction, unitId, XAPI_VERBS]);
 
   const computeCurrentPercent = useCallback((): number => {
     const currentComputePercent = computePercentRef.current;

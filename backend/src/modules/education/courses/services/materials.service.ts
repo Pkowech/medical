@@ -48,6 +48,7 @@ export interface RegisterExternalResourceDto {
   title: string;
   url: string;
   type: MaterialType;
+  courseId: string;
   description?: string;
   unitId?: string;
   topicId?: string;
@@ -348,12 +349,23 @@ export class MaterialsService {
 
   async create(material: Partial<Material>): Promise<Material> {
     try {
+      const courseId = material.courseId?.trim();
+      if (!courseId) {
+        throw new BadRequestException('Assign this material to a course.');
+      }
+      await this.validateMaterialPlacement(
+        courseId,
+        material.unitId ?? undefined,
+        material.topicId ?? undefined,
+      );
       const newMaterial = await this.prisma.material.create({
         data: {
           title: material.title || 'Untitled',
           type: material.type || MaterialType.other,
           fileId: material.fileId,
-          unitId: material.unitId || '',
+          courseId,
+          unitId: material.unitId || null,
+          topicId: material.topicId || null,
           userId: material.userId || '',
           content: material.content,
           category: material.category,
@@ -692,6 +704,9 @@ export class MaterialsService {
     shareWithCourse = false,
   ): Promise<Material> {
     try {
+      courseId = courseId?.trim();
+      unitId = unitId?.trim();
+      topicId = topicId?.trim();
       await this.assertCanUploadToPlatformLibrary(userId);
       if (!file) {
         throw new BadRequestException('No file uploaded');
@@ -925,6 +940,12 @@ export class MaterialsService {
     description?: string;
     type?: MaterialType;
   }): Promise<Material> {
+    const courseId = dto.courseId?.trim();
+    const unitId = dto.unitId?.trim();
+    const topicId = dto.topicId?.trim();
+    if (!courseId) {
+      throw new BadRequestException('Assign this material to a course.');
+    }
     await this.assertCanUploadToPlatformLibrary(dto.userId);
     const source = await this.prisma.material.findUnique({
       where: { id: dto.sourceMaterialId },
@@ -937,10 +958,8 @@ export class MaterialsService {
       throw new BadRequestException('Source material has no associated file in R2 storage');
     }
 
-    await this.validateMaterialPlacement(dto.courseId, dto.unitId, dto.topicId);
-    if (dto.courseId) {
-      await this.assertCanManageCourseMaterials(dto.courseId, dto.userId);
-    }
+    await this.validateMaterialPlacement(courseId, unitId, topicId);
+    await this.assertCanManageCourseMaterials(courseId, dto.userId);
 
     const material = await this.prisma.material.create({
       data: {
@@ -949,9 +968,9 @@ export class MaterialsService {
         type: dto.type ?? source.type,
         fileId: source.fileId,
         previewFileId: source.previewFileId ?? null,
-        courseId: dto.courseId ?? null,
-        unitId: dto.unitId ?? null,
-        topicId: dto.topicId ?? null,
+        courseId,
+        unitId: unitId ?? null,
+        topicId: topicId ?? null,
         userId: dto.userId,
         category: source.category,
         difficulty: source.difficulty,
@@ -989,23 +1008,23 @@ export class MaterialsService {
     url: string;
     title: string;
     description?: string;
-    courseId?: string;
+    courseId: string;
     unitId?: string;
     topicId?: string;
     userId: string;
     shareWithCourse?: boolean;
   }): Promise<Material> {
-    const courseId = dto.courseId?.trim() || undefined;
+    const courseId = dto.courseId?.trim();
+    if (!courseId) {
+      throw new BadRequestException('Assign this material to a course.');
+    }
     const unitId = dto.unitId?.trim() || undefined;
     const topicId = dto.topicId?.trim() || undefined;
     await this.validateMaterialPlacement(courseId, unitId, topicId);
-    if (dto.shareWithCourse && !courseId) {
-      throw new BadRequestException('Assign a course before sharing this material with a class.');
-    }
-    if (courseId && dto.shareWithCourse) {
+    if (dto.shareWithCourse) {
       await this.assertCanUploadToPlatformLibrary(dto.userId);
       await this.assertCanManageCourseMaterials(courseId, dto.userId);
-    } else if (courseId) {
+    } else {
       await this.assertCanAssignPrivateDriveMaterial(courseId, dto.userId);
     }
     const driveFile = await this.googleDrive.getSharedDriveFile(dto.url, dto.userId);
@@ -1073,7 +1092,7 @@ export class MaterialsService {
       fileId: string;
       title: string;
       description?: string;
-      courseId?: string;
+      courseId: string;
       unitId?: string;
       topicId?: string;
       shareWithCourse?: boolean;
@@ -1100,6 +1119,7 @@ export class MaterialsService {
       if (
         !item.fileId ||
         !item.title?.trim() ||
+        !item.courseId?.trim() ||
         (item.unitId && !item.courseId) ||
         (item.topicId && !item.unitId) ||
         (item.shareWithCourse && !item.courseId) ||
@@ -1109,7 +1129,7 @@ export class MaterialsService {
           fileId: item.fileId || '',
           title: item.title || '',
           status: 'failed',
-          error: 'Each file needs a unique ID and title; unit/topic placement must be nested in a course.',
+          error: 'Each file needs a unique ID, title, and course; unit/topic placement must follow the course hierarchy.',
         });
         continue;
       }
@@ -1217,39 +1237,37 @@ export class MaterialsService {
     unitId?: string,
     topicId?: string,
   ): Promise<void> {
-    if (!courseId && !unitId && !topicId) return;
-    if (!courseId) {
-      throw new BadRequestException(
-        'Assign a course before placing this material in a unit or topic.',
-      );
-    }
+    const assignedCourseId = courseId?.trim();
+    const assignedUnitId = unitId?.trim();
+    const assignedTopicId = topicId?.trim();
+    if (!assignedCourseId) throw new BadRequestException('Assign this material to a course.');
 
     const course = await this.prisma.course.findUnique({
-      where: { id: courseId },
+      where: { id: assignedCourseId },
       select: { id: true },
     });
     if (!course) throw new NotFoundException('Course not found');
-    if (!unitId) {
-      if (topicId) {
+    if (!assignedUnitId) {
+      if (assignedTopicId) {
         throw new BadRequestException('Choose a unit before assigning a topic.');
       }
       return;
     }
 
     const unit = await this.prisma.unit.findUnique({
-      where: { id: unitId },
+      where: { id: assignedUnitId },
       select: { id: true, courseId: true },
     });
     if (!unit) {
       throw new NotFoundException('Unit not found');
     }
-    if (unit.courseId !== courseId) {
+    if (unit.courseId !== assignedCourseId) {
       throw new BadRequestException('The selected unit does not belong to the selected course.');
     }
 
-    if (!topicId) return;
+    if (!assignedTopicId) return;
     const topic = await this.prisma.topic.findUnique({
-      where: { id: topicId },
+      where: { id: assignedTopicId },
       select: { unitId: true },
     });
     if (!topic) {
@@ -1624,9 +1642,12 @@ export class MaterialsService {
     }
   }
 
-  async convertToPdf(file: Express.Multer.File, userId: string) {
+  async convertToPdf(file: Express.Multer.File, userId: string, courseId: string) {
     try {
       await this.assertCanUploadToPlatformLibrary(userId);
+      const assignedCourseId = courseId?.trim();
+      await this.validateMaterialPlacement(assignedCourseId);
+      await this.assertCanManageCourseMaterials(assignedCourseId, userId);
       const ext = file.originalname.split('.').pop() || '';
       if (!['ppt', 'pptx', 'odp'].includes(ext.toLowerCase())) {
         throw new BadRequestException(
@@ -1687,6 +1708,7 @@ export class MaterialsService {
           type: MaterialType.pdf,
           fileId: fileRecord.id,
           userId,
+          courseId: assignedCourseId,
         },
       });
 
@@ -1705,7 +1727,21 @@ export class MaterialsService {
    */
   async createExternalResource(dto: RegisterExternalResourceDto) {
     try {
-      const { title, url, type, description, unitId, topicId, userId, category, difficulty, tags, metadata } = dto;
+      const {
+        title,
+        url,
+        type,
+        description,
+        courseId,
+        unitId,
+        topicId,
+        userId,
+        category,
+        difficulty,
+        tags,
+        metadata,
+      } = dto;
+      await this.validateMaterialPlacement(courseId, unitId, topicId);
       
       const material = await this.prisma.material.create({
         data: {
@@ -1713,6 +1749,7 @@ export class MaterialsService {
           content: url, // Store URL in content
           type,
           description,
+          courseId,
           unitId,
           topicId,
           userId,
@@ -1740,12 +1777,25 @@ export class MaterialsService {
     filename: string;
     mimetype: string;
     size?: number;
+    courseId?: string;
     unitId?: string;
     topicId?: string;
     userId?: string;
   }) {
     try {
-      const { hash, filename, mimetype, size, unitId, topicId, userId } = opts;
+      const { hash, filename, mimetype, size, courseId, unitId, topicId, userId } = opts;
+      let assignedCourseId = courseId?.trim();
+      if (!assignedCourseId && unitId) {
+        const unit = await this.prisma.unit.findUnique({
+          where: { id: unitId },
+          select: { courseId: true },
+        });
+        if (!unit) {
+          throw new NotFoundException('Unit not found');
+        }
+        assignedCourseId = unit.courseId;
+      }
+      await this.validateMaterialPlacement(assignedCourseId, unitId, topicId);
       const existing = await this.prisma.file.findFirst({ where: { hash } });
       let fileRecord = existing;
       if (!existing) {
@@ -1776,6 +1826,7 @@ export class MaterialsService {
                   ? MaterialType.slide
                   : MaterialType.notes,
           fileId: fileRecord!.id,
+          courseId: assignedCourseId,
           unitId: unitId || null,
           topicId: topicId || null,
           userId: userId || undefined,

@@ -92,7 +92,7 @@ export default function UploadMaterialPage() {
         }
       } catch (err) {
         console.warn('Failed to load courses for upload form', err);
-        setCourseLoadError('Courses could not be loaded. You can still link this material privately without a course.');
+        setCourseLoadError('Courses could not be loaded. A course is required to place this material.');
       } finally {
         setIsLoadingCourses(false);
       }
@@ -202,8 +202,12 @@ export default function UploadMaterialPage() {
       toast.error('Only instructors can upload files to the MedTrack library. Use Google Drive for personal files.');
       return;
     }
-    if (canAssignCourse && unitId && !selectedCourseId) {
-      toast.error('Choose a course before assigning a unit');
+    if (!selectedCourseId) {
+      toast.error('Choose a course to place this material.');
+      return;
+    }
+    if (topicId && !unitId) {
+      toast.error('Choose a unit before assigning a topic.');
       return;
     }
     if (canManagePlatformLibrary && shareWithCourse && !selectedCourseId) {
@@ -222,7 +226,7 @@ export default function UploadMaterialPage() {
           url: driveUrl.trim(),
           title: title.trim(),
           description: description.trim() || undefined,
-          courseId: canAssignCourse ? selectedCourseId : undefined,
+          courseId: selectedCourseId,
           unitId: canAssignCourse ? unitId : undefined,
           topicId: canAssignCourse ? topicId || undefined : undefined,
           shareWithCourse: canManagePlatformLibrary && shareWithCourse,
@@ -331,7 +335,7 @@ export default function UploadMaterialPage() {
           {canManagePlatformLibrary ? 'Add a study material' : 'Add personal study material'}
         </h1>
         <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-          Choose a file or link, add details, and optionally organize it with a course.
+          Add a file or link, then place it in a course. Unit and topic placement can be added when relevant.
         </p>
       </div>
       <form onSubmit={handleSubmit} className="space-y-7 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6" aria-label="Upload material form">
@@ -413,20 +417,18 @@ export default function UploadMaterialPage() {
             <>
           <div>
             <label htmlFor="course-select" className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">
-              Course <span className="text-gray-400">(optional)</span>
+              Course <span className="text-red-500">*</span>
             </label>
             <select
               id="course-select"
               value={selectedCourseId}
               onChange={e => setSelectedCourseId(e.target.value)}
+              required
+              disabled={isLoadingCourses || courses.length === 0}
               aria-busy={isLoadingCourses}
               className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:ring-blue-950"
             >
-              <option value="">
-                {source === 'upload'
-                  ? 'MedTrack library (not assigned to a course)'
-                  : 'Personal Drive (not assigned to a course)'}
-              </option>
+              <option value="">Select a course…</option>
               {courses.map(c => (
                 <option key={c.id} value={c.id}>
                   {c.title || c.name}
@@ -443,7 +445,7 @@ export default function UploadMaterialPage() {
 
           <div>
             <label htmlFor="unit-select" className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">
-              Unit <span className="text-gray-400">(optional)</span>
+              Unit <span className="text-gray-400">(optional; select to add topic placement)</span>
             </label>
             <select
               id="unit-select"
@@ -516,7 +518,7 @@ export default function UploadMaterialPage() {
             </select>
             <p className="mt-1.5 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
             {canManagePlatformLibrary
-              ? 'Assign a course for course-level resources such as textbooks. Add a unit or topic for more specific material. Leave placement blank for your library.'
+              ? 'A course is required. Leave the unit blank for course-level resources such as textbooks; select a unit to optionally place the material under a topic.'
               : 'Choose a course you are enrolled in to organize this personal Drive link. It remains private to you and is not shared with classmates.'}
             </p>
             </div>
@@ -619,8 +621,9 @@ export default function UploadMaterialPage() {
               disabled={
                 isUploading ||
                 !title.trim() ||
+                !selectedCourseId ||
                 (source === 'upload'
-                ? !file || Boolean(unitId && !selectedCourseId)
+                ? !file
                 : !driveUrl.trim())
               }
               className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm shadow-blue-500/30"
