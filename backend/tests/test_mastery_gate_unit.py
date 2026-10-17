@@ -12,7 +12,10 @@ Module._load = function (request, parent, isMain) {
     return {
       EnrollmentStatus: { active: 'active', completed: 'completed' },
       ProgressStatus: { inProgress: 'inProgress', dropped: 'dropped' },
-      Prisma: { TransactionIsolationLevel: { Serializable: 'Serializable' } },
+      Prisma: {
+        TransactionIsolationLevel: { Serializable: 'Serializable' },
+        PrismaClientKnownRequestError: class PrismaClientKnownRequestError extends Error {},
+      },
     };
   }
   return originalLoad.call(this, request, parent, isMain);

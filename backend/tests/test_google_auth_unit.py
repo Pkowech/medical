@@ -73,7 +73,7 @@ const service = new AuthService(
   usersService,
   {},
   {},
-  { get: key => key === 'GOOGLE_CLIENT_ID' ? configClientId : undefined },
+  { get: (key, fallback) => key === 'GOOGLE_CLIENT_ID' ? configClientId : fallback },
 );
 
 (async () => {

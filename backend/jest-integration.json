@@ -1,4 +1,0 @@
-{
-  "extends": "./jest.config.js",
-  "testRegex": ".*\\.integration-spec\\.ts$"
-}

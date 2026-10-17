@@ -5,8 +5,8 @@ def test_notification_service_fetches_and_normalizes_notifications():
     run_typescript(
         r"""
 const assert = require('node:assert/strict');
-const Module = require('node:module');
-const originalLoad = Module._load;
+const TestModule = require('node:module');
+const originalLoad = TestModule._load;
 const calls = [];
 const responses = [];
 const apiClient = {
@@ -16,9 +16,9 @@ const apiClient = {
   },
 };
 
-Module._load = function (request, parent, isMain) {
+TestModule._load = function (request, parent, isMain) {
   if (request === '../auth/services/apiClient' &&
-      parent?.filename.endsWith('/notificationService.ts')) {
+      parent?.filename.replaceAll('\\', '/').endsWith('/notificationService.ts')) {
     return { __esModule: true, default: apiClient };
   }
   return originalLoad.call(this, request, parent, isMain);
