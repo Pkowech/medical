@@ -53,7 +53,7 @@ interface MaterialCourseGroup {
   resourceCount: number;
 }
 
-const MATERIALS_SECTION_STATE_KEY = 'medtrack.materials.section-state.v1';
+const MATERIALS_SECTION_STATE_KEY = 'medtrack.materials.section-state.v2';
 
 export default function MaterialsDashboard() {
   const { setHeader } = usePageHeader();
@@ -296,7 +296,7 @@ export default function MaterialsDashboard() {
   const materialSectionStates = useMemo(() => {
     const sections: Array<{ id: string; defaultOpen: boolean }> = [];
     for (const course of organizedMaterials.courses) {
-      sections.push({ id: `course:${course.id}`, defaultOpen: true });
+      sections.push({ id: `course:${course.id}`, defaultOpen: false });
       for (const unit of course.units) {
         sections.push({
           id: `unit:${course.id}:${unit.id}`,
@@ -311,7 +311,7 @@ export default function MaterialsDashboard() {
       }
     }
     if (organizedMaterials.unassigned.length > 0) {
-      sections.push({ id: 'personal-unassigned', defaultOpen: true });
+      sections.push({ id: 'personal-unassigned', defaultOpen: false });
     }
     return sections;
   }, [organizedMaterials]);
@@ -887,7 +887,7 @@ export default function MaterialsDashboard() {
                 {organizedMaterials.courses.map((course) => (
                   <details
                     key={course.id}
-                    open={isSectionOpen(`course:${course.id}`, true)}
+                    open={isSectionOpen(`course:${course.id}`, false)}
                     onToggle={event => handleSectionToggle(`course:${course.id}`, event)}
                     className="group/course overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900"
                   >
@@ -965,7 +965,7 @@ export default function MaterialsDashboard() {
 
                 {organizedMaterials.unassigned.length > 0 && (
                   <details
-                    open={isSectionOpen('personal-unassigned', true)}
+                    open={isSectionOpen('personal-unassigned', false)}
                     onToggle={event => handleSectionToggle('personal-unassigned', event)}
                     className="group overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900"
                   >
