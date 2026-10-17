@@ -46,13 +46,18 @@ const user = {
 };
 let existing = null;
 let configClientId = 'google-client-id';
+const securitySettingsUpsertCalls = [];
 const prisma = {
   user: {
     findFirst: async () => existing,
     findUnique: async () => user,
     update: async () => user,
   },
-  userSecuritySettings: { upsert: async () => undefined },
+  userSecuritySettings: {
+    upsert: async args => {
+      securitySettingsUpsertCalls.push(args);
+    },
+  },
 };
 const usersService = { create: async () => ({ id: user.id }) };
 let createCalls = 0;
@@ -94,13 +99,30 @@ const service = new AuthService(
   assert.equal(created.refreshToken, 'app-refresh-token');
   assert.equal(created.user.id, user.id);
   assert.equal(created.roles.role, Role.student);
+  assert.deepEqual(securitySettingsUpsertCalls.at(-1), {
+    where: { userId: user.id },
+    update: { isEmailVerified: true },
+    create: {
+      userId: user.id,
+      isEmailVerified: true,
+      acceptTerms: true,
+    },
+  });
 
   existing = user;
   const createCallsBeforeExisting = createCalls;
   const matched = await service.loginWithGoogle({ idToken: 'google-id-token' });
   assert.equal(createCalls, createCallsBeforeExisting);
   assert.equal(matched.user.id, user.id);
-  assert.equal(prisma.userSecuritySettings.upsert ? true : false, true);
+  assert.deepEqual(securitySettingsUpsertCalls.at(-1), {
+    where: { userId: user.id },
+    update: { isEmailVerified: true },
+    create: {
+      userId: user.id,
+      isEmailVerified: true,
+      acceptTerms: false,
+    },
+  });
 
   existing = null;
   await assert.rejects(

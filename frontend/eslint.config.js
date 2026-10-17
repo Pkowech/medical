@@ -79,8 +79,6 @@ module.exports = [
       '__tests__/**',
       'src/__tests__/**',
       'src/tests/**',
-      'jest.setup.js',
-      'jest.config.js',
       'next-env.d.ts',
       'src/shims/**',
     ],
