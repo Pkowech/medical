@@ -80,12 +80,14 @@ export const useStudy = () => {
     notes?: string,
     activities: StudySessionActivity[] = [],
     durationSeconds?: number,
+    pausedDurationSeconds?: number,
   ): Promise<StudySession> => {
     try {
         const response = await apiService.put<StudySession>(`/study/session/${sessionId}/end`, {
             activities,
             notes,
             durationSeconds,
+            pausedDurationSeconds,
         });
         const endedSession = response.data;
 

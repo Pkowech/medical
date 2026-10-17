@@ -71,6 +71,8 @@ export const StudySession: React.FC<StudySessionProps> = ({
   const elapsedTimeRef = useRef(0);
   const lastActivitySecondsRef = useRef(0);
   const activeReadingRef = useRef<{ materialId: string; startedAtSeconds: number } | null>(null);
+  const pauseStartedAtRef = useRef<number | null>(null);
+  const pausedDurationMsRef = useRef(0);
 
   useEffect(() => {
     elapsedTimeRef.current = elapsedTime;
@@ -139,6 +141,10 @@ export const StudySession: React.FC<StudySessionProps> = ({
   const handleStart = async () => {
     if (sessionId) {
       setSessionError(null);
+      if (pauseStartedAtRef.current !== null) {
+        pausedDurationMsRef.current += Date.now() - pauseStartedAtRef.current;
+        pauseStartedAtRef.current = null;
+      }
       setIsActive(true);
       return;
     }
@@ -160,12 +166,23 @@ export const StudySession: React.FC<StudySessionProps> = ({
   };
 
   const handlePause = () => {
+    if (isActive && pauseStartedAtRef.current === null) {
+      pauseStartedAtRef.current = Date.now();
+    }
     setIsActive(false);
   };
 
   const handleStop = () => {
+    handlePause();
     setIsFocusMode(false);
     setShowEndDialog(true);
+  };
+
+  const getPausedDurationSeconds = () => {
+    const currentPauseMs = pauseStartedAtRef.current === null
+      ? 0
+      : Date.now() - pauseStartedAtRef.current;
+    return Math.floor((pausedDurationMsRef.current + currentPauseMs) / 1000);
   };
 
   const recordActivity = (
@@ -247,7 +264,13 @@ export const StudySession: React.FC<StudySessionProps> = ({
         sessionGoal.trim() ? `Session goal: ${sessionGoal.trim()}` : '',
         notes.trim(),
       ].filter(Boolean).join('\n\n');
-      const endedSession = await endSession(sessionId, sessionNotes, sessionActivities, elapsedTime);
+      const endedSession = await endSession(
+        sessionId,
+        sessionNotes,
+        sessionActivities,
+        elapsedTime,
+        getPausedDurationSeconds(),
+      );
       const durationLabel = `${endedSession.duration ?? Math.floor(elapsedTime / 60)} min`;
       if (endedSession.isValid) {
         toast.success(
@@ -430,6 +453,9 @@ export const StudySession: React.FC<StudySessionProps> = ({
               )}
               <p className="mt-1 text-xs text-muted-foreground">
                 Sessions under 5 minutes are saved but do not count toward progress or streaks.
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Intentional pauses are excluded when calculating your active-time focus score.
               </p>
             </div>
             <div className="text-3xl font-mono text-blue-600 dark:text-blue-400">

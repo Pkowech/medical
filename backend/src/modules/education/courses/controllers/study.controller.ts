@@ -66,6 +66,7 @@ export class StudyController {
       activities?: StudyActivity[];
       notes?: string;
       durationSeconds?: number;
+      pausedDurationSeconds?: number;
     },
   ) {
     return this.studyService.endStudySession(
@@ -74,6 +75,7 @@ export class StudyController {
       body.activities ?? [],
       body.notes,
       body.durationSeconds,
+      body.pausedDurationSeconds,
     );
   }
 

@@ -875,9 +875,15 @@ export class ProgressService {
             unitId: { not: null },
             topicId: null,
             materialId: null,
-            status: { in: [ProgressStatus.inProgress, ProgressStatus.completed] },
+            status: {
+              in: [
+                ProgressStatus.inProgress,
+                ProgressStatus.completed,
+                ProgressStatus.dropped,
+              ],
+            },
           },
-          orderBy: { lastAccessedAt: 'desc' },
+          orderBy: [{ updatedAt: 'desc' }, { lastAccessedAt: 'desc' }],
           select: { unitId: true, status: true, progressPercentage: true, lastAccessedAt: true },
         }),
       ]);
@@ -932,6 +938,8 @@ export class ProgressService {
       return units
         .map(unit => {
           const unitProgress = unitProgressById.get(unit.id);
+          if (unitProgress?.status === ProgressStatus.dropped) return null;
+
           const completedTopics = unit.topics.filter(topic => {
             const topicRecord = progressByTopicId.get(topic.id);
             return topicRecord?.isCompleted || topicRecord?.status === ProgressStatus.completed;

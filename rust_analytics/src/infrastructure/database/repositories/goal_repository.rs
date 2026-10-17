@@ -207,8 +207,6 @@ impl GoalRepository for PostgresGoalRepository {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[tokio::test]
     #[ignore]
     async fn test_get_user_goals() {
@@ -221,4 +219,3 @@ mod tests {
         // Requires test database
     }
 }
-

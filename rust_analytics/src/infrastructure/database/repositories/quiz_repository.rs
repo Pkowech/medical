@@ -188,8 +188,6 @@ impl QuizRepository for PostgresQuizRepository {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     // TODO: Add integration tests with test database
     #[tokio::test]
     #[ignore]

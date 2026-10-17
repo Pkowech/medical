@@ -173,7 +173,6 @@ impl UserProfileRepository for PostgresUserProfileRepository {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     // Assuming a test setup function for `Pool<Postgres>`
     // use crate::test_utils::setup_test_db;
 
@@ -239,4 +238,3 @@ mod tests {
         // assert!(matches!(error, Err(AnalyticsError::NotFound(_))));
     }
 }
-

@@ -229,6 +229,114 @@ export class UnitsService {
     }
   }
 
+  async getRelatedRecommendations(userId: string) {
+    const activeProgress = await this.prisma.progress.findMany({
+      where: {
+        userId,
+        unitId: { not: null },
+        topicId: null,
+        materialId: null,
+        status: ProgressStatus.inProgress,
+      },
+      select: { unitId: true },
+    });
+    const activeUnitIds = [
+      ...new Set(
+        activeProgress
+          .map((progress) => progress.unitId)
+          .filter((unitId): unitId is string => Boolean(unitId)),
+      ),
+    ];
+    if (activeUnitIds.length === 0) return [];
+
+    const [completedProgress, relations] = await Promise.all([
+      this.prisma.progress.findMany({
+        where: {
+          userId,
+          unitId: { not: null },
+          topicId: null,
+          materialId: null,
+          status: ProgressStatus.completed,
+        },
+        select: { unitId: true },
+      }),
+      this.prisma.unitRelation.findMany({
+        where: {
+          relationType: { in: ['similar', 'related', 'prerequisite'] },
+          OR: [
+            { sourceUnitId: { in: activeUnitIds } },
+            { targetUnitId: { in: activeUnitIds } },
+          ],
+        },
+        include: {
+          sourceUnit: {
+            include: {
+              course: { select: { id: true, title: true, name: true, status: true } },
+            },
+          },
+          targetUnit: {
+            include: {
+              course: { select: { id: true, title: true, name: true, status: true } },
+            },
+          },
+        },
+        orderBy: { score: 'desc' },
+      }),
+    ]);
+
+    const excludedUnitIds = new Set([
+      ...activeUnitIds,
+      ...completedProgress
+        .map((progress) => progress.unitId)
+        .filter((unitId): unitId is string => Boolean(unitId)),
+    ]);
+    const recommendations = new Map<
+      string,
+      {
+        unitId: string;
+        title: string;
+        description: string | null;
+        courseId: string;
+        courseTitle: string;
+        relationType: string;
+        score: number;
+        sourceUnitId: string;
+      }
+    >();
+
+    for (const relation of relations) {
+      const sourceIsActive = activeUnitIds.includes(relation.sourceUnitId);
+      const candidate = sourceIsActive
+        ? relation.targetUnit
+        : relation.sourceUnit;
+      if (
+        excludedUnitIds.has(candidate.id) ||
+        !candidate.isPublished ||
+        candidate.course.status !== 'published' ||
+        recommendations.has(candidate.id)
+      ) {
+        continue;
+      }
+
+      const enrolledSourceUnit = sourceIsActive
+        ? relation.sourceUnit
+        : relation.targetUnit;
+      recommendations.set(candidate.id, {
+        unitId: candidate.id,
+        title: candidate.title || candidate.name,
+        description: candidate.description,
+        courseId: candidate.courseId,
+        courseTitle:
+          candidate.course.title || candidate.course.name || 'Course',
+        relationType: relation.relationType,
+        score: relation.score,
+        sourceUnitId: enrolledSourceUnit.id,
+      });
+    }
+
+    return [...recommendations.values()].slice(0, 8);
+  }
+
   async findOne(id: string, userId?: string): Promise<UnitResponseDto> {
     const cacheKey = cacheKeys.unitById(id);
     const cached = await this.redisService.get<string>(cacheKey);

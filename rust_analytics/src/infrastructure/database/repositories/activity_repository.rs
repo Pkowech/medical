@@ -183,8 +183,6 @@ impl ActivityRepository for PostgresActivityRepository {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[tokio::test]
     #[ignore]
     async fn test_get_user_activities() {

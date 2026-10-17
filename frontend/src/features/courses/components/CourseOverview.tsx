@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { BookOpen, CheckCircle, ChevronRight, CircleCheck, Clock, Plus } from 'lucide-react';
+import { toast } from 'sonner';
 import { courseService } from '@/features/courses/services/courseService';
 import type { Course } from '@/shared/types/courseInterface';
 import type { TopicProgress } from '@/shared/types/progressInterface';
@@ -54,10 +55,17 @@ export function CourseOverview() {
     (progress?.topicProgress || []).map(item => [String(item.topicId), item]),
   );
   const activeUnitIds = new Set(activeUnits.flatMap(unit =>
-    typeof unit.unitId === 'string' || typeof unit.unitId === 'number'
+    (typeof unit.unitId === 'string' || typeof unit.unitId === 'number')
+      && unit.isCompleted !== true
       ? [String(unit.unitId)]
       : [],
   ));
+  const completedUnitIds = activeUnits.flatMap(unit =>
+    (typeof unit.unitId === 'string' || typeof unit.unitId === 'number')
+      && unit.isCompleted === true
+      ? [String(unit.unitId)]
+      : [],
+  );
   const units = course.units || [];
 
   return (
@@ -161,11 +169,17 @@ export function CourseOverview() {
         <UnitSelectionModal
           course={course}
           activeUnitIds={Array.from(activeUnitIds)}
+          completedUnitIds={completedUnitIds}
           onClose={() => setShowEnrollment(false)}
-          onComplete={() => {
+          onComplete={(action) => {
             setShowEnrollment(false);
             void queryClient.invalidateQueries({ queryKey: ['course-overview-active-units', courseId] });
             void queryClient.invalidateQueries({ queryKey: ['courses'] });
+            toast.success(
+              action === 'activated'
+                ? 'Unit added to your active units.'
+                : 'Unit removed from your active units. Your progress was kept.',
+            );
           }}
         />
       )}

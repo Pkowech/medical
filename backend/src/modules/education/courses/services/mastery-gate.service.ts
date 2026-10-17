@@ -1,5 +1,10 @@
 // src/modules/education/courses/services/mastery-gate.service.ts
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '#infrastructure/prisma/prisma.service';
 import { RedisService } from '#infrastructure/redis/redis.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -9,10 +14,12 @@ import {
   MasteryStatus,
   QuizCompletionResult,
 } from '../types/mastery.types';
-import { ProgressStatus } from '@prisma/client';
+import { EnrollmentStatus, Prisma, ProgressStatus } from '@prisma/client';
 import { PrescriptiveAnalyticsService } from '../../../ai-analytics/services/prescriptive-analytics.service';
 
 export { ReadinessSignal, MasteryStatus, QuizCompletionResult };
+
+export const MAX_ACTIVE_UNITS = 36;
 
 @Injectable()
 export class MasteryGateService {
@@ -438,138 +445,175 @@ export class MasteryGateService {
   }
 
   /**
-   * Validate concurrent unit limit (max 4-5 active units)
-   */
-  async validateConcurrentUnitLimit(
-    userId: string,
-    maxConcurrent: number = 4,
-  ): Promise<{ allowed: boolean; currentActive: number; message?: string }> {
-    try {
-      const activeUnits = await this.prisma.progress.count({
-        where: {
-          userId,
-          unitId: { not: null },
-          topicId: null,
-          materialId: null,
-          status: ProgressStatus.inProgress,
-        },
-      });
-
-      if (activeUnits >= maxConcurrent) {
-        return {
-          allowed: false,
-          currentActive: activeUnits,
-          message: `You already have ${activeUnits} active units. Complete one before starting another.`,
-        };
-      }
-
-      return { allowed: true, currentActive: activeUnits };
-    } catch (error) {
-      this.logger.error(
-        `Error validating concurrent unit limit for user ${userId}: ${getErrorMessage(error)}`,
-      );
-      return { allowed: true, currentActive: 0 }; // Default to allowed on error
-    }
-  }
-
-  /**
    * Activate a unit with concurrent slot assignment
    */
   async activateUnit(
     userId: string,
     unitId: string,
-    maxConcurrent: number = 4,
-  ): Promise<{ success: boolean; slotNumber?: number; message?: string }> {
+  ): Promise<{
+    success: boolean;
+    slotNumber?: number;
+    maxActiveUnits: number;
+    message?: string;
+  }> {
     try {
-      const unit = await this.prisma.unit.findUnique({
-        where: { id: unitId },
-        select: { id: true, courseId: true },
-      });
-      if (!unit) throw new NotFoundException(`Unit ${unitId} not found`);
+      return await this.prisma.$transaction(
+        async (transaction) => {
+          const unit = await transaction.unit.findUnique({
+            where: { id: unitId },
+            select: { id: true, courseId: true },
+          });
+          if (!unit) throw new NotFoundException(`Unit ${unitId} not found`);
 
-      const existing = await this.prisma.progress.findFirst({
-        where: { userId, unitId, topicId: null, materialId: null },
-      });
-      if (existing?.status === ProgressStatus.inProgress) {
-        return { success: true, slotNumber: 1 };
-      }
+          const enrollment = await transaction.courseEnrollment.findFirst({
+            where: {
+              userId,
+              courseId: unit.courseId,
+              status: { in: [EnrollmentStatus.active, EnrollmentStatus.completed] },
+            },
+            select: { id: true },
+          });
+          if (!enrollment) {
+            throw new BadRequestException(
+              'Enroll in this course before activating one of its units.',
+            );
+          }
 
-      const validation = await this.validateConcurrentUnitLimit(
-        userId,
-        maxConcurrent,
-      );
+          const existing = await transaction.progress.findFirst({
+            where: { userId, unitId, topicId: null, materialId: null },
+          });
+          if (existing?.status === ProgressStatus.inProgress) {
+            return {
+              success: true,
+              slotNumber: 1,
+              maxActiveUnits: MAX_ACTIVE_UNITS,
+            };
+          }
 
-      if (!validation.allowed) {
-        return { success: false, message: validation.message };
-      }
+          const activeSlots = await transaction.progress.findMany({
+            where: {
+              userId,
+              status: ProgressStatus.inProgress,
+              unitId: { not: null },
+              topicId: null,
+              materialId: null,
+            },
+            select: { unitId: true },
+          });
+          const activeUnitIds = new Set(
+            activeSlots
+              .map((progress) => progress.unitId)
+              .filter((activeUnitId): activeUnitId is string =>
+                Boolean(activeUnitId),
+              ),
+          );
+          if (activeUnitIds.size >= MAX_ACTIVE_UNITS) {
+            return {
+              success: false,
+              maxActiveUnits: MAX_ACTIVE_UNITS,
+              message: `You already have ${activeUnitIds.size} active units. Remove one before starting another.`,
+            };
+          }
 
-      // Check for active slots
-      const activeSlots = await this.prisma.progress.findMany({
-        where: {
-          userId,
-          status: ProgressStatus.inProgress,
-          unitId: { not: null },
-          topicId: null,
-          materialId: null,
+          if (existing) {
+            await transaction.progress.update({
+              where: { id: existing.id },
+              data: {
+                status: ProgressStatus.inProgress,
+                startedAt: new Date(),
+                courseId: unit.courseId,
+              },
+            });
+          } else {
+            await transaction.progress.create({
+              data: {
+                userId,
+                unitId,
+                courseId: unit.courseId,
+                topicId: null,
+                materialId: null,
+                status: ProgressStatus.inProgress,
+                startedAt: new Date(),
+              },
+            });
+          }
+
+          return {
+            success: true,
+            slotNumber: activeUnitIds.size + 1,
+            maxActiveUnits: MAX_ACTIVE_UNITS,
+          };
         },
-        select: {
-          unitId: true,
-        },
-      });
-
-      const activeCount = activeSlots.length;
-
-      // Find next available slot (conceptually, as we don't store slot numbers)
-      // This logic is more about counting active units than assigning a specific slot number
-      const nextSlot = 1; // Placeholder, as actual slot numbers are not stored
-
-      // Assuming MAX_CONCURRENT_UNITS is a class property (it's not defined, using maxConcurrent from parameter)
-      // The instruction snippet has a nested if, which seems like a copy-paste error.
-      // I'm interpreting it as a single check for the free tier limit, and then a potential premium limit.
-      if (activeCount >= maxConcurrent) {
-        // Using maxConcurrent from parameter
-        // This block should ideally not be reached if validation.allowed is false
-        // but keeping it for robustness based on the original intent.
-        // If there were different limits for premium, that logic would go here.
-        return {
-          success: false,
-          message: `Max concurrent units reached (${maxConcurrent} units).`,
-        };
-      }
-
-      // Create or update progress record for the unit activation itself
-      // We use findFirst to check if a specific unit-activation record exists
-      if (existing) {
-        await this.prisma.progress.update({
-          where: { id: existing.id },
-          data: {
-            status: ProgressStatus.inProgress,
-            startedAt: new Date(),
-            courseId: unit.courseId,
-          },
-        });
-      } else {
-        await this.prisma.progress.create({
-          data: {
-            userId,
-            unitId,
-            courseId: unit.courseId,
-            topicId: null,
-            materialId: null,
-            status: ProgressStatus.inProgress,
-            startedAt: new Date(),
-          },
-        });
-      }
-
-      this.logger.log(
-        `Activated unit ${unitId} for user ${userId} in slot ${nextSlot}`,
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
       );
-
-      return { success: true, slotNumber: nextSlot };
     } catch (error) {
       this.logger.error(
         `Error activating unit ${unitId} for user ${userId}: ${getErrorMessage(error)}`,
+      );
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2034'
+      ) {
+        throw new BadRequestException(
+          'Your active unit list changed. Please try again.',
+        );
+      }
+      throw error;
+    }
+  }
+
+  async deactivateUnit(
+    userId: string,
+    unitId: string,
+  ): Promise<{ success: true; message: string }> {
+    try {
+      await this.prisma.$transaction(async (transaction) => {
+        const unit = await transaction.unit.findUnique({
+          where: { id: unitId },
+          select: { id: true, courseId: true },
+        });
+        if (!unit) throw new NotFoundException(`Unit ${unitId} not found`);
+
+        const enrollment = await transaction.courseEnrollment.findFirst({
+          where: {
+            userId,
+            courseId: unit.courseId,
+            status: { in: [EnrollmentStatus.active, EnrollmentStatus.completed] },
+          },
+          select: { id: true },
+        });
+        if (!enrollment) {
+          throw new BadRequestException(
+            'You must be enrolled in this course to remove one of its units.',
+          );
+        }
+
+        const existing = await transaction.progress.findFirst({
+          where: { userId, unitId, topicId: null, materialId: null },
+        });
+        if (existing) {
+          await transaction.progress.update({
+            where: { id: existing.id },
+            data: { status: ProgressStatus.dropped },
+          });
+        } else {
+          await transaction.progress.create({
+            data: {
+              userId,
+              unitId,
+              courseId: unit.courseId,
+              topicId: null,
+              materialId: null,
+              status: ProgressStatus.dropped,
+            },
+          });
+        }
+      });
+
+      return { success: true, message: 'Unit removed from your active learning list. Progress was kept.' };
+    } catch (error) {
+      this.logger.error(
+        `Error removing unit ${unitId} for user ${userId}: ${getErrorMessage(error)}`,
       );
       throw error;
     }

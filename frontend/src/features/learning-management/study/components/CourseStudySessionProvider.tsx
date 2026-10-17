@@ -22,6 +22,8 @@ interface ActiveCourseSession {
   topicTitle: string;
   elapsedSeconds: number;
   lastActivitySeconds: number;
+  pausedDurationSeconds: number;
+  pauseStartedAtMs: number | null;
   isActive: boolean;
   activities: StudySessionActivity[];
   notes: string;
@@ -104,6 +106,8 @@ export function CourseStudySessionProvider({ children }: { children: React.React
       topicTitle: session.topicTitle,
       elapsedSeconds: session.elapsedSeconds,
       lastActivitySeconds: session.lastActivitySeconds,
+      pausedDurationSeconds: session.pausedDurationSeconds,
+      pauseStartedAtMs: session.pauseStartedAtMs,
       isActive: session.isActive,
       activities: session.activities,
       notes: session.notes,
@@ -121,6 +125,8 @@ export function CourseStudySessionProvider({ children }: { children: React.React
       const restored: ActiveCourseSession = {
         ...saved,
         isActive: false,
+        pausedDurationSeconds: saved.pausedDurationSeconds ?? 0,
+        pauseStartedAtMs: saved.pauseStartedAtMs ?? saved.updatedAt,
         activities: saved.activities,
       };
       setActiveSession(restored);
@@ -206,6 +212,8 @@ export function CourseStudySessionProvider({ children }: { children: React.React
         topicTitle,
         elapsedSeconds: 0,
         lastActivitySeconds: 0,
+        pausedDurationSeconds: 0,
+        pauseStartedAtMs: null,
         isActive: true,
         activities: [{
           type: 'reading',
@@ -294,11 +302,30 @@ export function CourseStudySessionProvider({ children }: { children: React.React
   }, []);
 
   const pauseCourseSession = useCallback(() => {
-    setActiveSession(current => current ? { ...current, isActive: false } : current);
+    setActiveSession(current =>
+      current
+        ? {
+            ...current,
+            isActive: false,
+            pauseStartedAtMs: current.pauseStartedAtMs ?? Date.now(),
+          }
+        : current,
+    );
   }, []);
 
   const resumeCourseSession = useCallback(() => {
-    setActiveSession(current => current ? { ...current, isActive: true } : current);
+    setActiveSession(current => {
+      if (!current) return current;
+      const pausedSeconds = current.pauseStartedAtMs === null
+        ? 0
+        : Math.max(0, Math.floor((Date.now() - current.pauseStartedAtMs) / 1000));
+      return {
+        ...current,
+        isActive: true,
+        pausedDurationSeconds: current.pausedDurationSeconds + pausedSeconds,
+        pauseStartedAtMs: null,
+      };
+    });
   }, []);
 
   const endCourseSession = useCallback(async () => {
@@ -317,6 +344,12 @@ export function CourseStudySessionProvider({ children }: { children: React.React
       }
     };
     try {
+      const currentPauseSeconds = currentSession.pauseStartedAtMs === null
+        ? 0
+        : Math.max(
+            0,
+            Math.floor((Date.now() - currentSession.pauseStartedAtMs) / 1000),
+          );
       const finalSegmentSeconds = Math.max(
         0,
         currentSession.elapsedSeconds - currentSession.lastActivitySeconds,
@@ -338,6 +371,7 @@ export function CourseStudySessionProvider({ children }: { children: React.React
         currentSession.notes,
         activities,
         currentSession.elapsedSeconds,
+        currentSession.pausedDurationSeconds + currentPauseSeconds,
       );
       if (ended.isValid) {
         toast.success(`Course study session saved (${ended.duration ?? 0} minutes).`);

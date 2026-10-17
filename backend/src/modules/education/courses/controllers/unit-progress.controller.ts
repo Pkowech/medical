@@ -1,4 +1,10 @@
-import { Body, Controller, Post, Param, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Delete,
+  Param,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '#modules/auth/guards/jwt-auth.guard';
 import { GetUser } from '#common/decorators/get-user.decorator';
@@ -26,13 +32,19 @@ export class UnitProgressController {
   @ApiOperation({ summary: 'Activate a unit within the concurrent study limit' })
   async activateUnit(
     @Param('id') unitId: string,
-    @Body('maxConcurrent') maxConcurrent: number | undefined,
     @GetUser() user: PrismaUser,
   ) {
-    return this.masteryGateService.activateUnit(
-      user.id,
-      unitId,
-      maxConcurrent ?? 4,
-    );
+    return this.masteryGateService.activateUnit(user.id, unitId);
+  }
+
+  @Delete(':id/activate')
+  @ApiOperation({
+    summary: 'Remove a unit from the active learning list without deleting progress',
+  })
+  async deactivateUnit(
+    @Param('id') unitId: string,
+    @GetUser() user: PrismaUser,
+  ) {
+    return this.masteryGateService.deactivateUnit(user.id, unitId);
   }
 }

@@ -38,6 +38,14 @@ export class UnitsController {
     return await this.unitsService.findAll();
   }
 
+  @Get('recommendations/related')
+  @ApiOperation({
+    summary: 'Get related units based on the learner active units',
+  })
+  async getRelatedRecommendations(@GetUser() user: User) {
+    return this.unitsService.getRelatedRecommendations(user.id);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get unit by ID' })
   @ApiResponse({ status: 200, description: 'Unit found' })

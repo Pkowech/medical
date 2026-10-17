@@ -918,7 +918,10 @@ export class CoursesService {
         where: { userId_courseId: { userId, courseId } },
       });
 
-      if (existingEnrollment) {
+      if (
+        existingEnrollment &&
+        existingEnrollment.status !== EnrollmentStatus.dropped
+      ) {
         this.logger.warn('User already enrolled', { courseId, userId });
         throw new BadRequestException('User already enrolled in this course');
       }
@@ -929,31 +932,53 @@ export class CoursesService {
       // Check prerequisites
       await this.checkPrerequisites(course, userId);
 
-      const enrollment = await this.prisma.courseEnrollment.create({
-        data: {
-          userId,
-          courseId,
-          totalUnits: course.units?.length || 0,
-          status: EnrollmentStatus.active,
-          enrolledAt: new Date(),
-          progressPercentage: 0,
-        },
-      });
+      const enrollment = existingEnrollment
+        ? await this.prisma.courseEnrollment.update({
+            where: { userId_courseId: { userId, courseId } },
+            data: {
+              status: EnrollmentStatus.active,
+              enrolledAt: new Date(),
+              completedAt: null,
+              totalUnits: course.units?.length || 0,
+            },
+          })
+        : await this.prisma.courseEnrollment.create({
+            data: {
+              userId,
+              courseId,
+              totalUnits: course.units?.length || 0,
+              status: EnrollmentStatus.active,
+              enrolledAt: new Date(),
+              progressPercentage: 0,
+            },
+          });
 
       // Initialize progress tracking in the unified Progress table
-      await this.prisma.progress.create({
-        data: {
+      const courseProgress = await this.prisma.progress.findFirst({
+        where: {
           userId,
-          topicId: null as any,
-          materialId: null as any,
-          unitId: null as any,
+          topicId: null,
+          materialId: null,
+          unitId: null,
           courseId,
-          status: ProgressStatus.notStarted,
-          progressPercentage: 0,
-          timeSpent: 0,
-          lastAccessedAt: new Date(),
         },
+        select: { id: true },
       });
+      if (!courseProgress) {
+        await this.prisma.progress.create({
+          data: {
+            userId,
+            topicId: null as any,
+            materialId: null as any,
+            unitId: null as any,
+            courseId,
+            status: ProgressStatus.notStarted,
+            progressPercentage: 0,
+            timeSpent: 0,
+            lastAccessedAt: new Date(),
+          },
+        });
+      }
 
       // Update enrollment count
       await this.prisma.course.update({
@@ -990,10 +1015,26 @@ export class CoursesService {
         data: { status: EnrollmentStatus.dropped },
       });
 
+      await this.prisma.progress.updateMany({
+        where: {
+          userId,
+          courseId,
+          unitId: { not: null },
+          topicId: null,
+          materialId: null,
+          status: { in: [ProgressStatus.inProgress, ProgressStatus.completed] },
+        },
+        data: { status: ProgressStatus.dropped },
+      });
+
       const course = await this.prisma.course.findUnique({
         where: { id: courseId },
       });
-      if (course) {
+      if (
+        course &&
+        (enrollment.status === EnrollmentStatus.active ||
+          enrollment.status === EnrollmentStatus.completed)
+      ) {
         await this.prisma.course.update({
           where: { id: courseId },
           data: { enrollmentCount: { decrement: 1 } },

@@ -75,8 +75,6 @@ impl GetGoalsUseCase {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[tokio::test]
     #[ignore]
     async fn test_get_goals_success() {

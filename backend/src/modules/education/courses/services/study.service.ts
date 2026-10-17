@@ -242,6 +242,7 @@ export class StudyService {
     activities: StudyActivity[],
     notes?: string,
     durationSeconds?: number,
+    pausedDurationSeconds?: number,
   ): Promise<StudySession> {
     const session = await this.prisma.studySession.findFirst({
       where: { id: sessionId, userId },
@@ -266,9 +267,22 @@ export class StudyService {
         : wallDurationSeconds;
     const duration = Math.round(activeDurationSeconds / 60);
 
-    const focusScore = wallDurationSeconds > 0
-      ? Math.round((activeDurationSeconds / wallDurationSeconds) * 100)
-      : this.calculateFocusScore(activities);
+    const intentionalPauseSeconds =
+      typeof pausedDurationSeconds === 'number' &&
+      Number.isFinite(pausedDurationSeconds)
+        ? Math.min(Math.max(0, pausedDurationSeconds), wallDurationSeconds)
+        : 0;
+    const unpausedDurationSeconds = Math.max(
+      0,
+      wallDurationSeconds - intentionalPauseSeconds,
+    );
+    const focusScore =
+      unpausedDurationSeconds > 0
+        ? Math.min(
+            100,
+            Math.round((activeDurationSeconds / unpausedDurationSeconds) * 100),
+          )
+        : 0;
 
     // SESS-001: Session outcome tracking
     const MIN_VALID_DURATION = 5; // minutes
@@ -429,19 +443,6 @@ export class StudyService {
     });
     await this.progressService.invalidateUserProgressCache(userId);
     return endedSession;
-  }
-
-  private calculateFocusScore(activities: StudyActivity[]): number {
-    if (!activities.length) {
-      return 0;
-    }
-
-    const totalDuration = activities.reduce(
-      (sum, act) => sum + (act.duration || 0),
-      0,
-    );
-    const maxDuration = Math.max(...activities.map((act) => act.duration || 0));
-    return totalDuration ? Math.round((maxDuration / totalDuration) * 100) : 0;
   }
 
   private async updateTopicProgress(

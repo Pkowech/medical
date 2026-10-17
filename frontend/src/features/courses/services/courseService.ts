@@ -25,8 +25,22 @@ interface CourseFilter {
 export interface UnitActivationResult {
   success: boolean;
   slotNumber?: number;
+  maxActiveUnits?: number;
   message?: string;
 }
+
+export interface RelatedUnitRecommendation {
+  unitId: string;
+  title: string;
+  description: string | null;
+  courseId: string;
+  courseTitle: string;
+  relationType: string;
+  score: number;
+  sourceUnitId: string;
+}
+
+export const MAX_ACTIVE_UNITS = 36;
 
 /**
  * Standardizes API responses by handling both unwrapped and wrapped { data: T } structures.
@@ -311,11 +325,22 @@ class CourseService {
   /**
    * Activates a unit (enrolls student in a study slot).
    */
-  async activateUnit(unitId: string, maxConcurrent = 4): Promise<UnitActivationResult> {
-    const response = await apiService.post<unknown>(`/units/${unitId}/activate`, {
-      maxConcurrent,
-    });
+  async activateUnit(unitId: string): Promise<UnitActivationResult> {
+    const response = await apiService.post<unknown>(`/units/${unitId}/activate`);
     return parseResponse<UnitActivationResult>(response.data);
+  }
+
+  async deactivateUnit(unitId: string): Promise<void> {
+    await apiService.delete<void>(`/units/${unitId}/activate`);
+  }
+
+  async getRelatedUnitRecommendations(): Promise<RelatedUnitRecommendation[]> {
+    const response = await apiService.get<unknown>('/units/recommendations/related');
+    const recommendations = parseResponse<unknown>(response.data);
+    if (!Array.isArray(recommendations)) {
+      throw new Error('The related unit recommendations response was invalid.');
+    }
+    return recommendations as RelatedUnitRecommendation[];
   }
 
   /**

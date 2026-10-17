@@ -46,7 +46,6 @@ impl GetEngagementMetricsUseCase {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     // use async_trait::async_trait;
     // use mockall::{automock, predicate::*};
     // use chrono::{Duration, Utc};

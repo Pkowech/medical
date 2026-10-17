@@ -85,8 +85,6 @@ impl UpdateGoalUseCase {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[tokio::test]
     #[ignore]
     async fn test_update_goal_status() {

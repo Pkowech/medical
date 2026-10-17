@@ -283,7 +283,7 @@ export const CoursesDashboard = () => {
     }
   };
 
-  const handleUnitsStarted = async () => {
+  const handleUnitsChanged = async (action: 'activated' | 'deactivated') => {
     setUnitSelectionCourse(null);
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['courses'] }),
@@ -292,12 +292,16 @@ export const CoursesDashboard = () => {
       queryClient.invalidateQueries({ queryKey: ['courseStatistics', user?.id] }),
     ]);
     setActiveTab('enrolled');
-    toast.success('Units added to My Learning.');
+    toast.success(
+      action === 'activated'
+        ? 'Unit added to your active units.'
+        : 'Unit removed from your active units. Your progress was kept.',
+    );
   };
 
-  const removeCourseFromLearning = async (course: Course) => {
+  const unenrollFromCourse = async (course: Course) => {
     const courseName = course.title || course.name;
-    if (!window.confirm(`Remove ${courseName} from My Learning? Your progress will be kept.`)) return;
+    if (!window.confirm(`Unenroll from ${courseName}? Your course progress will be kept.`)) return;
 
     try {
       await courseService.unenrollFromCourse(course.id);
@@ -307,10 +311,10 @@ export const CoursesDashboard = () => {
         queryClient.invalidateQueries({ queryKey: ['active-units'] }),
         queryClient.invalidateQueries({ queryKey: ['course-progress-dashboard'] }),
       ]);
-      toast.success(`${courseName} removed from My Learning. Your progress was kept.`);
+      toast.success(`You are unenrolled from ${courseName}. Your progress was kept.`);
     } catch (error) {
-      console.error('Failed to remove course from My Learning:', error);
-      toast.error('Could not remove this course from My Learning.');
+      console.error('Failed to unenroll from course:', error);
+      toast.error('Could not unenroll from this course.');
     }
   };
 
@@ -507,7 +511,7 @@ export const CoursesDashboard = () => {
                     wide={activeTab === 'enrolled'}
                     onSelectCourse={openCourseUnits}
 
-                    onRemoveCourse={removeCourseFromLearning}
+                    onUnenrollCourse={unenrollFromCourse}
                     router={router}
                     getResumePoint={getResumePoint}
                   />
@@ -551,9 +555,18 @@ export const CoursesDashboard = () => {
       {unitSelectionCourse && (
         <UnitSelectionModal
           course={unitSelectionCourse}
-          activeUnitIds={activeUnits.map(unit => String(unit.unitId || ''))}
+          activeUnitIds={activeUnits.flatMap(unit =>
+            typeof unit.unitId === 'string' && unit.isCompleted !== true
+              ? [unit.unitId]
+              : [],
+          )}
+          completedUnitIds={activeUnits.flatMap(unit =>
+            typeof unit.unitId === 'string' && unit.isCompleted === true
+              ? [unit.unitId]
+              : [],
+          )}
           onClose={() => setUnitSelectionCourse(null)}
-          onComplete={handleUnitsStarted}
+          onComplete={handleUnitsChanged}
         />
       )}
     </div>
@@ -606,12 +619,12 @@ interface CourseCardProps {
   course: Course;
   wide?: boolean;
   onSelectCourse: (course: Course) => void;
-  onRemoveCourse: (course: Course) => void;
+  onUnenrollCourse: (course: Course) => void;
   router: ReturnType<typeof useRouter>;
   getResumePoint: (courseId: string) => unknown;
 }
 
-const CourseCard = ({ course, wide = false, onSelectCourse, onRemoveCourse, router, getResumePoint }: CourseCardProps) => {
+const CourseCard = ({ course, wide = false, onSelectCourse, onUnenrollCourse, router, getResumePoint }: CourseCardProps) => {
   const isEnrolled = course.isEnrolled;
   const progress = course.progressPercentage ?? 0;
   const owner = getInstructorDisplayName(course.instructor ?? course.createdBy);
@@ -714,11 +727,11 @@ const CourseCard = ({ course, wide = false, onSelectCourse, onRemoveCourse, rout
             </div>
             <button
               type="button"
-              onClick={(event) => { event.stopPropagation(); void onRemoveCourse(course); }}
+              onClick={(event) => { event.stopPropagation(); void onUnenrollCourse(course); }}
               className="inline-flex w-full items-center justify-center gap-1.5 text-xs font-medium text-slate-400 transition-colors hover:text-rose-600"
             >
               <X className="h-3.5 w-3.5" />
-              Remove from My Learning
+              Unenroll from course
             </button>
           </div>
         </>
@@ -777,12 +790,12 @@ const CourseCard = ({ course, wide = false, onSelectCourse, onRemoveCourse, rout
               type="button"
               onClick={(event) => {
                 event.stopPropagation();
-                void onRemoveCourse(course);
+                void onUnenrollCourse(course);
               }}
               className="inline-flex w-full items-center justify-center gap-2 py-2 text-sm font-semibold text-rose-600 transition-colors hover:text-rose-700 dark:text-rose-400 dark:hover:text-rose-300"
             >
               <X className="h-4 w-4" />
-              Remove from My Learning
+              Unenroll from course
             </button>
           )}
           </div>

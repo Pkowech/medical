@@ -233,7 +233,6 @@ impl PathRepository for PostgresPathRepository {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     // use crate::test_utils::setup_test_db;
 
     #[tokio::test]
@@ -295,4 +294,3 @@ mod tests {
         // assert!(!recommendations.is_empty());
     }
 }
-

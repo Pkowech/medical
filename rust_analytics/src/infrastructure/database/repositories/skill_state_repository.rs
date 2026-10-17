@@ -115,8 +115,6 @@ impl SkillStateRepository for PostgresSkillStateRepository {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     // TODO: Add integration tests with test database
     #[tokio::test]
     #[ignore]
@@ -124,4 +122,3 @@ mod tests {
         // Test would require test database setup
     }
 }
-

@@ -129,6 +129,8 @@ export interface OfflineStudySession {
   elapsedSeconds: number;
   lastActivitySeconds: number;
   isActive: boolean;
+  pausedDurationSeconds?: number;
+  pauseStartedAtMs?: number | null;
   activities: Array<{
     type: 'reading' | 'quiz' | 'notes';
     duration: number;
