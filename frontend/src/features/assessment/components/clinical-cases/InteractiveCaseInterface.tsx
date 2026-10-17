@@ -21,6 +21,7 @@ import {
 import { toast } from 'sonner';
 
 import { apiService } from '@/features/auth/services/apiClient';
+import { sanitizeHtml } from '@/lib/utils/sanitizeHtml';
 
 interface PatientInfo {
   age: number;
@@ -435,7 +436,7 @@ export function InteractiveCaseInterface({ caseId, onComplete: _onComplete }: In
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="prose max-w-none">
-                  <div dangerouslySetInnerHTML={{ __html: currentSectionData.content }} />
+                  <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(currentSectionData.content) }} />
                 </div>
 
                 {/* Decision Points */}

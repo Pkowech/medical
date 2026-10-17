@@ -5,6 +5,7 @@ import { useSearch } from '@/features/search/hooks/useSearch';
 import Link from 'next/link';
 import { AlertCircle, RotateCcw, Zap } from 'lucide-react';
 import { formatSearchMetrics, getRelevanceLevel, getRelevanceColorClasses, isRetryableError } from '@/features/search/utils/searchUtils';
+import { sanitizeHtml } from '@/lib/utils/sanitizeHtml';
 
 interface SearchResultsProps {
   initialQuery?: string;
@@ -236,7 +237,7 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
                     <div 
                       className="text-gray-600 text-sm leading-relaxed"
                       dangerouslySetInnerHTML={{ 
-                        __html: ((r as unknown as { snippet?: string }).snippet) || r.description || '' 
+                        __html: sanitizeHtml(((r as unknown as { snippet?: string }).snippet) || r.description || '')
                       }}
                       role="region"
                       aria-label={`Content preview for ${r.title}`}

@@ -3,6 +3,7 @@
  * Provides common utilities for search-related UI operations
  */
 
+import { sanitizeHtml } from '@/lib/utils/sanitizeHtml';
 import { SEARCH_RESULT_ROUTES, SEARCH_RESULT_COLORS, SearchResultType } from '../config/searchConfig';
 
 /**
@@ -76,13 +77,28 @@ export function truncateText(text: string, maxLength: number = 150): string {
 }
 
 /**
- * Highlight search terms in text (simple implementation)
- * For more robust highlighting, use the snippet from backend
+ * Escape html before injecting highlighted search terms.
+ */
+export function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+/**
+ * Highlight search terms in text with a sanitized HTML fragment.
  */
 export function highlightSearchTerm(text: string, term: string): string {
-  if (!term || !text) return text;
-  const regex = new RegExp(`(${term})`, 'gi');
-  return text.replace(regex, '<mark>$1</mark>');
+  if (!term || !text) return sanitizeHtml(text);
+
+  const safeText = escapeHtml(text);
+  const escapedTerm = escapeHtml(term);
+  const regex = new RegExp(`(${escapedTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+
+  return sanitizeHtml(safeText.replace(regex, '<mark>$1</mark>'));
 }
 
 /**

@@ -788,8 +788,8 @@ export default function MaterialsDashboard() {
 
               <div className="space-y-3">
                 {organizedMaterials.courses.map((course) => (
-                  <details key={course.id} open className="group overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                    <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-4 py-3.5 marker:hidden transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/60 sm:px-5">
+                  <details key={course.id} open className="group/course overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                    <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-3.5 marker:hidden transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 dark:hover:bg-slate-800/60 sm:gap-4 sm:px-5">
                       <div className="flex min-w-0 items-center gap-3">
                         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
                           <BookOpen className="h-5 w-5" />
@@ -801,38 +801,40 @@ export default function MaterialsDashboard() {
                           </p>
                         </div>
                       </div>
-                      <ChevronDown aria-hidden="true" className="h-4 w-4 shrink-0 text-slate-500 transition-transform group-open:rotate-180 dark:text-slate-400" />
+                      <ChevronDown aria-hidden="true" className="h-4 w-4 shrink-0 text-slate-500 transition-transform group-open/course:rotate-180 dark:text-slate-400" />
                     </summary>
-                    <div className="border-t border-slate-100 px-4 py-2 dark:border-slate-800 sm:px-5">
+                    <div className="space-y-3 border-t border-slate-100 px-3 py-3 dark:border-slate-800 sm:px-5">
                       {course.units.map((unit) => {
                         const unitResourceCount = unit.materials.length
                           + unit.topics.reduce((count, topic) => count + topic.materials.length, 0);
 
                         return (
-                          <section key={unit.id} className="border-b border-slate-100 py-3 last:border-b-0 dark:border-slate-800">
-                            <div className="flex items-baseline justify-between gap-3">
-                              <h4 className="min-w-0 truncate text-sm font-medium text-slate-800 dark:text-slate-100">{unit.title}</h4>
+                          <details key={unit.id} className="group/unit overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700">
+                            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-3 marker:hidden transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 dark:hover:bg-slate-800/60">
+                              <h4 className="min-w-0 flex-1 break-words text-sm font-medium text-slate-800 dark:text-slate-100">{unit.title}</h4>
                               <span className="shrink-0 text-xs text-slate-500 dark:text-slate-400">
                                 {unitResourceCount} {unitResourceCount === 1 ? 'resource' : 'resources'}
                               </span>
+                              <ChevronDown aria-hidden="true" className="h-4 w-4 shrink-0 text-slate-500 transition-transform group-open/unit:rotate-180 dark:text-slate-400" />
+                            </summary>
+                            <div className="space-y-3 border-t border-slate-100 p-3 dark:border-slate-700">
+                              {unit.materials.length > 0 && renderMaterialItems(unit.materials)}
+                              {unit.topics.map((topic) => (
+                                <details key={topic.id} className="group/topic overflow-hidden rounded-md border border-slate-200 dark:border-slate-700">
+                                  <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 marker:hidden transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 dark:hover:bg-slate-800/60">
+                                    <h5 className="min-w-0 flex-1 break-words text-xs font-medium text-slate-700 dark:text-slate-200">{topic.title}</h5>
+                                    <span className="shrink-0 text-xs text-slate-500 dark:text-slate-400">
+                                      {topic.materials.length} {topic.materials.length === 1 ? 'resource' : 'resources'}
+                                    </span>
+                                    <ChevronDown aria-hidden="true" className="h-4 w-4 shrink-0 text-slate-500 transition-transform group-open/topic:rotate-180 dark:text-slate-400" />
+                                  </summary>
+                                  <div className="border-t border-slate-100 dark:border-slate-700">
+                                    {renderMaterialItems(topic.materials)}
+                                  </div>
+                                </details>
+                              ))}
                             </div>
-                            {unit.materials.length > 0 && (
-                              <div className="mt-2">
-                                {renderMaterialItems(unit.materials)}
-                              </div>
-                            )}
-                            {unit.topics.map((topic) => (
-                              <section key={topic.id} className="mt-3 border-t border-slate-100 pt-3 dark:border-slate-800">
-                                <div className="mb-1 flex items-baseline justify-between gap-3">
-                                  <h5 className="min-w-0 truncate text-xs font-medium text-slate-600 dark:text-slate-300">{topic.title}</h5>
-                                  <span className="shrink-0 text-xs text-slate-500 dark:text-slate-400">
-                                    {topic.materials.length} {topic.materials.length === 1 ? 'resource' : 'resources'}
-                                  </span>
-                                </div>
-                                {renderMaterialItems(topic.materials)}
-                              </section>
-                            ))}
-                          </section>
+                          </details>
                         );
                       })}
                     </div>
