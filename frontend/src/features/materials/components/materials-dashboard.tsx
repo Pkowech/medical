@@ -337,128 +337,152 @@ export default function MaterialsDashboard() {
     { id: 'revision_packs', label: 'Revision Packs' },
     { id: 'research', label: 'Research Papers' },
   ];
+  const contextTitle = filterContext === 'owned'
+    ? 'My materials'
+    : filterContext === 'shared'
+      ? 'Shared materials'
+      : 'Recommended review';
+  const contextDescription = filterContext === 'owned'
+    ? 'Keep your study resources organized by course, unit, and topic.'
+    : filterContext === 'shared'
+      ? 'Materials available to you from your courses and classmates.'
+      : 'Review resources selected to help strengthen topics from your recent quiz results.';
 
   return (
-    <div className="space-y-8 min-h-screen pb-20">
-      {/* Top Control Bar */}
+    <div className="mx-auto min-h-full w-full max-w-screen-2xl min-w-0 space-y-6 pb-20">
+      {/* Library heading and controls */}
       {!selectedCourseId && (
-      <div className="flex flex-col xl:flex-row gap-6 justify-between items-start xl:items-center bg-white dark:bg-slate-900/50 p-1 rounded-3xl">
-        
-        {/* Context Tabs */}
-        <div className="flex p-1 bg-slate-100 dark:bg-slate-800 rounded-2xl w-full xl:w-auto overflow-x-auto">
-          {[
-            { id: 'owned', label: 'My Drive', icon: Database },
-            { id: 'shared', label: 'Shared with me', icon: BookOpen },
-            { id: 'for_you', label: 'For You', icon: Sparkles, highlight: true },
-          ].map((tab) => {
-            const Icon = tab.icon;
-            const isActive = filterContext === tab.id;
-            const isHighlight = tab.highlight;
-            
-            return (
-              <button
-                key={tab.id}
-                onClick={() => {
-                  setFilterContext(tab.id as 'owned' | 'shared' | 'for_you');
-                  if (tab.id !== 'shared') {
-                    setSelectedCourseId(undefined);
-                    router.replace('/study-planner/materials');
-                  }
-                }}
-                title={tab.label}
-                className={`
-                  flex-1 xl:flex-initial flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-sm font-bold transition-all whitespace-nowrap
-                  ${isActive 
-                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-md shadow-slate-200/50 dark:shadow-none' 
-                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
-                  }
-                  ${!isActive && isHighlight ? 'text-indigo-600 dark:text-indigo-400' : ''}
-                `}
-              >
-                <Icon className={`w-4 h-4 ${isHighlight && !isActive ? 'text-indigo-500 animate-pulse' : ''}`} />
-                <span>{tab.label}</span>
-                {isHighlight && isActive && (
-                   <span className="ml-1 flex h-2 w-2 relative">
-                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-                     <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
-                   </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Right Actions */}
-        <div className="flex flex-col sm:flex-row gap-4 w-full xl:w-auto">
-          {((filterContext as string) !== 'for_you' && (filterContext as string) !== 'local') && ( // Hide search for 'local' as well
-            <div className="relative flex-1 sm:w-80 group">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
-              <input
-                type="text"
-                placeholder="Search knowledge base..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-11 pr-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-sm font-medium focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all shadow-sm"
-              />
+        <section className="space-y-5">
+          <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+            <div>
+              <p className="text-sm font-medium text-blue-700 dark:text-blue-300">Study library</p>
+              <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">
+                {contextTitle}
+              </h1>
+              <p className="mt-1 max-w-2xl text-sm text-slate-600 dark:text-slate-400">
+                {contextDescription}
+              </p>
             </div>
-          )}
-
-          <div className="flex gap-3">
-             {filterContext !== 'for_you' && (
-               <select
-                 aria-label="Sort materials"
-                 value={sortBy === 'title' ? 'title' : sortOrder === 'asc' ? 'oldest' : 'newest'}
-                 onChange={(event) => {
-                   const value = event.target.value;
-                   setSortBy(value === 'title' ? 'title' : 'createdAt');
-                   setSortOrder(value === 'oldest' || value === 'title' ? 'asc' : 'desc');
-                 }}
-                 className="rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-600 outline-none focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
-               >
-                 <option value="newest">Newest</option>
-                 <option value="oldest">Oldest</option>
-                 <option value="title">A–Z</option>
-               </select>
-             )}
-             {filterContext !== 'for_you' && (
-                <div className="flex items-center bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-1 shadow-sm">
-                  <button
-                    onClick={() => setViewMode('list')}
-                    title="List view"
-                    aria-label="Switch to list view"
-                    className={`p-2.5 rounded-xl transition-all ${viewMode === 'list' ? 'bg-slate-100 dark:bg-slate-700 text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
-                  >
-                    <LayoutList className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => setViewMode('grid')}
-                    title="Grid view"
-                    aria-label="Switch to grid view"
-                    className={`p-2.5 rounded-xl transition-all ${viewMode === 'grid' ? 'bg-slate-100 dark:bg-slate-700 text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
-                  >
-                    <LayoutGrid className="w-4 h-4" />
-                  </button>
-                </div>
-             )}
-
-            <Button 
-              onClick={() => router.push('/study-planner/materials/upload')} 
-              className="h-auto py-3 px-6 bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-200 rounded-2xl font-bold shadow-xl shadow-slate-900/10 transition-all hover:scale-[1.02] active:scale-[0.98]"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Upload
-            </Button>
+            {filterContext !== 'for_you' && (
+              <Button
+                onClick={() => router.push('/study-planner/materials/upload')}
+                className="h-10 shrink-0 gap-2 rounded-lg bg-blue-600 px-4 text-white hover:bg-blue-700"
+              >
+                <Plus className="h-4 w-4" />
+                Add material
+              </Button>
+            )}
           </div>
-        </div>
 
-      </div>
+          <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex w-full flex-wrap gap-1 rounded-lg bg-slate-100 p-1 dark:bg-slate-800 lg:w-auto">
+                {[
+                  { id: 'owned', label: 'My Drive', icon: Database },
+                  { id: 'shared', label: 'Shared with me', icon: BookOpen },
+                  { id: 'for_you', label: 'For You', icon: Sparkles },
+                ].map((tab) => {
+                  const Icon = tab.icon;
+                  const isActive = filterContext === tab.id;
+
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      aria-pressed={isActive}
+                      onClick={() => {
+                        setFilterContext(tab.id as 'owned' | 'shared' | 'for_you');
+                        if (tab.id !== 'shared') {
+                          setSelectedCourseId(undefined);
+                          router.replace('/study-planner/materials');
+                        }
+                      }}
+                      className={`inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 lg:flex-none ${
+                        isActive
+                          ? 'bg-white text-blue-700 shadow-sm dark:bg-slate-700 dark:text-blue-300'
+                          : 'text-slate-600 hover:bg-white/70 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-700/70 dark:hover:text-white'
+                      }`}
+                    >
+                      <Icon className="h-4 w-4" />
+                      {tab.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="flex min-w-0 flex-col gap-2 sm:flex-row lg:flex-1 lg:justify-end">
+                {filterContext !== 'for_you' && (
+                  <div className="group relative min-w-0 flex-1 sm:max-w-sm">
+                    <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 transition-colors group-focus-within:text-blue-600" />
+                    <input
+                      type="search"
+                      aria-label="Search materials"
+                      placeholder="Search your materials"
+                      value={searchTerm}
+                      onChange={(event) => setSearchTerm(event.target.value)}
+                      className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-10 pr-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:ring-blue-950"
+                    />
+                  </div>
+                )}
+
+                {filterContext !== 'for_you' && (
+                  <div className="flex items-center gap-2">
+                    <label htmlFor="materials-sort" className="sr-only">Sort materials</label>
+                    <select
+                      id="materials-sort"
+                      value={sortBy === 'title' ? 'title' : sortOrder === 'asc' ? 'oldest' : 'newest'}
+                      onChange={(event) => {
+                        const value = event.target.value;
+                        setSortBy(value === 'title' ? 'title' : 'createdAt');
+                        setSortOrder(value === 'oldest' || value === 'title' ? 'asc' : 'desc');
+                      }}
+                      className="h-10 min-w-28 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:focus:ring-blue-950"
+                    >
+                      <option value="newest">Newest</option>
+                      <option value="oldest">Oldest</option>
+                      <option value="title">A–Z</option>
+                    </select>
+                    <div className="flex h-10 items-center rounded-lg border border-slate-200 bg-white p-1 dark:border-slate-700 dark:bg-slate-950">
+                      <button
+                        type="button"
+                        onClick={() => setViewMode('list')}
+                        aria-label="Switch to list view"
+                        aria-pressed={viewMode === 'list'}
+                        className={`inline-flex h-8 w-8 items-center justify-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+                          viewMode === 'list' ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
+                        }`}
+                      >
+                        <LayoutList className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setViewMode('grid')}
+                        aria-label="Switch to grid view"
+                        aria-pressed={viewMode === 'grid'}
+                        className={`inline-flex h-8 w-8 items-center justify-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+                          viewMode === 'grid' ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
+                        }`}
+                      >
+                        <LayoutGrid className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
       )}
 
       {selectedCourseId && (
         <section className="mx-auto w-full max-w-5xl space-y-5">
           <button
             type="button"
-            onClick={() => router.push('/study-planner/materials')}
+            onClick={() => {
+              setSelectedCourseId(undefined);
+              setFilterContext('shared');
+              router.replace('/study-planner/materials');
+            }}
             className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 transition-colors hover:text-blue-700 dark:text-slate-300 dark:hover:text-blue-300"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -528,7 +552,7 @@ export default function MaterialsDashboard() {
                     Upcoming
                   </div>
                   <p className="mt-3 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-                    Course deadlines added by your instructor will appear here.
+                    No upcoming work has been added.
                   </p>
                 </section>
                 <section id="course-people" className="scroll-mt-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
@@ -646,15 +670,17 @@ export default function MaterialsDashboard() {
       
       {/* Intent Filters (Only show on library views) */}
       {!selectedCourseId && filterContext !== 'for_you' && (
-        <div className="flex gap-2 overflow-x-auto pb-4 no-scrollbar">
+        <div className="flex min-w-0 flex-wrap gap-2">
           {intents.map((intent) => (
             <button
               key={intent.id}
+              type="button"
               onClick={() => setIntentFilter(intent.id)}
-              className={`px-5 py-2.5 rounded-full text-xs font-bold uppercase tracking-wider border transition-all whitespace-nowrap ${
+              aria-pressed={intentFilter === intent.id}
+              className={`min-h-9 rounded-full border px-4 py-2 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
                 intentFilter === intent.id
-                  ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-transparent shadow-lg'
-                  : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
+                  ? 'border-blue-600 bg-blue-600 text-white dark:border-blue-500 dark:bg-blue-500'
+                  : 'border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-blue-800 dark:hover:bg-slate-800'
               }`}
             >
               {intent.label}
@@ -666,7 +692,7 @@ export default function MaterialsDashboard() {
       {/* Main Content Area */}
       {!selectedCourseId && (filterContext === 'for_you' ? (
         // --- AI Recommendations View ---
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-5">
           <div className="flex items-center gap-3 mb-2">
             <div className="p-2 bg-indigo-50 dark:bg-indigo-500/10 rounded-lg">
               <BrainCircuit className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
@@ -686,13 +712,13 @@ export default function MaterialsDashboard() {
               Could not load your recommendations: {recommendationError instanceof Error ? recommendationError.message : 'Please try again later.'}
             </div>
           ) : recommendations?.length ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
               {recommendations.map((rec) => (
                 <RecommendationCard key={rec.id} suggestion={rec} />
               ))}
             </div>
           ) : (
-            <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center dark:border-slate-700 dark:bg-slate-900">
+            <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center dark:border-slate-700 dark:bg-slate-900">
               <h3 className="font-semibold text-slate-900 dark:text-white">No targeted review suggestions yet</h3>
               <p className="mx-auto mt-2 max-w-xl text-sm text-slate-500">
                 Recommendations appear when recorded quiz scores identify a topic below 70% and there is a matching course, unit, or topic resource that you own or can access through sharing.
@@ -702,7 +728,7 @@ export default function MaterialsDashboard() {
         </div>
       ) : (
         // --- Materials Library View ---
-        <>
+        <div className="min-w-0 space-y-5">
           {(!courseFilterInitialized || isLoading) && !allMaterials.length ? (
             <div className="flex justify-center py-20">
               <div className="animate-spin rounded-full h-12 w-12 border-4 border-slate-200 border-t-indigo-500" />
@@ -713,95 +739,121 @@ export default function MaterialsDashboard() {
             </div>
           ) : allMaterials.length === 0 ? (
             // Strategic Empty State
-            <div className="text-center py-24 bg-slate-50 dark:bg-slate-900/50 rounded-3xl border border-dashed border-slate-300 dark:border-slate-700 group cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800/50 transition-colors" onClick={() => router.push('/study-planner/materials/upload')}>
-              <div className="w-20 h-20 bg-white dark:bg-slate-800 rounded-full shadow-xl shadow-slate-200/50 dark:shadow-none flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300">
-                <Upload className="w-10 h-10 text-indigo-500" />
+            <div className="rounded-xl border border-dashed border-slate-300 bg-white px-5 py-16 text-center dark:border-slate-700 dark:bg-slate-900">
+              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
+                <Upload className="h-6 w-6" />
               </div>
-              <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
-                {filterContext === 'shared' ? 'Nothing shared with you yet' : 'Start your Knowledge Vault'}
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
+                {debouncedSearch || intentFilter !== 'all'
+                  ? 'No matching materials'
+                  : filterContext === 'shared' ? 'Nothing shared with you yet' : 'Your library is ready'}
               </h3>
-              <p className="text-slate-500 max-w-md mx-auto mb-8 leading-relaxed">
-                {filterContext === 'shared'
+              <p className="mx-auto mt-2 mb-6 max-w-md text-sm leading-relaxed text-slate-600 dark:text-slate-400">
+                {debouncedSearch || intentFilter !== 'all'
+                  ? 'Try a different search or clear the resource type filter.'
+                  : filterContext === 'shared'
                   ? 'Materials shared directly with you or with one of your classes will appear here.'
-                  : 'Upload materials to My Drive, organize them by course and unit, and choose whether to share them with a class.'}
+                  : 'Add a study resource or connect it to one of your courses to keep everything organized.'}
               </p>
-              <Button onClick={(e) => { e.stopPropagation(); router.push('/study-planner/materials/upload'); }} className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-6 rounded-xl font-bold text-base shadow-lg shadow-indigo-500/20">
-                Upload Material
-              </Button>
+              {debouncedSearch || intentFilter !== 'all' ? (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setSearchTerm('');
+                    setDebouncedSearch('');
+                    setIntentFilter('all');
+                  }}
+                  className="rounded-lg"
+                >
+                  Clear filters
+                </Button>
+              ) : filterContext !== 'shared' ? (
+                <Button onClick={() => router.push('/study-planner/materials/upload')} className="rounded-lg bg-blue-600 text-white hover:bg-blue-700">
+                  Add material
+                </Button>
+              ) : null}
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="flex justify-between items-center px-2">
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-                  {totalCount} Resources Found
+              <div className="flex items-center justify-between border-b border-slate-200 pb-3 dark:border-slate-800">
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                  {totalCount} {totalCount === 1 ? 'resource' : 'resources'}
                 </span>
+                {debouncedSearch && (
+                  <span className="max-w-[60%] truncate text-xs text-slate-500 dark:text-slate-400">
+                    Results for “{debouncedSearch}”
+                  </span>
+                )}
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {organizedMaterials.courses.map((course) => (
-                  <details key={course.id} open className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                    <summary className="flex cursor-pointer list-none items-center justify-between gap-4 bg-gradient-to-r from-slate-50 to-white px-5 py-4 marker:hidden dark:from-slate-800 dark:to-slate-900">
+                  <details key={course.id} open className="group overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                    <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-4 py-3.5 marker:hidden transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/60 sm:px-5">
                       <div className="flex min-w-0 items-center gap-3">
-                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300">
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
                           <BookOpen className="h-5 w-5" />
                         </span>
                         <div className="min-w-0">
-                          <h3 className="truncate font-bold text-slate-900 dark:text-white">{course.title}</h3>
+                          <h3 className="truncate text-sm font-semibold text-slate-900 dark:text-white">{course.title}</h3>
                           <p className="text-xs text-slate-500 dark:text-slate-400">
                             {course.units.length} {course.units.length === 1 ? 'unit' : 'units'} · {course.resourceCount} {course.resourceCount === 1 ? 'resource' : 'resources'}
                           </p>
                         </div>
                       </div>
-                      <ChevronDown className="h-5 w-5 shrink-0 text-slate-400 transition-transform group-open:rotate-180" />
+                      <ChevronDown aria-hidden="true" className="h-4 w-4 shrink-0 text-slate-500 transition-transform group-open:rotate-180 dark:text-slate-400" />
                     </summary>
-                    <div className="space-y-3 border-t border-slate-100 p-4 dark:border-slate-800">
-                      {course.units.map((unit) => (
-                        <section key={unit.id} className="overflow-hidden rounded-xl border border-slate-100 dark:border-slate-800">
-                          <div className="flex items-center justify-between gap-3 bg-slate-50 px-4 py-3 dark:bg-slate-800/70">
-                            <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-100">{unit.title}</h4>
-                            <span className="text-xs text-slate-500 dark:text-slate-400">
-                              {unit.materials.length + unit.topics.reduce((count, topic) => count + topic.materials.length, 0)} resources
-                            </span>
-                          </div>
-                          {unit.materials.length > 0 && (
-                            <div className="border-t border-slate-100 dark:border-slate-800">
-                              <h5 className="px-4 pt-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Unit resources</h5>
-                              {renderMaterialItems(unit.materials)}
+                    <div className="border-t border-slate-100 px-4 py-2 dark:border-slate-800 sm:px-5">
+                      {course.units.map((unit) => {
+                        const unitResourceCount = unit.materials.length
+                          + unit.topics.reduce((count, topic) => count + topic.materials.length, 0);
+
+                        return (
+                          <section key={unit.id} className="border-b border-slate-100 py-3 last:border-b-0 dark:border-slate-800">
+                            <div className="flex items-baseline justify-between gap-3">
+                              <h4 className="min-w-0 truncate text-sm font-medium text-slate-800 dark:text-slate-100">{unit.title}</h4>
+                              <span className="shrink-0 text-xs text-slate-500 dark:text-slate-400">
+                                {unitResourceCount} {unitResourceCount === 1 ? 'resource' : 'resources'}
+                              </span>
                             </div>
-                          )}
-                          {unit.topics.map((topic) => (
-                            <details key={topic.id} className="group/topic border-t border-slate-100 dark:border-slate-800">
-                              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 marker:hidden">
-                                <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{topic.title}</span>
-                                <span className="flex items-center gap-2 text-xs text-slate-500">
-                                  {topic.materials.length} {topic.materials.length === 1 ? 'resource' : 'resources'}
-                                  <ChevronDown className="h-4 w-4 transition-transform group-open/topic:rotate-180" />
-                                </span>
-                              </summary>
-                              {renderMaterialItems(topic.materials)}
-                            </details>
-                          ))}
-                        </section>
-                      ))}
+                            {unit.materials.length > 0 && (
+                              <div className="mt-2">
+                                {renderMaterialItems(unit.materials)}
+                              </div>
+                            )}
+                            {unit.topics.map((topic) => (
+                              <section key={topic.id} className="mt-3 border-t border-slate-100 pt-3 dark:border-slate-800">
+                                <div className="mb-1 flex items-baseline justify-between gap-3">
+                                  <h5 className="min-w-0 truncate text-xs font-medium text-slate-600 dark:text-slate-300">{topic.title}</h5>
+                                  <span className="shrink-0 text-xs text-slate-500 dark:text-slate-400">
+                                    {topic.materials.length} {topic.materials.length === 1 ? 'resource' : 'resources'}
+                                  </span>
+                                </div>
+                                {renderMaterialItems(topic.materials)}
+                              </section>
+                            ))}
+                          </section>
+                        );
+                      })}
                     </div>
                   </details>
                 ))}
 
                 {organizedMaterials.unassigned.length > 0 && (
-                  <details open className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                    <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 marker:hidden">
+                  <details open className="group overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                    <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-4 py-3.5 marker:hidden transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/60 sm:px-5">
                       <div className="flex min-w-0 items-center gap-3">
-                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                           <FolderOpen className="h-5 w-5" />
                         </span>
                         <div>
-                          <h3 className="font-bold text-slate-900 dark:text-white">Personal &amp; unassigned</h3>
+                          <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Personal &amp; unassigned</h3>
                           <p className="text-xs text-slate-500 dark:text-slate-400">
                             {organizedMaterials.unassigned.length} resources not linked to a course
                           </p>
                         </div>
                       </div>
-                      <ChevronDown className="h-5 w-5 shrink-0 text-slate-400 transition-transform group-open:rotate-180" />
+                      <ChevronDown aria-hidden="true" className="h-4 w-4 shrink-0 text-slate-500 transition-transform group-open:rotate-180 dark:text-slate-400" />
                     </summary>
                     {viewMode === 'list' ? (
                       <div className="divide-y divide-slate-100 border-t border-slate-100 dark:divide-slate-800 dark:border-slate-800">
@@ -846,7 +898,7 @@ export default function MaterialsDashboard() {
               )}
             </div>
           )}
-        </>
+        </div>
       ))}
     </div>
   );

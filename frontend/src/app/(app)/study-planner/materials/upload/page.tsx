@@ -6,7 +6,7 @@ import { courseService } from '@/features/courses/services/courseService';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import type { Course, CourseEnrollment, CourseUnit, Lesson, Topic } from '@/shared/types/courseInterface';
-import { FileUp, FolderOpen, HardDrive, Link2 } from 'lucide-react';
+import { ArrowLeft, FileUp, FolderOpen, HardDrive, Link2 } from 'lucide-react';
 import DriveFolderImport from '@/features/materials/components/DriveFolderImport';
 import { usePermissions } from '@/features/auth/hooks/usePermissions';
 import { Role } from '@/shared/enums/role.enum';
@@ -250,7 +250,7 @@ export default function UploadMaterialPage() {
 
     if (!ALLOWED_TYPES.includes(file.type)) {
       toast.error(
-        'Unsupported file type. Allowed types: pdf, doc, docx, ppt, pptx, jpg, png, mp4.'
+        'Unsupported file type. Choose a PDF, DOC, DOCX, PPT, PPTX, or supported video file.'
       );
       return;
     }
@@ -316,20 +316,34 @@ export default function UploadMaterialPage() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto py-8 px-4">
-      <h1 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">
-        {canManagePlatformLibrary ? 'Upload Material' : 'Add Personal Study Material'}
-      </h1>
-      <form onSubmit={handleSubmit} className="space-y-6 bg-white dark:bg-slate-900 p-6 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm" aria-label="Upload material form">
+    <div className="mx-auto w-full max-w-3xl px-1 py-6 sm:px-2 sm:py-8">
+      <button
+        type="button"
+        onClick={() => router.push('/study-planner/materials')}
+        className="mb-5 inline-flex items-center gap-2 text-sm font-medium text-slate-600 transition-colors hover:text-blue-700 dark:text-slate-300 dark:hover:text-blue-300"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Back to materials
+      </button>
+      <div className="mb-5">
+        <p className="text-sm font-medium text-blue-700 dark:text-blue-300">Study library</p>
+        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">
+          {canManagePlatformLibrary ? 'Add a study material' : 'Add personal study material'}
+        </h1>
+        <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+          Choose a file or link, add details, and optionally organize it with a course.
+        </p>
+      </div>
+      <form onSubmit={handleSubmit} className="space-y-7 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6" aria-label="Upload material form">
         <div>
-          <span className="mb-2 block text-sm font-medium text-gray-700 dark:text-slate-300">Material source</span>
-          <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1 dark:border-slate-700 dark:bg-slate-800" role="group" aria-label="Material source">
+          <span className="mb-2 block text-sm font-medium text-slate-800 dark:text-slate-200">Material source</span>
+          <div className="flex w-full flex-wrap gap-1 rounded-lg bg-slate-100 p-1 dark:bg-slate-800 sm:w-fit" role="group" aria-label="Material source">
             {canManagePlatformLibrary && (
               <button
                 type="button"
                 aria-pressed={source === 'upload'}
                 onClick={() => setSource('upload')}
-                className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium ${source === 'upload' ? 'bg-white text-blue-700 shadow-sm dark:bg-slate-700 dark:text-blue-300' : 'text-slate-600 dark:text-slate-300'}`}
+                className={`inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors sm:flex-none ${source === 'upload' ? 'bg-white text-blue-700 shadow-sm dark:bg-slate-700 dark:text-blue-300' : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'}`}
               >
                 <FileUp className="h-4 w-4" /> Upload to library
               </button>
@@ -338,7 +352,7 @@ export default function UploadMaterialPage() {
               type="button"
               aria-pressed={source === 'drive'}
               onClick={() => setSource('drive')}
-              className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium ${source === 'drive' ? 'bg-white text-blue-700 shadow-sm dark:bg-slate-700 dark:text-blue-300' : 'text-slate-600 dark:text-slate-300'}`}
+              className={`inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors sm:flex-none ${source === 'drive' ? 'bg-white text-blue-700 shadow-sm dark:bg-slate-700 dark:text-blue-300' : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'}`}
             >
               <HardDrive className="h-4 w-4" /> Google Drive
             </button>
@@ -346,7 +360,7 @@ export default function UploadMaterialPage() {
               type="button"
               aria-pressed={source === 'folder'}
               onClick={() => setSource('folder')}
-              className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium ${source === 'folder' ? 'bg-white text-blue-700 shadow-sm dark:bg-slate-700 dark:text-blue-300' : 'text-slate-600 dark:text-slate-300'}`}
+              className={`inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors sm:flex-none ${source === 'folder' ? 'bg-white text-blue-700 shadow-sm dark:bg-slate-700 dark:text-blue-300' : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'}`}
             >
               <FolderOpen className="h-4 w-4" /> Import folder
             </button>
@@ -369,7 +383,7 @@ export default function UploadMaterialPage() {
             id="title"
             value={title}
             onChange={e => setTitle(e.target.value)}
-            className="block w-full border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-900 dark:text-white px-3 py-2 rounded-md focus:ring-blue-500 focus:border-blue-500"
+            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:ring-blue-950"
             required
             aria-required="true"
             placeholder="e.g. Introduction to Pharmacology"
@@ -384,21 +398,21 @@ export default function UploadMaterialPage() {
             id="description"
             value={description}
             onChange={e => setDescription(e.target.value)}
-            className="block w-full border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-900 dark:text-white px-3 py-2 rounded-md focus:ring-blue-500 focus:border-blue-500"
+            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:ring-blue-950"
             rows={4}
             placeholder="Brief description of the material..."
           />
         </div>
 
-        <div className="bg-blue-50 dark:bg-blue-900/10 p-4 rounded-lg border border-blue-100 dark:border-blue-800/30 space-y-4">
-          <h3 className="text-sm font-semibold text-blue-800 dark:text-blue-300 uppercase tracking-wider">
+        <div className="space-y-4 rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/60 sm:p-5">
+          <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">
             {canManagePlatformLibrary ? 'Placement' : source === 'drive' ? 'Private course assignment' : 'Personal storage'}
           </h3>
           
           {canManagePlatformLibrary || source === 'drive' ? (
             <>
           <div>
-            <label htmlFor="course-select" className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+            <label htmlFor="course-select" className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">
               Course <span className="text-gray-400">(optional)</span>
             </label>
             <select
@@ -406,7 +420,7 @@ export default function UploadMaterialPage() {
               value={selectedCourseId}
               onChange={e => setSelectedCourseId(e.target.value)}
               aria-busy={isLoadingCourses}
-              className="block w-full border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-900 dark:text-white px-3 py-2 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:ring-blue-950"
             >
               <option value="">
                 {source === 'upload'
@@ -428,7 +442,7 @@ export default function UploadMaterialPage() {
           </div>
 
           <div>
-            <label htmlFor="unit-select" className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+            <label htmlFor="unit-select" className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">
               Unit <span className="text-gray-400">(optional)</span>
             </label>
             <select
@@ -437,7 +451,7 @@ export default function UploadMaterialPage() {
               onChange={e => setUnitId(e.target.value)}
               disabled={!selectedCourseId || isLoadingUnits || units.length === 0}
               aria-busy={isLoadingUnits}
-              className="block w-full border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-900 dark:text-white px-3 py-2 rounded-md focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:bg-gray-100 dark:disabled:bg-slate-900"
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:ring-blue-950"
             >
               <option value="">
                 {isLoadingUnits ? 'Loading units…' : units.length === 0 && selectedCourseId ? 'No units found' : '-- Select a Unit --'}
@@ -454,7 +468,7 @@ export default function UploadMaterialPage() {
           </div>
             </>
           ) : (
-            <p className="text-sm text-blue-800 dark:text-blue-200">
+            <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">
               Personal files stay in your Google Drive. MedTrack stores a private link only; uploading
               to the MedTrack library and sharing with classmates is reserved for instructors.
             </p>
@@ -483,7 +497,7 @@ export default function UploadMaterialPage() {
 
           {(canManagePlatformLibrary || source === 'drive') && (
             <div>
-            <label htmlFor="topic-select" className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+            <label htmlFor="topic-select" className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">
               Topic / Lesson (optional)
             </label>
             <select
@@ -491,7 +505,7 @@ export default function UploadMaterialPage() {
               value={topicId}
               onChange={e => setTopicId(e.target.value)}
               disabled={!unitId || topics.length === 0}
-              className="block w-full border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-900 dark:text-white px-3 py-2 rounded-md focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:bg-gray-100 dark:disabled:bg-slate-900"
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:ring-blue-950"
             >
               <option value="">{topics.length === 0 && unitId ? 'No topics found' : '-- Select a Topic --'}</option>
               {topics.map(t => (
@@ -500,7 +514,7 @@ export default function UploadMaterialPage() {
                 </option>
               ))}
             </select>
-            <p className="mt-1 text-xs text-gray-500 dark:text-slate-500">
+            <p className="mt-1.5 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
             {canManagePlatformLibrary
               ? 'Assign a course for course-level resources such as textbooks. Add a unit or topic for more specific material. Leave placement blank for your library.'
               : 'Choose a course you are enrolled in to organize this personal Drive link. It remains private to you and is not shared with classmates.'}
@@ -525,7 +539,7 @@ export default function UploadMaterialPage() {
           </label>
           </>}
           {!canManagePlatformLibrary && source === 'drive' && (
-            <p className="text-sm text-blue-800 dark:text-blue-200">
+            <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">
               Course assignment is for your own organization only. The Drive file stays in your account, and classmates cannot access this link through MedTrack.
             </p>
           )}
@@ -540,7 +554,7 @@ export default function UploadMaterialPage() {
               id="type-select"
               value={type}
               onChange={e => setType(e.target.value)}
-              className="block w-full border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-900 dark:text-white px-3 py-2 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:ring-blue-950"
             >
               <option value="pdf">PDF Document</option>
               <option value="video">Video</option>
@@ -572,7 +586,7 @@ export default function UploadMaterialPage() {
                 value={driveUrl}
                 onChange={e => setDriveUrl(e.target.value)}
                 placeholder="https://drive.google.com/file/d/..."
-                className="block w-full rounded-md border border-gray-300 bg-white py-2 pl-10 pr-3 text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                className="w-full rounded-lg border border-slate-300 bg-white py-2.5 pl-10 pr-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:ring-blue-950"
                 required={source === 'drive'}
               />
             </div>

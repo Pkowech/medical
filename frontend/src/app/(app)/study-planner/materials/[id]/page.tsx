@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { useRouter, useParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Button } from '@/shared/components/ui/button';
-import { ArrowLeft, ExternalLink, File, Share, Trash, Maximize2, Minimize2, Eye, MessageSquare, Sparkles, Download } from 'lucide-react';
+import { ArrowLeft, ExternalLink, File, Share, Trash, Maximize2, Minimize2, Eye, Download } from 'lucide-react';
 import materialService from '@/features/courses/services/materialService';
 import useMaterialProgressTracker from '@/features/learning-management/hooks/useMaterialProgressTracker';
 import PDFViewer from '@/shared/components/pdf/PDFViewer';
@@ -18,6 +18,15 @@ import { useAuth } from '@/features/auth/hooks/useAuth';
 import { usePageHeader } from '@/core/providers/HeaderContext';
 import { hasPermission, Permission } from '@/lib/auth/roles';
 import { motion, AnimatePresence } from 'framer-motion';
+import { toast } from 'sonner';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/shared/components/ui/dialog';
 
 const isUrl = (str: string) => {
   try {
@@ -41,10 +50,10 @@ export default function MaterialViewPage() {
   const [isLoadingMaterial, setIsLoadingMaterial] = useState(true);
   const [error, setError] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [pdfCurrentPage, setPdfCurrentPage] = useState<number>(1);
   const [pdfNumPages, setPdfNumPages] = useState<number | null>(null);
   const [focusMode, setFocusMode] = useState(false);
-  const [showAssistant, setShowAssistant] = useState(false);
   
   const [localFile, setLocalFile] = useState<File | null>(null);
   
@@ -152,8 +161,8 @@ export default function MaterialViewPage() {
         (async () => {
           try {
             await api.post(`/materials/${material.id}/track/view`, { page: current });
-          } catch (err) {
-            console.warn('[MaterialView] Page tracking failed');
+          } catch (trackingError) {
+            console.warn('[MaterialView] Page tracking failed; queueing offline update.', trackingError);
             await offlineSync.addToQueue({
               materialId: material.id,
               page: current,
@@ -166,7 +175,13 @@ export default function MaterialViewPage() {
   }, [material?.id]);
 
   // 4. Stable PDF Headers
-  const accessToken = (session as any)?.accessToken;
+  const accessToken =
+    typeof session === 'object' &&
+    session !== null &&
+    'accessToken' in session &&
+    typeof session.accessToken === 'string'
+      ? session.accessToken
+      : undefined;
   const pdfHeaders = useMemo(() => {
     if (!accessToken) return undefined;
     return { Authorization: `Bearer ${accessToken}` };
@@ -174,12 +189,30 @@ export default function MaterialViewPage() {
 
   const handleDelete = async () => {
     if (!materialId) return;
+    setIsDeleting(true);
     try {
       await materialService.deleteMaterial(materialId);
+      toast.success('Material deleted.');
       router.push('/study-planner/materials');
     } catch (err) {
       console.error('Error deleting material:', err);
-      alert('Failed to delete material.');
+      toast.error(err instanceof Error ? err.message : 'Failed to delete material.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleShare = async () => {
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: material?.title, url: window.location.href });
+      } else {
+        await navigator.clipboard.writeText(window.location.href);
+        toast.success('Material link copied.');
+      }
+    } catch (shareError) {
+      if (shareError instanceof DOMException && shareError.name === 'AbortError') return;
+      toast.error('Could not share this material.');
     }
   };
 
@@ -275,28 +308,28 @@ export default function MaterialViewPage() {
   }
 
   return (
-    <div className={`flex flex-col h-full bg-gray-50 dark:bg-slate-900 transition-colors duration-300 overflow-hidden ${focusMode ? 'py-0' : 'p-4 md:p-6'}`}>
+    <div className={`flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-slate-50 transition-colors duration-300 dark:bg-slate-950 ${focusMode ? 'py-0' : 'p-3 sm:p-4 md:p-6'}`}>
       <div className={`flex flex-col h-full mx-auto w-full transition-all duration-300 ${focusMode ? 'max-w-full' : 'max-w-7xl'}`}>
         <AnimatePresence>
           {!focusMode && (
-            <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex justify-between items-center mb-4 shrink-0">
-              <Button variant="ghost" onClick={() => router.push('/study-planner/materials')}>
-                <ArrowLeft className="mr-2 h-4 w-4" /> Back
+            <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-2">
+              <Button variant="ghost" onClick={() => router.push('/study-planner/materials')} className="rounded-lg">
+                <ArrowLeft className="mr-2 h-4 w-4" /> Materials
               </Button>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => setShowAssistant(!showAssistant)}>
-                  <MessageSquare className="mr-2 h-4 w-4" /> {showAssistant ? 'Hide Assistant' : 'Study Assistant'}
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <Button variant="outline" size="sm" onClick={handleShare} aria-label="Share material" className="rounded-lg">
+                  <Share className="mr-2 h-4 w-4" /> Share
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => setFocusMode(true)}>
+                <Button variant="outline" size="sm" onClick={() => setFocusMode(true)} className="rounded-lg">
                   <Maximize2 className="mr-2 h-4 w-4" /> Focus
                 </Button>
-                {material?.fileUrl && (
-                  <Button variant="outline" size="sm" onClick={() => window.open(material.fileUrl, '_blank')}>
+                {(material.fileUrl || material.url) && (
+                  <Button variant="outline" size="sm" onClick={() => window.open(material.fileUrl || material.url, '_blank', 'noopener,noreferrer')} className="rounded-lg">
                     <Download className="mr-2 h-4 w-4" /> Download Original
                   </Button>
                 )}
                 {canDelete && (
-                  <Button variant="destructive" size="sm" onClick={() => setShowDeleteConfirm(true)}>
+                  <Button variant="destructive" size="sm" onClick={() => setShowDeleteConfirm(true)} className="rounded-lg">
                     <Trash className="mr-2 h-4 w-4" /> Delete
                   </Button>
                 )}
@@ -305,10 +338,10 @@ export default function MaterialViewPage() {
           )}
         </AnimatePresence>
 
-        <div className="flex flex-1 gap-6 min-h-0 overflow-hidden">
+        <div className="flex min-h-0 min-w-0 flex-1 gap-4 overflow-hidden sm:gap-6">
           {/* Main Document Area */}
           <div className="flex-1 flex flex-col min-w-0">
-            <Card className={`flex flex-col flex-1 overflow-hidden border-none shadow-xl dark:bg-slate-800/50 backdrop-blur-sm ${focusMode ? 'rounded-none' : ''}`}>
+            <Card className={`flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 ${focusMode ? 'rounded-none' : 'rounded-xl'}`}>
               {focusMode && (
                 <div className="absolute top-4 right-4 z-50">
                   <Button variant="secondary" size="sm" onClick={() => setFocusMode(false)}>
@@ -318,18 +351,27 @@ export default function MaterialViewPage() {
               )}
               
               {!focusMode && (
-                <CardHeader className="border-b dark:border-slate-700 bg-white/50 dark:bg-slate-800/50 shrink-0">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <div className="flex items-center gap-2 mb-1 text-blue-500 text-sm font-medium uppercase">
+                <CardHeader className="shrink-0 border-b border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900 sm:px-6">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <div className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-300">
                         <File className="h-4 w-4" />
                         <span>{material.type || 'DOCUMENT'}</span>
                       </div>
+                      <CardTitle className="line-clamp-2 text-base font-semibold leading-snug text-slate-900 dark:text-white">
+                        {material.title}
+                      </CardTitle>
                     </div>
                     <div className="flex gap-2">
-                      <Button variant="outline" size="icon"><Share className="h-4 w-4" /></Button>
-                      {material.fileUrl && (
-                        <Button variant="outline" size="icon" onClick={() => window.open(material.fileUrl, '_blank')}><ExternalLink className="h-4 w-4" /></Button>
+                      <Button type="button" variant="outline" size="icon" onClick={handleShare} aria-label="Share material">
+                        <Share className="h-4 w-4" />
+                      </Button>
+                      {(material.fileUrl || material.url) && (
+                        <Button variant="outline" size="icon" asChild>
+                          <a href={material.fileUrl || material.url} target="_blank" rel="noopener noreferrer" aria-label="Open original file">
+                            <ExternalLink className="h-4 w-4" />
+                          </a>
+                        </Button>
                       )}
                     </div>
                   </div>
@@ -344,72 +386,51 @@ export default function MaterialViewPage() {
             </Card>
 
             {!focusMode && material.description && (
-              <div className="mt-6 shrink-0">
-                <h3 className="text-lg font-bold mb-3 dark:text-white flex items-center gap-2">
-                  <Eye className="h-5 w-5 text-blue-500" /> Description
-                </h3>
-                <Card className="border-none shadow-sm bg-white/50 dark:bg-slate-800/50">
-                  <CardContent className="py-4 text-sm text-gray-600 dark:text-slate-300 leading-relaxed">
+              <section className="mt-4 shrink-0">
+                <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-100">
+                  <Eye className="h-4 w-4 text-blue-600 dark:text-blue-400" /> About this material
+                </h2>
+                <Card className="rounded-xl border-slate-200 bg-white py-0 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                  <CardContent className="py-3 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
                     {material.description}
                   </CardContent>
                 </Card>
-              </div>
+              </section>
             )}
           </div>
-
-          {/* AI Study Assistant Panel */}
-          <AnimatePresence>
-            {showAssistant && (
-              <motion.div
-                initial={{ opacity: 0, width: 0, x: 20 }}
-                animate={{ opacity: 1, width: 380, x: 0 }}
-                exit={{ opacity: 0, width: 0, x: 20 }}
-                transition={{ duration: 0.3 }}
-                className="shrink-0 flex flex-col"
-              >
-                <Card className="flex flex-col flex-1 border-none shadow-xl bg-white dark:bg-slate-800 overflow-hidden">
-                  <CardHeader className="border-b dark:border-slate-700 bg-blue-50 dark:bg-blue-900/20 py-4 shrink-0">
-                    <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
-                      <Sparkles className="h-5 w-5" />
-                      <CardTitle className="text-lg font-bold">Study Assistant</CardTitle>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="flex-1 overflow-y-auto p-4 bg-slate-50/50 dark:bg-slate-900/50 flex flex-col justify-end">
-                    <div className="text-center text-slate-500 dark:text-slate-400 mb-6">
-                      <div className="bg-blue-100 dark:bg-blue-900/30 p-3 rounded-full inline-flex mb-3">
-                        <MessageSquare className="h-6 w-6 text-blue-500" />
-                      </div>
-                      <p className="text-sm">Hi Sarah! I'm your study assistant.</p>
-                      <p className="text-xs mt-1">Ask me anything about this material.</p>
-                    </div>
-                    {/* Placeholder for chat messages */}
-                  </CardContent>
-                  <div className="p-4 border-t dark:border-slate-700 bg-white dark:bg-slate-800 shrink-0">
-                    <input 
-                      type="text" 
-                      placeholder="Ask a question..." 
-                      className="w-full bg-slate-100 dark:bg-slate-900 border-none rounded-full px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                    />
-                  </div>
-                </Card>
-              </motion.div>
-            )}
-          </AnimatePresence>
         </div>
       </div>
 
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl p-8 max-w-md w-full shadow-2xl border dark:border-slate-800">
-            <h3 className="text-2xl font-bold mb-4 dark:text-white text-center">Delete Material?</h3>
-            <p className="text-gray-600 dark:text-slate-400 mb-8 text-center">Are you sure you want to delete "{material.title}"?</p>
-            <div className="flex gap-3">
-              <Button variant="outline" className="flex-1" onClick={() => setShowDeleteConfirm(false)}>Cancel</Button>
-              <Button variant="destructive" className="flex-1" onClick={handleDelete}>Delete</Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <Dialog open={showDeleteConfirm} onOpenChange={open => !isDeleting && setShowDeleteConfirm(open)}>
+        <DialogContent className="max-w-md rounded-xl border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+          <DialogHeader className="text-left">
+            <DialogTitle className="text-slate-900 dark:text-white">Delete this material?</DialogTitle>
+            <DialogDescription className="pt-2 text-slate-600 dark:text-slate-300">
+              “{material.title}” will be permanently removed from the materials library.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-2 gap-2 sm:space-x-0">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isDeleting}
+              onClick={() => setShowDeleteConfirm(false)}
+              className="rounded-lg"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={isDeleting}
+              onClick={() => void handleDelete()}
+              className="rounded-lg"
+            >
+              {isDeleting ? 'Deleting…' : 'Delete material'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
