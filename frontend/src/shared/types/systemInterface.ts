@@ -331,6 +331,7 @@ export interface Settings {
     email: boolean;
     push: boolean;
     weeklyDigest: boolean;
+    progress: boolean;
   };
   security: {
     twoFactorEnabled: boolean;
