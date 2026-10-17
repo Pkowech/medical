@@ -1,4 +1,6 @@
 import React from 'react';
+import Link from 'next/link';
+import { BookOpen, CalendarDays, Target } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import ProgressBar from '@/shared/components/ui/ProgressBar';
@@ -136,6 +138,23 @@ export const StudyDashboard: React.FC = () => {
 
   return (
     <div className="p-3 bg-gray-50/50 dark:bg-slate-900/50 min-h-screen">
+      <nav aria-label="Study planner shortcuts" className="mb-4 grid grid-cols-3 gap-2 sm:gap-3">
+        {[
+          { href: '/study-planner/schedule', label: 'Schedule', icon: CalendarDays },
+          { href: '/study-planner/goals', label: 'Goals', icon: Target },
+          { href: '/study-planner/materials', label: 'Study materials', icon: BookOpen },
+        ].map(({ href, label, icon: Icon }) => (
+          <Link
+            key={href}
+            href={href}
+            className="flex min-h-20 flex-col items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white/80 p-3 text-center text-xs font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-200 dark:hover:bg-slate-800"
+          >
+            <Icon aria-hidden="true" className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+            <span>{label}</span>
+          </Link>
+        ))}
+      </nav>
+
       {/* AI-Generated Practice Quizzes */}
       {autoQuizzesError && (
         <p role="status" className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
@@ -229,28 +248,39 @@ export const StudyDashboard: React.FC = () => {
           <p className="rounded-lg border border-dashed border-slate-300 p-5 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
             Unit progress appears here after you begin lessons in an enrolled course.
           </p>
-        ) : unitProgress.map(unit => (
-          <button
-            key={unit.id}
-            type="button"
-            disabled={!unit.courseId}
-            onClick={() => unit.courseId && router.push(`/courses/${unit.courseId}/units/${unit.id}`)}
-            className="mb-3 block w-full rounded-lg p-2 text-left transition-colors hover:bg-slate-50 disabled:cursor-default dark:hover:bg-slate-800/70"
-          >
-            <div className="flex justify-between mb-1">
-              <p className="text-base text-gray-900 dark:text-slate-200">
-                {unit.name} ({courseProgress.find(c => c.id === unit.courseId)?.name})
+        ) : unitProgress.map(unit => {
+          const courseName = courseProgress.find(course => course.id === unit.courseId)?.name;
+
+          return (
+            <button
+              key={unit.id}
+              type="button"
+              disabled={!unit.id}
+              onClick={() => {
+                if (unit.courseId) {
+                  router.push(`/courses/${unit.courseId}/units/${unit.id}`);
+                } else if (unit.id) {
+                  router.push(`/unit/${unit.id}`);
+                }
+              }}
+              className="mb-3 block w-full rounded-lg p-2 text-left transition-colors hover:bg-slate-50 disabled:cursor-default disabled:hover:bg-transparent dark:hover:bg-slate-800/70"
+            >
+              <div className="flex justify-between mb-1">
+                <p className="text-base text-gray-900 dark:text-slate-200">
+                  {unit.name}
+                  {courseName ? ` (${courseName})` : ''}
+                </p>
+                <p className="text-sm text-gray-500 dark:text-slate-400">{unit.progressPercentage}%</p>
+              </div>
+              <div className="w-full h-2">
+                <ProgressBar value={unit.progressPercentage} className="h-2 rounded-full" />
+              </div>
+              <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">
+                Last synced: {formatLastUpdated(unit.lastUpdated)}
               </p>
-              <p className="text-sm text-gray-500 dark:text-slate-400">{unit.progressPercentage}%</p>
-            </div>
-            <div className="w-full h-2">
-              <ProgressBar value={unit.progressPercentage} className="h-2 rounded-full" />
-            </div>
-            <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">
-              Last synced: {formatLastUpdated(unit.lastUpdated)}
-            </p>
-          </button>
-        ))}
+            </button>
+          );
+        })}
       </div>
 
       {/* Peer Comparison */}

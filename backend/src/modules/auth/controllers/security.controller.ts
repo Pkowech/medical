@@ -28,6 +28,7 @@ import {
   VerifyRecoveryDto,
 } from '#common/dto/security.dto';
 import type { AuthenticatedRequest } from '#common/dto/user.dto';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 
 @ApiTags('Security')
 @Controller('auth/security')
@@ -143,29 +144,35 @@ export class SecurityController {
   }
 
   @Post('recovery/initiate')
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ auth: { limit: 5, ttl: 900 } })
   @ApiOperation({ summary: 'Initiate account recovery' })
-  @ApiResponse({ status: 200, description: 'Account recovery initiated' })
   @ApiResponse({
-    status: 501,
-    description: 'Password recovery is not configured',
+    status: 200,
+    description: 'A generic response is returned to prevent account enumeration',
+  })
+  @ApiResponse({
+    status: 503,
+    description: 'Password recovery email delivery is unavailable',
   })
   async initiateAccountRecovery(@Body() dto: AccountRecoveryDto) {
     await this.securityService.initiateAccountRecovery(dto.email);
-    return { message: 'Recovery process initiated' };
+    return {
+      message: 'If an account exists for this email, recovery instructions will be sent.',
+    };
   }
 
   @Post('recovery/verify')
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ auth: { limit: 5, ttl: 900 } })
   @ApiOperation({ summary: 'Verify account recovery request' })
   @ApiResponse({ status: 200, description: 'Recovery request verified' })
   @ApiResponse({
-    status: 501,
-    description: 'Password recovery is not configured',
+    status: 400,
+    description: 'The reset token is invalid or has expired',
   })
   async verifyRecoveryRequest(@Body() dto: VerifyRecoveryDto) {
-    const verified = await this.securityService.verifyRecoveryRequest(
-      dto.token,
-      dto.answers,
-    );
-    return { verified };
+    await this.securityService.verifyRecoveryRequest(dto.token, dto.newPassword);
+    return { message: 'Password has been reset successfully.' };
   }
 }

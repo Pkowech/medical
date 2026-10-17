@@ -170,7 +170,7 @@ export default function QuizHistoryPage() {
                     </div>
                   </div>
                 </div>
-                <div className="mt-4 md:mt-0 text-right">
+                <div className="mt-4 flex flex-col gap-2 md:mt-0 md:items-end">
                   <div className="text-2xl font-bold text-blue-600">
                     {attempt.score.toFixed(1)}%
                   </div>
@@ -178,13 +178,24 @@ export default function QuizHistoryPage() {
                     {attempt.correctAnswers} of {attempt.totalQuestions} correct
                   </p>
                   {attempt.unitId ? (
-                    <Button
-                      variant="outline"
-                      className="mt-2"
-                      onClick={() => router.push(`/quiz/unit/${attempt.unitId}`)}
-                    >
-                      Retake Unit Quiz
-                    </Button>
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <Button
+                        variant="outline"
+                        onClick={() =>
+                          router.push(
+                            `/quiz/results?unitId=${encodeURIComponent(attempt.unitId)}`,
+                          )
+                        }
+                      >
+                        View Results
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => router.push(`/quiz/unit/${attempt.unitId}`)}
+                      >
+                        Retake Unit Quiz
+                      </Button>
+                    </div>
                   ) : (
                     <p className="mt-2 text-xs text-gray-500">This quiz is no longer linked to a unit.</p>
                   )}

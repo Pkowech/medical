@@ -1,34 +1,37 @@
-// frontend/src/services/rewardService.ts
-
-import { Reward } from '@/features/community/gamification/services/services';
 import { getData, postData } from '@/features/auth/services/apiClient';
 
-export const getAvailableRewards = async (): Promise<Reward[]> => {
-  try {
-    const response = await getData<Reward[]>('/rewards');
-    return response?.data || [];
-  } catch (err) {
-    console.warn('getAvailableRewards: API unavailable, returning empty list', err);
-    return [];
+export const getRedeemedRewards = async (userId: string): Promise<string[]> => {
+  if (!userId) throw new Error('A user ID is required to load redeemed rewards.');
+
+  const response = await getData<unknown>(
+    `/rewards/user/${encodeURIComponent(userId)}`,
+  );
+  let rewards = response.data;
+
+  if (typeof rewards === 'string') {
+    const rawReward = rewards.trim();
+    if (!rawReward) return [];
+
+    try {
+      rewards = JSON.parse(rawReward);
+    } catch {
+      return [rawReward];
+    }
   }
+
+  if (typeof rewards === 'string') return rewards.trim() ? [rewards] : [];
+
+  if (!Array.isArray(rewards) || !rewards.every(reward => typeof reward === 'string')) {
+    throw new Error('The rewards service returned an invalid reward list.');
+  }
+
+  return rewards;
 };
 
-export const getRedeemedRewards = async (userId: string): Promise<Reward[]> => {
-  try {
-    const response = await getData<Reward[]>(`/users/${userId}/rewards`);
-    return response?.data || [];
-  } catch (err) {
-    console.warn('getRedeemedRewards: API unavailable, returning empty list', err);
-    return [];
+export const redeemReward = async (userId: string, rewardId: string): Promise<void> => {
+  if (!userId || !rewardId) {
+    throw new Error('A user ID and reward ID are required to redeem a reward.');
   }
-};
 
-export const redeemReward = async (userId: string, rewardId: string): Promise<boolean> => {
-  try {
-    await postData<void>(`/users/${userId}/rewards/${rewardId}`);
-    return true;
-  } catch (err) {
-    console.warn('redeemReward: API unavailable or failed', err);
-    return false;
-  }
+  await postData<void>(`/rewards/grant/${encodeURIComponent(userId)}`, { rewardId });
 };

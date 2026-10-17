@@ -147,6 +147,10 @@ Users can also connect their own Google account with the read-only Drive scope t
 
 Drive-backed materials can be linked at course level (for example, a textbook), unit level, or topic level. Class sharing remains disabled unless explicitly enabled.
 
+### Password recovery
+
+Password recovery requires `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_SECURE`, `EMAIL_USER`, `EMAIL_PASSWORD`, `EMAIL_FROM`, and `FRONTEND_URL` to be configured on the backend. Run the `20261017010000_add_password_reset_tokens` Prisma migration before deployment. Reset tokens are stored as hashes, expire after 30 minutes, and are single-use; completing a reset revokes the user's active sessions.
+
 When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
 
 If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:

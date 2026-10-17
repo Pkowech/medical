@@ -6,6 +6,8 @@ import {
   IsEmail,
   IsNumber,
   IsObject,
+  MaxLength,
+  Matches,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Prisma } from '@prisma/client';
@@ -259,10 +261,20 @@ export class AccountRecoveryDto {
 export class VerifyRecoveryDto {
   @ApiProperty({ description: 'Recovery token' })
   @IsString()
+  @MinLength(64)
+  @MaxLength(64)
+  @Matches(/^[a-f0-9]{64}$/i)
   token!: string;
 
-  @ApiProperty({ description: 'Security question answers' })
-  answers!: { [key: string]: string };
+  @ApiProperty({ description: 'New account password' })
+  @IsString()
+  @MinLength(8)
+  @MaxLength(128)
+  @Matches(/[A-Z]/, { message: 'Password must contain an uppercase letter' })
+  @Matches(/[a-z]/, { message: 'Password must contain a lowercase letter' })
+  @Matches(/[0-9]/, { message: 'Password must contain a number' })
+  @Matches(/[^A-Za-z0-9]/, { message: 'Password must contain a special character' })
+  newPassword!: string;
 }
 
 // ============================================================================

@@ -32,9 +32,14 @@ class PerformanceMonitor {
   private setupPerformanceObservers(): void {
     // Observe page load metrics
     if (typeof window !== 'undefined') {
-      window.addEventListener('load', () => {
-        this.capturePageLoadMetrics();
-      });
+      const captureAfterLoad = () => {
+        window.setTimeout(() => this.capturePageLoadMetrics(), 0);
+      };
+      if (document.readyState === 'complete') {
+        captureAfterLoad();
+      } else {
+        window.addEventListener('load', captureAfterLoad, { once: true });
+      }
 
       // Observe resource timing
       if ('PerformanceObserver' in window) {
@@ -47,13 +52,15 @@ class PerformanceMonitor {
         resourceObserver.observe({ entryTypes: ['resource'] });
 
         // Observe largest contentful paint
-        const lcpObserver = new PerformanceObserver(list => {
-          const entries = list.getEntries();
-          const lastEntry = entries[entries.length - 1];
-          this.addMetric('largestContentfulPaint', lastEntry.startTime);
-        });
+        if (PerformanceObserver.supportedEntryTypes?.includes('largest-contentful-paint')) {
+          const lcpObserver = new PerformanceObserver(list => {
+            const entries = list.getEntries();
+            const lastEntry = entries[entries.length - 1];
+            if (lastEntry) this.addMetric('largestContentfulPaint', lastEntry.startTime);
+          });
 
-        lcpObserver.observe({ entryTypes: ['largest-contentful-paint'] });
+          lcpObserver.observe({ type: 'largest-contentful-paint', buffered: true });
+        }
       }
     }
   }
@@ -96,14 +103,20 @@ class PerformanceMonitor {
 
     const navigation = navigationEntries[0] as PerformanceNavigationTiming | undefined;
     const fcp = (paintEntries || []).find(entry => entry.name === 'first-contentful-paint');
-    const lcp = lcpEntries && lcpEntries.length ? lcpEntries[0] : undefined;
+    const lcp = lcpEntries.length ? lcpEntries[lcpEntries.length - 1] : undefined;
 
     this.pageLoadMetrics.push({
       url: window.location.href,
-      loadTime: navigation ? navigation.loadEventEnd - navigation.startTime : 0,
-      domContentLoaded: navigation ? navigation.domContentLoadedEventEnd - navigation.startTime : 0,
-      firstContentfulPaint: fcp ? fcp.startTime : 0,
-      largestContentfulPaint: (lcp as PerformanceEntry)?.startTime ?? 0,
+      loadTime:
+        navigation && navigation.loadEventEnd > 0
+          ? navigation.loadEventEnd - navigation.startTime
+          : 0,
+      domContentLoaded:
+        navigation && navigation.domContentLoadedEventEnd > 0
+          ? navigation.domContentLoadedEventEnd - navigation.startTime
+          : 0,
+      firstContentfulPaint: fcp?.startTime ?? 0,
+      largestContentfulPaint: lcp?.startTime ?? 0,
       timeToInteractive: this.calculateTimeToInteractive(),
       timestamp: Date.now(),
     });

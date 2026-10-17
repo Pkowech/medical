@@ -8,7 +8,7 @@ import { LoadingSpinner } from '@/shared/components/ui/loading-spinner';
 import { Card } from '@/shared/components/ui/card';
 import { Button } from '@/shared/components/ui/button'; // Standardized casing
 import { toast } from 'sonner';
-import { Trophy, Star, Target, Zap, BookOpen, Clock } from 'lucide-react';
+import { Trophy, Star, Target, Clock } from 'lucide-react';
 
 interface Achievement {
   id: string;
@@ -16,21 +16,16 @@ interface Achievement {
   description: string;
   icon: string;
   progress: number;
-  completed: boolean;
-  completedAt?: string;
-  type: 'quiz' | 'study' | 'streak' | 'milestone';
-  points: number;
+  isUnlocked: boolean;
+  unlockedAt?: string;
 }
 
 interface AchievementStats {
-  totalAchievements: number;
-  completedAchievements: number;
-  totalPoints: number;
+  totalEarned: number;
+  totalPossible: number;
+  points: number;
   rank: string;
-  nextRank: {
-    name: string;
-    pointsNeeded: number;
-  };
+  nextRankProgress: number;
 }
 
 export default function AchievementsPage() {
@@ -38,14 +33,11 @@ export default function AchievementsPage() {
   const [loading, setLoading] = useState(true);
   const [achievements, setAchievements] = useState<Achievement[]>([]);
   const [stats, setStats] = useState<AchievementStats>({
-    totalAchievements: 0,
-    completedAchievements: 0,
-    totalPoints: 0,
+    totalEarned: 0,
+    totalPossible: 0,
+    points: 0,
     rank: 'Beginner',
-    nextRank: {
-      name: 'Intermediate',
-      pointsNeeded: 100,
-    },
+    nextRankProgress: 0,
   });
 
   useEffect(() => {
@@ -53,7 +45,7 @@ export default function AchievementsPage() {
       try {
         const [achievementsResponse, statsResponse] = await Promise.all([
           apiService.get<Achievement[]>('/users/achievements'),
-          apiService.get<AchievementStats>('/users/achievement-stats'),
+          apiService.get<AchievementStats>('/users/achievement-summary'),
         ]);
         setAchievements(achievementsResponse.data);
         setStats(statsResponse.data);
@@ -66,21 +58,6 @@ export default function AchievementsPage() {
 
     fetchAchievements();
   }, []);
-
-  const getAchievementIcon = (type: Achievement['type']) => {
-    switch (type) {
-      case 'quiz':
-        return <Target className="w-8 h-8 text-blue-500" />;
-      case 'study':
-        return <BookOpen className="w-8 h-8 text-green-500" />;
-      case 'streak':
-        return <Zap className="w-8 h-8 text-yellow-500" />;
-      case 'milestone':
-        return <Star className="w-8 h-8 text-purple-500" />;
-      default:
-        return <Trophy className="w-8 h-8 text-gray-500" />;
-    }
-  };
 
   if (loading) {
     return <LoadingSpinner />;
@@ -97,7 +74,7 @@ export default function AchievementsPage() {
               <Trophy className="w-8 h-8 text-yellow-500" />
               <div>
                 <p className="text-xs font-semibold text-gray-400 dark:text-slate-500 uppercase tracking-wider">Total Points</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.totalPoints}</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.points}</p>
               </div>
             </div>
           </Card>
@@ -116,7 +93,7 @@ export default function AchievementsPage() {
               <div>
                 <p className="text-xs font-semibold text-gray-400 dark:text-slate-500 uppercase tracking-wider">Achievements</p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {stats.completedAchievements}/{stats.totalAchievements}
+                    {stats.totalEarned}/{stats.totalPossible}
                 </p>
               </div>
             </div>
@@ -126,8 +103,10 @@ export default function AchievementsPage() {
               <Clock className="w-8 h-8 text-purple-500" />
               <div>
                 <p className="text-xs font-semibold text-gray-400 dark:text-slate-500 uppercase tracking-wider">Next Rank</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.nextRank.name}</p>
-                <p className="text-xs text-gray-500 dark:text-slate-500">{stats.nextRank.pointsNeeded} pts left</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                  {Math.round(stats.nextRankProgress)}%
+                </p>
+                <p className="text-xs text-gray-500 dark:text-slate-500">progress to next rank</p>
               </div>
             </div>
           </Card>
@@ -137,10 +116,12 @@ export default function AchievementsPage() {
           {achievements.map(achievement => (
             <Card
               key={achievement.id}
-              className={`p-6 transition-all bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm border-gray-100 dark:border-slate-700/50 hover:border-slate-300 dark:hover:border-slate-600 ${achievement.completed ? 'ring-1 ring-green-500/20 shadow-[0_0_15px_-3px_rgba(34,197,94,0.1)]' : ''}`}
+              className={`p-6 transition-all bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm border-gray-100 dark:border-slate-700/50 hover:border-slate-300 dark:hover:border-slate-600 ${achievement.isUnlocked ? 'ring-1 ring-green-500/20 shadow-[0_0_15px_-3px_rgba(34,197,94,0.1)]' : ''}`}
             >
               <div className="flex items-start space-x-4">
-                <div className="shrink-0">{getAchievementIcon(achievement.type)}</div>
+                <div className="shrink-0">
+                  <Trophy className="w-8 h-8 text-yellow-500" aria-hidden="true" />
+                </div>
                 <div className="flex-1">
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{achievement.title}</h3>
                   <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">{achievement.description}</p>
@@ -156,21 +137,17 @@ export default function AchievementsPage() {
                       />
                     </div>
                   </div>
-                  {achievement.completed && (
+                  {achievement.isUnlocked && (
                     <div className="mt-4 flex items-center text-sm font-medium text-green-600 dark:text-green-400">
                       <Trophy className="w-4 h-4 mr-1.5" />
-                      Completed
-                      {achievement.completedAt && (
+                      Unlocked
+                      {achievement.unlockedAt && (
                         <span className="ml-2 font-normal text-gray-400 dark:text-slate-500">
-                          on {new Date(achievement.completedAt).toLocaleDateString()}
+                          on {new Date(achievement.unlockedAt).toLocaleDateString()}
                         </span>
                       )}
                     </div>
                   )}
-                  <div className="mt-4 flex items-center text-xs font-medium text-gray-400 dark:text-slate-500">
-                    <Star className="w-3.5 h-3.5 mr-1.5" />
-                    {achievement.points} points
-                  </div>
                 </div>
               </div>
             </Card>

@@ -48,6 +48,8 @@ const publicPathRoots = [
   '/features',
   '/pricing',
   '/privacy',
+  '/cookie-policy',
+  '/accessibility',
   '/terms',
   '/login',
   '/register',
@@ -63,7 +65,13 @@ const publicPathRoots = [
 const marketingPathRoots = ['/', '/about', '/contact', '/features', '/pricing'];
 
 function isPublicPath(pathname: string): boolean {
-  return publicPathRoots.some(
+  const isCourseCatalogPage =
+    pathname === '/courses' ||
+    (/^\/courses\/[^/]+$/.test(pathname) &&
+      pathname !== '/courses/manage' &&
+      pathname !== '/courses/create');
+
+  return isCourseCatalogPage || publicPathRoots.some(
     path => pathname === path || (path !== '/' && pathname.startsWith(`${path}/`))
   );
 }

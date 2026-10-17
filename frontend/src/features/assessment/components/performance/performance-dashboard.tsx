@@ -65,22 +65,29 @@ export function PerformanceDashboard() {
       <div className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm rounded-lg shadow-sm border border-gray-100 dark:border-slate-700/50 p-6">
         <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Page Load Performance</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {pageLoadMetrics[0] && (
+          {pageLoadMetrics[0] ? (
             <>
-              <MetricCard title="Load Time" value={`${pageLoadMetrics[0].loadTime.toFixed(2)}ms`} />
+              <MetricCard
+                title="Load Time"
+                value={formatMetric(pageLoadMetrics[0].loadTime)}
+              />
               <MetricCard
                 title="First Contentful Paint"
-                value={`${pageLoadMetrics[0].firstContentfulPaint.toFixed(2)}ms`}
+                value={formatMetric(pageLoadMetrics[0].firstContentfulPaint)}
               />
               <MetricCard
                 title="Largest Contentful Paint"
-                value={`${pageLoadMetrics[0].largestContentfulPaint.toFixed(2)}ms`}
+                value={formatMetric(pageLoadMetrics[0].largestContentfulPaint)}
               />
               <MetricCard
                 title="Time to Interactive"
-                value={`${pageLoadMetrics[0].timeToInteractive.toFixed(2)}ms`}
+                value={formatMetric(pageLoadMetrics[0].timeToInteractive)}
               />
             </>
+          ) : (
+            <p role="status" className="col-span-full text-sm text-slate-500 dark:text-slate-400">
+              Page-load measurements are not available yet. They are recorded after a full page load.
+            </p>
           )}
         </div>
       </div>
@@ -156,4 +163,8 @@ function MetricCard({ title, value }: { title: string; value: string }) {
       <p className="text-2xl font-semibold text-gray-900 dark:text-white">{value}</p>
     </div>
   );
+}
+
+function formatMetric(value: number): string {
+  return Number.isFinite(value) && value > 0 ? `${value.toFixed(2)}ms` : 'Not available';
 }

@@ -3,16 +3,17 @@ import {
   UnauthorizedException,
   BadRequestException,
   NotFoundException,
-  NotImplementedException,
   Logger,
   Inject,
   forwardRef,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as argon2 from 'argon2';
 import * as speakeasy from 'speakeasy';
 import * as qrcode from 'qrcode';
 import * as crypto from 'crypto';
+import { createTransport } from 'nodemailer';
 import { PrismaService } from '#infrastructure/prisma/prisma.service';
 import {
   UserSecuritySettings,
@@ -362,18 +363,123 @@ export class SecurityService {
     return newCodes;
   }
 
-  async initiateAccountRecovery(_email: string): Promise<void> {
-    throw new NotImplementedException(
-      'Password recovery is not configured yet. You can change your password in Settings while signed in.',
-    );
+  async initiateAccountRecovery(email: string): Promise<void> {
+    const host = this.configService.get<string>('EMAIL_HOST');
+    const userName = this.configService.get<string>('EMAIL_USER');
+    const password = this.configService.get<string>('EMAIL_PASSWORD');
+    const frontendUrl = this.configService.get<string>('FRONTEND_URL');
+    if (!host || !userName || !password || !frontendUrl) {
+      throw new ServiceUnavailableException(
+        'Password recovery email delivery is not configured.',
+      );
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const user = await this.prisma.user.findFirst({
+      where: { email: { equals: normalizedEmail, mode: 'insensitive' } },
+      select: { id: true, email: true },
+    });
+    if (!user) return;
+
+    const token = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
+
+    await this.prisma.passwordResetToken.upsert({
+      where: { userId: user.id },
+      create: { userId: user.id, tokenHash, expiresAt },
+      update: { tokenHash, expiresAt, createdAt: new Date() },
+    });
+
+    const resetUrl = new URL('/reset-password', frontendUrl);
+    resetUrl.hash = new URLSearchParams({ token }).toString();
+    const transporter = createTransport({
+      host,
+      port: this.configService.get<number>('EMAIL_PORT', 587),
+      secure: this.configService.get<boolean>('EMAIL_SECURE', false),
+      auth: { user: userName, pass: password },
+      connectionTimeout: 10_000,
+      socketTimeout: 10_000,
+    });
+
+    try {
+      await transporter.sendMail({
+        from: this.configService.get<string>(
+          'EMAIL_FROM',
+          'noreply@medtrack-hub.com',
+        ),
+        to: user.email,
+        subject: 'Reset your MedTrack Hub password',
+        text: `Use this link to reset your password. It expires in 30 minutes: ${resetUrl.toString()}`,
+        html: `<p>We received a request to reset your MedTrack Hub password.</p><p><a href="${resetUrl.toString()}">Reset your password</a></p><p>This link expires in 30 minutes. If you did not request this, you can ignore this email.</p>`,
+      });
+    } catch {
+      // Keep the response indistinguishable from an unknown address to avoid account enumeration.
+      this.logger.error('Password recovery email delivery failed.');
+    } finally {
+      transporter.close();
+    }
   }
 
-  async verifyRecoveryRequest(
-    _token: string,
-    _answers: { [key: string]: string },
-  ): Promise<boolean> {
-    throw new NotImplementedException(
-      'Password recovery is not configured yet. Request a new recovery link later or change your password in Settings while signed in.',
+  async verifyRecoveryRequest(token: string, newPassword: string): Promise<void> {
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const now = new Date();
+    const resetToken = await this.prisma.passwordResetToken.findUnique({
+      where: { tokenHash },
+      select: { id: true, userId: true, expiresAt: true },
+    });
+
+    if (!resetToken || resetToken.expiresAt <= now) {
+      throw new BadRequestException('Invalid or expired password reset link.');
+    }
+
+    const passwordHash = await argon2.hash(newPassword);
+    const activeSessions = await this.prisma.userSession.findMany({
+      where: {
+        userId: resetToken.userId,
+        revokedAt: null,
+        expiresAt: { gt: now },
+      },
+      select: { token: true },
+    });
+
+    await this.prisma.$transaction(async transaction => {
+      const consumed = await transaction.passwordResetToken.deleteMany({
+        where: { id: resetToken.id, tokenHash, expiresAt: { gt: now } },
+      });
+      if (consumed.count !== 1) {
+        throw new BadRequestException('Invalid or expired password reset link.');
+      }
+
+      await transaction.user.update({
+        where: { id: resetToken.userId },
+        data: { password: passwordHash, updatedAt: now },
+      });
+      await transaction.userSecuritySettings.updateMany({
+        where: { userId: resetToken.userId },
+        data: { passwordLastChanged: now },
+      });
+      await transaction.userSession.updateMany({
+        where: { userId: resetToken.userId, revokedAt: null },
+        data: { isActive: false, revokedAt: now },
+      });
+
+      await transaction.securityEvent.create({
+        data: {
+          userId: resetToken.userId,
+          eventType: securityEventTypes.passwordChange,
+          description: 'Password was reset using account recovery',
+          details: { message: 'Password was reset using account recovery' },
+          severity: 'high',
+          timestamp: now,
+        },
+      });
+    });
+
+    await Promise.all(
+      activeSessions.map(({ token: sessionToken }) =>
+        this.tokenBlacklistService.blacklistToken(sessionToken),
+      ),
     );
   }
 }

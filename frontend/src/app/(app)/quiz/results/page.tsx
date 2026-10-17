@@ -1,237 +1,258 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
+import React, { useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { CheckCircle2, XCircle } from 'lucide-react';
+import { API_PATHS } from '@/lib/auth/apiPaths';
 import { apiService } from '@/features/auth/services/apiClient';
+import { useAuthStore } from '@/features/auth/store/useAuthStore';
 import { AppErrorBoundary } from '@/features/security/components/AppErrorBoundary';
 import { LoadingSpinner } from '@/shared/components/ui/loading-spinner';
 import { SEO } from '@/shared/components/layout/SEO';
-import { Clock, CheckCircle, XCircle, Brain } from 'lucide-react';
+import { Button } from '@/shared/components/ui/button';
+import { Card } from '@/shared/components/ui/card';
 
-interface QuizResult {
+interface QuizAttempt {
   id: string;
-  quizTitle: string;
+  quizId: string;
   score: number;
-  totalQuestions: number;
+  percentage: number;
   correctAnswers: number;
-  timeSpent: number;
-  date: string;
-  category: string;
-  difficulty: string;
-  questions: {
-    id: string;
-    question: string;
-    userAnswer: string;
-    correctAnswer: string;
-    isCorrect: boolean;
-  }[];
+  totalQuestions: number;
+  completedAt: string | null;
+  isPassed: boolean;
+}
+
+interface QuizResultsSummary {
+  totalQuizzes: number;
+  completedQuizzes: number;
+  averageScore: number;
+  attempts: QuizAttempt[];
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isQuizAttempt(value: unknown): value is QuizAttempt {
+  return (
+    isRecord(value) &&
+    typeof value.id === 'string' &&
+    typeof value.quizId === 'string' &&
+    typeof value.score === 'number' &&
+    typeof value.percentage === 'number' &&
+    typeof value.correctAnswers === 'number' &&
+    typeof value.totalQuestions === 'number' &&
+    (typeof value.completedAt === 'string' || value.completedAt === null) &&
+    typeof value.isPassed === 'boolean'
+  );
+}
+
+function isQuizResultsSummary(value: unknown): value is QuizResultsSummary {
+  return (
+    isRecord(value) &&
+    typeof value.totalQuizzes === 'number' &&
+    typeof value.completedQuizzes === 'number' &&
+    typeof value.averageScore === 'number' &&
+    Array.isArray(value.attempts) &&
+    value.attempts.every(isQuizAttempt)
+  );
 }
 
 export default function QuizResultsPage() {
-  const { quizId } = useParams();
-  const [isLoading, setIsLoading] = useState(true);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const unitId = searchParams.get('unitId');
+  const userId = useAuthStore(state => state.user?.id);
+  const [isLoading, setIsLoading] = useState(Boolean(unitId));
   const [error, setError] = useState<string | null>(null);
-  const [results, setResults] = useState<QuizResult[]>([]);
-  const [selectedResult, setSelectedResult] = useState<QuizResult | null>(null);
+  const [results, setResults] = useState<QuizResultsSummary | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
+    if (!unitId) {
+      setIsLoading(false);
+      return;
+    }
+    if (!userId) {
+      setError('Sign in to view your quiz results.');
+      setIsLoading(false);
+      return;
+    }
+
+    let isCurrent = true;
     const fetchQuizResults = async () => {
+      setIsLoading(true);
+      setError(null);
+
       try {
-        setIsLoading(true);
-        setError(null);
-        const response = await apiService.get<QuizResult[]>(`/quiz/results/${quizId}`);
-        setResults(response.data);
+        const response = await apiService.get<unknown>(API_PATHS.QUIZ.RESULTS(userId, unitId));
+        const payload =
+          isRecord(response) && response.success === true && 'data' in response
+            ? response.data
+            : response;
+
+        if (!isQuizResultsSummary(payload)) {
+          throw new Error('Quiz results were returned in an unsupported format.');
+        }
+        if (isCurrent) setResults(payload);
       } catch (err: unknown) {
-        if (err instanceof Error) {
-          setError(err.message);
-        } else {
-          setError('Failed to load quiz results');
+        if (isCurrent) {
+          setError(err instanceof Error ? err.message : 'Failed to load quiz results.');
         }
       } finally {
-        setIsLoading(false);
+        if (isCurrent) setIsLoading(false);
       }
     };
 
-    fetchQuizResults();
-  }, []);
+    void fetchQuizResults();
+    return () => {
+      isCurrent = false;
+    };
+  }, [reloadKey, unitId, userId]);
 
-  const getScoreColor = (score: number) => {
-    if (score >= 80) return 'text-green-500';
-    if (score >= 60) return 'text-yellow-500';
-    return 'text-red-500';
-  };
-
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
-      case 'easy':
-        return 'text-green-500';
-      case 'medium':
-        return 'text-yellow-500';
-      case 'hard':
-        return 'text-red-500';
-      default:
-        return 'text-gray-500';
-    }
-  };
-
-  if (isLoading) {
-    return <LoadingSpinner fullScreen />;
+  if (!unitId) {
+    return (
+      <AppErrorBoundary>
+        <SEO title="Quiz Results" description="View your quiz results and performance analytics" />
+        <div className="mx-auto max-w-3xl px-4 py-8">
+          <Card className="p-8 text-center">
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Quiz Results</h1>
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+              Choose a quiz from your history to review results for its unit.
+            </p>
+            <Button className="mt-5" onClick={() => router.push('/quiz/history')}>
+              View quiz history
+            </Button>
+          </Card>
+        </div>
+      </AppErrorBoundary>
+    );
   }
+
+  if (isLoading) return <LoadingSpinner fullScreen />;
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-lg shadow-lg">
-          <div className="text-center">
-            <h2 className="mt-6 text-3xl font-extrabold text-gray-900">Error Loading Results</h2>
-            <p className="mt-2 text-sm text-gray-600">{error}</p>
-            <div className="mt-5">
-              <button
-                onClick={() => window.location.reload()}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              >
-                Retry
-              </button>
+      <AppErrorBoundary>
+        <SEO title="Quiz Results" description="View your quiz results and performance analytics" />
+        <div className="mx-auto max-w-3xl px-4 py-8">
+          <Card className="p-8 text-center">
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
+              Unable to load results
+            </h1>
+            <p role="alert" className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+              {error}
+            </p>
+            <div className="mt-5 flex flex-col justify-center gap-2 sm:flex-row">
+              <Button onClick={() => setReloadKey(key => key + 1)}>Try again</Button>
+              <Button variant="outline" onClick={() => router.push('/quiz/history')}>
+                View quiz history
+              </Button>
             </div>
-          </div>
+          </Card>
         </div>
-      </div>
+      </AppErrorBoundary>
     );
   }
+
+  if (!results) return null;
 
   return (
     <AppErrorBoundary>
       <SEO title="Quiz Results" description="View your quiz results and performance analytics" />
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Quiz Results</h1>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Review your quiz performance and track your progress
-          </p>
+      <div className="mx-auto max-w-5xl px-4 py-8">
+        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Quiz Results</h1>
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+              Your recent attempts for this unit.
+            </p>
+          </div>
+          <Button variant="outline" onClick={() => router.push('/quiz/history')}>
+            View quiz history
+          </Button>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Results List */}
-          <div className="lg:col-span-2">
-            <div className="bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden">
-              <div className="p-6">
-                <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-                  Recent Results
-                </h2>
-                <div className="space-y-4">
-                  {results.map(result => (
-                    <div
-                      key={result.id}
-                      className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
-                      onClick={() => setSelectedResult(result)}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-                            {result.quizTitle}
-                          </h3>
-                          <p className="text-sm text-gray-500 dark:text-gray-400">
-                            {result.category}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <span className={`text-2xl font-bold ${getScoreColor(result.score)}`}>
-                            {result.score}%
-                          </span>
-                          <p className="text-sm text-gray-500 dark:text-gray-400">
-                            {result.correctAnswers}/{result.totalQuestions} correct
-                          </p>
-                        </div>
-                      </div>
-                      <div className="mt-2 flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
-                        <div className="flex items-center">
-                          <Clock className="h-4 w-4 mr-1" />
-                          {result.timeSpent} minutes
-                        </div>
-                        <span
-                          className={`px-2 py-1 rounded-full ${getDifficultyColor(
-                            result.difficulty
-                          )} bg-opacity-10`}
-                        >
-                          {result.difficulty}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Selected Result Details */}
-          <div className="lg:col-span-1">
-            {selectedResult ? (
-              <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
-                <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-                  Result Details
-                </h2>
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Quiz</h3>
-                    <p className="mt-1 text-lg text-gray-900 dark:text-white">
-                      {selectedResult.quizTitle}
-                    </p>
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Score</h3>
-                    <p className={`mt-1 text-3xl font-bold ${getScoreColor(selectedResult.score)}`}>
-                      {selectedResult.score}%
-                    </p>
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                      Questions
-                    </h3>
-                    <div className="mt-2 space-y-2">
-                      {selectedResult.questions.map(question => (
-                        <div
-                          key={question.id}
-                          className="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
-                        >
-                          <p className="text-sm text-gray-900 dark:text-white">
-                            {question.question}
-                          </p>
-                          <div className="mt-2 flex items-center space-x-2">
-                            {question.isCorrect ? (
-                              <CheckCircle className="h-4 w-4 text-green-500" />
-                            ) : (
-                              <XCircle className="h-4 w-4 text-red-500" />
-                            )}
-                            <span className="text-sm text-gray-500 dark:text-gray-400">
-                              Your answer: {question.userAnswer}
-                            </span>
-                          </div>
-                          {!question.isCorrect && (
-                            <p className="mt-1 text-sm text-green-500">
-                              Correct answer: {question.correctAnswer}
-                            </p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
-                <div className="text-center">
-                  <Brain className="mx-auto h-12 w-12 text-gray-400" />
-                  <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">
-                    No Result Selected
-                  </h3>
-                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                    Select a result to view details
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
+        <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <Card className="p-4">
+            <p className="text-sm text-slate-500 dark:text-slate-400">Total attempts</p>
+            <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-white">
+              {results.totalQuizzes}
+            </p>
+          </Card>
+          <Card className="p-4">
+            <p className="text-sm text-slate-500 dark:text-slate-400">Completed attempts</p>
+            <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-white">
+              {results.completedQuizzes}
+            </p>
+          </Card>
+          <Card className="p-4">
+            <p className="text-sm text-slate-500 dark:text-slate-400">Average score</p>
+            <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-white">
+              {Math.round(results.averageScore)}%
+            </p>
+          </Card>
         </div>
+
+        <section aria-labelledby="attempts-heading" className="space-y-3">
+          <h2
+            id="attempts-heading"
+            className="text-lg font-semibold text-slate-900 dark:text-white"
+          >
+            Attempts
+          </h2>
+          {results.attempts.map((attempt, index) => (
+            <Card
+              key={attempt.id}
+              className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <div>
+                <h3 className="font-semibold text-slate-900 dark:text-white">
+                  Attempt {results.attempts.length - index}
+                </h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  {attempt.completedAt
+                    ? new Date(attempt.completedAt).toLocaleString()
+                    : 'In progress'}
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                <span className="text-lg font-bold text-slate-900 dark:text-white">
+                  {Math.round(attempt.percentage)}%
+                </span>
+                <span className="text-sm text-slate-600 dark:text-slate-400">
+                  {attempt.correctAnswers}/{attempt.totalQuestions} correct
+                </span>
+                <span
+                  className={`inline-flex items-center gap-1 text-sm font-medium ${
+                    attempt.isPassed
+                      ? 'text-green-700 dark:text-green-400'
+                      : 'text-amber-700 dark:text-amber-400'
+                  }`}
+                >
+                  {attempt.isPassed ? (
+                    <CheckCircle2 aria-hidden="true" className="h-4 w-4" />
+                  ) : (
+                    <XCircle aria-hidden="true" className="h-4 w-4" />
+                  )}
+                  {attempt.isPassed ? 'Passed' : 'Needs review'}
+                </span>
+              </div>
+            </Card>
+          ))}
+
+          {results.attempts.length === 0 && (
+            <Card className="p-6 text-center">
+              <p className="text-slate-600 dark:text-slate-400">
+                No quiz attempts have been recorded for this unit yet.
+              </p>
+              <Button className="mt-4" onClick={() => router.push(`/quiz/unit/${unitId}`)}>
+                Start unit quiz
+              </Button>
+            </Card>
+          )}
+        </section>
       </div>
     </AppErrorBoundary>
   );

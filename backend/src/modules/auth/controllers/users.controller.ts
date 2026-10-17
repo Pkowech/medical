@@ -332,20 +332,6 @@ export class UsersController {
     return ApiResponseDto.success(undefined, 'Password updated successfully');
   }
 
-  @Post('reset-password')
-  @ApiOperation({ summary: 'Reset user password' })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Password reset email sent',
-  })
-  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'User not found' })
-  async resetPassword(
-    @Body() body: { email: string },
-  ): Promise<ApiResponseDto<null>> {
-    await this.usersService.resetPassword(body.email);
-    return ApiResponseDto.success(null, 'Password reset email sent');
-  }
-
   @Delete(':id')
   @Roles(Role.admin)
   @ApiOperation({ summary: 'Delete user (Admin only)' })

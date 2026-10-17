@@ -5,32 +5,43 @@
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { getUserPoints } from '../services/gamificationService';
-import { UserPoints } from '@/features/community/gamification/types/gamification';
 import { Star } from 'lucide-react';
+import { useAuthStore } from '@/features/auth/store/useAuthStore';
 
 export const UserPointsWidget: React.FC = () => {
-  const [userPoints, setUserPoints] = useState<UserPoints | null>(null);
+  const userId = useAuthStore(state => state.user?.id);
+  const [userPoints, setUserPoints] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Assuming a fixed user ID for mock data
-  const currentUserId = 'user-1';
-
   useEffect(() => {
+    if (!userId) {
+      setError('Sign in to view your points.');
+      setLoading(false);
+      return;
+    }
+
+    let isCurrent = true;
     const fetchUserPoints = async () => {
+      setLoading(true);
+      setError(null);
       try {
-        const points = await getUserPoints(currentUserId);
-        setUserPoints(points);
+        const points = await getUserPoints(userId);
+        if (isCurrent) setUserPoints(points);
       } catch (err) {
-        setError('Failed to fetch user points.');
-        console.error(err);
+        if (isCurrent) {
+          setError(err instanceof Error ? err.message : 'Failed to fetch user points.');
+        }
       } finally {
-        setLoading(false);
+        if (isCurrent) setLoading(false);
       }
     };
 
-    fetchUserPoints();
-  }, [currentUserId]);
+    void fetchUserPoints();
+    return () => {
+      isCurrent = false;
+    };
+  }, [userId]);
 
   if (loading) {
     return (
@@ -56,15 +67,11 @@ export const UserPointsWidget: React.FC = () => {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {userPoints ? (
-          <div className="grid grid-cols-2 gap-4">
+        {userPoints !== null ? (
+          <div>
             <div>
               <p className="text-sm text-muted-foreground">Total Points</p>
-              <p className="text-3xl font-bold text-primary">{userPoints.totalPoints}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Earned Today</p>
-              <p className="text-3xl font-bold text-green-500">+{userPoints.pointsEarnedToday}</p>
+              <p className="text-3xl font-bold text-primary">{userPoints}</p>
             </div>
           </div>
         ) : (

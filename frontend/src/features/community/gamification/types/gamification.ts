@@ -1,18 +1,4 @@
-export interface UserPoints {
-  userId: string;
-  totalPoints: number;
-  pointsEarnedToday: number;
-  level: number;
-  nextLevelAt: number;
-  streak: number;
-  lastUpdated: string;
-  milestones: {
-    id: string;
-    name: string;
-    points: number;
-    achieved: boolean;
-  }[];
-}
+export type UserPoints = number;
 
 export interface Badge {
   id: string;

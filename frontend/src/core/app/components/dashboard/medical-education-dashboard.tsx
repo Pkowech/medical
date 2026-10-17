@@ -366,14 +366,18 @@ const MedicalEducationDashboard = () => {
                 <div className="pr-4">
                   <p className="text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">
                     {stats.streak || 0}
-                    <span className="ml-1 text-sm font-medium text-slate-500 dark:text-slate-400">days</span>
+                    <span className="ml-1 text-sm font-medium text-slate-500 dark:text-slate-400">
+                      {(stats.streak || 0) === 1 ? 'day' : 'days'}
+                    </span>
                   </p>
                   <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Current streak</p>
                 </div>
                 <div className="pl-4">
                   <p className="text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">
                     {stats.studyHours || 0}
-                    <span className="ml-1 text-sm font-medium text-slate-500 dark:text-slate-400">hrs</span>
+                    <span className="ml-1 text-sm font-medium text-slate-500 dark:text-slate-400">
+                      {(stats.studyHours || 0) === 1 ? 'hr' : 'hrs'}
+                    </span>
                   </p>
                   <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Study time</p>
                 </div>

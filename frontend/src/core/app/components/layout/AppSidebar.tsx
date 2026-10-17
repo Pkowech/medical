@@ -33,7 +33,9 @@ export function Sidebar({ user, navigationItems }: SidebarProps) {
   const visibleNavigationItems = isDesktop
     ? navigationItems
     : navigationItems.filter(
-        item => !mobilePrimaryNavigation.some(tab => tab.href === item.href),
+        item =>
+          !mobilePrimaryNavigation.some(tab => tab.href === item.href) ||
+          Boolean(item.children?.length),
       );
 
   useEffect(() => {

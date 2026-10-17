@@ -167,7 +167,7 @@ class AuthService {
       '/auth/security/recovery/verify',
       {
         token,
-        answers: { password: newPassword },
+        newPassword,
       }
     );
     return response.data;

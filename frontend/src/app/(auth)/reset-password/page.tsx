@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuthStore } from '@/features/auth/store/useAuthStore';
@@ -14,6 +14,7 @@ import { getAuthErrorDetails } from '@/features/auth/services/authErrors';
 function ResetPasswordContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const queryToken = useRef(searchParams.get('token')).current;
   const { resetPassword } = useAuthStore();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -24,7 +25,21 @@ function ResetPasswordContent() {
     confirmPassword: '',
   });
 
-  const token = searchParams.get('token');
+  const [token, setToken] = useState<string | null>(null);
+  const [tokenResolved, setTokenResolved] = useState(false);
+  useEffect(() => {
+    const fragmentToken = new URLSearchParams(window.location.hash.slice(1)).get('token');
+    const resetToken = fragmentToken || queryToken;
+    setToken(resetToken);
+    if (resetToken) {
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+    setTokenResolved(true);
+  }, [queryToken]);
+
+  if (!tokenResolved) {
+    return <div className="min-h-40" aria-label="Loading password reset form" />;
+  }
 
   if (!token) {
     return (
@@ -84,7 +99,6 @@ function ResetPasswordContent() {
     setIsLoading(true);
 
     try {
-      // useAuthStore.resetPassword expects (token, newPassword)
       await resetPassword(validation.data.token, validation.data.password);
       setSuccess(true);
       setTimeout(() => {

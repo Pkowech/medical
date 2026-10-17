@@ -3,7 +3,10 @@
 export const dynamic = 'force-dynamic';
 
 import React, { ReactNode, useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import { DashboardLayout } from '@/core/app/components/layout/DashboardLayout';
+import { MarketingFooter } from '@/core/marketing/MarketingFooter';
+import { MarketingHeader } from '@/core/marketing/MarketingHeader';
 import { LayoutProvider } from '@/core/providers/LayoutContext';
 import { HeaderProvider } from '@/core/providers/HeaderContext';
 import AppErrorBoundary from '@/features/security/components/AppErrorBoundary';
@@ -23,6 +26,7 @@ interface AppLayoutProps {
 
 const AppLayoutContent: React.FC<AppLayoutProps> = ({ children }) => {
   const { session, isLoading } = useAuth();
+  const pathname = usePathname();
   const { filteredNavigation } = usePermissions();
   const [mounted, setMounted] = React.useState(false);
 
@@ -55,6 +59,19 @@ const AppLayoutContent: React.FC<AppLayoutProps> = ({ children }) => {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <LoadingSpinner size="lg" />
+      </div>
+    );
+  }
+
+  const isPublicCoursePage =
+    pathname === '/courses' || /^\/courses\/[^/]+$/.test(pathname);
+
+  if (!user && isPublicCoursePage) {
+    return (
+      <div className="flex min-h-screen flex-col">
+        <MarketingHeader />
+        <div id="main-content" className="flex-1">{children}</div>
+        <MarketingFooter />
       </div>
     );
   }

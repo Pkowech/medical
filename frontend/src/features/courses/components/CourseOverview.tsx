@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { BookOpen, CheckCircle, ChevronRight, CircleCheck, Clock, Plus } from 'lucide-react';
 import { toast } from 'sonner';
@@ -9,6 +10,7 @@ import { courseService } from '@/features/courses/services/courseService';
 import type { Course } from '@/shared/types/courseInterface';
 import type { TopicProgress } from '@/shared/types/progressInterface';
 import { UnitSelectionModal } from './UnitSelectionModal';
+import { useAuth } from '@/features/auth/hooks/useAuth';
 
 type CourseProgress = {
   topicProgress?: Array<TopicProgress & { topicId?: string }>;
@@ -25,6 +27,7 @@ export function CourseOverview() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { courseId } = useParams<{ courseId: string }>();
+  const { user } = useAuth();
   const [showEnrollment, setShowEnrollment] = useState(false);
 
   const { data: course, isLoading: courseLoading, error: courseError } = useQuery<Course>({
@@ -35,12 +38,12 @@ export function CourseOverview() {
   const { data: progress } = useQuery<CourseProgress>({
     queryKey: ['course-overview-progress', courseId],
     queryFn: () => courseService.getDetailedCourseProgress(courseId),
-    enabled: Boolean(courseId),
+    enabled: Boolean(courseId && user?.id),
   });
   const { data: activeUnits = [] } = useQuery<Array<Record<string, unknown>>>({
     queryKey: ['course-overview-active-units', courseId],
     queryFn: () => courseService.getEnrolledUnits(),
-    enabled: Boolean(courseId),
+    enabled: Boolean(courseId && user?.id),
   });
 
   if (courseLoading) {
@@ -73,18 +76,30 @@ export function CourseOverview() {
       <div className="mx-auto max-w-7xl space-y-8">
         <header className="flex flex-col gap-5 border-b border-slate-200 pb-6 dark:border-slate-800 sm:flex-row sm:items-end sm:justify-between">
           <div className="min-w-0">
-            <p className="text-sm font-medium text-slate-500 dark:text-slate-400">My courses <span className="px-1">/</span> Units</p>
+            <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
+              <Link href="/courses" className="hover:text-blue-700 dark:hover:text-blue-300">Courses</Link>
+              <span className="px-1">/</span> {user ? 'Units' : 'Course preview'}
+            </p>
             <h1 className="mt-2 text-3xl font-semibold text-slate-900 dark:text-white">{course.title || course.name}</h1>
             {course.description && <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-400">{course.description}</p>}
           </div>
-          <button
-            type="button"
-            onClick={() => setShowEnrollment(true)}
-            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
-          >
-            <Plus className="h-4 w-4" />
-            Enroll in units
-          </button>
+          {user ? (
+            <button
+              type="button"
+              onClick={() => setShowEnrollment(true)}
+              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+            >
+              <Plus className="h-4 w-4" />
+              Enroll in units
+            </button>
+          ) : (
+            <Link
+              href={`/login?callbackUrl=${encodeURIComponent(`/courses/${courseId}`)}`}
+              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+            >
+              Sign in to enroll
+            </Link>
+          )}
         </header>
 
         <section className="space-y-5" aria-label="Course units">
@@ -109,7 +124,9 @@ export function CourseOverview() {
                 key={unit.id}
                 type="button"
                 onClick={() => {
-                  if (isActive) {
+                  if (!user) {
+                    router.push(`/login?callbackUrl=${encodeURIComponent(`/courses/${courseId}`)}`);
+                  } else if (isActive) {
                     router.push(`/courses/${courseId}/units/${unit.id}`);
                   } else {
                     setShowEnrollment(true);
@@ -147,14 +164,18 @@ export function CourseOverview() {
                   </span>
                   <span className="mt-auto pt-6">
                     <span className="flex items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
-                      <span>{percentage === 100 ? 'Unit completed' : `${completedTopics} of ${topics.length} topics complete`}</span>
-                      {percentage === 100 && <CheckCircle className="h-4 w-4 text-emerald-600" />}
+                      <span>
+                        {user
+                          ? percentage === 100 ? 'Unit completed' : `${completedTopics} of ${topics.length} topics complete`
+                          : `${topics.length} topics`}
+                      </span>
+                      {user && percentage === 100 && <CheckCircle className="h-4 w-4 text-emerald-600" />}
                     </span>
                     <span className="mt-2 block h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
                       <span className="block h-full rounded-full bg-blue-600 transition-[width]" style={{ width: `${percentage}%` }} />
                     </span>
                     <span className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 text-sm font-semibold text-blue-700 dark:border-slate-800 dark:text-blue-300">
-                      <span>{isActive ? 'Continue unit' : 'Enroll unit'}</span>
+                      <span>{!user ? 'Sign in to access' : isActive ? 'Continue unit' : 'Enroll unit'}</span>
                       <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
                     </span>
                   </span>

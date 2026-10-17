@@ -67,18 +67,30 @@ export const CoursesDashboard = () => {
   const { getResumePoint } = useStudy();
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<'enrolled' | 'discover' | 'recommended'>('enrolled');
+  const [activeTab, setActiveTab] = useState<'enrolled' | 'discover' | 'recommended'>(
+    user?.id ? 'enrolled' : 'discover',
+  );
   const [filters, setFilters] = useState<CourseFilter>({
     searchTerm: '',
     difficulty: '',
     category: '',
-    status: 'enrolled', // Default to enrolled
+    status: user?.id ? 'enrolled' : 'all',
   });
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [unitSelectionCourse, setUnitSelectionCourse] = useState<Course | null>(null);
   const [courseToUnenroll, setCourseToUnenroll] = useState<Course | null>(null);
   const [isUnenrolling, setIsUnenrolling] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    if (user?.id) {
+      setActiveTab(current => current === 'discover' ? current : 'enrolled');
+      setFilters(current => ({
+        ...current,
+        status: current.status === 'all' ? 'enrolled' : current.status,
+      }));
+    }
+  }, [user?.id]);
 
   const { data: progressDashboard } = useQuery({
     queryKey: ['course-progress-dashboard', user?.id],
@@ -351,7 +363,7 @@ export const CoursesDashboard = () => {
       <div className="mx-auto flex max-w-7xl flex-col space-y-6">
         
         {/* Stats Grid */}
-        <div className="order-1 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {user && <div className="order-1 grid grid-cols-2 gap-3 lg:grid-cols-4">
           <StatCard
             icon={BookOpen}
             title="My Units"
@@ -376,14 +388,14 @@ export const CoursesDashboard = () => {
             value={`${courseStatistics.avgScore || 0}%`}
             description="Average topic quiz score"
           />
-        </div>
+        </div>}
 
         {/* Search & Tabs Header */}
         <div className="order-2 flex flex-col justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:flex-row sm:items-center">
           <div className="flex min-w-0 flex-col gap-3">
             <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-white">Classes</h1>
             <div className="flex w-fit max-w-full items-center gap-1 overflow-x-auto rounded-full bg-slate-100 p-1 dark:bg-slate-800">
-              <TabButton 
+              {user && <TabButton
                 active={activeTab === 'enrolled'} 
                 onClick={() => {
                   setActiveTab('enrolled');
@@ -392,14 +404,14 @@ export const CoursesDashboard = () => {
                 }}
                 label="My Classes"
                 icon={BookOpen}
-              />
+              />}
               <TabButton 
                 active={activeTab === 'discover'} 
                 onClick={() => { setActiveTab('discover'); }}
                 label="Discover"
                 icon={Search}
               />
-              <TabButton 
+              {user && <TabButton
                 active={activeTab === 'recommended'} 
                 onClick={() => {
                   setActiveTab('recommended');
@@ -408,7 +420,7 @@ export const CoursesDashboard = () => {
                 }}
                 label="For You"
                 icon={Star}
-              />
+              />}
             </div>
             {activeTab === 'recommended' && (
               <p className="text-xs text-slate-500 dark:text-slate-400 ml-2 animate-in fade-in slide-in-from-left-2">
@@ -528,6 +540,11 @@ export const CoursesDashboard = () => {
                 {(infiniteData as any)?.pages?.flatMap((page: any) => page.courses)?.length ?? 0}
               </span>
             </div>
+            {!user && (
+              <p className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-950 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-100">
+                Browse the course catalog without an account. Sign in to enroll, access lessons, and track your progress.
+              </p>
+            )}
             {(infiniteData as any)?.pages?.flatMap((p: any) => p.courses)?.length > 0 ? (
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 {(infiniteData as any).pages.flatMap((p: any) => p.courses).map((course: any) => (
@@ -716,6 +733,11 @@ const CourseCard = ({
   const paletteIndex = Array.from(course.id).reduce((sum, character) => sum + character.charCodeAt(0), 0) % bannerPalettes.length;
 
   const openCourse = async () => {
+    if (!isEnrolled) {
+      router.push(`/courses/${course.id}`);
+      return;
+    }
+
     if (course.unitId) {
       router.push(`/courses/${course.id}/units/${course.unitId}`);
       return;

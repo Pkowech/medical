@@ -593,23 +593,6 @@ export class UsersService {
     await this.clearCache(user);
   }
 
-  public async resetPassword(email: string): Promise<void> {
-    const user = await this.findByEmail(email);
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
-
-    const tempPassword = Math.random().toString(36).slice(-8);
-    const hash = await argon2.hash(tempPassword);
-    await this.prisma.user.update({
-      where: { email },
-      data: { password: hash, updatedAt: new Date() },
-    });
-
-    await this.clearCache(user);
-    // TODO: send tempPassword via email
-  }
-
   public async validateUser(
     emailOrUsername: string,
     password: string,
