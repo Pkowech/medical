@@ -53,6 +53,8 @@ interface MaterialCourseGroup {
   resourceCount: number;
 }
 
+const MATERIALS_SECTION_STATE_KEY = 'medtrack.materials.section-state.v1';
+
 export default function MaterialsDashboard() {
   const { setHeader } = usePageHeader();
   const router = useRouter();
@@ -73,6 +75,42 @@ export default function MaterialsDashboard() {
   // Sort State
   const [sortBy, setSortBy] = useState<string>('createdAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [sectionOpenState, setSectionOpenState] = useState<Record<string, boolean>>({});
+  const [hasRestoredSectionState, setHasRestoredSectionState] = useState(false);
+
+  useEffect(() => {
+    try {
+      const savedState = window.localStorage.getItem(MATERIALS_SECTION_STATE_KEY);
+      if (savedState) {
+        const parsed: unknown = JSON.parse(savedState);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          setSectionOpenState(
+            Object.fromEntries(
+              Object.entries(parsed).filter((entry): entry is [string, boolean] =>
+                typeof entry[1] === 'boolean',
+              ),
+            ),
+          );
+        }
+      }
+    } catch (error) {
+      console.warn('Could not restore Materials section state:', error);
+    } finally {
+      setHasRestoredSectionState(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!hasRestoredSectionState) return;
+    try {
+      window.localStorage.setItem(
+        MATERIALS_SECTION_STATE_KEY,
+        JSON.stringify(sectionOpenState),
+      );
+    } catch (error) {
+      console.warn('Could not save Materials section state:', error);
+    }
+  }, [hasRestoredSectionState, sectionOpenState]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -255,6 +293,53 @@ export default function MaterialsDashboard() {
       unassigned,
     };
   }, [allMaterials]);
+  const materialSectionStates = useMemo(() => {
+    const sections: Array<{ id: string; defaultOpen: boolean }> = [];
+    for (const course of organizedMaterials.courses) {
+      sections.push({ id: `course:${course.id}`, defaultOpen: true });
+      for (const unit of course.units) {
+        sections.push({
+          id: `unit:${course.id}:${unit.id}`,
+          defaultOpen: false,
+        });
+        for (const topic of unit.topics) {
+          sections.push({
+            id: `topic:${course.id}:${unit.id}:${topic.id}`,
+            defaultOpen: false,
+          });
+        }
+      }
+    }
+    if (organizedMaterials.unassigned.length > 0) {
+      sections.push({ id: 'personal-unassigned', defaultOpen: true });
+    }
+    return sections;
+  }, [organizedMaterials]);
+  const allMaterialSectionsOpen =
+    materialSectionStates.length > 0 &&
+    materialSectionStates.every(
+      section => sectionOpenState[section.id] ?? section.defaultOpen,
+    );
+
+  const isSectionOpen = (id: string, defaultOpen: boolean) =>
+    sectionOpenState[id] ?? defaultOpen;
+
+  const handleSectionToggle = (
+    id: string,
+    event: React.SyntheticEvent<HTMLDetailsElement>,
+  ) => {
+    const isOpen = event.currentTarget.open;
+    setSectionOpenState(previous =>
+      previous[id] === isOpen ? previous : { ...previous, [id]: isOpen },
+    );
+  };
+
+  const setAllMaterialSectionsOpen = (open: boolean) => {
+    setSectionOpenState(previous => ({
+      ...previous,
+      ...Object.fromEntries(materialSectionStates.map(section => [section.id, open])),
+    }));
+  };
 
   const toggleCourseSharing = async (material: Material) => {
     if (!material.unitId) {
@@ -775,20 +860,37 @@ export default function MaterialsDashboard() {
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-200 pb-3 dark:border-slate-800">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3 dark:border-slate-800">
                 <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
                   {totalCount} {totalCount === 1 ? 'resource' : 'resources'}
                 </span>
-                {debouncedSearch && (
-                  <span className="max-w-[60%] truncate text-xs text-slate-500 dark:text-slate-400">
-                    Results for “{debouncedSearch}”
-                  </span>
-                )}
+                <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
+                  {debouncedSearch && (
+                    <span className="max-w-full truncate text-xs text-slate-500 dark:text-slate-400">
+                      Results for “{debouncedSearch}”
+                    </span>
+                  )}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setAllMaterialSectionsOpen(!allMaterialSectionsOpen)}
+                    disabled={materialSectionStates.length === 0}
+                    className="h-9 shrink-0 rounded-lg"
+                  >
+                    {allMaterialSectionsOpen ? 'Collapse all' : 'Expand all'}
+                  </Button>
+                </div>
               </div>
 
               <div className="space-y-3">
                 {organizedMaterials.courses.map((course) => (
-                  <details key={course.id} open className="group/course overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                  <details
+                    key={course.id}
+                    open={isSectionOpen(`course:${course.id}`, true)}
+                    onToggle={event => handleSectionToggle(`course:${course.id}`, event)}
+                    className="group/course overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900"
+                  >
                     <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-3.5 marker:hidden transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 dark:hover:bg-slate-800/60 sm:gap-4 sm:px-5">
                       <div className="flex min-w-0 items-center gap-3">
                         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
@@ -809,7 +911,14 @@ export default function MaterialsDashboard() {
                           + unit.topics.reduce((count, topic) => count + topic.materials.length, 0);
 
                         return (
-                          <details key={unit.id} className="group/unit overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700">
+                          <details
+                            key={unit.id}
+                            open={isSectionOpen(`unit:${course.id}:${unit.id}`, false)}
+                            onToggle={event =>
+                              handleSectionToggle(`unit:${course.id}:${unit.id}`, event)
+                            }
+                            className="group/unit overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700"
+                          >
                             <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-3 marker:hidden transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 dark:hover:bg-slate-800/60">
                               <h4 className="min-w-0 flex-1 break-words text-sm font-medium text-slate-800 dark:text-slate-100">{unit.title}</h4>
                               <span className="shrink-0 text-xs text-slate-500 dark:text-slate-400">
@@ -820,7 +929,20 @@ export default function MaterialsDashboard() {
                             <div className="space-y-3 border-t border-slate-100 p-3 dark:border-slate-700">
                               {unit.materials.length > 0 && renderMaterialItems(unit.materials)}
                               {unit.topics.map((topic) => (
-                                <details key={topic.id} className="group/topic overflow-hidden rounded-md border border-slate-200 dark:border-slate-700">
+                                <details
+                                  key={topic.id}
+                                  open={isSectionOpen(
+                                    `topic:${course.id}:${unit.id}:${topic.id}`,
+                                    false,
+                                  )}
+                                  onToggle={event =>
+                                    handleSectionToggle(
+                                      `topic:${course.id}:${unit.id}:${topic.id}`,
+                                      event,
+                                    )
+                                  }
+                                  className="group/topic overflow-hidden rounded-md border border-slate-200 dark:border-slate-700"
+                                >
                                   <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 marker:hidden transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 dark:hover:bg-slate-800/60">
                                     <h5 className="min-w-0 flex-1 break-words text-xs font-medium text-slate-700 dark:text-slate-200">{topic.title}</h5>
                                     <span className="shrink-0 text-xs text-slate-500 dark:text-slate-400">
@@ -842,7 +964,11 @@ export default function MaterialsDashboard() {
                 ))}
 
                 {organizedMaterials.unassigned.length > 0 && (
-                  <details open className="group overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                  <details
+                    open={isSectionOpen('personal-unassigned', true)}
+                    onToggle={event => handleSectionToggle('personal-unassigned', event)}
+                    className="group overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900"
+                  >
                     <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-4 py-3.5 marker:hidden transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/60 sm:px-5">
                       <div className="flex min-w-0 items-center gap-3">
                         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
