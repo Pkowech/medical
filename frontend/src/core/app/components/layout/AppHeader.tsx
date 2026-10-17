@@ -9,6 +9,8 @@ import {
   Moon,
   ChevronDown,
   Flame,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react';
 import { useLayoutStore } from '@/core/stores/useLayoutStore';
 import { useAuth } from '@/features/auth/hooks/useAuth';
@@ -30,7 +32,14 @@ export const AppHeader: React.FC<HeaderProps> = ({
   setNotificationsOpen,
   onNotificationRefresh,
 }) => {
-  const { sidebarOpen, setSidebarOpen, headerUserMenuOpen, setHeaderUserMenuOpen } = useLayoutStore();
+  const {
+    sidebarOpen,
+    setSidebarOpen,
+    sidebarCollapsed,
+    setSidebarCollapsed,
+    headerUserMenuOpen,
+    setHeaderUserMenuOpen,
+  } = useLayoutStore();
   const { header } = usePageHeader();
 
   const { logout } = useAuth();
@@ -102,8 +111,25 @@ export const AppHeader: React.FC<HeaderProps> = ({
               onClick={() => setSidebarOpen(!sidebarOpen)}
               className="lg:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors mr-1 text-gray-500 dark:text-slate-400"
               aria-label="Toggle sidebar"
+              aria-expanded={sidebarOpen}
+              aria-controls="app-sidebar"
             >
               <Menu className="h-6 w-6" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              className="hidden lg:inline-flex rounded-lg p-2 text-slate-500 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-slate-400 dark:hover:bg-slate-800"
+              aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              aria-expanded={!sidebarCollapsed}
+              aria-controls="app-sidebar"
+            >
+              {sidebarCollapsed ? (
+                <PanelLeftOpen aria-hidden="true" className="h-5 w-5" />
+              ) : (
+                <PanelLeftClose aria-hidden="true" className="h-5 w-5" />
+              )}
             </button>
 
             {header ? (

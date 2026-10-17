@@ -51,6 +51,7 @@ export interface NavigationItemProps {
   sidebarCollapsed?: boolean;
   sidebarOpen?: boolean;
   onClick?: () => void;
+  onExpandSidebar?: () => void;
   active?: boolean;
 }
 

@@ -11,6 +11,7 @@ export const NavigationItemComponent: React.FC<NavigationItemProps> = ({
   sidebarCollapsed = false,
   sidebarOpen = false,
   onClick,
+  onExpandSidebar,
   active: propActive = false,
 }) => {
   const pathname = usePathname();
@@ -26,30 +27,33 @@ export const NavigationItemComponent: React.FC<NavigationItemProps> = ({
   };
 
   const isItemActive = isActive(item.href);
-  const isChildActive = item.children?.some(child => isActive(child.href));
+  const isChildActive = item.children?.some(
+    child => isActive(child.href) || child.children?.some(grandchild => isActive(grandchild.href)),
+  );
   const effectiveActive = isItemActive || isChildActive || propActive;
   const activeStateClasses = effectiveActive
     ? 'bg-blue-50/80 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 shadow-sm'
     : 'text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white';
 
-  // Auto-expand if a child is active
   useEffect(() => {
-    if (isChildActive) {
-      setIsExpanded(true);
-    }
-  }, [isChildActive]);
+    setIsExpanded(Boolean(isChildActive));
+  }, [isChildActive, item.id]);
 
-  const toggleExpanded = () => setIsExpanded(expanded => !expanded);
+  const toggleExpanded = () => {
+    if (sidebarCollapsed && !sidebarOpen) onExpandSidebar?.();
+    setIsExpanded(expanded => !expanded);
+  };
 
   const showLabel = !sidebarCollapsed || sidebarOpen;
 
-  const baseClasses = `w-full flex items-center justify-between px-4 py-2.5 text-left text-sm font-semibold rounded-xl transition-all ${activeStateClasses}`;
-  const parentRowClasses = `w-full flex items-center justify-between text-left text-sm font-semibold rounded-xl transition-all ${activeStateClasses}`;
+  const baseClasses = `w-full flex items-center ${showLabel ? 'justify-between px-4' : 'justify-center px-2'} py-2.5 text-left text-sm font-semibold rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 ${activeStateClasses}`;
+  const parentRowClasses = `w-full flex items-center justify-between text-left text-sm font-semibold rounded-xl transition-colors ${activeStateClasses}`;
 
   const itemLabel = (
     <>
-      <div className="flex items-center space-x-3">
+      <div className={`flex min-w-0 items-center ${showLabel ? 'space-x-3' : 'justify-center'}`}>
         <item.icon
+          aria-hidden="true"
           className={`h-5 w-5 shrink-0 ${item.color || 'text-gray-600 dark:text-gray-300'}`}
         />
         {showLabel && (
@@ -73,7 +77,9 @@ export const NavigationItemComponent: React.FC<NavigationItemProps> = ({
           {item.href ? (
             <Link
               href={item.href}
-              className="flex min-w-0 flex-1 items-center rounded-l-xl px-4 py-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500"
+              title={!showLabel ? item.label : undefined}
+              aria-label={!showLabel ? item.label : undefined}
+              className={`flex min-w-0 flex-1 items-center rounded-l-xl ${showLabel ? 'px-4' : 'justify-center px-2'} py-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500`}
               onClick={onClick}
               aria-current={pathname === item.href ? 'page' : undefined}
             >
@@ -83,7 +89,8 @@ export const NavigationItemComponent: React.FC<NavigationItemProps> = ({
             <button
               type="button"
               onClick={toggleExpanded}
-              className="flex min-w-0 flex-1 items-center rounded-l-xl px-4 py-2.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500"
+              title={!showLabel ? item.label : undefined}
+              className={`flex min-w-0 flex-1 items-center rounded-l-xl ${showLabel ? 'px-4' : 'justify-center px-2'} py-2.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500`}
               aria-expanded={isExpanded}
               aria-controls={childrenId}
             >
@@ -98,7 +105,7 @@ export const NavigationItemComponent: React.FC<NavigationItemProps> = ({
             <button
               type="button"
               onClick={toggleExpanded}
-              className="mr-2 rounded-md p-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+              className={`shrink-0 rounded-md p-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${showLabel ? 'mr-2' : 'mr-1'}`}
               aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${item.label}`}
               aria-expanded={isExpanded}
               aria-controls={childrenId}
@@ -110,7 +117,7 @@ export const NavigationItemComponent: React.FC<NavigationItemProps> = ({
             </button>
           )}
         </div>
-        <div id={childrenId} hidden={!isExpanded || !showLabel} className="ml-6 mt-1 space-y-1">
+        <div id={childrenId} hidden={!isExpanded || !showLabel} className="ml-4 mt-1 space-y-1 border-l border-slate-200 pl-2 dark:border-slate-700">
           {item.children.map(child => (
             <NavigationItemComponent
               key={child.id}
@@ -118,6 +125,7 @@ export const NavigationItemComponent: React.FC<NavigationItemProps> = ({
               sidebarCollapsed={sidebarCollapsed}
               sidebarOpen={sidebarOpen}
               onClick={onClick}
+              onExpandSidebar={onExpandSidebar}
             />
           ))}
         </div>
@@ -131,6 +139,8 @@ export const NavigationItemComponent: React.FC<NavigationItemProps> = ({
       {item.href ? (
         <Link
           href={item.href}
+          title={!showLabel ? item.label : undefined}
+          aria-label={!showLabel ? item.label : undefined}
           className={baseClasses}
           onClick={onClick}
           aria-current={pathname === item.href ? 'page' : undefined}
