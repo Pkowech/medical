@@ -26,7 +26,7 @@ export default function SecurityPage() {
             Set up MFA and review trusted devices for best protection.
           </p>
           <Link
-            href="/settings/security"
+            href="/settings#security"
             className="mt-4 inline-flex items-center text-sm font-medium text-blue-600 hover:text-blue-700"
           >
             Go to security settings →

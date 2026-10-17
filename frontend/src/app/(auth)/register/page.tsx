@@ -68,7 +68,9 @@ export default function RegisterPage() {
       toast({
         title: 'Account created',
         description: registration.emailVerificationRequired
-          ? 'Check your email for a verification link before signing in.'
+          ? registration.verificationEmailSent
+            ? 'Check your email for a verification link before signing in.'
+            : 'Your account was created, but the verification email could not be delivered. Request a new link before signing in.'
           : 'Your account is ready. Sign in to continue.',
       });
       router.push('/login?callbackUrl=%2Ffinish-setup');

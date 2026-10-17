@@ -26,6 +26,8 @@ import { Resource } from '#common/decorators/resource.decorator';
 import { Action } from '#common/decorators/action.decorator';
 import { PrismaService } from '#infrastructure/prisma/prisma.service';
 import { AdminCreateUserDto, AdminUpdateUserDto } from '../dto/admin-user.dto';
+import { AdminSettingsService } from '../services/admin-settings.service';
+import { AdminSystemSettingsDto } from '../dto/system-settings.dto';
 
 @ApiTags('Admin')
 @Controller('admin')
@@ -36,7 +38,22 @@ import { AdminCreateUserDto, AdminUpdateUserDto } from '../dto/admin-user.dto';
 export class AdminController {
   constructor(
    private readonly adminService: AdminService,
+   private readonly adminSettingsService: AdminSettingsService,
    private readonly prisma: PrismaService) {}
+
+  @Get('settings')
+  @Action('read')
+  @ApiOperation({ summary: 'Get global system settings' })
+  async getSystemSettings() {
+    return this.adminSettingsService.getSettings();
+  }
+
+  @Put('settings')
+  @Action('update')
+  @ApiOperation({ summary: 'Update global system settings' })
+  async updateSystemSettings(@Body() settings: AdminSystemSettingsDto) {
+    return this.adminSettingsService.updateSettings(settings);
+  }
 
   @Get('system-overview/data')
   @ApiOperation({ summary: 'Get system-wide metrics' })

@@ -23,6 +23,7 @@ export interface JwtPayload {
   role: Role;
   roles: Role[];
   permissions: string[];
+  mfaSetupRequired?: boolean;
   iat?: number;
   exp?: number;
 }

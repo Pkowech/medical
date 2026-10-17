@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { Bell, Globe, Moon, Shield, Sun, User } from 'lucide-react';
 import { Settings } from '@/shared/types';
 import { useAuthStore } from '@/features/auth/store/useAuthStore';
+import { useTheme } from '@/app/providers';
 import { changePasswordSchema } from '@/lib/auth/validations';
 import { getAuthErrorDetails } from '@/features/auth/services/authErrors';
 import { TwoFactorAuth } from '@/features/auth/components/TwoFactorAuth';
@@ -37,6 +38,7 @@ interface UserSettings {
 export default function SettingsPage() {
   const { isLoading, session } = useRequireAuth();
   const router = useRouter();
+  const { setTheme } = useTheme();
   const changePassword = useAuthStore(state => state.changePassword);
   const [saving, setSaving] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -94,7 +96,7 @@ export default function SettingsPage() {
           allowMessages: response.data.privacy?.allowMessages ?? true,
         };
         setSettings(loadedSettings);
-        applyTheme(loadedSettings.theme);
+        setTheme(loadedSettings.theme);
         setSettingsLoadFailed(false);
       } catch (error) {
         console.error('Error loading settings:', error);
@@ -108,24 +110,11 @@ export default function SettingsPage() {
     if (session) {
       fetchSettings();
     }
-  }, [session]);
-
-  const applyTheme = (theme: 'light' | 'dark' | 'system') => {
-    localStorage.setItem('theme', theme);
-    if (theme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else if (theme === 'light') {
-      document.documentElement.classList.remove('dark');
-    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  };
+  }, [session, setTheme]);
 
   const handleThemeChange = (theme: 'light' | 'dark' | 'system') => {
     setSettings(prev => ({ ...prev, theme }));
-    applyTheme(theme);
+    setTheme(theme);
   };
 
   const handleChangePassword = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -249,7 +238,7 @@ export default function SettingsPage() {
                 </Button>
               </div>
             </CardContent>
-          </Card>
+            </Card>
 
           {/* Email Settings */}
           <Card>
@@ -420,7 +409,7 @@ export default function SettingsPage() {
           </Card>
 
           {/* Security Section */}
-          <Card>
+          <Card id="security">
             <CardHeader>
               <CardTitle className="flex items-center">
                 <Shield className="h-5 w-5 mr-2" />

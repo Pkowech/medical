@@ -34,7 +34,7 @@ const tourSlides = [
 export default function OnboardingPage() {
   const router = useRouter();
   const { data: session, update: updateSession } = useSession();
-  const { user, updateUser } = useAuthStore();
+  const { user, setUser } = useAuthStore();
   const [step, setStep] = useState(0);
   const [profile, setProfile] = useState({
     name: '',
@@ -131,8 +131,7 @@ export default function OnboardingPage() {
         preferences: updatedPreferences,
       });
 
-      // Update local store
-      updateUser({
+      setUser({
         ...user,
         careerStage,
         healthcareField,

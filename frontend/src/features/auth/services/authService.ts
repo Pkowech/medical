@@ -257,14 +257,20 @@ class AuthService {
     return response.data;
   }
 
-  async verifyTwoFactorAuth(token: string): Promise<void> {
-    const response = await apiService.post<{ valid: boolean }>(
+  async verifyTwoFactorAuth(
+    token: string
+  ): Promise<{ auth?: { accessToken: string; refreshToken: string; expiresAt: string } }> {
+    const response = await apiService.post<{
+      valid: boolean;
+      auth?: { accessToken: string; refreshToken: string; expiresAt: string };
+    }>(
       '/auth/security/2fa/verify',
       { token }
     );
     if (!response.data.valid) {
       throw new Error('The authenticator code is incorrect.');
     }
+    return response.data;
   }
 
   async disableTwoFactorAuth(token: string): Promise<void> {

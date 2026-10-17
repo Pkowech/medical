@@ -4,9 +4,15 @@
 
 import React, { useEffect, useState } from 'react';
 import Image from 'next/image';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 import { authService } from '@/features/auth/services/authService';
 
-export const TwoFactorAuth: React.FC = () => {
+export const TwoFactorAuth: React.FC<{ requiredSetup?: boolean }> = ({
+  requiredSetup = false,
+}) => {
+  const { update } = useSession();
+  const router = useRouter();
   const [enabled, setEnabled] = useState(false);
   const [setup, setSetup] = useState<{ secret: string; qrCode: string } | null>(null);
   const [token, setToken] = useState('');
@@ -15,6 +21,10 @@ export const TwoFactorAuth: React.FC = () => {
   const [isUpdating, setIsUpdating] = useState(false);
 
   useEffect(() => {
+    if (requiredSetup) {
+      setLoading(false);
+      return;
+    }
     authService
       .getSecuritySettings()
       .then(settings => setEnabled(settings.twoFactorEnabled))
@@ -23,14 +33,29 @@ export const TwoFactorAuth: React.FC = () => {
         setError('Could not load two-factor authentication settings.');
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [requiredSetup]);
 
   const handleEnable = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setIsUpdating(true);
     setError(null);
     try {
-      await authService.verifyTwoFactorAuth(token);
+      const result = await authService.verifyTwoFactorAuth(token);
+      if (requiredSetup) {
+        if (!result.auth?.accessToken || !result.auth.refreshToken || !result.auth.expiresAt) {
+          throw new Error('Two-factor setup succeeded but the session could not be renewed.');
+        }
+        await update({
+          user: {
+            mfaSetupRequired: false,
+            accessToken: result.auth.accessToken,
+            refreshToken: result.auth.refreshToken,
+            accessTokenExpires: new Date(result.auth.expiresAt).getTime(),
+          },
+        });
+        router.replace('/dashboard');
+        return;
+      }
       setEnabled(true);
       setSetup(null);
       setToken('');
@@ -80,7 +105,7 @@ export const TwoFactorAuth: React.FC = () => {
             : 'Add an authenticator app as a second sign-in step.'}
         </p>
       </div>
-      {enabled ? (
+      {enabled && !requiredSetup ? (
         <form onSubmit={handleDisable} className="space-y-3">
           <label htmlFor="disable-2fa-token" className="block text-sm font-medium">
             Authenticator code to disable 2FA
@@ -128,7 +153,11 @@ export const TwoFactorAuth: React.FC = () => {
             className="w-full rounded-md border border-gray-300 px-3 py-2"
           />
           <button type="submit" disabled={isUpdating} className="text-sm underline disabled:opacity-50">
-            {isUpdating ? 'Verifying...' : 'Verify and enable'}
+            {isUpdating
+              ? 'Verifying...'
+              : requiredSetup
+                ? 'Verify and continue'
+                : 'Verify and enable'}
           </button>
         </form>
       ) : (

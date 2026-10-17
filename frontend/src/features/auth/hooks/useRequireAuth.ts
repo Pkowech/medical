@@ -28,6 +28,11 @@ export function useRequireAuth(options: UseRequireAuthOptions = {}) {
       return;
     }
 
+    if (session.user?.mfaSetupRequired) {
+      router.replace('/mfa-setup');
+      return;
+    }
+
     // At this point, session is available.
     // Check for required role
     if (requiredRole) {

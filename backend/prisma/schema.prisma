@@ -406,6 +406,15 @@ model User {
   @@map("users")
 }
 
+model AppSystemSettings {
+  id        String   @id @default("global")
+  settings  Json
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("app_system_settings")
+}
+
 model GoogleDriveConnection {
   id                    String   @id @default(uuid())
   userId                String   @unique @map("user_id")

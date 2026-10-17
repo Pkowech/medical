@@ -7,6 +7,7 @@ import {
   Inject,
   forwardRef,
   ServiceUnavailableException,
+  Optional,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as argon2 from 'argon2';
@@ -28,6 +29,7 @@ import {
 } from '#common/dto/security.dto';
 import { TokenBlacklistService } from './token-blacklist.service';
 import type { SecurityEventData } from '#common/dto/security.dto';
+import { AdminSettingsService } from '#modules/admin/services/admin-settings.service';
 
 @Injectable()
 export class SecurityService {
@@ -38,6 +40,8 @@ export class SecurityService {
     private configService: ConfigService,
     @Inject(forwardRef(() => TokenBlacklistService))
     private tokenBlacklistService: TokenBlacklistService,
+    @Optional()
+    private readonly adminSettingsService?: AdminSettingsService,
   ) {}
 
   private generateBackupCodes(count = 10): string[] {
@@ -172,6 +176,7 @@ export class SecurityService {
       throw new BadRequestException('New passwords do not match');
     }
 
+    await this.adminSettingsService?.validatePassword(dto.newPassword);
     const passwordHash = await argon2.hash(dto.newPassword);
     await this.prisma.user.update({
       where: { id: userId },
@@ -396,12 +401,7 @@ export class SecurityService {
     });
     if (settings?.isEmailVerified) return;
 
-    try {
-      await this.sendVerificationEmail(user);
-    } catch (error) {
-      if (!(error instanceof ServiceUnavailableException)) throw error;
-      this.logger.error('Could not send a requested verification email.');
-    }
+    await this.sendVerificationEmail(user);
   }
 
   async resendVerificationEmail(userId: string): Promise<void> {
@@ -552,6 +552,7 @@ export class SecurityService {
   }
 
   async verifyRecoveryRequest(token: string, newPassword: string): Promise<void> {
+    await this.adminSettingsService?.validatePassword(newPassword);
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
     const now = new Date();
     const resetToken = await this.prisma.passwordResetToken.findUnique({

@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic';
 
 import React, { ReactNode, useEffect } from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { DashboardLayout } from '@/core/app/components/layout/DashboardLayout';
 import { MarketingFooter } from '@/core/marketing/MarketingFooter';
 import { MarketingHeader } from '@/core/marketing/MarketingHeader';
@@ -27,6 +27,7 @@ interface AppLayoutProps {
 const AppLayoutContent: React.FC<AppLayoutProps> = ({ children }) => {
   const { session, isLoading } = useAuth();
   const pathname = usePathname();
+  const router = useRouter();
   const { filteredNavigation } = usePermissions();
   const [mounted, setMounted] = React.useState(false);
 
@@ -42,6 +43,12 @@ const AppLayoutContent: React.FC<AppLayoutProps> = ({ children }) => {
       } as User)
     : null;
 
+  useEffect(() => {
+    if (user?.mfaSetupRequired && pathname !== '/mfa-setup') {
+      router.replace('/mfa-setup');
+    }
+  }, [pathname, router, user?.mfaSetupRequired]);
+
   // Fetch deadlines
   useEffect(() => {
     if (!session?.user) return;
@@ -56,6 +63,14 @@ const AppLayoutContent: React.FC<AppLayoutProps> = ({ children }) => {
   }, [session?.user]);
 
   if (!mounted || isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
+  }
+
+  if (user?.mfaSetupRequired) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <LoadingSpinner size="lg" />

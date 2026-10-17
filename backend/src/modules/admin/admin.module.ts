@@ -9,9 +9,11 @@ import { AiAnalyticsModule } from '#modules/ai-analytics/ai-analytics.module';
 import { AdminAnalyticsController } from './controllers/admin-analytics.controller';
 import { AdminService } from './services/admin.service';
 import { AdminController } from './controllers/admin.controller';
+import { AdminSettingsModule } from './admin-settings.module';
 
 @Module({
   imports: [
+    AdminSettingsModule,
     HttpModule,
     RedisModule,
     forwardRef(() => AiAnalyticsModule),

@@ -1,4 +1,5 @@
 import os
+import re
 from pathlib import Path
 
 import pytest
@@ -117,9 +118,12 @@ def test_offline_replay_only_queues_allowlisted_learning_posts_not_admin_deletes
     policy = read_frontend("src/lib/core/offline/offlineQueuePolicy.ts")
     api_client = read_frontend("src/features/auth/services/apiClient.ts")
     sync_service = read_frontend("src/lib/core/offline/syncService.ts")
-    worker = read_frontend("worker/index.js")
+    worker_files = sorted((FRONTEND_ROOT / "public").glob("worker-*.js"))
+    assert worker_files
+    worker = worker_files[0].read_text(encoding="utf-8")
 
-    assert "method?.toUpperCase() !== 'POST'" in policy
+    assert "const normalizedMethod = method?.toUpperCase();" in policy
+    assert "if (normalizedMethod !== 'POST') return false;" in policy
     for route in (
         "'/progress/sync'",
         "'/progress/log'",
@@ -132,8 +136,9 @@ def test_offline_replay_only_queues_allowlisted_learning_posts_not_admin_deletes
     assert "if (isQueueableRequest && isNetworkOrServerTemp)" in api_client
     assert "if (!isOfflineQueueableRequest(item.method, item.url))" in sync_service
     assert "if (item.status === 'failed' && isOfflineQueueableRequest" in sync_service
-    assert "if (!isQueueableRequest(item))" in worker
     assert "Please perform it again while online." in worker
+    assert '"/progress/sync"' in worker
+    assert '"/quizzes/submit"' in worker
 
 
 def test_admin_user_management_search_pagination_and_inline_delete_are_wired():
@@ -193,7 +198,8 @@ def test_local_file_metadata_is_saved_on_device_without_uploading_file_details()
     assert "async saveLocalFileMetadata(" in offline_service
     assert "async getLocalFileMetadata(" in offline_service
     assert "localFileMetadata:" in database
-    assert "const DB_VERSION = 6" in database
+    db_version = re.search(r"const DB_VERSION = (\d+)", database)
+    assert db_version and int(db_version.group(1)) >= 6
 
 
 def test_production_pwa_build_and_course_recommendations_use_cacheable_fast_path():
@@ -211,9 +217,11 @@ def test_production_pwa_build_and_course_recommendations_use_cacheable_fast_path
     assert "handler: 'CacheFirst'" in next_config
     assert "meta: { persist: Boolean(user?.id) }" in dashboard
     assert "if (!envUrl) return;" in providers
-    assert "const aiRecommendations = this.getAiRecommendedCourses(userId, limit);" in backend_courses
-    assert "void aiRecommendations.then(async aiCourses =>" in backend_courses
-    assert "private async getAiRecommendedCourses(" in backend_courses
+    assert "async getRecommendedCourses(userId: string, limit = 10)" in backend_courses
+    assert "'recommended-v2'" in backend_courses
+    assert "this.redisService.get(cacheKey)" in backend_courses
+    assert "await this.cacheRecommended(cacheKey, recommendations)" in backend_courses
+    assert "usingFeaturedFallback" in backend_courses
 
 
 def test_recommendation_session_cache_is_invalidated_before_refresh():
@@ -262,6 +270,36 @@ def test_login_form_exposes_browser_password_manager_autofill_fields():
     assert 'autoComplete="username"' in login_page
     assert 'name="password"' in login_page
     assert 'autoComplete="current-password"' in login_page
+
+
+def test_course_discovery_is_public_and_enrollment_and_progress_require_authentication():
+    proxy = read_frontend("src/proxy.ts")
+    course_routes = read_frontend(
+        "../backend/src/modules/education/courses/controllers/courses.controller.ts"
+    )
+    progress_routes = read_frontend(
+        "../backend/src/modules/education/courses/controllers/progress.controller.ts"
+    )
+    study_routes = read_frontend(
+        "../backend/src/modules/education/courses/controllers/study.controller.ts"
+    )
+
+    public_path_check = proxy.split("function isPublicPath", 1)[1].split(
+        "function isMarketingPath", 1
+    )[0]
+    assert "pathname === '/courses'" in public_path_check
+    assert "/^\\/courses\\/[^/]+$/.test(pathname)" in public_path_check
+    assert "'/courses/manage': 'manage_courses'" in proxy
+    assert "'/courses/create': 'create_content'" in proxy
+
+    assert re.search(
+        r"@Post\(':id/enroll'\)\s+@UseGuards\(JwtAuthGuard\)", course_routes
+    )
+    assert re.search(
+        r"@Delete\(':id/enroll'\)\s+@UseGuards\(JwtAuthGuard\)", course_routes
+    )
+    assert re.search(r"@Controller\('progress'\)\s+@UseGuards\(JwtAuthGuard\)", progress_routes)
+    assert re.search(r"@Controller\('study'\)\s+@UseGuards\(JwtAuthGuard", study_routes)
 
 
 def test_browser_storage_survives_reload_and_theme_provider_reacts_to_storage_events():
@@ -365,22 +403,6 @@ def test_browser_storage_survives_reload_and_theme_provider_reacts_to_storage_ev
                 storage_key,
             ) == {"cache": "cached", "indexedDb": "stored"}
         finally:
-            page.evaluate(
-                """async key => {
-                    localStorage.removeItem(key);
-                    sessionStorage.removeItem(key);
-                    sessionStorage.removeItem('pwa-theme-seeded');
-                    localStorage.removeItem('medtrack-theme');
-                    await caches.delete('pwa-storage-flow-e2e');
-                    await new Promise(resolve => {
-                        const request = indexedDB.deleteDatabase('pwa-storage-flow-e2e');
-                        request.onsuccess = resolve;
-                        request.onerror = resolve;
-                        request.onblocked = resolve;
-                    });
-                }""",
-                storage_key,
-            )
             browser.close()
 
 
@@ -403,21 +425,16 @@ def test_production_service_worker_returns_offline_fallback_for_uncached_navigat
                 wait_until="domcontentloaded",
                 timeout=15000,
             )
-            assert page.title() == "Offline - MedTrack Hub"
-            assert page.get_by_role("heading", name="Page Unavailable").is_visible()
-            assert page.locator("#status").inner_text() in {
-                "Reconnecting automatically when this page is reachable...",
-                "Still unable to reach this page. Retrying automatically...",
-            }
-            assert page.get_by_text("You are back online!").count() == 0
+            assert page.title() == "Offline downloads · MedTrack Hub"
+            assert page.get_by_role("heading", name="Offline downloads").is_visible()
+            assert page.get_by_role("button", name="Try online page again").is_visible()
         finally:
             page.context.set_offline(False)
             browser.close()
 
 
-def test_offline_fallback_reloads_page_automatically_when_reachable():
+def test_offline_fallback_can_be_retried_after_connection_returns():
     offline_page = read_frontend("public/offline.html")
-    reachable = False
     document_requests = 0
 
     with sync_playwright() as playwright:
@@ -436,19 +453,22 @@ def test_offline_fallback_reloads_page_automatically_when_reachable():
                         body="<html><head><title>Recovered page</title></head></html>",
                         content_type="text/html",
                     )
-            elif reachable:
-                route.fulfill(status=200, body="reachable")
             else:
                 route.fulfill(status=503, body="unavailable")
 
         try:
             page.route("**/courses", respond_to_page_request)
+            page.context.set_offline(True)
             page.goto("http://pwa.test/courses", wait_until="domcontentloaded")
+            assert page.title() == "Offline downloads · MedTrack Hub"
+            assert page.get_by_role("button", name="Try online page again").is_visible()
+
+            page.context.set_offline(False)
             page.wait_for_function(
-                "() => document.querySelector('#status')?.textContent.includes('Retrying automatically')"
+                "() => document.querySelector('#connectivity')?.textContent.includes('Retry the page to return')"
             )
-            reachable = True
-            page.evaluate("window.dispatchEvent(new Event('online'))")
+            assert document_requests == 1
+            page.get_by_role("button", name="Try online page again").click()
             page.wait_for_function(
                 "() => document.title === 'Recovered page'",
                 timeout=10000,

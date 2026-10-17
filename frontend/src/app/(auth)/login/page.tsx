@@ -2,6 +2,7 @@
 import { Suspense, useState, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { getSession } from 'next-auth/react';
 import {
   FaUser,
   FaLock,
@@ -40,7 +41,7 @@ function getSafeCallbackUrl(requestedCallbackUrl: string | null): string {
 }
 
 function LoginContent() {
-  const { login, isAuthenticated, signIn: nextAuthSignIn } = useAuth();
+  const { login, isAuthenticated, user, signIn: nextAuthSignIn } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const requestedCallbackUrl = searchParams.get('callbackUrl');
@@ -48,9 +49,11 @@ function LoginContent() {
   // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated) {
-      router.replace(getSafeCallbackUrl(requestedCallbackUrl));
+      router.replace(
+        user?.mfaSetupRequired ? '/mfa-setup' : getSafeCallbackUrl(requestedCallbackUrl)
+      );
     }
-  }, [isAuthenticated, requestedCallbackUrl, router]);
+  }, [isAuthenticated, requestedCallbackUrl, router, user?.mfaSetupRequired]);
 
   const [error, setError] = useState('');
   const [canRetry, setCanRetry] = useState(false);
@@ -221,7 +224,10 @@ function LoginContent() {
 
         // Keep same-origin callback URLs as client-side paths. Passing the
         // complete deployment URL can make Next.js perform a full reload.
-        const callbackUrl = getSafeCallbackUrl(requestedCallbackUrl);
+        const session = await getSession();
+        const callbackUrl = session?.user?.mfaSetupRequired
+          ? '/mfa-setup'
+          : getSafeCallbackUrl(requestedCallbackUrl);
 
         // Reload through the browser so the session cookie written by
         // NextAuth is included in the first protected dashboard request.

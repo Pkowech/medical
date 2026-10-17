@@ -5,6 +5,7 @@ import {
   Logger,
   NotFoundException,
   ServiceUnavailableException,
+  Optional,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '#infrastructure/prisma/prisma.service';
@@ -36,6 +37,7 @@ import { RoleLimitingService } from './role-limiting.service'; // Inject for gue
 import type { JwtPayload } from '#common/dto/security.dto';
 import { securityEventTypes } from '#common/dto/security.dto';
 import { Prisma } from '@prisma/client';
+import { AdminSettingsService } from '#modules/admin/services/admin-settings.service';
 
 interface GoogleIdentityPayload {
   sub?: string;
@@ -75,6 +77,8 @@ export class AuthService {
     private readonly rolesService: RolesService,
     private readonly roleLimitingService: RoleLimitingService, // Added for guest rate limit
     private readonly configService: ConfigService,
+    @Optional()
+    private readonly adminSettingsService?: AdminSettingsService,
   ) {
     // Initialize configuration from environment
     this.MAX_FAILED_ATTEMPTS = this.configService.get<number>(
@@ -173,6 +177,7 @@ export class AuthService {
     ipAddress?: string,
     userAgent?: string,
     deviceId?: string,
+    forceMfaSetup = false,
   ): Promise<AuthResponse> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -201,20 +206,42 @@ export class AuthService {
       await this.permissionCalculationService.getEffectivePermissionsForRole(
         primaryRole,
       );
+    const securitySettings = await this.prisma.userSecuritySettings.findUnique({
+      where: { userId: user.id },
+      select: { twoFactorEnabled: true },
+    });
+    const systemSettings = await this.adminSettingsService?.getSettings();
+    const mfaSetupRequired =
+      forceMfaSetup ||
+      Boolean(
+        systemSettings?.twoFactorAuthRequired &&
+          !securitySettings?.twoFactorEnabled,
+      );
+    const sessionTimeoutMinutes = systemSettings?.sessionTimeout ?? 120;
+    const accessTokenLifetimeMs = mfaSetupRequired
+      ? 10 * 60 * 1000
+      : Math.min(
+          this.parseDurationToMilliseconds(this.JWT_EXPIRES_IN),
+          sessionTimeoutMinutes * 60 * 1000,
+        );
     const payload: JwtPayload = {
       sub: user.id,
       email: user.email,
       role: primaryRole,
       roles: allRoles,
       permissions,
+      ...(mfaSetupRequired && { mfaSetupRequired: true }),
     };
     const accessToken = await this.jwtService.signAsync(payload, {
       secret: this.JWT_SECRET,
-      expiresIn: this.JWT_EXPIRES_IN as any,
+      expiresIn: Math.floor(accessTokenLifetimeMs / 1000),
     });
-    const refreshToken = await this.refreshTokenService.createRefreshToken(
-      user.id,
-    );
+    const refreshToken = mfaSetupRequired
+      ? ''
+      : await this.refreshTokenService.createRefreshToken(
+          user.id,
+          Math.ceil(accessTokenLifetimeMs / 1000),
+        );
 
     await this.prisma.user.update({
       where: { id: user.id },
@@ -237,7 +264,7 @@ export class AuthService {
       accessToken,
       refreshToken,
       expiresAt: new Date(
-        Date.now() + this.parseDurationToMilliseconds(this.JWT_EXPIRES_IN),
+        Date.now() + accessTokenLifetimeMs,
       ),
       user: {
         id: user.id,
@@ -251,6 +278,7 @@ export class AuthService {
         studyYear: user.studyYear,
         yearOfExperience: user.yearOfExperience,
         specialization: user.specialization,
+        ...(mfaSetupRequired && { mfaSetupRequired: true }),
       },
       roles: {
         role: primaryRole,
@@ -258,6 +286,17 @@ export class AuthService {
         permissions,
       },
     };
+  }
+
+  async completeRequiredTwoFactor(userId: string): Promise<AuthResponse> {
+    const securitySettings = await this.prisma.userSecuritySettings.findUnique({
+      where: { userId },
+      select: { twoFactorEnabled: true },
+    });
+    if (!securitySettings?.twoFactorEnabled) {
+      throw new UnauthorizedException('Required two-factor setup is incomplete.');
+    }
+    return this.issueAuthResponse(userId);
   }
 
   /**
@@ -323,6 +362,17 @@ export class AuthService {
       (userRole: any) => userRole.role.name as Role,
     );
 
+    const [systemSettings, securitySettings] = await Promise.all([
+      this.adminSettingsService?.getSettings(),
+      this.prisma.userSecuritySettings.findUnique({
+        where: { userId },
+        select: { twoFactorEnabled: true },
+      }),
+    ]);
+    const mfaSetupRequired =
+      payload.mfaSetupRequired ||
+      Boolean(systemSettings?.twoFactorAuthRequired && !securitySettings?.twoFactorEnabled);
+
     return {
       id: user.id,
       username: user.username ?? '',
@@ -336,6 +386,7 @@ export class AuthService {
           user.id,
         ),
       isEmailVerified: user.securitySettings?.isEmailVerified || false,
+      ...(mfaSetupRequired && { mfaSetupRequired: true }),
     };
   }
 
@@ -474,6 +525,20 @@ export class AuthService {
           { stack: getErrorStack(error) },
         );
         // Continue with null securitySettings - 2FA will be skipped
+      }
+
+      const systemSettings = await this.adminSettingsService?.getSettings();
+      if (
+        systemSettings?.twoFactorAuthRequired &&
+        !securitySettings?.twoFactorEnabled
+      ) {
+        return this.issueAuthResponse(
+          user.id,
+          ipAddress,
+          userAgent,
+          deviceId,
+          true,
+        );
       }
 
       // Check 2FA if enabled
@@ -650,6 +715,8 @@ export class AuthService {
       profilePicture,
     } = registerDto;
 
+    await this.adminSettingsService?.validatePassword(password);
+
     this.logger.debug('Register request received with fields:', {
       firstName,
       lastName,
@@ -691,23 +758,20 @@ export class AuthService {
         throw new NotFoundException('Failed to fetch created user');
       }
 
-      // Send verification email
-      try {
-        await this.securityService.sendVerificationEmail(user as any);
-      } catch (emailError) {
-        this.logger.error(
-          `Failed to send verification email: ${getErrorMessage(emailError)}`,
-          { userId: user.id, stack: getErrorStack(emailError) },
-        );
-
-        // In development, auto-verify email if sending fails
-        if (process.env.NODE_ENV !== 'production') {
-          await this.prisma.userSecuritySettings.update({
-            where: { id: user.id },
-            data: {
-              isEmailVerified: true,
-            },
-          });
+      const emailVerificationRequired = this.configService.get<boolean>(
+        'ENABLE_EMAIL_VERIFICATION',
+        true,
+      );
+      let verificationEmailSent = false;
+      if (emailVerificationRequired) {
+        try {
+          await this.securityService.sendVerificationEmail(user as any);
+          verificationEmailSent = true;
+        } catch (emailError) {
+          this.logger.error(
+            `Failed to send verification email: ${getErrorMessage(emailError)}`,
+            { userId: user.id, stack: getErrorStack(emailError) },
+          );
         }
       }
 
@@ -720,10 +784,8 @@ export class AuthService {
           username: user.username || '',
           isEmailVerified: await this.securityService.isEmailVerified(user.id),
         },
-        emailVerificationRequired: this.configService.get<boolean>(
-          'ENABLE_EMAIL_VERIFICATION',
-          true,
-        ),
+        emailVerificationRequired,
+        verificationEmailSent,
       };
     } catch (error) {
       this.logger.error(`Registration error: ${getErrorMessage(error)}`, {
@@ -753,6 +815,19 @@ export class AuthService {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
+    const systemSettings = await this.adminSettingsService?.getSettings();
+    if (systemSettings?.twoFactorAuthRequired) {
+      const securitySettings = await this.prisma.userSecuritySettings.findUnique({
+        where: { userId },
+        select: { twoFactorEnabled: true },
+      });
+      if (!securitySettings?.twoFactorEnabled) {
+        throw new UnauthorizedException(
+          'Complete required two-factor setup before refreshing this session.',
+        );
+      }
+    }
+
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       include: { userRoles: { include: { role: true } } },
@@ -770,6 +845,11 @@ export class AuthService {
         userRole,
       );
 
+    const sessionTimeoutMinutes = systemSettings?.sessionTimeout ?? 120;
+    const accessTokenLifetimeMs = Math.min(
+      this.parseDurationToMilliseconds(this.JWT_EXPIRES_IN),
+      sessionTimeoutMinutes * 60 * 1000,
+    );
     const payload: JwtPayload = {
       sub: user.id,
       email: user.email,
@@ -780,11 +860,12 @@ export class AuthService {
 
     const accessToken = await this.jwtService.signAsync(payload, {
       secret: this.JWT_SECRET,
-      expiresIn: this.JWT_EXPIRES_IN as any,
+      expiresIn: Math.floor(accessTokenLifetimeMs / 1000),
     });
 
     const newRefreshToken = await this.refreshTokenService.createRefreshToken(
       user.id,
+      Math.ceil(accessTokenLifetimeMs / 1000),
     );
     await this.refreshTokenService.revokeRefreshToken(refreshToken);
 
@@ -798,7 +879,7 @@ export class AuthService {
 
     const isEmailVerified = await this.securityService.isEmailVerified(user.id);
     const expiresAt = new Date(
-      Date.now() + this.parseDurationToMilliseconds(this.JWT_EXPIRES_IN),
+      Date.now() + accessTokenLifetimeMs,
     );
 
     return {

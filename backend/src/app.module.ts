@@ -26,6 +26,7 @@ import { UsersModule } from './modules/auth/users.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { RolesModule } from './modules/auth/roles.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { AdminSettingsModule } from './modules/admin/admin-settings.module';
 
 // Learning & Education Modules
 import { AssessmentModule } from '#modules/education/assessment/assessment.module';
@@ -147,6 +148,7 @@ const redisModules = shouldEnableRedis
       ? [AnalyticsQueueModule, EngagementCommunicationModule]
       : []),
     AdminModule,
+    AdminSettingsModule,
 
     // Integration & Infrastructure
     IntegrationsModule,

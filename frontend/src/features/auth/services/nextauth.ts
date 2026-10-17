@@ -178,6 +178,7 @@ async function exchangeGoogleCredential(
     roles,
     permissions,
     isEmailVerified: authUser.isEmailVerified === true,
+    mfaSetupRequired: authUser.mfaSetupRequired === true,
     careerStage:
       authUser.careerStage === 'student' || authUser.careerStage === 'professional'
         ? authUser.careerStage
@@ -379,6 +380,7 @@ export const authOptions: NextAuthOptions = {
             role: (roles?.role as unknown as Role) || (user?.role as unknown as Role) || Role.guest,
             roles: (roles?.roles as Role[]) || (user?.roles as Role[]) || (user?.role ? [(user.role as unknown as Role)] : []),
             isEmailVerified: (user?.isEmailVerified as boolean) || false,
+            mfaSetupRequired: user?.mfaSetupRequired === true,
             careerStage:
               user?.careerStage === 'student' || user?.careerStage === 'professional'
                 ? user.careerStage
@@ -541,6 +543,18 @@ export const authOptions: NextAuthOptions = {
         ) {
           token.specialization = updatedUser.specialization;
         }
+        if (typeof updatedUser.mfaSetupRequired === 'boolean') {
+          token.mfaSetupRequired = updatedUser.mfaSetupRequired;
+        }
+        if (typeof updatedUser.accessToken === 'string') {
+          token.accessToken = updatedUser.accessToken;
+        }
+        if (typeof updatedUser.refreshToken === 'string') {
+          token.refreshToken = updatedUser.refreshToken;
+        }
+        if (typeof updatedUser.accessTokenExpires === 'number') {
+          token.accessTokenExpires = updatedUser.accessTokenExpires;
+        }
         return token;
       }
 
@@ -557,6 +571,7 @@ export const authOptions: NextAuthOptions = {
           refreshToken: sessionUser.refreshToken ?? '',
           firstName: sessionUser.firstName,
           lastName: sessionUser.lastName,
+          mfaSetupRequired: sessionUser.mfaSetupRequired === true,
           careerStage: sessionUser.careerStage,
           healthcareField: sessionUser.healthcareField,
           studyYear: sessionUser.studyYear,
@@ -663,6 +678,7 @@ export const authOptions: NextAuthOptions = {
         typeof token.yearOfExperience === 'number' ? token.yearOfExperience : null;
       session.user.specialization =
         typeof token.specialization === 'string' ? token.specialization : null;
+      session.user.mfaSetupRequired = token.mfaSetupRequired === true;
       return session;
     },
 

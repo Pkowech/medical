@@ -52,7 +52,7 @@ def test_settings_round_trip_and_preserve_unrelated_preferences(user_factory):
             "weeklyDigest": False,
             "progress": False,
         },
-        "security": {"loginNotifications": False, "twoFactorEnabled": True},
+        "security": {"loginNotifications": False},
         "preferences": {"language": "sw", "timezone": "Africa/Kampala"},
         "privacy": {
             "profileVisibility": "public",

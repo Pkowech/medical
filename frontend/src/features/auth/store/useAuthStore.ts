@@ -1,6 +1,5 @@
 // store/useAuthStore.ts
 import { create } from 'zustand';
-import { patchData } from '@/features/auth/services/apiClient';
 import { authService } from '../services/authService'; // Use the unified authService
 import {
   User as BackendUser,
@@ -20,7 +19,6 @@ interface AuthState {
   clearError: () => void;
   clearUser: () => void;
   setUser: (user: User | null) => void;
-  updateUser: (userData: Partial<User>) => Promise<void>;
   changePassword: (
     currentPassword: string,
     newPassword: string,
@@ -90,18 +88,6 @@ export const useAuthStore = create<AuthState>((set, _get) => ({
 
   clearError: () => set({ error: null }),
 
-  updateUser: async userData => {
-    try {
-      set({ isLoading: true, error: null });
-      // This updates the backend. The session can be updated via `useSession().update()` if needed.
-      await patchData<Partial<User>>(`/users/profile`, userData);
-      set({ isLoading: false });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      set({ error: message || 'Update failed', isLoading: false });
-      throw error instanceof Error ? error : new Error(String(error));
-    }
-  },
   changePassword: async (currentPassword, newPassword, confirmPassword) => {
     try {
       set({ isLoading: true, error: null });

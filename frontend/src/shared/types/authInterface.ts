@@ -68,6 +68,7 @@ export interface User extends UserBase {
   roles: Role[];
   permissions: Permission[];
   isEmailVerified: boolean;
+  mfaSetupRequired?: boolean;
   isActive?: boolean;
   lastLoginAt?: string;
   preferences?: UserPreferences;
@@ -203,11 +204,11 @@ export interface LoginResponsePayload {
   message?: string;
   code?: string;
   data?: {
-    user?: Record<string, unknown>;
     roles?: Record<string, unknown>;
     accessToken?: string;
     refreshToken?: string;
     expiresAt?: string | number;
+    user?: Record<string, unknown> & { mfaSetupRequired?: boolean };
   };
   raw?: string;
   [key: string]: unknown;
@@ -220,6 +221,7 @@ export interface RegisterResponse {
     'id' | 'email' | 'firstName' | 'lastName' | 'username' | 'isEmailVerified'
   >;
   emailVerificationRequired: boolean;
+  verificationEmailSent: boolean;
 }
 
 /**

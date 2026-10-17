@@ -49,6 +49,17 @@ export class JwtAuthGuard extends AuthGuard('jwt') implements CanActivate {
 
       if (result && request.user) {
         this.logger.debug(`User authenticated for ${routePath}: ${request.user.id}`);
+
+        if (
+          request.user.mfaSetupRequired &&
+          !['/auth/security/2fa/setup', '/auth/security/2fa/verify'].some(path =>
+            (request.originalUrl || request.path || '').split('?')[0].endsWith(path),
+          )
+        ) {
+          throw new UnauthorizedException(
+            'Complete required two-factor setup before using the platform.',
+          );
+        }
         
         // Check if token is blacklisted
         const token = authHeader?.replace('Bearer ', '');

@@ -53,6 +53,7 @@ export interface AuthenticatedUser {
   isEmailVerified: boolean;
   permissions: string[];
   roles: RoleName[];
+  mfaSetupRequired?: boolean;
 }
 
 export interface AuthenticatedRequest extends Request {
@@ -542,6 +543,9 @@ export class AuthUserDto {
 
   @ApiPropertyOptional({ description: 'Specialty or area of interest' })
   specialization?: string | null;
+
+  @ApiPropertyOptional({ description: 'Session is restricted to required MFA enrollment' })
+  mfaSetupRequired?: boolean;
 }
 
 // Define AuthResponse THIRD (depends on AuthUserDto with lazy type resolution)
@@ -586,6 +590,11 @@ export class RegistrationResponseDto {
     description: 'Whether the user must verify their email before signing in',
   })
   emailVerificationRequired!: boolean;
+
+  @ApiProperty({
+    description: 'Whether the verification email was delivered successfully',
+  })
+  verificationEmailSent!: boolean;
 }
 
 export class GoogleAuthDto {

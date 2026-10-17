@@ -22,12 +22,13 @@ export class RefreshTokenService {
     private redisService: RedisService,
   ) {}
 
-  async createRefreshToken(userId: string): Promise<string> {
+  async createRefreshToken(userId: string, expiresInSeconds?: number): Promise<string> {
     const refreshToken = uuidv4();
-    const refreshTokenExpiry = parseInt(
+    const configuredExpiry = Number.parseInt(
       this.configService.get('JWT_REFRESH_EXPIRATION', '604800'),
       10,
     );
+    const refreshTokenExpiry = expiresInSeconds ?? configuredExpiry;
 
     const tokenData: TokenData = {
       token: refreshToken,

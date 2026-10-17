@@ -18,6 +18,7 @@ import {
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { SecurityService } from '../../auth/services/security.service';
+import { AuthService } from '../services/auth.service';
 import { JwtAuthGuard } from '#modules/auth/guards/jwt-auth.guard';
 import {
   SecuritySettingsDto,
@@ -34,7 +35,10 @@ import { Public } from '#common/constants/auth.constants';
 @ApiTags('Security')
 @Controller('auth/security')
 export class SecurityController {
-  constructor(private readonly securityService: SecurityService) {}
+  constructor(
+    private readonly securityService: SecurityService,
+    private readonly authService: AuthService,
+  ) {}
 
   @Post('2fa/setup')
   @UseGuards(JwtAuthGuard)
@@ -61,6 +65,10 @@ export class SecurityController {
       req.user.id,
       dto.token,
     );
+    if (isValid && req.user.mfaSetupRequired) {
+      const auth = await this.authService.completeRequiredTwoFactor(req.user.id);
+      return { valid: true, auth };
+    }
     return { valid: isValid };
   }
 
