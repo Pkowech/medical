@@ -82,7 +82,9 @@ export class AdminService {
   }
 
   async getUser(id: string): Promise<User> {
-    const response = await apiService.get<UserResponse>(`${this.baseUrl}/users/${id}`);
+    const response = await apiService.get<UserResponse>(
+      `${this.baseUrl}/users/${encodeURIComponent(id)}`,
+    );
     return this.unwrapPayload<User>(response.data);
   }
 
@@ -92,12 +94,15 @@ export class AdminService {
   }
 
   async updateUser(id: string, userData: Partial<User>): Promise<User> {
-    const response = await apiService.put<UserResponse>(`${this.baseUrl}/users/${id}`, userData);
+    const response = await apiService.put<UserResponse>(
+      `${this.baseUrl}/users/${encodeURIComponent(id)}`,
+      userData,
+    );
     return this.unwrapPayload<User>(response.data);
   }
 
   async deleteUser(id: string): Promise<void> {
-    await apiService.delete(`${this.baseUrl}/users/${id}`);
+    await apiService.delete(`${this.baseUrl}/users/${encodeURIComponent(id)}`);
   }
 
   async getRoles(page = 1, limit = 10): Promise<RoleEntity[]> {
@@ -126,17 +131,33 @@ export class AdminService {
   }
 
   async createRole(roleData: Partial<RoleEntity>): Promise<RoleEntity> {
-    const response = await apiService.post<RoleEntity>(`${this.baseUrl}/roles`, roleData);
+    const response = await apiService.post<RoleEntity>(
+      `${this.baseUrl}/roles`,
+      this.serializeRole(roleData),
+    );
     return this.unwrapPayload<RoleEntity>(response.data);
   }
 
   async updateRole(id: string, roleData: Partial<RoleEntity>): Promise<RoleEntity> {
-    const response = await apiService.put<RoleEntity>(`${this.baseUrl}/roles/${id}`, roleData);
+    const response = await apiService.put<RoleEntity>(
+      `${this.baseUrl}/roles/${encodeURIComponent(id)}`,
+      this.serializeRole(roleData),
+    );
     return this.unwrapPayload<RoleEntity>(response.data);
   }
 
   async deleteRole(id: string): Promise<void> {
-    await apiService.delete(`${this.baseUrl}/roles/${id}`);
+    await apiService.delete(`${this.baseUrl}/roles/${encodeURIComponent(id)}`);
+  }
+
+  private serializeRole(role: Partial<RoleEntity>) {
+    return {
+      name: role.name,
+      description: role.description,
+      color: role.color,
+      hierarchyLevel: role.hierarchyLevel,
+      permissionNames: role.permissions?.map(permission => permission.name),
+    };
   }
 
   async getSystemAnalytics(): Promise<SystemAnalytics | null> {

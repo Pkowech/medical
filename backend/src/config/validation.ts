@@ -72,7 +72,7 @@ export const validationSchema = Joi.object({
   EMAIL_SECURE: Joi.boolean().default(false),
   EMAIL_USER: Joi.string().email().optional(),
   EMAIL_PASSWORD: Joi.string().optional(),
-  EMAIL_FROM: Joi.string().email().default('noreply@medtrack-hub.com'),
+  EMAIL_FROM: Joi.string().email().optional(),
 
   // AWS
   AWS_REGION: Joi.string().default('us-east-1'),

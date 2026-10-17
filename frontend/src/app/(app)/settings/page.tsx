@@ -15,6 +15,7 @@ import { Settings } from '@/shared/types';
 import { useAuthStore } from '@/features/auth/store/useAuthStore';
 import { changePasswordSchema } from '@/lib/auth/validations';
 import { getAuthErrorDetails } from '@/features/auth/services/authErrors';
+import { TwoFactorAuth } from '@/features/auth/components/TwoFactorAuth';
 
 interface UserSettings {
   email: string;
@@ -22,7 +23,6 @@ interface UserSettings {
   emailNotifications: boolean;
   pushNotifications: boolean;
   weeklyDigest: boolean;
-  twoFactorAuth: boolean;
   loginNotifications: boolean;
   language: string;
   timezone: string;
@@ -40,6 +40,7 @@ export default function SettingsPage() {
   const changePassword = useAuthStore(state => state.changePassword);
   const [saving, setSaving] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
+  const [settingsLoadFailed, setSettingsLoadFailed] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: '',
@@ -55,58 +56,50 @@ export default function SettingsPage() {
     emailNotifications: true,
     pushNotifications: false,
     weeklyDigest: true,
-    twoFactorAuth: false,
     loginNotifications: true,
     language: 'en',
     timezone: 'Africa/Nairobi',
     showProgress: true,
     profileVisibility: 'public',
-    showEmail: true,
-    showPhone: true,
-    showLocation: true,
+    showEmail: false,
+    showPhone: false,
+    showLocation: false,
     allowMessages: true,
   });
 
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        // Try to fetch from API
-        try {
-          const response = await apiService.get<Settings>('/users/settings');
-          const profileVisibility = response.data.privacy?.profileVisibility;
-          const validVisibility: 'public' | 'private' =
-            profileVisibility === 'public' || profileVisibility === 'private'
-              ? profileVisibility
-              : 'public';
+        const response = await apiService.get<Settings>('/users/settings');
+        const profileVisibility = response.data.privacy?.profileVisibility;
+        const validVisibility: 'public' | 'private' =
+          profileVisibility === 'public' || profileVisibility === 'private'
+            ? profileVisibility
+            : 'public';
 
-          setSettings(prev => ({
-            ...prev,
-            email: response.data.email || '',
-            theme: (localStorage.getItem('theme') as 'light' | 'dark' | 'system') || 'system',
-            language: response.data.preferences?.language || 'en',
-            timezone: response.data.preferences?.timezone || 'Africa/Nairobi',
-            emailNotifications: response.data.notifications?.email ?? true,
-            pushNotifications: response.data.notifications?.push ?? false,
-            weeklyDigest: response.data.notifications?.weeklyDigest ?? true,
-            twoFactorAuth: response.data.security?.twoFactorEnabled ?? false,
-            loginNotifications: response.data.security?.loginNotifications ?? true,
-            profileVisibility: validVisibility,
-            showEmail: response.data.privacy?.showEmail ?? true,
-            showPhone: response.data.privacy?.showPhone ?? true,
-            showLocation: response.data.privacy?.showLocation ?? true,
-            allowMessages: response.data.privacy?.allowMessages ?? true,
-          }));
-        } catch {
-          // Fallback to localStorage for theme
-          setSettings(prev => ({
-            ...prev,
-            theme: (localStorage.getItem('theme') as 'light' | 'dark' | 'system') || 'system',
-            email: session?.user?.email || '',
-          }));
-        }
+        const loadedSettings: UserSettings = {
+          email: response.data.email || '',
+          theme: response.data.theme || 'system',
+          language: response.data.preferences?.language || 'en',
+          timezone: response.data.preferences?.timezone || 'Africa/Nairobi',
+          emailNotifications: response.data.notifications?.email ?? true,
+          pushNotifications: response.data.notifications?.push ?? false,
+          weeklyDigest: response.data.notifications?.weeklyDigest ?? true,
+          loginNotifications: response.data.security?.loginNotifications ?? true,
+          showProgress: response.data.notifications?.progress ?? true,
+          profileVisibility: validVisibility,
+          showEmail: response.data.privacy?.showEmail ?? false,
+          showPhone: response.data.privacy?.showPhone ?? false,
+          showLocation: response.data.privacy?.showLocation ?? false,
+          allowMessages: response.data.privacy?.allowMessages ?? true,
+        };
+        setSettings(loadedSettings);
+        applyTheme(loadedSettings.theme);
+        setSettingsLoadFailed(false);
       } catch (error) {
         console.error('Error loading settings:', error);
         toast.error('Failed to load settings');
+        setSettingsLoadFailed(true);
       } finally {
         setInitialLoading(false);
       }
@@ -117,23 +110,22 @@ export default function SettingsPage() {
     }
   }, [session]);
 
-  const handleThemeChange = (theme: 'light' | 'dark' | 'system') => {
-    setSettings(prev => ({ ...prev, theme }));
+  const applyTheme = (theme: 'light' | 'dark' | 'system') => {
     localStorage.setItem('theme', theme);
-
-    // Apply theme immediately
     if (theme === 'dark') {
       document.documentElement.classList.add('dark');
     } else if (theme === 'light') {
       document.documentElement.classList.remove('dark');
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      document.documentElement.classList.add('dark');
     } else {
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      if (prefersDark) {
-        document.documentElement.classList.add('dark');
-      } else {
-        document.documentElement.classList.remove('dark');
-      }
+      document.documentElement.classList.remove('dark');
     }
+  };
+
+  const handleThemeChange = (theme: 'light' | 'dark' | 'system') => {
+    setSettings(prev => ({ ...prev, theme }));
+    applyTheme(theme);
   };
 
   const handleChangePassword = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -179,41 +171,35 @@ export default function SettingsPage() {
     setSaveMessage('');
 
     try {
-      // Try to save to API
-      try {
-        await apiService.put('/users/settings', {
-          email: settings.email,
-          notifications: {
-            email: settings.emailNotifications,
-            push: settings.pushNotifications,
-            weeklyDigest: settings.weeklyDigest,
-          },
-          security: {
-            twoFactorEnabled: settings.twoFactorAuth,
-            loginNotifications: settings.loginNotifications,
-          },
-          preferences: {
-            language: settings.language,
-            timezone: settings.timezone,
-          },
-          privacy: {
-            profileVisibility: settings.profileVisibility,
-            showEmail: settings.showEmail,
-            showPhone: settings.showPhone,
-            showLocation: settings.showLocation,
-            allowMessages: settings.allowMessages,
-          },
-        });
-        toast.success('Settings updated successfully');
-        setSaveMessage('Settings saved successfully');
-      } catch {
-        // Fallback: just save locally
-        setSaveMessage('Settings updated locally (API unavailable)');
-      }
+      await apiService.put('/users/settings', {
+        theme: settings.theme,
+        notifications: {
+          email: settings.emailNotifications,
+          push: settings.pushNotifications,
+          weeklyDigest: settings.weeklyDigest,
+          progress: settings.showProgress,
+        },
+        security: {
+          loginNotifications: settings.loginNotifications,
+        },
+        preferences: {
+          language: settings.language,
+          timezone: settings.timezone,
+        },
+        privacy: {
+          profileVisibility: settings.profileVisibility,
+          showEmail: settings.showEmail,
+          showPhone: settings.showPhone,
+          showLocation: settings.showLocation,
+          allowMessages: settings.allowMessages,
+        },
+      });
+      toast.success('Settings updated successfully');
+      setSaveMessage('Settings saved successfully');
       setTimeout(() => setSaveMessage(''), 3000);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error saving settings:', error);
-      toast.error('Failed to save settings');
+      toast.error(error instanceof Error ? error.message : 'Failed to save settings');
       setSaveMessage('Error saving settings');
     } finally {
       setSaving(false);
@@ -277,11 +263,10 @@ export default function SettingsPage() {
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium mb-2">Email Address</label>
-                  <Input
-                    type="email"
-                    value={settings.email}
-                    onChange={e => handleInputChange('email', e.target.value)}
-                  />
+                  <Input type="email" value={settings.email} readOnly disabled />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Contact support to change the email address on your account.
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -444,15 +429,8 @@ export default function SettingsPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="font-medium">Two-Factor Authentication</h3>
-                    <p className="text-sm text-gray-500">Add an extra layer of security</p>
-                  </div>
-                  <Switch
-                    checked={settings.twoFactorAuth}
-                    onCheckedChange={() => handleToggle('twoFactorAuth')}
-                  />
+                <div className="border-b pb-4">
+                  <TwoFactorAuth />
                 </div>
 
                 <div className="flex items-center justify-between">
@@ -515,9 +493,16 @@ export default function SettingsPage() {
                   </Button>
                 </form>
 
-                <Button variant="destructive" size="sm">
-                  Delete Account
-                </Button>
+                <p className="text-sm text-gray-500">
+                  To request account deletion, contact{' '}
+                  <a
+                    className="underline"
+                    href="mailto:aaronrono427@gmail.com?subject=Account%20deletion%20request"
+                  >
+                    support
+                  </a>
+                  .
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -596,6 +581,12 @@ export default function SettingsPage() {
         </div>
 
         <div className="flex justify-end">
+          {settingsLoadFailed && (
+            <p role="alert" className="mr-4 py-2 text-sm text-red-700">
+              Settings could not be loaded. Reload the page before saving to avoid overwriting
+              existing preferences.
+            </p>
+          )}
           {saveMessage && (
             <div
               className={`mr-4 py-2 px-4 rounded-md ${
@@ -610,7 +601,7 @@ export default function SettingsPage() {
           <Button
             variant="default"
             onClick={handleSaveSettings}
-            disabled={saving}
+            disabled={saving || settingsLoadFailed}
             className={saving ? 'opacity-50 cursor-not-allowed' : ''}
           >
             {saving ? 'Saving...' : 'Save Settings'}

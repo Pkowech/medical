@@ -25,10 +25,11 @@ export default function AdminRolesPage() {
   const fetchRoles = async () => {
     try {
       setLoading(true);
+      setError(null);
       const fetchedRolesData = await adminService.getRoles();
       setRoles(fetchedRolesData);
     } catch (err) {
-      setError('Failed to fetch roles.');
+      setError(err instanceof Error ? err.message : 'Failed to fetch roles.');
       console.error(err);
     } finally {
       setLoading(false);
@@ -52,7 +53,7 @@ export default function AdminRolesPage() {
       setEditingRole(null);
       fetchRoles(); // Refresh the list
     } catch (error) {
-      setError('Failed to save role.');
+      setError(error instanceof Error ? error.message : 'Failed to save role.');
       console.error(error);
     }
   };
@@ -63,7 +64,7 @@ export default function AdminRolesPage() {
         await adminService.deleteRole(roleId);
         fetchRoles(); // Refresh the list
       } catch (error) {
-        setError('Failed to delete role.');
+        setError(error instanceof Error ? error.message : 'Failed to delete role.');
         console.error(error);
       }
     }
@@ -87,10 +88,6 @@ export default function AdminRolesPage() {
     return <div className="text-center py-8">Loading Role Management...</div>;
   }
 
-  if (error) {
-    return <div className="text-center py-8 text-red-500">Error: {error}</div>;
-  }
-
   return (
     <div className="space-y-8">
       <div className="flex justify-between items-center">
@@ -104,6 +101,18 @@ export default function AdminRolesPage() {
           <PlusCircle className="mr-2 h-4 w-4" /> Add New Role
         </Button>
       </div>
+
+      {error && (
+        <div
+          className="flex items-center justify-between gap-4 rounded-md border border-destructive/30 p-3 text-sm text-destructive"
+          role="alert"
+        >
+          <span>{error}</span>
+          <Button variant="outline" size="sm" onClick={() => void fetchRoles()}>
+            Retry
+          </Button>
+        </div>
+      )}
 
       {isFormOpen && (
         <RoleForm

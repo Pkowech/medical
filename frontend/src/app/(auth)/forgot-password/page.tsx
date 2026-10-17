@@ -34,7 +34,15 @@ export default function ForgotPasswordPage() {
       await forgotPassword(validation.data.email);
       setSuccess(true);
     } catch (err: unknown) {
-      setError(getAuthErrorDetails(err, 'Could not process your password recovery request.').message);
+      const details = getAuthErrorDetails(
+        err,
+        'Could not process your password recovery request.',
+      );
+      setError(
+        details.code === 'SERVICE_UNAVAILABLE'
+          ? 'Password recovery is temporarily unavailable. Please try again later.'
+          : details.message,
+      );
     } finally {
       setIsLoading(false);
     }

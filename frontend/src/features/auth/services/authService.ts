@@ -76,8 +76,11 @@ class AuthService {
 
   async register(registerData: RegisterDTO): Promise<RegisterResponse> {
     // Use apiService for registration, as it's an unauthenticated endpoint initially
-    const response = await apiService.post<RegisterResponse>('/auth/register', registerData);
-    return response.data;
+    const response = await apiService.post<ApiResponse<RegisterResponse>>(
+      '/auth/register',
+      registerData
+    );
+    return response.data.data;
   }
 
   async logout(): Promise<void> {
@@ -173,10 +176,10 @@ class AuthService {
     return response.data;
   }
 
-  async resendVerificationEmail(): Promise<ApiResponse<GenericRecord>> {
+  async resendVerificationEmail(email: string): Promise<ApiResponse<GenericRecord>> {
     const response = await apiService.post<ApiResponse<GenericRecord>>(
-      '/auth/security/email/resend',
-      {}
+      '/auth/security/email/resend-request',
+      { email }
     );
     return response.data;
   }
@@ -247,21 +250,25 @@ class AuthService {
   }
 
   // New method to setup 2FA
-  async setupTwoFactorAuth(): Promise<{ otpauthUrl: string }> {
-    const response = await apiService.post<{ otpauthUrl: string }>(
+  async setupTwoFactorAuth(): Promise<{ secret: string; qrCode: string }> {
+    const response = await apiService.post<{ secret: string; qrCode: string }>(
       '/auth/security/2fa/setup'
     );
     return response.data;
   }
 
-  // New method to verify 2FA
   async verifyTwoFactorAuth(token: string): Promise<void> {
-    await apiService.post('/auth/security/2fa/verify', { token });
+    const response = await apiService.post<{ valid: boolean }>(
+      '/auth/security/2fa/verify',
+      { token }
+    );
+    if (!response.data.valid) {
+      throw new Error('The authenticator code is incorrect.');
+    }
   }
 
-  // New method to disable 2FA
-  async disableTwoFactorAuth(): Promise<void> {
-    await apiService.post('/auth/security/2fa/disable');
+  async disableTwoFactorAuth(token: string): Promise<void> {
+    await apiService.post('/auth/security/2fa/disable', { token });
   }
 
   // New method to generate backup codes
@@ -273,14 +280,16 @@ class AuthService {
   }
 
   // New method to get security settings
-  async getSecuritySettings(): Promise<GenericRecord> {
-    const response = await apiService.get<GenericRecord>('/auth/security/settings');
+  async getSecuritySettings(): Promise<{ twoFactorEnabled: boolean }> {
+    const response = await apiService.get<{ twoFactorEnabled: boolean }>(
+      '/auth/security/settings'
+    );
     return response.data;
   }
 
   // New method to update security settings
   async updateSecuritySettings(data: GenericRecord): Promise<GenericRecord> {
-    const response = await apiService.patch<GenericRecord>('/auth/security/settings', data);
+    const response = await apiService.put<GenericRecord>('/auth/security/settings', data);
     return response.data;
   }
 

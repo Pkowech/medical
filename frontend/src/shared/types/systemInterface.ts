@@ -292,6 +292,9 @@ export interface RoleEntity {
   permissions: PermissionEntity[];
   description?: string;
   isSystem: boolean;
+  color?: string | null;
+  hierarchyLevel?: number;
+  isActive?: boolean;
   createdAt: string;
   updatedAt: string;
 }

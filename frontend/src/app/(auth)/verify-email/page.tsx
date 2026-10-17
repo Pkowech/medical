@@ -77,20 +77,9 @@ function VerifyEmailContent() {
                   <p className="text-sm text-gray-500">
                     If you're having trouble verifying your email, you can:
                   </p>
-                  <button
-                    onClick={async () => {
-                      try {
-                        const data = await authService.resendVerificationEmail();
-                        setMessage(data.message || 'New verification email sent! Please check your inbox.');
-                      } catch (error: unknown) {
-                        const errMessage = error && typeof error === 'object' && 'message' in error ? String(error.message) : 'Failed to resend verification email';
-                        setMessage(errMessage);
-                      }
-                    }}
-                    className="text-blue-600 hover:text-blue-500"
-                  >
+                  <Link href="/resend-verification" className="text-blue-600 hover:text-blue-500">
                     Request a new verification link
-                  </button>
+                  </Link>
                   <div className="pt-2">
                     <Link href="/login" className="text-blue-600 hover:text-blue-500">
                       Return to login

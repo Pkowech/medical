@@ -1,92 +1,84 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { FaSpinner, FaEnvelope } from 'react-icons/fa';
+import Link from 'next/link';
+import { FaSpinner } from 'react-icons/fa';
+import { AuthForm } from '@/features/auth/components/AuthForm';
+import { FormField } from '@/features/auth/components/FormField';
+import { Notification } from '@/features/auth/components/Notification';
 import { authService } from '@/features/auth/services/authService';
+import { getAuthErrorDetails } from '@/features/auth/services/authErrors';
 
 export default function ResendVerificationPage() {
+  const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
-  const router = useRouter();
 
-  const handleResendVerification = async () => {
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
     setLoading(true);
     setError('');
     setMessage('');
 
     try {
-      const data = await authService.resendVerificationEmail();
-      setMessage(data.message || 'Verification email sent! Please check your inbox.');
-      // Optionally redirect after a delay
-      setTimeout(() => {
-        router.push('/login');
-      }, 3000);
-    } catch (error: unknown) {
-      const errMessage = error && typeof error === 'object' && 'message' in error ? String(error.message) : 'An error occurred. Please try again later.';
-      setError(errMessage);
+      const response = await authService.resendVerificationEmail(email.trim());
+      setMessage(
+        response.message ??
+          'If an unverified account exists for this email, a verification link will be sent.',
+      );
+    } catch (requestError: unknown) {
+      setError(
+        getAuthErrorDetails(
+          requestError,
+          'Could not request a verification email. Please try again later.',
+        ).message,
+      );
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Resend Verification Email
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            Didn&apos;t receive the verification email? We&apos;ll send it again.
+    <>
+      {error && <Notification type="error" message={error} onClose={() => setError('')} />}
+      <AuthForm
+        title="Resend Verification Email"
+        subtitle="Enter the email address you used to register. If it belongs to an unverified account, we’ll send a new link."
+        onSubmit={handleSubmit}
+        isLoading={loading}
+        submitText={loading ? 'Sending...' : 'Send Verification Link'}
+        footer={
+          <p className="text-center text-sm text-gray-600 dark:text-gray-400">
+            <Link href="/login" className="font-medium text-blue-600 hover:text-blue-700">
+              Return to sign in
+            </Link>
           </p>
-        </div>
-
-        <div className="mt-8 space-y-6">
-          {message && (
-            <div className="rounded-md bg-green-50 p-4">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <FaEnvelope className="h-5 w-5 text-green-400" />
-                </div>
-                <div className="ml-3">
-                  <p className="text-sm font-medium text-green-800">{message}</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {error && (
-            <div className="rounded-md bg-red-50 p-4">
-              <div className="flex">
-                <div className="ml-3">
-                  <p className="text-sm font-medium text-red-800">{error}</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <button
-            onClick={handleResendVerification}
-            disabled={loading}
-            className={`group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white ${
-              loading
-                ? 'bg-indigo-400 cursor-not-allowed'
-                : 'bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500'
-            }`}
-          >
-            {loading ? (
-              <>
-                <FaSpinner className="animate-spin -ml-1 mr-2 h-5 w-5" />
-                Sending...
-              </>
-            ) : (
-              'Resend Verification Email'
-            )}
-          </button>
-        </div>
-      </div>
-    </div>
+        }
+      >
+        {message ? (
+          <p role="status" className="rounded-md bg-green-50 p-4 text-sm text-green-800">
+            {message}
+          </p>
+        ) : (
+          <FormField
+            label="Email Address"
+            type="email"
+            name="email"
+            autoComplete="email"
+            value={email}
+            onChange={event => setEmail(event.target.value)}
+            required
+            placeholder="Enter your email"
+          />
+        )}
+      </AuthForm>
+      {loading && (
+        <span className="sr-only" role="status">
+          <FaSpinner aria-hidden="true" />
+          Sending verification request
+        </span>
+      )}
+    </>
   );
 }

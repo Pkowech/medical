@@ -100,10 +100,57 @@ export class SecurityService {
       throw new BadRequestException('2FA not set up');
     }
 
-    return speakeasy.totp.verify({
+    const isValid = speakeasy.totp.verify({
       secret: settings.twoFactorSecret,
       encoding: 'base32',
       token,
+    });
+    if (!isValid) return false;
+
+    if (!settings.twoFactorEnabled) {
+      await this.prisma.userSecuritySettings.update({
+        where: { userId },
+        data: { twoFactorEnabled: true },
+      });
+      await this.logSecurityEvent(userId, securityEventTypes.twoFactorEnabled, {
+        details: { message: 'Two-factor authentication was enabled' },
+        severity: 'high',
+        timestamp: new Date(),
+      });
+    }
+
+    return true;
+  }
+
+  async disableTwoFactor(userId: string, token: string): Promise<void> {
+    const settings = await this.prisma.userSecuritySettings.findUnique({
+      where: { userId },
+    });
+    if (!settings?.twoFactorEnabled || !settings.twoFactorSecret) {
+      throw new BadRequestException('Two-factor authentication is not enabled');
+    }
+
+    const isValid = speakeasy.totp.verify({
+      secret: settings.twoFactorSecret,
+      encoding: 'base32',
+      token,
+    });
+    if (!isValid) {
+      throw new UnauthorizedException('The authenticator code is incorrect');
+    }
+
+    await this.prisma.userSecuritySettings.update({
+      where: { userId },
+      data: {
+        twoFactorEnabled: false,
+        twoFactorSecret: null,
+        backupCodes: [],
+      },
+    });
+    await this.logSecurityEvent(userId, securityEventTypes.twoFactorDisabled, {
+      details: { message: 'Two-factor authentication was disabled' },
+      severity: 'high',
+      timestamp: new Date(),
     });
   }
 
@@ -225,26 +272,71 @@ export class SecurityService {
       return;
     }
 
-    // Production: Create token
+    const host = this.configService.get<string>('EMAIL_HOST');
+    const userName = this.configService.get<string>('EMAIL_USER');
+    const password = this.configService.get<string>('EMAIL_PASSWORD');
+    const frontendUrl = this.configService.get<string>('FRONTEND_URL');
+    if (!host || !userName || !password || !frontendUrl) {
+      throw new ServiceUnavailableException(
+        'Email verification delivery is not configured.',
+      );
+    }
+
     const verificationToken = crypto.randomBytes(32).toString('hex');
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
-    await this.prisma.emailVerificationToken.create({
-      data: {
+    await this.prisma.emailVerificationToken.upsert({
+      where: { userId: user.id },
+      create: {
         userId: user.id,
         token: verificationToken,
         expiresAt,
       },
+      update: {
+        token: verificationToken,
+        expiresAt,
+        createdAt: new Date(),
+      },
     });
 
-    const verificationLink = `${this.configService.get(
-      'FRONTEND_URL',
-    )}/verify-email?token=${verificationToken}`;
+    const verificationUrl = new URL('/verify-email', frontendUrl);
+    verificationUrl.searchParams.set('token', verificationToken);
+    const transporter = createTransport({
+      host,
+      port: this.configService.get<number>('EMAIL_PORT', 587),
+      secure: this.configService.get<boolean>('EMAIL_SECURE', false),
+      auth: {
+        user: userName,
+        pass: host.toLowerCase() === 'smtp.gmail.com'
+          ? password.replace(/\s+/g, '')
+          : password,
+      },
+      connectionTimeout: 10_000,
+      socketTimeout: 10_000,
+    });
 
-    // TODO: Implement actual email sending (e.g., via Nodemailer)
-    this.logger.log(
-      `Verification email sent to ${user.email}. Link: ${verificationLink}`,
-    );
+    try {
+      await transporter.sendMail({
+        from: this.configService.get<string>('EMAIL_FROM') || userName,
+        to: user.email,
+        subject: 'Verify your MedTrack Hub email',
+        text: `Verify your email address to complete your MedTrack Hub account setup: ${verificationUrl.toString()}\n\nThis link expires in 24 hours. If you did not create this account, you can ignore this email.`,
+        html: `<p>Verify your email address to complete your MedTrack Hub account setup.</p><p><a href="${verificationUrl.toString()}">Verify email address</a></p><p>This link expires in 24 hours. If you did not create this account, you can ignore this email.</p>`,
+      });
+    } catch (error) {
+      await this.prisma.emailVerificationToken.deleteMany({
+        where: { userId: user.id, token: verificationToken },
+      });
+      this.logger.error(
+        'Email verification delivery failed.',
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw new ServiceUnavailableException(
+        'Email verification delivery is temporarily unavailable.',
+      );
+    } finally {
+      transporter.close();
+    }
   }
 
   async verifyEmail(token: string): Promise<void> {
@@ -253,7 +345,7 @@ export class SecurityService {
       include: { user: true },
     });
 
-    if (!emailToken || emailToken.expiresAt < new Date()) {
+    if (!emailToken || emailToken.expiresAt <= new Date()) {
       throw new BadRequestException('Invalid or expired verification token');
     }
 
@@ -282,23 +374,46 @@ export class SecurityService {
     );
   }
 
-  async resendVerificationEmail(email: string): Promise<void> {
-    const user = await this.prisma.user.findUnique({ where: { email } });
-    if (!user) {
-      throw new NotFoundException('User not found');
+  async requestVerificationEmail(email: string): Promise<void> {
+    const mailIsConfigured = Boolean(
+      this.configService.get<string>('EMAIL_HOST') &&
+        this.configService.get<string>('EMAIL_USER') &&
+        this.configService.get<string>('EMAIL_PASSWORD') &&
+        this.configService.get<string>('FRONTEND_URL'),
+    );
+    if (!mailIsConfigured) {
+      throw new ServiceUnavailableException(
+        'Email verification delivery is not configured.',
+      );
     }
 
+    const user = await this.prisma.user.findFirst({
+      where: { email: { equals: email.trim(), mode: 'insensitive' } },
+    });
+    if (!user) return;
     const settings = await this.prisma.userSecuritySettings.findUnique({
       where: { userId: user.id },
+    });
+    if (settings?.isEmailVerified) return;
+
+    try {
+      await this.sendVerificationEmail(user);
+    } catch (error) {
+      if (!(error instanceof ServiceUnavailableException)) throw error;
+      this.logger.error('Could not send a requested verification email.');
+    }
+  }
+
+  async resendVerificationEmail(userId: string): Promise<void> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+
+    const settings = await this.prisma.userSecuritySettings.findUnique({
+      where: { userId },
     });
     if (settings?.isEmailVerified) {
       throw new BadRequestException('Email already verified');
     }
-
-    // Delete existing tokens
-    await this.prisma.emailVerificationToken.deleteMany({
-      where: { userId: user.id },
-    });
 
     await this.sendVerificationEmail(user);
   }
@@ -385,11 +500,21 @@ export class SecurityService {
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
     const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
 
-    await this.prisma.passwordResetToken.upsert({
-      where: { userId: user.id },
-      create: { userId: user.id, tokenHash, expiresAt },
-      update: { tokenHash, expiresAt, createdAt: new Date() },
-    });
+    try {
+      await this.prisma.passwordResetToken.upsert({
+        where: { userId: user.id },
+        create: { userId: user.id, tokenHash, expiresAt },
+        update: { tokenHash, expiresAt, createdAt: new Date() },
+      });
+    } catch (error) {
+      this.logger.error(
+        'Could not persist a password recovery token.',
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw new ServiceUnavailableException(
+        'Password recovery is temporarily unavailable.',
+      );
+    }
 
     const resetUrl = new URL('/reset-password', frontendUrl);
     resetUrl.hash = new URLSearchParams({ token }).toString();
@@ -397,25 +522,30 @@ export class SecurityService {
       host,
       port: this.configService.get<number>('EMAIL_PORT', 587),
       secure: this.configService.get<boolean>('EMAIL_SECURE', false),
-      auth: { user: userName, pass: password },
+      auth: {
+        user: userName,
+        pass: host.toLowerCase() === 'smtp.gmail.com'
+          ? password.replace(/\s+/g, '')
+          : password,
+      },
       connectionTimeout: 10_000,
       socketTimeout: 10_000,
     });
 
     try {
       await transporter.sendMail({
-        from: this.configService.get<string>(
-          'EMAIL_FROM',
-          'noreply@medtrack-hub.com',
-        ),
+        from: this.configService.get<string>('EMAIL_FROM') || userName,
         to: user.email,
         subject: 'Reset your MedTrack Hub password',
         text: `Use this link to reset your password. It expires in 30 minutes: ${resetUrl.toString()}`,
         html: `<p>We received a request to reset your MedTrack Hub password.</p><p><a href="${resetUrl.toString()}">Reset your password</a></p><p>This link expires in 30 minutes. If you did not request this, you can ignore this email.</p>`,
       });
-    } catch {
+    } catch (error) {
       // Keep the response indistinguishable from an unknown address to avoid account enumeration.
-      this.logger.error('Password recovery email delivery failed.');
+      this.logger.error(
+        'Password recovery email delivery failed.',
+        error instanceof Error ? error.stack : undefined,
+      );
     } finally {
       transporter.close();
     }

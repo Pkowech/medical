@@ -215,10 +215,11 @@ export interface LoginResponsePayload {
 
 // Registration specific response
 export interface RegisterResponse {
-  user: User;
-  accessToken: string;
-  token_expiration: string;
-  refresh_token?: string;
+  user: Pick<
+    User,
+    'id' | 'email' | 'firstName' | 'lastName' | 'username' | 'isEmailVerified'
+  >;
+  emailVerificationRequired: boolean;
 }
 
 /**

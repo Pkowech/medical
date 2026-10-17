@@ -30,6 +30,7 @@ import {
   GoogleAuthDto,
   AuthResponse,
   AuthUserDto,
+  RegistrationResponseDto,
   UserRolesDto,
 } from '#common/dto/user.dto';
 
@@ -38,7 +39,13 @@ import { Request as ExpressRequest } from 'express';
 import { Public } from '#common/constants/auth.constants';
 
 @ApiTags('Auth')
-@ApiExtraModels(ApiResponseDto, AuthUserDto, UserRolesDto, AuthResponse)
+@ApiExtraModels(
+  ApiResponseDto,
+  AuthUserDto,
+  UserRolesDto,
+  AuthResponse,
+  RegistrationResponseDto,
+)
 @Controller('auth')
 export class AuthController {
   private readonly logger = new Logger(AuthController.name);
@@ -127,7 +134,7 @@ export class AuthController {
         { $ref: getSchemaPath(ApiResponseDto) },
         {
           properties: {
-            data: { $ref: getSchemaPath(AuthResponse) },
+            data: { $ref: getSchemaPath(RegistrationResponseDto) },
           },
         },
       ],
@@ -143,7 +150,7 @@ export class AuthController {
   })
   async register(
     @Body() registerDto: RegisterDto,
-  ): Promise<ApiResponseDto<AuthResponse>> {
+  ): Promise<ApiResponseDto<RegistrationResponseDto>> {
     const authResponse = await this.authService.register(registerDto);
     return ApiResponseDto.created(authResponse, 'User registered successfully');
   }

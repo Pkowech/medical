@@ -149,7 +149,11 @@ Drive-backed materials can be linked at course level (for example, a textbook), 
 
 ### Password recovery
 
-Password recovery requires `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_SECURE`, `EMAIL_USER`, `EMAIL_PASSWORD`, `EMAIL_FROM`, and `FRONTEND_URL` to be configured on the backend. Run the `20261017010000_add_password_reset_tokens` Prisma migration before deployment. Reset tokens are stored as hashes, expire after 30 minutes, and are single-use; completing a reset revokes the user's active sessions.
+Account email verification and password recovery require `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_SECURE`, `EMAIL_USER`, `EMAIL_PASSWORD`, and `FRONTEND_URL` to be configured on the backend. `EMAIL_FROM` is optional and defaults to `EMAIL_USER`, which is appropriate for Gmail SMTP. For Gmail, use an App Password with 2-Step Verification enabled; spaces copied from Google's display format are removed by the mailer. Do not use a regular Google account password.
+
+`ENABLE_EMAIL_VERIFICATION` defaults to `true` and prevents password login until the user verifies their email. Signup sends a single-use verification link that expires after 24 hours and does not issue an authenticated session. Signed-out users can request another link from the verification page; the response is generic to avoid disclosing whether an address has an account. Locally, non-production signup continues to auto-verify accounts.
+
+Run the `20261017010000_add_password_reset_tokens` Prisma migration before deploying password recovery. Reset tokens are stored as hashes, expire after 30 minutes, and are single-use; completing a reset revokes the user's active sessions.
 
 When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
 

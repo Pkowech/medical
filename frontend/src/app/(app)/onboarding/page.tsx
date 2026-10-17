@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Button } from '@/shared/components/ui/button';
 import { useAuthStore } from '@/features/auth/store/useAuthStore';
 import { userService } from '@/features/profile/services/userService';
@@ -192,6 +193,15 @@ export default function OnboardingPage() {
           <p className="text-slate-600 dark:text-slate-400 mb-8 text-center leading-relaxed">
             We&apos;re excited to support your healthcare learning and career. Let&apos;s personalize your experience.
           </p>
+          <p className="mb-6 text-sm leading-relaxed text-slate-500 dark:text-slate-400">
+            Personalization asks for your career stage, healthcare field, study year or experience,
+            optional specialty, and study targets. These details help tailor learning suggestions
+            and goals; they are not patient records. You can skip this setup and review our{' '}
+            <Link href="/privacy" className="text-blue-600 underline dark:text-blue-400">
+              Privacy Notice
+            </Link>
+            .
+          </p>
           <div className="w-full space-y-3">
             <Button
               size="lg"
@@ -246,7 +256,7 @@ export default function OnboardingPage() {
                 className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-500 dark:text-slate-500 cursor-not-allowed"
                 value={profile.name}
               />
-              <p className="text-xs text-slate-400 mt-1">Name can be changed in settings.</p>
+              <p className="text-xs text-slate-400 mt-1">Name can be changed from your profile.</p>
             </div>
 
             <div>

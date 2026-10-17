@@ -574,6 +574,20 @@ export class AuthResponse {
   }
 }
 
+export class RegistrationResponseDto {
+  @ApiProperty({
+    description: 'Registered user profile information',
+    type: () => AuthUserDto,
+  })
+  @Type(() => AuthUserDto)
+  user!: AuthUserDto;
+
+  @ApiProperty({
+    description: 'Whether the user must verify their email before signing in',
+  })
+  emailVerificationRequired!: boolean;
+}
+
 export class GoogleAuthDto {
   @ApiProperty({ description: 'Google OpenID Connect ID token' })
   @IsString()

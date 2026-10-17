@@ -41,6 +41,7 @@ import {
   AchievementDto,
   AchievementStatsDto,
 } from '#common/dto/user.dto';
+import { UpdateUserSettingsDto } from '#common/dto/user-settings.dto';
 import {
   BaseUserResponseDto,
   ApiResponseDto,
@@ -101,6 +102,29 @@ export class UsersController {
     );
   }
 
+  @Get('settings')
+  @ApiOperation({ summary: 'Get current user settings' })
+  async getSettings(
+    @CurrentUser() user: AuthenticatedRequest['user'],
+  ): Promise<ApiResponseDto<Awaited<ReturnType<UsersService['getSettings']>>>> {
+    return ApiResponseDto.success(
+      await this.usersService.getSettings(user.id),
+      'Settings retrieved successfully',
+    );
+  }
+
+  @Put('settings')
+  @ApiOperation({ summary: 'Update current user settings' })
+  async updateSettings(
+    @CurrentUser() user: AuthenticatedRequest['user'],
+    @Body() settings: UpdateUserSettingsDto,
+  ): Promise<ApiResponseDto<Awaited<ReturnType<UsersService['getSettings']>>>> {
+    return ApiResponseDto.success(
+      await this.usersService.updateSettings(user.id, settings),
+      'Settings updated successfully',
+    );
+  }
+
   @Get('profile/:id')
   @ApiOperation({ summary: 'Get user profile by ID' })
   @ApiResponseWithData(HttpStatus.OK, UserProfileResponseDto)
@@ -108,10 +132,12 @@ export class UsersController {
   @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'User not found' })
   async getUserProfile(
     @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() currentUser: AuthenticatedRequest['user'],
   ): Promise<ApiResponseDto<UserProfileResponseDto>> {
     console.log(`[UsersController] Fetching profile for user: ${id}`);
     try {
       const response = await this.usersService.getUserProfile(id);
+      await this.applyProfilePrivacy(response, currentUser);
       console.log(
         `[UsersController] Successfully fetched profile for user: ${id}`,
       );
@@ -184,6 +210,7 @@ export class UsersController {
   @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'User not found' })
   async findByEmail(
     @Param('email') email: string,
+    @CurrentUser() currentUser: AuthenticatedRequest['user'],
   ): Promise<ApiResponseDto<BaseUserResponseDto>> {
     const user = await this.usersService.findByEmail(email);
     if (!user) {
@@ -191,6 +218,7 @@ export class UsersController {
     }
 
     const mappedUser = await this.usersService.mapUserToDto(user);
+    await this.applyProfilePrivacy(mappedUser, currentUser);
     return ApiResponseDto.success(mappedUser, 'User retrieved successfully');
   }
 
@@ -201,6 +229,7 @@ export class UsersController {
   @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'User not found' })
   async findByUsername(
     @Param('username') username: string,
+    @CurrentUser() currentUser: AuthenticatedRequest['user'],
   ): Promise<ApiResponseDto<BaseUserResponseDto>> {
     const user = await this.usersService.findByUsername(username);
     if (!user) {
@@ -208,6 +237,7 @@ export class UsersController {
     }
 
     const mappedUser = await this.usersService.mapUserToDto(user);
+    await this.applyProfilePrivacy(mappedUser, currentUser);
     return ApiResponseDto.success(mappedUser, 'User retrieved successfully');
   }
 
@@ -230,7 +260,8 @@ export class UsersController {
       );
       throw new ForbiddenException('Cannot update another user');
     }
-    try {
+
+      try {
       const updatedUser = await this.usersService.updateProfile(
         id,
         updateUserDto,
@@ -246,6 +277,23 @@ export class UsersController {
       );
       throw error;
     }
+  }
+
+  private async applyProfilePrivacy<T extends BaseUserResponseDto>(
+    profile: T,
+    viewer: AuthenticatedRequest['user'],
+  ): Promise<void> {
+    if (!profile.id || profile.id === viewer.id || viewer.role === Role.admin) {
+      return;
+    }
+
+    const { privacy } = await this.usersService.getSettings(profile.id);
+    if (privacy.profileVisibility === 'private') {
+      throw new ForbiddenException('This profile is private.');
+    }
+    if (!privacy.showEmail) delete profile.email;
+    if (!privacy.showPhone) delete profile.phoneNumber;
+    if (!privacy.showLocation) delete profile.location;
   }
 
   @Post(':id/profile/image')

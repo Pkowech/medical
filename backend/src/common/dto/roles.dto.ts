@@ -1,7 +1,9 @@
-import { IsString, IsOptional, IsNumber, IsBoolean } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsBoolean, IsArray, IsIn } from 'class-validator';
+import { RoleName } from '@prisma/client';
 
 export class CreateRoleDto {
   @IsString()
+  @IsIn(Object.values(RoleName))
   name!: string;
 
   @IsOptional()
@@ -15,11 +17,17 @@ export class CreateRoleDto {
   @IsOptional()
   @IsNumber()
   hierarchyLevel?: number;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  permissionNames?: string[];
 }
 
 export class UpdateRoleDto {
   @IsOptional()
   @IsString()
+  @IsIn(Object.values(RoleName))
   name?: string;
 
   @IsOptional()
@@ -37,6 +45,11 @@ export class UpdateRoleDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  permissionNames?: string[];
 }
 
 export class AssignPermissionDto {

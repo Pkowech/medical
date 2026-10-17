@@ -3,111 +3,145 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
-import { Switch } from '@/shared/components/ui/switch';
-import { Label } from '@/shared/components/ui/label';
-import {
-  getTwoFactorAuthStatus,
-  enableTwoFactorAuth,
-  disableTwoFactorAuth,
-} from '@/features/auth/services/securityService';
-
-import type { TwoFactorAuthStatus } from '@/shared/types/systemInterface';
-import { Lock } from 'lucide-react';
+import Image from 'next/image';
+import { authService } from '@/features/auth/services/authService';
 
 export const TwoFactorAuth: React.FC = () => {
-  const [status, setStatus] = useState<TwoFactorAuthStatus | null>(null);
+  const [enabled, setEnabled] = useState(false);
+  const [setup, setSetup] = useState<{ secret: string; qrCode: string } | null>(null);
+  const [token, setToken] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
 
-  const fetchStatus = async () => {
-    try {
-      const fetchedStatus = await getTwoFactorAuthStatus();
-      setStatus(fetchedStatus);
-    } catch (err) {
-      setError('Failed to fetch 2FA status.');
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    fetchStatus();
+    authService
+      .getSecuritySettings()
+      .then(settings => setEnabled(settings.twoFactorEnabled))
+      .catch((err: unknown) => {
+        console.error('Failed to fetch two-factor authentication settings:', err);
+        setError('Could not load two-factor authentication settings.');
+      })
+      .finally(() => setLoading(false));
   }, []);
 
-  const handleToggle2FA = async (checked: boolean) => {
+  const handleEnable = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
     setIsUpdating(true);
+    setError(null);
     try {
-      if (checked) {
-        // In a real app, this would trigger a flow to set up 2FA (e.g., QR code, SMS verification)
-        // For mock, we'll just enable it with a default method
-        const updatedStatus = await enableTwoFactorAuth('app');
-        setStatus(updatedStatus);
-        alert('Two-factor authentication enabled!');
-      } else {
-        const updatedStatus = await disableTwoFactorAuth();
-        setStatus(updatedStatus);
-        alert('Two-factor authentication disabled.');
-      }
-    } catch (err) {
-      setError('Failed to update 2FA status.');
-      console.error(err);
+      await authService.verifyTwoFactorAuth(token);
+      setEnabled(true);
+      setSetup(null);
+      setToken('');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Could not enable two-factor authentication.');
     } finally {
       setIsUpdating(false);
     }
   };
 
-  if (loading) {
-    return (
-      <Card>
-        <CardContent className="p-6 text-center">Loading 2FA status...</CardContent>
-      </Card>
-    );
-  }
+  const handleBeginSetup = async () => {
+    setIsUpdating(true);
+    setError(null);
+    try {
+      setSetup(await authService.setupTwoFactorAuth());
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Could not start two-factor setup.');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
 
-  if (error) {
-    return (
-      <Card>
-        <CardContent className="p-6 text-center text-red-500">Error: {error}</CardContent>
-      </Card>
-    );
-  }
+  const handleDisable = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setIsUpdating(true);
+    setError(null);
+    try {
+      await authService.disableTwoFactorAuth(token);
+      setEnabled(false);
+      setToken('');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Could not disable two-factor authentication.');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  if (loading) return <p role="status">Loading two-factor settings...</p>;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center">
-          <Lock className="mr-2" /> Two-Factor Authentication
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex items-center justify-between">
-          <Label htmlFor="2fa-switch" className="text-base">
-            Enable 2FA
-          </Label>
-          <Switch
-            id="2fa-switch"
-            checked={status?.enabled}
-            onCheckedChange={handleToggle2FA}
-            disabled={isUpdating}
+    <div className="space-y-3 border-t pt-4">
+      <div>
+        <h3 className="font-medium">Two-Factor Authentication</h3>
+        <p className="text-sm text-gray-500">
+          {enabled
+            ? 'Two-factor authentication is enabled.'
+            : 'Add an authenticator app as a second sign-in step.'}
+        </p>
+      </div>
+      {enabled ? (
+        <form onSubmit={handleDisable} className="space-y-3">
+          <label htmlFor="disable-2fa-token" className="block text-sm font-medium">
+            Authenticator code to disable 2FA
+          </label>
+          <input
+            id="disable-2fa-token"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            pattern="[0-9]{6}"
+            maxLength={6}
+            value={token}
+            onChange={event => setToken(event.target.value)}
+            required
+            className="w-full rounded-md border border-gray-300 px-3 py-2"
           />
-        </div>
-        {status?.enabled ? (
-          <p className="text-sm text-muted-foreground">
-            2FA is currently enabled using the <strong>{status.method}</strong> method.
-            {status.lastEnabledAt && (
-              <span> Last enabled on {new Date(status.lastEnabledAt).toLocaleDateString()}.</span>
-            )}
+          <button type="submit" disabled={isUpdating} className="text-sm underline disabled:opacity-50">
+            {isUpdating ? 'Updating...' : 'Disable 2FA'}
+          </button>
+        </form>
+      ) : setup ? (
+        <form onSubmit={handleEnable} className="space-y-3">
+          <Image
+            src={setup.qrCode}
+            alt="Authenticator app setup QR code"
+            width={192}
+            height={192}
+            unoptimized
+          />
+          <p className="text-sm text-gray-500">
+            Scan the code with your authenticator app. If scanning is unavailable, enter this
+            setup key: <code>{setup.secret}</code>
           </p>
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            Two-factor authentication adds an extra layer of security to your account.
-          </p>
-        )}
-        {isUpdating && <p className="text-sm text-blue-500">Updating 2FA status...</p>}
-      </CardContent>
-    </Card>
+          <label htmlFor="enable-2fa-token" className="block text-sm font-medium">
+            Enter the six-digit code from your app
+          </label>
+          <input
+            id="enable-2fa-token"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            pattern="[0-9]{6}"
+            maxLength={6}
+            value={token}
+            onChange={event => setToken(event.target.value)}
+            required
+            className="w-full rounded-md border border-gray-300 px-3 py-2"
+          />
+          <button type="submit" disabled={isUpdating} className="text-sm underline disabled:opacity-50">
+            {isUpdating ? 'Verifying...' : 'Verify and enable'}
+          </button>
+        </form>
+      ) : (
+        <button
+          type="button"
+          onClick={() => void handleBeginSetup()}
+          disabled={isUpdating}
+          className="text-sm underline disabled:opacity-50"
+        >
+          {isUpdating ? 'Starting setup...' : 'Set up authenticator app'}
+        </button>
+      )}
+      {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
+    </div>
   );
 };

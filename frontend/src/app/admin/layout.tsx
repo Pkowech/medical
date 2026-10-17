@@ -22,17 +22,20 @@ const AdminLayoutContent: React.FC<AdminLayoutProps> = ({ children }) => {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const { setSidebarOpen } = useLayoutStore();
 
+  const isAdmin =
+    user?.role === Role.admin || (user?.roles?.includes(Role.admin) ?? false);
+
   // Check authentication and admin status
   useEffect(() => {
     // Only redirect after auth loading is complete
     if (!authLoading) {
       if (!isAuthenticated) {
         router.replace('/login');
-      } else if (user?.role !== Role.admin) {
+      } else if (!isAdmin) {
         router.replace('/dashboard');
       }
     }
-  }, [authLoading, isAuthenticated, user?.role, router]);
+  }, [authLoading, isAuthenticated, isAdmin, router]);
 
   // Close mobile sidebar when the route/pathname changes
   const pathname = usePathname();
@@ -49,7 +52,7 @@ const AdminLayoutContent: React.FC<AdminLayoutProps> = ({ children }) => {
     );
   }
 
-  if (!isAuthenticated || user?.role !== Role.admin) {
+  if (!isAuthenticated || !isAdmin) {
     return null;
   }
 
@@ -57,7 +60,7 @@ const AdminLayoutContent: React.FC<AdminLayoutProps> = ({ children }) => {
     <AppErrorBoundary>
       <DashboardLayout
         navigationItems={adminNavigationConfig}
-        user={user}
+        user={user ?? null}
         isLoading={authLoading}
       >
         {children}

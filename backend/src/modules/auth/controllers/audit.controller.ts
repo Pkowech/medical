@@ -36,7 +36,8 @@ export class AuditController {
   async getAuditLogs(
     @Query() pagination: PaginationDto,
   ): Promise<AuditLogEntry[]> {
-    const { page = 1, limit = 10 } = pagination;
+    const page = Math.max(1, Math.floor(pagination.page ?? 1));
+    const limit = Math.min(100, Math.max(1, Math.floor(pagination.limit ?? 10)));
     return this.auditLogService.getAuditLogs(page, limit);
   }
 }

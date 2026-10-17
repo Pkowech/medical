@@ -14,6 +14,7 @@ import { RedisService } from '#infrastructure/redis/redis.service';
 import { UserAnalyticsService } from '#modules/ai-analytics/services/user-analytics.service';
 import { GlobalSearchSyncService } from '#infrastructure/search/services/global-search-sync.service';
 import { CreateUserDto, UpdateUserDto } from '#common/dto/user.dto';
+import { UpdateUserSettingsDto } from '#common/dto/user-settings.dto';
 import { BaseUserResponseDto } from '#common/dto/base-response.dto';
 import { UserProfileResponseDto, UserListResponseDto } from '#common/dto';
 import { PaginationDto } from '#common/dto/pagination.dto';
@@ -104,6 +105,143 @@ export class UsersService {
 
   private generateKey(field: string, value: string): string {
     return `${this.CACHE_PREFIX}:${field}:${value}`;
+  }
+
+  async getSettings(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        email: true,
+        preferences: true,
+        securitySettings: {
+          select: {
+            twoFactorEnabled: true,
+            loginNotifications: true,
+          },
+        },
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException(`User with ID ${userId} not found`);
+    }
+
+    const preferences = this.jsonObject(user.preferences);
+    const notifications = this.jsonObject(preferences.notifications);
+    const privacy = this.jsonObject(preferences.privacy);
+
+    return {
+      email: user.email,
+      theme: this.stringSetting(preferences.theme, ['light', 'dark', 'system'], 'system'),
+      notifications: {
+        email: this.booleanSetting(notifications.email, true),
+        push: this.booleanSetting(notifications.push, false),
+        weeklyDigest: this.booleanSetting(notifications.weeklyDigest, true),
+        progress: this.booleanSetting(notifications.progress, true),
+      },
+      security: {
+        twoFactorEnabled: user.securitySettings?.twoFactorEnabled ?? false,
+        loginNotifications: user.securitySettings?.loginNotifications ?? true,
+      },
+      preferences: {
+        language: this.stringSetting(
+          preferences.language,
+          ['en', 'es', 'fr', 'de', 'sw'],
+          'en',
+        ),
+        timezone: this.stringSetting(
+          preferences.timezone,
+          ['Africa/Nairobi', 'Africa/Dar_es_Salaam', 'Africa/Kampala', 'UTC'],
+          'Africa/Nairobi',
+        ),
+      },
+      privacy: {
+        profileVisibility: this.stringSetting(
+          privacy.profileVisibility,
+          ['public', 'private'],
+          'public',
+        ),
+        showEmail: this.booleanSetting(privacy.showEmail, false),
+        showPhone: this.booleanSetting(privacy.showPhone, false),
+        showLocation: this.booleanSetting(privacy.showLocation, false),
+        allowMessages: this.booleanSetting(privacy.allowMessages, true),
+      },
+    };
+  }
+
+  async updateSettings(userId: string, settings: UpdateUserSettingsDto) {
+    const existingUser = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { preferences: true },
+    });
+    if (!existingUser) {
+      throw new NotFoundException(`User with ID ${userId} not found`);
+    }
+
+    const currentPreferences = this.jsonObject(existingUser.preferences);
+    const currentNotifications = this.jsonObject(currentPreferences.notifications);
+    const currentPrivacy = this.jsonObject(currentPreferences.privacy);
+    const preferences: Prisma.InputJsonObject = {
+      ...currentPreferences,
+      ...(settings.theme !== undefined && { theme: settings.theme }),
+      ...(settings.preferences ?? {}),
+      ...(settings.notifications && {
+        notifications: {
+          ...currentNotifications,
+          ...settings.notifications,
+        },
+      }),
+      ...(settings.privacy && {
+        privacy: {
+          ...currentPrivacy,
+          ...settings.privacy,
+        },
+      }),
+    };
+
+    await this.prisma.$transaction(async tx => {
+      await tx.user.update({
+        where: { id: userId },
+        data: { preferences },
+      });
+
+      if (settings.security?.loginNotifications !== undefined) {
+        await tx.userSecuritySettings.upsert({
+          where: { userId },
+          create: {
+            userId,
+            loginNotifications: settings.security.loginNotifications,
+          },
+          update: {
+            loginNotifications: settings.security.loginNotifications,
+          },
+        });
+      }
+    });
+
+    return this.getSettings(userId);
+  }
+
+  private jsonObject(
+    value: Prisma.JsonValue | null | undefined,
+  ): Prisma.JsonObject {
+    return value !== null && typeof value === 'object' && !Array.isArray(value)
+      ? (value as Prisma.JsonObject)
+      : {};
+  }
+
+  private booleanSetting(value: Prisma.JsonValue | undefined, fallback: boolean): boolean {
+    return typeof value === 'boolean' ? value : fallback;
+  }
+
+  private stringSetting<const T extends readonly string[]>(
+    value: Prisma.JsonValue | undefined,
+    allowed: T,
+    fallback: T[number],
+  ): T[number] {
+    return typeof value === 'string' && allowed.includes(value)
+      ? (value as T[number])
+      : fallback;
   }
 
   // Helper to flatten Prisma user object into BaseUserResponseDto

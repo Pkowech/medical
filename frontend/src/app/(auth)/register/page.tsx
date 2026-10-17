@@ -55,7 +55,7 @@ export default function RegisterPage() {
 
     try {
       setFieldErrors({});
-      await register({
+      const registration = await register({
         email: validationResult.data.email,
         password: validationResult.data.password,
         firstName: validationResult.data.firstName,
@@ -67,7 +67,9 @@ export default function RegisterPage() {
       });
       toast({
         title: 'Account created',
-        description: 'Sign in to finish setting up your profile and learning goals.',
+        description: registration.emailVerificationRequired
+          ? 'Check your email for a verification link before signing in.'
+          : 'Your account is ready. Sign in to continue.',
       });
       router.push('/login?callbackUrl=%2Ffinish-setup');
     } catch (err: unknown) {

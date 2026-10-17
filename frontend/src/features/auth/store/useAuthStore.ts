@@ -2,7 +2,11 @@
 import { create } from 'zustand';
 import { patchData } from '@/features/auth/services/apiClient';
 import { authService } from '../services/authService'; // Use the unified authService
-import { User as BackendUser, RegisterDTO } from '@/shared/types/authInterface';
+import {
+  User as BackendUser,
+  RegisterDTO,
+  RegisterResponse,
+} from '@/shared/types/authInterface';
 import { getAuthErrorDetails } from '@/features/auth/services/authErrors';
 
 type User = BackendUser;
@@ -12,7 +16,7 @@ interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
-  register: (userData: RegisterDTO) => Promise<unknown>;
+  register: (userData: RegisterDTO) => Promise<RegisterResponse>;
   clearError: () => void;
   clearUser: () => void;
   setUser: (user: User | null) => void;

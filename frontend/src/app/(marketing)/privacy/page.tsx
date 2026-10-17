@@ -18,6 +18,14 @@ const sections = [
           marketing pages also record page and call-to-action interactions.
         </p>
         <p>
+          During optional onboarding, profile information may include whether you are a student or
+          professional, your healthcare field, study year or years of experience, and an optional
+          specialty or area of interest. Study targets are also saved. These details support
+          healthcare-learning recommendations and progress goals; they are not needed to create an
+          account, and onboarding can be skipped. The service is for learning and should not be used
+          to submit identifiable patient information.
+        </p>
+        <p>
           If you upload learning materials or connect Google Drive, we process the files or links
           and the account information needed to provide those features. Sign-in and security
           functions also process session, device, and network information. Do not submit patient

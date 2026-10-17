@@ -16,6 +16,7 @@ import {
   GoogleAuthDto,
   LoginDto,
   RegisterDto,
+  RegistrationResponseDto,
 } from '#common/dto/user.dto';
 import { TokenBlacklistService } from './token-blacklist.service';
 import { SecurityService } from './security.service';
@@ -452,6 +453,15 @@ export class AuthService {
         throw new UnauthorizedException('Incorrect password. Please try again.');
       }
 
+      if (this.configService.get<boolean>('ENABLE_EMAIL_VERIFICATION', true)) {
+        const isEmailVerified = await this.securityService.isEmailVerified(user.id);
+        if (!isEmailVerified) {
+          throw new UnauthorizedException(
+            'Please verify your email address',
+          );
+        }
+      }
+
       // Get security settings with error handling
       let securitySettings = null;
       try {
@@ -621,7 +631,9 @@ export class AuthService {
   /**
    * Registers a new user and returns access tokens
    */
-  async register(registerDto: RegisterDto): Promise<AuthResponse> {
+  async register(
+    registerDto: RegisterDto,
+  ): Promise<RegistrationResponseDto> {
     const {
       email,
       password,
@@ -699,57 +711,19 @@ export class AuthService {
         }
       }
 
-      const userRole = user.userRoles?.[0]?.role.name || Role.student;
-      const allRoles = user.userRoles.map((ur: any) => ur.role.name as Role);
-
-      const permissions =
-        await this.permissionCalculationService.getEffectivePermissionsForRole(
-          userRole as Role,
-        );
-
-      const payload: JwtPayload = {
-        sub: user.id,
-        email: user.email,
-        role: userRole as Role,
-        roles: allRoles, // Add this line
-        permissions,
-      };
-
-      const accessToken = await this.jwtService.signAsync(payload);
-      const refreshToken = await this.refreshTokenService.createRefreshToken(
-        user.id,
-      );
-
-      const expiresAt = new Date(
-        Date.now() + this.parseDurationToMilliseconds(this.JWT_EXPIRES_IN),
-      );
-
-      let isEmailVerified = false;
-      try {
-        isEmailVerified = await this.securityService.isEmailVerified(user.id);
-      } catch (error) {
-        this.logger.warn(
-          `Could not check email verification: ${getErrorMessage(error)}`,
-        );
-      }
-
       return {
-        accessToken,
-        refreshToken,
-        expiresAt,
         user: {
           id: user.id,
           email: user.email,
           firstName: user.firstName || '',
           lastName: user.lastName || '',
           username: user.username || '',
-          isEmailVerified,
+          isEmailVerified: await this.securityService.isEmailVerified(user.id),
         },
-        roles: {
-          role: userRole as Role,
-          roles: allRoles,
-          permissions,
-        },
+        emailVerificationRequired: this.configService.get<boolean>(
+          'ENABLE_EMAIL_VERIFICATION',
+          true,
+        ),
       };
     } catch (error) {
       this.logger.error(`Registration error: ${getErrorMessage(error)}`, {

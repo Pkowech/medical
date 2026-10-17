@@ -29,6 +29,7 @@ import {
 } from '#common/dto/security.dto';
 import type { AuthenticatedRequest } from '#common/dto/user.dto';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
+import { Public } from '#common/constants/auth.constants';
 
 @ApiTags('Security')
 @Controller('auth/security')
@@ -61,6 +62,19 @@ export class SecurityController {
       dto.token,
     );
     return { valid: isValid };
+  }
+
+  @Post('2fa/disable')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Disable two-factor authentication' })
+  @ApiResponse({ status: 200, description: '2FA disabled successfully' })
+  async disableTwoFactor(
+    @Request() req: AuthenticatedRequest,
+    @Body() dto: VerifyTwoFactorDto,
+  ) {
+    await this.securityService.disableTwoFactor(req.user.id, dto.token);
+    return { message: 'Two-factor authentication disabled successfully' };
   }
 
   @Put('password')
@@ -125,6 +139,7 @@ export class SecurityController {
     return { backupCodes: codes };
   }
 
+  @Public()
   @Post('email/verify')
   @ApiOperation({ summary: 'Verify email address' })
   @ApiResponse({ status: 200, description: 'Email verified successfully' })
@@ -143,6 +158,28 @@ export class SecurityController {
     return { message: 'Verification email sent' };
   }
 
+  @Public()
+  @Post('email/resend-request')
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ auth: { limit: 3, ttl: 900 } })
+  @ApiOperation({ summary: 'Request an email verification message' })
+  @ApiResponse({
+    status: 200,
+    description: 'A generic response is returned to prevent account enumeration',
+  })
+  @ApiResponse({
+    status: 503,
+    description: 'Email verification delivery is not configured',
+  })
+  async requestVerificationEmail(@Body() dto: AccountRecoveryDto) {
+    await this.securityService.requestVerificationEmail(dto.email);
+    return {
+      message:
+        'If an unverified account exists for this email, a verification link will be sent.',
+    };
+  }
+
+  @Public()
   @Post('recovery/initiate')
   @UseGuards(ThrottlerGuard)
   @Throttle({ auth: { limit: 5, ttl: 900 } })
@@ -162,6 +199,7 @@ export class SecurityController {
     };
   }
 
+  @Public()
   @Post('recovery/verify')
   @UseGuards(ThrottlerGuard)
   @Throttle({ auth: { limit: 5, ttl: 900 } })

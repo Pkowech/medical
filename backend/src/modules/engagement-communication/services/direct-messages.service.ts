@@ -81,9 +81,23 @@ export class DirectMessagesService {
 
     const target = await this.prisma.user.findFirst({
       where: { id: targetUserId, isActive: true },
-      select: { id: true },
+      select: { id: true, preferences: true },
     });
     if (!target) throw new NotFoundException('User not found.');
+
+    const preferences = target.preferences;
+    const privacy =
+      preferences && typeof preferences === 'object' && !Array.isArray(preferences)
+        ? preferences.privacy
+        : undefined;
+    if (
+      privacy &&
+      typeof privacy === 'object' &&
+      !Array.isArray(privacy) &&
+      privacy.allowMessages === false
+    ) {
+      throw new ForbiddenException('This user does not accept direct messages.');
+    }
 
     const pairKey = [userId, targetUserId].sort().join(':');
     const conversation = await this.prisma.directConversation.upsert({

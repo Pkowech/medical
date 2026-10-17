@@ -91,19 +91,19 @@ export default function AdminUsersPage() {
   }, [isAdmin, page, debouncedSearch, roleFilter, statusFilter, refreshVersion]);
 
   const handleCreateOrUpdateUser = async (
-    userData: Omit<User, 'id' | 'createdAt' | 'lastLogin'> | User
+    userData: Partial<User> & { password?: string; acceptTerms?: boolean }
   ) => {
     try {
-      if ('id' in userData && userData.id) {
-        await adminService.updateUser(userData.id, userData as User);
+      if (editingUser?.id) {
+        await adminService.updateUser(editingUser.id, userData);
       } else {
-        await adminService.createUser(userData as Omit<User, 'id' | 'createdAt' | 'lastLogin'>);
+        await adminService.createUser(userData);
       }
       setIsFormOpen(false);
       setEditingUser(null);
       setRefreshVersion(version => version + 1);
     } catch (err) {
-      setError('Failed to save user.');
+      setError(err instanceof Error ? err.message : 'Failed to save user.');
       console.error(err);
     }
   };

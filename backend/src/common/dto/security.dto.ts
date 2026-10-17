@@ -136,14 +136,6 @@ export interface RateLimitConfig {
 // ============================================================================
 
 export class SecuritySettingsDto {
-  @ApiProperty({
-    description: 'Enable two-factor authentication',
-    required: false,
-  })
-  @IsOptional()
-  @IsBoolean()
-  twoFactorEnabled?: boolean;
-
   @ApiProperty({ description: 'Login notification settings', required: false })
   @IsOptional()
   @IsBoolean()
@@ -218,7 +210,7 @@ export class TwoFactorSetupDto {
 export class VerifyTwoFactorDto {
   @ApiProperty({ description: 'TOTP token from authenticator app' })
   @IsString()
-  @MinLength(6)
+  @Matches(/^\d{6}$/)
   token!: string;
 }
 

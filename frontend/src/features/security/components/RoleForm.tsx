@@ -21,11 +21,14 @@ export const RoleForm: React.FC<RoleFormProps> = ({ role, onSave, onCancel }) =>
     name: '',
     permissions: [],
   });
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   useEffect(() => {
     if (role) {
+      setValidationError(null);
       setFormData(role);
     } else {
+      setValidationError(null);
       setFormData({
         name: '',
         permissions: [],
@@ -52,10 +55,11 @@ export const RoleForm: React.FC<RoleFormProps> = ({ role, onSave, onCancel }) =>
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (formData.name && formData.permissions) {
+    if (formData.name?.trim()) {
+      setValidationError(null);
       onSave(formData as RoleEntity);
     } else {
-      alert('Please fill in all required fields.');
+      setValidationError('Enter a role name.');
     }
   };
 
@@ -71,14 +75,19 @@ export const RoleForm: React.FC<RoleFormProps> = ({ role, onSave, onCancel }) =>
             <Input id="name" value={formData.name || ''} onChange={handleChange} required />
           </div>
           <div>
-            <Label htmlFor="permissions">Permissions (comma-separated)</Label>
+            <Label htmlFor="permissions">Permission names (comma-separated)</Label>
             <Textarea
               id="permissions"
               value={formData.permissions?.map(p => p.name).join(', ') || ''}
               onChange={handleChange}
-              required
+              placeholder="manage_users, view_audit_logs"
             />
           </div>
+          {validationError && (
+            <p role="alert" className="text-sm text-destructive">
+              {validationError}
+            </p>
+          )}
           <div className="flex justify-end space-x-2">
             <Button type="button" variant="outline" onClick={onCancel}>
               Cancel

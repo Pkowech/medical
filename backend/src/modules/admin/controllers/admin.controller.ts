@@ -21,10 +21,11 @@ import { RoleGuard } from '#common/guards/roles.guard';
 import { Roles } from '#common/decorators/roles.decorator';
 import { Role } from '#modules/auth/constants/role.constants';
 import { AdminService } from '../services/admin.service';
-import { UpdateUserDto, CreateUserDto, PaginationDto, CreateRoleDto, UpdateRoleDto } from '#common/dto';
+import { PaginationDto, CreateRoleDto, UpdateRoleDto } from '#common/dto';
 import { Resource } from '#common/decorators/resource.decorator';
 import { Action } from '#common/decorators/action.decorator';
 import { PrismaService } from '#infrastructure/prisma/prisma.service';
+import { AdminCreateUserDto, AdminUpdateUserDto } from '../dto/admin-user.dto';
 
 @ApiTags('Admin')
 @Controller('admin')
@@ -83,7 +84,7 @@ export class AdminController {
     status: 201,
     description: 'Returns the created user',
   })
-  async createUser(@Body() createUserDto: CreateUserDto) {
+  async createUser(@Body() createUserDto: AdminCreateUserDto) {
     return this.adminService.createUser(createUserDto);
   }
 
@@ -96,7 +97,7 @@ export class AdminController {
   })
   async updateUser(
     @Param('id') id: string,
-    @Body() updateUserDto: UpdateUserDto,
+    @Body() updateUserDto: AdminUpdateUserDto,
   ) {
     return this.adminService.updateUser(id, updateUserDto);
   }
@@ -113,8 +114,8 @@ export class AdminController {
   @Action('read')
   @ApiOperation({ summary: 'Get all roles (paginated)' })
   async getRoles(@Query() pagination: PaginationDto) {
-    const page = pagination.page && !isNaN(Number(pagination.page)) ? Number(pagination.page) : 1;
-    const limit = pagination.limit && !isNaN(Number(pagination.limit)) ? Number(pagination.limit) : 10;
+    const page = Math.max(1, Math.floor(pagination.page ?? 1));
+    const limit = Math.min(100, Math.max(1, Math.floor(pagination.limit ?? 10)));
     return this.adminService.getRoles(page, limit);
   }
 
