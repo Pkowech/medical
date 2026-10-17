@@ -12,6 +12,7 @@ interface RecommendationCardProps {
 
 export const RecommendationCard: React.FC<RecommendationCardProps> = ({ suggestion }) => {
   const router = useRouter();
+  const suggestionLink = suggestion.link;
 
   const getPriorityColor = (priority: string) => {
     switch (priority?.toLowerCase?.() || 'medium') {
@@ -28,7 +29,7 @@ export const RecommendationCard: React.FC<RecommendationCardProps> = ({ suggesti
     <div className="group relative overflow-hidden bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 hover:border-indigo-500/30 hover:shadow-xl hover:shadow-indigo-500/5 transition-all duration-300">
       {/* Decorative Gradient Background */}
       <div className="absolute top-0 right-0 w-64 h-64 bg-linear-to-br from-indigo-500/5 to-purple-500/5 rounded-full blur-3xl -mr-32 -mt-32 pointer-events-none" />
-      
+
       <div className="relative z-10">
         {/* Header */}
         <div className="flex items-start justify-between mb-4">
@@ -77,14 +78,16 @@ export const RecommendationCard: React.FC<RecommendationCardProps> = ({ suggesti
              )}
           </div>
 
-          <Button 
-            size="sm" 
-            onClick={() => router.push(suggestion.link || '#')}
-            className="bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-indigo-600 dark:hover:bg-indigo-50 hover:text-white dark:hover:text-indigo-600 transition-all font-bold shadow-lg shadow-slate-200/50 dark:shadow-none group-hover:translate-x-1"
-          >
-            Start
-            <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
-          </Button>
+          {suggestionLink && (
+            <Button
+              size="sm"
+              onClick={() => router.push(suggestionLink)}
+              className="bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-indigo-600 dark:hover:bg-indigo-50 hover:text-white dark:hover:text-indigo-600 transition-all font-bold shadow-lg shadow-slate-200/50 dark:shadow-none group-hover:translate-x-1"
+            >
+              Start
+              <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
+            </Button>
+          )}
         </div>
       </div>
     </div>

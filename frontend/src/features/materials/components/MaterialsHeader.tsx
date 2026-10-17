@@ -12,7 +12,7 @@ export const MaterialsHeader = () => {
     <div className="flex items-center justify-between">
       <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Study Materials</h1>
       <div className="flex items-center gap-2">
-        <Button variant="default" size="sm" onClick={() => router.push('/materials/upload')}>
+        <Button variant="default" size="sm" onClick={() => router.push('/study-planner/materials/upload')}>
           <Upload className="h-4 w-4 mr-2" />
           Upload Material
         </Button>

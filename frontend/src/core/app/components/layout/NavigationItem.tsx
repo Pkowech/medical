@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useId } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ChevronRight } from 'lucide-react';
@@ -15,6 +15,7 @@ export const NavigationItemComponent: React.FC<NavigationItemProps> = ({
 }) => {
   const pathname = usePathname();
   const [isExpanded, setIsExpanded] = useState(false);
+  const childrenId = useId();
 
   // Determine if this item or any of its children are active
   const isActive = (path?: string) => {
@@ -27,6 +28,9 @@ export const NavigationItemComponent: React.FC<NavigationItemProps> = ({
   const isItemActive = isActive(item.href);
   const isChildActive = item.children?.some(child => isActive(child.href));
   const effectiveActive = isItemActive || isChildActive || propActive;
+  const activeStateClasses = effectiveActive
+    ? 'bg-blue-50/80 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 shadow-sm'
+    : 'text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white';
 
   // Auto-expand if a child is active
   useEffect(() => {
@@ -35,30 +39,14 @@ export const NavigationItemComponent: React.FC<NavigationItemProps> = ({
     }
   }, [isChildActive]);
 
-  const handleClick = (_e: React.MouseEvent) => {
-    if (item.children) {
-      // If it has children and no href (or we want to prioritize toggling), toggle expand
-      // If it has href, navigation might happen, but usually folders don't have hrefs in this pattern.
-      // Assuming folder behavior for items with children:
-      if (!item.href || item.children.length > 0) {
-        // e.preventDefault(); // if it was a link
-        setIsExpanded(!isExpanded);
-      }
-    }
-
-    if (onClick && !item.children) {
-      onClick();
-    }
-  };
+  const toggleExpanded = () => setIsExpanded(expanded => !expanded);
 
   const showLabel = !sidebarCollapsed || sidebarOpen;
 
-  const baseClasses = `w-full flex items-center justify-between px-4 py-2.5 text-left text-sm font-semibold rounded-xl transition-all ${effectiveActive
-      ? 'bg-blue-50/80 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 shadow-sm'
-      : 'text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white'
-    }`;
+  const baseClasses = `w-full flex items-center justify-between px-4 py-2.5 text-left text-sm font-semibold rounded-xl transition-all ${activeStateClasses}`;
+  const parentRowClasses = `w-full flex items-center justify-between text-left text-sm font-semibold rounded-xl transition-all ${activeStateClasses}`;
 
-  const itemContent = (
+  const itemLabel = (
     <>
       <div className="flex items-center space-x-3">
         <item.icon
@@ -75,35 +63,64 @@ export const NavigationItemComponent: React.FC<NavigationItemProps> = ({
           </>
         )}
       </div>
-      {item.children && showLabel && (
-        <ChevronRight
-          className={`h-4 w-4 text-gray-600 dark:text-gray-300 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
-        />
-      )}
     </>
   );
 
-  // If item has children, it behaves primarily as a toggle (unless it also has a unique href, which is rare for folders)
-  // To keep it simple: if children exist, render as button to toggle.
   if (item.children) {
     return (
-      <div>
-        <button type="button" onClick={handleClick} className={baseClasses}>
-          {itemContent}
-        </button>
-        {isExpanded && showLabel && (
-          <div className="ml-6 mt-1 space-y-1">
-            {item.children.map(child => (
-              <NavigationItemComponent
-                key={child.id}
-                item={child}
-                sidebarCollapsed={sidebarCollapsed}
-                sidebarOpen={sidebarOpen}
-                onClick={onClick}
+      <div className="mb-1">
+        <div className={parentRowClasses}>
+          {item.href ? (
+            <Link
+              href={item.href}
+              className="flex min-w-0 flex-1 items-center rounded-l-xl px-4 py-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500"
+              onClick={onClick}
+              aria-current={pathname === item.href ? 'page' : undefined}
+            >
+              {itemLabel}
+            </Link>
+          ) : (
+            <button
+              type="button"
+              onClick={toggleExpanded}
+              className="flex min-w-0 flex-1 items-center rounded-l-xl px-4 py-2.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500"
+              aria-expanded={isExpanded}
+              aria-controls={childrenId}
+            >
+              {itemLabel}
+              <ChevronRight
+                aria-hidden="true"
+                className={`ml-auto h-4 w-4 text-gray-600 transition-transform dark:text-gray-300 ${isExpanded ? 'rotate-90' : ''}`}
               />
-            ))}
-          </div>
-        )}
+            </button>
+          )}
+          {item.href && (
+            <button
+              type="button"
+              onClick={toggleExpanded}
+              className="mr-2 rounded-md p-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+              aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${item.label}`}
+              aria-expanded={isExpanded}
+              aria-controls={childrenId}
+            >
+              <ChevronRight
+                aria-hidden="true"
+                className={`h-4 w-4 text-gray-600 transition-transform dark:text-gray-300 ${isExpanded ? 'rotate-90' : ''}`}
+              />
+            </button>
+          )}
+        </div>
+        <div id={childrenId} hidden={!isExpanded || !showLabel} className="ml-6 mt-1 space-y-1">
+          {item.children.map(child => (
+            <NavigationItemComponent
+              key={child.id}
+              item={child}
+              sidebarCollapsed={sidebarCollapsed}
+              sidebarOpen={sidebarOpen}
+              onClick={onClick}
+            />
+          ))}
+        </div>
       </div>
     );
   }
@@ -112,12 +129,17 @@ export const NavigationItemComponent: React.FC<NavigationItemProps> = ({
   return (
     <div className="mb-1">
       {item.href ? (
-        <Link href={item.href} className={baseClasses} onClick={onClick}>
-          {itemContent}
+        <Link
+          href={item.href}
+          className={baseClasses}
+          onClick={onClick}
+          aria-current={pathname === item.href ? 'page' : undefined}
+        >
+          {itemLabel}
         </Link>
       ) : (
-        <button type="button" onClick={handleClick} className={baseClasses}>
-          {itemContent}
+        <button type="button" className={baseClasses}>
+          {itemLabel}
         </button>
       )}
     </div>
