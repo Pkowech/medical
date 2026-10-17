@@ -5,16 +5,26 @@ import { useRouter } from 'next/navigation';
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { usePageHeader } from '@/core/providers/HeaderContext';
 import materialService from '@/features/courses/services/materialService';
+import { courseService } from '@/features/courses/services/courseService';
 import { Material } from '@/shared/types/materialInterface';
+import type { Course } from '@/shared/types/courseInterface';
 import { MaterialListItem } from './MaterialListItem';
 import { MaterialCard } from './MaterialCard';
 import { RecommendationCard } from './RecommendationCard'; // New Component
 import { Button } from '@/shared/components/ui/button';
 import { toast } from 'sonner';
 import { 
-  Search, Plus, LayoutGrid, LayoutList, ChevronDown, X,
-  BrainCircuit, Database, BookOpen, Sparkles, Upload, FolderOpen
+  Search, Plus, LayoutGrid, LayoutList, ChevronDown,
+  BrainCircuit, Database, BookOpen, Sparkles, Upload, FolderOpen,
+  CalendarDays, Download, FileText, MoreVertical, UserRound, ArrowLeft
 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/shared/components/ui/dropdown-menu';
+import { getInstructorDisplayName } from '@/lib/utils';
 
 interface MaterialsPageData {
   items: Material[];
@@ -64,17 +74,6 @@ export default function MaterialsDashboard() {
   const [sortBy, setSortBy] = useState<string>('createdAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
-  // Set header - "Knowledge Vault" branding
-  useEffect(() => {
-    setHeader({
-      title: 'Knowledge Vault',
-      description: 'Centralized intelligence for your medical mastery',
-      icon: <Database className="w-6 h-6 text-indigo-500" />,
-    });
-    // Only cleanup on unmount
-    return () => setHeader(null);
-  }, []); // Empty dependency array - set only once on mount
-
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const courseId = params.get('courseId') || undefined;
@@ -85,6 +84,32 @@ export default function MaterialsDashboard() {
     }
     setCourseFilterInitialized(true);
   }, []);
+
+  const {
+    data: selectedCourse,
+    isLoading: isCourseLoading,
+    isError: isCourseError,
+    error: courseError,
+  } = useQuery<Course, Error>({
+    queryKey: ['course', selectedCourseId],
+    queryFn: () => courseService.getCourseById(selectedCourseId!),
+    enabled: courseFilterInitialized && Boolean(selectedCourseId),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  useEffect(() => {
+    const courseTitle = selectedCourse?.title || selectedCourse?.name;
+    setHeader({
+      title: selectedCourseId ? courseTitle || 'Course materials' : 'Knowledge Vault',
+      description: selectedCourseId
+        ? 'Course stream and shared learning materials'
+        : 'Centralized intelligence for your medical mastery',
+      icon: selectedCourseId
+        ? <BookOpen className="h-6 w-6 text-indigo-500" />
+        : <Database className="h-6 w-6 text-indigo-500" />,
+    });
+    return () => setHeader(null);
+  }, [selectedCourseId, selectedCourse?.title, selectedCourse?.name, setHeader]);
 
   // Debounce search
   useEffect(() => {
@@ -280,6 +305,30 @@ export default function MaterialsDashboard() {
     </div>
   );
 
+  const formatStreamDate = (date?: string) => {
+    if (!date) return 'Date not available';
+    const parsedDate = new Date(date);
+    if (Number.isNaN(parsedDate.getTime())) return 'Date not available';
+    return new Intl.DateTimeFormat(undefined, {
+      day: 'numeric',
+      month: 'short',
+      year: parsedDate.getFullYear() === new Date().getFullYear() ? undefined : 'numeric',
+    }).format(parsedDate);
+  };
+
+  const courseInstructor = selectedCourse
+    ? getInstructorDisplayName(selectedCourse.instructor ?? selectedCourse.createdBy)
+    : '';
+  const courseBannerPalettes = [
+    'from-slate-600 via-slate-600 to-slate-800',
+    'from-blue-700 via-blue-700 to-indigo-900',
+    'from-teal-700 via-cyan-700 to-slate-800',
+    'from-violet-700 via-indigo-700 to-slate-800',
+  ];
+  const coursePaletteIndex = selectedCourseId
+    ? Array.from(selectedCourseId).reduce((sum, character) => sum + character.charCodeAt(0), 0) % courseBannerPalettes.length
+    : 0;
+
   // Intent Filters Definition
   const intents = [
     { id: 'all', label: 'All Resources' },
@@ -292,6 +341,7 @@ export default function MaterialsDashboard() {
   return (
     <div className="space-y-8 min-h-screen pb-20">
       {/* Top Control Bar */}
+      {!selectedCourseId && (
       <div className="flex flex-col xl:flex-row gap-6 justify-between items-start xl:items-center bg-white dark:bg-slate-900/50 p-1 rounded-3xl">
         
         {/* Context Tabs */}
@@ -401,30 +451,201 @@ export default function MaterialsDashboard() {
           </div>
         </div>
 
-        {selectedCourseId && (
-          <div className="flex items-center justify-between gap-3 rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 dark:border-indigo-900/50 dark:bg-indigo-950/30">
-            <div className="flex min-w-0 items-center gap-2 text-sm text-indigo-900 dark:text-indigo-100">
-              <FolderOpen className="h-4 w-4 shrink-0" />
-              <span className="truncate font-semibold">Showing this course&apos;s materials</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedCourseId(undefined);
-                setFilterContext('shared');
-                router.replace('/study-planner/materials');
-              }}
-              className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-indigo-700 hover:text-indigo-900 dark:text-indigo-300 dark:hover:text-white"
-            >
-              <X className="h-3.5 w-3.5" />
-              Clear course
-            </button>
-          </div>
-        )}
       </div>
+      )}
+
+      {selectedCourseId && (
+        <section className="mx-auto w-full max-w-5xl space-y-5">
+          <button
+            type="button"
+            onClick={() => router.push('/study-planner/materials')}
+            className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 transition-colors hover:text-blue-700 dark:text-slate-300 dark:hover:text-blue-300"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            All materials
+          </button>
+
+          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            {isCourseLoading ? (
+              <div className="h-44 animate-pulse bg-slate-200 dark:bg-slate-800" />
+            ) : isCourseError ? (
+              <div role="alert" className="p-6 text-sm text-rose-700 dark:text-rose-300">
+                Could not load course details: {courseError instanceof Error ? courseError.message : 'Please try again later.'}
+              </div>
+            ) : (
+              <>
+                <div className={`relative flex min-h-44 items-end overflow-hidden bg-gradient-to-br ${courseBannerPalettes[coursePaletteIndex]} px-6 py-6 text-white sm:px-8`}>
+                  <BookOpen className="absolute -bottom-10 -right-3 h-48 w-48 rotate-[-12deg] text-white/10 sm:h-56 sm:w-56" aria-hidden="true" />
+                  <div className="relative min-w-0 max-w-3xl">
+                    {selectedCourse?.code && (
+                      <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-white/75">
+                        {selectedCourse.code}
+                      </p>
+                    )}
+                    <h1 className="line-clamp-2 text-2xl font-medium leading-tight sm:text-3xl">
+                      {selectedCourse?.title || selectedCourse?.name || 'Course materials'}
+                    </h1>
+                    {courseInstructor && (
+                      <p className="mt-2 text-sm text-white/85">{courseInstructor}</p>
+                    )}
+                  </div>
+                </div>
+                <div className="border-t border-slate-100 bg-slate-100 px-6 py-3 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-200 sm:px-8">
+                  {selectedCourse?.category?.name || selectedCourse?.description || 'Course learning materials'}
+                </div>
+                <nav aria-label="Course sections" className="flex items-center gap-7 border-t border-slate-200 px-5 dark:border-slate-800 sm:px-8">
+                  <a
+                    href="#course-stream"
+                    aria-current="page"
+                    className="border-b-2 border-blue-600 py-3 text-sm font-semibold text-blue-700 dark:text-blue-300"
+                  >
+                    Stream
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/courses/${selectedCourseId}`)}
+                    className="border-b-2 border-transparent py-3 text-sm font-medium text-slate-600 transition-colors hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+                  >
+                    Classwork
+                  </button>
+                  <a
+                    href="#course-people"
+                    className="border-b-2 border-transparent py-3 text-sm font-medium text-slate-600 transition-colors hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+                  >
+                    People
+                  </a>
+                </nav>
+              </>
+            )}
+          </div>
+
+          {isCourseError ? null : (
+            <div id="course-stream" className="grid grid-cols-1 items-start gap-5 md:grid-cols-[minmax(170px,0.75fr)_minmax(0,2.5fr)]">
+              <aside className="space-y-4">
+                <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-100">
+                    <CalendarDays className="h-4 w-4 text-slate-500" />
+                    Upcoming
+                  </div>
+                  <p className="mt-3 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
+                    Course deadlines added by your instructor will appear here.
+                  </p>
+                </section>
+                <section id="course-people" className="scroll-mt-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                  <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Instructor</h2>
+                  <div className="mt-3 flex items-center gap-3">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
+                      <UserRound className="h-4 w-4" />
+                    </span>
+                    <p className="min-w-0 truncate text-sm text-slate-700 dark:text-slate-300">
+                      {courseInstructor || 'Instructor information unavailable'}
+                    </p>
+                  </div>
+                </section>
+              </aside>
+
+              <div className="min-w-0 space-y-3">
+                <div className="flex items-center justify-between px-1">
+                  <h2 className="text-base font-semibold text-slate-800 dark:text-slate-100">Class stream</h2>
+                  <span className="text-sm text-slate-500 dark:text-slate-400">
+                    {totalCount} {totalCount === 1 ? 'item' : 'items'}
+                  </span>
+                </div>
+
+                {(!courseFilterInitialized || isLoading) && !allMaterials.length ? (
+                  <div className="space-y-3" aria-label="Loading course materials">
+                    {[0, 1, 2].map((item) => (
+                      <div key={item} className="h-20 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800" />
+                    ))}
+                  </div>
+                ) : isMaterialsError ? (
+                  <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-200">
+                    Could not load course materials: {materialsError instanceof Error ? materialsError.message : 'Please try again later.'}
+                  </div>
+                ) : allMaterials.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-slate-300 bg-white px-5 py-10 text-center dark:border-slate-700 dark:bg-slate-900">
+                    <FolderOpen className="mx-auto h-8 w-8 text-slate-400" />
+                    <h3 className="mt-3 font-semibold text-slate-800 dark:text-slate-100">No materials in this stream yet</h3>
+                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                      Materials shared with this class will appear here.
+                    </p>
+                  </div>
+                ) : (
+                  allMaterials.map((material) => {
+                    const ownerName = material.user
+                      ? [material.user.firstName, material.user.lastName].filter(Boolean).join(' ')
+                      : material.author || courseInstructor || 'Course instructor';
+                    const fileUrl = material.fileUrl || material.url;
+
+                    return (
+                      <article
+                        key={material.id}
+                        className="flex min-h-20 items-center gap-3 rounded-xl border border-slate-100 bg-slate-100 px-3 py-3 transition-colors hover:bg-slate-200/70 dark:border-slate-800 dark:bg-slate-800/80 dark:hover:bg-slate-800 sm:gap-4 sm:px-4"
+                      >
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300">
+                          <FileText className="h-5 w-5" />
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => router.push(`/study-planner/materials/${material.id}`)}
+                          className="min-w-0 flex-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                        >
+                          <p className="line-clamp-2 text-sm font-medium text-slate-800 dark:text-slate-100">
+                            <span className="font-semibold">{ownerName}</span>
+                            {' posted a new material: '}
+                            <span>{material.title}</span>
+                          </p>
+                          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                            {formatStreamDate(material.uploadDate || material.createdAt)}
+                          </p>
+                        </button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button
+                              type="button"
+                              aria-label={`Options for ${material.title}`}
+                              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-slate-600 transition-colors hover:bg-white hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-white"
+                            >
+                              <MoreVertical className="h-5 w-5" />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onSelect={() => router.push(`/study-planner/materials/${material.id}`)}>
+                              Open material
+                            </DropdownMenuItem>
+                            {fileUrl && (
+                              <DropdownMenuItem onSelect={() => window.open(fileUrl, '_blank', 'noopener,noreferrer')}>
+                                <Download className="mr-2 h-4 w-4" />
+                                Open file
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </article>
+                    );
+                  })
+                )}
+
+                {hasNextPage && (
+                  <div className="flex justify-center pt-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => fetchNextPage()}
+                      disabled={isFetchingNextPage}
+                      className="rounded-lg"
+                    >
+                      {isFetchingNextPage ? 'Loading more…' : 'Show older materials'}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </section>
+      )}
       
       {/* Intent Filters (Only show on library views) */}
-      {filterContext !== 'for_you' && (
+      {!selectedCourseId && filterContext !== 'for_you' && (
         <div className="flex gap-2 overflow-x-auto pb-4 no-scrollbar">
           {intents.map((intent) => (
             <button
@@ -443,7 +664,7 @@ export default function MaterialsDashboard() {
       )}
 
       {/* Main Content Area */}
-      {filterContext === 'for_you' ? (
+      {!selectedCourseId && (filterContext === 'for_you' ? (
         // --- AI Recommendations View ---
         <div className="space-y-6">
           <div className="flex items-center gap-3 mb-2">
@@ -626,7 +847,7 @@ export default function MaterialsDashboard() {
             </div>
           )}
         </>
-      )}
+      ))}
     </div>
   );
 }
