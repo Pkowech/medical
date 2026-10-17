@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { usePermissions } from '@/features/auth/hooks/usePermissions';
-import { Settings, Shield, Bell, Mail, Lock, Globe, Database } from 'lucide-react';
+import { Settings, Shield, Bell, Mail, Lock, Globe, Database, AlertTriangle } from 'lucide-react';
 import { Role } from '@/shared/enums/role.enum';
 
 const SettingsPage = () => {
@@ -33,6 +33,11 @@ const SettingsPage = () => {
   return (
     <div className="p-6">
       <h1 className="text-2xl font-bold mb-6">System Settings</h1>
+
+      <div role="status" className="mb-6 flex items-start gap-3 rounded-md border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+        <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
+        <p>These settings are a preview only. Changes are not saved or applied to the platform.</p>
+      </div>
 
       <div className="flex flex-col md:flex-row gap-6">
         {/* Sidebar */}

@@ -4,7 +4,6 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Button } from '@/shared/components/ui/button';
 import {
-  AlertCircle,
   BookMarked,
   TrendingDown,
   Calendar,
@@ -179,6 +178,7 @@ export const SpacedRepetitionWidget = () => {
                     <Button
                       size="sm"
                       variant="ghost"
+                      aria-label={`Open flashcards for ${topic.topicName}`}
                       className="flex-shrink-0"
                       onClick={() => router.push(`/flashcards?topic=${topic.topicId}`)}
                     >

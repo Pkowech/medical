@@ -22,7 +22,6 @@ interface NotesPanelProps {
 
 export const NotesPanel = ({
   topicId,
-  materialId,
   lessonKey = 'general',
   notes: propNotes,
   saveNote,

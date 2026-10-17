@@ -26,7 +26,10 @@ function getSafeCallbackUrl(requestedCallbackUrl: string | null): string {
 
   try {
     const resolvedUrl = new URL(requestedCallbackUrl, window.location.origin);
-    if (resolvedUrl.origin === window.location.origin) {
+    if (
+      resolvedUrl.origin === window.location.origin &&
+      !resolvedUrl.pathname.startsWith('//')
+    ) {
       return `${resolvedUrl.pathname}${resolvedUrl.search}${resolvedUrl.hash}`;
     }
   } catch {
@@ -57,7 +60,6 @@ function LoginContent() {
   const [success, setSuccess] = useState('');
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
-  const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [socialLoading, setSocialLoading] = useState<'google' | null>(null);
   const [formErrors, setFormErrors] = useState<FormErrors>({});
@@ -146,8 +148,6 @@ function LoginContent() {
       setIdentifier(value);
     } else if (name === 'password') {
       setPassword(value);
-    } else if (name === 'rememberMe') {
-      setRememberMe(e.target.checked);
     }
 
     // Mark field as touched
@@ -228,7 +228,6 @@ function LoginContent() {
         window.location.assign(callbackUrl);
       }
     } catch (error: unknown) {
-      console.error('Login failed:', error); // Log the full error object
       const authError = getAuthErrorDetails(
         error,
         'An unexpected error occurred during login. Please try again later.'
@@ -455,19 +454,7 @@ function LoginContent() {
           </div>
         </div>
 
-        <div className="flex items-center justify-between gap-3">
-          <label htmlFor="rememberMe" className="flex cursor-pointer items-center gap-3">
-            <input
-              id="rememberMe"
-              name="rememberMe"
-              type="checkbox"
-              checked={rememberMe}
-              onChange={e => setRememberMe(e.target.checked)}
-              className="h-5 w-5 cursor-pointer rounded-md border border-slate-300 bg-white accent-blue-600"
-            />
-            <span className="text-[1.05rem] text-slate-700 dark:text-slate-200">Remember me</span>
-          </label>
-
+        <div className="flex justify-end">
           <div className="text-sm font-medium">
             <Link
               href="/forgot-password"

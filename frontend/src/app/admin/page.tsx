@@ -21,6 +21,7 @@ import { Button } from '@/shared/components/ui/button';
 import { adminService } from '@/features/admin/services/adminService';
 import { SystemAnalytics } from '@/shared/types/analyticsInterface';
 import { Skeleton } from '@/shared/components/ui/skeleton';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 export default function AdminDashboardPage() {
@@ -183,8 +184,6 @@ export default function AdminDashboardPage() {
             title="Total Users" 
             value={stats?.totalUsers ?? null} 
             icon={Users} 
-            trend="up"
-            subValue={stats ? '+12% from last month' : undefined}
           />
           <StatCard 
             title="Active Learners" 
@@ -224,11 +223,12 @@ export default function AdminDashboardPage() {
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {adminActions.map((action) => (
-            <Card 
-              key={action.title} 
-              className="group cursor-pointer hover:border-blue-500/50 transition-all duration-300 shadow-sm hover:shadow-xl bg-white dark:bg-slate-800/50 border-slate-100 dark:border-slate-700/50"
-              onClick={() => router.push(action.href)}
+            <Link
+              key={action.title}
+              href={action.href}
+              className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
             >
+              <Card className="group cursor-pointer hover:border-blue-500/50 transition-all duration-300 shadow-sm hover:shadow-xl bg-white dark:bg-slate-800/50 border-slate-100 dark:border-slate-700/50">
               <CardContent className="p-6">
                 <div className="flex items-start gap-4">
                   <div className={`p-4 rounded-2xl ${action.bgColor} transition-transform group-hover:scale-110 duration-300`}>
@@ -245,7 +245,8 @@ export default function AdminDashboardPage() {
                   </div>
                 </div>
               </CardContent>
-            </Card>
+              </Card>
+            </Link>
           ))}
         </div>
       </div>
@@ -262,7 +263,9 @@ export default function AdminDashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="h-50 flex items-center justify-center border border-white/10 rounded-lg bg-white/5 backdrop-blur-sm">
-              <p className="text-blue-100/50 text-sm italic">Activity chart visualization would render here</p>
+              <p className="text-blue-100/80 text-sm text-center px-4">
+                Activity trends are not available yet; live reporting is not configured.
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -274,28 +277,10 @@ export default function AdminDashboardPage() {
               System Status
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between p-3 rounded-lg bg-slate-50 dark:bg-slate-900/50">
-              <span className="text-sm font-medium">Database (PostgreSQL)</span>
-              <div className="flex items-center gap-2">
-                <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse"></div>
-                <span className="text-xs text-green-500 font-bold uppercase">Online</span>
-              </div>
-            </div>
-            <div className="flex items-center justify-between p-3 rounded-lg bg-slate-50 dark:bg-slate-900/50">
-              <span className="text-sm font-medium">Storage (Cloudflare R2)</span>
-              <div className="flex items-center gap-2">
-                <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse"></div>
-                <span className="text-xs text-green-500 font-bold uppercase">Online</span>
-              </div>
-            </div>
-            <div className="flex items-center justify-between p-3 rounded-lg bg-slate-50 dark:bg-slate-900/50">
-              <span className="text-sm font-medium">Caching (Redis)</span>
-              <div className="flex items-center gap-2">
-                <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse"></div>
-                <span className="text-xs text-green-500 font-bold uppercase">Online</span>
-              </div>
-            </div>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              Live health checks are not configured. Service status cannot be confirmed here.
+            </p>
           </CardContent>
         </Card>
       </div>

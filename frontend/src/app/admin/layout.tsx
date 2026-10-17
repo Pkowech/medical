@@ -27,9 +27,9 @@ const AdminLayoutContent: React.FC<AdminLayoutProps> = ({ children }) => {
     // Only redirect after auth loading is complete
     if (!authLoading) {
       if (!isAuthenticated) {
-        router.push('/login');
+        router.replace('/login');
       } else if (user?.role !== Role.admin) {
-        router.push('/dashboard');
+        router.replace('/dashboard');
       }
     }
   }, [authLoading, isAuthenticated, user?.role, router]);

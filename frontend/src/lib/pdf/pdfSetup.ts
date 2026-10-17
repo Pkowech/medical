@@ -32,7 +32,7 @@ export const initPDFWorker = async (): Promise<boolean> => {
     try {
       const workerUrl = new URL(workerPath, window.location.href).href;
       pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
-    } catch (error) {
+    } catch {
       // Fallback to relative path
       pdfjs.GlobalWorkerOptions.workerSrc = workerPath;
     }

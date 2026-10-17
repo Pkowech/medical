@@ -19,11 +19,11 @@ export default function DashboardPage() {
   useEffect(() => {
     const customSession = session as CustomSession;
     if (customSession?.error === 'TokenExpiredError') {
-      console.warn('Dashboard: Token expired, redirecting to marketing page');
-      router.replace('/');
+      console.warn('Dashboard: Token expired, redirecting to sign-in');
+      router.replace('/login?callbackUrl=%2Fdashboard');
     } else if (status === 'unauthenticated') {
-      console.warn('Dashboard: User unauthenticated, redirecting to marketing page');
-      router.replace('/');
+      console.warn('Dashboard: User unauthenticated, redirecting to sign-in');
+      router.replace('/login?callbackUrl=%2Fdashboard');
     }
   }, [session, status, router]);
 

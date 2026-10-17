@@ -110,10 +110,12 @@ export const UserList: React.FC<UserListProps> = ({
       </CardHeader>
       <CardContent>
         {users.length === 0 ? (
-          <p className="text-muted-foreground text-center">
-            {search || roleFilter !== 'all' || statusFilter !== 'all'
-              ? 'No users match these filters.'
-              : 'No users found.'}
+          <p className="text-muted-foreground text-center" role={loading ? 'status' : undefined}>
+            {loading
+              ? 'Loading users…'
+              : search || roleFilter !== 'all' || statusFilter !== 'all'
+                ? 'No users match these filters.'
+                : 'No users found.'}
           </p>
         ) : (
           <div className="overflow-x-auto">
@@ -176,6 +178,7 @@ export const UserList: React.FC<UserListProps> = ({
                         size="sm"
                         onClick={() => onEdit(user)}
                         className="mr-2"
+                        aria-label={`Edit ${user.fullName || user.email}`}
                       >
                         <Edit className="h-4 w-4" />
                       </Button>

@@ -84,8 +84,6 @@ export function DecisionTreeLogic({
   });
   const [showConsequences, setShowConsequences] = useState<Record<string, boolean>>({});
   const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({});
-  // Track visited nodes to avoid revisiting and for analytics
-  const [visitedNodes, setVisitedNodes] = useState<Set<string>>(new Set([decisionTree.starting_node]));
 
   const currentNodeData = decisionTree.nodes.find(node => node.id === currentNode);
 
@@ -131,7 +129,6 @@ export function DecisionTreeLogic({
     setTimeout(
       () => {
         setCurrentNode(selectedOption.leads_to);
-        setVisitedNodes((prev: Set<string>) => new Set([...prev, selectedOption.leads_to]));
 
         // Check if path is complete
         const nextNode = decisionTree.nodes.find(node => node.id === selectedOption.leads_to);

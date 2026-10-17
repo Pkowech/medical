@@ -68,13 +68,8 @@ class AuthService {
         redirect: false,
       });
 
-      if (result?.error) {
-        console.error('[AuthService] NextAuth signIn failed:', result.error);
-      }
-
       return result;
     } catch (error) {
-      console.error('[AuthService] Login error:', error);
       throw error;
     }
   }

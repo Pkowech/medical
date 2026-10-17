@@ -62,7 +62,6 @@ interface TopicQuizProps {
 
 export const TopicQuiz: React.FC<TopicQuizProps> = ({
   topicId,
-  unitId,
   courseId,
   userId,
   isOpen,

@@ -53,6 +53,19 @@ interface MaterialCourseGroup {
   resourceCount: number;
 }
 
+const MATERIAL_TYPE_FILTERS = [
+  { id: 'all', label: 'All types' },
+  { id: 'pdf', label: 'PDFs' },
+  { id: 'video', label: 'Videos' },
+  { id: 'slide', label: 'Slides' },
+  { id: 'quiz_guide', label: 'Quiz guides' },
+  { id: 'notes', label: 'Notes' },
+  { id: 'audio', label: 'Audio' },
+  { id: 'interactive', label: 'Interactive' },
+  { id: 'flashcard', label: 'Flashcards' },
+  { id: 'other', label: 'Other' },
+] as const;
+
 const MATERIALS_SECTION_STATE_KEY = 'medtrack.materials.section-state.v2';
 
 export default function MaterialsDashboard() {
@@ -70,7 +83,7 @@ export default function MaterialsDashboard() {
   const [courseFilterInitialized, setCourseFilterInitialized] = useState(false);
   const [sharingMaterialIds, setSharingMaterialIds] = useState<Set<string>>(new Set());
   const queryClient = useQueryClient();
-  const [intentFilter, setIntentFilter] = useState('all'); // Intent-based filter
+  const [materialTypeFilter, setMaterialTypeFilter] = useState('all');
   
   // Sort State
   const [sortBy, setSortBy] = useState<string>('createdAt');
@@ -152,8 +165,8 @@ export default function MaterialsDashboard() {
   // Debounce search
   useEffect(() => {
     const timer = setTimeout(() => {
-      setDebouncedSearch(searchTerm);
-    }, 500);
+      setDebouncedSearch(searchTerm.trim());
+    }, 350);
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
@@ -168,7 +181,7 @@ export default function MaterialsDashboard() {
     hasNextPage,
     isFetchingNextPage,
   } = useInfiniteQuery({
-    queryKey: ['materials', debouncedSearch, intentFilter, filterContext, selectedCourseId, sortBy, sortOrder],
+    queryKey: ['materials', debouncedSearch, materialTypeFilter, filterContext, selectedCourseId, sortBy, sortOrder],
     queryFn: async ({ pageParam = 1 }) => {
       const page = pageParam as number;
       const scope = selectedCourseId
@@ -181,7 +194,7 @@ export default function MaterialsDashboard() {
         page,
         limit: pageSize,
         search: debouncedSearch,
-        type: intentFilter === 'all' ? undefined : intentFilter, 
+        type: materialTypeFilter === 'all' ? undefined : materialTypeFilter,
         scope: scope,
         courseId: selectedCourseId,
         sortBy,
@@ -414,14 +427,6 @@ export default function MaterialsDashboard() {
     ? Array.from(selectedCourseId).reduce((sum, character) => sum + character.charCodeAt(0), 0) % courseBannerPalettes.length
     : 0;
 
-  // Intent Filters Definition
-  const intents = [
-    { id: 'all', label: 'All Resources' },
-    { id: 'lecture_notes', label: 'Lecture Notes' },
-    { id: 'clinical_cases', label: 'Clinical Cases' },
-    { id: 'revision_packs', label: 'Revision Packs' },
-    { id: 'research', label: 'Research Papers' },
-  ];
   const contextTitle = filterContext === 'owned'
     ? 'My materials'
     : filterContext === 'shared'
@@ -501,8 +506,8 @@ export default function MaterialsDashboard() {
                     <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 transition-colors group-focus-within:text-blue-600" />
                     <input
                       type="search"
-                      aria-label="Search materials"
-                      placeholder="Search your materials"
+                      aria-label="Search materials by title, content, course, unit, or topic"
+                      placeholder="Search title, course, unit, topic…"
                       value={searchTerm}
                       onChange={(event) => setSearchTerm(event.target.value)}
                       className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-10 pr-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:ring-blue-950"
@@ -654,11 +659,39 @@ export default function MaterialsDashboard() {
               </aside>
 
               <div className="min-w-0 space-y-3">
-                <div className="flex items-center justify-between px-1">
+                <div className="flex flex-wrap items-center justify-between gap-3 px-1">
                   <h2 className="text-base font-semibold text-slate-800 dark:text-slate-100">Class stream</h2>
-                  <span className="text-sm text-slate-500 dark:text-slate-400">
-                    {totalCount} {totalCount === 1 ? 'item' : 'items'}
-                  </span>
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    <label htmlFor="course-material-search" className="sr-only">
+                      Search course materials by title, content, unit, or topic
+                    </label>
+                    <input
+                      id="course-material-search"
+                      type="search"
+                      placeholder="Search this course…"
+                      value={searchTerm}
+                      onChange={event => setSearchTerm(event.target.value)}
+                      className="h-9 w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:ring-blue-950 sm:w-52"
+                    />
+                    <label htmlFor="course-material-type" className="sr-only">
+                      Filter course materials by resource type
+                    </label>
+                    <select
+                      id="course-material-type"
+                      value={materialTypeFilter}
+                      onChange={event => setMaterialTypeFilter(event.target.value)}
+                      className="h-9 min-w-28 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:focus:ring-blue-950"
+                    >
+                      {MATERIAL_TYPE_FILTERS.map(filter => (
+                        <option key={filter.id} value={filter.id}>
+                          {filter.label}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="shrink-0 text-sm text-slate-500 dark:text-slate-400">
+                      {totalCount} {totalCount === 1 ? 'item' : 'items'}
+                    </span>
+                  </div>
                 </div>
 
                 {(!courseFilterInitialized || isLoading) && !allMaterials.length ? (
@@ -674,10 +707,30 @@ export default function MaterialsDashboard() {
                 ) : allMaterials.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-slate-300 bg-white px-5 py-10 text-center dark:border-slate-700 dark:bg-slate-900">
                     <FolderOpen className="mx-auto h-8 w-8 text-slate-400" />
-                    <h3 className="mt-3 font-semibold text-slate-800 dark:text-slate-100">No materials in this stream yet</h3>
+                    <h3 className="mt-3 font-semibold text-slate-800 dark:text-slate-100">
+                      {debouncedSearch || materialTypeFilter !== 'all'
+                        ? 'No matching materials'
+                        : 'No materials in this stream yet'}
+                    </h3>
                     <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                      Materials shared with this class will appear here.
+                      {debouncedSearch || materialTypeFilter !== 'all'
+                        ? 'Try another search or resource type.'
+                        : 'Materials shared with this class will appear here.'}
                     </p>
+                    {(debouncedSearch || materialTypeFilter !== 'all') && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setSearchTerm('');
+                          setDebouncedSearch('');
+                          setMaterialTypeFilter('all');
+                        }}
+                        className="mt-4 rounded-lg"
+                      >
+                        Clear filters
+                      </Button>
+                    )}
                   </div>
                 ) : (
                   allMaterials.map((material) => {
@@ -753,25 +806,30 @@ export default function MaterialsDashboard() {
         </section>
       )}
       
-      {/* Intent Filters (Only show on library views) */}
+      {/* Material type filters (only show on library views) */}
       {!selectedCourseId && filterContext !== 'for_you' && (
-        <div className="flex min-w-0 flex-wrap gap-2">
-          {intents.map((intent) => (
+        <section aria-label="Filter by resource type" className="space-y-2">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+            Resource type
+          </h2>
+          <div className="flex min-w-0 flex-wrap gap-2">
+          {MATERIAL_TYPE_FILTERS.map((filter) => (
             <button
-              key={intent.id}
+              key={filter.id}
               type="button"
-              onClick={() => setIntentFilter(intent.id)}
-              aria-pressed={intentFilter === intent.id}
+              onClick={() => setMaterialTypeFilter(filter.id)}
+              aria-pressed={materialTypeFilter === filter.id}
               className={`min-h-9 rounded-full border px-4 py-2 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
-                intentFilter === intent.id
+                materialTypeFilter === filter.id
                   ? 'border-blue-600 bg-blue-600 text-white dark:border-blue-500 dark:bg-blue-500'
                   : 'border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-blue-800 dark:hover:bg-slate-800'
               }`}
             >
-              {intent.label}
+              {filter.label}
             </button>
           ))}
-        </div>
+          </div>
+        </section>
       )}
 
       {/* Main Content Area */}
@@ -829,24 +887,24 @@ export default function MaterialsDashboard() {
                 <Upload className="h-6 w-6" />
               </div>
               <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
-                {debouncedSearch || intentFilter !== 'all'
+                {debouncedSearch || materialTypeFilter !== 'all'
                   ? 'No matching materials'
                   : filterContext === 'shared' ? 'Nothing shared with you yet' : 'Your library is ready'}
               </h3>
               <p className="mx-auto mt-2 mb-6 max-w-md text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-                {debouncedSearch || intentFilter !== 'all'
+                {debouncedSearch || materialTypeFilter !== 'all'
                   ? 'Try a different search or clear the resource type filter.'
                   : filterContext === 'shared'
                   ? 'Materials shared directly with you or with one of your classes will appear here.'
                   : 'Add a study resource or connect it to one of your courses to keep everything organized.'}
               </p>
-              {debouncedSearch || intentFilter !== 'all' ? (
+              {debouncedSearch || materialTypeFilter !== 'all' ? (
                 <Button
                   variant="outline"
                   onClick={() => {
                     setSearchTerm('');
                     setDebouncedSearch('');
-                    setIntentFilter('all');
+                    setMaterialTypeFilter('all');
                   }}
                   className="rounded-lg"
                 >

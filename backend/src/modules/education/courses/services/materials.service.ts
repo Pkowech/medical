@@ -1496,6 +1496,34 @@ export class MaterialsService {
               { title: { contains: term, mode: 'insensitive' } },
               { description: { contains: term, mode: 'insensitive' } },
               { content: { contains: term, mode: 'insensitive' } },
+              { category: { contains: term, mode: 'insensitive' } },
+              {
+                course: {
+                  is: {
+                    OR: [
+                      { title: { contains: term, mode: 'insensitive' } },
+                      { name: { contains: term, mode: 'insensitive' } },
+                    ],
+                  },
+                },
+              },
+              {
+                unit: {
+                  is: {
+                    OR: [
+                      { title: { contains: term, mode: 'insensitive' } },
+                      { name: { contains: term, mode: 'insensitive' } },
+                    ],
+                  },
+                },
+              },
+              {
+                topic: {
+                  is: {
+                    name: { contains: term, mode: 'insensitive' },
+                  },
+                },
+              },
             ],
           },
         ];

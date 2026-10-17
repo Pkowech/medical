@@ -5,8 +5,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import {
   ChevronLeft,
   ChevronRight,
-  ChevronDown,
-  ChevronUp,
   ClipboardCheck,
 } from 'lucide-react';
 import { useParams } from 'next/navigation';
