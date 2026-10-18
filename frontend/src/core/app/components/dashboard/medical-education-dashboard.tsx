@@ -290,13 +290,13 @@ const MedicalEducationDashboard = () => {
     <div className="min-h-[calc(100dvh-4rem)] w-full min-w-0 bg-slate-50 dark:bg-slate-950 p-3 sm:p-4 md:p-6">
       <div className="mx-auto w-full max-w-screen-2xl min-w-0 space-y-4 sm:space-y-6">
         <section className="grid grid-cols-1 gap-4 lg:grid-cols-12" aria-label="Study overview">
-          <div className="relative isolate overflow-hidden rounded-3xl border border-slate-800 bg-slate-950 p-6 text-white shadow-sm sm:p-8 lg:col-span-8">
+          <div className="relative isolate overflow-hidden rounded-3xl border border-slate-200 bg-linear-to-br from-white via-indigo-50 to-cyan-50 p-6 text-slate-900 shadow-sm dark:border-slate-800 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 dark:text-white sm:p-8 lg:col-span-8">
             <div className="pointer-events-none absolute -right-16 -top-24 -z-10 h-72 w-72 rounded-full bg-indigo-500/20 blur-3xl" />
             <div className="pointer-events-none absolute -bottom-32 right-1/4 -z-10 h-64 w-64 rounded-full bg-cyan-400/10 blur-3xl" />
             <div className="flex h-full flex-col justify-between gap-8">
               <div>
-                <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-slate-300">
-                  <GraduationCap className="h-4 w-4 text-cyan-300" />
+                <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/70 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
+                  <GraduationCap className="h-4 w-4 text-cyan-600 dark:text-cyan-300" />
                   My learning
                 </div>
                 <h2 className="max-w-xl text-2xl font-semibold tracking-tight sm:text-3xl">
@@ -306,7 +306,7 @@ const MedicalEducationDashboard = () => {
                       ? 'Your courses are ready to review'
                       : 'Build your next study habit'}
                 </h2>
-                <p className="mt-2 max-w-xl text-sm leading-6 text-slate-300 sm:text-base">
+                <p className="mt-2 max-w-xl text-sm leading-6 text-slate-600 dark:text-slate-300 sm:text-base">
                   {activeCourse
                     ? 'Pick up your course progress and keep moving through the next lesson.'
                     : firstCourse
@@ -317,16 +317,16 @@ const MedicalEducationDashboard = () => {
 
               <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
                 <div className="min-w-0">
-                  <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
                     {activeCourse ? 'Up next in your learning' : firstCourse ? 'Ready to review' : 'Your course library'}
                   </p>
-                  <p className="mt-1 truncate text-lg font-semibold text-white">
+                  <p className="mt-1 truncate text-lg font-semibold text-slate-900 dark:text-white">
                     {displayCourse?.name || 'Browse available courses'}
                   </p>
                   {displayCourse && (
                     <div className="mt-4 flex items-center gap-3">
                       <div
-                        className="h-2 w-48 max-w-[55vw] overflow-hidden rounded-full bg-white/15"
+                        className="h-2 w-48 max-w-[55vw] overflow-hidden rounded-full bg-slate-200 dark:bg-white/15"
                         role="progressbar"
                         aria-label={`${displayCourse.name} progress`}
                         aria-valuemin={0}
@@ -334,11 +334,11 @@ const MedicalEducationDashboard = () => {
                         aria-valuenow={Math.min(100, Math.max(0, displayCourse.progressPercentage))}
                       >
                         <div
-                          className="h-full rounded-full bg-cyan-300 transition-[width]"
+                          className="h-full rounded-full bg-cyan-500 transition-[width] dark:bg-cyan-300"
                           style={{ width: `${Math.min(100, Math.max(0, displayCourse.progressPercentage))}%` }}
                         />
                       </div>
-                      <span className="text-xs font-medium text-slate-300">
+                      <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
                         {Math.round(displayCourse.progressPercentage)}% complete
                       </span>
                     </div>
@@ -347,7 +347,7 @@ const MedicalEducationDashboard = () => {
                 <button
                   type="button"
                   onClick={handleContinueLearning}
-                  className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-cyan-300 px-5 py-3 text-sm font-semibold text-slate-950 transition-colors hover:bg-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
+                  className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-cyan-500 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-cyan-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:bg-cyan-300 dark:text-slate-950 dark:hover:bg-cyan-200 dark:focus-visible:ring-cyan-200 dark:focus-visible:ring-offset-slate-950"
                 >
                   {activeCourse ? 'Continue learning' : firstCourse ? 'Review a course' : 'Explore courses'}
                   <ArrowRight className="h-4 w-4" />
