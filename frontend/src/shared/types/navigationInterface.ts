@@ -26,20 +26,15 @@ export interface LayoutContextType extends LayoutState {
   toggleTheme: () => void;
 }
 
-export interface HeaderProps {
+export interface SidebarProps {
   theme: 'light' | 'dark';
   toggleTheme: () => void;
   user?: AppUser | null;
+  navigationItems: NavigationItem[];
   notifications: Notification[];
   notificationsOpen: boolean;
   setNotificationsOpen: (isOpen: boolean) => void;
-  onNotificationRefresh?: () => void; // Callback to refresh notifications
-}
-
-export interface SidebarProps {
-  theme: 'light' | 'dark';
-  user?: AppUser | null;
-  navigationItems: NavigationItem[];
+  onNotificationRefresh?: () => void;
   // Optional title for special sidebars (e.g. Admin Panel)
   title?: string;
   // When true the sidebar renders admin-specific quick actions/profile
