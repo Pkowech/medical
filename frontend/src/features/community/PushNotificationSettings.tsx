@@ -16,10 +16,13 @@ function isStandalone(): boolean {
   );
 }
 
-function decodeVapidKey(key: string): Uint8Array {
+function decodeVapidKey(key: string): ArrayBuffer {
   const padding = '='.repeat((4 - (key.length % 4)) % 4);
   const base64 = (key + padding).replace(/-/g, '+').replace(/_/g, '/');
-  return Uint8Array.from(atob(base64), character => character.charCodeAt(0));
+  const decoded = Uint8Array.from(atob(base64), character => character.charCodeAt(0));
+  const buffer = new ArrayBuffer(decoded.length);
+  new Uint8Array(buffer).set(decoded);
+  return buffer;
 }
 
 export function PushNotificationSettings({
@@ -34,9 +37,7 @@ export function PushNotificationSettings({
 
   useEffect(() => {
     const pushSupported =
-      'serviceWorker' in navigator &&
-      'PushManager' in window &&
-      'Notification' in window;
+      'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
     const isIOS =
       /iPad|iPhone|iPod/.test(navigator.userAgent) ||
       (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -81,9 +82,14 @@ export function PushNotificationSettings({
           throw new Error('Allow notifications to enable push on this device.');
         }
 
+        if (!(await navigator.serviceWorker.getRegistration())) {
+          throw new Error(
+            'The MedTrack service worker is not ready. Reload the app and try again.'
+          );
+        }
         const registration = await navigator.serviceWorker.ready;
         const keyResponse = await apiService.get<{ publicKey: string }>(
-          '/notifications/push/public-key',
+          '/notifications/push/public-key'
         );
         const publicKey = keyResponse.data.publicKey;
         if (!publicKey) throw new Error('Push notifications are not configured on the server.');
@@ -94,15 +100,30 @@ export function PushNotificationSettings({
             userVisibleOnly: true,
             applicationServerKey: decodeVapidKey(publicKey),
           }));
-        await apiService.post('/notifications/push/subscriptions', subscription.toJSON());
+        const subscriptionJson = subscription.toJSON();
+        const p256dh = subscriptionJson.keys?.p256dh;
+        const auth = subscriptionJson.keys?.auth;
+        if (!subscriptionJson.endpoint || !p256dh || !auth) {
+          throw new Error('The browser returned an incomplete push subscription.');
+        }
+        await apiService.post('/notifications/push/subscriptions', {
+          endpoint: subscriptionJson.endpoint,
+          p256dh,
+          auth,
+        });
         setHasSubscription(true);
         onEnabledChange(true);
       } else {
+        if (!(await navigator.serviceWorker.getRegistration())) {
+          throw new Error(
+            'The MedTrack service worker is not ready. Reload the app and try again.'
+          );
+        }
         const registration = await navigator.serviceWorker.ready;
         const subscription = await registration.pushManager.getSubscription();
         if (subscription) {
           await apiService.delete(
-            `/notifications/push/subscriptions?endpoint=${encodeURIComponent(subscription.endpoint)}`,
+            `/notifications/push/subscriptions?endpoint=${encodeURIComponent(subscription.endpoint)}`
           );
           await subscription.unsubscribe();
         }
@@ -114,7 +135,7 @@ export function PushNotificationSettings({
       setError(
         changeError instanceof Error
           ? changeError.message
-          : 'Could not update push notification settings.',
+          : 'Could not update push notification settings.'
       );
     } finally {
       setIsBusy(false);

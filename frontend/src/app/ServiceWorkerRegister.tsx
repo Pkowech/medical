@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { syncService } from '@/lib/core/offline/syncService';
 
 const showUpdateBanner = process.env.NEXT_PUBLIC_ENABLE_APP_UPDATE_BANNER === 'true';
 
@@ -50,15 +49,9 @@ export function ServiceWorkerRegister() {
     };
 
     const onServiceWorkerMessage = (event: MessageEvent) => {
-      if (event.data?.type !== 'SYNC_OUTBOX') return;
-      const replyPort = event.ports[0];
-      void syncService.syncOutbox().then(
-        () => replyPort?.postMessage({ success: true }),
-        error => {
-          console.error('[PWA] Background sync request failed:', error);
-          replyPort?.postMessage({ success: false });
-        },
-      );
+      if (event.data?.type === 'SYNC_OUTBOX_COMPLETE') {
+        window.dispatchEvent(new Event('learning:offline-sync-complete'));
+      }
     };
 
     navigator.serviceWorker.addEventListener('controllerchange', onControllerChange);

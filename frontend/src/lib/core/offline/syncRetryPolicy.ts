@@ -5,7 +5,7 @@ const MAX_EXPONENTIAL_DELAY_MS = 5 * 60 * 1_000;
 export function getSyncRetryDelay(
   attempts: number,
   retryAfter: string | null = null,
-  now = Date.now(),
+  now = Date.now()
 ): number {
   if (retryAfter) {
     const retryAfterSeconds = Number(retryAfter);

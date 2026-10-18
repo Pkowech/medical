@@ -156,6 +156,17 @@ unified queue during app startup, then removed from the legacy queue only after
 the copy succeeds.
 
 The service worker is registered by the root application component. When a new
-worker is waiting, the app shows an update prompt; accepting it activates the
-new worker and reloads the page. Browser Background Sync is used when available,
-with foreground online/visibility sync as the fallback.
+worker is waiting, the app shows an update prompt when
+`NEXT_PUBLIC_ENABLE_APP_UPDATE_BANNER=true`; otherwise it activates automatically
+and reloads the open app. Browser Background Sync flushes the IndexedDB queue
+when available, with foreground online/visibility sync as the fallback.
+
+Transient outbox failures remain queued and retry with exponential backoff (up
+to one hour when the server supplies `Retry-After`); permanent client errors
+remain available for review and manual retry. To enable device push, configure
+`WEB_PUSH_VAPID_PUBLIC_KEY`, `WEB_PUSH_VAPID_PRIVATE_KEY`, and
+`WEB_PUSH_VAPID_SUBJECT` on the backend. Generate a stable VAPID key pair with
+`pnpm exec web-push generate-vapid-keys` and keep the private key secret.
+Users enable push per device from Settings; their browser must support service
+workers and Push, and iPhone/iPad users must first install MedTrack on the Home
+Screen.

@@ -767,34 +767,35 @@ export default function MaterialsDashboard() {
       : 'Review resources selected to help strengthen topics from your recent quiz results.';
 
   return (
-    <div className="mx-auto min-h-full w-full max-w-screen-2xl min-w-0 space-y-6 pb-20">
+    <div className="mx-auto min-h-full w-full max-w-screen-2xl min-w-0 space-y-3 pb-20 sm:space-y-6">
       {/* Library heading and controls */}
       {!selectedCourseId && (
-        <section className="space-y-5">
-          <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-            <div>
-              <p className="text-sm font-medium text-blue-700 dark:text-blue-300">Study library</p>
-              <h1 className="mt-1 text-2xl font-semibold tracking-tight text-foreground dark:text-foreground">
+        <section className="space-y-3 sm:space-y-5">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="hidden text-sm font-medium text-blue-700 dark:text-blue-300 sm:block">Study library</p>
+              <h1 className="text-xl font-semibold tracking-tight text-foreground sm:mt-1 sm:text-2xl dark:text-foreground">
                 {contextTitle}
               </h1>
-              <p className="mt-1 max-w-2xl text-sm text-muted-foreground dark:text-muted-foreground">
+              <p className="mt-1 hidden max-w-2xl text-sm text-muted-foreground dark:text-muted-foreground sm:block">
                 {contextDescription}
               </p>
             </div>
             {filterContext !== 'for_you' && (
               <Button
                 onClick={() => router.push('/study-planner/materials/upload')}
-                className="h-10 shrink-0 gap-2 rounded-lg bg-blue-600 px-4 text-white hover:bg-blue-700"
+                aria-label="Add material"
+                className="h-10 w-10 shrink-0 gap-2 rounded-lg bg-blue-600 p-0 text-white hover:bg-blue-700 sm:w-auto sm:px-4"
               >
                 <Plus className="h-4 w-4" />
-                Add material
+                <span className="hidden sm:inline">Add material</span>
               </Button>
             )}
           </div>
 
-          <div className="rounded-xl border border-border bg-card p-3 shadow-sm dark:border-border dark:bg-card sm:p-4">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-              <div className="flex w-full flex-wrap gap-1 rounded-lg bg-muted p-1 dark:bg-card lg:w-auto">
+          <div className="rounded-xl border border-border bg-card p-2 shadow-sm dark:border-border dark:bg-card sm:p-4">
+            <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between lg:gap-3">
+              <div className="flex w-full min-w-0 flex-nowrap gap-1 overflow-x-auto rounded-lg bg-muted p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:w-auto">
                 {[
                   { id: 'owned', label: 'My Drive', icon: Database },
                   { id: 'shared', label: 'Shared with me', icon: BookOpen },
@@ -815,7 +816,7 @@ export default function MaterialsDashboard() {
                           router.replace('/study-planner/materials');
                         }
                       }}
-                      className={`inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 lg:flex-none ${
+                      className={`inline-flex min-h-9 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-2.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 sm:min-h-10 sm:gap-2 sm:px-3 sm:text-sm ${
                         isActive
                           ? 'bg-card text-blue-700 shadow-sm dark:bg-secondary dark:text-blue-300'
                           : 'text-muted-foreground hover:bg-card/70 hover:text-foreground dark:text-muted-foreground dark:hover:bg-secondary/70 dark:hover:text-foreground'
@@ -828,9 +829,9 @@ export default function MaterialsDashboard() {
                 })}
               </div>
 
-              <div className="flex min-w-0 flex-col gap-2 sm:flex-row lg:flex-1 lg:justify-end">
+              <div className="flex min-w-0 items-center gap-1.5 lg:flex-1 lg:justify-end">
                 {filterContext !== 'for_you' && (
-                  <div className="group relative min-w-0 flex-1 sm:max-w-sm">
+                  <div className="group relative min-w-0 flex-1 lg:max-w-sm">
                     <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-blue-600" />
                     <input
                       type="search"
@@ -838,7 +839,7 @@ export default function MaterialsDashboard() {
                       placeholder="Search title, course, unit, topic…"
                       value={searchTerm}
                       onChange={(event) => setSearchTerm(event.target.value)}
-                      className="h-10 w-full rounded-lg border border-border bg-card pl-10 pr-3 text-sm text-foreground outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-border dark:bg-background dark:text-foreground dark:focus:ring-blue-950"
+                      className="h-10 w-full rounded-lg border border-border bg-card pl-10 pr-2 text-xs text-foreground outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-border dark:bg-background dark:text-foreground dark:focus:ring-blue-950 sm:px-3 sm:pl-10 sm:text-sm"
                     />
                   </div>
                 )}
@@ -854,13 +855,13 @@ export default function MaterialsDashboard() {
                         setSortBy(value === 'title' ? 'title' : 'createdAt');
                         setSortOrder(value === 'oldest' || value === 'title' ? 'asc' : 'desc');
                       }}
-                      className="h-10 min-w-28 rounded-lg border border-border bg-card px-3 text-sm text-muted-foreground outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-border dark:bg-background dark:text-muted-foreground dark:focus:ring-blue-950"
+                      className="h-10 w-[5.5rem] shrink-0 rounded-lg border border-border bg-card px-2 text-xs text-muted-foreground outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-border dark:bg-background dark:text-muted-foreground dark:focus:ring-blue-950 sm:w-28 sm:px-3 sm:text-sm"
                     >
                       <option value="newest">Newest</option>
                       <option value="oldest">Oldest</option>
                       <option value="title">A–Z</option>
                     </select>
-                    <div className="flex h-10 items-center rounded-lg border border-border bg-card p-1 dark:border-border dark:bg-background">
+                    <div className="flex h-10 shrink-0 items-center rounded-lg border border-border bg-card p-1 dark:border-border dark:bg-background">
                       <button
                         type="button"
                         onClick={() => setViewMode('list')}
@@ -1387,18 +1388,18 @@ export default function MaterialsDashboard() {
       
       {/* Material type filters (only show on library views) */}
       {!selectedCourseId && filterContext !== 'for_you' && (
-        <section aria-label="Filter by resource type" className="space-y-2">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground dark:text-muted-foreground">
+        <section aria-label="Filter by resource type" className="space-y-1.5 sm:space-y-2">
+          <h2 className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground sm:text-xs dark:text-muted-foreground">
             Resource type
           </h2>
-          <div className="flex min-w-0 flex-wrap gap-2">
+          <div className="-mx-1 flex min-w-0 gap-1.5 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:gap-2 sm:overflow-visible sm:pb-0">
           {MATERIAL_TYPE_FILTERS.map((filter) => (
             <button
               key={filter.id}
               type="button"
               onClick={() => setMaterialTypeFilter(filter.id)}
               aria-pressed={materialTypeFilter === filter.id}
-              className={`min-h-9 rounded-full border px-4 py-2 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+              className={`min-h-8 shrink-0 whitespace-nowrap rounded-full border px-3 py-1.5 text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 sm:min-h-9 sm:px-4 sm:py-2 sm:text-xs ${
                 materialTypeFilter === filter.id
                   ? 'border-blue-600 bg-blue-600 text-white dark:border-blue-500 dark:bg-blue-500'
                   : 'border-border bg-card text-muted-foreground hover:border-blue-300 hover:bg-blue-50 dark:border-border dark:bg-card dark:text-muted-foreground dark:hover:border-blue-800 dark:hover:bg-card'

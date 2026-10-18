@@ -111,7 +111,7 @@ def test_offline_progress_queue_covers_enqueue_read_remove_flush_and_legacy_migr
     assert "syncService.syncOutbox()" in queue
     assert "syncQueue:" in read_frontend("src/lib/core/offline/db.ts")
     assert "async addToOutbox(" in sync_service
-    assert "async syncOutbox()" in sync_service
+    assert "async syncOutbox(" in sync_service
 
 
 def test_offline_replay_only_queues_allowlisted_learning_posts_not_admin_deletes():

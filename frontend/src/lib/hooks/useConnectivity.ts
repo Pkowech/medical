@@ -50,9 +50,19 @@ export function useConnectivity() {
       });
     };
     const handleOffline = () => setIsOnline(false);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== 'visible' || !navigator.onLine) return;
+      setIsOnline(true);
+      void syncService.syncOutbox().catch(error => {
+        if (!disposed) {
+          setStatusError(error instanceof Error ? error.message : String(error));
+        }
+      });
+    };
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     // 2. Poll Sync Status (Simple approach since SyncService doesn't emit events)
     // Detailed event-bus integration can be added later if polling proves expensive.
@@ -62,6 +72,7 @@ export function useConnectivity() {
       disposed = true;
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       clearInterval(intervalId);
     };
   }, [isOnline, refreshStatus]);

@@ -25,7 +25,9 @@ export class PushNotificationsService {
     const publicKey = process.env.WEB_PUSH_VAPID_PUBLIC_KEY?.trim();
     const privateKey = process.env.WEB_PUSH_VAPID_PRIVATE_KEY?.trim();
     const subject = process.env.WEB_PUSH_VAPID_SUBJECT?.trim();
-    const configuredValues = [publicKey, privateKey, subject].filter(Boolean).length;
+    const configuredValues = [publicKey, privateKey, subject].filter(
+      Boolean,
+    ).length;
 
     if (configuredValues !== 0 && configuredValues !== 3) {
       throw new Error(
@@ -58,7 +60,7 @@ export class PushNotificationsService {
     userId: string,
     subscription: PushSubscriptionDto,
   ): Promise<void> {
-    await this.prisma.$transaction(async tx => {
+    await this.prisma.$transaction(async (tx) => {
       const user = await tx.user.findUnique({
         where: { id: userId },
         select: { preferences: true },
@@ -89,7 +91,7 @@ export class PushNotificationsService {
     if (!endpoint) {
       throw new NotFoundException('Push subscription endpoint is required');
     }
-    await this.prisma.$transaction(async tx => {
+    await this.prisma.$transaction(async (tx) => {
       const user = await tx.user.findUnique({
         where: { id: userId },
         select: { preferences: true },
@@ -134,7 +136,7 @@ export class PushNotificationsService {
       url: this.safePath(message.url),
     });
     const results = await Promise.all(
-      subscriptions.map(async subscription => {
+      subscriptions.map(async (subscription) => {
         try {
           await webPush.sendNotification(
             {
@@ -176,7 +178,7 @@ export class PushNotificationsService {
   }
 
   private jsonObject(
-    value: Prisma.JsonValue | null | undefined,
+    value: Prisma.JsonValue | Prisma.InputJsonValue | null | undefined,
   ): Prisma.InputJsonObject {
     return value !== null &&
       value !== undefined &&
@@ -187,7 +189,7 @@ export class PushNotificationsService {
   }
 
   private safePath(path: string): string {
-    return path.startsWith('/') && !path.startsWith('//')
+    return path.length <= 512 && path.startsWith('/') && !path.startsWith('//')
       ? path
       : '/notifications';
   }

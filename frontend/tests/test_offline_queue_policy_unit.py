@@ -40,7 +40,8 @@ assert.equal(getSyncRetryDelay(1), 5000);
 assert.equal(getSyncRetryDelay(2), 10000);
 assert.equal(getSyncRetryDelay(30), 300000);
 assert.equal(getSyncRetryDelay(1, '30'), 30000);
-assert.equal(getSyncRetryDelay(1, 'Sun, 06 Nov 1994 08:49:37 GMT', 0), 1000);
+const pastRetry = Date.parse('Sun, 06 Nov 1994 08:49:37 GMT');
+assert.equal(getSyncRetryDelay(1, 'Sun, 06 Nov 1994 08:49:37 GMT', pastRetry + 1000), 1000);
 assert.equal(getSyncRetryDelay(1, 'not a retry delay'), 5000);
 """
     )
