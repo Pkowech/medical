@@ -3,6 +3,7 @@
 import React, {
   createContext,
   useContext,
+  useCallback,
   useLayoutEffect,
   useState,
   ReactNode,
@@ -135,14 +136,14 @@ const SimpleThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return () => window.removeEventListener('storage', onStorage);
   }, []);
 
-  const setTheme = (t: Theme) => setThemeState(t);
-  const toggleTheme = () => {
+  const setTheme = useCallback((nextTheme: Theme) => setThemeState(nextTheme), []);
+  const toggleTheme = useCallback(() => {
     setThemeState(prev => (prev === 'dark' ? 'light' : 'dark'));
-  };
+  }, []);
 
   const value = React.useMemo(
     () => ({ theme, colorScheme, setTheme, toggleTheme }),
-    [theme, colorScheme]
+    [theme, colorScheme, setTheme, toggleTheme]
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
