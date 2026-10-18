@@ -163,10 +163,9 @@ export const CourseContent = ({
             {materials.map(m => {
               const isVideo = m.type?.toLowerCase().includes('video') || m.contentType?.toLowerCase().includes('video');
               return (
-                <div 
+                <div
                   key={m.id} 
-                  onClick={() => openMaterial(String(m.id))}
-                  className="relative p-4 border border-border dark:border-border/50 rounded-xl bg-card dark:bg-card/50 hover:shadow-md hover:border-blue-200 dark:hover:border-blue-500/30 transition-all group overflow-hidden cursor-pointer"
+                  className="relative p-4 border border-border dark:border-border/50 rounded-xl bg-card dark:bg-card/50 hover:shadow-md hover:border-blue-200 dark:hover:border-blue-500/30 transition-all group overflow-hidden"
                 >
                   <div className="flex items-start gap-4">
                     <div className={`p-3 rounded-lg shrink-0 ${

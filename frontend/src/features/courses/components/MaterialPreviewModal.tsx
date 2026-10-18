@@ -367,19 +367,6 @@ export const MaterialPreviewModal = ({
               <ChevronLeft className="h-4 w-4" />
               Back
             </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={onClose}
-              title="Close preview"
-              aria-label="Close preview"
-              className="h-9 w-9 rounded-full border border-border bg-card text-muted-foreground hover:bg-muted dark:border-border dark:bg-card dark:text-muted-foreground dark:hover:bg-card"
-            >
-              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                <path d="M6 6l12 12M18 6L6 18" />
-              </svg>
-            </Button>
             {materials.length > 1 && (
               <>
                 <Button type="button" variant="ghost" size="sm" onClick={() => navigateMaterial(-1)} disabled={materialIndex <= 0} aria-label="Open previous material" title="Previous material">
@@ -463,16 +450,6 @@ export const MaterialPreviewModal = ({
                 aria-label="Show viewer controls"
               >
                 <ChevronDown className="h-4 w-4" />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={onClose}
-                title="Close preview"
-                aria-label="Close preview"
-              >
-                <X className="h-4 w-4" />
               </Button>
             </div>
           </div>

@@ -7,7 +7,7 @@ import {
   ChevronRight,
   ClipboardCheck,
 } from 'lucide-react';
-import { useParams } from 'next/navigation';
+import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { instructorRoles } from '@/shared/enums/role.enum';
 import { useLayoutStore } from '@/core/stores/useLayoutStore';
@@ -28,7 +28,11 @@ import { useUnitData } from '@/features/courses/hooks/useUnitData';
 import { useCourseNavigation } from '@/features/courses/hooks/useCourseNavigation';
 import { useXapi } from '@/lib/xapi/useXapi';
 import { MaterialPreviewModal } from '@/features/courses/components/MaterialPreviewModal';
+import { TopicForm } from '@/features/courses/components/TopicForm';
+import { topicService } from '@/features/courses/services/topicService';
+import type { Topic } from '@/shared/types/courseInterface';
 import { Button } from '@/shared/components/ui/button';
+import { Dialog, DialogContent } from '@/shared/components/ui/dialog';
 import progressService from '@/features/learning-management/services/progressService';
 import offlineProgressSync from '@/features/learning-management/services/offlineProgressSync';
 import { toast } from 'sonner';
@@ -63,7 +67,11 @@ type NormalisedMaterial = {
 
 export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) => {
   const params = useParams();
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const unitId = propUnitId || (params?.unitId as string);
+  const selectedTopicId = searchParams.get('topicId') || (params?.topicId as string | undefined);
 
   // ── Global UI state ────────────────────────────────────────────────────
   const {
@@ -86,10 +94,25 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
 
   // ── Local state ────────────────────────────────────────────────────────
   const [offlineMode, setOfflineMode] = useState(false);
-  const [selectedMaterialId, setSelectedMaterialId] = useState<string | null>(null);
-  const [hasSelectedTopic, setHasSelectedTopic] = useState(Boolean(params?.topicId));
+  const [isAddTopicOpen, setIsAddTopicOpen] = useState(false);
+  const selectedMaterialId = searchParams.get('materialId');
+  const hasSelectedTopic = Boolean(selectedTopicId);
   const { user } = useAuth();
   const isAdmin = Boolean(user?.role && instructorRoles.includes(user.role));
+
+  const updateRouteQuery = (key: string, value: string | null) => {
+    if (searchParams.get(key) === value) return;
+
+    const nextSearchParams = new URLSearchParams(searchParams.toString());
+    if (value) {
+      nextSearchParams.set(key, value);
+    } else {
+      nextSearchParams.delete(key);
+    }
+
+    const query = nextSearchParams.toString();
+    router.push(`${pathname}${query ? `?${query}` : ''}`, { scroll: false });
+  };
 
   const openMaterial = (id: string) => {
     if (typedCurrentTopic?.id != null) {
@@ -100,28 +123,31 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
       );
     }
     setSidebarCollapsed(false);
-    setSelectedMaterialId(id);
+    updateRouteQuery('materialId', id);
   };
   const openCoursePanel = (panelName: string) => {
-    setSelectedMaterialId(null);
+    updateRouteQuery('materialId', null);
     setSidebarCollapsed(false);
     toggleCoursePanel(panelName);
   };
   const closeMaterial = () => {
     setSidebarCollapsed(false);
-    setSelectedMaterialId(null);
+    updateRouteQuery('materialId', null);
   };
 
-  const handleAddTopic = async () => {
-    console.warn('Admin wants to add a new topic!');
-    // In a real application, you would make an API call here, e.g.:
-    // await apiService.createTopic(unitId, { title: 'New Topic', description: '...' });
-    // After successful creation, refetch unit data to update the UI
-    // Assuming useUnitData provides a refetch method
-    // If useUnitData doesn't return refetch, you might need to use a mutation hook (e.g., from react-query)
-    // useUnitData returns a `refetch` function; call it if available
-    if (typeof refetchUnit === 'function') {
-      refetchUnit();
+  const handleAddTopic = async (topicData: Partial<Topic>) => {
+    if (!unitId) {
+      throw new Error('Cannot create a topic because the unit could not be identified.');
+    }
+
+    try {
+      await topicService.createTopic(unitId, topicData);
+      setIsAddTopicOpen(false);
+      toast.success('Topic created successfully.');
+      await refetchUnit();
+    } catch (error) {
+      console.error('Failed to create topic:', error);
+      throw error;
     }
   };
 
@@ -139,10 +165,9 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
     navigatePrev,
     isFirstLesson,
     isLastLesson,
-  } = useCourseNavigation(unitData?.chapters || [], unitId);
+  } = useCourseNavigation(unitData?.chapters || [], unitId, selectedTopicId);
 
   const selectTopic = (chapterIndex: number, lessonIndex: number) => {
-    setHasSelectedTopic(true);
     closeCoursePanel('quiz');
     closeCoursePanel('unit-quiz');
     navigateTo(chapterIndex, lessonIndex);
@@ -440,7 +465,15 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
                     <ChevronRight className="h-4 w-4" />
                   </button>
                 )}
-                <Breadcrumb />
+                <Breadcrumb
+                  items={[
+                    { label: 'Courses', href: '/courses' },
+                    ...(courseId
+                      ? [{ label: 'Course overview', href: `/courses/${courseId}` }]
+                      : []),
+                    { label: unitData.title },
+                  ]}
+                />
                 </div>
                 <Button
                   type="button"
@@ -471,7 +504,7 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
             {/* Admin actions - Add Topic */}
             {!selectedMaterialId && isAdmin && (
               <div className="flex justify-end mt-4">
-                <Button onClick={handleAddTopic}>Add New Topic</Button>
+                <Button onClick={() => setIsAddTopicOpen(true)}>Add New Topic</Button>
               </div>
             )}
 
@@ -481,7 +514,7 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
                 isOpen={Boolean(selectedMaterialId)}
                 onClose={closeMaterial}
                 materials={allResources}
-                onNavigate={setSelectedMaterialId}
+                onNavigate={id => updateRouteQuery('materialId', id)}
                 inline
               />
             ) : activeCoursePanel === 'unit-quiz' ? (
@@ -578,8 +611,8 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
                   progress={progress}
                   toggleBookmark={toggleBookmark}
                   toggleLessonComplete={handleToggleLessonComplete}
-                  navigatePrev={() => { setHasSelectedTopic(true); navigatePrev(); }}
-                  navigateNext={() => { setHasSelectedTopic(true); navigateNext(); }}
+                  navigatePrev={navigatePrev}
+                  navigateNext={navigateNext}
                   onOpenMasteryQuiz={() => toggleCoursePanel('quiz')}
                   isFirstLesson={isFirstLesson}
                   isLastLesson={isLastLesson}
@@ -613,7 +646,16 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
           </div>
         </main>
       </div>
-
+      <Dialog open={isAddTopicOpen} onOpenChange={setIsAddTopicOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
+          <TopicForm
+            topic={null}
+            unitId={unitId}
+            onSave={handleAddTopic}
+            onCancel={() => setIsAddTopicOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

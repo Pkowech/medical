@@ -62,6 +62,11 @@ interface CoursesPageData {
   limit: number;
 }
 
+const courseUnitHref = (courseId: string, unitId: string, topicId?: string) => {
+  const path = `/courses/${encodeURIComponent(courseId)}/units/${encodeURIComponent(unitId)}`;
+  return topicId ? `${path}?topicId=${encodeURIComponent(topicId)}` : path;
+};
+
 export const CoursesDashboard = () => {
   const { setHeader } = usePageHeader();
   const { getResumePoint } = useStudy();
@@ -288,7 +293,7 @@ export const CoursesDashboard = () => {
   const openCourseUnits = async (course: Course) => {
     try {
       if (course.unitId) {
-        router.push(`/courses/${course.id}/units/${course.unitId}`);
+        router.push(courseUnitHref(course.id, course.unitId, course.nextTopicId));
         return;
       }
 
@@ -297,12 +302,12 @@ export const CoursesDashboard = () => {
         | null;
 
       if (resume && resume.type === 'topic' && resume.unitId) {
-        router.push(`/courses/${course.id}/units/${resume.unitId}/topics/${resume.id}`);
+        router.push(courseUnitHref(course.id, resume.unitId, resume.id));
         return;
       }
 
       if (resume && resume.unitId) {
-        router.push(`/courses/${course.id}/units/${resume.unitId}`);
+        router.push(courseUnitHref(course.id, resume.unitId));
         return;
       }
 
@@ -442,7 +447,7 @@ export const CoursesDashboard = () => {
         </div>
 
         {activeTab === 'enrolled' && (
-          <div className="order-4 space-y-8">
+          <div className="order-3 space-y-8">
             {[
               {
                 title: 'Ongoing Units',
@@ -483,7 +488,9 @@ export const CoursesDashboard = () => {
                           <div className="mt-4 flex flex-wrap gap-2">
                             <button
                               type="button"
-                              onClick={() => router.push(`/courses/${courseId}/units/${unitId}`)}
+                              disabled={!courseId || !unitId}
+                              onClick={() => router.push(courseUnitHref(courseId, unitId, unit.nextTopicId as string | undefined))}
+                              aria-label={`Continue ${String(unit.unitTitle ?? 'unit')}`}
                               className="inline-flex items-center gap-1 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700"
                             >
                               {section.completed ? 'Review unit' : 'Continue unit'}
@@ -531,7 +538,7 @@ export const CoursesDashboard = () => {
             <p className="mt-4 text-muted-foreground font-medium">Curating your courses...</p>
           </div>
         ) : (
-          <div className="order-3 space-y-6">
+          <div className="order-4 space-y-6">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-muted-foreground dark:text-muted-foreground">
                 {activeTab === 'enrolled' ? 'Enrolled classes' : activeTab === 'recommended' ? 'Recommended classes' : 'Explore classes'}
@@ -738,21 +745,30 @@ const CourseCard = ({
       return;
     }
 
-    if (course.unitId) {
-      router.push(`/courses/${course.id}/units/${course.unitId}`);
-      return;
-    }
-    const resume = await getResumePoint(course.id) as { type?: string; unitId?: string; id?: string } | null;
-    if (resume?.type === 'topic' && resume.unitId) {
-      router.push(`/courses/${course.id}/units/${resume.unitId}/topics/${resume.id}`);
-    } else {
+    try {
+      const resume = course.unitId && course.nextTopicId
+        ? null
+        : await getResumePoint(course.id) as { type?: string; unitId?: string; id?: string } | null;
+      const unitId = course.unitId || resume?.unitId;
+      const topicId = course.nextTopicId || (
+        resume?.type === 'topic' && resume.unitId === unitId ? resume.id : undefined
+      );
+
+      if (unitId) {
+        router.push(courseUnitHref(course.id, unitId, topicId));
+        return;
+      }
+      router.push(`/courses/${course.id}`);
+    } catch (error) {
+      console.error('Could not resume the course:', error);
+      toast.error('Could not load your resume point. Opening the course overview instead.');
       router.push(`/courses/${course.id}`);
     }
   };
 
   const handleTitleClick = () => {
     if (course.unitId) {
-      router.push(`/courses/${course.id}/units/${course.unitId}`);
+      router.push(courseUnitHref(course.id, course.unitId, course.nextTopicId));
     } else if (enrolledView) {
       onSelectCourse(course);
     } else {

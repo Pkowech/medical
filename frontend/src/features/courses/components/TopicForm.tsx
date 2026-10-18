@@ -30,6 +30,7 @@ export const TopicForm: React.FC<TopicFormProps> = ({ topic, unitId, onSave, onC
   });
 
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (topic) {
@@ -72,15 +73,20 @@ export const TopicForm: React.FC<TopicFormProps> = ({ topic, unitId, onSave, onC
     if (formData.title && unitId) {
       try {
         setLoading(true);
+        setErrorMessage(null);
         await onSave(formData);
       } catch (error) {
         console.error('Error saving topic:', error);
-        alert('Failed to save topic. Please try again.');
+        setErrorMessage(
+          error instanceof Error && error.message
+            ? error.message
+            : 'Failed to save topic. Please try again.',
+        );
       } finally {
         setLoading(false);
       }
     } else {
-      alert('Please fill in all required fields.');
+      setErrorMessage('Enter a topic title before saving.');
     }
   };
 
@@ -91,6 +97,11 @@ export const TopicForm: React.FC<TopicFormProps> = ({ topic, unitId, onSave, onC
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
+          {errorMessage && (
+            <p role="alert" className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+              {errorMessage}
+            </p>
+          )}
           <div>
             <label htmlFor="title" className="block text-sm font-medium mb-1">
               Title *

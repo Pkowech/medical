@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 
 type NavLesson = {
@@ -11,6 +11,7 @@ type NavChapter = { id: string | number; lessons: NavLesson[] };
 export const useCourseNavigation = (
   chapters: NavChapter[] = [],
   parentUnitId?: string,
+  selectedTopicId?: string,
 ) => {
   const params = useParams();
   const router = useRouter();
@@ -27,30 +28,28 @@ export const useCourseNavigation = (
       topicIdFromUrl = slug[3];
     }
   }
+  const activeTopicId = selectedTopicId || topicIdFromUrl;
 
   const [currentChapterIndex, setCurrentChapterIndex] = useState(0);
   const [currentLessonIndex, setCurrentLessonIndex] = useState(0);
-  const previousParentUnitId = useRef<string | undefined>(undefined);
 
   // Sync state from URL
   useEffect(() => {
     if (!chapters.length) return;
 
-    if (parentUnitId && !topicIdFromUrl) {
-      if (previousParentUnitId.current !== parentUnitId) {
-        setCurrentChapterIndex(0);
-        setCurrentLessonIndex(0);
-      }
-      previousParentUnitId.current = parentUnitId;
+    if (parentUnitId && !activeTopicId) {
+      setCurrentChapterIndex(0);
+      setCurrentLessonIndex(0);
       return;
     }
 
-    previousParentUnitId.current = parentUnitId;
-    
     let chIdx = 0;
     let lsIdx = 0;
     
-    if (parentUnitId && topicIdFromUrl) {
+    if (parentUnitId && activeTopicId) {
+      chIdx = chapters.findIndex(c => String(c.id) === String(activeTopicId));
+      if (chIdx === -1) chIdx = 0;
+    } else if (topicIdFromUrl) {
       chIdx = chapters.findIndex(c => String(c.id) === String(topicIdFromUrl));
       if (chIdx === -1) chIdx = 0;
     } else if (unitIdFromUrl) {
@@ -65,7 +64,7 @@ export const useCourseNavigation = (
     
     setCurrentChapterIndex(chIdx);
     setCurrentLessonIndex(lsIdx);
-  }, [chapters, parentUnitId, unitIdFromUrl, topicIdFromUrl]);
+  }, [chapters, parentUnitId, unitIdFromUrl, topicIdFromUrl, activeTopicId]);
 
   const currentChapter = chapters?.[currentChapterIndex];
   const currentLesson = currentChapter?.lessons?.[currentLessonIndex];
@@ -89,9 +88,13 @@ export const useCourseNavigation = (
     setCurrentChapterIndex(chapterIndex);
     setCurrentLessonIndex(lessonIndex);
 
-    // Unit pages render topic selection in-place; the legacy nested topic page
-    // does not share the unit layout or its topic-material filtering.
-    if (parentUnitId) return;
+    if (parentUnitId) {
+      const query = targetLesson
+        ? `?topicId=${encodeURIComponent(String(targetLesson.id))}`
+        : '';
+      router.push(`/courses/${courseId}/units/${parentUnitId}${query}`);
+      return;
+    }
 
     if (courseId) {
       if (targetLesson) {

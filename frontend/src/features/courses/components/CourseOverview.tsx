@@ -69,6 +69,14 @@ export function CourseOverview() {
       ? [String(unit.unitId)]
       : [],
   );
+  const completedUnitIdSet = new Set(completedUnitIds);
+  const enrolledUnitIds = new Set([...activeUnitIds, ...completedUnitIdSet]);
+  const nextTopicByUnitId = new Map(activeUnits.flatMap(unit =>
+    (typeof unit.unitId === 'string' || typeof unit.unitId === 'number')
+      && (typeof unit.nextTopicId === 'string' || typeof unit.nextTopicId === 'number')
+      ? [[String(unit.unitId), String(unit.nextTopicId)]]
+      : [],
+  ));
   const units = course.units || [];
 
   return (
@@ -118,6 +126,8 @@ export function CourseOverview() {
             }).length;
             const percentage = topics.length ? Math.round((completedTopics / topics.length) * 100) : 0;
             const isActive = activeUnitIds.has(String(unit.id));
+            const isCompleted = completedUnitIdSet.has(String(unit.id));
+            const isEnrolled = enrolledUnitIds.has(String(unit.id));
 
             return (
               <button
@@ -126,8 +136,13 @@ export function CourseOverview() {
                 onClick={() => {
                   if (!user) {
                     router.push(`/login?callbackUrl=${encodeURIComponent(`/courses/${courseId}`)}`);
-                  } else if (isActive) {
-                    router.push(`/courses/${courseId}/units/${unit.id}`);
+                  } else if (isEnrolled) {
+                    const nextTopicId = nextTopicByUnitId.get(String(unit.id));
+                    router.push(
+                      `/courses/${courseId}/units/${unit.id}${
+                        nextTopicId ? `?topicId=${encodeURIComponent(nextTopicId)}` : ''
+                      }`,
+                    );
                   } else {
                     setShowEnrollment(true);
                   }
@@ -138,9 +153,9 @@ export function CourseOverview() {
                   <span aria-hidden="true" className="pointer-events-none absolute -right-7 -top-10 h-36 w-36 rounded-full border-18 border-white/10" />
                   <span className="relative flex items-center justify-between gap-3">
                     <span className="text-xs font-semibold uppercase text-white/75">Unit {String(index + 1).padStart(2, '0')}</span>
-                    {isActive && (
+                    {isEnrolled && (
                       <span className="inline-flex items-center gap-1 rounded-full bg-black/15 px-2.5 py-1 text-xs font-medium text-white">
-                        <CircleCheck className="h-3.5 w-3.5" /> Active
+                        <CircleCheck className="h-3.5 w-3.5" /> {isCompleted ? 'Completed' : 'Active'}
                       </span>
                     )}
                   </span>
@@ -175,7 +190,15 @@ export function CourseOverview() {
                       <span className="block h-full rounded-full bg-blue-600 transition-[width]" style={{ width: `${percentage}%` }} />
                     </span>
                     <span className="mt-4 flex items-center justify-between border-t border-border pt-3 text-sm font-semibold text-blue-700 dark:border-border dark:text-blue-300">
-                      <span>{!user ? 'Sign in to access' : isActive ? 'Continue unit' : 'Enroll unit'}</span>
+                      <span>
+                        {!user
+                          ? 'Sign in to access'
+                          : isCompleted
+                            ? 'Review unit'
+                            : isActive
+                              ? 'Continue unit'
+                              : 'Enroll unit'}
+                      </span>
                       <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
                     </span>
                   </span>
@@ -194,8 +217,13 @@ export function CourseOverview() {
           onClose={() => setShowEnrollment(false)}
           onComplete={(action) => {
             setShowEnrollment(false);
-            void queryClient.invalidateQueries({ queryKey: ['course-overview-active-units', courseId] });
-            void queryClient.invalidateQueries({ queryKey: ['courses'] });
+            void Promise.all([
+              queryClient.invalidateQueries({ queryKey: ['course-overview-active-units', courseId] }),
+              queryClient.invalidateQueries({ queryKey: ['active-units'] }),
+              queryClient.invalidateQueries({ queryKey: ['course-progress-dashboard'] }),
+              queryClient.invalidateQueries({ queryKey: ['courseStatistics', user?.id] }),
+              queryClient.invalidateQueries({ queryKey: ['courses'] }),
+            ]);
             toast.success(
               action === 'activated'
                 ? 'Unit added to your active units.'

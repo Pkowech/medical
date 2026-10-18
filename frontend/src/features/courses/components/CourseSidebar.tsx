@@ -68,6 +68,7 @@ export const CourseSidebar = ({
     <div className="w-80 h-full min-h-0 transition-all duration-300 overflow-hidden bg-card dark:bg-card border-r border-border dark:border-border flex flex-col shadow-xl">
       <div className="lg:hidden flex justify-end p-4 border-b border-border dark:border-border">
         <button
+          type="button"
           onClick={() => setSidebarOpen(false)}
           className="p-2 text-muted-foreground hover:text-muted-foreground dark:text-muted-foreground dark:hover:text-muted-foreground bg-muted dark:bg-card rounded-full"
           aria-label="Close sidebar"
@@ -153,31 +154,25 @@ export const CourseSidebar = ({
                                 <div className="flex items-center space-x-3">
                                   {isLocked ? (
                                     <Lock className="w-4 h-4 text-muted-foreground" />
-                                  ) : (
+                                  ) : lessonResources.length > 0 ? (
                                     <button
                                       type="button"
                                       onClick={(e) => toggleMaterials(e, lesson.id)}
                                       aria-expanded={expandedLessonMaterials === lesson.id}
                                       aria-label={`View materials for ${lesson.title}`}
-                                      className={`cursor-pointer hover:scale-125 transition-all p-0.5 rounded-full z-10 ${
-                                        lessonResources.length > 0
-                                          ? 'ring-2 ring-blue-400/30 bg-blue-50 dark:bg-blue-900/20 shadow-sm shadow-blue-500/20'
-                                          : 'hover:bg-muted dark:hover:bg-card'
-                                      }`}
+                                      className="z-10 rounded-full bg-blue-50 p-0.5 shadow-sm shadow-blue-500/20 ring-2 ring-blue-400/30 transition-all hover:scale-125 dark:bg-blue-900/20"
                                       title="Click to view relevant materials (videos, links, etc.)"
                                     >
                                       {isCompleted ? (
                                         <CheckCircle className="w-4 h-4 text-green-500" />
                                       ) : (
-                                        <Circle className={`w-4 h-4 transition-colors ${
-                                          expandedLessonMaterials === lesson.id 
-                                            ? 'text-blue-600 fill-blue-500/20' 
-                                            : lessonResources.length > 0
-                                              ? 'text-blue-500'
-                                              : 'text-muted-foreground'
-                                        }`} />
+                                        <Circle className="w-4 h-4 text-blue-500" />
                                       )}
                                     </button>
+                                  ) : isCompleted ? (
+                                    <CheckCircle className="w-4 h-4 text-green-500" />
+                                  ) : (
+                                    <Circle className="w-4 h-4 text-muted-foreground" />
                                   )}
                                   <button
                                     type="button"
@@ -277,26 +272,22 @@ export const CourseSidebar = ({
                   key={resource.id}
                   className="flex items-center justify-between p-3 bg-background dark:bg-card/30 rounded-lg border border-transparent dark:border-border/50 group hover:border-blue-200 dark:hover:border-blue-500/30 transition-all"
                 >
-                  <div 
-                    className="flex items-center space-x-3 flex-1 cursor-pointer"
+                  <button
+                    type="button"
+                    aria-label={`Open ${resource.title}`}
+                    className="flex min-w-0 flex-1 items-center space-x-3 text-left"
                     onClick={() => openMaterial(String(resource.id))}
                   >
                     <div className="p-2 bg-blue-100/50 dark:bg-blue-900/20 rounded-md text-blue-600 dark:text-blue-400 group-hover:bg-blue-600 group-hover:text-white transition-colors">
                       {resource.type.toLowerCase().includes('video') ? <PlayCircle className="w-4 h-4" /> : <FileText className="w-4 h-4" />}
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <p className="text-sm font-medium text-foreground dark:text-muted-foreground group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{resource.title}</p>
                       {resource.size && <p className="text-xs text-muted-foreground dark:text-muted-foreground">{resource.size}</p>}
                     </div>
-                  </div>
+                    <ExternalLink className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                  </button>
                   <div className="flex items-center gap-1">
-                    <button
-                      className="p-1.5 text-muted-foreground hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                      title={`Open ${resource.title}`}
-                      onClick={() => openMaterial(String(resource.id))}
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                    </button>
                     {(onDownloadMaterial || resource.url) && (
                       <button
                       type="button"
