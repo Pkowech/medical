@@ -169,6 +169,34 @@ export class AuthService {
     );
   }
 
+  private async getTwoFactorEnabled(
+    userId: string,
+    user?: { securitySettings?: { twoFactorEnabled?: boolean } | null },
+  ): Promise<boolean> {
+    const securitySettings = user?.securitySettings;
+    if (
+      securitySettings &&
+      typeof securitySettings.twoFactorEnabled === 'boolean'
+    ) {
+      return securitySettings.twoFactorEnabled;
+    }
+
+    const securitySettingsModel = (this.prisma as any).userSecuritySettings;
+    if (
+      !securitySettingsModel ||
+      typeof securitySettingsModel.findUnique !== 'function'
+    ) {
+      return false;
+    }
+
+    const settings = await securitySettingsModel.findUnique({
+      where: { userId },
+      select: { twoFactorEnabled: true },
+    });
+
+    return Boolean(settings?.twoFactorEnabled);
+  }
+
   /**
    * Creates the application session and records a successful authentication.
    */
@@ -181,7 +209,10 @@ export class AuthService {
   ): Promise<AuthResponse> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      include: { userRoles: { include: { role: true } } },
+      include: {
+        userRoles: { include: { role: true } },
+        securitySettings: { select: { twoFactorEnabled: true } },
+      },
     });
 
     if (!user) {
@@ -206,16 +237,15 @@ export class AuthService {
       await this.permissionCalculationService.getEffectivePermissionsForRole(
         primaryRole,
       );
-    const securitySettings = await this.prisma.userSecuritySettings.findUnique({
-      where: { userId: user.id },
-      select: { twoFactorEnabled: true },
-    });
+    const twoFactorEnabled = await this.getTwoFactorEnabled(
+      user.id,
+      user,
+    );
     const systemSettings = await this.adminSettingsService?.getSettings();
     const mfaSetupRequired =
       forceMfaSetup ||
       Boolean(
-        systemSettings?.twoFactorAuthRequired &&
-          !securitySettings?.twoFactorEnabled,
+        systemSettings?.twoFactorAuthRequired && !twoFactorEnabled,
       );
     const sessionTimeoutMinutes = systemSettings?.sessionTimeout ?? 120;
     const accessTokenLifetimeMs = mfaSetupRequired
@@ -289,11 +319,14 @@ export class AuthService {
   }
 
   async completeRequiredTwoFactor(userId: string): Promise<AuthResponse> {
-    const securitySettings = await this.prisma.userSecuritySettings.findUnique({
-      where: { userId },
-      select: { twoFactorEnabled: true },
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        securitySettings: { select: { twoFactorEnabled: true } },
+      },
     });
-    if (!securitySettings?.twoFactorEnabled) {
+    if (!(await this.getTwoFactorEnabled(userId, user ?? undefined))) {
       throw new UnauthorizedException('Required two-factor setup is incomplete.');
     }
     return this.issueAuthResponse(userId);
@@ -362,16 +395,13 @@ export class AuthService {
       (userRole: any) => userRole.role.name as Role,
     );
 
-    const [systemSettings, securitySettings] = await Promise.all([
+    const [systemSettings, twoFactorEnabled] = await Promise.all([
       this.adminSettingsService?.getSettings(),
-      this.prisma.userSecuritySettings.findUnique({
-        where: { userId },
-        select: { twoFactorEnabled: true },
-      }),
+      this.getTwoFactorEnabled(userId),
     ]);
     const mfaSetupRequired =
       payload.mfaSetupRequired ||
-      Boolean(systemSettings?.twoFactorAuthRequired && !securitySettings?.twoFactorEnabled);
+      Boolean(systemSettings?.twoFactorAuthRequired && !twoFactorEnabled);
 
     return {
       id: user.id,
@@ -817,11 +847,8 @@ export class AuthService {
 
     const systemSettings = await this.adminSettingsService?.getSettings();
     if (systemSettings?.twoFactorAuthRequired) {
-      const securitySettings = await this.prisma.userSecuritySettings.findUnique({
-        where: { userId },
-        select: { twoFactorEnabled: true },
-      });
-      if (!securitySettings?.twoFactorEnabled) {
+      const twoFactorEnabled = await this.getTwoFactorEnabled(userId);
+      if (!twoFactorEnabled) {
         throw new UnauthorizedException(
           'Complete required two-factor setup before refreshing this session.',
         );

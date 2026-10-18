@@ -325,8 +325,8 @@ const PDFViewer = React.memo(({ file, onPageChange, initialPage = 1, headers }: 
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-muted/50 dark:border-border dark:bg-card/50">
-      <div className="flex justify-between items-center p-3 bg-card dark:bg-card border-b border-border dark:border-border z-10">
-        <div className="flex gap-2">
+      <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-1 border-b border-border bg-card p-2 dark:border-border dark:bg-card sm:flex sm:justify-between sm:gap-2 sm:p-3">
+        <div className="flex shrink-0 gap-1 sm:gap-2">
           <Button 
             type="button"
             variant="outline" 
@@ -352,9 +352,9 @@ const PDFViewer = React.memo(({ file, onPageChange, initialPage = 1, headers }: 
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
-        <div className="text-sm font-medium text-muted-foreground dark:text-muted-foreground">
+        <div className="min-w-0 justify-self-center whitespace-nowrap text-xs font-medium text-muted-foreground dark:text-muted-foreground sm:text-sm">
           {loading ? 'Loading...' : (
-            <label className="inline-flex items-center gap-1">
+            <label className="inline-flex items-center gap-1 whitespace-nowrap">
               <span>Page</span>
               <input
                 type="number"
@@ -371,13 +371,13 @@ const PDFViewer = React.memo(({ file, onPageChange, initialPage = 1, headers }: 
                     goToEnteredPage();
                   }
                 }}
-                className="w-10 border-b border-border bg-transparent text-center outline-none focus:border-blue-500 dark:border-border"
+                className="w-8 border-b border-border bg-transparent text-center outline-none focus:border-blue-500 dark:border-border sm:w-10"
               />
               <span>of {numPages || '?'}</span>
             </label>
           )}
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
           <Button
             type="button"
             variant="outline"
@@ -393,7 +393,7 @@ const PDFViewer = React.memo(({ file, onPageChange, initialPage = 1, headers }: 
           <button
             type="button"
             onClick={() => setZoom(1)}
-            className="min-w-12 px-1 text-xs text-muted-foreground hover:text-blue-600 dark:text-muted-foreground"
+            className="min-w-10 px-1 text-xs text-muted-foreground hover:text-blue-600 dark:text-muted-foreground sm:min-w-12"
             aria-label="Reset zoom"
             title="Reset zoom"
           >

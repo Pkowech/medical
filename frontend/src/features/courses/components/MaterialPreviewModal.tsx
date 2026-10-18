@@ -402,7 +402,7 @@ export const MaterialPreviewModal = ({
               {isVideo ? <Youtube className="w-5 h-5" /> : <FileText className="w-5 h-5" />}
             </div>
             <div>
-              <DialogTitle className="max-w-[min(60vw,36rem)] truncate text-lg font-bold">
+              <DialogTitle className="max-w-full break-words text-base font-bold leading-snug sm:line-clamp-2 sm:max-w-[min(50vw,36rem)] sm:text-lg">
                 {material?.title || (previewError ? 'Unable to open material' : 'Loading material...')}
               </DialogTitle>
               <DialogDescription className="sr-only">
