@@ -38,7 +38,6 @@ export class AssessmentProgressService {
   async updateProgress(
     userId: string,
     assessmentId: string,
-    progressData: Partial<AssessmentProgress>,
   ): Promise<AssessmentProgress> {
     const cacheKey = `progress:${userId}:${assessmentId}`;
     // NOTE: Do NOT read from cache here \u2014 this is a write operation and must
@@ -55,35 +54,43 @@ export class AssessmentProgressService {
       );
     }
 
-    const existingProgress = await (
-      this.prisma as AnyPrisma
-    ).assessmentProgress.findUnique({
-      where: { userId_assessmentId: { userId, assessmentId } as any },
+    const attempts = await this.prisma.quizAttempt.findMany({
+      where: { userId, quizId: assessmentId },
+      select: {
+        startedAt: true,
+        completedAt: true,
+        percentage: true,
+        isPassed: true,
+      },
+      orderBy: { startedAt: 'desc' },
     });
+    if (!attempts.length) {
+      throw new NotFoundException(
+        `No quiz attempts found for user ${userId} and assessment ${assessmentId}`,
+      );
+    }
+    const completedAttempts = attempts.filter((attempt) => attempt.completedAt);
+    const bestScore = completedAttempts.length
+      ? Math.max(...completedAttempts.map((attempt) => attempt.percentage))
+      : 0;
 
-    const updatedProgress = await (
-      this.prisma as AnyPrisma
-    ).assessmentProgress.upsert({
-      where: { userId_assessmentId: { userId, assessmentId } as any },
+    const updatedProgress = await this.prisma.assessmentProgress.upsert({
+      where: { userId_assessmentId: { userId, assessmentId } },
       update: {
-        completionPercentage:
-          progressData.completionPercentage ??
-          existingProgress?.completionPercentage ??
-          0,
-        lastAttemptedAt: progressData.lastAttemptedAt ?? new Date(),
-        totalAttempts:
-          progressData.totalAttempts ?? existingProgress?.totalAttempts ?? 0,
-        bestScore: progressData.bestScore ?? existingProgress?.bestScore ?? 0,
-        isPassed: progressData.isPassed ?? existingProgress?.isPassed ?? false,
+        completionPercentage: completedAttempts.length ? 100 : 0,
+        lastAttemptedAt: attempts[0].startedAt,
+        totalAttempts: attempts.length,
+        bestScore,
+        isPassed: completedAttempts.some((attempt) => attempt.isPassed),
       },
       create: {
         userId,
         assessmentId,
-        completionPercentage: progressData.completionPercentage ?? 0,
-        lastAttemptedAt: progressData.lastAttemptedAt ?? new Date(),
-        totalAttempts: progressData.totalAttempts ?? 1,
-        bestScore: progressData.bestScore ?? 0,
-        isPassed: progressData.isPassed ?? false,
+        completionPercentage: completedAttempts.length ? 100 : 0,
+        lastAttemptedAt: attempts[0].startedAt,
+        totalAttempts: attempts.length,
+        bestScore,
+        isPassed: completedAttempts.some((attempt) => attempt.isPassed),
       },
     });
 
@@ -108,9 +115,13 @@ export class AssessmentProgressService {
     );
 
     // Emit event for orchestration services (weakness detection, etc.)
-    if (result.completionPercentage >= 100) {
+    if (completedAttempts.length > 0) {
       const timestamp = new Date();
-      const score = result.bestScore ?? 0;
+      const latestCompletedAttempt = completedAttempts.reduce(
+        (latest, attempt) =>
+          attempt.startedAt > latest.startedAt ? attempt : latest,
+      );
+      const score = latestCompletedAttempt.percentage;
       this.eventEmitter.emit('assessment.completed', {
         userId,
         assessmentId,
@@ -122,7 +133,7 @@ export class AssessmentProgressService {
         attemptData: {
           score,
           maxScore: 100,
-          passed: result.isPassed,
+          passed: latestCompletedAttempt.isPassed,
           progressPercentage: result.completionPercentage,
           timeSpentMinutes: 0,
           timestamp: timestamp.toISOString(),

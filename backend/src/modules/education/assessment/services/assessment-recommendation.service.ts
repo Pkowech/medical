@@ -2,9 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '#infrastructure/prisma/prisma.service';
 
 export type PerformanceDiagnosis =
-  | 'prerequisite_gap'
-  | 'target_content_gap'
-  | 'insufficient_evidence';
+  'prerequisite_gap' | 'target_content_gap' | 'insufficient_evidence';
 
 export interface LearningResourceRecommendation {
   kind: 'material' | 'topic' | 'unit' | 'course' | 'prerequisite_diagnostic';
@@ -53,12 +51,18 @@ export class AssessmentRecommendationService {
 
   async recommendForAnswers(
     userId: string,
-    scope: { topicId?: string | null; unitId?: string | null; courseId?: string | null },
+    scope: {
+      topicId?: string | null;
+      unitId?: string | null;
+      courseId?: string | null;
+    },
     answers: SubmittedAnswer[],
   ): Promise<QuizPerformanceRecommendations> {
     if (!answers.length) return { topics: [], recommendations: [] };
 
-    const questionIds = [...new Set(answers.map((answer) => answer.questionId))];
+    const questionIds = [
+      ...new Set(answers.map((answer) => answer.questionId)),
+    ];
     const questions = await this.prisma.question.findMany({
       where: { id: { in: questionIds } },
       select: { id: true, topicIds: true, unitId: true },
@@ -186,54 +190,59 @@ export class AssessmentRecommendationService {
         ),
       ),
     ];
-    const [priorResponses, priorTopicAttempts] = await Promise.all([
-      prerequisiteUnitIds.length
-        ? this.prisma.userResponse.findMany({
+    const unitIdByTopicId = new Map<string, string>();
+    for (const unit of prerequisiteUnits.values()) {
+      for (const topic of unit.topics) {
+        unitIdByTopicId.set(topic.id, unit.id);
+      }
+    }
+    const priorResponses =
+      prerequisiteUnitIds.length || prerequisiteTopicIds.length
+        ? await this.prisma.userResponse.findMany({
             where: {
               userId,
-              question: { unitId: { in: prerequisiteUnitIds } },
+              question: {
+                OR: [
+                  { unitId: { in: prerequisiteUnitIds } },
+                  { topicIds: { hasSome: prerequisiteTopicIds } },
+                ],
+              },
             },
-            select: { isCorrect: true, question: { select: { unitId: true } } },
+            select: {
+              isCorrect: true,
+              question: { select: { unitId: true, topicIds: true } },
+            },
             orderBy: { createdAt: 'desc' },
             take: 200,
           })
-        : Promise.resolve([]),
-      prerequisiteTopicIds.length
-        ? this.prisma.topicQuizAttempt.findMany({
-            where: { userId, topicId: { in: prerequisiteTopicIds } },
-            select: {
-              score: true,
-              questionCount: true,
-              correctAnswers: true,
-              topic: { select: { unitId: true } },
-            },
-            orderBy: { createdAt: 'desc' },
-            take: 100,
-          })
-        : Promise.resolve([]),
-    ]);
+        : [];
 
-    const evidenceByUnit = new Map<string, { correct: number; total: number }>();
+    const evidenceByUnit = new Map<
+      string,
+      { correct: number; total: number }
+    >();
     for (const response of priorResponses) {
-      const unitId = response.question.unitId;
-      if (!unitId || !prerequisiteUnitIds.includes(unitId)) continue;
-      const evidence = evidenceByUnit.get(unitId) ?? { correct: 0, total: 0 };
-      evidence.total += 1;
-      if (response.isCorrect) evidence.correct += 1;
-      evidenceByUnit.set(unitId, evidence);
-    }
-    for (const attempt of priorTopicAttempts) {
-      const unitId = attempt.topic.unitId;
-      if (!prerequisiteUnitIds.includes(unitId)) continue;
-      const evidence = evidenceByUnit.get(unitId) ?? { correct: 0, total: 0 };
-      evidence.correct += attempt.correctAnswers;
-      evidence.total += attempt.questionCount;
-      evidenceByUnit.set(unitId, evidence);
+      const responseUnitIds = new Set([
+        ...(response.question.unitId &&
+        prerequisiteUnitIds.includes(response.question.unitId)
+          ? [response.question.unitId]
+          : []),
+        ...response.question.topicIds
+          .map((topicId) => unitIdByTopicId.get(topicId))
+          .filter((unitId): unitId is string => Boolean(unitId)),
+      ]);
+      for (const unitId of responseUnitIds) {
+        const evidence = evidenceByUnit.get(unitId) ?? { correct: 0, total: 0 };
+        evidence.total += 1;
+        if (response.isCorrect) evidence.correct += 1;
+        evidenceByUnit.set(unitId, evidence);
+      }
     }
 
     const weakTopics = topics
       .map((topic) => {
-        const questionIdsForTopic = questionIdsByTopic.get(topic.id) ?? new Set<string>();
+        const questionIdsForTopic =
+          questionIdsByTopic.get(topic.id) ?? new Set<string>();
         const topicAnswers = [...questionIdsForTopic]
           .filter((id) => answersByQuestion.has(id))
           .map((id) => answersByQuestion.get(id)!);
@@ -262,9 +271,10 @@ export class AssessmentRecommendationService {
           unitId: unit.id,
           unitName: unit.title || unit.name,
           sampleSize: evidence?.total ?? 0,
-          accuracy: evidence && evidence.total > 0
-            ? evidence.correct / evidence.total
-            : null,
+          accuracy:
+            evidence && evidence.total > 0
+              ? evidence.correct / evidence.total
+              : null,
         };
       });
       const hasCompleteEvidence =
@@ -272,9 +282,7 @@ export class AssessmentRecommendationService {
         prerequisiteEvidence.every((item) => item.sampleSize >= 3);
       const weakPrerequisite = prerequisiteEvidence.filter(
         (item) =>
-          item.sampleSize >= 3 &&
-          item.accuracy !== null &&
-          item.accuracy < 0.6,
+          item.sampleSize >= 3 && item.accuracy !== null && item.accuracy < 0.6,
       );
       const diagnosis: PerformanceDiagnosis = weakPrerequisite.length
         ? 'prerequisite_gap'
@@ -291,24 +299,34 @@ export class AssessmentRecommendationService {
       const resourceTopics =
         diagnosis === 'prerequisite_gap'
           ? prerequisiteUnitsForTopic
-              .filter((unit) => weakPrerequisite.some((item) => item.unitId === unit.id))
+              .filter((unit) =>
+                weakPrerequisite.some((item) => item.unitId === unit.id),
+              )
               .flatMap((unit) => unit.topics)
           : [entry.topic];
-      const resourceTopicIds = [...new Set(resourceTopics.map((topic) => topic.id))];
+      const resourceTopicIds = [
+        ...new Set(resourceTopics.map((topic) => topic.id)),
+      ];
       const resourceUnitIds =
         diagnosis === 'prerequisite_gap'
-          ? [...new Set(
-              prerequisiteUnitsForTopic
-                .filter((unit) => weakPrerequisite.some((item) => item.unitId === unit.id))
-                .map((unit) => unit.id),
-            )]
+          ? [
+              ...new Set(
+                prerequisiteUnitsForTopic
+                  .filter((unit) =>
+                    weakPrerequisite.some((item) => item.unitId === unit.id),
+                  )
+                  .map((unit) => unit.id),
+              ),
+            ]
           : [targetUnit.id];
       const resourceCourseIds = [
         ...new Set([
           ...(diagnosis === 'prerequisite_gap'
             ? resourceUnitIds
-                .map((unitId) =>
-                  prerequisiteUnitsForTopic.find((unit) => unit.id === unitId)?.courseId,
+                .map(
+                  (unitId) =>
+                    prerequisiteUnitsForTopic.find((unit) => unit.id === unitId)
+                      ?.courseId,
                 )
                 .filter((id): id is string => Boolean(id))
             : [targetCourse.id]),
@@ -335,16 +353,18 @@ export class AssessmentRecommendationService {
         orderBy: { updatedAt: 'desc' },
         take: 8,
       });
-      const recommendations: LearningResourceRecommendation[] = resources.map((material) => ({
-        kind: 'material',
-        id: material.id,
-        title: material.title,
-        href: `/study-planner/materials/${material.id}`,
-        reason:
-          diagnosis === 'prerequisite_gap'
-            ? 'Review this prerequisite material before retrying the target topic.'
-            : 'Review material mapped to this topic before trying another assessment.',
-      }));
+      const recommendations: LearningResourceRecommendation[] = resources.map(
+        (material) => ({
+          kind: 'material',
+          id: material.id,
+          title: material.title,
+          href: `/study-planner/materials/${material.id}`,
+          reason:
+            diagnosis === 'prerequisite_gap'
+              ? 'Review this prerequisite material before retrying the target topic.'
+              : 'Review material mapped to this topic before trying another assessment.',
+        }),
+      );
 
       for (const resourceTopic of resourceTopics) {
         const resourceUnit =
@@ -358,23 +378,26 @@ export class AssessmentRecommendationService {
           id: resourceTopic.id,
           title: resourceTopic.name,
           href: `/courses/${resourceUnit?.courseId ?? targetCourse.id}/units/${resourceUnit?.id ?? targetUnit.id}?topicId=${resourceTopic.id}`,
-          reason: diagnosis === 'prerequisite_gap'
-            ? 'Strengthen a mapped prerequisite topic.'
-            : 'Revisit the topic where your quiz answers indicate difficulty.',
+          reason:
+            diagnosis === 'prerequisite_gap'
+              ? 'Strengthen a mapped prerequisite topic.'
+              : 'Revisit the topic where your quiz answers indicate difficulty.',
         });
       }
 
       for (const unitId of resourceUnitIds) {
-        const unit = prerequisiteUnitsForTopic.find((item) => item.id === unitId)
-          ?? targetUnit;
+        const unit =
+          prerequisiteUnitsForTopic.find((item) => item.id === unitId) ??
+          targetUnit;
         recommendations.push({
           kind: 'unit',
           id: unit.id,
           title: unit.title || unit.name,
           href: `/quiz/unit/${unit.id}`,
-          reason: diagnosis === 'insufficient_evidence'
-            ? 'Take a short practice quiz here to check prerequisite knowledge.'
-            : 'Review this unit to address the identified learning gap.',
+          reason:
+            diagnosis === 'insufficient_evidence'
+              ? 'Take a short practice quiz here to check prerequisite knowledge.'
+              : 'Review this unit to address the identified learning gap.',
         });
         if (
           diagnosis === 'insufficient_evidence' &&
@@ -385,7 +408,8 @@ export class AssessmentRecommendationService {
             id: unit.id,
             title: `Check prerequisite knowledge: ${unit.title || unit.name}`,
             href: `/quiz/unit/${unit.id}`,
-            reason: 'There are not enough prior answers to tell whether the difficulty is foundational or topic-specific.',
+            reason:
+              'There are not enough prior answers to tell whether the difficulty is foundational or topic-specific.',
           });
         }
       }
@@ -398,9 +422,11 @@ export class AssessmentRecommendationService {
               recommendations.push({
                 kind: 'course',
                 id: relation.prerequisite.id,
-                title: relation.prerequisite.title || relation.prerequisite.name,
+                title:
+                  relation.prerequisite.title || relation.prerequisite.name,
                 href: `/courses/${relation.prerequisite.id}`,
-                reason: 'This course is a mapped prerequisite for the area you struggled with.',
+                reason:
+                  'This course is a mapped prerequisite for the area you struggled with.',
               });
             }
           }
@@ -411,7 +437,8 @@ export class AssessmentRecommendationService {
           id: targetCourse.id,
           title: targetCourse.title || targetCourse.name,
           href: `/courses/${targetCourse.id}`,
-          reason: 'Continue with the course containing the topic you struggled with.',
+          reason:
+            'Continue with the course containing the topic you struggled with.',
         });
       }
 

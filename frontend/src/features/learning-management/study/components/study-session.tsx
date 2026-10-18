@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useCallback, useState, useEffect, useRef } from 'react';
 import { useStudy } from '../hooks/useStudy';
 import { Card, CardContent } from '@/shared/components/ui/card';
 import { Button } from '@/shared/components/ui/button';
@@ -13,7 +13,7 @@ import {
 import { Label } from '@/shared/components/ui/label';
 import { Textarea } from '@/shared/components/ui/textarea';
 import { ScrollArea } from '@/shared/components/ui/scroll-area';
-import { Play, Pause, Square, BookOpen, Sparkles, ScrollText, Maximize2, Minimize2 } from 'lucide-react';
+import { Play, Pause, Square, BookOpen } from 'lucide-react';
 import materialService from '@/features/courses/services/materialService';
 import { MaterialPreviewModal } from '@/features/courses/components/MaterialPreviewModal';
 import { useAuthStore } from '@/features/auth/store/useAuthStore';
@@ -35,12 +35,11 @@ interface StudySessionProps {
 }
 
 type Activity = {
-  type: 'reading' | 'quiz' | 'notes';
+  type: 'reading';
   durationSeconds: number;
   timestamp: Date;
   metadata?: Record<string, unknown>;
 };
-
 
 export const StudySession: React.FC<StudySessionProps> = ({
   topicId,
@@ -68,22 +67,30 @@ export const StudySession: React.FC<StudySessionProps> = ({
   const [notes, setNotes] = useState('');
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [sessionGoal, setSessionGoal] = useState('');
-  const [focusGoalMinutes, setFocusGoalMinutes] = useState(25);
-  const [isFocusMode, setIsFocusMode] = useState(false);
-  const elapsedTimeRef = useRef(0);
-  const lastActivitySecondsRef = useRef(0);
+  const elapsedMillisecondsRef = useRef(0);
+  const activeSegmentStartedAtRef = useRef<number | null>(null);
   const activeReadingRef = useRef<{ materialId: string; startedAtSeconds: number } | null>(null);
   const pauseStartedAtRef = useRef<number | null>(null);
   const pausedDurationMsRef = useRef(0);
+  const getElapsedSeconds = useCallback(
+    () =>
+      Math.floor(
+        (elapsedMillisecondsRef.current +
+          (activeSegmentStartedAtRef.current === null
+            ? 0
+            : performance.now() - activeSegmentStartedAtRef.current)) /
+          1000,
+      ),
+    [],
+  );
 
   const getSessionXapiContext = (activeSessionId: string, material?: Material) => {
-    const courseId = material?.courseId
-      ?? (studyContext?.type === 'course' ? studyContext.id : undefined);
-    const unitId = material?.unitId
-      ?? (studyContext?.type === 'unit' ? studyContext.id : undefined);
-    const topicId = material?.topicId
-      ?? (studyContext?.type === 'topic' ? studyContext.id : undefined);
+    const courseId =
+      material?.courseId ?? (studyContext?.type === 'course' ? studyContext.id : undefined);
+    const unitId =
+      material?.unitId ?? (studyContext?.type === 'unit' ? studyContext.id : undefined);
+    const topicId =
+      material?.topicId ?? (studyContext?.type === 'topic' ? studyContext.id : undefined);
     const extensions: Record<string, unknown> = {
       [URLS.XAPI_EXTENSIONS.STUDY_SESSION_ID]: activeSessionId,
       [URLS.XAPI_EXTENSIONS.COURSE_ID]: courseId,
@@ -96,13 +103,15 @@ export const StudySession: React.FC<StudySessionProps> = ({
       ...(courseId
         ? {
             contextActivities: {
-              parent: [{
-                id: URLS.COURSE(courseId),
-                definition: {
-                  name: { 'en-US': `Course ${courseId}` },
-                  type: 'http://adlnet.gov/expapi/activities/course',
+              parent: [
+                {
+                  id: URLS.COURSE(courseId),
+                  definition: {
+                    name: { 'en-US': `Course ${courseId}` },
+                    type: 'http://adlnet.gov/expapi/activities/course',
+                  },
                 },
-              }],
+              ],
             },
           }
         : {}),
@@ -118,24 +127,13 @@ export const StudySession: React.FC<StudySessionProps> = ({
   });
 
   useEffect(() => {
-    elapsedTimeRef.current = elapsedTime;
-  }, [elapsedTime]);
-
-  useEffect(() => {
-    let timer: number | undefined;
-    if (isActive) {
-      timer = window.setInterval(() => {
-        setElapsedTime((prev: number) => {
-          const next = prev + 1;
-          elapsedTimeRef.current = next;
-          return next;
-        });
-      }, 1000);
-    }
-    return () => {
-      if (timer) window.clearInterval(timer);
-    };
-  }, [isActive]);
+    if (!isActive) return;
+    const timer = window.setInterval(
+      () => setElapsedTime(getElapsedSeconds()),
+      1000,
+    );
+    return () => window.clearInterval(timer);
+  }, [getElapsedSeconds, isActive]);
 
   useEffect(() => {
     if (!sessionId || !studyCourseId) {
@@ -147,47 +145,38 @@ export const StudySession: React.FC<StudySessionProps> = ({
     let isCurrent = true;
     setIsLoadingMaterials(true);
     setMaterialsError(null);
-    materialService.getMaterialsPaginated({
-      page: 1,
-      limit: 50,
-      courseId: studyCourseId,
-      scope: 'enrolled',
-    }).then(result => {
-      if (isCurrent) setCourseMaterials(result.items);
-    }).catch(error => {
-      console.error('Could not load course materials for the study session:', error);
-      if (isCurrent) setMaterialsError('Course materials could not be loaded. Please try again.');
-    }).finally(() => {
-      if (isCurrent) setIsLoadingMaterials(false);
-    });
+    materialService
+      .getMaterialsPaginated({
+        page: 1,
+        limit: 50,
+        courseId: studyCourseId,
+        scope: 'enrolled',
+      })
+      .then(result => {
+        if (isCurrent) setCourseMaterials(result.items);
+      })
+      .catch(error => {
+        console.error('Could not load course materials for the study session:', error);
+        if (isCurrent) setMaterialsError('Course materials could not be loaded. Please try again.');
+      })
+      .finally(() => {
+        if (isCurrent) setIsLoadingMaterials(false);
+      });
 
     return () => {
       isCurrent = false;
     };
   }, [materialsLoadAttempt, sessionId, studyCourseId]);
 
-  useEffect(() => {
-    if (isActive && elapsedTime === focusGoalMinutes * 60) {
-      toast.success(`${focusGoalMinutes}-minute focus goal reached. Keep going or wrap up.`);
-    }
-  }, [elapsedTime, focusGoalMinutes, isActive]);
-
-  useEffect(() => {
-    if (!isFocusMode) return;
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !selectedMaterialId) setIsFocusMode(false);
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isFocusMode, selectedMaterialId]);
-
   const handleStart = async () => {
     if (sessionId) {
       setSessionError(null);
+      const now = performance.now();
       if (pauseStartedAtRef.current !== null) {
-        pausedDurationMsRef.current += Date.now() - pauseStartedAtRef.current;
+        pausedDurationMsRef.current += now - pauseStartedAtRef.current;
         pauseStartedAtRef.current = null;
       }
+      activeSegmentStartedAtRef.current = now;
       setIsActive(true);
       return;
     }
@@ -197,12 +186,13 @@ export const StudySession: React.FC<StudySessionProps> = ({
       const session = await startSession(studyContext);
       if (session) {
         setSessionId(session.id);
+        activeSegmentStartedAtRef.current = performance.now();
         setIsActive(true);
         void trackAction(
           XAPI_VERBS.LAUNCHED,
           studySessionXapiObject(session.id),
           undefined,
-          getSessionXapiContext(session.id),
+          getSessionXapiContext(session.id)
         );
         onSessionStarted?.();
       } else {
@@ -215,35 +205,27 @@ export const StudySession: React.FC<StudySessionProps> = ({
   };
 
   const handlePause = () => {
-    if (isActive && pauseStartedAtRef.current === null) {
-      pauseStartedAtRef.current = Date.now();
+    if (isActive && activeSegmentStartedAtRef.current !== null) {
+      const now = performance.now();
+      elapsedMillisecondsRef.current += now - activeSegmentStartedAtRef.current;
+      activeSegmentStartedAtRef.current = null;
+      pauseStartedAtRef.current = now;
+      setElapsedTime(Math.floor(elapsedMillisecondsRef.current / 1000));
     }
     setIsActive(false);
   };
 
   const handleStop = () => {
     handlePause();
-    setIsFocusMode(false);
     setShowEndDialog(true);
   };
 
   const getPausedDurationSeconds = () => {
-    const currentPauseMs = pauseStartedAtRef.current === null
-      ? 0
-      : Date.now() - pauseStartedAtRef.current;
+    const currentPauseMs =
+      pauseStartedAtRef.current === null
+        ? 0
+        : performance.now() - pauseStartedAtRef.current;
     return Math.floor((pausedDurationMsRef.current + currentPauseMs) / 1000);
-  };
-
-  const recordActivity = (
-    type: Activity['type'],
-    metadata?: Record<string, unknown>,
-    durationSeconds = Math.max(0, elapsedTimeRef.current - lastActivitySecondsRef.current),
-  ) => {
-    setActivities(prev => [
-      ...prev,
-      { type, durationSeconds, timestamp: new Date(), ...(metadata ? { metadata } : {}) },
-    ]);
-    lastActivitySecondsRef.current = elapsedTimeRef.current;
   };
 
   const takeOpenMaterialActivity = (): Activity | null => {
@@ -252,11 +234,10 @@ export const StudySession: React.FC<StudySessionProps> = ({
 
     const durationSeconds = Math.max(
       0,
-      elapsedTimeRef.current - activeReading.startedAtSeconds,
+      getElapsedSeconds() - activeReading.startedAtSeconds,
     );
     const material = courseMaterials.find(item => String(item.id) === activeReading.materialId);
     activeReadingRef.current = null;
-    lastActivitySecondsRef.current = elapsedTimeRef.current;
     return {
       type: 'reading',
       durationSeconds,
@@ -282,9 +263,8 @@ export const StudySession: React.FC<StudySessionProps> = ({
     recordOpenMaterialTime();
     activeReadingRef.current = {
       materialId,
-      startedAtSeconds: elapsedTimeRef.current,
+      startedAtSeconds: getElapsedSeconds(),
     };
-    lastActivitySecondsRef.current = elapsedTimeRef.current;
     setSelectedMaterialId(materialId);
   };
 
@@ -309,35 +289,32 @@ export const StudySession: React.FC<StudySessionProps> = ({
         timestamp: activity.timestamp.toISOString(),
         ...(activity.metadata ? { metadata: activity.metadata } : {}),
       }));
-      const sessionNotes = [
-        sessionGoal.trim() ? `Session goal: ${sessionGoal.trim()}` : '',
-        notes.trim(),
-      ].filter(Boolean).join('\n\n');
+      const elapsedSeconds = getElapsedSeconds();
       const endedSession = await endSession(
         sessionId,
-        sessionNotes,
+        notes.trim(),
         sessionActivities,
-        elapsedTime,
-        getPausedDurationSeconds(),
+        elapsedSeconds,
+        getPausedDurationSeconds()
       );
       void trackAction(
         XAPI_VERBS.COMPLETED,
         studySessionXapiObject(sessionId),
         {
           completion: true,
-          duration: `PT${elapsedTime}S`,
+          duration: `PT${elapsedSeconds}S`,
         },
-        getSessionXapiContext(sessionId),
+        getSessionXapiContext(sessionId)
       );
       const durationLabel = `${endedSession.duration ?? Math.floor(elapsedTime / 60)} min`;
       if (endedSession.isValid) {
         toast.success(
-          `${durationLabel} study session saved${contextLabel ? ` for ${contextLabel}` : ''} and counted toward your learning progress.`,
+          `${durationLabel} study session saved${contextLabel ? ` for ${contextLabel}` : ''} and counted toward your learning progress.`
         );
       } else {
         const reason = endedSession.invalidReason ? ` ${endedSession.invalidReason}.` : '';
         toast.info(
-          `${durationLabel} study session saved${contextLabel ? ` for ${contextLabel}` : ''}, but was not counted toward progress or streaks.${reason}`,
+          `${durationLabel} study session saved${contextLabel ? ` for ${contextLabel}` : ''}, but was not counted toward progress or streaks.${reason}`
         );
       }
       setShowEndDialog(false);
@@ -350,10 +327,6 @@ export const StudySession: React.FC<StudySessionProps> = ({
     }
   };
 
-  const addActivity = (type: Activity['type']) => {
-    recordActivity(type);
-  };
-
   const formatTime = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
@@ -361,39 +334,37 @@ export const StudySession: React.FC<StudySessionProps> = ({
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const formatActivityDuration = (seconds: number) => seconds < 60
-    ? `${seconds} sec`
-    : `${Math.floor(seconds / 60)} min`;
-
-  const renderCourseMaterials = (focusMode = false) => {
+  const renderCourseMaterials = () => {
     if (!studyCourseId || !sessionId) return null;
 
     return (
-      <section className={`space-y-3 rounded-xl border p-4 ${focusMode ? 'border-border bg-slate-900/70 text-white' : 'bg-muted/20'}`}>
+      <section className="space-y-3 rounded-xl border bg-muted/20 p-4">
         <div>
-          <h3 className={`font-semibold ${focusMode ? 'text-white' : ''}`}>Course materials</h3>
-          <p className={`mt-1 text-xs ${focusMode ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
+          <h3 className="font-semibold">Course materials</h3>
+          <p className="mt-1 text-xs text-muted-foreground">
             Open a resource here; reading time and material progress are tracked during the session.
           </p>
         </div>
         {isLoadingMaterials ? (
-          <p className={`text-sm ${focusMode ? 'text-slate-300' : 'text-muted-foreground'}`} role="status">
+          <p className="text-sm text-muted-foreground" role="status">
             Loading course materials…
           </p>
         ) : materialsError ? (
           <div className="flex flex-wrap items-center gap-3">
-            <p className="text-sm text-red-500" role="alert">{materialsError}</p>
+            <p className="text-sm text-red-500" role="alert">
+              {materialsError}
+            </p>
             <Button
               type="button"
               size="sm"
-              variant={focusMode ? 'secondary' : 'outline'}
+              variant="outline"
               onClick={() => setMaterialsLoadAttempt(attempt => attempt + 1)}
             >
               Retry
             </Button>
           </div>
         ) : courseMaterials.length === 0 ? (
-          <p className={`text-sm ${focusMode ? 'text-slate-300' : 'text-muted-foreground'}`}>
+          <p className="text-sm text-muted-foreground">
             No materials are linked to this course yet.
           </p>
         ) : (
@@ -402,18 +373,18 @@ export const StudySession: React.FC<StudySessionProps> = ({
               {courseMaterials.map(material => (
                 <div
                   key={material.id}
-                  className={`flex items-center justify-between gap-3 rounded-lg border p-3 ${focusMode ? 'border-border bg-slate-950/70' : 'bg-background'}`}
+                  className="flex items-center justify-between gap-3 rounded-lg border bg-background p-3"
                 >
                   <div className="min-w-0">
-                    <p className={`truncate text-sm font-medium ${focusMode ? 'text-white' : ''}`}>{material.title}</p>
-                    <p className={`mt-0.5 text-xs capitalize ${focusMode ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
+                    <p className="truncate text-sm font-medium">{material.title}</p>
+                    <p className="mt-0.5 text-xs capitalize text-muted-foreground">
                       {material.type || material.contentType}
                     </p>
                   </div>
                   <Button
                     type="button"
                     size="sm"
-                    variant={focusMode ? 'secondary' : 'outline'}
+                    variant="outline"
                     onClick={() => openMaterial(String(material.id))}
                     disabled={!isActive}
                     aria-label={`Read ${material.title}`}
@@ -432,146 +403,45 @@ export const StudySession: React.FC<StudySessionProps> = ({
 
   return (
     <div>
-      {isFocusMode && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="focus-mode-title"
-          className="fixed inset-0 z-[60] flex min-h-screen flex-col items-center justify-center overflow-y-auto bg-slate-950 px-6 py-10 text-white"
-        >
-          {selectedMaterialId ? (
-            <div className="h-dvh w-full">
-              <MaterialPreviewModal
-                materialId={selectedMaterialId}
-                isOpen
-                onClose={closeMaterial}
-                materials={courseMaterials}
-                onNavigate={openMaterial}
-                inline
-                topicId={courseMaterials.find(item => String(item.id) === selectedMaterialId)?.topicId}
-                userId={userId}
-                studySessionId={sessionId ?? undefined}
-                fallbackMaterial={courseMaterials.find(item => String(item.id) === selectedMaterialId)}
-              />
-            </div>
-          ) : (
-            <>
-              <div className="absolute right-6 top-6">
-                <Button variant="outline" onClick={() => setIsFocusMode(false)} className="border-border bg-slate-900 text-white hover:bg-slate-800">
-                  <Minimize2 className="mr-2 h-4 w-4" />
-                  Exit focus mode
-                </Button>
-              </div>
-              <div className="w-full max-w-2xl text-center">
-                <p className="text-sm font-semibold uppercase tracking-[0.25em] text-indigo-300">Focus session</p>
-                <h2 id="focus-mode-title" className="mt-4 text-3xl font-semibold">One thing at a time.</h2>
-                {sessionGoal.trim() && (
-                  <p className="mx-auto mt-4 max-w-xl text-lg text-slate-300">{sessionGoal.trim()}</p>
-                )}
-                <p className="mt-12 font-mono text-7xl font-semibold tabular-nums sm:text-8xl" aria-live="off">
-                  {formatTime(Math.max(0, focusGoalMinutes * 60 - elapsedTime))}
-                </p>
-                <p className="mt-3 text-muted-foreground">
-                  {elapsedTime >= focusGoalMinutes * 60
-                    ? `${formatTime(elapsedTime)} focused · goal reached`
-                    : `${formatTime(elapsedTime)} focused · ${focusGoalMinutes}-minute goal`}
-                </p>
-                <div className="mt-10 flex justify-center gap-3">
-                  {isActive ? (
-                    <Button variant="outline" onClick={handlePause} className="border-border bg-slate-900 text-white hover:bg-slate-800">
-                      <Pause className="mr-2 h-4 w-4" />
-                      Pause
-                    </Button>
-                  ) : (
-                    <Button onClick={handleStart}>
-                      <Play className="mr-2 h-4 w-4" />
-                      Resume session
-                    </Button>
-                  )}
-                  <Button variant="destructive" onClick={handleStop}>
-                    <Square className="mr-2 h-4 w-4" />
-                    End session
-                  </Button>
-                </div>
-                <p className="mt-8 text-sm text-muted-foreground">Press Escape to leave focus mode. Your session timer keeps its place.</p>
-              </div>
-              <div className="mt-8 w-full max-w-2xl text-left">
-                {renderCourseMaterials(true)}
-              </div>
-            </>
-          )}
-        </div>
-      )}
       <Card>
         <CardContent className="space-y-6">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-2xl font-semibold">{studyContext ? 'Course study session' : 'General focus session'}</h2>
-              {contextLabel && (
-                <p className="mt-1 text-sm text-muted-foreground">{contextLabel}</p>
-              )}
+              <h2 className="text-2xl font-semibold">
+                {studyContext ? 'Course study session' : 'Study session'}
+              </h2>
+              {contextLabel && <p className="mt-1 text-sm text-muted-foreground">{contextLabel}</p>}
               <p className="mt-1 text-xs text-muted-foreground">
                 Sessions under 5 minutes are saved but do not count toward progress or streaks.
               </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Intentional pauses are excluded when calculating your active-time focus score.
-              </p>
             </div>
-            <div className="text-3xl font-mono text-blue-600 dark:text-blue-400">
+            <div
+              className="font-mono text-3xl tabular-nums text-blue-600 dark:text-blue-400"
+              aria-live="off"
+            >
               {formatTime(elapsedTime)}
             </div>
           </div>
 
-          {sessionGoal.trim() && (
-            <div className="rounded-lg border border-indigo-100 bg-indigo-50/70 px-4 py-3 text-sm text-indigo-950 dark:border-indigo-900 dark:bg-indigo-950/30 dark:text-indigo-100">
-              <span className="font-semibold">Session goal:</span> {sessionGoal.trim()}
-            </div>
-          )}
-
-          {!sessionId && (
-            <div className="space-y-3 rounded-xl border bg-muted/20 p-4">
-              <div className="space-y-2">
-                <Label htmlFor="study-session-goal">What will you accomplish?</Label>
-                <Textarea
-                  id="study-session-goal"
-                  value={sessionGoal}
-                  onChange={event => setSessionGoal(event.target.value)}
-                  placeholder="For example: explain the renin-angiotensin system from memory"
-                  className="min-h-20"
-                />
-              </div>
-              <div>
-                <Label>Focus interval</Label>
-                <div className="mt-2 flex gap-2">
-                  {[25, 50].map(minutes => (
-                    <Button
-                      key={minutes}
-                      type="button"
-                      size="sm"
-                      variant={focusGoalMinutes === minutes ? 'default' : 'outline'}
-                      aria-pressed={focusGoalMinutes === minutes}
-                      onClick={() => setFocusGoalMinutes(minutes)}
-                    >
-                      {minutes} minutes
-                    </Button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
           <div className="flex justify-center gap-4">
-            {!isActive ? (
+            {!sessionId ? (
               <Button onClick={handleStart} className="w-40">
                 <Play className="h-4 w-4 mr-2" />
-                {sessionId ? 'Resume Session' : 'Start Session'}
+                Start session
               </Button>
             ) : (
               <>
-                <Button variant="outline" onClick={handlePause} className="w-32">
-                  <Pause className="h-4 w-4 mr-2" />
-                  Pause
-                </Button>
+                {isActive ? (
+                  <Button variant="outline" onClick={handlePause} className="w-32">
+                    <Pause className="h-4 w-4 mr-2" />
+                    Pause
+                  </Button>
+                ) : (
+                  <Button onClick={handleStart} className="w-32">
+                    <Play className="h-4 w-4 mr-2" />
+                    Resume
+                  </Button>
+                )}
                 <Button variant="destructive" onClick={handleStop} className="w-32">
                   <Square className="h-4 w-4 mr-2" />
                   End Session
@@ -580,78 +450,13 @@ export const StudySession: React.FC<StudySessionProps> = ({
             )}
           </div>
 
-          {sessionId && (
-            <div className="flex justify-center">
-              <Button variant="outline" onClick={() => setIsFocusMode(true)}>
-                <Maximize2 className="mr-2 h-4 w-4" />
-                Enter focus mode
-              </Button>
-            </div>
+          {sessionError && (
+            <p role="alert" className="text-center text-sm text-red-600">
+              {sessionError}
+            </p>
           )}
-
-          {sessionError && <p role="alert" className="text-center text-sm text-red-600">{sessionError}</p>}
-
-          <div className="flex justify-center gap-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => addActivity('reading')}
-              disabled={!sessionId || !isActive}
-              title="Add Reading Activity"
-              aria-label="Add reading activity"
-              className="h-10 w-10"
-            >
-              <BookOpen className="h-5 w-5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => addActivity('quiz')}
-              disabled={!sessionId || !isActive}
-              title="Add Quiz Activity"
-              aria-label="Add quiz activity"
-              className="h-10 w-10"
-            >
-              <Sparkles className="h-5 w-5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => addActivity('notes')}
-              disabled={!sessionId || !isActive}
-              title="Add Notes Activity"
-              aria-label="Add notes activity"
-              className="h-10 w-10"
-            >
-              <ScrollText className="h-5 w-5" />
-            </Button>
-          </div>
 
           {renderCourseMaterials()}
-
-          {activities.length > 0 && (
-            <div>
-              <h3 className="text-lg font-medium mb-2">Activities</h3>
-              <ScrollArea className="h-50 rounded-md border p-4">
-                <div className="space-y-2">
-                  {activities.map((activity, index) => (
-                    <div key={index} className="flex items-center gap-2 text-sm">
-                      {activity.type === 'reading' && <BookOpen className="h-4 w-4" />}
-                      {activity.type === 'quiz' && <Sparkles className="h-4 w-4" />}
-                      {activity.type === 'notes' && <ScrollText className="h-4 w-4" />}
-                      <span>
-                        {activity.type.charAt(0).toUpperCase() + activity.type.slice(1)} -{' '}
-                        {formatActivityDuration(activity.durationSeconds)}
-                        {typeof activity.metadata?.materialTitle === 'string'
-                          ? ` · ${activity.metadata.materialTitle}`
-                          : ''}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
-            </div>
-          )}
         </CardContent>
       </Card>
 
@@ -688,7 +493,7 @@ export const StudySession: React.FC<StudySessionProps> = ({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      {!isFocusMode && selectedMaterialId && (
+      {selectedMaterialId && (
         <MaterialPreviewModal
           materialId={selectedMaterialId}
           isOpen

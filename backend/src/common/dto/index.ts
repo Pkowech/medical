@@ -159,18 +159,12 @@ export * from './gamification.dto';
 
 export * from './spaced-repetition.dto';
 
-// Student Interactions & Results
+// Student Interactions
 export {
   StudentInteractionDto,
   CreateStudentInteractionDto,
   UpdateStudentInteractionDto,
 } from './student-interaction.dto';
-
-export {
-  FlashcardResultDto,
-  CreateFlashcardResultDto,
-  UpdateFlashcardResultDto,
-} from './flashcard-result.dto';
 
 // File & Media
 export * from './file.dto';

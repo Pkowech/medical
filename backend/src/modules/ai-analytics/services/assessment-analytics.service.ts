@@ -43,7 +43,7 @@ type AdaptiveQuestionWithOptions = Question & { options: Option[] };
  * Used by:
  * - assessment-recommendations.service.ts (personalized assessment recommendations)
  * - adaptive-quiz.service.ts (adaptive quiz performance tracking and BKT updates)
- * - assessments.service.ts (quiz submissions and analytics)
+ * - quiz.service.ts (quiz submissions and analytics)
  */
 @Injectable()
 export class AssessmentAnalyticsService implements OnModuleInit {

@@ -284,11 +284,6 @@ export const pageMetadata: RouteMetadata[] = [
     description: 'Complete this medical learning quiz.',
   },
   {
-    path: '/rapid-review',
-    title: 'Rapid Review',
-    description: 'Review key medical concepts in rapid review mode.',
-  },
-  {
     path: '/rewards',
     title: 'Rewards',
     description: 'View rewards earned through your learning activity.',

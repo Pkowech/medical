@@ -61,3 +61,7 @@ dist/
 .env
 
 /src/generated
+
+.windsurf
+.claude
+.agents

@@ -18,7 +18,6 @@ import { BlueprintController } from './controllers/blueprint.controller';
 
 import { AssessmentProgressController } from './controllers/assessment-progress.controller';
 
-import { AssessmentsService } from './services/assessments.service';
 import { QuizService } from './services/quiz.service';
 import { FlashcardsService } from './services/flashcards.service';
 import { AdaptiveQuizService } from './services/adaptive-quiz.service';
@@ -53,7 +52,6 @@ import { SM2AlgorithmService } from './services/sm2-algorithm.service';
     AssessmentProgressController,
   ],
   providers: [
-    AssessmentsService,
     QuizService,
     FlashcardsService,
     AdaptiveQuizService,
@@ -68,7 +66,6 @@ import { SM2AlgorithmService } from './services/sm2-algorithm.service';
     AssessmentRecommendationService,
   ],
   exports: [
-    AssessmentsService,
     QuizService,
     FlashcardsService,
     AdaptiveQuizService,

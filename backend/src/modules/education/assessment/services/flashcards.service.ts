@@ -6,7 +6,6 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../../../infrastructure/prisma/prisma.service';
 import { RedisService } from '../../../../infrastructure/redis/redis.service';
-import { AssessmentProgressService } from './assessment-progress.service';
 import { SM2AlgorithmService } from './sm2-algorithm.service';
 import { AssessmentAnalyticsService } from '#modules/ai-analytics/services/assessment-analytics.service';
 import { CreateFlashcardDto } from '#common/dto';
@@ -53,7 +52,6 @@ export class FlashcardsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly redisService: RedisService,
-    private readonly progressService: AssessmentProgressService,
     private readonly sm2Algorithm: SM2AlgorithmService,
     private readonly analyticsService: AssessmentAnalyticsService,
   ) {}
@@ -162,10 +160,15 @@ export class FlashcardsService {
         nextReview: true,
       },
     });
-    const dueToday = cards.filter((card) => card.nextReview <= new Date()).length;
+    const dueToday = cards.filter(
+      (card) => card.nextReview <= new Date(),
+    ).length;
     const mastered = cards.filter((card) => card.repetitions >= 2).length;
     const totalInterval = cards.reduce((sum, card) => sum + card.interval, 0);
-    const totalEaseFactor = cards.reduce((sum, card) => sum + card.easeFactor, 0);
+    const totalEaseFactor = cards.reduce(
+      (sum, card) => sum + card.easeFactor,
+      0,
+    );
 
     return {
       totalCards: cards.length,
@@ -352,19 +355,6 @@ export class FlashcardsService {
       },
     });
 
-    // Update AssessmentProgress
-    await this.progressService.updateProgress(
-      userProgress.userId,
-      userProgress.flashcardId,
-      {
-        completionPercentage: ((result.updated.repetitions || 0) / 10) * 100,
-        lastAttemptedAt: new Date(),
-        totalAttempts: result.updated.repetitions || 0,
-        bestScore: quality >= 3 ? 100 : 0,
-        isPassed: quality >= 3,
-      },
-    );
-
     // Invalidate Redis cache keys
     await this.redisService.del(`due_flashcards:${userProgress.userId}`);
     this.logger.log(
@@ -375,14 +365,17 @@ export class FlashcardsService {
 
   async recordTopicQuizReviews(
     userId: string,
-    topicId: string,
+    topicId: string | null,
     answers: Array<{ questionId: string; isCorrect: boolean }>,
   ): Promise<number> {
     const now = new Date();
     const scheduledCount = await this.prisma.$transaction(async (tx) => {
       for (const answer of answers) {
         const question = await tx.question.findFirst({
-          where: { id: answer.questionId, topicIds: { has: topicId } },
+          where: {
+            id: answer.questionId,
+            ...(topicId ? { topicIds: { has: topicId } } : {}),
+          },
           include: { options: true },
         });
         if (!question) {

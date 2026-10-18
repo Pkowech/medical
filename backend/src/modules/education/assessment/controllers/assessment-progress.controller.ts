@@ -2,7 +2,6 @@ import {
   Controller,
   Get,
   Post,
-  Body,
   Param,
   UseGuards,
   Request,
@@ -58,12 +57,10 @@ export class AssessmentProgressController {
   async updateProgress(
     @Param('assessmentId', ParseUUIDPipe) assessmentId: string,
     @Request() req: any,
-    @Body() progressData: Partial<AssessmentProgressDto>,
   ) {
     return this.assessmentProgressService.updateProgress(
       req.user.id,
       assessmentId,
-      progressData,
     );
   }
 
@@ -132,14 +129,18 @@ export class AssessmentProgressController {
   }
 
   @Get('history')
-  @ApiOperation({ summary: 'Get quiz history and stats for the authenticated user' })
+  @ApiOperation({
+    summary: 'Get quiz history and stats for the authenticated user',
+  })
   @ApiResponse({ status: 200, description: 'Quiz history and stats retrieved' })
   async getQuizHistory(@User('id') userId: string) {
     return this.analyticsService.getQuizHistory(userId);
   }
 
   @Get('predictions')
-  @ApiOperation({ summary: 'Get assessment estimates from recent quiz attempts' })
+  @ApiOperation({
+    summary: 'Get assessment estimates from recent quiz attempts',
+  })
   @ApiResponse({ status: 200, description: 'User assessment estimates' })
   async getUserAssessmentPredictions(@User('id') userId: string) {
     return this.analyticsService.getUserAssessmentPredictions(userId);
@@ -298,9 +299,14 @@ export class AssessmentProgressController {
     return await this.analyticsService.getRelatedResources(assessmentId);
   }
 
-  private assertOwnUser(authenticatedUserId: string, requestedUserId: string): void {
+  private assertOwnUser(
+    authenticatedUserId: string,
+    requestedUserId: string,
+  ): void {
     if (authenticatedUserId !== requestedUserId) {
-      throw new ForbiddenException('You can only access your own assessment data');
+      throw new ForbiddenException(
+        'You can only access your own assessment data',
+      );
     }
   }
 

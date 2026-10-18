@@ -69,12 +69,6 @@ const navigationConfig: NavigationItem[] = [
         href: '/clinical-cases',
         icon: GraduationCap,
       },
-      {
-        id: 'rapid-review',
-        label: 'Rapid Review',
-        href: '/rapid-review',
-        icon: Clock,
-      },
     ],
   },
   {

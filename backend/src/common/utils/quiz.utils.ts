@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { Question, QuestionDifficulty, QuestionCategory } from '@prisma/client';
 import { AdaptiveQuizSession } from '../dto/assessment.dto';
 
@@ -12,8 +12,109 @@ type QuestionType =
   | 'matching'
   | 'ordering';
 
+export interface OptionQuizResponse {
+  questionId: string;
+  selectedAnswers: string[];
+}
+
+export interface GradedOptionQuizResponse extends OptionQuizResponse {
+  isCorrect: boolean;
+  earnedPoints: number;
+}
+
 @Injectable()
 export class QuizUtils {
+  static calculatePointsPercentage(
+    earnedPoints: number,
+    totalPoints: number,
+  ): number {
+    return totalPoints > 0 ? Math.round((earnedPoints / totalPoints) * 100) : 0;
+  }
+
+  static gradeOptionQuiz(
+    questions: Array<{
+      id: string;
+      points: number;
+      options: Array<{ id: string; isCorrect: boolean }>;
+    }>,
+    responses: OptionQuizResponse[],
+  ): {
+    responses: GradedOptionQuizResponse[];
+    correctAnswers: number;
+    earnedPoints: number;
+    totalPoints: number;
+    percentage: number;
+  } {
+    const questionIds = questions.map((question) => question.id);
+    const responseIds = responses.map((response) => response.questionId);
+    if (
+      questionIds.length === 0 ||
+      responseIds.length !== questionIds.length ||
+      new Set(responseIds).size !== responseIds.length ||
+      questionIds.some((questionId) => !responseIds.includes(questionId))
+    ) {
+      throw new BadRequestException(
+        'A quiz submission must contain exactly one answer for every question',
+      );
+    }
+
+    const questionsById = new Map(
+      questions.map((question) => [question.id, question]),
+    );
+    let correctAnswers = 0;
+    let earnedPoints = 0;
+    let totalPoints = 0;
+    const gradedResponses = responses.map((response) => {
+      const question = questionsById.get(response.questionId);
+      if (
+        !question ||
+        !Array.isArray(response.selectedAnswers) ||
+        response.selectedAnswers.some((id) => typeof id !== 'string') ||
+        new Set(response.selectedAnswers).size !==
+          response.selectedAnswers.length
+      ) {
+        throw new BadRequestException(
+          'A quiz response contains invalid answers',
+        );
+      }
+
+      const optionIds = new Set(question.options.map((option) => option.id));
+      if (response.selectedAnswers.some((id) => !optionIds.has(id))) {
+        throw new BadRequestException(
+          'A selected option does not belong to its question',
+        );
+      }
+
+      const correctOptionIds = question.options
+        .filter((option) => option.isCorrect)
+        .map((option) => option.id);
+      const isCorrect =
+        correctOptionIds.length === response.selectedAnswers.length &&
+        correctOptionIds.every((id) => response.selectedAnswers.includes(id));
+      const points = question.points || 1;
+      totalPoints += points;
+      if (isCorrect) {
+        correctAnswers += 1;
+        earnedPoints += points;
+      }
+
+      return {
+        questionId: response.questionId,
+        selectedAnswers: response.selectedAnswers,
+        isCorrect,
+        earnedPoints: isCorrect ? points : 0,
+      };
+    });
+
+    return {
+      responses: gradedResponses,
+      correctAnswers,
+      earnedPoints,
+      totalPoints,
+      percentage: this.calculatePointsPercentage(earnedPoints, totalPoints),
+    };
+  }
+
   static getDifficultyIndex(difficulty: QuestionDifficulty): number {
     switch (difficulty) {
       case QuestionDifficulty.easy:

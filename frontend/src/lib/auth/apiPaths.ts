@@ -43,7 +43,6 @@ export const API_PATHS = {
     UNIT: (unitId: string) => `/quiz/unit/${unitId}`,
     SUBMIT: '/quiz/submit',
     RESULTS: (userId: string, unitId: string) => `/quiz/results/${userId}/${unitId}`,
-    RAPID_REVIEW: (userId: string) => `/quiz/rapid-review/${userId}`,
   },
 
   CLINICAL_CASES: {

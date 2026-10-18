@@ -16,7 +16,6 @@ import {
   ClipboardList,
   AlertCircle,
   PlayCircle,
-  X,
   GraduationCap,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -24,6 +23,13 @@ import { usePageHeader } from '@/core/providers/HeaderContext';
 import { useAuthStore } from '@/features/auth/store/useAuthStore';
 import type { Deadline } from '@/shared/types';
 import { StatCard } from '@/shared/components/ui/StatCard';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/shared/components/ui/dialog';
 import { StudySession } from '@/features/learning-management/study/components/study-session';
 import { useStudy } from '@/features/learning-management/study/hooks/useStudy';
 import { useProgress } from '@/shared/hooks/useProgress';
@@ -395,7 +401,7 @@ const MedicalEducationDashboard = () => {
               className="flex w-full items-center justify-between rounded-xl border border-border bg-muted px-4 py-3 text-left transition-colors hover:border-indigo-300 hover:bg-indigo-50 dark:hover:border-indigo-900 dark:hover:bg-indigo-950/30"
             >
               <span>
-                <span className="block text-sm font-semibold text-foreground dark:text-foreground">Start a focus session</span>
+                <span className="block text-sm font-semibold text-foreground dark:text-foreground">Start a study session</span>
                 <span className="mt-0.5 block text-xs text-muted-foreground dark:text-muted-foreground">Track time spent studying</span>
               </span>
               <Clock className="h-5 w-5 text-indigo-500" />
@@ -842,55 +848,63 @@ const MedicalEducationDashboard = () => {
 
       </div>
       
-      {showStudySession && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-card dark:bg-card rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-border dark:border-border">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-2xl font-bold text-foreground dark:text-foreground">Study Session</h3>
-              {!studySessionStarted && (
-                <button
-                  onClick={() => setShowStudySession(false)}
-                  className="p-2 hover:bg-muted dark:hover:bg-secondary rounded-lg transition-colors"
-                  title="Close"
-                  aria-label="Close study session setup"
-                >
-                  <X className="w-5 h-5 dark:text-muted-foreground" />
-                </button>
-              )}
-            </div>
-            <div className="mb-5">
-              <label htmlFor="study-course-context" className="mb-2 block text-sm font-medium text-muted-foreground dark:text-muted-foreground">
-                Study context
-              </label>
-              <select
-                id="study-course-context"
-                value={selectedStudyCourse?.id ?? ''}
-                onChange={event => setSelectedStudyCourseId(event.target.value)}
-                disabled={studySessionStarted}
-                className="w-full rounded-xl border border-border bg-card px-3 py-2.5 text-sm text-foreground focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-border dark:bg-card dark:text-foreground"
-              >
-                <option value="">General study (not linked to a course)</option>
-                {(data.courseData ?? []).map(course => (
-                  <option key={course.id} value={course.id}>{course.name}</option>
-                ))}
-              </select>
-              <p className="mt-2 text-xs text-muted-foreground dark:text-muted-foreground">
-                Linking a course session associates the time with its next incomplete topic.
-              </p>
-            </div>
-            <StudySession
-              context={selectedStudyCourse ? { type: 'course', id: selectedStudyCourse.id } : undefined}
-              contextLabel={selectedStudyCourse?.name}
-              onSessionStarted={() => setStudySessionStarted(true)}
-              onSessionEnd={() => {
-                setStudySessionStarted(false);
-                setShowStudySession(false);
-                handleRefetch();
-              }} 
-            />
+      <Dialog
+        open={showStudySession}
+        onOpenChange={open => {
+          if (!open && !studySessionStarted) setShowStudySession(false);
+        }}
+      >
+        <DialogContent
+          className="max-h-[90vh] max-w-2xl overflow-y-auto"
+          showCloseButton={!studySessionStarted}
+        >
+          <DialogHeader>
+            <DialogTitle>Study session</DialogTitle>
+            <DialogDescription>
+              Track active study time. Paused time is excluded from your session duration.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <label
+              htmlFor="study-course-context"
+              className="text-sm font-medium text-muted-foreground"
+            >
+              Study context
+            </label>
+            <select
+              id="study-course-context"
+              value={selectedStudyCourse?.id ?? ''}
+              onChange={event => setSelectedStudyCourseId(event.target.value)}
+              disabled={studySessionStarted}
+              className="w-full rounded-xl border border-border bg-card px-3 py-2.5 text-sm text-foreground focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:bg-card"
+            >
+              <option value="">General study (not linked to a course)</option>
+              {(data.courseData ?? []).map(course => (
+                <option key={course.id} value={course.id}>
+                  {course.name}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-muted-foreground">
+              Linking a course associates the session with its next incomplete topic.
+            </p>
           </div>
-        </div>
-      )}
+          <StudySession
+            context={
+              selectedStudyCourse
+                ? { type: 'course', id: selectedStudyCourse.id }
+                : undefined
+            }
+            contextLabel={selectedStudyCourse?.name}
+            onSessionStarted={() => setStudySessionStarted(true)}
+            onSessionEnd={() => {
+              setStudySessionStarted(false);
+              setShowStudySession(false);
+              handleRefetch();
+            }}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

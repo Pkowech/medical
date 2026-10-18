@@ -11,7 +11,13 @@ import { RedisService } from '#infrastructure/redis/redis.service';
 import { AssessmentProgressService } from './assessment-progress.service';
 import { AssessmentAnalyticsService } from '#modules/ai-analytics/services/assessment-analytics.service';
 import { MasteryGateService } from '../../courses/services/mastery-gate.service';
-import { Option, Question, Quiz, QuizAttempt, UserActivityType } from '@prisma/client';
+import {
+  Option,
+  Question,
+  Quiz,
+  QuizAttempt,
+  UserActivityType,
+} from '@prisma/client';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { QuizUtils } from '#common/utils/quiz.utils';
@@ -36,6 +42,43 @@ type PublicQuizQuestion = Omit<
 > & {
   options: Array<Pick<Option, 'id' | 'text' | 'order'>>;
 };
+
+function canonicalizeOptionResponses(value: unknown): string {
+  if (!Array.isArray(value)) {
+    throw new ConflictException('Stored quiz responses are invalid');
+  }
+
+  const responses = value.map((entry) => {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+      throw new ConflictException('Stored quiz responses are invalid');
+    }
+    const response = entry as Record<string, unknown>;
+    const selectedAnswers = response.selectedAnswers;
+    if (
+      typeof response.questionId !== 'string' ||
+      !Array.isArray(selectedAnswers) ||
+      selectedAnswers.some((answer) => typeof answer !== 'string')
+    ) {
+      throw new ConflictException('Stored quiz responses are invalid');
+    }
+    return {
+      questionId: response.questionId,
+      selectedAnswers: [...selectedAnswers].sort(),
+    };
+  });
+
+  if (
+    new Set(responses.map(({ questionId }) => questionId)).size !==
+    responses.length
+  ) {
+    throw new ConflictException('Stored quiz responses are invalid');
+  }
+  return JSON.stringify(
+    responses.sort((left, right) =>
+      left.questionId.localeCompare(right.questionId),
+    ),
+  );
+}
 
 @Injectable()
 @ApiTags('quizzes')
@@ -64,7 +107,9 @@ export class QuizService {
       });
       if (!unit) throw new NotFoundException(`Unit ${unitId} not found`);
       if (courseId && courseId !== unit.courseId) {
-        throw new BadRequestException('The selected unit does not belong to the course');
+        throw new BadRequestException(
+          'The selected unit does not belong to the course',
+        );
       }
       courseId = unit.courseId;
     }
@@ -72,11 +117,17 @@ export class QuizService {
     if (topicId) {
       const topic = await this.prisma.topic.findUnique({
         where: { id: topicId },
-        select: { id: true, unitId: true, unit: { select: { courseId: true } } },
+        select: {
+          id: true,
+          unitId: true,
+          unit: { select: { courseId: true } },
+        },
       });
       if (!topic) throw new NotFoundException(`Topic ${topicId} not found`);
       if (unitId && unitId !== topic.unitId) {
-        throw new BadRequestException('The selected topic does not belong to the unit');
+        throw new BadRequestException(
+          'The selected topic does not belong to the unit',
+        );
       }
       unitId = topic.unitId;
       courseId = topic.unit.courseId;
@@ -91,12 +142,11 @@ export class QuizService {
         ...question,
         courseId: question.courseId ?? courseId,
         unitId: question.unitId ?? unitId,
-        topicIds:
-          question.topicIds?.length
-            ? question.topicIds
-            : data.topicId
-              ? [data.topicId]
-              : [],
+        topicIds: question.topicIds?.length
+          ? question.topicIds
+          : data.topicId
+            ? [data.topicId]
+            : [],
       };
     });
     for (const question of preparedQuestions) {
@@ -110,10 +160,16 @@ export class QuizService {
     if (topicIds.length > 0) {
       const topics = await this.prisma.topic.findMany({
         where: { id: { in: topicIds } },
-        select: { id: true, unitId: true, unit: { select: { courseId: true } } },
+        select: {
+          id: true,
+          unitId: true,
+          unit: { select: { courseId: true } },
+        },
       });
       if (topics.length !== topicIds.length) {
-        throw new BadRequestException('One or more question topic IDs do not exist');
+        throw new BadRequestException(
+          'One or more question topic IDs do not exist',
+        );
       }
       const topicsById = new Map(topics.map((topic) => [topic.id, topic]));
       for (const question of preparedQuestions) {
@@ -162,7 +218,10 @@ export class QuizService {
           },
           select: { id: true },
         });
-        questionRecords.push({ questionId: createdQuestion.id, order: index + 1 });
+        questionRecords.push({
+          questionId: createdQuestion.id,
+          order: index + 1,
+        });
       }
 
       const createdQuiz = await tx.quiz.create({
@@ -184,9 +243,11 @@ export class QuizService {
 
     await this.invalidateAssessmentCaches(
       [
-        ...new Set(preparedQuestions.map((question) => question.unitId).filter(
-          (id): id is string => Boolean(id),
-        )),
+        ...new Set(
+          preparedQuestions
+            .map((question) => question.unitId)
+            .filter((id): id is string => Boolean(id)),
+        ),
         ...(unitId ? [unitId] : []),
       ],
       [
@@ -215,6 +276,64 @@ export class QuizService {
     ]);
   }
 
+  private async ensureTopicPracticeQuiz(
+    tx: Prisma.TransactionClient,
+    topic: { id: string; name: string; unitId: string },
+    questions: Array<{ id: string }>,
+  ): Promise<Quiz> {
+    const quiz = await tx.quiz.upsert({
+      where: { topicPracticeForId: topic.id },
+      create: {
+        title: `${topic.name} Practice Quiz`,
+        description: `Practice questions for ${topic.name}`,
+        topicId: topic.id,
+        topicPracticeForId: topic.id,
+        unitId: topic.unitId,
+        createdBy: 'system-topic-practice',
+        isPublished: true,
+        publishedAt: new Date(),
+        maxAttempts: null,
+        passingScore: 70,
+        questionCount: questions.length,
+        questions: {
+          create: questions.map((question, order) => ({
+            questionId: question.id,
+            order,
+          })),
+        },
+      },
+      update: {
+        title: `${topic.name} Practice Quiz`,
+        description: `Practice questions for ${topic.name}`,
+        unitId: topic.unitId,
+        questionCount: questions.length,
+        isPublished: true,
+        publishedAt: new Date(),
+      },
+    });
+
+    const existingQuestions = await tx.quizQuestion.findMany({
+      where: { quizId: quiz.id },
+      select: { questionId: true },
+    });
+    const existingIds = existingQuestions.map(({ questionId }) => questionId);
+    const expectedIds = questions.map(({ id }) => id);
+    if (
+      existingIds.length !== expectedIds.length ||
+      existingIds.some((id, index) => id !== expectedIds[index])
+    ) {
+      await tx.quizQuestion.deleteMany({ where: { quizId: quiz.id } });
+      await tx.quizQuestion.createMany({
+        data: questions.map((question, order) => ({
+          quizId: quiz.id,
+          questionId: question.id,
+          order,
+        })),
+      });
+    }
+    return quiz;
+  }
+
   async getQuestionBank(filters: QuestionBankFilters) {
     return this.questionBankService.findQuestions({
       ...filters,
@@ -228,13 +347,8 @@ export class QuizService {
       options: Array<Pick<Option, 'id' | 'text' | 'order'>>;
     },
   ): PublicQuizQuestion {
-    const {
-      options,
-      explanation,
-      choices,
-      metadata,
-      ...publicQuestion
-    } = question;
+    const { options, explanation, choices, metadata, ...publicQuestion } =
+      question;
     void explanation;
     void choices;
     void metadata;
@@ -248,10 +362,14 @@ export class QuizService {
     const quiz = await this.prisma.quiz.findUnique({ where: { id: quizId } });
     if (!quiz) throw new NotFoundException(`Quiz ${quizId} not found`);
     if (quiz.createdBy !== creatorId) {
-      throw new BadRequestException('Only the quiz creator can publish this quiz');
+      throw new BadRequestException(
+        'Only the quiz creator can publish this quiz',
+      );
     }
     if (quiz.questionCount < 1) {
-      throw new BadRequestException('A quiz must contain at least one question before publishing');
+      throw new BadRequestException(
+        'A quiz must contain at least one question before publishing',
+      );
     }
 
     const publishedQuiz = await this.prisma.quiz.update({
@@ -294,7 +412,7 @@ export class QuizService {
         },
       });
 
-          if (data.questions && data.questions.length > 0) {
+      if (data.questions && data.questions.length > 0) {
         await tx.quizQuestion.createMany({
           data: data.questions.map((qId, index) => ({
             quizId: createdQuiz.id,
@@ -454,7 +572,7 @@ export class QuizService {
       throw new NotFoundException(`Quiz with ID ${id} not found`);
     }
 
-    if ((existingQuiz).createdBy !== creatorId) {
+    if (existingQuiz.createdBy !== creatorId) {
       this.logger.error(
         `User ${creatorId} not authorized to update quiz ${id}`,
       );
@@ -480,7 +598,7 @@ export class QuizService {
           description: data.description,
           maxAttempts: data.maxAttempts,
           passingScore: data.passingScore,
-          isPublished: data.isPublished ?? (existingQuiz).isPublished,
+          isPublished: data.isPublished ?? existingQuiz.isPublished,
         },
         include: {
           questions: { include: { question: true } },
@@ -511,7 +629,7 @@ export class QuizService {
       throw new NotFoundException(`Quiz with ID ${id} not found`);
     }
 
-    if ((existingQuiz).createdBy !== creatorId) {
+    if (existingQuiz.createdBy !== creatorId) {
       this.logger.error(
         `User ${creatorId} not authorized to delete quiz ${id}`,
       );
@@ -563,11 +681,15 @@ export class QuizService {
       ? quiz.questions.map(({ question }) =>
           this.toPublicQuizQuestion(question),
         )
-      : await this.prisma.question.findMany({
-          where: { unitId, isActive: true },
-          orderBy: { createdAt: 'desc' },
-          include: optionInclude,
-        }).then((items) => items.map((question) => this.toPublicQuizQuestion(question)));
+      : await this.prisma.question
+          .findMany({
+            where: { unitId, isActive: true },
+            orderBy: { createdAt: 'desc' },
+            include: optionInclude,
+          })
+          .then((items) =>
+            items.map((question) => this.toPublicQuizQuestion(question)),
+          );
 
     // Return an empty array when no questions exist for the unit instead of throwing
     // This allows callers (and tests) to handle empty quizzes gracefully.
@@ -616,7 +738,10 @@ export class QuizService {
   }
 
   @ApiOperation({ summary: 'Get questions for a topic' })
-  @ApiResponse({ status: 200, description: 'Topic questions retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Topic questions retrieved successfully',
+  })
   async getQuestionsByTopic(topicId: string): Promise<PublicQuizQuestion[]> {
     const cacheKey = `topic:${topicId}:questions:v2`;
     const cachedQuestions = await this.redisService.get(cacheKey);
@@ -649,28 +774,12 @@ export class QuizService {
     const publicQuestions = questions.map((question) =>
       this.toPublicQuizQuestion(question),
     );
-    await this.redisService.set(cacheKey, JSON.stringify(publicQuestions), 3600);
+    await this.redisService.set(
+      cacheKey,
+      JSON.stringify(publicQuestions),
+      3600,
+    );
     return publicQuestions;
-  }
-
-  @ApiOperation({ summary: 'Get rapid review questions for a user' })
-  @ApiResponse({ status: 200, description: 'Rapid review questions' })
-  async getRapidReviewQuestions(
-    _userId: string,
-    topics?: string[],
-  ): Promise<Question[]> {
-    const where: any = { isActive: true };
-    if (topics && topics.length > 0) {
-      where.category = { in: topics };
-    }
-
-    const questions = await this.prisma.question.findMany({
-      where,
-      orderBy: { successRate: 'asc' },
-      take: 10,
-    });
-
-    return questions;
   }
 
   @ApiOperation({ summary: 'Submit an answer for a question' })
@@ -753,7 +862,9 @@ export class QuizService {
     userId: string,
     unitId: string,
     answers: QuizAnswerDto[],
-  ): Promise<QuizAttempt & { recommendations: QuizPerformanceRecommendations }> {
+  ): Promise<
+    QuizAttempt & { recommendations: QuizPerformanceRecommendations }
+  > {
     const quizInclude = {
       questions: {
         include: {
@@ -799,7 +910,9 @@ export class QuizService {
     if (
       submittedQuestionIds.length !== expectedQuestionIds.length ||
       new Set(submittedQuestionIds).size !== submittedQuestionIds.length ||
-      expectedQuestionIds.some((questionId) => !submittedQuestionIds.includes(questionId))
+      expectedQuestionIds.some(
+        (questionId) => !submittedQuestionIds.includes(questionId),
+      )
     ) {
       throw new BadRequestException(
         'A quiz submission must contain exactly one answer for every quiz question',
@@ -834,6 +947,8 @@ export class QuizService {
 
       let correctAnswers = 0;
       const totalQuestions = activeQuiz.questions.length;
+      let totalPoints = 0;
+      let earnedPoints = 0;
 
       for (const answer of answers) {
         const question = activeQuiz.questions.find(
@@ -850,13 +965,25 @@ export class QuizService {
           question,
           answer.selectedOption,
         );
+        const questionPoints = question.points || 1;
+        const responseScore = Math.min(
+          questionPoints,
+          Math.max(
+            0,
+            gradingResult.partialCredit ??
+              (gradingResult.isCorrect ? questionPoints : 0),
+          ),
+        );
+        totalPoints += questionPoints;
+        earnedPoints += responseScore;
         await tx.userResponse.create({
           data: {
             userId,
             questionId: answer.questionId,
             attemptId: prelimAttempt.id,
-            answer: JSON.stringify(answer.selectedOption),
+            answer: answer.selectedOption,
             isCorrect: gradingResult.isCorrect,
+            score: responseScore,
             createdAt: new Date(),
           },
         });
@@ -880,23 +1007,27 @@ export class QuizService {
         }
 
         // Collect BKT update data — will be dispatched after transaction commits
-        const skillId = (question as any).topicId || (question as any).topic_ids?.[0] || (question as any).topicIds?.[0] || activeQuiz.topicId;
+        const skillId =
+          (question as any).topicId ||
+          (question as any).topic_ids?.[0] ||
+          (question as any).topicIds?.[0] ||
+          activeQuiz.topicId;
         if (skillId) {
           bktUpdates.push({ skillId, isCorrect: gradingResult.isCorrect });
         }
       }
 
-      const { score: scorePercentage, isPassed } = QuizUtils.calculateScore(
-        correctAnswers,
-        totalQuestions,
-        activeQuiz.passingScore || 70,
+      const scorePercentage = QuizUtils.calculatePointsPercentage(
+        earnedPoints,
+        totalPoints,
       );
+      const isPassed = scorePercentage >= (activeQuiz.passingScore || 70);
 
       const attempt = await tx.quizAttempt.update({
         where: { id: prelimAttempt.id },
         data: {
           score: scorePercentage,
-          maxScore: totalQuestions,
+          maxScore: totalPoints,
           percentage: scorePercentage,
           isPassed,
           completedAt: new Date(),
@@ -922,15 +1053,6 @@ export class QuizService {
       if (isPassed && activeQuiz.unitId) {
         // REMOVE THIS LINE: await tx.unitProgress.upsert({...});
       }
-
-      await this.progressService.updateProgress(userId, activeQuiz.id, {
-        isPassed,
-        completionPercentage: 100,
-        bestScore: scorePercentage,
-        totalAttempts: existingAttempts + 1,
-      });
-
-      await this.analyticsService.generateAnalytics(userId, activeQuiz.id);
 
       // Trigger mastery gate logic for topic-level quizzes
       if (activeQuiz.topicId) {
@@ -965,6 +1087,9 @@ export class QuizService {
       };
     });
 
+    await this.progressService.updateProgress(userId, activeQuiz.id);
+    await this.analyticsService.generateAnalytics(userId, activeQuiz.id);
+
     if (result.autoQuizCompleted) {
       this.eventEmitter.emit('auto-quiz.completed', {
         userId,
@@ -985,41 +1110,84 @@ export class QuizService {
       void this.analyticsService
         .updateBktForAssessment(userId, skillId, isCorrect)
         .catch((err) =>
-          this.logger.warn(`Failed to update BKT for skill ${skillId}: ${String(err)}`),
+          this.logger.warn(
+            `Failed to update BKT for skill ${skillId}: ${String(err)}`,
+          ),
         );
     }
 
-    await Promise.all(
-      Array.from(reviewAnswersByTopic.entries()).map(async ([topicId, reviewAnswers]) => {
-        try {
-          await this.flashcardsService.recordTopicQuizReviews(
-            userId,
-            topicId,
-            reviewAnswers,
-          );
-        } catch (error) {
-          this.logger.warn(
-            `Quiz ${activeQuiz.id} was recorded, but review cards could not be scheduled for topic ${topicId}: ${String(error)}`,
-          );
-        }
-      }),
+    const reviewAnswersByQuestion = new Map(
+      [...reviewAnswersByTopic.values()]
+        .flat()
+        .map((answer) => [answer.questionId, answer]),
     );
+    try {
+      await this.flashcardsService.recordTopicQuizReviews(
+        userId,
+        activeQuiz.topicId,
+        [...reviewAnswersByQuestion.values()],
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Quiz ${activeQuiz.id} was recorded, but its review cards could not be scheduled: ${String(error)}`,
+      );
+    }
 
-    const recommendations = await this.recommendationService.recommendForAnswers(
-      userId,
-      {
-        topicId: activeQuiz.topicId,
-        unitId: activeQuiz.unitId,
-        courseId: activeQuiz.unit?.courseId,
-      },
-      [...reviewAnswersByTopic.values()].flat(),
-    );
+    const recommendations =
+      await this.recommendationService.recommendForAnswers(
+        userId,
+        {
+          topicId: activeQuiz.topicId,
+          unitId: activeQuiz.unitId,
+          courseId: activeQuiz.unit?.courseId,
+        },
+        [...reviewAnswersByTopic.values()].flat(),
+      );
 
     return { ...result.attempt, recommendations };
   }
 
+  @ApiOperation({ summary: 'Get progress for a topic quiz' })
+  async getTopicQuizProgress(userId: string, topicId: string) {
+    const topic = await this.prisma.topic.findUnique({
+      where: { id: topicId },
+      select: { id: true },
+    });
+    if (!topic)
+      throw new NotFoundException(`Topic with ID ${topicId} not found`);
+
+    const attempts = await this.prisma.quizAttempt.findMany({
+      where: {
+        userId,
+        completedAt: { not: null },
+        quiz: { topicId },
+      },
+      select: {
+        percentage: true,
+        isPassed: true,
+        completedAt: true,
+      },
+      orderBy: { completedAt: 'desc' },
+    });
+    const scores = attempts.map((attempt) => attempt.percentage);
+    return {
+      topicId,
+      totalAttempts: attempts.length,
+      latestScore: scores[0] ?? null,
+      bestScore: scores.length ? Math.max(...scores) : null,
+      averageScore: scores.length
+        ? scores.reduce((total, score) => total + score, 0) / scores.length
+        : null,
+      isPassed: attempts.some((attempt) => attempt.isPassed),
+      lastAttemptedAt: attempts[0]?.completedAt ?? null,
+    };
+  }
+
   @ApiOperation({ summary: 'Submit a topic-level quiz' })
-  @ApiResponse({ status: 200, description: 'Topic quiz submitted successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Topic quiz submitted successfully',
+  })
   async submitTopicQuiz(
     userId: string,
     topicId: string,
@@ -1039,18 +1207,22 @@ export class QuizService {
         where: { id: topicId },
         select: {
           id: true,
+          name: true,
           unitId: true,
           unit: { select: { courseId: true } },
         },
       });
-      if (!topic) throw new NotFoundException(`Topic with ID ${topicId} not found`);
+      if (!topic)
+        throw new NotFoundException(`Topic with ID ${topicId} not found`);
       if (
         !Array.isArray(responses) ||
         responses.length === 0 ||
         responses.length > 100 ||
         responses.some((response) => !response || typeof response !== 'object')
       ) {
-        throw new BadRequestException('Topic quiz responses must contain 1–100 answer objects');
+        throw new BadRequestException(
+          'Topic quiz responses must contain 1–100 answer objects',
+        );
       }
 
       const questionIds = responses.map((r) => r.questionId);
@@ -1058,11 +1230,14 @@ export class QuizService {
         questionIds.some((id) => typeof id !== 'string' || !id) ||
         new Set(questionIds).size !== questionIds.length
       ) {
-        throw new BadRequestException('Topic quiz responses contain invalid or duplicate question IDs');
+        throw new BadRequestException(
+          'Topic quiz responses contain invalid or duplicate question IDs',
+        );
       }
       const fetchedQuestions = await this.prisma.question.findMany({
         where: { topicIds: { has: topicId }, isActive: true },
         include: { options: true },
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
       });
       if (
         fetchedQuestions.length !== questionIds.length ||
@@ -1072,95 +1247,76 @@ export class QuizService {
           'A topic quiz must answer every current question exactly once',
         );
       }
-      const questionMap = new Map(fetchedQuestions.map((q) => [q.id, q]));
-      const selectedAnswersByQuestion = new Map<string, string[]>();
-
-      let score = 0;
-      let correctAnswers = 0;
-      let totalPoints = 0;
-      const reviewAnswers: Array<{ questionId: string; isCorrect: boolean }> = [];
-
-      for (const response of responses) {
-        const question = questionMap.get(response.questionId);
-        if (!question || !Array.isArray(response.selectedAnswers)) {
-          throw new BadRequestException('A submitted question does not belong to this topic');
-        }
-
-        const selectedIds = response.selectedAnswers;
-        if (
-          selectedIds.some((id) => typeof id !== 'string') ||
-          new Set(selectedIds).size !== selectedIds.length
-        ) {
-          throw new BadRequestException('A topic quiz response contains invalid or duplicate options');
-        }
-        const optionIds = new Set(question.options.map((option) => option.id));
-        if (selectedIds.some((id) => !optionIds.has(id))) {
-          throw new BadRequestException('A selected option does not belong to its question');
-        }
-
-        totalPoints += question.points || 1;
-        const correctOptions = question.options.filter(option => option.isCorrect);
-        const isCorrect =
-          correctOptions.length === selectedIds.length &&
-          correctOptions.every(option => selectedIds.includes(option.id));
-        if (isCorrect) {
-          score += question.points || 1;
-          correctAnswers += 1;
-        }
-        reviewAnswers.push({ questionId: question.id, isCorrect });
-        selectedAnswersByQuestion.set(question.id, selectedIds);
-      }
-
-      const scorePercentage = totalPoints > 0 ? Math.round((score / totalPoints) * 100) : 0;
-      const passed = scorePercentage >= 70;
-      await this.prisma.topicQuizAttempt.create({
-        data: {
-          userId,
-          topicId,
-          score: scorePercentage,
-          questionCount: responses.length,
-          correctAnswers,
-          responses: reviewAnswers.map((answer) => ({
-            questionId: answer.questionId,
-            isCorrect: answer.isCorrect,
-            selectedAnswers: selectedAnswersByQuestion.get(answer.questionId) ?? [],
-          })) as Prisma.InputJsonValue,
-        },
-      });
-      const recommendations = await this.recommendationService.recommendForAnswers(
-        userId,
-        { topicId, unitId: topic.unitId, courseId: topic.unit.courseId },
-        reviewAnswers,
+      const graded = QuizUtils.gradeOptionQuiz(fetchedQuestions, responses);
+      const reviewAnswers = graded.responses.map(
+        ({ questionId, isCorrect }) => ({
+          questionId,
+          isCorrect,
+        }),
       );
-      this.eventEmitter.emit('assessment.completed', {
-        userId,
-        assessmentId: topicId,
-        courseId: topic.unit.courseId,
-        topicId,
-        score: scorePercentage,
-        maxScore: 100,
-        timestamp: new Date(),
-        attemptData: {
-          score: scorePercentage,
-          maxScore: 100,
-          passed,
-          progressPercentage: 100,
-          timestamp: new Date().toISOString(),
-        },
+      const scorePercentage = graded.percentage;
+      const passed = scorePercentage >= 70;
+      const topicQuiz = await this.prisma.$transaction(async (tx) => {
+        const quiz = await this.ensureTopicPracticeQuiz(
+          tx,
+          topic,
+          fetchedQuestions,
+        );
+        const attempt = await tx.quizAttempt.create({
+          data: {
+            userId,
+            quizId: quiz.id,
+            completedAt: new Date(),
+            score: scorePercentage,
+            maxScore: graded.totalPoints,
+            percentage: scorePercentage,
+            correctAnswers: graded.correctAnswers,
+            totalQuestions: fetchedQuestions.length,
+            isPassed: passed,
+          },
+        });
+        await tx.userResponse.createMany({
+          data: graded.responses.map((response) => ({
+            userId,
+            questionId: response.questionId,
+            attemptId: attempt.id,
+            answer: response.selectedAnswers as Prisma.InputJsonValue,
+            isCorrect: response.isCorrect,
+            score: response.earnedPoints,
+          })),
+        });
+        return quiz;
       });
+      await this.progressService.updateProgress(userId, topicQuiz.id);
+      await this.analyticsService.generateAnalytics(userId, topicQuiz.id);
+      const recommendations =
+        await this.recommendationService.recommendForAnswers(
+          userId,
+          { topicId, unitId: topic.unitId, courseId: topic.unit.courseId },
+          reviewAnswers,
+        );
       for (const answer of reviewAnswers) {
         void this.analyticsService
           .updateBktForAssessment(userId, topicId, answer.isCorrect)
           .catch((error) =>
-            this.logger.warn(`Could not update topic mastery for ${topicId}: ${String(error)}`),
+            this.logger.warn(
+              `Could not update topic mastery for ${topicId}: ${String(error)}`,
+            ),
           );
       }
-      const reviewCardsScheduled =
-        await this.flashcardsService.recordTopicQuizReviews(
-          userId,
-          topicId,
-          reviewAnswers,
+      let reviewCardsScheduled = 0;
+      try {
+        reviewCardsScheduled =
+          await this.flashcardsService.recordTopicQuizReviews(
+            userId,
+            topicId,
+            reviewAnswers,
+          );
+      } catch (error) {
+        this.logger.warn(
+          `Topic quiz ${topicQuiz.id} was recorded, but its review cards could not be scheduled: ${String(error)}`,
         );
+      }
       const mastery = await this.masteryGateService.onQuizComplete(
         userId,
         topicId,
@@ -1174,16 +1330,23 @@ export class QuizService {
             userId,
             type: UserActivityType.QUIZ_ATTEMPT,
             description: `Completed topic quiz: ${topicId}`,
-            details: { topicId, score: scorePercentage, passed, totalPoints },
+            details: {
+              topicId,
+              score: scorePercentage,
+              passed,
+              totalPoints: graded.totalPoints,
+            },
           },
         });
       } catch (error) {
-        this.logger.warn(`Could not record activity for topic quiz ${topicId}: ${String(error)}`);
+        this.logger.warn(
+          `Could not record activity for topic quiz ${topicId}: ${String(error)}`,
+        );
       }
-      
+
       return {
         score: scorePercentage,
-        feedback: passed 
+        feedback: passed
           ? `Great job! You scored ${scorePercentage}%`
           : `You scored ${scorePercentage}%. Keep practicing!`,
         passed,
@@ -1204,124 +1367,199 @@ export class QuizService {
     topicId: string,
     attemptId: string,
     responses: Array<{ questionId: string; selectedAnswers: string[] }>,
-  ): Promise<{ attemptId: string; score: number; validatedAt: Date; formative: true }> {
+  ): Promise<{
+    attemptId: string;
+    score: number;
+    validatedAt: Date;
+    formative: true;
+  }> {
     if (typeof attemptId !== 'string' || !attemptId.trim()) {
       throw new BadRequestException('An offline attempt ID is required');
     }
-    if (!Array.isArray(responses) || responses.length === 0) {
-      throw new BadRequestException('At least one practice response is required');
+    if (
+      !Array.isArray(responses) ||
+      responses.length === 0 ||
+      responses.length > 100
+    ) {
+      throw new BadRequestException(
+        'Practice responses must contain 1–100 answers',
+      );
     }
-    if (responses.some(response => !response || typeof response !== 'object' || Array.isArray(response))) {
+    if (
+      responses.some(
+        (response) =>
+          !response || typeof response !== 'object' || Array.isArray(response),
+      )
+    ) {
       throw new BadRequestException('Practice responses must be objects');
     }
 
     const questionIds = responses.map((response) => response.questionId);
     if (
-      questionIds.some((questionId) => typeof questionId !== 'string' || !questionId) ||
+      questionIds.some(
+        (questionId) => typeof questionId !== 'string' || !questionId,
+      ) ||
       new Set(questionIds).size !== questionIds.length
     ) {
-      throw new BadRequestException('Practice responses contain invalid or duplicate question IDs');
+      throw new BadRequestException(
+        'Practice responses contain invalid or duplicate question IDs',
+      );
     }
+
+    const topic = await this.prisma.topic.findUnique({
+      where: { id: topicId },
+      select: { id: true, name: true, unitId: true },
+    });
+    if (!topic)
+      throw new NotFoundException(`Topic with ID ${topicId} not found`);
 
     const questions = await this.prisma.question.findMany({
       where: {
         isActive: true,
         topicIds: { has: topicId },
       },
-      select: {
-        id: true,
-        points: true,
-        options: { select: { id: true, isCorrect: true } },
-      },
+      include: { options: { select: { id: true, isCorrect: true } } },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     });
     if (
       questions.length !== questionIds.length ||
-      questions.some(question => !questionIds.includes(question.id))
+      questions.some((question) => !questionIds.includes(question.id))
     ) {
       throw new BadRequestException(
         'A practice attempt must answer every current question for this topic',
       );
     }
 
-    const questionById = new Map(questions.map((question) => [question.id, question]));
-    const normalizedResponses = responses.map((response) => {
+    const graded = QuizUtils.gradeOptionQuiz(questions, responses);
+    const normalizedResponses = graded.responses.map((response) => ({
+      questionId: response.questionId,
+      selectedAnswers: [...response.selectedAnswers].sort(),
+    }));
+    const score = graded.percentage;
+    const attempt = await this.prisma.$transaction(async (tx) => {
+      const storedAttempt = await tx.offlinePracticeAttempt.upsert({
+        where: { id: attemptId },
+        create: {
+          id: attemptId,
+          userId,
+          topicId,
+          responses: normalizedResponses as Prisma.InputJsonValue,
+          score,
+        },
+        update: {},
+        select: {
+          id: true,
+          userId: true,
+          topicId: true,
+          responses: true,
+          score: true,
+          validatedAt: true,
+        },
+      });
+      const storedAnswerKey = canonicalizeOptionResponses(
+        storedAttempt.responses,
+      );
+      const requestedAnswerKey =
+        canonicalizeOptionResponses(normalizedResponses);
       if (
-        !Array.isArray(response.selectedAnswers) ||
-        response.selectedAnswers.some((optionId) => typeof optionId !== 'string') ||
-        new Set(response.selectedAnswers).size !== response.selectedAnswers.length
+        storedAttempt.userId !== userId ||
+        storedAttempt.topicId !== topicId ||
+        storedAnswerKey !== requestedAnswerKey
       ) {
-        throw new BadRequestException('Practice response contains invalid or duplicate options');
+        throw new ConflictException(
+          'This offline attempt ID is already associated with another submission',
+        );
       }
-      const question = questionById.get(response.questionId);
-      if (!question) {
-        throw new BadRequestException('A submitted question does not belong to this topic');
+
+      const topicQuiz = await this.ensureTopicPracticeQuiz(
+        tx,
+        topic,
+        questions,
+      );
+      const existingQuizAttempt = await tx.quizAttempt.findUnique({
+        where: { id: attemptId },
+        include: { responses: { select: { questionId: true, answer: true } } },
+      });
+      const isNewQuizAttempt = !existingQuizAttempt;
+      if (existingQuizAttempt) {
+        const existingAnswers = canonicalizeOptionResponses(
+          existingQuizAttempt.responses.map((response) => ({
+            questionId: response.questionId,
+            selectedAnswers: response.answer,
+          })),
+        );
+        if (
+          existingQuizAttempt.userId !== userId ||
+          existingQuizAttempt.quizId !== topicQuiz.id ||
+          existingAnswers !== requestedAnswerKey
+        ) {
+          throw new ConflictException(
+            'This offline attempt ID is already associated with another quiz attempt',
+          );
+        }
+      } else {
+        await tx.quizAttempt.create({
+          data: {
+            id: attemptId,
+            userId,
+            quizId: topicQuiz.id,
+            completedAt: storedAttempt.validatedAt,
+            score,
+            percentage: score,
+            maxScore: graded.totalPoints,
+            correctAnswers: graded.correctAnswers,
+            totalQuestions: graded.responses.length,
+            isPassed: score >= (topicQuiz.passingScore ?? 70),
+          },
+        });
+        await tx.userResponse.createMany({
+          data: graded.responses.map((response) => ({
+            userId,
+            questionId: response.questionId,
+            attemptId,
+            answer: response.selectedAnswers as Prisma.InputJsonValue,
+            isCorrect: response.isCorrect,
+            score: response.earnedPoints,
+          })),
+        });
       }
-      const optionIds = new Set(question.options.map((option) => option.id));
-      if (response.selectedAnswers.some((optionId) => !optionIds.has(optionId))) {
-        throw new BadRequestException('A selected option does not belong to its question');
-      }
-      return {
-        questionId: response.questionId,
-        selectedAnswers: [...response.selectedAnswers].sort(),
-      };
+      return { storedAttempt, topicQuiz, isNewQuizAttempt };
     });
 
-    let earnedPoints = 0;
-    let totalPoints = 0;
-    for (const response of normalizedResponses) {
-      const question = questionById.get(response.questionId)!;
-      const correctOptionIds = question.options
-        .filter((option) => option.isCorrect)
-        .map((option) => option.id)
-        .sort();
-      const points = question.points || 1;
-      totalPoints += points;
-      if (
-        correctOptionIds.length === response.selectedAnswers.length &&
-        correctOptionIds.every((optionId, index) => optionId === response.selectedAnswers[index])
-      ) {
-        earnedPoints += points;
-      }
-    }
-    const score = totalPoints > 0 ? Math.round((earnedPoints / totalPoints) * 100) : 0;
-
-    const attempt = await this.prisma.offlinePracticeAttempt.upsert({
-      where: { id: attemptId },
-      create: {
-        id: attemptId,
+    if (attempt.isNewQuizAttempt) {
+      await this.analyticsService.generateAnalytics(
         userId,
-        topicId,
-        responses: normalizedResponses as Prisma.InputJsonValue,
-        score,
-      },
-      update: {},
-      select: { id: true, userId: true, topicId: true, responses: true, score: true, validatedAt: true },
-    });
-
-    const storedResponses = attempt.responses as typeof normalizedResponses;
-    const storedAnswerKey = JSON.stringify(
-      storedResponses
-        .map((response) => ({
-          questionId: response.questionId,
-          selectedAnswers: [...response.selectedAnswers].sort(),
-        }))
-        .sort((left, right) => left.questionId.localeCompare(right.questionId)),
-    );
-    const requestedAnswerKey = JSON.stringify(
-      [...normalizedResponses].sort((left, right) => left.questionId.localeCompare(right.questionId)),
-    );
-    if (
-      attempt.userId !== userId ||
-      attempt.topicId !== topicId ||
-      storedAnswerKey !== requestedAnswerKey
-    ) {
-      throw new ConflictException('This offline attempt ID is already associated with another submission');
+        attempt.topicQuiz.id,
+      );
+      for (const answer of graded.responses) {
+        void this.analyticsService
+          .updateBktForAssessment(userId, topicId, answer.isCorrect)
+          .catch((error) =>
+            this.logger.warn(
+              `Could not update topic mastery for ${topicId}: ${String(error)}`,
+            ),
+          );
+      }
+      try {
+        await this.flashcardsService.recordTopicQuizReviews(
+          userId,
+          topicId,
+          graded.responses.map(({ questionId, isCorrect }) => ({
+            questionId,
+            isCorrect,
+          })),
+        );
+      } catch (error) {
+        this.logger.warn(
+          `Offline quiz ${attemptId} was recorded, but its review cards could not be scheduled: ${String(error)}`,
+        );
+      }
     }
 
     return {
-      attemptId: attempt.id,
-      score: attempt.score,
-      validatedAt: attempt.validatedAt,
+      attemptId: attempt.storedAttempt.id,
+      score: attempt.storedAttempt.score,
+      validatedAt: attempt.storedAttempt.validatedAt,
       formative: true,
     };
   }
