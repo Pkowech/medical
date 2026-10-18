@@ -95,6 +95,9 @@ export interface ScheduleEvent {
   status?: string; // pending, in_progress, completed, cancelled
   category?: string; // academic, social, personal, work
   color?: string; // Hex color for custom styling
+  courseId?: string | null;
+  topicId?: string | null;
+  goalId?: string;
   
   // Recurring events
   isRecurring?: boolean;

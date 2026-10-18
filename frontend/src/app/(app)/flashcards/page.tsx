@@ -12,7 +12,7 @@ import { Progress } from '@/shared/components/ui/progress';
 export default function FlashcardsPage() {
   const router = useRouter();
   const { user } = useAuthStore();
-  const { stats, isLoading, syncCards } = useSpacedRepetition(user?.id || '');
+  const { stats, isLoading, refreshCards } = useSpacedRepetition(user?.id || '');
 
   if (isLoading) {
     return (
@@ -29,9 +29,9 @@ export default function FlashcardsPage() {
           <h1 className="text-3xl font-bold text-foreground dark:text-foreground">Flashcard Decks</h1>
           <p className="text-muted-foreground dark:text-muted-foreground">Master medical concepts with spaced repetition.</p>
         </div>
-        <Button variant="outline" onClick={() => syncCards()}>
+        <Button variant="outline" onClick={() => void refreshCards()}>
           <RefreshCw className="h-4 w-4 mr-2" />
-          Sync Progress
+          Refresh reviews
         </Button>
       </div>
 
@@ -55,18 +55,18 @@ export default function FlashcardsPage() {
           <CardContent>
             <div className="flex items-center">
               <CheckCircle2 className="h-8 w-8 text-green-500 mr-3" />
-              <div className="text-3xl font-bold">{stats?.total ? stats.total - stats.due : 0}</div>
+              <div className="text-3xl font-bold">{stats?.mastered || 0}</div>
             </div>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Retention Rate</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Average Ease</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center">
               <Brain className="h-8 w-8 text-blue-500 mr-3" />
-              <div className="text-3xl font-bold">85%</div>
+              <div className="text-3xl font-bold">{stats?.avgEaseFactor?.toFixed(1) ?? '—'}</div>
             </div>
           </CardContent>
         </Card>
