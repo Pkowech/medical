@@ -68,8 +68,17 @@ class FlashcardApiService {
     return response.data as Flashcard;
   }
 
-  async getDueCards(userId: string): Promise<UserFlashcardProgress[]> {
-    const response = await api.get(`/flashcards/due/${userId}`);
+  async getDueCards(
+    userId: string,
+    filters: { courseId?: string; topicId?: string } = {},
+  ): Promise<UserFlashcardProgress[]> {
+    const params = new URLSearchParams();
+    if (filters.courseId) params.set('courseId', filters.courseId);
+    if (filters.topicId) params.set('topicId', filters.topicId);
+    const query = params.toString();
+    const response = await api.get(
+      `/flashcards/due/${userId}${query ? `?${query}` : ''}`,
+    );
     return response.data as UserFlashcardProgress[];
   }
 

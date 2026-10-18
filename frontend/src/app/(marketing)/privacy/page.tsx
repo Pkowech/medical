@@ -1,9 +1,7 @@
 import type { Metadata } from 'next';
+import { getPageMetadata } from '@/core/metadata/pageMetadata';
 
-export const metadata: Metadata = {
-  title: 'Privacy Notice | MedTrack Hub',
-  description: 'How MedTrack Hub handles personal data under Kenya’s Data Protection Act, 2019.',
-};
+export const metadata: Metadata = getPageMetadata('/privacy');
 
 const sections = [
   {

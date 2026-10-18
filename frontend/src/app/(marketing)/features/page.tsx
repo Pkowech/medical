@@ -1,7 +1,11 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import { features } from '@/core/marketing/data/features';
 import { FeatureCard } from '@/core/marketing/cards/FeatureCard';
+import { getPageMetadata } from '@/core/metadata/pageMetadata';
+
+export const metadata: Metadata = getPageMetadata('/features');
 
 export default function FeaturesPage() {
   return (

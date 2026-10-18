@@ -11,16 +11,21 @@ interface SpacedRepetitionReviewProps {
   questionId?: string;
   question?: string;
   answer?: string;
+  courseId?: string;
+  topicId?: string;
 }
 
 export function SpacedRepetitionReview({
   questionId: _questionId,
   question: propQuestion,
   answer: propAnswer,
+  courseId,
+  topicId,
 }: SpacedRepetitionReviewProps) {
   const { data: session } = useSession();
-  const { currentCard, stats, isLoading, error, rateCard } = useSpacedRepetition(
-    session?.user?.id || ''
+  const { currentCard, stats, isLoading, error, rateCard, refreshCards } = useSpacedRepetition(
+    session?.user?.id || '',
+    { courseId, topicId },
   );
 
   const [showAnswer, setShowAnswer] = useState(false);
@@ -51,7 +56,12 @@ export function SpacedRepetitionReview({
   if (error) {
     return (
       <Alert variant="destructive">
-        <AlertDescription>{error.message}</AlertDescription>
+        <AlertDescription className="flex items-center justify-between gap-3">
+          <span>{error.message}</span>
+          <Button type="button" variant="outline" size="sm" onClick={() => void refreshCards()}>
+            Retry
+          </Button>
+        </AlertDescription>
       </Alert>
     );
   }
@@ -119,7 +129,7 @@ export function SpacedRepetitionReview({
                   }}
                 >
                   <ThumbsDown className="h-4 w-4 mr-2" />
-                  Hard (1)
+                  Hard (2)
                 </Button>
                 <Button
                   variant="outline"
@@ -131,7 +141,7 @@ export function SpacedRepetitionReview({
                   }}
                 >
                   <ThumbsUp className="h-4 w-4 mr-2" />
-                  Good (2)
+                  Good (4)
                 </Button>
                 <Button
                   className="px-10 bg-green-600 hover:bg-green-700 text-white shadow-lg"
@@ -142,7 +152,7 @@ export function SpacedRepetitionReview({
                   }}
                 >
                   <CheckCircle2 className="h-4 w-4 mr-2" />
-                  Easy (3)
+                  Easy (5)
                 </Button>
               </div>
             </div>

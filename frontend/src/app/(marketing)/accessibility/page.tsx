@@ -1,9 +1,7 @@
 import type { Metadata } from 'next';
+import { getPageMetadata } from '@/core/metadata/pageMetadata';
 
-export const metadata: Metadata = {
-  title: 'Accessibility | MedTrack Hub',
-  description: 'Accessibility information and contact details for MedTrack Hub.',
-};
+export const metadata: Metadata = getPageMetadata('/accessibility');
 
 export default function AccessibilityPage() {
   return (

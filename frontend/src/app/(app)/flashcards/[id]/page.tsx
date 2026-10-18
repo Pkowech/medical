@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/features/auth/store/useAuthStore';
 import { SpacedRepetitionReview } from '@/features/learning-management/study/components/SpacedRepetitionReview';
 import { Button } from '@/shared/components/ui/button';
@@ -10,6 +10,7 @@ import { ChevronLeft } from 'lucide-react';
 export default function FlashcardStudyPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user } = useAuthStore();
   
   // id could be 'all' or a specific categoryId/unitId in the future
@@ -28,9 +29,8 @@ export default function FlashcardStudyPage() {
       <div className="bg-card dark:bg-card rounded-xl shadow-lg border border-border dark:border-border p-6">
         {user?.id ? (
           <SpacedRepetitionReview 
-            questionId="" // The index/current card is handled inside the component
-            question="" 
-            answer=""
+            courseId={searchParams.get('courseId') ?? undefined}
+            topicId={searchParams.get('topicId') ?? undefined}
           />
         ) : (
           <div className="text-center py-12">

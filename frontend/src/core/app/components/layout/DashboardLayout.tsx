@@ -70,6 +70,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
     const coursePathSegments = pathname?.split('/').filter(Boolean) ?? [];
     const isCoursePage = coursePathSegments[0] === 'courses' && coursePathSegments.length > 2;
+    const isUnitContentPage =
+        coursePathSegments[0] === 'courses' && coursePathSegments[2] === 'units';
     const isMaterialViewPage =
         coursePathSegments[0] === 'study-planner' &&
         coursePathSegments[1] === 'materials' &&
@@ -100,7 +102,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
                 {/* Main app column (center) */}
                 <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-                    {!isQuizSessionPage && !isImmersive && (
+                    {!isQuizSessionPage && !isUnitContentPage && !isImmersive && (
                         <AppHeader />
                     )}
 

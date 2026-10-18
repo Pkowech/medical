@@ -185,7 +185,7 @@ export const CourseSidebar = ({
                                     <p className="text-sm font-medium text-foreground dark:text-muted-foreground">{lesson.title}</p>
                                     <div className="flex items-center space-x-2">
                                       <p className="text-xs text-muted-foreground dark:text-muted-foreground">{lesson.duration}</p>
-                                      {lesson.failedAttempts && lesson.failedAttempts > 0 && (
+                                      {lesson.failedAttempts != null && lesson.failedAttempts > 0 && (
                                         <span className="text-[10px] bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 px-1 rounded">
                                           {lesson.failedAttempts} attempts
                                         </span>

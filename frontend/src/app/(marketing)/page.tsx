@@ -1,14 +1,16 @@
 import { Metadata } from 'next';
 import MarketingPage from '@/core/marketing/MarketingPage';
+import { getPageMetadata } from '@/core/metadata/pageMetadata';
 
+const pageMetadata = getPageMetadata('/');
 export const metadata: Metadata = {
-  title: 'MedTrack Hub - Intelligent Medical Education',
-  description:
-    'Explore medical courses, practice with quizzes and flashcards, plan study sessions, and track your learning progress with MedTrack Hub.',
+  title: {
+    absolute: pageMetadata.title,
+  },
+  description: pageMetadata.description,
   openGraph: {
-    title: 'MedTrack Hub - Intelligent Medical Education',
-    description:
-      'Explore medical courses, practice with quizzes and flashcards, plan study sessions, and track your learning progress with MedTrack Hub.',
+    title: pageMetadata.title,
+    description: pageMetadata.description,
     type: 'website',
     images: ['/og-image.png'],
   },

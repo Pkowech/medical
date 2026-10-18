@@ -1,10 +1,8 @@
 import type { Metadata } from 'next';
 import ScheduleComponent from '@/features/learning-management/components/schedule/schedule-component';
+import { getPageMetadata } from '@/core/metadata/pageMetadata';
 
-export const metadata: Metadata = {
-  title: 'Academic Schedule | MedTrack Hub',
-  description: 'Manage your medical school timetable, lectures, study sessions, and exam deadlines.',
-};
+export const metadata: Metadata = getPageMetadata('/study-planner/schedule');
 
 export default function SchedulePage() {
   return <ScheduleComponent />;

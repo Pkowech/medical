@@ -1,10 +1,8 @@
 import { Metadata } from 'next';
 import { SessionManager } from '@/features/auth/components/SessionManager';
+import { getPageMetadata } from '@/core/metadata/pageMetadata';
 
-export const metadata: Metadata = {
-  title: 'Active Sessions | MedTrack Hub',
-  description: 'Manage your active sessions and devices',
-};
+export const metadata: Metadata = getPageMetadata('/profile/sessions');
 
 export default async function SessionsPage() {
   return (

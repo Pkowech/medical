@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { 
   Calendar,
   ChevronLeft, 
@@ -42,9 +43,11 @@ const EVENT_TYPES = {
   group: { label: 'Group', color: 'bg-orange-100 text-orange-700', icon: Users },
   exam: { label: 'Exam', color: 'bg-red-100 text-red-700 font-bold', icon: Calendar },
   goal: { label: 'Goal', color: 'bg-amber-100 text-amber-700', icon: Target },
+  review: { label: 'Course review', color: 'bg-orange-100 text-orange-700', icon: BookOpen },
 };
 
 export default function ScheduleComponent() {
+  const router = useRouter();
   const { user } = useAuth();
   const { setHeader } = usePageHeader();
 
@@ -470,7 +473,39 @@ export default function ScheduleComponent() {
               </div>
             )}
 
-            {isEditMode && selectedEvent ? (
+            {selectedEvent?.type === 'review' ? (
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  These are course flashcards due for spaced-repetition review.
+                </p>
+                {selectedEvent.description && (
+                  <p className="rounded-lg bg-muted p-3 text-sm">{selectedEvent.description}</p>
+                )}
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      const params = new URLSearchParams();
+                      if (selectedEvent.courseId) params.set('courseId', selectedEvent.courseId);
+                      if (selectedEvent.topicId) params.set('topicId', selectedEvent.topicId);
+                      const query = params.toString();
+                      router.push(`/flashcards/all${query ? `?${query}` : ''}`);
+                    }}
+                  >
+                    Start review
+                  </Button>
+                  {selectedEvent.courseId && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => router.push(`/courses/${selectedEvent.courseId}`)}
+                    >
+                      Open course
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ) : isEditMode && selectedEvent ? (
               <EventEditor
                 event={selectedEvent}
                 onUpdate={handleUpdateEvent}

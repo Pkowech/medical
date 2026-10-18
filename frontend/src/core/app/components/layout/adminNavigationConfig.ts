@@ -54,6 +54,14 @@ const adminNavigationConfig: NavigationItem[] = [
     label: 'Content Management',
     href: '/admin/content',
     icon: FileText,
+    children: [
+      {
+        id: 'upload-materials',
+        label: 'Upload Materials',
+        href: '/admin/materials/upload',
+        icon: FileText,
+      },
+    ],
   },
   {
     id: 'roles',

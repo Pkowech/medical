@@ -1,8 +1,7 @@
 import type { Metadata } from 'next';
+import { getPageMetadata } from '@/core/metadata/pageMetadata';
 
-export const metadata: Metadata = {
-  title: 'Cookie and Device Storage Notice | MedTrack Hub',
-};
+export const metadata: Metadata = getPageMetadata('/cookie-policy');
 
 export default function CookiePolicyPage() {
   return (

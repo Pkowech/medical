@@ -163,9 +163,26 @@ export class FlashcardsService {
   })
   async getDueCards(
     userId: string,
+    filters: { courseId?: string; topicId?: string } = {},
   ): Promise<Array<UserFlashcardProgress & { flashcard: Flashcard }>> {
+    const questionFilter =
+      filters.courseId || filters.topicId
+        ? {
+            is: {
+              ...(filters.courseId ? { courseId: filters.courseId } : {}),
+              ...(filters.topicId ? { topicIds: { has: filters.topicId } } : {}),
+            },
+          }
+        : undefined;
+
     return this.prisma.userFlashcardProgress.findMany({
-      where: { userId, nextReview: { lte: new Date() } },
+      where: {
+        userId,
+        nextReview: { lte: new Date() },
+        ...(questionFilter
+          ? { flashcard: { question: questionFilter } }
+          : {}),
+      },
       include: { flashcard: true },
       orderBy: { nextReview: 'asc' },
     });
@@ -203,6 +220,7 @@ export class FlashcardsService {
               question: {
                 select: {
                   topicIds: true,
+                  course: { select: { id: true, name: true } },
                   unit: {
                     select: {
                       id: true,
@@ -238,7 +256,7 @@ export class FlashcardsService {
       const question = progress.flashcard.question;
       const topicId = question?.topicIds[0] ?? null;
       const topicName = topicId ? topicNames.get(topicId) : undefined;
-      const course = question?.unit?.course;
+      const course = question?.course ?? question?.unit?.course;
       const reviewDay = progress.nextReview.toISOString().slice(0, 10);
       const date = reviewDay < startDay ? startDay : reviewDay;
       const key = `${date}:${course?.id ?? 'general'}:${topicId ?? 'general'}`;

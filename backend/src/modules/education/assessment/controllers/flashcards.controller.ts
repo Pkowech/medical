@@ -33,10 +33,12 @@ export class FlashcardsController {
   @Get('due/:userId')
   async getDueCards(
     @Param('userId', ParseUUIDPipe) userId: string,
+    @Query('courseId') courseId: string | undefined,
+    @Query('topicId') topicId: string | undefined,
     @CurrentUser() currentUser: User,
   ) {
     this.assertCanAccessUser(currentUser, userId);
-    return this.flashcardsService.getDueCards(userId);
+    return this.flashcardsService.getDueCards(userId, { courseId, topicId });
   }
 
   @Get('schedule/:userId')

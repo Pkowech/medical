@@ -1,26 +1,23 @@
 import { Button } from '@/shared/components/ui/button';
 import Link from 'next/link';
-import Head from 'next/head';
+import type { Metadata } from 'next';
 import { features } from '@/core/marketing/data/features';
 import { FeatureCard } from '@/core/marketing/cards/FeatureCard';
+import { getPageMetadata } from '@/core/metadata/pageMetadata';
+
+const pageMetadata = getPageMetadata('/about');
+export const metadata: Metadata = {
+  ...pageMetadata,
+  openGraph: {
+    title: `${pageMetadata.title} | MedTrack Hub`,
+    description: pageMetadata.description,
+    type: 'website',
+    images: ['/og-image.png'],
+  },
+};
 
 export default function AboutPage() {
   return (
-    <>
-      <Head>
-        <title>About MedTrack Hub - Our Mission and Vision</title>
-        <meta
-          name="description"
-          content="Learn about MedTrack Hub and its tools for medical courses, practice, study planning, and progress tracking."
-        />
-        <meta property="og:title" content="About MedTrack Hub - Our Mission and Vision" />
-        <meta
-          property="og:description"
-          content="Learn about MedTrack Hub and its tools for medical courses, practice, study planning, and progress tracking."
-        />
-        <meta property="og:type" content="website" />
-        <meta property="og:image" content="/og-image.png" />
-      </Head>
       <main className="container mx-auto py-12 px-4">
         {/* Hero Section */}
         <section aria-labelledby="about-hero-heading" className="mb-14 text-center sm:mb-20">
@@ -94,6 +91,5 @@ export default function AboutPage() {
           </Link>
         </section>
       </main>
-    </>
   );
 }

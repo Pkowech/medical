@@ -1,23 +1,37 @@
-'use client';
-
-import { useParams } from 'next/navigation';
+import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
 import { features } from '@/core/marketing/data/features';
 
-const FeaturePage = () => {
-  const params = useParams();
-  const slug = params?.slug;
-  const feature =
-    typeof slug === 'string'
-      ? features.find(f => f.title.toLowerCase().replace(/\s+/g, '-') === slug)
-      : undefined;
+type FeaturePageProps = {
+  params: Promise<{ slug: string }>;
+};
+
+const getFeature = (slug: string) =>
+  features.find(feature => feature.title.toLowerCase().replace(/\s+/g, '-') === slug);
+
+export async function generateMetadata({ params }: FeaturePageProps): Promise<Metadata> {
+  const { slug } = await params;
+  const feature = getFeature(slug);
 
   if (!feature) {
-    return (
-      <main className="min-h-[50vh] px-4 py-16 text-center sm:px-6">
-        <h1 className="text-2xl font-bold text-foreground sm:text-3xl">Feature not found</h1>
-        <p className="mt-3 text-base text-muted-foreground">This feature page is not available.</p>
-      </main>
-    );
+    return {
+      title: 'Feature Not Found',
+      description: 'The requested MedTrack Hub feature page is not available.',
+    };
+  }
+
+  return {
+    title: feature.title,
+    description: feature.description,
+  };
+}
+
+export default async function FeaturePage({ params }: FeaturePageProps) {
+  const { slug } = await params;
+  const feature = getFeature(slug);
+
+  if (!feature) {
+    notFound();
   }
 
   return (
@@ -42,6 +56,4 @@ const FeaturePage = () => {
       </div>
     </main>
   );
-};
-
-export default FeaturePage;
+}

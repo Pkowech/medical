@@ -1,11 +1,9 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Button } from '@/shared/components/ui/button';
+import { getPageMetadata } from '@/core/metadata/pageMetadata';
 
-export const metadata: Metadata = {
-  title: 'Contact MedTrack Hub',
-  description: 'Contact MedTrack Hub by email for questions or privacy requests.',
-};
+export const metadata: Metadata = getPageMetadata('/contact');
 
 export default function ContactPage() {
   return (

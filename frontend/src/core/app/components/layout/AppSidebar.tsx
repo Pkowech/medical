@@ -64,7 +64,7 @@ export function Sidebar({
     : navigationItems.filter(
         item =>
           !mobilePrimaryNavigation.some(tab => tab.href === item.href) ||
-          Boolean(item.children?.length),
+          Boolean(item.children?.length) || item.id === 'search',
       );
 
   useEffect(() => {

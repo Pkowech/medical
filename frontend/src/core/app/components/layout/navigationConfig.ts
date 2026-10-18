@@ -2,16 +2,19 @@ import {
   LayoutDashboard,
   GraduationCap,
   Route,
+  Brain,
   FileText,
   Calendar,
   Target,
   Users,
   User,
   BarChart,
+  Search,
   Shield,
   MessageSquare,
   Clock,
   HardDriveDownload,
+  Trophy,
 } from 'lucide-react';
 
 import { NavigationItem } from '@/shared/types/navigationInterface';
@@ -28,6 +31,57 @@ const navigationConfig: NavigationItem[] = [
     label: 'Courses',
     href: '/courses',
     icon: GraduationCap,
+  },
+  {
+    id: 'practice',
+    label: 'Practice',
+    icon: Brain,
+    children: [
+      {
+        id: 'assessments',
+        label: 'Assessments',
+        href: '/assessment',
+        icon: FileText,
+      },
+      {
+        id: 'quizzes',
+        label: 'Quizzes',
+        href: '/quiz',
+        icon: Target,
+        children: [
+          {
+            id: 'quiz-history',
+            label: 'Quiz History',
+            href: '/quiz/history',
+            icon: Clock,
+          },
+        ],
+      },
+      {
+        id: 'flashcards',
+        label: 'Flashcards',
+        href: '/flashcards',
+        icon: Brain,
+      },
+      {
+        id: 'clinical-cases',
+        label: 'Clinical Cases',
+        href: '/clinical-cases',
+        icon: GraduationCap,
+      },
+      {
+        id: 'rapid-review',
+        label: 'Rapid Review',
+        href: '/rapid-review',
+        icon: Clock,
+      },
+    ],
+  },
+  {
+    id: 'search',
+    label: 'Search',
+    href: '/search',
+    icon: Search,
   },
   {
     id: 'offline-downloads',
@@ -69,9 +123,37 @@ const navigationConfig: NavigationItem[] = [
   },
   {
     id: 'progress-tracking',
-    label: 'Progress',
+    label: 'Progress & Analytics',
     href: '/progress',
     icon: BarChart,
+    children: [
+      {
+        id: 'learning-analytics',
+        label: 'Analytics',
+        href: '/analytics',
+        icon: BarChart,
+      },
+    ],
+  },
+  {
+    id: 'achievements',
+    label: 'Achievements',
+    href: '/gamification',
+    icon: Trophy,
+    children: [
+      {
+        id: 'rewards',
+        label: 'Rewards',
+        href: '/rewards',
+        icon: Trophy,
+      },
+      {
+        id: 'profile-achievements',
+        label: 'Milestones',
+        href: '/profile/achievements',
+        icon: Target,
+      },
+    ],
   },
   {
     id: 'community',

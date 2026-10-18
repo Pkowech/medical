@@ -255,7 +255,7 @@ export const CourseContent = ({
               {lesson.masteryUnlocked ? "Retake Mastery Quiz" : "Unlock Mastery Quiz"}
               <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </button>
-            {lesson.failedAttempts && lesson.failedAttempts > 0 && !lesson.masteryUnlocked && (
+            {lesson.failedAttempts != null && lesson.failedAttempts > 0 && !lesson.masteryUnlocked && (
               <div className="flex items-center gap-2 px-3 py-1 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-full text-xs font-bold uppercase tracking-wider">
                 <XCircle className="w-3 h-3" />
                 {lesson.failedAttempts} Failed Attempts

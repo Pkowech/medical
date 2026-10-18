@@ -11,10 +11,28 @@ interface RootLayoutProps {
   children: ReactNode;
 }
 
+const configuredSiteUrl =
+  process.env.NEXT_PUBLIC_BASE_URL ||
+  process.env.NEXT_PUBLIC_APP_URL ||
+  process.env.NEXTAUTH_URL ||
+  process.env.VERCEL_URL;
+const siteUrl = configuredSiteUrl
+  ? new URL(
+      /^https?:\/\//i.test(configuredSiteUrl)
+        ? configuredSiteUrl
+        : `https://${configuredSiteUrl}`,
+    )
+  : undefined;
+
 export const metadata: Metadata = {
-  title: 'MedTrack Hub',
+  title: {
+    default: 'MedTrack Hub',
+    template: '%s | MedTrack Hub',
+  },
+  ...(siteUrl ? { metadataBase: siteUrl } : {}),
   manifest: '/manifest.json',
-  description: 'Comprehensive medical learning and tracking platform',
+  description:
+    'Medical courses, quizzes, flashcards, study planning, and progress tracking in one learning platform.',
   icons: {
     icon: '/favicon.svg',
     apple: '/android-chrome-192x192.png',

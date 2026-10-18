@@ -1,9 +1,7 @@
 import type { Metadata } from 'next';
+import { getPageMetadata } from '@/core/metadata/pageMetadata';
 
-export const metadata: Metadata = {
-  title: 'Terms of Use | MedTrack Hub',
-  description: 'Terms for using MedTrack Hub learning tools and services.',
-};
+export const metadata: Metadata = getPageMetadata('/terms');
 
 const terms = [
   {

@@ -1,10 +1,8 @@
 import type { Metadata } from 'next';
 import GoalsComponent from '@/features/learning-management/components/goals/goals-component';
+import { getPageMetadata } from '@/core/metadata/pageMetadata';
 
-export const metadata: Metadata = {
-  title: 'Learning Goals — Study Planner',
-  description: 'Set and track your learning goals to stay organized and motivated.',
-};
+export const metadata: Metadata = getPageMetadata('/study-planner/goals');
 
 export default function GoalsPage() {
   return <GoalsComponent />;
