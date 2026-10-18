@@ -14,16 +14,11 @@ const normalizeMaterialUrl = (url?: string): string | undefined => {
     return trimmed;
   }
 
-  if (withoutPrefix.startsWith('v1/')) {
-    return `/api/backend/${withoutPrefix}`;
-  }
+  const normalized = withoutPrefix.replace(/^v1\//, '').replace(/^api\//, '');
+  if (!normalized) return trimmed;
 
-  if (withoutPrefix.startsWith('api/materials/')) {
-    return `/api/backend/${withoutPrefix.replace(/^api\//, '')}`;
-  }
-
-  if (withoutPrefix.startsWith('materials/')) {
-    return `/api/backend/${withoutPrefix}`;
+  if (normalized.startsWith('materials/')) {
+    return `/api/backend/${normalized}`;
   }
 
   return trimmed.startsWith('/') ? trimmed : `/${trimmed}`;

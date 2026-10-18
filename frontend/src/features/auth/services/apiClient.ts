@@ -85,7 +85,10 @@ class ApiService {
     if (errorType === 'timeout' || errorType === 'network') {
       return true;
     }
-    if (errorType === 'server' && status && status >= 500 && status < 599) {
+    if (status === 408 || status === 425 || status === 429) {
+      return true;
+    }
+    if (errorType === 'server' && status && status >= 500 && status < 600) {
       // Retry on server errors except 501 Not Implemented
       return status !== 501;
     }
@@ -156,10 +159,8 @@ class ApiService {
           originalRequest.method,
           originalRequest.url
         );
-        const isNetworkOrServerTemp =
-          errorType === 'network' ||
-          errorType === 'timeout' ||
-          (axios.isAxiosError(error) && error.response?.status === 503);
+        const responseStatus = axios.isAxiosError(error) ? error.response?.status : undefined;
+        const isNetworkOrServerTemp = this.isRetryable(errorType, responseStatus);
 
         if (isQueueableRequest && isNetworkOrServerTemp) {
           try {

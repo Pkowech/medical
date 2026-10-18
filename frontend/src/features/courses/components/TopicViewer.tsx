@@ -506,23 +506,14 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
           status: 'completed',
           progressPercentage: 100,
         });
-        await refreshLearningCaches();
+        try {
+          await refreshLearningCaches();
+        } catch (error) {
+          console.error('Could not refresh learning data after saving material progress:', error);
+        }
       } catch (error) {
         console.error('Error tracking material progress:', error);
-        try {
-          await offlineProgressSync.addToQueue({
-            courseId,
-            unitId,
-            topicId,
-            materialId: selectedMaterialId,
-            percent: 100,
-            status: 'completed',
-          });
-          toast.info('Material progress saved offline and will sync when connected.');
-        } catch (queueError) {
-          console.error('Failed to queue material progress for sync:', queueError);
-          toast.error('Material progress could not be saved.');
-        }
+        toast.error('Material progress could not be saved.');
       }
     }
     

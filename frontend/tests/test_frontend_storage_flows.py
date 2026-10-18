@@ -122,6 +122,21 @@ def test_offline_api_queues_keep_the_original_mutation_method():
     assert "originalRequest.url || '',\n              method," in api_client
 
 
+def test_material_progress_does_not_queue_permanent_api_errors():
+    api_client = read_frontend("src/features/auth/services/apiClient.ts")
+    tracker = read_frontend("src/features/learning-management/hooks/useMaterialProgressTracker.tsx")
+    topic_viewer = read_frontend("src/features/courses/components/TopicViewer.tsx")
+    close_handler = topic_viewer.split("const handleCloseMaterial =", 1)[1].split(
+        "const handleToggleBookmark =", 1
+    )[0]
+
+    assert "status === 408 || status === 425 || status === 429" in api_client
+    assert "status !== 501" in api_client
+    assert "offlineSync.addToQueue" not in tracker
+    assert "offlineProgressSync.addToQueue" not in close_handler
+    assert "Could not refresh learning data after saving material progress" in close_handler
+
+
 def test_offline_replay_only_queues_allowlisted_learning_posts_not_admin_deletes():
     policy = read_frontend("src/lib/core/offline/offlineQueuePolicy.ts")
     api_client = read_frontend("src/features/auth/services/apiClient.ts")
