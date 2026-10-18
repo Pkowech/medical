@@ -6,10 +6,19 @@ const LEARNING_PATH_BASE_URL = '/learning-paths';
 
 class LearningPathService {
   async getMyProgress(): Promise<LearningPathProgress[]> {
-    const response = await apiService.get<ApiResponse<LearningPathProgress[]>>(
-      `${LEARNING_PATH_BASE_URL}/my-progress`
+    const response = await apiService.get<unknown>(
+      `${LEARNING_PATH_BASE_URL}/my-progress`,
     );
-    return response.data.data;
+    let payload: unknown = response;
+    for (let depth = 0; depth < 3; depth += 1) {
+      if (Array.isArray(payload)) return payload as LearningPathProgress[];
+      if (!payload || typeof payload !== 'object' || !('data' in payload)) break;
+      payload = payload.data;
+    }
+    if (!Array.isArray(payload)) {
+      throw new Error('The learning path progress response was invalid.');
+    }
+    return payload as LearningPathProgress[];
   }
 
   async getRecommendedPaths(limit: number = 5): Promise<LearningPath[]> {

@@ -1,13 +1,20 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { usePageHeader } from '@/core/providers/HeaderContext';
+import { useAuth } from '@/features/auth/hooks/useAuth';
 import materialService from '@/features/courses/services/materialService';
 import { courseService } from '@/features/courses/services/courseService';
+import { apiService } from '@/features/auth/services/apiClient';
+import scheduleService from '@/features/learning-management/study/services/scheduleService';
+import { learningPathService } from '@/features/learning-management/services/learningPathService';
 import { Material } from '@/shared/types/materialInterface';
 import type { Course } from '@/shared/types/courseInterface';
+import type { LearningPathProgress } from '@/shared/types/learningInterface';
+import type { ScheduleEvent } from '@/shared/types/studyInterface';
 import { MaterialListItem } from './MaterialListItem';
 import { MaterialCard } from './MaterialCard';
 import { RecommendationCard } from './RecommendationCard'; // New Component
@@ -16,9 +23,17 @@ import { toast } from 'sonner';
 import { 
   Search, Plus, LayoutGrid, LayoutList, ChevronDown, CheckCircle2,
   BrainCircuit, Database, BookOpen, Sparkles, Upload, FolderOpen,
-  ArrowLeft, Clock, Layers, Play
+  ArrowLeft, Clock, Layers, Play, CalendarClock, Target, Route
 } from 'lucide-react';
 import { getInstructorDisplayName } from '@/lib/utils';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/shared/components/ui/dialog';
 
 interface MaterialsPageData {
   items: Material[];
@@ -47,6 +62,41 @@ interface MaterialCourseGroup {
   resourceCount: number;
 }
 
+interface RoadmapGoal {
+  id: string;
+  title: string;
+  status: string;
+  targetDate: string;
+  progressPercentage?: number;
+  course?: { id: string; title?: string };
+  learningPath?: { id: string; title?: string };
+  courseId?: string;
+  learningPathId?: string;
+  relatedCourse?: string;
+  relatedLearningPath?: string;
+}
+
+interface RoadmapDeadline {
+  id: string;
+  title: string;
+  dueDate: string;
+  courseId?: string;
+  unitId?: string;
+  priority?: string;
+}
+
+interface RoadmapDueItem {
+  id: string;
+  title: string;
+  dueDate: string;
+  progressPercentage?: number;
+}
+
+interface RoadmapTopicSelection {
+  title: string;
+  unitTitle: string;
+}
+
 const MATERIAL_TYPE_FILTERS = [
   { id: 'all', label: 'All types' },
   { id: 'pdf', label: 'PDFs' },
@@ -62,8 +112,77 @@ const MATERIAL_TYPE_FILTERS = [
 
 const MATERIALS_SECTION_STATE_KEY = 'medtrack.materials.section-state.v2';
 
+const localDateTimeValue = (date: Date) => {
+  const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return localDate.toISOString().slice(0, 16);
+};
+
+const getCourseRoadmapEvents = async (courseId: string): Promise<ScheduleEvent[]> => {
+  const now = new Date();
+  const monthAhead = new Date(now);
+  monthAhead.setDate(monthAhead.getDate() + 30);
+  let payload: unknown = await apiService.get<unknown>('/events', {
+    params: { startDate: now.toISOString(), endDate: monthAhead.toISOString() },
+  });
+
+  for (let depth = 0; depth < 3; depth += 1) {
+    if (Array.isArray(payload)) break;
+    if (!payload || typeof payload !== 'object') break;
+    const record = payload as Record<string, unknown>;
+    if (Array.isArray(record.items)) {
+      payload = record.items;
+      break;
+    }
+    if (Array.isArray(record.events)) {
+      payload = record.events;
+      break;
+    }
+    if ('data' in record) {
+      payload = record.data;
+      continue;
+    }
+    break;
+  }
+
+  if (!Array.isArray(payload)) {
+    throw new Error('The schedule events response was invalid.');
+  }
+
+  return payload.flatMap((item): ScheduleEvent[] => {
+    if (!item || typeof item !== 'object') return [];
+    const event = item as Record<string, unknown>;
+    const description = typeof event.description === 'string' ? event.description : '';
+    if (!description.includes(`[courseId:${courseId}]`)) return [];
+    const dateValue = event.date ?? event.startDate;
+    if (
+      typeof dateValue !== 'string'
+      && typeof dateValue !== 'number'
+      && !(dateValue instanceof Date)
+    ) {
+      return [];
+    }
+    const date = new Date(dateValue);
+    if (Number.isNaN(date.getTime())) return [];
+    const endDateValue = event.endDate;
+    const endDate = typeof endDateValue === 'string'
+      || typeof endDateValue === 'number'
+      || endDateValue instanceof Date
+      ? new Date(endDateValue)
+      : date;
+    return [{
+      id: typeof event.id === 'string' ? event.id : `${courseId}-${date.getTime()}`,
+      title: typeof event.title === 'string' ? event.title : 'Course study session',
+      description,
+      date,
+      endDate: Number.isNaN(endDate.getTime()) ? date : endDate,
+      type: typeof event.type === 'string' ? event.type : 'study',
+    }];
+  });
+};
+
 export default function MaterialsDashboard() {
   const { setHeader } = usePageHeader();
+  const { user } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   
@@ -85,6 +204,18 @@ export default function MaterialsDashboard() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [sectionOpenState, setSectionOpenState] = useState<Record<string, boolean>>({});
   const [hasRestoredSectionState, setHasRestoredSectionState] = useState(false);
+  const [topicToSchedule, setTopicToSchedule] = useState<RoadmapTopicSelection | null>(null);
+  const [scheduledStart, setScheduledStart] = useState(() => {
+    const nextHour = new Date();
+    nextHour.setMinutes(0, 0, 0);
+    nextHour.setHours(nextHour.getHours() + 1);
+    if (nextHour.getHours() >= 22) {
+      nextHour.setDate(nextHour.getDate() + 1);
+      nextHour.setHours(9);
+    }
+    return localDateTimeValue(nextHour);
+  });
+  const [isScheduling, setIsScheduling] = useState(false);
 
   useEffect(() => {
     try {
@@ -125,7 +256,9 @@ export default function MaterialsDashboard() {
 
   useEffect(() => {
     setSelectedCourseId(requestedCourseId);
-    if (requestedCourseId || requestedScope === 'enrolled' || requestedScope === 'shared') {
+    if (requestedScope === 'owned') {
+      setFilterContext('owned');
+    } else if (requestedCourseId || requestedScope === 'enrolled' || requestedScope === 'shared') {
       setFilterContext('shared');
     }
     setCourseFilterInitialized(true);
@@ -141,6 +274,81 @@ export default function MaterialsDashboard() {
     queryFn: () => courseService.getCourseById(selectedCourseId!),
     enabled: courseFilterInitialized && Boolean(selectedCourseId),
     staleTime: 5 * 60 * 1000,
+  });
+  const {
+    data: activeGoals = [],
+    isLoading: goalsLoading,
+    isError: goalsError,
+    refetch: refetchGoals,
+  } = useQuery<RoadmapGoal[], Error>({
+    queryKey: ['course-roadmap-goals', user?.id, selectedCourseId],
+    queryFn: async () => {
+      const response = await apiService.get<unknown>('/learning-goals', {
+        params: { status: 'active', limit: 100 },
+      });
+      let payload: unknown = response;
+      for (let depth = 0; depth < 3; depth += 1) {
+        if (Array.isArray(payload)) return payload as RoadmapGoal[];
+        if (!payload || typeof payload !== 'object' || !('data' in payload)) break;
+        payload = payload.data;
+      }
+      if (!Array.isArray(payload)) {
+        throw new Error('The active goals response was invalid.');
+      }
+      return payload as RoadmapGoal[];
+    },
+    enabled: Boolean(user?.id && selectedCourseId),
+    staleTime: 60 * 1000,
+  });
+  const {
+    data: learningPathProgress = [],
+    isLoading: learningPathsLoading,
+    isError: learningPathsError,
+    refetch: refetchLearningPaths,
+  } = useQuery<LearningPathProgress[], Error>({
+    queryKey: ['course-roadmap-learning-paths', user?.id],
+    queryFn: () => learningPathService.getMyProgress(),
+    enabled: Boolean(user?.id && selectedCourseId),
+    staleTime: 2 * 60 * 1000,
+  });
+  const {
+    data: courseDeadlines = [],
+    isLoading: deadlinesLoading,
+    isError: deadlinesError,
+    refetch: refetchDeadlines,
+  } = useQuery<RoadmapDeadline[], Error>({
+    queryKey: ['course-roadmap-deadlines', user?.id, selectedCourseId],
+    queryFn: async () => {
+      const response = await apiService.get<unknown>('/deadlines');
+      let payload: unknown = response;
+      for (let depth = 0; depth < 3; depth += 1) {
+        if (Array.isArray(payload)) return payload as RoadmapDeadline[];
+        if (!payload || typeof payload !== 'object' || !('data' in payload)) break;
+        payload = payload.data;
+      }
+      if (!Array.isArray(payload)) {
+        throw new Error('The course deadlines response was invalid.');
+      }
+      return payload as RoadmapDeadline[];
+    },
+    enabled: Boolean(user?.id && selectedCourseId),
+    staleTime: 60 * 1000,
+  });
+  const {
+    data: upcomingStudySessions = [],
+    isLoading: scheduleLoading,
+    isError: scheduleError,
+    refetch: refetchSchedule,
+  } = useQuery({
+    queryKey: ['course-roadmap-schedule', user?.id, selectedCourseId],
+    queryFn: () => {
+      if (!selectedCourseId) {
+        throw new Error('A course is required to load its scheduled sessions.');
+      }
+      return getCourseRoadmapEvents(selectedCourseId);
+    },
+    enabled: Boolean(user?.id && selectedCourseId),
+    staleTime: 60 * 1000,
   });
 
   useEffect(() => {
@@ -180,7 +388,7 @@ export default function MaterialsDashboard() {
     queryFn: async ({ pageParam = 1 }) => {
       const page = pageParam as number;
       const scope = selectedCourseId
-        ? 'enrolled'
+        ? requestedScope === 'owned' ? 'owned' : 'enrolled'
         : filterContext === 'owned'
           ? 'owned'
           : 'shared';
@@ -343,6 +551,12 @@ export default function MaterialsDashboard() {
     );
   };
 
+  const setSectionOpen = (id: string, isOpen: boolean) => {
+    setSectionOpenState(previous =>
+      previous[id] === isOpen ? previous : { ...previous, [id]: isOpen },
+    );
+  };
+
   const setAllMaterialSectionsOpen = (open: boolean) => {
     setSectionOpenState(previous => ({
       ...previous,
@@ -422,6 +636,124 @@ export default function MaterialsDashboard() {
   const courseLevelMaterials = allMaterials.filter(
     material => !getMaterialUnitId(material),
   );
+  const matchingLearningPaths = learningPathProgress.filter(progress => {
+    if (progress.status === 'completed') return false;
+    const path = progress.learningPath;
+    const courseIsInPath = path.courses.some(course => {
+      if (!course || typeof course !== 'object') return false;
+      const record = course as Record<string, unknown>;
+      return record.id === selectedCourseId || record.courseId === selectedCourseId;
+    });
+    const courseIsInPathModule = path.pathStructure?.phases.some(phase =>
+      phase.modules.some(module =>
+        module.type === 'course' && module.resourceId === selectedCourseId,
+      ),
+    ) ?? false;
+    return courseIsInPath || courseIsInPathModule;
+  });
+  const matchingPathIds = new Set(matchingLearningPaths.map(progress => progress.learningPath.id));
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const dueSoonLimit = new Date(startOfToday);
+  dueSoonLimit.setDate(dueSoonLimit.getDate() + 7);
+  dueSoonLimit.setHours(23, 59, 59, 999);
+  const overdueLimit = new Date(startOfToday);
+  overdueLimit.setDate(overdueLimit.getDate() - 7);
+  const dueSoonGoals = activeGoals.filter(goal => {
+    if (goal.status !== 'active') return false;
+    const courseMatches =
+      goal.course?.id === selectedCourseId
+      || goal.courseId === selectedCourseId
+      || goal.relatedCourse === selectedCourseId;
+    const goalPathId = goal.learningPath?.id ?? goal.learningPathId ?? goal.relatedLearningPath;
+    const pathMatches = Boolean(goalPathId && matchingPathIds.has(goalPathId));
+    const dueDate = new Date(
+      /^\d{4}-\d{2}-\d{2}$/.test(goal.targetDate)
+        ? `${goal.targetDate}T00:00:00`
+        : goal.targetDate,
+    );
+    return (courseMatches || pathMatches)
+      && !Number.isNaN(dueDate.getTime())
+      && dueDate >= overdueLimit
+      && dueDate <= dueSoonLimit;
+  }).sort((first, second) =>
+    new Date(first.targetDate).getTime() - new Date(second.targetDate).getTime(),
+  );
+  const courseUnitIds = new Set(courseUnits.map(unit => String(unit.id)));
+  const dueSoonDeadlines = courseDeadlines.filter(deadline => {
+    const date = new Date(deadline.dueDate);
+    const isForCourse = deadline.courseId === selectedCourseId
+      || Boolean(deadline.unitId && courseUnitIds.has(deadline.unitId));
+    return isForCourse
+      && !Number.isNaN(date.getTime())
+      && date >= overdueLimit
+      && date <= dueSoonLimit;
+  }).sort((first, second) =>
+    new Date(first.dueDate).getTime() - new Date(second.dueDate).getTime(),
+  );
+  const dueSoonItems: RoadmapDueItem[] = [
+    ...dueSoonGoals.map(goal => ({
+      id: `goal:${goal.id}`,
+      title: goal.title,
+      dueDate: goal.targetDate,
+      progressPercentage: goal.progressPercentage,
+    })),
+    ...dueSoonDeadlines.map(deadline => ({
+      id: `deadline:${deadline.id}`,
+      title: deadline.title,
+      dueDate: deadline.dueDate,
+    })),
+  ].sort((first, second) =>
+    new Date(first.dueDate).getTime() - new Date(second.dueDate).getTime(),
+  );
+  const courseStudySessions = upcomingStudySessions.filter(event =>
+    event.description?.includes(`[courseId:${selectedCourseId}]`)
+    && event.date >= now
+    && event.date <= new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
+  ).sort((first, second) => first.date.getTime() - second.date.getTime());
+
+  const scheduleTopicStudy = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!selectedCourse || !topicToSchedule) return;
+    const startDate = new Date(scheduledStart);
+    if (Number.isNaN(startDate.getTime()) || startDate <= new Date()) {
+      toast.error('Choose a future date and time for this study session.');
+      return;
+    }
+
+    setIsScheduling(true);
+    try {
+      await scheduleService.createEvent({
+        title: `Study: ${selectedCourse.title || selectedCourse.name} — ${topicToSchedule.title}`,
+        description: `Study session for ${topicToSchedule.title} in ${topicToSchedule.unitTitle}. [courseId:${selectedCourse.id}]`,
+        date: startDate,
+        endDate: new Date(startDate.getTime() + 45 * 60 * 1000),
+        type: 'study',
+        location: 'Study Planner',
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ['course-roadmap-schedule', user?.id, selectedCourse.id],
+      });
+      toast.success('Study session added to your schedule.');
+      setTopicToSchedule(null);
+    } catch (error) {
+      console.error('Could not schedule roadmap study session:', error);
+      toast.error(error instanceof Error ? error.message : 'Could not add this session to your schedule.');
+    } finally {
+      setIsScheduling(false);
+    }
+  };
+  const openTopicScheduler = (title: string, unitTitle: string) => {
+    const nextHour = new Date();
+    nextHour.setMinutes(0, 0, 0);
+    nextHour.setHours(nextHour.getHours() + 1);
+    if (nextHour.getHours() >= 22) {
+      nextHour.setDate(nextHour.getDate() + 1);
+      nextHour.setHours(9);
+    }
+    setScheduledStart(localDateTimeValue(nextHour));
+    setTopicToSchedule({ title, unitTitle });
+  };
 
   const contextTitle = filterContext === 'owned'
     ? 'My materials'
@@ -566,7 +898,7 @@ export default function MaterialsDashboard() {
             type="button"
             onClick={() => {
               setSelectedCourseId(undefined);
-              setFilterContext('shared');
+              setFilterContext(requestedScope === 'owned' ? 'owned' : 'shared');
               router.replace('/study-planner/materials');
             }}
             className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-blue-700 dark:hover:text-blue-300"
@@ -643,6 +975,164 @@ export default function MaterialsDashboard() {
                 </div>
               </section>
 
+              <section className="grid gap-4 lg:grid-cols-3" aria-label="Course learning connections">
+                <div className="rounded-xl border border-border bg-card p-4 dark:border-border dark:bg-card">
+                  <div className="flex items-center justify-between gap-3">
+                    <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground dark:text-foreground">
+                      <Target className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                      Due soon
+                    </h2>
+                    <Link href="/study-planner/goals" className="text-xs font-medium text-blue-700 hover:underline dark:text-blue-300">
+                      All goals
+                    </Link>
+                  </div>
+                  {goalsError && (
+                    <div className="mt-3 text-sm text-rose-700 dark:text-rose-300" role="alert">
+                      Could not load course goals.{' '}
+                      <button type="button" className="underline" onClick={() => void refetchGoals()}>
+                        Retry
+                      </button>
+                    </div>
+                  )}
+                  {deadlinesError && (
+                    <div className="mt-3 text-sm text-rose-700 dark:text-rose-300" role="alert">
+                      Could not load course deadlines.{' '}
+                      <button type="button" className="underline" onClick={() => void refetchDeadlines()}>
+                        Retry
+                      </button>
+                    </div>
+                  )}
+                  {goalsLoading || deadlinesLoading ? (
+                    <p className="mt-3 text-sm text-muted-foreground dark:text-muted-foreground" role="status">
+                      Loading course goals and deadlines…
+                    </p>
+                  ) : goalsError || deadlinesError ? (
+                    <p className="mt-3 text-sm text-muted-foreground dark:text-muted-foreground">
+                      Some course due dates may be missing because a source could not be loaded.
+                    </p>
+                  ) : dueSoonItems.length > 0 ? (
+                    <ul className="mt-3 space-y-3">
+                      {dueSoonItems.slice(0, 5).map(item => {
+                        const dueDate = new Date(
+                              /^\d{4}-\d{2}-\d{2}$/.test(item.dueDate)
+                                ? `${item.dueDate}T00:00:00`
+                                : item.dueDate,
+                            );
+                        return (
+                          <li key={item.id} className="border-t border-border pt-3 first:border-0 first:pt-0 dark:border-border">
+                            <p className="text-sm font-medium text-foreground dark:text-foreground">{item.title}</p>
+                            <p className="mt-1 text-xs text-muted-foreground dark:text-muted-foreground">
+                              {dueDate < startOfToday ? 'Overdue since' : 'Due'} {dueDate.toLocaleDateString()}
+                              {typeof item.progressPercentage === 'number' && ` · ${Math.round(item.progressPercentage)}% complete`}
+                            </p>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  ) : (
+                    <p className="mt-3 text-sm text-muted-foreground dark:text-muted-foreground">
+                      No course goals or deadlines are overdue or due in the next 7 days.{' '}
+                      <Link href="/study-planner/goals" className="font-medium text-blue-700 hover:underline dark:text-blue-300">
+                        Set a goal
+                      </Link>
+                    </p>
+                  )}
+                </div>
+
+                <div className="rounded-xl border border-border bg-card p-4 dark:border-border dark:bg-card">
+                  <div className="flex items-center justify-between gap-3">
+                    <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground dark:text-foreground">
+                      <Route className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+                      Learning paths
+                    </h2>
+                    <Link href="/learning-paths" className="text-xs font-medium text-blue-700 hover:underline dark:text-blue-300">
+                      Browse paths
+                    </Link>
+                  </div>
+                  {learningPathsError ? (
+                    <div className="mt-3 text-sm text-rose-700 dark:text-rose-300" role="alert">
+                      Could not load learning paths.{' '}
+                      <button type="button" className="underline" onClick={() => void refetchLearningPaths()}>
+                        Retry
+                      </button>
+                    </div>
+                  ) : learningPathsLoading ? (
+                    <p className="mt-3 text-sm text-muted-foreground dark:text-muted-foreground" role="status">
+                      Loading learning paths…
+                    </p>
+                  ) : matchingLearningPaths.length > 0 ? (
+                    <ul className="mt-3 space-y-3">
+                      {matchingLearningPaths.slice(0, 3).map(progress => {
+                        const path = progress.learningPath;
+                        const currentPhase = path.pathStructure?.phases[progress.currentPhaseIndex];
+                        const currentModule = currentPhase?.modules[progress.currentModuleIndex];
+                        return (
+                          <li key={progress.id} className="border-t border-border pt-3 first:border-0 first:pt-0 dark:border-border">
+                            <Link
+                              href={`/learning-paths/${encodeURIComponent(path.id)}`}
+                              className="text-sm font-medium text-blue-700 hover:underline dark:text-blue-300"
+                            >
+                              {path.title}
+                            </Link>
+                            <p className="mt-1 text-xs text-muted-foreground dark:text-muted-foreground">
+                              {Math.round(progress.overallProgressPercentage)}% complete
+                              {currentModule ? ` · Next: ${currentModule.title}` : currentPhase ? ` · ${currentPhase.title}` : ''}
+                            </p>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  ) : (
+                    <p className="mt-3 text-sm text-muted-foreground dark:text-muted-foreground">
+                      No enrolled learning path includes this course yet.{' '}
+                      <Link href="/learning-paths" className="font-medium text-blue-700 hover:underline dark:text-blue-300">
+                        Explore learning paths
+                      </Link>
+                    </p>
+                  )}
+                </div>
+
+                <div className="rounded-xl border border-border bg-card p-4 dark:border-border dark:bg-card">
+                  <div className="flex items-center justify-between gap-3">
+                    <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground dark:text-foreground">
+                      <CalendarClock className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                      Scheduled study
+                    </h2>
+                    <Link href="/study-planner/schedule" className="text-xs font-medium text-blue-700 hover:underline dark:text-blue-300">
+                      Open schedule
+                    </Link>
+                  </div>
+                  {scheduleLoading ? (
+                    <p className="mt-3 text-sm text-muted-foreground dark:text-muted-foreground" role="status">
+                      Loading scheduled study…
+                    </p>
+                  ) : courseStudySessions.length > 0 ? (
+                    <ul className="mt-3 space-y-3">
+                      {courseStudySessions.slice(0, 3).map(session => (
+                        <li key={session.id} className="border-t border-border pt-3 first:border-0 first:pt-0 dark:border-border">
+                          <p className="text-sm font-medium text-foreground dark:text-foreground">{session.title}</p>
+                          <p className="mt-1 text-xs text-muted-foreground dark:text-muted-foreground">
+                            {session.date.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="mt-3 text-sm text-muted-foreground dark:text-muted-foreground">
+                      No upcoming study sessions for this course. Schedule one from any topic below.
+                    </p>
+                  )}
+                  {scheduleError && (
+                    <p className="mt-2 text-xs text-rose-700 dark:text-rose-300" role="alert">
+                      Could not refresh your schedule.{' '}
+                      <button type="button" className="underline" onClick={() => void refetchSchedule()}>
+                        Retry
+                      </button>
+                    </p>
+                  )}
+                </div>
+              </section>
+
               <section className="space-y-4" aria-labelledby="course-roadmap-heading">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                   <div>
@@ -710,7 +1200,6 @@ export default function MaterialsDashboard() {
                       return (
                         <details
                           key={unitId}
-                          open={unitIndex === 0}
                           className="overflow-hidden rounded-xl border border-border bg-card dark:bg-card"
                         >
                           <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-4 marker:hidden hover:bg-muted/50 dark:hover:bg-secondary/50 sm:px-5">
@@ -749,12 +1238,13 @@ export default function MaterialsDashboard() {
                               </Button>
                             </div>
                             {unitOnlyMaterials.length > 0 && (
-                              <div className="rounded-lg border border-border dark:border-border">
-                                <h3 className="px-3 pt-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground dark:text-muted-foreground">
-                                  Unit resources
-                                </h3>
+                              <details className="group/unit-resources rounded-lg border border-border dark:border-border">
+                                <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground marker:hidden dark:text-muted-foreground">
+                                  Unit resources ({unitOnlyMaterials.length})
+                                  <ChevronDown aria-hidden="true" className="h-4 w-4 shrink-0 transition-transform group-open/unit-resources:rotate-180" />
+                                </summary>
                                 {renderMaterialItems(unitOnlyMaterials)}
-                              </div>
+                              </details>
                             )}
                             {topics.length > 0 && (
                               <ol className="space-y-2" aria-label={`${unit.title || unit.name} topics`}>
@@ -792,11 +1282,24 @@ export default function MaterialsDashboard() {
                                           >
                                             Study
                                           </Button>
+                                          <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => openTopicScheduler(
+                                              topicTitle,
+                                              unit.title || unit.name || `Unit ${unitIndex + 1}`,
+                                            )}
+                                            className="shrink-0 rounded-lg px-2"
+                                          >
+                                            <CalendarClock className="mr-1 h-3.5 w-3.5" />
+                                            Schedule
+                                          </Button>
                                         </div>
                                         {topicMaterials.length > 0 && (
                                           <details className="mt-2 border-t border-border pt-2 dark:border-border">
                                             <summary className="cursor-pointer text-xs font-medium text-blue-700 dark:text-blue-300">
-                                              View resources
+                                              View resources ({topicMaterials.length})
                                             </summary>
                                             {renderMaterialItems(topicMaterials)}
                                           </details>
@@ -840,6 +1343,43 @@ export default function MaterialsDashboard() {
                   </div>
                 )}
               </section>
+              <Dialog
+                open={Boolean(topicToSchedule)}
+                onOpenChange={open => {
+                  if (!open && !isScheduling) setTopicToSchedule(null);
+                }}
+              >
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Schedule topic study</DialogTitle>
+                    <DialogDescription>
+                      Add a 45-minute study session for {topicToSchedule?.title} to your schedule.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <form onSubmit={scheduleTopicStudy} className="space-y-4">
+                    <label htmlFor="roadmap-study-start" className="block text-sm font-medium text-foreground dark:text-foreground">
+                      Start date and time
+                    </label>
+                    <input
+                      id="roadmap-study-start"
+                      type="datetime-local"
+                      required
+                      min={localDateTimeValue(new Date())}
+                      value={scheduledStart}
+                      onChange={event => setScheduledStart(event.target.value)}
+                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-border"
+                    />
+                    <DialogFooter>
+                      <Button type="button" variant="outline" onClick={() => setTopicToSchedule(null)} disabled={isScheduling}>
+                        Cancel
+                      </Button>
+                      <Button type="submit" disabled={isScheduling} className="bg-blue-600 text-white hover:bg-blue-700">
+                        {isScheduling ? 'Scheduling…' : 'Add to schedule'}
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </DialogContent>
+              </Dialog>
             </>
           ) : null}
         </section>
@@ -982,14 +1522,19 @@ export default function MaterialsDashboard() {
 
               <div className="space-y-3">
                 {organizedMaterials.courses.map((course) => (
-                  <details
+                  <section
                     key={course.id}
-                    open={isSectionOpen(`course:${course.id}`, false)}
-                    onToggle={event => handleSectionToggle(`course:${course.id}`, event)}
                     className="group/course overflow-hidden rounded-xl border border-border bg-card shadow-sm dark:border-border dark:bg-card"
                   >
-                    <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-3.5 marker:hidden transition-colors hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 dark:hover:bg-card/60 sm:gap-4 sm:px-5">
-                      <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex items-center gap-3 px-3 py-3.5 transition-colors hover:bg-background dark:hover:bg-card/60 sm:gap-4 sm:px-5">
+                      <button
+                        type="button"
+                        onClick={() => router.push(
+                          `/study-planner/materials?courseId=${encodeURIComponent(course.id)}&scope=${filterContext === 'owned' ? 'owned' : 'enrolled'}`,
+                        )}
+                        className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500"
+                        aria-label={`Open ${course.title} roadmap`}
+                      >
                         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
                           <BookOpen className="h-5 w-5" />
                         </span>
@@ -999,10 +1544,25 @@ export default function MaterialsDashboard() {
                             {course.units.length} {course.units.length === 1 ? 'unit' : 'units'} · {course.resourceCount} {course.resourceCount === 1 ? 'resource' : 'resources'}
                           </p>
                         </div>
-                      </div>
-                      <ChevronDown aria-hidden="true" className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open/course:rotate-180 dark:text-muted-foreground" />
-                    </summary>
-                    <div className="space-y-3 border-t border-border px-3 py-3 dark:border-border sm:px-5">
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSectionOpen(
+                          `course:${course.id}`,
+                          !isSectionOpen(`course:${course.id}`, false),
+                        )}
+                        aria-expanded={isSectionOpen(`course:${course.id}`, false)}
+                        aria-label={`${isSectionOpen(`course:${course.id}`, false) ? 'Collapse' : 'Expand'} ${course.title} resources`}
+                        className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:bg-card"
+                      >
+                        <ChevronDown
+                          aria-hidden="true"
+                          className={`h-4 w-4 transition-transform ${isSectionOpen(`course:${course.id}`, false) ? 'rotate-180' : ''}`}
+                        />
+                      </button>
+                    </div>
+                    {isSectionOpen(`course:${course.id}`, false) && (
+                      <div className="space-y-3 border-t border-border px-3 py-3 dark:border-border sm:px-5">
                       {course.units.map((unit) => {
                         const unitResourceCount = unit.materials.length
                           + unit.topics.reduce((count, topic) => count + topic.materials.length, 0);
@@ -1056,8 +1616,9 @@ export default function MaterialsDashboard() {
                           </details>
                         );
                       })}
-                    </div>
-                  </details>
+                      </div>
+                    )}
+                  </section>
                 ))}
 
                 {organizedMaterials.unassigned.length > 0 && (
