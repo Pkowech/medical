@@ -1,12 +1,16 @@
 import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from '#infrastructure/prisma/prisma.service';
 import { NotificationPriority } from '@prisma/client';
+import { PushNotificationsService } from './push-notifications.service';
 
 @Injectable()
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly pushNotificationsService: PushNotificationsService,
+  ) {}
 
   /**
    * UX-001: Check if notification exceeds daily severity limit
@@ -48,7 +52,7 @@ export class NotificationsService {
     type?: string,
     metadata?: any,
     priority: NotificationPriority = NotificationPriority.low,
-    sentViaPush = false,
+    sendViaPush = true,
   ) {
     // UX-001: Check throttle
     const canSend = await this.checkThrottleLimit(userId, priority);
@@ -67,12 +71,12 @@ export class NotificationsService {
           metadata: metadata || {},
           priority,
           throttled: true,
-          sentViaPush: false, // Don't send throttled notifications
+          sentViaPush: false,
         },
       });
     }
 
-    return await this.prisma.notification.create({
+    const notification = await this.prisma.notification.create({
       data: {
         userId,
         message: content,
@@ -80,9 +84,35 @@ export class NotificationsService {
         metadata: metadata || {},
         priority,
         throttled: false,
-        sentViaPush, // UX-002: Track if sent via push
+        sentViaPush: false,
       },
     });
+
+    if (sendViaPush) {
+      const title =
+        typeof metadata?.title === 'string' ? metadata.title : 'MedTrack Hub';
+      const actionUrl =
+        typeof metadata?.actionUrl === 'string' ? metadata.actionUrl : '/notifications';
+      void this.pushNotificationsService
+        .sendToUser(userId, { title, body: content, url: actionUrl })
+        .then(async sent => {
+          if (sent) {
+            await this.prisma.notification.update({
+              where: { id: notification.id },
+              data: { sentViaPush: true },
+            });
+          }
+        })
+        .catch(error => {
+          this.logger.error(
+            `Could not deliver push for notification ${notification.id}: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          );
+        });
+    }
+
+    return notification;
   }
 
   async findByUser(userId: string, page: number = 1, limit: number = 10) {

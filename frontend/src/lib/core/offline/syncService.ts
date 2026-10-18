@@ -3,11 +3,11 @@ import { getSession } from 'next-auth/react';
 import { initDB, SyncQueueItem } from './db';
 import { normalizeApiUrl } from './normalizeApiUrl';
 import { isOfflineQueueableRequest } from './offlineQueuePolicy';
+import { getSyncRetryDelay } from './syncRetryPolicy';
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 const SYNC_STORE_NAME = 'syncQueue' as const;
-const MAX_SYNC_ATTEMPTS = 3;
 
 class SyncService {
   private isFlushing = false; // Concurrency lock to prevent parallel flushes
@@ -63,12 +63,7 @@ class SyncService {
     };
     await db.put(SYNC_STORE_NAME, item);
     // Request a background sync
-    if (
-      typeof navigator !== 'undefined' &&
-      typeof window !== 'undefined' &&
-      'serviceWorker' in navigator &&
-      'SyncManager' in window
-    ) {
+    if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
       void navigator.serviceWorker.ready
         .then(registration => {
           const regWithSync = registration as ServiceWorkerRegistration & {
@@ -114,7 +109,9 @@ class SyncService {
         retryableFailedChanges,
         isFlushing: this.isFlushing, // Expose flush lock status
         readyToSync: pendingItems.some(item => (item.nextAttemptAt ?? 0) <= Date.now()),
-        latestFailure: failedItems.sort((a, b) => b.createdAt - a.createdAt)[0]?.lastError,
+        latestFailure: items
+          .filter(item => item.lastError)
+          .sort((a, b) => b.createdAt - a.createdAt)[0]?.lastError,
       };
     } catch (error) {
       console.warn('Failed to get sync status from IndexedDB. Connection may be closing.', error);
@@ -142,7 +139,7 @@ class SyncService {
    * 4. Include lastUpdated timestamp with each sync for server-side conflict resolution
    * 5. Update item status to track sync progress
    */
-  async syncOutbox(): Promise<void> {
+  async syncOutbox(forceRetry = false): Promise<void> {
     if (typeof navigator !== 'undefined' && !navigator.onLine) return;
 
     // Prevent parallel flush executions (concurrency lock)
@@ -184,13 +181,12 @@ class SyncService {
       // 1. Get all pending items
       const items = await db.getAll(SYNC_STORE_NAME);
 
-      // Only retry active items. Failed records remain available for diagnostics
-      // but must not keep the global pending indicator or retry forever.
+      // Permanent client errors stay failed; transient errors remain queued with
+      // capped backoff so temporary outages do not strand learning activity.
       const pendingItems = items.filter(
         item =>
         item.status !== 'failed' &&
-        (item.attempts ?? 0) < MAX_SYNC_ATTEMPTS &&
-        (item.nextAttemptAt ?? 0) <= Date.now(),
+        (forceRetry || (item.nextAttemptAt ?? 0) <= Date.now()),
       );
 
       // Optimization: Fetch session once at start of flush
@@ -309,7 +305,11 @@ class SyncService {
             response.status === 403 ||
             response.status === 404 ||
             response.status === 400 ||
-            response.status === 422
+            response.status === 422 ||
+            (response.status >= 400 &&
+              response.status < 500 &&
+              ![408, 425, 429].includes(response.status)) ||
+            response.status === 501
           ) {
             // 404/400 are treated as unrecoverable errors for the queue.
             // (e.g. endpoint renamed/removed, or data is invalid for current schema)
@@ -324,7 +324,7 @@ class SyncService {
             });
             await this.updateOfflinePracticeAttempt(db, item, 'failed', `${response.status} Client Error`);
           } else {
-            // Other errors (5xx, 3xx, etc.): STOP flush and keep item queued
+            // Transient server errors: keep the item queued and respect Retry-After.
             const errorMsg = `Server error ${response.status}`;
             const attempts = (item.attempts ?? 0) + 1;
             console.error(
@@ -332,18 +332,16 @@ class SyncService {
             );
             await db.put(SYNC_STORE_NAME, {
               ...item,
-              status: attempts >= MAX_SYNC_ATTEMPTS ? 'failed' : 'pending',
+              status: 'pending',
               lastError: errorMsg,
               attempts,
               nextAttemptAt:
-                attempts >= MAX_SYNC_ATTEMPTS
-                  ? undefined
-                  : Date.now() + Math.min(60_000, 5_000 * 2 ** (attempts - 1)),
+                Date.now() + getSyncRetryDelay(attempts, response.headers.get('Retry-After')),
             });
             await this.updateOfflinePracticeAttempt(
               db,
               item,
-              attempts >= MAX_SYNC_ATTEMPTS ? 'failed' : 'pending',
+              'pending',
               errorMsg,
             );
             return; // BREAK - stop processing to preserve causal order
@@ -363,18 +361,15 @@ class SyncService {
           const attempts = (item.attempts ?? 0) + 1;
           await db.put(SYNC_STORE_NAME, {
             ...item,
-            status: attempts >= MAX_SYNC_ATTEMPTS ? 'failed' : 'pending',
+            status: 'pending',
             lastError: errorMsg,
             attempts,
-            nextAttemptAt:
-              attempts >= MAX_SYNC_ATTEMPTS
-                ? undefined
-                : Date.now() + Math.min(60_000, 5_000 * 2 ** (attempts - 1)),
+            nextAttemptAt: Date.now() + getSyncRetryDelay(attempts),
           });
           await this.updateOfflinePracticeAttempt(
             db,
             item,
-            attempts >= MAX_SYNC_ATTEMPTS ? 'failed' : 'pending',
+            'pending',
             errorMsg,
           );
           

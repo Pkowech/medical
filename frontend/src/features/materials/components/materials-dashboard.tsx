@@ -21,7 +21,7 @@ import { RecommendationCard } from './RecommendationCard'; // New Component
 import { Button } from '@/shared/components/ui/button';
 import { toast } from 'sonner';
 import { 
-  Search, Plus, LayoutGrid, LayoutList, ChevronDown, CheckCircle2,
+  Search, Plus, LayoutGrid, LayoutList, ChevronDown, ChevronRight, CheckCircle2,
   BrainCircuit, Database, BookOpen, Sparkles, Upload, FolderOpen,
   ArrowLeft, Clock, Layers, Play, CalendarClock, Target, Route
 } from 'lucide-react';
@@ -1527,11 +1527,8 @@ export default function MaterialsDashboard() {
                     className="group/course overflow-hidden rounded-xl border border-border bg-card shadow-sm dark:border-border dark:bg-card"
                   >
                     <div className="flex items-center gap-3 px-3 py-3.5 transition-colors hover:bg-background dark:hover:bg-card/60 sm:gap-4 sm:px-5">
-                      <button
-                        type="button"
-                        onClick={() => router.push(
-                          `/study-planner/materials?courseId=${encodeURIComponent(course.id)}&scope=${filterContext === 'owned' ? 'owned' : 'enrolled'}`,
-                        )}
+                      <Link
+                        href={`/study-planner/materials?courseId=${encodeURIComponent(course.id)}&scope=${filterContext === 'owned' ? 'owned' : 'enrolled'}`}
                         className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500"
                         aria-label={`Open ${course.title} roadmap`}
                       >
@@ -1544,7 +1541,11 @@ export default function MaterialsDashboard() {
                             {course.units.length} {course.units.length === 1 ? 'unit' : 'units'} · {course.resourceCount} {course.resourceCount === 1 ? 'resource' : 'resources'}
                           </p>
                         </div>
-                      </button>
+                        <span className="ml-auto inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-blue-700 dark:text-blue-300">
+                          Open roadmap
+                          <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                        </span>
+                      </Link>
                       <button
                         type="button"
                         onClick={() => setSectionOpen(

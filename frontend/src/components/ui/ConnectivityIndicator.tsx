@@ -18,6 +18,7 @@ export function ConnectivityIndicator() {
     retryFailed,
     discardFailed,
     latestFailure,
+    triggerSync,
   } = useConnectivity();
   const [showSuccess, setShowSuccess] = useState(false);
   const [prevFlushing, setPrevFlushing] = useState(isFlushing);
@@ -72,8 +73,8 @@ export function ConnectivityIndicator() {
           ? 'bottom-[calc(5rem+env(safe-area-inset-bottom))]'
           : 'bottom-[calc(4.5rem+env(safe-area-inset-bottom))] lg:bottom-4',
         !isOnline && "bg-red-500 text-white",
-        (statusError || failedChanges > 0) && "bg-amber-600 text-white",
-        isOnline && failedChanges === 0 && !statusError && !showSuccess && "bg-blue-600 text-white",
+        (statusError || failedChanges > 0 || (pendingChanges > 0 && !!latestFailure)) && "bg-amber-600 text-white",
+        isOnline && failedChanges === 0 && !statusError && !latestFailure && !showSuccess && "bg-blue-600 text-white",
         showSuccess && "bg-green-600 text-white"
       )}
     >
@@ -145,12 +146,26 @@ export function ConnectivityIndicator() {
         <>
           <RefreshCw className={cn("w-4 h-4", isFlushing && "animate-spin")} />
           <span className="text-sm font-medium">
-            {isFlushing ? 'Syncing...' : 'Changes pending'}
+            {isFlushing
+              ? 'Syncing...'
+              : latestFailure
+                ? 'Sync retry scheduled'
+                : 'Changes pending'}
           </span>
           <span className="text-xs bg-card/20 px-2 py-0.5 rounded-full">
             {pendingChanges}
           </span>
-
+          {!isFlushing && latestFailure && (
+            <button
+              type="button"
+              className="rounded bg-card/20 px-2 py-1 text-xs font-semibold hover:bg-card/30"
+              onClick={() => void triggerSync()}
+              title={latestFailure}
+              aria-label={`Retry pending changes now. Latest error: ${latestFailure}`}
+            >
+              Retry now
+            </button>
+          )}
         </>
       )}
     </div>

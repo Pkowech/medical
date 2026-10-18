@@ -17,6 +17,7 @@ import { useTheme } from '@/app/providers';
 import { changePasswordSchema } from '@/lib/auth/validations';
 import { getAuthErrorDetails } from '@/features/auth/services/authErrors';
 import { TwoFactorAuth } from '@/features/auth/components/TwoFactorAuth';
+import { PushNotificationSettings } from '@/features/community/PushNotificationSettings';
 
 interface UserSettings {
   email: string;
@@ -376,18 +377,12 @@ export default function SettingsPage() {
                   />
                 </div>
 
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="font-medium">Push Notifications</h3>
-                    <p className="text-sm text-muted-foreground dark:text-muted-foreground">
-                      Receive push notifications in browser
-                    </p>
-                  </div>
-                  <Switch
-                    checked={settings.pushNotifications}
-                    onCheckedChange={() => handleToggle('pushNotifications')}
-                  />
-                </div>
+                <PushNotificationSettings
+                  enabled={settings.pushNotifications}
+                  onEnabledChange={enabled =>
+                    setSettings(previous => ({ ...previous, pushNotifications: enabled }))
+                  }
+                />
 
                 <div className="flex items-center justify-between">
                   <div>

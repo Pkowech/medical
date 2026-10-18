@@ -92,7 +92,7 @@ export function useConnectivity() {
     },
     triggerSync: async () => {
       try {
-        await syncService.syncOutbox();
+        await syncService.syncOutbox(true);
         await refreshStatus();
       } catch (error) {
         setStatusError(error instanceof Error ? error.message : String(error));

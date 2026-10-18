@@ -71,8 +71,8 @@ export class FlashcardsService {
       // If no questionId, create a standalone flashcard
       flashcard = await this.prisma.flashcard.create({
         data: {
-          front: dto.front ?? '',
-          back: dto.back ?? '',
+          front: dto.front ?? dto.question ?? dto.content ?? '',
+          back: dto.back ?? dto.answer ?? '',
           difficulty: dto.difficulty
             ? (dto.difficulty as QuestionDifficulty)
             : QuestionDifficulty.medium,
@@ -95,10 +95,10 @@ export class FlashcardsService {
         userId,
         flashcardId: flashcard.id,
         easeFactor: 2.5,
-        interval: 1,
+        interval: 0,
         nextReview: new Date(),
         correctStreak: 0,
-        lastReview: new Date(),
+        lastReview: null,
         repetitions: 0,
       },
     });
@@ -116,16 +116,35 @@ export class FlashcardsService {
     mastered: number;
     needsReview: number;
     avgEaseFactor: number;
+    total: number;
+    due: number;
+    upcoming: number;
+    averageInterval: number;
   }> {
-    // Route through Rust gRPC via AssessmentAnalyticsService
-    const grpcStats =
-      await this.analyticsService.getSpacedRepetitionStats(userId);
+    const cards = await this.prisma.userFlashcardProgress.findMany({
+      where: { userId },
+      select: {
+        easeFactor: true,
+        interval: true,
+        repetitions: true,
+        nextReview: true,
+      },
+    });
+    const dueToday = cards.filter((card) => card.nextReview <= new Date()).length;
+    const mastered = cards.filter((card) => card.repetitions >= 2).length;
+    const totalInterval = cards.reduce((sum, card) => sum + card.interval, 0);
+    const totalEaseFactor = cards.reduce((sum, card) => sum + card.easeFactor, 0);
+
     return {
-      totalCards: grpcStats.totalCards,
-      dueToday: grpcStats.dueToday,
-      mastered: grpcStats.masteredCards,
-      needsReview: grpcStats.learningCards + grpcStats.relearningCards,
-      avgEaseFactor: grpcStats.avgEaseFactor,
+      totalCards: cards.length,
+      dueToday,
+      mastered,
+      needsReview: cards.length - mastered,
+      avgEaseFactor: cards.length ? totalEaseFactor / cards.length : 2.5,
+      total: cards.length,
+      due: dueToday,
+      upcoming: cards.length - dueToday,
+      averageInterval: cards.length ? totalInterval / cards.length : 0,
     };
   }
 
@@ -142,36 +161,109 @@ export class FlashcardsService {
     description: 'List of due flashcards',
     type: Array,
   })
-  async getDueCards(userId: string): Promise<Flashcard[]> {
-    const cacheKey = `due_flashcards:${userId}`;
-    const cachedCards = await this.redisService.get<string>(cacheKey);
-    if (cachedCards) {
-      return JSON.parse(cachedCards);
-    }
-
-    // Use analytics service to get due card ids, then fetch full Flashcard records
-    const dueProtoCards = await this.analyticsService.getDueCards(userId);
-    const cardIds = (dueProtoCards || [])
-      .map((c: any) => c.card_id)
-      .filter(Boolean);
-
-    if (cardIds.length === 0) {
-      await this.redisService.set(cacheKey, JSON.stringify([]), 1 * 60 * 60);
-      return [];
-    }
-
-    const flashcards = await this.prisma.flashcard.findMany({
-      where: { id: { in: cardIds } },
+  async getDueCards(
+    userId: string,
+  ): Promise<Array<UserFlashcardProgress & { flashcard: Flashcard }>> {
+    return this.prisma.userFlashcardProgress.findMany({
+      where: { userId, nextReview: { lte: new Date() } },
+      include: { flashcard: true },
+      orderBy: { nextReview: 'asc' },
     });
+  }
 
-    // Preserve order returned by analytics
-    const flashcardMap = new Map(flashcards.map((f) => [f.id, f]));
-    const ordered = cardIds
-      .map((id: string) => flashcardMap.get(id))
-      .filter(Boolean);
+  async getScheduledReviews(
+    userId: string,
+    startDate: Date,
+    endDate: Date,
+  ): Promise<
+    Array<{
+      date: string;
+      title: string;
+      description: string;
+      count: number;
+      courseId: string | null;
+      topicId: string | null;
+    }>
+  > {
+    if (
+      Number.isNaN(startDate.getTime()) ||
+      Number.isNaN(endDate.getTime()) ||
+      endDate < startDate
+    ) {
+      throw new BadRequestException('A valid review date range is required');
+    }
 
-    await this.redisService.set(cacheKey, JSON.stringify(ordered), 1 * 60 * 60);
-    return ordered as Flashcard[];
+    const [progressCards, topics] = await Promise.all([
+      this.prisma.userFlashcardProgress.findMany({
+        where: { userId, nextReview: { lte: endDate } },
+        select: {
+          nextReview: true,
+          flashcard: {
+            select: {
+              question: {
+                select: {
+                  topicIds: true,
+                  unit: {
+                    select: {
+                      id: true,
+                      name: true,
+                      course: { select: { id: true, name: true } },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      }),
+      this.prisma.topic.findMany({
+        select: { id: true, name: true },
+      }),
+    ]);
+    const topicNames = new Map(topics.map((topic) => [topic.id, topic.name]));
+    const startDay = startDate.toISOString().slice(0, 10);
+    const groups = new Map<
+      string,
+      {
+        date: string;
+        title: string;
+        description: string;
+        count: number;
+        courseId: string | null;
+        topicId: string | null;
+      }
+    >();
+
+    for (const progress of progressCards) {
+      const question = progress.flashcard.question;
+      const topicId = question?.topicIds[0] ?? null;
+      const topicName = topicId ? topicNames.get(topicId) : undefined;
+      const course = question?.unit?.course;
+      const reviewDay = progress.nextReview.toISOString().slice(0, 10);
+      const date = reviewDay < startDay ? startDay : reviewDay;
+      const key = `${date}:${course?.id ?? 'general'}:${topicId ?? 'general'}`;
+      const existing = groups.get(key);
+      if (existing) {
+        existing.count += 1;
+        existing.title = `Review ${existing.count} ${existing.count === 1 ? 'card' : 'cards'}${topicName ? `: ${topicName}` : ''}`;
+      } else {
+        const title = `Review 1 card${topicName ? `: ${topicName}` : ''}`;
+        groups.set(key, {
+          date,
+          title,
+          description: course?.name
+            ? `Spaced repetition review for ${course.name}`
+            : 'Spaced repetition review',
+          count: 1,
+          courseId: course?.id ?? null,
+          topicId,
+        });
+      }
+    }
+
+    return Array.from(groups.values()).sort((left, right) =>
+      left.date.localeCompare(right.date),
+    );
   }
 
   @ApiOperation({ summary: 'Update a flashcard after review' })
@@ -183,13 +275,14 @@ export class FlashcardsService {
   async updateCard(
     userFlashcardProgressId: string,
     quality: number,
+    userId: string,
   ): Promise<UserFlashcardProgress> {
     if (quality < 1 || quality > 5) {
       throw new BadRequestException('Quality must be between 1 and 5');
     }
 
-    const userProgress = await this.prisma.userFlashcardProgress.findUnique({
-      where: { id: userFlashcardProgressId },
+    const userProgress = await this.prisma.userFlashcardProgress.findFirst({
+      where: { id: userFlashcardProgressId, userId },
       include: { flashcard: true },
     });
 
@@ -240,6 +333,89 @@ export class FlashcardsService {
       `Updated user flashcard progress ${userFlashcardProgressId} with quality ${quality}, next review in ${result.updated.interval} days`,
     );
     return updatedUserProgress;
+  }
+
+  async recordTopicQuizReviews(
+    userId: string,
+    topicId: string,
+    answers: Array<{ questionId: string; isCorrect: boolean }>,
+  ): Promise<number> {
+    const now = new Date();
+    const scheduledCount = await this.prisma.$transaction(async (tx) => {
+      for (const answer of answers) {
+        const question = await tx.question.findFirst({
+          where: { id: answer.questionId, topicIds: { has: topicId } },
+          include: { options: true },
+        });
+        if (!question) {
+          throw new NotFoundException(
+            `Question ${answer.questionId} not found for topic ${topicId}`,
+          );
+        }
+
+        let flashcard = await tx.flashcard.findFirst({
+          where: { questionId: question.id },
+        });
+        if (!flashcard) {
+          const correctAnswers = question.options
+            .filter((option) => option.isCorrect)
+            .map((option) => option.text);
+          flashcard = await tx.flashcard.create({
+            data: {
+              questionId: question.id,
+              front: question.text,
+              back: question.explanation || correctAnswers.join('\n'),
+              difficulty: question.difficulty,
+              tags: question.tags,
+              hints: [],
+            },
+          });
+        }
+
+        const progress = await tx.userFlashcardProgress.upsert({
+          where: {
+            userId_flashcardId: { userId, flashcardId: flashcard.id },
+          },
+          update: {},
+          create: {
+            userId,
+            flashcardId: flashcard.id,
+            easeFactor: 2.5,
+            interval: 0,
+            repetitions: 0,
+            correctStreak: 0,
+            nextReview: now,
+          },
+        });
+        const review = this.sm2Algorithm.reviewCard(
+          {
+            easeFactor: progress.easeFactor,
+            interval: progress.interval,
+            repetitions: progress.repetitions,
+            correctStreak: progress.correctStreak,
+            lastReviewDate: progress.lastReview ?? undefined,
+            nextReviewDate: progress.nextReview,
+          },
+          answer.isCorrect ? 4 : 2,
+        );
+
+        await tx.userFlashcardProgress.update({
+          where: { id: progress.id },
+          data: {
+            easeFactor: review.updated.easeFactor,
+            interval: review.updated.interval,
+            repetitions: review.updated.repetitions,
+            correctStreak: review.updated.correctStreak,
+            lastReview: now,
+            nextReview: review.updated.nextReviewDate,
+          },
+        });
+      }
+      return answers.length;
+    });
+
+    await this.redisService.del(`due_flashcards:${userId}`);
+    return scheduledCount;
   }
 
   @ApiOperation({ summary: 'Sync flashcards for a user' })

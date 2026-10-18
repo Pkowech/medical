@@ -366,6 +366,7 @@ model User {
   materialShares          MaterialShare[]
   materials               Material[]
   notifications           Notification[]
+  pushSubscriptions       PushSubscription[]
   predictionAudits        PredictionAudit[]
   predictionValidations   PredictionValidation[]
   questionFlags           QuestionFlag[]
@@ -1529,6 +1530,21 @@ model Notification {
   @@index([priority])
   @@index([userId, createdAt(sort: Desc)])
   @@map("notifications")
+}
+
+model PushSubscription {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  endpoint  String   @db.VarChar(2048)
+  p256dh    String   @db.VarChar(256)
+  auth      String   @db.VarChar(256)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, endpoint])
+  @@index([userId])
+  @@map("push_subscriptions")
 }
 
 model WeeklyDigest {

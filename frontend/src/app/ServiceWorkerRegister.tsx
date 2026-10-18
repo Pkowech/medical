@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { syncService } from '@/lib/core/offline/syncService';
 
 const showUpdateBanner = process.env.NEXT_PUBLIC_ENABLE_APP_UPDATE_BANNER === 'true';
 
@@ -9,14 +10,20 @@ export function ServiceWorkerRegister() {
   const activatingUpdate = useRef(false);
 
   useEffect(() => {
-    if (!showUpdateBanner || process.env.NODE_ENV !== 'production' || !('serviceWorker' in navigator)) return;
+    if (process.env.NODE_ENV !== 'production' || !('serviceWorker' in navigator)) return;
 
     let disposed = false;
     let registration: ServiceWorkerRegistration | undefined;
 
     const showWaitingWorker = () => {
-      if (!disposed && registration?.waiting) {
-        setWaitingWorker(registration.waiting);
+      const waiting = registration?.waiting;
+      if (!disposed && waiting) {
+        if (showUpdateBanner) {
+          setWaitingWorker(waiting);
+        } else {
+          activatingUpdate.current = Boolean(navigator.serviceWorker.controller);
+          waiting.postMessage({ type: 'SKIP_WAITING' });
+        }
       }
     };
 
@@ -42,12 +49,26 @@ export function ServiceWorkerRegister() {
       if (activatingUpdate.current) window.location.reload();
     };
 
+    const onServiceWorkerMessage = (event: MessageEvent) => {
+      if (event.data?.type !== 'SYNC_OUTBOX') return;
+      const replyPort = event.ports[0];
+      void syncService.syncOutbox().then(
+        () => replyPort?.postMessage({ success: true }),
+        error => {
+          console.error('[PWA] Background sync request failed:', error);
+          replyPort?.postMessage({ success: false });
+        },
+      );
+    };
+
     navigator.serviceWorker.addEventListener('controllerchange', onControllerChange);
+    navigator.serviceWorker.addEventListener('message', onServiceWorkerMessage);
     void register();
 
     return () => {
       disposed = true;
       navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange);
+      navigator.serviceWorker.removeEventListener('message', onServiceWorkerMessage);
     };
   }, []);
 

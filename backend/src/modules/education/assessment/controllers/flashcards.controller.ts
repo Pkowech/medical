@@ -7,6 +7,7 @@ import {
   UseGuards,
   ParseUUIDPipe,
   ForbiddenException,
+  Query,
 } from '@nestjs/common';
 import { User } from '@prisma/client';
 import { FlashcardsService } from '../services/flashcards.service';
@@ -14,6 +15,7 @@ import { JwtAuthGuard } from '#modules/auth/guards/jwt-auth.guard';
 import { CurrentUser } from '#common/decorators/current-user.decorator';
 import { Role } from '#modules/auth/constants/role.constants';
 import { getUserPrimaryRole } from '#common/utils/role.util';
+import { CreateFlashcardDto } from '#common/dto';
 
 @Controller('flashcards')
 @UseGuards(JwtAuthGuard)
@@ -22,11 +24,9 @@ export class FlashcardsController {
 
   @Post('create')
   async createFlashcard(
-    @Body('questionId') questionId: string,
+    @Body() dto: CreateFlashcardDto,
     @CurrentUser() currentUser: User,
   ) {
-    // construct a CreateFlashcardDto shape so the service signature is satisfied
-    const dto = { questionId } as any;
     return this.flashcardsService.createFlashcard(currentUser.id, dto);
   }
 
@@ -39,12 +39,28 @@ export class FlashcardsController {
     return this.flashcardsService.getDueCards(userId);
   }
 
+  @Get('schedule/:userId')
+  async getScheduledReviews(
+    @Param('userId', ParseUUIDPipe) userId: string,
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
+    @CurrentUser() currentUser: User,
+  ) {
+    this.assertCanAccessUser(currentUser, userId);
+    return this.flashcardsService.getScheduledReviews(
+      userId,
+      new Date(startDate),
+      new Date(endDate),
+    );
+  }
+
   @Post('update/:cardId')
   async updateCard(
-    @Param('cardId') cardId: string,
+    @Param('cardId', ParseUUIDPipe) cardId: string,
     @Body('quality') quality: number,
+    @CurrentUser() currentUser: User,
   ) {
-    return this.flashcardsService.updateCard(cardId, quality);
+    return this.flashcardsService.updateCard(cardId, quality, currentUser.id);
   }
 
   @Get('overview/:userId')

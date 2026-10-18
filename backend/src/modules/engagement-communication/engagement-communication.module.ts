@@ -17,6 +17,7 @@ import { DirectMessagesController } from './controllers/direct-messages.controll
 // Communication Services
 import { ChatService } from './services/chat.service';
 import { NotificationsService } from './services/notifications.service';
+import { PushNotificationsService } from './services/push-notifications.service';
 import { WeeklyDigestService } from './services/weekly-digest.service';
 import { ForumService } from './services/forum.service';
 import { DirectMessagesService } from './services/direct-messages.service';
@@ -61,6 +62,7 @@ import { OnboardingService } from './services/onboarding.service';
   providers: [
     ChatService,
     NotificationsService,
+    PushNotificationsService,
     WeeklyDigestService,
     ForumService,
     DirectMessagesService,
@@ -72,6 +74,7 @@ import { OnboardingService } from './services/onboarding.service';
   exports: [
     ChatService,
     NotificationsService,
+    PushNotificationsService,
     WeeklyDigestService,
     ForumService,
     DirectMessagesService,

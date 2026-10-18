@@ -17,6 +17,7 @@ import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { QuizUtils } from '#common/utils/quiz.utils';
 import { QuizAnswerDto, CreateQuizDto } from '#common/dto/assessment.dto';
 import { QuestionBankService } from './question-bank.service';
+import { FlashcardsService } from './flashcards.service';
 
 import { GlobalSearchSyncService } from '../../../../infrastructure/search/services/global-search-sync.service';
 import { MaxAttemptsExceededException } from '#common/exceptions/quiz.exception';
@@ -39,6 +40,7 @@ export class QuizService {
     private readonly questionBankService: QuestionBankService,
     private readonly searchSync: GlobalSearchSyncService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly flashcardsService: FlashcardsService,
   ) {}
 
   @ApiOperation({ summary: 'Create a new quiz' })
@@ -727,6 +729,7 @@ export class QuizService {
     masteryUnlocked: boolean;
     nextTopicUnlocked: boolean;
     nextTopicId?: string;
+    reviewCardsScheduled: number;
   }> {
     try {
       const topic = await this.prisma.topic.findUnique({
@@ -748,6 +751,7 @@ export class QuizService {
 
       let score = 0;
       let totalPoints = 0;
+      const reviewAnswers: Array<{ questionId: string; isCorrect: boolean }> = [];
 
       for (const response of responses) {
         const question = questionMap.get(response.questionId);
@@ -760,16 +764,23 @@ export class QuizService {
         const selectedIds: string[] = Array.isArray(response.selectedAnswers)
           ? response.selectedAnswers
           : [];
-        if (
+        const isCorrect =
           correctOptions.length === selectedIds.length &&
-          correctOptions.every(option => selectedIds.includes(option.id))
-        ) {
+          correctOptions.every(option => selectedIds.includes(option.id));
+        if (isCorrect) {
           score += question.points || 1;
         }
+        reviewAnswers.push({ questionId: question.id, isCorrect });
       }
 
       const scorePercentage = totalPoints > 0 ? Math.round((score / totalPoints) * 100) : 0;
       const passed = scorePercentage >= 70;
+      const reviewCardsScheduled =
+        await this.flashcardsService.recordTopicQuizReviews(
+          userId,
+          topicId,
+          reviewAnswers,
+        );
       const mastery = await this.masteryGateService.onQuizComplete(
         userId,
         topicId,
@@ -799,6 +810,7 @@ export class QuizService {
         masteryUnlocked: mastery.masteryUnlocked,
         nextTopicUnlocked: mastery.nextTopicUnlocked,
         nextTopicId: mastery.nextTopicId,
+        reviewCardsScheduled,
       };
     } catch (error) {
       this.logger.error(`Error submitting topic quiz: ${String(error)}`);

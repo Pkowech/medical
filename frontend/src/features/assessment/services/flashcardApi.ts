@@ -26,8 +26,11 @@ export interface UserFlashcardProgress extends SM2Card {
   id: string;
   userId: string;
   flashcardId: string;
+  nextReview: string | Date;
+  lastReview?: string | Date | null;
   createdAt?: Date;
   updatedAt?: Date;
+  flashcard: Flashcard;
 }
 
 export interface CardStats {
@@ -36,6 +39,10 @@ export interface CardStats {
   mastered: number;
   needsReview: number;
   avgEaseFactor: number;
+  total: number;
+  due: number;
+  upcoming: number;
+  averageInterval: number;
 }
 
 class FlashcardApiService {
@@ -50,9 +57,9 @@ class FlashcardApiService {
     return response.data as Flashcard;
   }
 
-  async getDueCards(userId: string): Promise<Flashcard[]> {
+  async getDueCards(userId: string): Promise<UserFlashcardProgress[]> {
     const response = await api.get(`/flashcards/due/${userId}`);
-    return response.data as Flashcard[];
+    return response.data as UserFlashcardProgress[];
   }
 
   async updateCard(cardId: string, quality: number): Promise<UserFlashcardProgress> {

@@ -380,6 +380,7 @@ export class StudyService {
             topic,
             activities: topicActivities as any,
           });
+          await this.ensureTopicReviewCards(userId, topic.id);
           unitMinutes.set(
             topic.unitId,
             (unitMinutes.get(topic.unitId) ?? 0) + topicDuration,
@@ -400,6 +401,7 @@ export class StudyService {
           topic: session.topic,
           activities: activities as any,
         });
+        await this.ensureTopicReviewCards(userId, session.topic.id);
         if (session.topic.unitId) {
           const progressUpdateDto: ProgressUpdateDto = {
             courseId: session.topic.unit.courseId,
@@ -443,6 +445,64 @@ export class StudyService {
     });
     await this.progressService.invalidateUserProgressCache(userId);
     return endedSession;
+  }
+
+  private async ensureTopicReviewCards(
+    userId: string,
+    topicId: string,
+  ): Promise<void> {
+    const questions = await this.prisma.question.findMany({
+      where: { topicIds: { has: topicId }, isActive: true },
+      include: {
+        options: {
+          where: { isCorrect: true },
+          select: { text: true },
+        },
+      },
+      orderBy: { usageCount: 'asc' },
+    });
+    if (!questions.length) return;
+
+    const nextReview = new Date();
+    nextReview.setDate(nextReview.getDate() + 1);
+
+    await this.prisma.$transaction(async (tx) => {
+      for (const question of questions) {
+        let flashcard = await tx.flashcard.findFirst({
+          where: { questionId: question.id },
+        });
+        if (!flashcard) {
+          flashcard = await tx.flashcard.create({
+            data: {
+              questionId: question.id,
+              front: question.text,
+              back:
+                question.explanation ||
+                question.options.map((option) => option.text).join('\n'),
+              difficulty: question.difficulty,
+              tags: question.tags,
+              hints: [],
+            },
+          });
+        }
+
+        await tx.userFlashcardProgress.upsert({
+          where: {
+            userId_flashcardId: { userId, flashcardId: flashcard.id },
+          },
+          update: {},
+          create: {
+            userId,
+            flashcardId: flashcard.id,
+            easeFactor: 2.5,
+            interval: 0,
+            repetitions: 0,
+            correctStreak: 0,
+            nextReview,
+          },
+        });
+      }
+    });
   }
 
   private async updateTopicProgress(

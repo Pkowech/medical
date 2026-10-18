@@ -62,3 +62,14 @@ def test_local_material_reader_renders_article_content():
 
     assert 'accept=".pdf,.txt,.md"' in material_reader
     assert "<pre>{fileContent}</pre>" in material_reader
+
+
+def test_course_library_row_opens_roadmap_independently_from_resource_toggle():
+    """Course navigation and resource expansion must use separate controls."""
+    materials_dashboard = read_frontend("src/features/materials/components/materials-dashboard.tsx")
+
+    assert 'aria-label={`Open ${course.title} roadmap`}' in materials_dashboard
+    assert 'Open roadmap' in materials_dashboard
+    assert 'aria-expanded={isSectionOpen(`course:${course.id}`, false)}' in materials_dashboard
+    assert 'aria-label={`${isSectionOpen(`course:${course.id}`, false) ? \'Collapse\' : \'Expand\'} ${course.title} resources`}' in materials_dashboard
+    assert 'onClick={() => setSectionOpen(' in materials_dashboard
