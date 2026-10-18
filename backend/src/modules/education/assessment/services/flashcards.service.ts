@@ -35,8 +35,15 @@ export class FlashcardsService {
       flashcard: {
         question: {
           is: {
-            ...(filters.courseId ? { courseId: filters.courseId } : {}),
             ...(filters.topicId ? { topicIds: { has: filters.topicId } } : {}),
+            ...(filters.courseId
+              ? {
+                  OR: [
+                    { courseId: filters.courseId },
+                    { unit: { is: { courseId: filters.courseId } } },
+                  ],
+                }
+              : {}),
           },
         },
       },
