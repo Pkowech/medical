@@ -67,6 +67,9 @@ const courseUnitHref = (courseId: string, unitId: string, topicId?: string) => {
   return topicId ? `${path}?topicId=${encodeURIComponent(topicId)}` : path;
 };
 
+const displayString = (value: unknown, fallback = '') =>
+  typeof value === 'string' || typeof value === 'number' ? String(value) : fallback;
+
 export const CoursesDashboard = () => {
   const { setHeader } = usePageHeader();
   const { getResumePoint } = useStudy();
@@ -158,8 +161,10 @@ export const CoursesDashboard = () => {
     isLoading: coursesLoading,
     isError: coursesError,
     error: coursesErrorDetails,
+    refetch: refetchCourses,
     fetchNextPage,
     hasNextPage,
+    isFetchingNextPage,
   } = useInfiniteQuery<CoursesPageData, Error, InfiniteData<CoursesPageData>>({
     queryKey: [
       'courses',
@@ -232,10 +237,10 @@ export const CoursesDashboard = () => {
       } else if (Array.isArray(raw)) {
         const unitItems = raw as Array<Record<string, unknown>>;
         const courses: Course[] = unitItems.map(unit => ({
-          id: String(unit.courseId ?? ''),
-          name: String(unit.courseTitle ?? ''),
-          title: String(unit.unitTitle ?? ''),
-          description: `Part of ${unit.courseTitle ?? ''}`,
+          id: displayString(unit.courseId),
+          name: displayString(unit.courseTitle),
+          title: displayString(unit.unitTitle),
+          description: `Part of ${displayString(unit.courseTitle)}`,
           categoryId: '',
           status: 'published',
           price: 0,
@@ -289,6 +294,7 @@ export const CoursesDashboard = () => {
     unit => unit.isCompleted === true || unit.status === 'completed',
   ).length;
   const ongoingUnitCount = activeUnits.length - completedUnitCount;
+  const loadedCourses = infiniteData?.pages.flatMap(page => page.courses) ?? [];
 
   const openCourseUnits = async (course: Course) => {
     try {
@@ -472,13 +478,16 @@ export const CoursesDashboard = () => {
                 ) : (
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                     {section.units.map(unit => {
-                      const unitId = String(unit.unitId ?? '');
-                      const courseId = String(unit.courseId ?? '');
+                      const unitId = displayString(unit.unitId);
+                      const courseId = displayString(unit.courseId);
+                      const unitTitle = displayString(unit.unitTitle, 'unit');
+                      const courseTitle = displayString(unit.courseTitle, 'course');
+                      const nextTopicId = displayString(unit.nextTopicId);
                       const percentage = Math.min(100, Math.max(0, Number(unit.progressPercentage) || 0));
                       return (
                         <article key={unitId} className="rounded-lg border border-border bg-card p-5 shadow-sm dark:border-border dark:bg-card">
-                          <p className="mb-1 text-xs font-semibold uppercase text-muted-foreground dark:text-muted-foreground">{String(unit.courseTitle ?? 'Course')}</p>
-                          <h3 className="font-bold text-foreground dark:text-foreground">{String(unit.unitTitle ?? 'Unit')}</h3>
+                          <p className="mb-1 text-xs font-semibold uppercase text-muted-foreground dark:text-muted-foreground">{courseTitle}</p>
+                          <h3 className="font-bold text-foreground dark:text-foreground">{unitTitle}</h3>
                           <p className="mt-2 text-sm text-muted-foreground dark:text-muted-foreground">
                             {Number(unit.completedTopics) || 0} of {Number(unit.totalTopics) || 0} topics complete
                           </p>
@@ -489,8 +498,8 @@ export const CoursesDashboard = () => {
                             <button
                               type="button"
                               disabled={!courseId || !unitId}
-                              onClick={() => router.push(courseUnitHref(courseId, unitId, unit.nextTopicId as string | undefined))}
-                              aria-label={`Continue ${String(unit.unitTitle ?? 'unit')}`}
+                              onClick={() => router.push(courseUnitHref(courseId, unitId, nextTopicId || undefined))}
+                              aria-label={`Continue ${unitTitle}`}
                               className="inline-flex items-center gap-1 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700"
                             >
                               {section.completed ? 'Review unit' : 'Continue unit'}
@@ -500,7 +509,7 @@ export const CoursesDashboard = () => {
                               type="button"
                               onClick={() => router.push(`/courses/${courseId}`)}
                               disabled={!courseId}
-                              aria-label={`View all units in ${String(unit.courseTitle ?? 'course')}`}
+                              aria-label={`View all units in ${courseTitle}`}
                               className="inline-flex items-center gap-1 rounded-md border border-border px-3 py-2 text-sm font-semibold text-muted-foreground hover:bg-background disabled:cursor-not-allowed disabled:opacity-50 dark:border-border dark:text-muted-foreground dark:hover:bg-secondary"
                             >
                               <BookOpen className="h-4 w-4" />
@@ -529,11 +538,20 @@ export const CoursesDashboard = () => {
 
         {/* Content Grid */}
         {coursesError ? (
-          <div role="alert" className="order-3 rounded-xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-200">
-            Could not load courses: {coursesErrorDetails instanceof Error ? coursesErrorDetails.message : 'Please try again later.'}
+          <div role="alert" className="order-4 rounded-xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-200">
+            <p>
+              Could not load courses: {coursesErrorDetails instanceof Error ? coursesErrorDetails.message : 'Please try again later.'}
+            </p>
+            <button
+              type="button"
+              onClick={() => void refetchCourses()}
+              className="mt-3 rounded-md border border-rose-300 px-3 py-2 font-semibold hover:bg-rose-100 dark:border-rose-800 dark:hover:bg-rose-950"
+            >
+              Retry
+            </button>
           </div>
         ) : coursesLoading ? (
-          <div className="order-3 flex flex-col items-center justify-center py-20">
+          <div className="order-4 flex flex-col items-center justify-center py-20">
             <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent" />
             <p className="mt-4 text-muted-foreground font-medium">Curating your courses...</p>
           </div>
@@ -544,7 +562,7 @@ export const CoursesDashboard = () => {
                 {activeTab === 'enrolled' ? 'Enrolled classes' : activeTab === 'recommended' ? 'Recommended classes' : 'Explore classes'}
               </h2>
               <span className="text-sm text-muted-foreground dark:text-muted-foreground">
-                {(infiniteData as any)?.pages?.flatMap((page: any) => page.courses)?.length ?? 0}
+                {loadedCourses.length}
               </span>
             </div>
             {!user && (
@@ -552,9 +570,9 @@ export const CoursesDashboard = () => {
                 Browse the course catalog without an account. Sign in to enroll, access lessons, and track your progress.
               </p>
             )}
-            {(infiniteData as any)?.pages?.flatMap((p: any) => p.courses)?.length > 0 ? (
+            {loadedCourses.length > 0 ? (
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                {(infiniteData as any).pages.flatMap((p: any) => p.courses).map((course: any) => (
+                {loadedCourses.map(course => (
                   <CourseCard 
                     key={course.unitId || course.id} 
                     course={activeTab === 'enrolled'
@@ -599,10 +617,12 @@ export const CoursesDashboard = () => {
             {hasNextPage && (
               <div className="flex justify-center pt-8">
                 <button
-                  onClick={() => fetchNextPage()}
+                  type="button"
+                  onClick={() => void fetchNextPage()}
+                  disabled={isFetchingNextPage}
                   className="px-8 py-3 bg-card dark:bg-card border border-border dark:border-border rounded-2xl font-bold text-muted-foreground dark:text-muted-foreground hover:bg-background dark:hover:bg-secondary transition-all shadow-sm"
                 >
-                  Show More Courses
+                  {isFetchingNextPage ? 'Loading…' : 'Show More Courses'}
                 </button>
               </div>
             )}

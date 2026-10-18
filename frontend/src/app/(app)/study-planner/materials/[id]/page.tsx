@@ -60,6 +60,10 @@ export default function MaterialViewPage() {
   const lastTrackedPage = useRef<number>(0);
   const trackingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const canDelete = user && (user.role === 'admin' || hasPermission(user.role as never, 'EDIT_COURSES' as Permission));
+  const materialCourseId = material?.courseId || material?.course?.id || material?.unit?.course?.id;
+  const materialsReturnUrl = materialCourseId
+    ? `/study-planner/materials?courseId=${encodeURIComponent(materialCourseId)}&scope=enrolled`
+    : '/study-planner/materials';
 
   useEffect(() => {
     if (!material) return;
@@ -215,7 +219,7 @@ export default function MaterialViewPage() {
     try {
       await materialService.deleteMaterial(materialId);
       toast.success('Material deleted.');
-      router.push('/study-planner/materials');
+      router.push(materialsReturnUrl);
     } catch (err) {
       console.error('Error deleting material:', err);
       toast.error(err instanceof Error ? err.message : 'Failed to delete material.');
@@ -330,13 +334,18 @@ export default function MaterialViewPage() {
   }
 
   return (
-    <div className={`flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-background transition-colors duration-300 dark:bg-background ${focusMode ? 'py-0' : 'p-3 sm:p-4 md:p-6'}`}>
+    <div className={`flex min-h-0 min-w-0 flex-col overflow-hidden bg-background transition-colors duration-300 dark:bg-background ${
+      focusMode
+        ? 'fixed inset-0 z-50 h-[100dvh] w-screen max-w-none p-0'
+        : 'h-full p-3 sm:p-4 md:p-6'
+    }`}>
       <div className={`flex flex-col h-full mx-auto w-full transition-all duration-300 ${focusMode ? 'max-w-full' : 'max-w-7xl'}`}>
         <AnimatePresence>
           {!focusMode && (
             <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-2">
-              <Button variant="ghost" onClick={() => router.push('/study-planner/materials')} className="rounded-lg">
-                <ArrowLeft className="mr-2 h-4 w-4" /> Materials
+              <Button variant="ghost" onClick={() => router.push(materialsReturnUrl)} className="rounded-lg">
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                {materialCourseId ? 'Course materials' : 'Materials'}
               </Button>
               <div className="flex flex-wrap items-center justify-end gap-2">
                 <Button variant="outline" size="sm" onClick={handleShare} aria-label="Share material" className="rounded-lg">
@@ -422,16 +431,17 @@ export default function MaterialViewPage() {
             </Card>
 
             {!focusMode && material.description && (
-              <section className="mt-4 shrink-0">
-                <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold text-muted-foreground dark:text-muted-foreground">
-                  <Eye className="h-4 w-4 text-blue-600 dark:text-blue-400" /> About this material
-                </h2>
+              <details className="mt-3 shrink-0">
+                <summary className="flex cursor-pointer list-none items-center gap-2 py-2 text-sm font-semibold text-muted-foreground marker:hidden dark:text-muted-foreground">
+                  <Eye className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                  About this material
+                </summary>
                 <Card className="rounded-xl border-border bg-card py-0 shadow-sm dark:border-border dark:bg-card">
                   <CardContent className="py-3 text-sm leading-relaxed text-muted-foreground dark:text-muted-foreground">
                     {material.description}
                   </CardContent>
                 </Card>
-              </section>
+              </details>
             )}
           </div>
         </div>

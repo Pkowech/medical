@@ -121,7 +121,6 @@ export const MaterialListItem: React.FC<MaterialListItemProps> = React.memo(({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem
-                disabled={!material.unitId}
                 onSelect={(event) => {
                   event.preventDefault();
                   onToggleCourseSharing?.(material);

@@ -199,7 +199,7 @@ const MedicalEducationDashboard = () => {
   }) => {
     if (course.id && course.unitId && course.nextTopicId) {
       router.push(
-        `/courses/${course.id}/units/${course.unitId}/topics/${course.nextTopicId}`,
+        `/courses/${course.id}/units/${course.unitId}?topicId=${encodeURIComponent(course.nextTopicId)}`,
       );
       return;
     }
@@ -236,7 +236,9 @@ const MedicalEducationDashboard = () => {
     try {
       const resumePoint = await getResumePoint(displayCourse.id);
       if (resumePoint && 'id' in resumePoint && resumePoint.unitId) {
-        router.push(`/courses/${displayCourse.id}/units/${resumePoint.unitId}/topics/${resumePoint.id}`);
+        router.push(
+          `/courses/${displayCourse.id}/units/${resumePoint.unitId}?topicId=${encodeURIComponent(String(resumePoint.id))}`,
+        );
         return;
       }
       if (resumePoint && 'unitId' in resumePoint && resumePoint.unitId) {

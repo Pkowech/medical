@@ -1,5 +1,7 @@
 import MaterialsDashboard from '@/features/materials/components/materials-dashboard';
 import { Metadata } from 'next';
+import { Suspense } from 'react';
+import { LoadingSpinner } from '@/shared/components/ui/loading-spinner';
 
 export const metadata: Metadata = {
   title: 'Study Materials — Study Planner',
@@ -7,5 +9,9 @@ export const metadata: Metadata = {
 };
 
 export default function MaterialsPage() {
-  return <MaterialsDashboard />;
+  return (
+    <Suspense fallback={<LoadingSpinner />}>
+      <MaterialsDashboard />
+    </Suspense>
+  );
 }

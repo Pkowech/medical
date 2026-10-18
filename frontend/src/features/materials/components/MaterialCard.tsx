@@ -89,7 +89,7 @@ export const MaterialCard: React.FC<MaterialCardProps> = React.memo(({
               </a>
             </Button>
           )}
-          {canManageSharing && material.unitId && (
+          {canManageSharing && (
             <Button
               type="button"
               variant="ghost"

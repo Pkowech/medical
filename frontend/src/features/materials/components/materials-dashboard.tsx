@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { usePageHeader } from '@/core/providers/HeaderContext';
 import materialService from '@/features/courses/services/materialService';
@@ -71,6 +71,7 @@ const MATERIALS_SECTION_STATE_KEY = 'medtrack.materials.section-state.v2';
 export default function MaterialsDashboard() {
   const { setHeader } = usePageHeader();
   const router = useRouter();
+  const searchParams = useSearchParams();
   
   // View State
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
@@ -125,16 +126,16 @@ export default function MaterialsDashboard() {
     }
   }, [hasRestoredSectionState, sectionOpenState]);
 
+  const requestedCourseId = searchParams.get('courseId') || undefined;
+  const requestedScope = searchParams.get('scope');
+
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const courseId = params.get('courseId') || undefined;
-    const requestedScope = params.get('scope');
-    setSelectedCourseId(courseId);
-    if (courseId || requestedScope === 'enrolled' || requestedScope === 'shared') {
+    setSelectedCourseId(requestedCourseId);
+    if (requestedCourseId || requestedScope === 'enrolled' || requestedScope === 'shared') {
       setFilterContext('shared');
     }
     setCourseFilterInitialized(true);
-  }, []);
+  }, [requestedCourseId, requestedScope]);
 
   const {
     data: selectedCourse,
@@ -261,7 +262,8 @@ export default function MaterialsDashboard() {
       }
       courseGroup.resourceCount += 1;
 
-      const unitId = material.unitId ? String(material.unitId) : 'course-resources';
+      const materialUnitId = material.unitId ?? material.unit?.id;
+      const unitId = materialUnitId != null ? String(materialUnitId) : 'course-resources';
       let unitGroup = courseGroup.units.find((unit) => unit.id === unitId);
       if (!unitGroup) {
         unitGroup = {
@@ -355,8 +357,8 @@ export default function MaterialsDashboard() {
   };
 
   const toggleCourseSharing = async (material: Material) => {
-    if (!material.unitId) {
-      toast.error('Assign this material to a course and unit before sharing it with a class.');
+    if (!material.courseId && !material.course?.id && !material.unitId && !material.unit?.course?.id) {
+      toast.error('Assign this material to a course before sharing it with a class.');
       return;
     }
 
@@ -384,7 +386,11 @@ export default function MaterialsDashboard() {
         <MaterialListItem
           key={material.id}
           material={material}
-          canManageSharing={filterContext === 'owned' && !sharingMaterialIds.has(material.id)}
+          canManageSharing={
+            filterContext === 'owned' &&
+            Boolean(material.courseId || material.course?.id || material.unitId || material.unit?.course?.id) &&
+            !sharingMaterialIds.has(material.id)
+          }
           onToggleCourseSharing={toggleCourseSharing}
           onView={(item) => router.push(`/study-planner/materials/${item.id}`)}
         />
@@ -396,7 +402,11 @@ export default function MaterialsDashboard() {
         <MaterialCard
           key={material.id}
           material={material}
-          canManageSharing={filterContext === 'owned' && !sharingMaterialIds.has(material.id)}
+          canManageSharing={
+            filterContext === 'owned' &&
+            Boolean(material.courseId || material.course?.id || material.unitId || material.unit?.course?.id) &&
+            !sharingMaterialIds.has(material.id)
+          }
           onToggleCourseSharing={toggleCourseSharing}
         />
       ))}

@@ -36,12 +36,12 @@ export function CourseOverview() {
     enabled: Boolean(courseId),
   });
   const { data: progress } = useQuery<CourseProgress>({
-    queryKey: ['course-overview-progress', courseId],
+    queryKey: ['course-overview-progress', courseId, user?.id],
     queryFn: () => courseService.getDetailedCourseProgress(courseId),
     enabled: Boolean(courseId && user?.id),
   });
   const { data: activeUnits = [] } = useQuery<Array<Record<string, unknown>>>({
-    queryKey: ['course-overview-active-units', courseId],
+    queryKey: ['course-overview-active-units', courseId, user?.id],
     queryFn: () => courseService.getEnrolledUnits(),
     enabled: Boolean(courseId && user?.id),
   });
@@ -51,7 +51,14 @@ export function CourseOverview() {
   }
 
   if (courseError || !course) {
-    return <div className="flex min-h-screen items-center justify-center text-red-600">Unable to load this course.</div>;
+    return (
+      <main className="flex min-h-screen flex-col items-center justify-center gap-4 text-center text-red-600">
+        <p>Unable to load this course.</p>
+        <Link href="/courses" className="text-sm font-medium text-blue-700 hover:underline dark:text-blue-300">
+          Back to all courses
+        </Link>
+      </main>
+    );
   }
 
   const topicProgress = new Map(

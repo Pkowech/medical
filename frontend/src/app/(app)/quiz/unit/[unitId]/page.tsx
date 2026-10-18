@@ -12,6 +12,15 @@ export default function UnitQuizPage({ params }: UnitQuizPageProps) {
   const router = useRouter();
   const [unitId, setUnitId] = useState<string>('');
   const [unitTitle, setUnitTitle] = useState('Unit quiz');
+  const [courseId, setCourseId] = useState<string>();
+
+  const returnToUnit = () => {
+    router.push(
+      courseId && unitId
+        ? `/courses/${courseId}/units/${unitId}`
+        : '/courses',
+    );
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -31,7 +40,10 @@ export default function UnitQuizPage({ params }: UnitQuizPageProps) {
     void unitService
       .getUnitById(unitId)
       .then(unit => {
-        if (mounted) setUnitTitle(unit.title || unit.name || 'Unit quiz');
+        if (mounted) {
+          setUnitTitle(unit.title || unit.name || 'Unit quiz');
+          setCourseId(unit.courseId);
+        }
       })
       .catch(error => {
         console.error('Unable to load the unit title for its quiz:', error);
@@ -48,7 +60,7 @@ export default function UnitQuizPage({ params }: UnitQuizPageProps) {
         <header className="mb-5 flex items-center gap-3">
           <button
             type="button"
-            onClick={() => router.back()}
+            onClick={returnToUnit}
             className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground shadow-sm transition-colors hover:bg-muted active:scale-95 dark:border-border dark:bg-card dark:text-muted-foreground dark:hover:bg-card motion-reduce:transition-none"
             aria-label="Exit quiz"
           >
@@ -69,7 +81,7 @@ export default function UnitQuizPage({ params }: UnitQuizPageProps) {
             lessonTitle={unitTitle}
             scope="unit"
             immersive
-            onReturn={() => router.back()}
+            onReturn={returnToUnit}
           />
         ) : (
           <div

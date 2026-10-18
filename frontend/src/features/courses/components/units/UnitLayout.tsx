@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import Link from 'next/link';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   ChevronLeft,
@@ -100,7 +101,7 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
   const { user } = useAuth();
   const isAdmin = Boolean(user?.role && instructorRoles.includes(user.role));
 
-  const updateRouteQuery = (key: string, value: string | null) => {
+  const updateRouteQuery = (key: string, value: string | null, replace = false) => {
     if (searchParams.get(key) === value) return;
 
     const nextSearchParams = new URLSearchParams(searchParams.toString());
@@ -111,7 +112,12 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
     }
 
     const query = nextSearchParams.toString();
-    router.push(`${pathname}${query ? `?${query}` : ''}`, { scroll: false });
+    const href = `${pathname}${query ? `?${query}` : ''}`;
+    if (replace) {
+      router.replace(href, { scroll: false });
+    } else {
+      router.push(href, { scroll: false });
+    }
   };
 
   const openMaterial = (id: string) => {
@@ -126,13 +132,13 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
     updateRouteQuery('materialId', id);
   };
   const openCoursePanel = (panelName: string) => {
-    updateRouteQuery('materialId', null);
+    updateRouteQuery('materialId', null, true);
     setSidebarCollapsed(false);
     toggleCoursePanel(panelName);
   };
   const closeMaterial = () => {
     setSidebarCollapsed(false);
-    updateRouteQuery('materialId', null);
+    updateRouteQuery('materialId', null, true);
   };
 
   const handleAddTopic = async (topicData: Partial<Topic>) => {
@@ -361,6 +367,19 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
           <p className="text-muted-foreground dark:text-muted-foreground text-sm mt-2">
             {unitError instanceof Error ? unitError.message : 'Failed to load unit data'}
           </p>
+          <div className="mt-4 flex flex-wrap justify-center gap-3">
+            <Button type="button" variant="outline" onClick={() => void refetchUnit()}>
+              Retry
+            </Button>
+            {courseId && (
+              <Link
+                href={`/courses/${courseId}`}
+                className="inline-flex h-10 items-center rounded-md border border-border px-4 text-sm font-medium hover:bg-muted"
+              >
+                Back to course overview
+              </Link>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -369,7 +388,17 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
   if (!unitData) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background/50 dark:bg-card/50">
-        <p className="text-muted-foreground dark:text-muted-foreground">Unit not found.</p>
+        <div className="text-center">
+          <p className="text-muted-foreground dark:text-muted-foreground">Unit not found.</p>
+          {courseId && (
+            <Link
+              href={`/courses/${courseId}`}
+              className="mt-4 inline-flex h-10 items-center rounded-md border border-border px-4 text-sm font-medium hover:bg-muted"
+            >
+              Back to course overview
+            </Link>
+          )}
+        </div>
       </div>
     );
   }

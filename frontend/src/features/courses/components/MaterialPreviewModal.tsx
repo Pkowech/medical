@@ -19,7 +19,6 @@ import {
   ExternalLink,
   FileText,
   Loader2,
-  X,
   Youtube,
 } from 'lucide-react';
 import { VideoPlayer } from './VideoPlayer';
@@ -536,17 +535,6 @@ export const MaterialPreviewModal = ({
                 aria-label="Enter focus mode"
               >
                 <ChevronUp className="h-4 w-4" />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={onClose}
-                title="Close preview"
-                aria-label="Close preview"
-                className="h-9 w-9 rounded-full border border-border bg-card text-muted-foreground hover:bg-muted dark:border-border dark:bg-card dark:text-muted-foreground dark:hover:bg-card"
-              >
-                <X className="h-4 w-4" />
               </Button>
             </div>
           </DialogHeader>
