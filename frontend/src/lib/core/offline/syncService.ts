@@ -9,6 +9,16 @@ type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 const SYNC_STORE_NAME = 'syncQueue' as const;
 
+function isRetryableFailedItem(item: SyncQueueItem): boolean {
+  if (!isOfflineQueueableRequest(item.method, item.url)) return false;
+
+  const statusMatch = item.lastError?.match(/^(\d{3}) Client Error\b/);
+  if (!statusMatch) return true;
+
+  const status = Number(statusMatch[1]);
+  return status === 408 || status === 425 || status === 429;
+}
+
 class SyncService {
   private isFlushing = false; // Concurrency lock to prevent parallel flushes
 
@@ -97,9 +107,7 @@ class SyncService {
       const pendingItems = items.filter(item => item.status !== 'failed');
       const failedItems = items.filter(item => item.status === 'failed');
       const failedChanges = failedItems.length;
-      const retryableFailedChanges = failedItems.filter(item =>
-        isOfflineQueueableRequest(item.method, item.url)
-      ).length;
+      const retryableFailedChanges = failedItems.filter(isRetryableFailedItem).length;
       const count = pendingItems.length;
       return {
         lastSyncTimestamp: Date.now(), // This should ideally come from actual last sync, but for now, current time
@@ -506,9 +514,9 @@ class SyncService {
     const item = await db.get(SYNC_STORE_NAME, id);
 
     if (item) {
-      if (!isOfflineQueueableRequest(item.method, item.url)) {
+      if (!isRetryableFailedItem(item)) {
         throw new Error(
-          'This action cannot be retried automatically. Please perform it again while online.'
+          'This failed action cannot be retried automatically. Please resolve the error or perform it again while online.'
         );
       }
       await db.put(SYNC_STORE_NAME, {
@@ -529,7 +537,7 @@ class SyncService {
     const items = await this.getQueueItems();
     const tx = db.transaction(SYNC_STORE_NAME, 'readwrite');
     for (const item of items) {
-      if (item.status === 'failed' && isOfflineQueueableRequest(item.method, item.url)) {
+      if (item.status === 'failed' && isRetryableFailedItem(item)) {
         await tx.store.put({
           ...item,
           status: 'pending',

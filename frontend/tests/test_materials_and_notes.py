@@ -104,3 +104,12 @@ def test_resource_type_filter_is_compact_and_applied_to_material_query():
     assert 'aria-pressed={materialTypeFilter === filter.id}' in materials_dashboard
     assert "queryKey: ['materials', debouncedSearch, materialTypeFilter" in materials_dashboard
     assert "type: materialTypeFilter === 'all' ? undefined : materialTypeFilter" in materials_dashboard
+
+
+def test_pdf_page_navigation_scrolls_inside_the_document_viewer():
+    """Changing PDF pages should not scroll the outer page on touch screens."""
+    pdf_viewer = read_frontend("src/shared/components/pdf/PDFViewer.tsx")
+
+    assert 'scrollContainerRef.current' in pdf_viewer
+    assert 'scrollRoot.scrollTo(' in pdf_viewer
+    assert 'scrollIntoView(' not in pdf_viewer

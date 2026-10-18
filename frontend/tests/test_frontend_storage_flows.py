@@ -202,6 +202,9 @@ def test_failed_offline_changes_can_be_cleared_without_retrying_unsafe_requests(
     assert "retryableFailedChanges > 0" in indicator
     assert "Discard all failed offline changes from this device?" in indicator
     assert "Clear failed" in indicator
+    assert "function isRetryableFailedItem(item: SyncQueueItem)" in service
+    assert "failedItems.filter(isRetryableFailedItem)" in service
+    assert "item.status === 'failed' && isRetryableFailedItem(item)" in service
 
 
 def test_local_file_metadata_is_saved_on_device_without_uploading_file_details():

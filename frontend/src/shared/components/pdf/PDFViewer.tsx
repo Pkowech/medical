@@ -246,10 +246,17 @@ const PDFViewer = React.memo(({ file, onPageChange, initialPage = 1, headers }: 
     const nextPage = Math.max(1, Math.min(requestedPage, numPages ?? requestedPage));
     setPage(nextPage);
     setPageInput(String(nextPage));
-    document.getElementById(`pdf-page-${nextPage}`)?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'start',
-    });
+    const scrollRoot = scrollContainerRef.current;
+    const targetPage = scrollRoot?.querySelector<HTMLElement>(`[data-pdf-page="${nextPage}"]`);
+    if (scrollRoot && targetPage) {
+      const rootBounds = scrollRoot.getBoundingClientRect();
+      const pageBounds = targetPage.getBoundingClientRect();
+      const paddingTop = Number.parseFloat(window.getComputedStyle(scrollRoot).paddingTop) || 0;
+      scrollRoot.scrollTo({
+        top: scrollRoot.scrollTop + pageBounds.top - rootBounds.top - scrollRoot.clientTop - paddingTop,
+        behavior: 'smooth',
+      });
+    }
   }, [numPages]);
 
   const goPrev = () => navigateToPage(page - 1);
