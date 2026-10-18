@@ -1,21 +1,35 @@
-import { S3Client, ListBucketsCommand } from "@aws-sdk/client-s3";
+import { S3Client, ListBucketsCommand } from '@aws-sdk/client-s3';
+
+const endpoint = process.env.R2_ENDPOINT;
+const accessKeyId = process.env.R2_ACCESS_KEY_ID;
+const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
+
+if (!endpoint || !accessKeyId || !secretAccessKey) {
+  throw new Error(
+    'Set R2_ENDPOINT, R2_ACCESS_KEY_ID, and R2_SECRET_ACCESS_KEY before running this check.',
+  );
+}
 
 const s3 = new S3Client({
-  region: "auto",
-  endpoint: "https://2674f2a3a71a5a584604cebb68700c5f.r2.cloudflarestorage.com",
-  credentials: {
-    accessKeyId: "ee144f3169aa7a88c88beee9303eec3d",
-    secretAccessKey: "ab58c21424b6d159882877b0b4d6c99a6bd0935f8f740d4383a62e6a79432917",
-  },
+  region: 'auto',
+  endpoint,
+  credentials: { accessKeyId, secretAccessKey },
 });
 
 async function run() {
   try {
     const data = await s3.send(new ListBucketsCommand({}));
-    console.log("Buckets:", data.Buckets?.map(b => b.Name));
-    console.log("Success: R2 is reachable!");
-  } catch (err) {
-    console.error("Error:", err);
+    console.log('Buckets:', data.Buckets?.map(bucket => bucket.Name));
+    console.log('Success: R2 is reachable!');
+  } catch (error) {
+    console.error(
+      'R2 connectivity check failed:',
+      error instanceof Error ? error.message : 'Unknown error',
+    );
+    process.exitCode = 1;
+  } finally {
+    s3.destroy();
   }
 }
-run();
+
+void run();

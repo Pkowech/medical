@@ -22,7 +22,7 @@ import * as argon2 from 'argon2';
 import { Prisma, User } from '@prisma/client';
 import { Role } from '#modules/auth/constants/role.constants';
 import {
-  FILE_STORAGE,
+  PROFILE_IMAGE_STORAGE,
   IFileStorage,
 } from '#infrastructure/storage/file-storage.interface';
 import sharp from 'sharp';
@@ -98,7 +98,7 @@ export class UsersService {
     private readonly redisService: RedisService,
     @Inject(forwardRef(() => UserAnalyticsService))
     private readonly userAnalyticsService: UserAnalyticsService,
-    @Inject(FILE_STORAGE) private readonly fileStorage: IFileStorage,
+    @Inject(PROFILE_IMAGE_STORAGE) private readonly fileStorage: IFileStorage,
     @Inject(forwardRef(() => GlobalSearchSyncService))
     private readonly searchSync: GlobalSearchSyncService,
   ) {}

@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
-  FILE_STORAGE,
+  MATERIAL_FILE_STORAGE,
   IFileStorage,
 } from '#infrastructure/storage/file-storage.interface';
 
@@ -68,7 +68,7 @@ export class MaterialsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
-    @Inject(FILE_STORAGE) private readonly fileStorage: IFileStorage,
+    @Inject(MATERIAL_FILE_STORAGE) private readonly fileStorage: IFileStorage,
     private readonly eventEmitter: EventEmitter2,
     private readonly aiAnalyticsService: AiAnalyticsService,
     private readonly progressService: ProgressService,
