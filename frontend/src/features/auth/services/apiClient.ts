@@ -118,8 +118,7 @@ class ApiService {
           if (token) {
             // Ensure headers object exists
             config.headers.Authorization = `Bearer ${token}`;
-            const isFormData =
-              typeof FormData !== 'undefined' && config.data instanceof FormData;
+            const isFormData = typeof FormData !== 'undefined' && config.data instanceof FormData;
             if (!isFormData) {
               config.headers['Content-Type'] = 'application/json';
             }
@@ -155,7 +154,7 @@ class ApiService {
         // Note: 503 is also often a temporary server issue worth queuing
         const isQueueableRequest = isOfflineQueueableRequest(
           originalRequest.method,
-          originalRequest.url,
+          originalRequest.url
         );
         const isNetworkOrServerTemp =
           errorType === 'network' ||
@@ -242,8 +241,10 @@ class ApiService {
 
                 // Sync the new token into the store immediately
                 if (newSession?.user) {
-                  useAuthStore.setState({ 
-                    user: newSession.user as unknown as ReturnType<typeof useAuthStore.getState>['user'],
+                  useAuthStore.setState({
+                    user: newSession.user as unknown as ReturnType<
+                      typeof useAuthStore.getState
+                    >['user'],
                     isAuthenticated: true,
                   });
                 }
@@ -260,14 +261,14 @@ class ApiService {
               // Clear store immediately to prevent other parallel requests from using the stale token
               await this.clearOfflineCacheForCurrentUser();
               useAuthStore.getState().clearUser();
-              
+
               // Use Promise.race to add timeout to signOut
               try {
                 await Promise.race([
                   signOut({ redirect: false }),
-                  new Promise((_, reject) => 
+                  new Promise((_, reject) =>
                     setTimeout(() => reject(new Error('SignOut timeout')), 2000)
-                  )
+                  ),
                 ]);
               } catch (signOutError) {
                 console.warn('[Token Refresh] signOut timed out or failed:', signOutError);
@@ -289,19 +290,22 @@ class ApiService {
               this.isSigningOut = true;
               await this.clearOfflineCacheForCurrentUser();
               useAuthStore.getState().clearUser();
-              
+
               // Use Promise.race to add timeout to signOut
               try {
                 await Promise.race([
                   signOut({ redirect: false }),
-                  new Promise((_, reject) => 
+                  new Promise((_, reject) =>
                     setTimeout(() => reject(new Error('SignOut timeout')), 2000)
-                  )
+                  ),
                 ]);
               } catch (signOutError) {
-                console.warn('[Token Refresh] signOut timed out or failed during error handling:', signOutError);
+                console.warn(
+                  '[Token Refresh] signOut timed out or failed during error handling:',
+                  signOutError
+                );
               }
-              
+
               console.warn('[Token Refresh] Redirecting to login page from error handler');
               window.location.href = '/login';
             }
@@ -386,13 +390,10 @@ class ApiService {
 
   get<T = unknown>(
     url: string,
-    options: RequestOptions & { responseType: 'arraybuffer' },
+    options: RequestOptions & { responseType: 'arraybuffer' }
   ): Promise<T>;
   get<T = unknown>(url: string, options?: RequestOptions): Promise<ApiResponse<T>>;
-  async get<T = unknown>(
-    url: string,
-    options?: RequestOptions,
-  ): Promise<ApiResponse<T> | T> {
+  async get<T = unknown>(url: string, options?: RequestOptions): Promise<ApiResponse<T> | T> {
     try {
       const config: AxiosRequestConfig = {
         headers: options?.headers,
@@ -524,19 +525,11 @@ export async function getData<T = unknown>(url: string, options?: RequestOptions
   return apiService.get<T>(url, options);
 }
 
-export async function postData<T = unknown>(
-  url: string,
-  data?: unknown,
-  options?: RequestOptions
-) {
+export async function postData<T = unknown>(url: string, data?: unknown, options?: RequestOptions) {
   return apiService.post<T>(url, data, options);
 }
 
-export async function putData<T = unknown>(
-  url: string,
-  data?: unknown,
-  options?: RequestOptions
-) {
+export async function putData<T = unknown>(url: string, data?: unknown, options?: RequestOptions) {
   return apiService.put<T>(url, data, options);
 }
 

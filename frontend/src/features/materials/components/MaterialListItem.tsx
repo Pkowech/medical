@@ -91,7 +91,7 @@ export const MaterialListItem: React.FC<MaterialListItemProps> = React.memo(({
             asChild
             className="h-9 w-9 text-muted-foreground hover:bg-blue-50 hover:text-blue-700 dark:text-muted-foreground dark:hover:bg-blue-950/50 dark:hover:text-blue-300"
           >
-            <a href={fileUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open file for ${material.title}`}>
+            <a href={fileUrl.startsWith('/') ? `${window.location.origin}${fileUrl}` : fileUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open file for ${material.title}`}>
               <Download className="h-4 w-4" />
             </a>
           </Button>

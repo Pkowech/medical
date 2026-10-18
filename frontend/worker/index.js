@@ -47,7 +47,11 @@ function safeQueuePath(item) {
         /^\/quizzes\/topic\/[^/]+\/offline-attempts$/.test(path) ||
         /^\/progress\/materials\/[^/]+\/read$/.test(path))) ||
     (method === 'PUT' && /^\/study\/session\/[^/]+\/end$/.test(path));
-  if (!allowed) throw new Error('This queued action is not safe to replay.');
+  if (!allowed) {
+    throw new Error(
+      'This action is not safe to replay automatically. Please perform it again while online.'
+    );
+  }
 
   return {
     method,

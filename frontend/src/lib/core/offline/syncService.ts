@@ -43,7 +43,7 @@ class SyncService {
     lastUpdated?: number,
     id?: string,
     userId?: string,
-    type?: SyncQueueItem['type'],
+    type?: SyncQueueItem['type']
   ): Promise<void> {
     const now = Date.now();
     const db = await this.getDb();
@@ -98,7 +98,7 @@ class SyncService {
       const failedItems = items.filter(item => item.status === 'failed');
       const failedChanges = failedItems.length;
       const retryableFailedChanges = failedItems.filter(item =>
-        isOfflineQueueableRequest(item.method, item.url),
+        isOfflineQueueableRequest(item.method, item.url)
       ).length;
       const count = pendingItems.length;
       return {
@@ -131,7 +131,7 @@ class SyncService {
 
   /**
    * Strict Serial Flush with Concurrency Lock & Error Handling
-   * 
+   *
    * Rules:
    * 1. Only one flush can run at a time (isFlushing lock)
    * 2. If an item fails (except 400 Bad Request), STOP processing and keep item queued
@@ -173,25 +173,23 @@ class SyncService {
       leaseTimer = setInterval(() => {
         if (db && lockOwner) {
           this.renewLease(db, lockOwner).catch(error =>
-            console.error('[SyncService] Failed to renew sync lease:', error),
+            console.error('[SyncService] Failed to renew sync lease:', error)
           );
         }
       }, 30_000);
-      
+
       // 1. Get all pending items
       const items = (await db.getAll(SYNC_STORE_NAME)).sort(
         (first, second) =>
           first.createdAt - second.createdAt ||
           first.timestamp - second.timestamp ||
-          first.id.localeCompare(second.id),
+          first.id.localeCompare(second.id)
       );
 
       // Permanent client errors stay failed; transient errors remain queued with
       // capped backoff so temporary outages do not strand learning activity.
       const pendingItems = items.filter(
-        item =>
-        item.status !== 'failed' &&
-        (forceRetry || (item.nextAttemptAt ?? 0) <= Date.now()),
+        item => item.status !== 'failed' && (forceRetry || (item.nextAttemptAt ?? 0) <= Date.now())
       );
 
       // Optimization: Fetch session once at start of flush
@@ -203,7 +201,8 @@ class SyncService {
           await db.put(SYNC_STORE_NAME, {
             ...item,
             status: 'failed',
-            lastError: 'This action is not safe to replay automatically. Please perform it again while online.',
+            lastError:
+              'This action is not safe to replay automatically. Please perform it again while online.',
             nextAttemptAt: undefined,
           });
           continue;
@@ -243,14 +242,14 @@ class SyncService {
 
           const headers = {
             ...cleanHeaders,
-            ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
             'X-Client-Timestamp': String(item.lastUpdated || item.createdAt),
             'Content-Type': 'application/json',
           };
 
           console.warn(`[SyncService] Attempting to sync item ${item.id} to ${item.url}`, {
-             method: item.method,
-             hasToken: !!token
+            method: item.method,
+            hasToken: !!token,
           });
 
           const controller = new AbortController();
@@ -327,7 +326,12 @@ class SyncService {
               lastError: `${response.status} Client Error - Payload or Endpoint invalid`,
               nextAttemptAt: undefined,
             });
-            await this.updateOfflinePracticeAttempt(db, item, 'failed', `${response.status} Client Error`);
+            await this.updateOfflinePracticeAttempt(
+              db,
+              item,
+              'failed',
+              `${response.status} Client Error`
+            );
           } else {
             // Transient server errors: keep the item queued and respect Retry-After.
             const errorMsg = `Server error ${response.status}`;
@@ -343,15 +347,9 @@ class SyncService {
               nextAttemptAt:
                 Date.now() + getSyncRetryDelay(attempts, response.headers.get('Retry-After')),
             });
-            await this.updateOfflinePracticeAttempt(
-              db,
-              item,
-              'pending',
-              errorMsg,
-            );
+            await this.updateOfflinePracticeAttempt(db, item, 'pending', errorMsg);
             return; // BREAK - stop processing to preserve causal order
           }
-
         } catch (error) {
           const errorMsg =
             error instanceof Error && error.name === 'AbortError'
@@ -362,7 +360,7 @@ class SyncService {
           console.error(
             `❌ Network error syncing item ${item.id}: ${errorMsg}. Stopping flush to preserve causal order.`
           );
-          
+
           const attempts = (item.attempts ?? 0) + 1;
           await db.put(SYNC_STORE_NAME, {
             ...item,
@@ -371,16 +369,10 @@ class SyncService {
             attempts,
             nextAttemptAt: Date.now() + getSyncRetryDelay(attempts),
           });
-          await this.updateOfflinePracticeAttempt(
-            db,
-            item,
-            'pending',
-            errorMsg,
-          );
-          
+          await this.updateOfflinePracticeAttempt(db, item, 'pending', errorMsg);
+
           return; // BREAK - stop processing on network errors
         }
-
       }
 
       console.warn('✅ Sync flush completed successfully');
@@ -421,7 +413,7 @@ class SyncService {
     db: Awaited<ReturnType<typeof initDB>>,
     item: SyncQueueItem,
     status: 'pending' | 'failed',
-    lastError?: string,
+    lastError?: string
   ): Promise<void> {
     if (item.type !== 'offline_practice_submission') return;
     const attempt = await db.get('offlinePracticeAttempts', item.id);
@@ -435,10 +427,7 @@ class SyncService {
     }
   }
 
-  private async renewLease(
-    db: Awaited<ReturnType<typeof initDB>>,
-    owner: string,
-  ): Promise<void> {
+  private async renewLease(db: Awaited<ReturnType<typeof initDB>>, owner: string): Promise<void> {
     const tx = db.transaction('syncLocks', 'readwrite');
     const lock = await tx.store.get('outbox');
     if (lock?.owner !== owner) {
@@ -461,12 +450,15 @@ class SyncService {
           const session = !storeToken ? await getSession() : null;
           const token = storeToken || session?.user?.accessToken;
 
-          const res = await fetch(this.normalizeUrl(`/progress/sync?userId=${encodeURIComponent(userId)}`), {
-            headers: {
-               ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-               'Content-Type': 'application/json',
+          const res = await fetch(
+            this.normalizeUrl(`/progress/sync?userId=${encodeURIComponent(userId)}`),
+            {
+              headers: {
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                'Content-Type': 'application/json',
+              },
             }
-          });
+          );
           if (res.ok) return (await res.json()) || [];
         } catch {
           // ignore and fall through to local store fallback
@@ -516,7 +508,7 @@ class SyncService {
     if (item) {
       if (!isOfflineQueueableRequest(item.method, item.url)) {
         throw new Error(
-          'This action cannot be retried automatically. Please perform it again while online.',
+          'This action cannot be retried automatically. Please perform it again while online.'
         );
       }
       await db.put(SYNC_STORE_NAME, {
@@ -527,7 +519,7 @@ class SyncService {
         nextAttemptAt: undefined,
       });
     }
-    
+
     // Trigger a new flush
     await this.syncOutbox();
   }

@@ -22,7 +22,7 @@ import { Button } from '@/shared/components/ui/button';
 import { toast } from 'sonner';
 import { 
   Search, Plus, LayoutGrid, LayoutList, ChevronDown, ChevronRight, CheckCircle2,
-  BrainCircuit, Database, BookOpen, Sparkles, Upload, FolderOpen,
+  Database, BookOpen, Sparkles, Upload, FolderOpen,
   ArrowLeft, Clock, Layers, Play, CalendarClock, Target, Route
 } from 'lucide-react';
 import { getInstructorDisplayName } from '@/lib/utils';
@@ -866,6 +866,29 @@ export default function MaterialsDashboard() {
                 )}
               </div>
             </div>
+            {filterContext !== 'for_you' && (
+              <div
+                role="group"
+                aria-label="Filter by resource type"
+                className="mt-2 flex min-w-0 gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:gap-2 sm:overflow-visible"
+              >
+                {MATERIAL_TYPE_FILTERS.map((filter) => (
+                  <button
+                    key={filter.id}
+                    type="button"
+                    onClick={() => setMaterialTypeFilter(filter.id)}
+                    aria-pressed={materialTypeFilter === filter.id}
+                    className={`min-h-8 shrink-0 whitespace-nowrap rounded-full border px-3 py-1.5 text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 sm:min-h-9 sm:px-4 sm:py-2 sm:text-xs ${
+                      materialTypeFilter === filter.id
+                        ? 'border-blue-600 bg-blue-600 text-white dark:border-blue-500 dark:bg-blue-500'
+                        : 'border-border bg-card text-muted-foreground hover:border-blue-300 hover:bg-blue-50 dark:border-border dark:bg-card dark:text-muted-foreground dark:hover:border-blue-800 dark:hover:bg-card'
+                    }`}
+                  >
+                    {filter.label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </section>
       )}
@@ -1363,49 +1386,13 @@ export default function MaterialsDashboard() {
         </section>
       )}
       
-      {/* Material type filters (only show on library views) */}
-      {!selectedCourseId && filterContext !== 'for_you' && (
-        <section aria-label="Filter by resource type" className="space-y-1.5 sm:space-y-2">
-          <h2 className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground sm:text-xs dark:text-muted-foreground">
-            Resource type
-          </h2>
-          <div className="-mx-1 flex min-w-0 gap-1.5 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:gap-2 sm:overflow-visible sm:pb-0">
-          {MATERIAL_TYPE_FILTERS.map((filter) => (
-            <button
-              key={filter.id}
-              type="button"
-              onClick={() => setMaterialTypeFilter(filter.id)}
-              aria-pressed={materialTypeFilter === filter.id}
-              className={`min-h-8 shrink-0 whitespace-nowrap rounded-full border px-3 py-1.5 text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 sm:min-h-9 sm:px-4 sm:py-2 sm:text-xs ${
-                materialTypeFilter === filter.id
-                  ? 'border-blue-600 bg-blue-600 text-white dark:border-blue-500 dark:bg-blue-500'
-                  : 'border-border bg-card text-muted-foreground hover:border-blue-300 hover:bg-blue-50 dark:border-border dark:bg-card dark:text-muted-foreground dark:hover:border-blue-800 dark:hover:bg-card'
-              }`}
-            >
-              {filter.label}
-            </button>
-          ))}
-          </div>
-        </section>
-      )}
-
       {/* Main Content Area */}
       {!selectedCourseId && (filterContext === 'for_you' ? (
         // --- AI Recommendations View ---
-        <div className="min-w-0 space-y-5">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 bg-indigo-50 dark:bg-indigo-500/10 rounded-lg">
-              <BrainCircuit className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
-            </div>
-            <div>
-              <h2 className="text-xl font-bold text-foreground dark:text-foreground">Curated for your goals</h2>
-              <p className="text-sm text-muted-foreground">Matched to topics where your recorded quiz scores show room to improve</p>
-            </div>
-          </div>
-          
+        <div className="min-w-0">
           {isRecLoading && !recommendations ? (
-             <div className="flex justify-center py-20">
-               <div className="animate-spin rounded-full h-12 w-12 border-4 border-border border-t-indigo-500" />
+             <div className="flex justify-center py-12">
+               <div className="animate-spin rounded-full h-8 w-8 border-4 border-border border-t-indigo-500" />
              </div>
           ) : isRecError ? (
             <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-200">
@@ -1418,10 +1405,10 @@ export default function MaterialsDashboard() {
               ))}
             </div>
           ) : (
-            <div className="rounded-xl border border-dashed border-border bg-card p-8 text-center dark:border-border dark:bg-card">
-              <h3 className="font-semibold text-foreground dark:text-foreground">No targeted review suggestions yet</h3>
-              <p className="mx-auto mt-2 max-w-xl text-sm text-muted-foreground">
-                Recommendations appear when recorded quiz scores identify a topic below 70% and there is a matching course, unit, or topic resource that you own or can access through sharing.
+            <div className="rounded-xl border border-dashed border-border bg-card px-4 py-5 text-center dark:border-border dark:bg-card sm:px-6">
+              <h3 className="font-medium text-foreground dark:text-foreground">No recommendations yet</h3>
+              <p className="mx-auto mt-1 max-w-lg text-sm text-muted-foreground">
+                Recommendations appear when a quiz result is below 70% and a matching course resource is available.
               </p>
             </div>
           )}

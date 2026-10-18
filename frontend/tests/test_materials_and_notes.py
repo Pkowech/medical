@@ -84,3 +84,23 @@ def test_material_library_uses_consistent_concise_tab_labels():
     assert 'label: \'My Drive\'' not in materials_dashboard
     assert 'label: \'Shared with me\'' not in materials_dashboard
     assert 'Keep your study resources organized by course, unit, and topic.' not in materials_dashboard
+
+
+def test_recommended_materials_view_avoids_repeated_intro_copy():
+    """The For You tab should not repeat its label in a second page heading."""
+    materials_dashboard = read_frontend("src/features/materials/components/materials-dashboard.tsx")
+
+    assert "label: 'For You'" in materials_dashboard
+    assert 'Curated for your goals' not in materials_dashboard
+    assert 'Recommendations appear when a quiz result is below 70%' in materials_dashboard
+
+
+def test_resource_type_filter_is_compact_and_applied_to_material_query():
+    """Resource filters stay in the control card and drive the paginated request."""
+    materials_dashboard = read_frontend("src/features/materials/components/materials-dashboard.tsx")
+
+    assert 'aria-label="Filter by resource type"' in materials_dashboard
+    assert 'onClick={() => setMaterialTypeFilter(filter.id)}' in materials_dashboard
+    assert 'aria-pressed={materialTypeFilter === filter.id}' in materials_dashboard
+    assert "queryKey: ['materials', debouncedSearch, materialTypeFilter" in materials_dashboard
+    assert "type: materialTypeFilter === 'all' ? undefined : materialTypeFilter" in materials_dashboard

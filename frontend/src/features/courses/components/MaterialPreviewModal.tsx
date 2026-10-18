@@ -230,7 +230,8 @@ export const MaterialPreviewModal = ({
   const downloadOriginal = () => {
     if (!material?.fileUrl) return;
     trackDownload();
-    window.open(material.fileUrl, '_blank', 'noopener,noreferrer');
+    const safeUrl = material.fileUrl.startsWith('/') ? `${window.location.origin}${material.fileUrl}` : material.fileUrl;
+    window.open(safeUrl, '_blank', 'noopener,noreferrer');
   };
 
   const retryPreview = () => {

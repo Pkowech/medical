@@ -84,7 +84,7 @@ export const MaterialCard: React.FC<MaterialCardProps> = React.memo(({
               asChild
               className="h-9 w-9 shrink-0 text-muted-foreground dark:text-muted-foreground"
             >
-              <a href={fileUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open file for ${material.title}`}>
+              <a href={fileUrl.startsWith('/') ? `${window.location.origin}${fileUrl}` : fileUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open file for ${material.title}`}>
                 <Download className="h-4 w-4" />
               </a>
             </Button>

@@ -11,7 +11,7 @@ interface PushNotificationSettingsProps {
 
 function isStandalone(): boolean {
   return (
-    window.matchMedia('(display-mode: standalone)').matches ||
+    (window.matchMedia?.('(display-mode: standalone)').matches ?? false) ||
     (navigator as Navigator & { standalone?: boolean }).standalone === true
   );
 }
@@ -121,14 +121,13 @@ export function PushNotificationSettings({
         }
         const registration = await navigator.serviceWorker.ready;
         const subscription = await registration.pushManager.getSubscription();
-        if (subscription) {
-          await apiService.delete(
-            `/notifications/push/subscriptions?endpoint=${encodeURIComponent(subscription.endpoint)}`
-          );
-          await subscription.unsubscribe();
-        }
+        const endpoint = subscription
+          ? `?endpoint=${encodeURIComponent(subscription.endpoint)}`
+          : '';
+        await apiService.delete(`/notifications/push/subscriptions${endpoint}`);
         setHasSubscription(false);
         onEnabledChange(false);
+        await subscription?.unsubscribe();
       }
     } catch (changeError) {
       console.error('[PWA] Could not update push notification settings:', changeError);

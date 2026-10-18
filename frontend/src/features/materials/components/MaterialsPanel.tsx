@@ -21,12 +21,12 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({
 
   const handleViewMaterial = (material: Material) => {
     const url = material.fileUrl || material.url;
+    const safeUrl = url ? (url.startsWith('/') ? `${window.location.origin}${url}` : url) : undefined;
     if (url?.endsWith('.pdf')) {
       setSelectedMaterial(material);
       setViewMode('viewer');
-    } else if (url) {
-      // Handle other file types or open in new tab
-      window.open(url, '_blank');
+    } else if (safeUrl) {
+      window.open(safeUrl, '_blank', 'noopener,noreferrer');
     }
   };
 
@@ -112,7 +112,7 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({
 
                   {materialUrl && (
                     <a
-                      href={materialUrl}
+                      href={materialUrl.startsWith('/') ? `${window.location.origin}${materialUrl}` : materialUrl}
                       download
                       className="p-2 text-muted-foreground dark:text-muted-foreground hover:bg-muted dark:hover:bg-secondary rounded transition"
                       title="Download material"

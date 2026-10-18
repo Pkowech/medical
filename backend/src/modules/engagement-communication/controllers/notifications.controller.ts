@@ -48,7 +48,7 @@ export class NotificationsController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async removePushSubscription(
     @Request() req: AuthenticatedRequest,
-    @Query('endpoint') endpoint: string,
+    @Query('endpoint') endpoint?: string,
   ): Promise<void> {
     await this.pushNotificationsService.removeSubscription(
       req.user.id,

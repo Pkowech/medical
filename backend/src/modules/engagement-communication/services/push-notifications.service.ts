@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Injectable,
   Logger,
   NotFoundException,
@@ -87,9 +88,11 @@ export class PushNotificationsService {
     });
   }
 
-  async removeSubscription(userId: string, endpoint: string): Promise<void> {
-    if (!endpoint) {
-      throw new NotFoundException('Push subscription endpoint is required');
+  async removeSubscription(userId: string, endpoint?: string): Promise<void> {
+    if (endpoint !== undefined && !endpoint) {
+      throw new BadRequestException(
+        'Push subscription endpoint cannot be empty.',
+      );
     }
     await this.prisma.$transaction(async (tx) => {
       const user = await tx.user.findUnique({
@@ -109,7 +112,9 @@ export class PushNotificationsService {
           },
         },
       });
-      await tx.pushSubscription.deleteMany({ where: { userId, endpoint } });
+      if (endpoint) {
+        await tx.pushSubscription.deleteMany({ where: { userId, endpoint } });
+      }
     });
   }
 
