@@ -116,3 +116,18 @@ def test_pdf_page_navigation_scrolls_inside_the_document_viewer():
     assert 'scrollIntoView(' not in pdf_viewer
     assert "isMaterialViewPage && 'h-full flex flex-col'" in dashboard_layout
     assert "isMaterialViewPage && 'h-full py-0'" in dashboard_layout
+
+
+def test_material_reader_controls_fit_into_a_compact_mobile_toolbar():
+    """Mobile reader actions remain accessible without wrapping into extra rows."""
+    material_page = read_frontend("src/app/(app)/study-planner/materials/[id]/page.tsx")
+    pdf_viewer = read_frontend("src/shared/components/pdf/PDFViewer.tsx")
+
+    assert 'flex-nowrap items-center justify-between gap-1 sm:mb-3' in material_page
+    assert 'aria-label="Share material"' in material_page
+    assert 'aria-label="Enter focus mode"' in material_page
+    assert 'aria-label="Download original"' in material_page
+    assert 'aria-label="Delete material"' in material_page
+    assert 'sr-only sm:not-sr-only' in material_page
+    assert 'bg-card p-1 dark:border-border dark:bg-card sm:flex' in pdf_viewer
+    assert 'h-7 w-7 p-0 sm:h-8 sm:w-8' in pdf_viewer

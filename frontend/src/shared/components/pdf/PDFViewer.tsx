@@ -332,7 +332,7 @@ const PDFViewer = React.memo(({ file, onPageChange, initialPage = 1, headers }: 
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-muted/50 dark:border-border dark:bg-card/50">
-      <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-1 border-b border-border bg-card p-2 dark:border-border dark:bg-card sm:flex sm:justify-between sm:gap-2 sm:p-3">
+      <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-1 border-b border-border bg-card p-1 dark:border-border dark:bg-card sm:flex sm:justify-between sm:gap-2 sm:p-2">
         <div className="flex shrink-0 gap-1 sm:gap-2">
           <Button 
             type="button"
@@ -340,7 +340,7 @@ const PDFViewer = React.memo(({ file, onPageChange, initialPage = 1, headers }: 
             size="sm" 
             onClick={goPrev} 
             disabled={page <= 1 || loading}
-            className="h-8 w-8 p-0"
+            className="h-7 w-7 p-0 sm:h-8 sm:w-8"
             aria-label="Previous page"
             title="Previous page"
           >
@@ -352,7 +352,7 @@ const PDFViewer = React.memo(({ file, onPageChange, initialPage = 1, headers }: 
             size="sm" 
             onClick={goNext} 
             disabled={!!(numPages && page >= numPages) || loading}
-            className="h-8 w-8 p-0"
+            className="h-7 w-7 p-0 sm:h-8 sm:w-8"
             aria-label="Next page"
             title="Next page"
           >
@@ -393,7 +393,7 @@ const PDFViewer = React.memo(({ file, onPageChange, initialPage = 1, headers }: 
             disabled={zoom <= MIN_PDF_ZOOM}
             aria-label="Zoom out"
             title="Zoom out"
-            className="h-8 w-8 p-0"
+            className="h-7 w-7 p-0 sm:h-8 sm:w-8"
           >
             <ZoomOut className="h-4 w-4" />
           </Button>
@@ -414,7 +414,7 @@ const PDFViewer = React.memo(({ file, onPageChange, initialPage = 1, headers }: 
             disabled={zoom >= MAX_PDF_ZOOM}
             aria-label="Zoom in"
             title="Zoom in"
-            className="h-8 w-8 p-0"
+            className="h-7 w-7 p-0 sm:h-8 sm:w-8"
           >
             <ZoomIn className="h-4 w-4" />
           </Button>
@@ -426,7 +426,7 @@ const PDFViewer = React.memo(({ file, onPageChange, initialPage = 1, headers }: 
               onClick={() => setZoom(1)}
               aria-label="Reset zoom"
               title="Reset zoom"
-              className="h-8 w-8 p-0"
+              className="h-7 w-7 p-0 sm:h-8 sm:w-8"
             >
               <RotateCcw className="h-4 w-4" />
             </Button>

@@ -342,17 +342,20 @@ export default function MaterialViewPage() {
       <div className={`flex flex-col h-full mx-auto w-full transition-all duration-300 ${focusMode ? 'max-w-full' : 'max-w-7xl'}`}>
         <AnimatePresence>
           {!focusMode && (
-            <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-2">
-              <Button variant="ghost" onClick={() => router.push(materialsReturnUrl)} className="rounded-lg">
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                {materialCourseId ? 'Course materials' : 'Materials'}
+            <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-1 flex shrink-0 flex-nowrap items-center justify-between gap-1 sm:mb-3 sm:gap-2">
+              <Button variant="ghost" onClick={() => router.push(materialsReturnUrl)} className="h-8 shrink-0 rounded-lg px-2 sm:h-9 sm:px-3">
+                <ArrowLeft className="mr-1 h-4 w-4 sm:mr-2" />
+                <span className="sm:hidden">Back</span>
+                <span className="hidden sm:inline">{materialCourseId ? 'Course materials' : 'Materials'}</span>
               </Button>
-              <div className="flex flex-wrap items-center justify-end gap-2">
-                <Button variant="outline" size="sm" onClick={handleShare} aria-label="Share material" className="rounded-lg">
-                  <Share className="mr-2 h-4 w-4" /> Share
+              <div className="flex min-w-0 shrink items-center justify-end gap-1 sm:gap-2">
+                <Button variant="outline" size="sm" onClick={handleShare} aria-label="Share material" title="Share material" className="h-8 w-8 shrink-0 rounded-lg p-0 sm:h-9 sm:w-auto sm:px-3">
+                  <Share className="h-4 w-4 sm:mr-2" />
+                  <span className="sr-only sm:not-sr-only">Share</span>
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => setFocusMode(true)} className="rounded-lg">
-                  <Maximize2 className="mr-2 h-4 w-4" /> Focus
+                <Button variant="outline" size="sm" onClick={() => setFocusMode(true)} aria-label="Enter focus mode" title="Focus" className="h-8 w-8 shrink-0 rounded-lg p-0 sm:h-9 sm:w-auto sm:px-3">
+                  <Maximize2 className="h-4 w-4 sm:mr-2" />
+                  <span className="sr-only sm:not-sr-only">Focus</span>
                 </Button>
                 {(material.fileUrl || material.url) && (
                   <Button
@@ -362,14 +365,18 @@ export default function MaterialViewPage() {
                       trackMaterialDownload();
                       window.open(material.fileUrl || material.url, '_blank', 'noopener,noreferrer');
                     }}
-                    className="rounded-lg"
+                    aria-label="Download original"
+                    title="Download original"
+                    className="h-8 w-8 shrink-0 rounded-lg p-0 sm:h-9 sm:w-auto sm:px-3"
                   >
-                    <Download className="mr-2 h-4 w-4" /> Download Original
+                    <Download className="h-4 w-4 sm:mr-2" />
+                    <span className="sr-only sm:not-sr-only">Download Original</span>
                   </Button>
                 )}
                 {canDelete && (
-                  <Button variant="destructive" size="sm" onClick={() => setShowDeleteConfirm(true)} className="rounded-lg">
-                    <Trash className="mr-2 h-4 w-4" /> Delete
+                  <Button variant="destructive" size="sm" onClick={() => setShowDeleteConfirm(true)} aria-label="Delete material" title="Delete material" className="h-8 w-8 shrink-0 rounded-lg p-0 sm:h-9 sm:w-auto sm:px-3">
+                    <Trash className="h-4 w-4 sm:mr-2" />
+                    <span className="sr-only sm:not-sr-only">Delete</span>
                   </Button>
                 )}
               </div>
