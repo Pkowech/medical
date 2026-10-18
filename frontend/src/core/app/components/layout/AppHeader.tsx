@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React from 'react';
 import {
   Menu,
   PanelLeftClose,
@@ -9,7 +9,7 @@ import {
 import { usePathname } from 'next/navigation';
 import { useLayoutStore } from '@/core/stores/useLayoutStore';
 import { usePageHeader } from '@/core/providers/HeaderContext';
-import { applyPageMetadata, getPageMetadata } from '@/core/metadata/pageMetadata';
+import { getPageMetadata } from '@/core/metadata/pageMetadata';
 
 export const AppHeader: React.FC = () => {
   const {
@@ -24,10 +24,6 @@ export const AppHeader: React.FC = () => {
   const title = header?.title || route.title;
   const description = header?.description || route.description;
   const isMetadataHeader = header?.presentation === 'metadata';
-
-  useEffect(() => {
-    applyPageMetadata({ title, description });
-  }, [description, title]);
 
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-card/95 pt-[env(safe-area-inset-top)] shadow-sm backdrop-blur-md dark:bg-card/95">

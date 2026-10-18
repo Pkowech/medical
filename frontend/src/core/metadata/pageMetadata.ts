@@ -426,7 +426,9 @@ export const getPageMetadata = (pathname: string): PageMetadata => {
 };
 
 export const applyPageMetadata = ({ title, description }: PageMetadata): void => {
-  document.title = `${title} | MedTrack Hub`;
+  document.title = title.toLowerCase().endsWith('medtrack hub')
+    ? title
+    : `${title} | MedTrack Hub`;
 
   let descriptionElement = document.querySelector<HTMLMetaElement>(
     'meta[name="description"]',

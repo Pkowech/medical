@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo, useId, useLayoutEffect, useRef } from 'react';
+import { usePathname } from 'next/navigation';
 import {
   Dialog,
   DialogContent,
@@ -29,7 +30,8 @@ import { Material, MaterialType } from '@/shared/types/materialInterface';
 import URLS from '@/lib/urls';
 import { offlineService } from '@/lib/core/offline/offlineService';
 import { useXapi } from '@/lib/xapi/useXapi';
-import { usePageHeader } from '@/core/providers/HeaderContext';
+import { usePageHeader, type PageHeader } from '@/core/providers/HeaderContext';
+import { getPageMetadata } from '@/core/metadata/pageMetadata';
 
 interface MaterialPreviewModalProps {
   materialId: string | null;
@@ -65,8 +67,11 @@ export const MaterialPreviewModal = ({
   const [retryAttempt, setRetryAttempt] = useState(0);
   const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
   const trackedViewKeyRef = useRef<string | null>(null);
+  const hadInlineOpenRef = useRef(false);
+  const previousHeaderRef = useRef<PageHeader | null>(null);
   const immersiveOwner = useId();
-  const { setImmersive } = usePageHeader();
+  const pathname = usePathname();
+  const { header, setHeader, setImmersive } = usePageHeader();
   const xapiContext = useMemo(() => ({
     extensions: {
       [URLS.XAPI_EXTENSIONS.COURSE_ID]: material?.courseId,
@@ -86,6 +91,53 @@ export const MaterialPreviewModal = ({
   useEffect(() => {
     if (!isOpen) setIsHeaderCollapsed(false);
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!inline || !isOpen || !material) return;
+
+    if (!hadInlineOpenRef.current) {
+      previousHeaderRef.current = header;
+      hadInlineOpenRef.current = true;
+    }
+
+    const materialHeader: PageHeader = {
+      title: material.title || 'Study Material',
+      description: material.description || 'Review this study material.',
+      presentation: 'metadata',
+    };
+    if (
+      header?.title !== materialHeader.title ||
+      header.description !== materialHeader.description ||
+      header.presentation !== materialHeader.presentation
+    ) {
+      setHeader(materialHeader);
+    }
+  }, [
+    header?.description,
+    header?.presentation,
+    header?.title,
+    inline,
+    isOpen,
+    material,
+    setHeader,
+  ]);
+
+  useEffect(
+    () => () => {
+      if (!hadInlineOpenRef.current) return;
+
+      hadInlineOpenRef.current = false;
+      const routeMetadata = getPageMetadata(pathname ?? '/');
+      setHeader(
+        previousHeaderRef.current ?? {
+          ...routeMetadata,
+          presentation: 'metadata',
+        },
+      );
+      previousHeaderRef.current = null;
+    },
+    [pathname, setHeader],
+  );
 
   useEffect(() => {
     if (isOpen && materialId) {
@@ -348,7 +400,15 @@ export const MaterialPreviewModal = ({
               {isVideo ? <Youtube className="h-5 w-5" /> : <FileText className="h-5 w-5" />}
             </div>
             <div className="min-w-0">
-              <h2 className="truncate text-lg font-bold text-foreground dark:text-foreground">{material?.title || 'Loading material...'}</h2>
+              {inline ? (
+                <h1 className="truncate text-lg font-bold text-foreground dark:text-foreground">
+                  {material?.title || 'Loading material...'}
+                </h1>
+              ) : (
+                <h2 className="truncate text-lg font-bold text-foreground dark:text-foreground">
+                  {material?.title || 'Loading material...'}
+                </h2>
+              )}
               <p className="text-xs font-medium uppercase text-muted-foreground">
                 {material?.type || 'Study material'}{material?.size ? ` • ${material.size}` : ''}
               </p>

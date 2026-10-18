@@ -15,6 +15,7 @@ import {
   Flashcard,
   UserFlashcardProgress,
   QuestionDifficulty,
+  Prisma,
 } from '@prisma/client';
 import { QuestionNotFoundException } from '../../../../common/exceptions/not-found.exception';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
@@ -23,6 +24,24 @@ import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 @ApiTags('flashcards')
 export class FlashcardsService {
   private readonly logger = new Logger(FlashcardsService.name);
+
+  private getProgressScopeWhere(filters: {
+    courseId?: string;
+    topicId?: string;
+  }): Prisma.UserFlashcardProgressWhereInput {
+    if (!filters.courseId && !filters.topicId) return {};
+
+    return {
+      flashcard: {
+        question: {
+          is: {
+            ...(filters.courseId ? { courseId: filters.courseId } : {}),
+            ...(filters.topicId ? { topicIds: { has: filters.topicId } } : {}),
+          },
+        },
+      },
+    };
+  }
 
   constructor(
     private readonly prisma: PrismaService,
@@ -124,22 +143,10 @@ export class FlashcardsService {
     upcoming: number;
     averageInterval: number;
   }> {
-    const questionFilter =
-      filters.courseId || filters.topicId
-        ? {
-            is: {
-              ...(filters.courseId ? { courseId: filters.courseId } : {}),
-              ...(filters.topicId ? { topicIds: { has: filters.topicId } } : {}),
-            },
-          }
-        : undefined;
-
     const cards = await this.prisma.userFlashcardProgress.findMany({
       where: {
         userId,
-        ...(questionFilter
-          ? { flashcard: { question: questionFilter } }
-          : {}),
+        ...this.getProgressScopeWhere(filters),
       },
       select: {
         easeFactor: true,
@@ -183,23 +190,11 @@ export class FlashcardsService {
     userId: string,
     filters: { courseId?: string; topicId?: string } = {},
   ): Promise<Array<UserFlashcardProgress & { flashcard: Flashcard }>> {
-    const questionFilter =
-      filters.courseId || filters.topicId
-        ? {
-            is: {
-              ...(filters.courseId ? { courseId: filters.courseId } : {}),
-              ...(filters.topicId ? { topicIds: { has: filters.topicId } } : {}),
-            },
-          }
-        : undefined;
-
     return this.prisma.userFlashcardProgress.findMany({
       where: {
         userId,
         nextReview: { lte: new Date() },
-        ...(questionFilter
-          ? { flashcard: { question: questionFilter } }
-          : {}),
+        ...this.getProgressScopeWhere(filters),
       },
       include: { flashcard: true },
       orderBy: { nextReview: 'asc' },
