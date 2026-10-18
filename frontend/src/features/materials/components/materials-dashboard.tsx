@@ -755,50 +755,17 @@ export default function MaterialsDashboard() {
     setTopicToSchedule({ title, unitTitle });
   };
 
-  const contextTitle = filterContext === 'owned'
-    ? 'My materials'
-    : filterContext === 'shared'
-      ? 'Shared materials'
-      : 'Recommended review';
-  const contextDescription = filterContext === 'owned'
-    ? 'Keep your study resources organized by course, unit, and topic.'
-    : filterContext === 'shared'
-      ? 'Materials available to you from your courses and classmates.'
-      : 'Review resources selected to help strengthen topics from your recent quiz results.';
-
   return (
     <div className="mx-auto min-h-full w-full max-w-screen-2xl min-w-0 space-y-3 pb-20 sm:space-y-6">
-      {/* Library heading and controls */}
+      {/* Library controls */}
       {!selectedCourseId && (
-        <section className="space-y-3 sm:space-y-5">
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <p className="hidden text-sm font-medium text-blue-700 dark:text-blue-300 sm:block">Study library</p>
-              <h1 className="text-xl font-semibold tracking-tight text-foreground sm:mt-1 sm:text-2xl dark:text-foreground">
-                {contextTitle}
-              </h1>
-              <p className="mt-1 hidden max-w-2xl text-sm text-muted-foreground dark:text-muted-foreground sm:block">
-                {contextDescription}
-              </p>
-            </div>
-            {filterContext !== 'for_you' && (
-              <Button
-                onClick={() => router.push('/study-planner/materials/upload')}
-                aria-label="Add material"
-                className="h-10 w-10 shrink-0 gap-2 rounded-lg bg-blue-600 p-0 text-white hover:bg-blue-700 sm:w-auto sm:px-4"
-              >
-                <Plus className="h-4 w-4" />
-                <span className="hidden sm:inline">Add material</span>
-              </Button>
-            )}
-          </div>
-
+        <section>
           <div className="rounded-xl border border-border bg-card p-2 shadow-sm dark:border-border dark:bg-card sm:p-4">
             <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between lg:gap-3">
               <div className="flex w-full min-w-0 flex-nowrap gap-1 overflow-x-auto rounded-lg bg-muted p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:w-auto">
                 {[
-                  { id: 'owned', label: 'My Drive', icon: Database },
-                  { id: 'shared', label: 'Shared with me', icon: BookOpen },
+                  { id: 'owned', label: 'My materials', icon: Database },
+                  { id: 'shared', label: 'Shared materials', icon: BookOpen },
                   { id: 'for_you', label: 'For You', icon: Sparkles },
                 ].map((tab) => {
                   const Icon = tab.icon;
@@ -830,6 +797,16 @@ export default function MaterialsDashboard() {
               </div>
 
               <div className="flex min-w-0 items-center gap-1.5 lg:flex-1 lg:justify-end">
+                {filterContext !== 'for_you' && (
+                  <Button
+                    onClick={() => router.push('/study-planner/materials/upload')}
+                    aria-label="Add material"
+                    className="h-10 w-10 shrink-0 gap-2 rounded-lg bg-blue-600 p-0 text-white hover:bg-blue-700 sm:w-auto sm:px-4"
+                  >
+                    <Plus className="h-4 w-4" />
+                    <span className="hidden sm:inline">Add material</span>
+                  </Button>
+                )}
                 {filterContext !== 'for_you' && (
                   <div className="group relative min-w-0 flex-1 lg:max-w-sm">
                     <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-blue-600" />

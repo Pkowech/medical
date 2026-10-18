@@ -73,3 +73,14 @@ def test_course_library_row_opens_roadmap_independently_from_resource_toggle():
     assert 'aria-expanded={isSectionOpen(`course:${course.id}`, false)}' in materials_dashboard
     assert 'aria-label={`${isSectionOpen(`course:${course.id}`, false) ? \'Collapse\' : \'Expand\'} ${course.title} resources`}' in materials_dashboard
     assert 'onClick={() => setSectionOpen(' in materials_dashboard
+
+
+def test_material_library_uses_consistent_concise_tab_labels():
+    """Library tabs name each collection without repeating a heading and description."""
+    materials_dashboard = read_frontend("src/features/materials/components/materials-dashboard.tsx")
+
+    assert "{ id: 'owned', label: 'My materials', icon: Database }" in materials_dashboard
+    assert "{ id: 'shared', label: 'Shared materials', icon: BookOpen }" in materials_dashboard
+    assert 'label: \'My Drive\'' not in materials_dashboard
+    assert 'label: \'Shared with me\'' not in materials_dashboard
+    assert 'Keep your study resources organized by course, unit, and topic.' not in materials_dashboard

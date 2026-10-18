@@ -179,7 +179,12 @@ class SyncService {
       }, 30_000);
       
       // 1. Get all pending items
-      const items = await db.getAll(SYNC_STORE_NAME);
+      const items = (await db.getAll(SYNC_STORE_NAME)).sort(
+        (first, second) =>
+          first.createdAt - second.createdAt ||
+          first.timestamp - second.timestamp ||
+          first.id.localeCompare(second.id),
+      );
 
       // Permanent client errors stay failed; transient errors remain queued with
       // capped backoff so temporary outages do not strand learning activity.

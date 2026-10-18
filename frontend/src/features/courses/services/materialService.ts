@@ -1,6 +1,53 @@
 import { apiService } from '@/features/auth/services/apiClient';
 import { Material } from '@/shared/types/materialInterface';
 
+const normalizeMaterialUrl = (url?: string): string | undefined => {
+  if (!url || url.startsWith('http://') || url.startsWith('https://') || url.startsWith('blob:') || url.startsWith('data:') || url.startsWith('mailto:')) {
+    return url;
+  }
+
+  const trimmed = url.trim();
+  if (!trimmed) return undefined;
+
+  const withoutPrefix = trimmed.replace(/^\/+/, '');
+  if (!withoutPrefix || withoutPrefix.startsWith('api/backend/')) {
+    return trimmed;
+  }
+
+  if (withoutPrefix.startsWith('v1/')) {
+    return `/api/backend/${withoutPrefix}`;
+  }
+
+  if (withoutPrefix.startsWith('api/materials/')) {
+    return `/api/backend/${withoutPrefix.replace(/^api\//, '')}`;
+  }
+
+  if (withoutPrefix.startsWith('materials/')) {
+    return `/api/backend/${withoutPrefix}`;
+  }
+
+  return trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+};
+
+const normalizeMaterial = <T extends Partial<Material>>(material: T): T => {
+  if (!material) return material;
+
+  if ('fileUrl' in material) {
+    material.fileUrl = normalizeMaterialUrl(material.fileUrl as string | undefined) as T['fileUrl'];
+  }
+  if ('previewFileUrl' in material) {
+    material.previewFileUrl = normalizeMaterialUrl(material.previewFileUrl as string | undefined) as T['previewFileUrl'];
+  }
+  if ('url' in material && typeof material.url === 'string') {
+    material.url = normalizeMaterialUrl(material.url) as T['url'];
+  }
+
+  return material;
+};
+
+const normalizeMaterialList = <T extends Partial<Material>>(items: T[] | undefined): T[] =>
+  (items ?? []).map((item) => normalizeMaterial(item));
+
 export interface DriveFolderPreview {
   folderId: string;
   folderName: string;
@@ -33,7 +80,7 @@ const materialService = {
     const response = await apiService.get<Material[]>('/materials', {
       params: filters,
     });
-    return response.data;
+    return normalizeMaterialList(response.data);
   },
 
   async getMaterialsPaginated(params: {
@@ -50,7 +97,10 @@ const materialService = {
     const response = await apiService.get<{ items: Material[]; total: number; page: number; pageSize: number }>('/materials/paginated', {
       params,
     });
-    return response.data;
+    return {
+      ...response.data,
+      items: normalizeMaterialList(response.data.items),
+    };
   },
 
   async getRecommendedMaterials() {
@@ -79,12 +129,12 @@ const materialService = {
 
   async createMaterial(material: Material): Promise<Material> {
     const response = await apiService.post<Material>('/materials', material);
-    return response.data;
+    return normalizeMaterial(response.data);
   },
 
   async getMaterialById(id: string): Promise<Material> {
     const response = await apiService.get<Material>(`/materials/${id}`);
-    return response.data;
+    return normalizeMaterial(response.data);
   },
 
   async getMaterialsByTopicId(topicId: string): Promise<Material[]> {
@@ -93,7 +143,8 @@ const materialService = {
         params: { topicId },
       });
       const data = response.data;
-      return Array.isArray(data) ? data : data?.items || [];
+      const items = Array.isArray(data) ? data : data?.items || [];
+      return normalizeMaterialList(items);
     } catch (error) {
       console.error('Error fetching materials by topic:', error);
       return [];
@@ -104,7 +155,7 @@ const materialService = {
     const response = await apiService.get<Material & { fileUrl?: string }>(
       `/materials/${id}/with-url`
     );
-    return response.data;
+    return normalizeMaterial(response.data);
   },
 
   async getMaterialPreviewContent(id: string): Promise<Uint8Array> {
@@ -142,7 +193,7 @@ const materialService = {
     shareWithCourse?: boolean;
   }): Promise<Material> {
     const response = await apiService.post<Material>('/materials/drive', input);
-    return response.data;
+    return normalizeMaterial(response.data);
   },
 
   async getGoogleDriveConnectionStatus(): Promise<{ connected: boolean }> {
@@ -199,7 +250,7 @@ const materialService = {
 
   async setCourseSharing(id: string, shared: boolean): Promise<Material> {
     const response = await apiService.patch<Material>(`/materials/${id}/share-with-course`, { shared });
-    return response.data;
+    return normalizeMaterial(response.data);
   },
 
   // Local File System Methods (for Offline/Local Library)

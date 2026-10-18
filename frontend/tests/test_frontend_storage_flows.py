@@ -114,6 +114,14 @@ def test_offline_progress_queue_covers_enqueue_read_remove_flush_and_legacy_migr
     assert "async syncOutbox(" in sync_service
 
 
+def test_offline_api_queues_keep_the_original_mutation_method():
+    api_client = read_frontend("src/features/auth/services/apiClient.ts")
+
+    assert "const method = originalRequest.method?.toUpperCase();" in api_client
+    assert "if (method !== 'POST' && method !== 'PUT')" in api_client
+    assert "originalRequest.url || '',\n              method," in api_client
+
+
 def test_offline_replay_only_queues_allowlisted_learning_posts_not_admin_deletes():
     policy = read_frontend("src/lib/core/offline/offlineQueuePolicy.ts")
     api_client = read_frontend("src/features/auth/services/apiClient.ts")

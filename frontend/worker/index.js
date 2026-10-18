@@ -146,7 +146,10 @@ async function flushOutboxFromWorker(db, owner, onSynced) {
   const items = await requestResult(transaction.objectStore(SYNC_QUEUE_STORE).getAll());
   await complete;
   items.sort(
-    (first, second) => first.createdAt - second.createdAt || first.timestamp - second.timestamp
+    (first, second) =>
+      first.createdAt - second.createdAt ||
+      first.timestamp - second.timestamp ||
+      first.id.localeCompare(second.id)
   );
 
   const dueItems = items.filter(

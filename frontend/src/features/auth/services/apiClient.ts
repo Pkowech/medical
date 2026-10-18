@@ -166,6 +166,10 @@ class ApiService {
           try {
             // Lazy load syncService to separate imports slightly (optional but safe)
             const { syncService } = await import('@/lib/core/offline/syncService');
+            const method = originalRequest.method?.toUpperCase();
+            if (method !== 'POST' && method !== 'PUT') {
+              throw new Error(`Cannot queue unsupported offline method: ${method ?? 'unknown'}`);
+            }
             console.warn(
               `[Offline] Queuing mutation: ${originalRequest.method} ${originalRequest.url}`
             );
@@ -173,7 +177,7 @@ class ApiService {
             // Queue request
             await syncService.addToOutbox(
               originalRequest.url || '',
-              'POST',
+              method,
               originalRequest.data
                 ? typeof originalRequest.data === 'string'
                   ? JSON.parse(originalRequest.data)
