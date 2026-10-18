@@ -102,8 +102,10 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
                 {/* Main app column (center) */}
                 <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-                    {!isQuizSessionPage && !isUnitContentPage && !isImmersive && (
-                        <AppHeader />
+                    {!isQuizSessionPage && !isImmersive && (
+                        <div className={cn(isUnitContentPage && 'lg:hidden')}>
+                            <AppHeader />
+                        </div>
                     )}
 
                     {/* content area */}

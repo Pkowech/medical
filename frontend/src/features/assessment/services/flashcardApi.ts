@@ -107,8 +107,17 @@ class FlashcardApiService {
     return response.data as UserFlashcardProgress;
   }
 
-  async getCardStats(userId: string): Promise<CardStats> {
-    const response = await api.get(`/flashcards/overview/${userId}`);
+  async getCardStats(
+    userId: string,
+    filters: { courseId?: string; topicId?: string } = {},
+  ): Promise<CardStats> {
+    const params = new URLSearchParams();
+    if (filters.courseId) params.set('courseId', filters.courseId);
+    if (filters.topicId) params.set('topicId', filters.topicId);
+    const query = params.toString();
+    const response = await api.get(
+      `/flashcards/overview/${userId}${query ? `?${query}` : ''}`,
+    );
     return response.data as CardStats;
   }
 

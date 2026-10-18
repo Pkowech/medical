@@ -110,7 +110,10 @@ export class FlashcardsService {
 
   @ApiOperation({ summary: 'Get flashcard statistics for a user' })
   @ApiResponse({ status: 200, description: 'User flashcard statistics' })
-  async getCardStats(userId: string): Promise<{
+  async getCardStats(
+    userId: string,
+    filters: { courseId?: string; topicId?: string } = {},
+  ): Promise<{
     totalCards: number;
     dueToday: number;
     mastered: number;
@@ -121,8 +124,23 @@ export class FlashcardsService {
     upcoming: number;
     averageInterval: number;
   }> {
+    const questionFilter =
+      filters.courseId || filters.topicId
+        ? {
+            is: {
+              ...(filters.courseId ? { courseId: filters.courseId } : {}),
+              ...(filters.topicId ? { topicIds: { has: filters.topicId } } : {}),
+            },
+          }
+        : undefined;
+
     const cards = await this.prisma.userFlashcardProgress.findMany({
-      where: { userId },
+      where: {
+        userId,
+        ...(questionFilter
+          ? { flashcard: { question: questionFilter } }
+          : {}),
+      },
       select: {
         easeFactor: true,
         interval: true,

@@ -518,17 +518,20 @@ export class ProgressService {
 
       let materialProgress: Progress | undefined;
       await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+        const whereData = {
+          userId,
+          materialId,
+          topicId: topicId ?? null,
+          unitId: material.unitId,
+          courseId: courseId ?? null,
+        };
+        const existingProgress = await tx.progress.findFirst({
+          where: whereData,
+        });
+
         // Check for conflict if clientTimestamp provided
         if (clientTimestamp !== undefined) {
-          const existing = await tx.progress.findFirst({
-            where: {
-              userId,
-              materialId,
-              topicId: topicId ?? null,
-            },
-          });
-
-          if (existing && existing.lastUpdated > clientTimestamp) {
+          if (existingProgress && existingProgress.lastUpdated > clientTimestamp) {
             throw new ConflictException(
               'Server has newer data. Please refresh and retry.',
             );
@@ -538,37 +541,23 @@ export class ProgressService {
         const now = new Date();
         const currentTimestamp = clientTimestamp ?? BigInt(now.getTime());
 
-        // Build where clause with only actual IDs to avoid foreign key violations
-        const whereData: any = {
-          userId,
-          materialId,
-          topicId: topicId || null,
-          unitId: material.unitId || null,
-          courseId: courseId || null,
-        };
-
-        const createData: any = {
-          userId,
-          materialId,
-          topicId: topicId || null,
-          unitId: material.unitId || null,
-          courseId: courseId || null,
+        const progressData = {
           isCompleted: true,
           completedAt: now,
           lastUpdated: currentTimestamp,
         };
 
-        materialProgress = await tx.progress.upsert({
-          where: {
-            userId_topicId_materialId_unitId_courseId: whereData,
-          },
-          update: {
-            isCompleted: true,
-            completedAt: now,
-            lastUpdated: currentTimestamp,
-          },
-          create: createData,
-        });
+        materialProgress = existingProgress
+          ? await tx.progress.update({
+              where: { id: existingProgress.id },
+              data: progressData,
+            })
+          : await tx.progress.create({
+              data: {
+                ...whereData,
+                ...progressData,
+              },
+            });
 
         // Unit and Course progress updates are removed here as they are now derived aggregates.
 

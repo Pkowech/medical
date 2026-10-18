@@ -86,7 +86,7 @@ export const CourseSidebar = ({
                 <button
                   type="button"
                   onClick={() => setSidebarCollapsed(true)}
-                  className="hidden rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground dark:text-muted-foreground dark:hover:bg-card dark:hover:text-foreground lg:inline-flex"
+                  className="hidden h-8 w-8 items-center justify-center rounded-md border border-border bg-background text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-border dark:bg-card dark:text-muted-foreground dark:hover:bg-secondary dark:hover:text-foreground lg:inline-flex"
                   aria-label="Collapse course sidebar"
                   title="Collapse course sidebar"
                 >

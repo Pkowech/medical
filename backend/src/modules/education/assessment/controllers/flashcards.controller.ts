@@ -68,10 +68,12 @@ export class FlashcardsController {
   @Get('overview/:userId')
   async getCardStats(
     @Param('userId') userId: string,
+    @Query('courseId') courseId: string | undefined,
+    @Query('topicId') topicId: string | undefined,
     @CurrentUser() currentUser: User,
   ) {
     this.assertCanAccessUser(currentUser, userId);
-    return this.flashcardsService.getCardStats(userId);
+    return this.flashcardsService.getCardStats(userId, { courseId, topicId });
   }
 
   @Get('high-risk-topics/:userId')
