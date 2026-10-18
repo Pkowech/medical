@@ -58,6 +58,84 @@ class ProgressTrackingTests:
     # STUDY PROGRESS TRACKING TESTS
     # =====================================================================
 
+    def test_shared_material_progress_authorization(self):
+        """Shared material progress works without enrollment; course-only progress does not."""
+        self.setup_user()
+        recipient = ProgressTrackingTests()
+        recipient_id, _ = recipient.setup_user()
+        unauthorized = ProgressTrackingTests()
+        unauthorized.setup_user()
+
+        course_response = self.session.post(
+            f"{self.BASE_URL}/courses",
+            json={
+                "title": "Shared Material Progress Test",
+                "description": "Test",
+                "duration": 10,
+            },
+            headers=self.get_headers(),
+            timeout=self.TIMEOUT,
+        )
+        assert course_response.status_code == 201, course_response.text
+        course_id = course_response.json()["id"]
+
+        material_response = self.session.post(
+            f"{self.BASE_URL}/materials/external",
+            json={
+                "title": "Shared progress test material",
+                "url": "https://example.com/progress-test",
+                "type": "other",
+                "courseId": course_id,
+            },
+            headers=self.get_headers(),
+            timeout=self.TIMEOUT,
+        )
+        assert material_response.status_code == 201, material_response.text
+        material_id = material_response.json()["id"]
+
+        share_response = self.session.post(
+            f"{self.BASE_URL}/materials/{material_id}/share",
+            json={"userId": recipient_id},
+            headers=self.get_headers(),
+            timeout=self.TIMEOUT,
+        )
+        assert share_response.status_code in (200, 201), share_response.text
+
+        progress_payload = {
+            "courseId": course_id,
+            "materialId": material_id,
+            "status": "inProgress",
+            "progressPercentage": 35,
+            "timeSpentMinutes": 4,
+        }
+        saved_response = recipient.session.post(
+            f"{self.BASE_URL}/progress/sync",
+            json=progress_payload,
+            headers=recipient.get_headers(),
+            timeout=self.TIMEOUT,
+        )
+        assert saved_response.status_code == 200, saved_response.text
+
+        denied_response = unauthorized.session.post(
+            f"{self.BASE_URL}/progress/sync",
+            json=progress_payload,
+            headers=unauthorized.get_headers(),
+            timeout=self.TIMEOUT,
+        )
+        assert denied_response.status_code == 403, denied_response.text
+
+        course_only_response = recipient.session.post(
+            f"{self.BASE_URL}/progress/sync",
+            json={
+                "courseId": course_id,
+                "status": "inProgress",
+                "progressPercentage": 10,
+            },
+            headers=recipient.get_headers(),
+            timeout=self.TIMEOUT,
+        )
+        assert course_only_response.status_code == 404, course_only_response.text
+
     def test_course_enrollment_tracking(self):
         """Test tracking of course enrollment"""
         print("\n[TEST] Course Enrollment Tracking")
@@ -762,10 +840,17 @@ class ProgressTrackingTests:
 # TEST EXECUTION
 # =====================================================================
 
+class TestMaterialProgressAuthorization:
+    @pytest.mark.integration
+    def test_shared_material_progress_authorization(self):
+        ProgressTrackingTests().test_shared_material_progress_authorization()
+
+
 if __name__ == "__main__":
     tests = ProgressTrackingTests()
 
     # Study Progress Tests
+    tests.test_shared_material_progress_authorization()
     tests.test_course_enrollment_tracking()
     tests.test_unit_completion_workflow()
     tests.test_course_completion_state()

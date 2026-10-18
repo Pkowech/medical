@@ -13,6 +13,7 @@ export interface PageHeader {
   title: string;
   description?: string;
   icon?: React.ReactNode;
+  presentation?: 'header' | 'metadata';
 }
 
 interface HeaderContextType {

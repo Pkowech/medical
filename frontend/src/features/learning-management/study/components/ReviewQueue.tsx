@@ -1,49 +1,53 @@
-import React, { useEffect, useState } from 'react';
+'use client';
+
+import React, { useCallback, useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader } from '@/shared/components/ui/card';
 import { Button } from '@/shared/components/ui/button';
 import { ScrollArea } from '@/shared/components/ui/scroll-area';
 import { Separator } from '@/shared/components/ui/separator';
-import { Play, RefreshCw } from 'lucide-react';
-import { flashcardApi, UserFlashcardProgress } from '@/features/assessment/services/flashcardApi';
+import { AlertCircle, Play, RefreshCw } from 'lucide-react';
+import { flashcardApi, type UserFlashcardProgress } from '@/features/assessment/services/flashcardApi';
 import { useAuthStore } from '@/features/auth/store/useAuthStore';
 import { useRouter } from 'next/navigation';
 
 export const ReviewQueue: React.FC = () => {
-  const { user } = useAuthStore();
+  const userId = useAuthStore(state => state.user?.id);
   const router = useRouter();
   const [dueCards, setDueCards] = useState<UserFlashcardProgress[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const fetchDueCards = async () => {
-    if (!user) return;
-    try {
-      // getDueCards returns Flashcard[], but we need UserFlashcardProgress
-      // This endpoint should be updated or we fetch stats instead
-      const _stats = await flashcardApi.getCardStats(user.id); // TODO: use stats to populate dueCards
+  const fetchDueCards = useCallback(async () => {
+    if (!userId) {
       setDueCards([]);
-    } catch (error) {
-      console.error('Failed to fetch due cards:', error);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    try {
+      setDueCards(await flashcardApi.getDueCards(userId));
+    } catch (fetchError) {
+      console.error('Failed to fetch due review cards:', fetchError);
+      setError('Review cards could not be loaded. Try again.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [userId]);
 
   useEffect(() => {
-    fetchDueCards();
-  }, [user]);
+    void fetchDueCards();
+  }, [fetchDueCards]);
 
   const handleStartReview = () => {
-    router.push('/flashcards');
-  };
-
-  const formatDate = (date: Date) => {
-    return new Date(date).toLocaleDateString();
+    router.push('/flashcards/all');
   };
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-[200px]">
-        <p className="text-muted-foreground dark:text-muted-foreground">Loading review queue...</p>
+      <div className="flex min-h-[200px] items-center justify-center" role="status">
+        <p className="text-muted-foreground">Loading review queue...</p>
       </div>
     );
   }
@@ -51,44 +55,68 @@ export const ReviewQueue: React.FC = () => {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <h3 className="text-lg font-semibold">Review Queue</h3>
+        <div>
+          <h3 className="text-lg font-semibold">Course review queue</h3>
+          <p className="text-sm text-muted-foreground">
+            {dueCards.length} {dueCards.length === 1 ? 'card' : 'cards'} due
+          </p>
+        </div>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={fetchDueCards} className="h-8 w-8">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={() => void fetchDueCards()}
+            aria-label="Refresh review queue"
+            className="h-8 w-8"
+          >
             <RefreshCw className="h-4 w-4" />
           </Button>
           <Button
+            type="button"
             onClick={handleStartReview}
             disabled={dueCards.length === 0}
             className="flex items-center gap-2"
           >
             <Play className="h-4 w-4" />
-            Start Review
+            Start review
           </Button>
         </div>
       </CardHeader>
       <CardContent>
-        {dueCards.length === 0 ? (
-          <p className="text-center text-muted-foreground dark:text-muted-foreground">No cards due for review</p>
+        {error ? (
+          <div role="alert" className="flex items-center justify-between gap-3 text-sm text-destructive">
+            <span className="flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              {error}
+            </span>
+            <Button type="button" variant="outline" size="sm" onClick={() => void fetchDueCards()}>
+              Retry
+            </Button>
+          </div>
+        ) : dueCards.length === 0 ? (
+          <p className="text-center text-sm text-muted-foreground">
+            You’re all caught up. Reviews from studied topics and quizzes will appear here.
+          </p>
         ) : (
           <ScrollArea className="h-[300px] pr-4">
             <div className="space-y-4">
               {dueCards.map(card => (
-                <div key={card.id} className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">Card #{card.id.slice(0, 8)}</p>
-                      <p className="text-sm text-muted-foreground dark:text-muted-foreground">
-                        Last review:{' '}
-                        {card.lastReviewDate ? formatDate(card.lastReviewDate) : 'Never'}
+                <div key={card.id} className="space-y-3">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <p className="line-clamp-2 font-medium">
+                        {card.flashcard.front || 'Course review card'}
+                      </p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {card.lastReview
+                          ? `Last reviewed ${new Date(card.lastReview).toLocaleDateString()}`
+                          : 'New card'}
                       </p>
                     </div>
-                    <div className="flex gap-2">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                        {card.correctStreak} streak
-                      </span>
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
-                        {card.interval} days
-                      </span>
+                    <div className="flex shrink-0 flex-col items-end gap-1 text-xs text-muted-foreground">
+                      <span>{card.correctStreak} correct in a row</span>
+                      <span>{card.interval} day interval</span>
                     </div>
                   </div>
                   <Separator />

@@ -7,6 +7,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ClipboardCheck,
+  Info,
 } from 'lucide-react';
 import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/features/auth/hooks/useAuth';
@@ -193,6 +194,7 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
         title: unitData.title,
         description: unitData.description || 'Unit content and materials',
         icon: '📘',
+        presentation: 'metadata',
       });
     }
     return () => setHeader(null);
@@ -510,6 +512,21 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
                     { label: unitData.title },
                   ]}
                 />
+                <details className="group relative shrink-0">
+                  <summary
+                    aria-label="About this unit"
+                    title="About this unit"
+                    className="list-none cursor-pointer rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                  >
+                    <Info className="h-4 w-4" />
+                  </summary>
+                  <div className="absolute left-0 top-full z-30 mt-2 w-72 max-w-[calc(100vw-2rem)] rounded-lg border border-border bg-card p-3 text-sm shadow-lg">
+                    <p className="font-semibold text-foreground">{unitData.title}</p>
+                    {unitData.description && (
+                      <p className="mt-1 text-muted-foreground">{unitData.description}</p>
+                    )}
+                  </div>
+                </details>
                 </div>
                 <Button
                   type="button"

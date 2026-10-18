@@ -8,9 +8,9 @@ import { Alert, AlertDescription } from '@/shared/components/ui/alert';
 import { ThumbsUp, ThumbsDown, Clock, CheckCircle2 } from 'lucide-react';
 
 interface SpacedRepetitionReviewProps {
-  questionId: string;
-  question: string;
-  answer: string;
+  questionId?: string;
+  question?: string;
+  answer?: string;
 }
 
 export function SpacedRepetitionReview({
@@ -24,10 +24,19 @@ export function SpacedRepetitionReview({
   );
 
   const [showAnswer, setShowAnswer] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Use props if provided, otherwise fallback to currentCard from hook
-  const displayQuestion = propQuestion || currentCard?.question || 'Loading card content...';
-  const displayAnswer = propAnswer || currentCard?.answer || 'No answer available.';
+  const displayQuestion = propQuestion || currentCard?.flashcard.front || 'Loading card content...';
+  const displayAnswer = propAnswer || currentCard?.flashcard.back || 'No answer available.';
+
+  const submitRating = async (quality: number) => {
+    setIsSubmitting(true);
+    try {
+      if (await rateCard(quality)) setShowAnswer(false);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -78,7 +87,7 @@ export function SpacedRepetitionReview({
           <div className="text-sm font-medium text-muted-foreground">Next Review</div>
           <div className="flex items-center space-x-1 text-sm text-muted-foreground">
             <Clock className="h-4 w-4" />
-            <span>{currentCard.nextReview.toLocaleDateString()}</span>
+            <span>{new Date(currentCard.nextReview).toLocaleDateString()}</span>
           </div>
         </div>
       </div>
@@ -103,10 +112,10 @@ export function SpacedRepetitionReview({
                 <Button
                   variant="outline"
                   className="px-8 border-red-200 hover:bg-red-50 hover:text-red-700 dark:border-red-900/50 dark:hover:bg-red-900/20"
+                  disabled={isSubmitting}
                   onClick={(e) => {
                     e.stopPropagation();
-                    rateCard(1); // Hard
-                    setShowAnswer(false);
+                    void submitRating(2);
                   }}
                 >
                   <ThumbsDown className="h-4 w-4 mr-2" />
@@ -115,10 +124,10 @@ export function SpacedRepetitionReview({
                 <Button
                   variant="outline"
                   className="px-8 border-blue-200 hover:bg-blue-50 hover:text-blue-700 dark:border-blue-900/50 dark:hover:bg-blue-900/20"
+                  disabled={isSubmitting}
                   onClick={(e) => {
                     e.stopPropagation();
-                    rateCard(3); // Good
-                    setShowAnswer(false);
+                    void submitRating(4);
                   }}
                 >
                   <ThumbsUp className="h-4 w-4 mr-2" />
@@ -126,10 +135,10 @@ export function SpacedRepetitionReview({
                 </Button>
                 <Button
                   className="px-10 bg-green-600 hover:bg-green-700 text-white shadow-lg"
+                  disabled={isSubmitting}
                   onClick={(e) => {
                     e.stopPropagation();
-                    rateCard(5); // Easy
-                    setShowAnswer(false);
+                    void submitRating(5);
                   }}
                 >
                   <CheckCircle2 className="h-4 w-4 mr-2" />

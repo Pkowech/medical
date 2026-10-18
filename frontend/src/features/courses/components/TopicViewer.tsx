@@ -257,6 +257,7 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
           title: topicData.title || 'Topic',
           description: topicData.description || 'Learning material',
           icon: '📖',
+          presentation: 'metadata',
         });
 
         // Fetch materials for this topic
@@ -328,6 +329,7 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
                 title: bundle.title,
                 description: bundle.description || 'Learning material',
                 icon: '📖',
+                presentation: 'metadata',
               });
               return;
             }

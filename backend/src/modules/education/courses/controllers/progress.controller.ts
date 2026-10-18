@@ -272,7 +272,12 @@ export class ProgressController {
       ? BigInt(clientTimestampHeader)
       : undefined;
 
-    if (progress.unitId || progress.materialId || progress.topicId) {
+    if (
+      progress.courseId ||
+      progress.unitId ||
+      progress.materialId ||
+      progress.topicId
+    ) {
       return this.progressService.updateUnitMaterialTopicProgress(req.user.id, {
         ...progress,
         status: progress.status || 'completed',

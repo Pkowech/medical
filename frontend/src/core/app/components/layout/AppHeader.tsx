@@ -27,10 +27,15 @@ export const AppHeader: React.FC = () => {
   } = useLayoutStore();
   const { header } = usePageHeader();
   const pathname = usePathname();
+  const isMetadataHeader = header?.presentation === 'metadata';
 
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-card/95 pt-[env(safe-area-inset-top)] shadow-sm backdrop-blur-md dark:bg-card/95">
-      <div className="px-3 py-3 transition-all duration-300 sm:px-4 sm:py-4 md:px-6 lg:px-8">
+      <div
+        className={`px-3 transition-all duration-300 sm:px-4 md:px-6 lg:px-8 ${
+          isMetadataHeader ? 'py-2' : 'py-3 sm:py-4'
+        }`}
+      >
         <div className="flex min-h-10 items-center gap-3">
           <button
             type="button"
@@ -58,21 +63,23 @@ export const AppHeader: React.FC = () => {
             )}
           </button>
 
-          {header?.icon && (
+          {!isMetadataHeader && header?.icon && (
             <div aria-hidden="true" className="shrink-0 text-xl sm:text-2xl">
               {header.icon}
             </div>
           )}
-          <div className="min-w-0 flex-1">
-            <h1 className="truncate text-lg font-bold text-foreground sm:text-xl md:text-2xl">
-              {header?.title || getRouteTitle(pathname)}
-            </h1>
-            {header?.description && (
-              <p className="hidden max-w-2xl truncate text-xs text-muted-foreground md:block sm:text-sm">
-                {header.description}
-              </p>
-            )}
-          </div>
+          {!isMetadataHeader && (
+            <div className="min-w-0 flex-1">
+              <h1 className="truncate text-lg font-bold text-foreground sm:text-xl md:text-2xl">
+                {header?.title || getRouteTitle(pathname)}
+              </h1>
+              {header?.description && (
+                <p className="hidden max-w-2xl truncate text-xs text-muted-foreground md:block sm:text-sm">
+                  {header.description}
+                </p>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </header>

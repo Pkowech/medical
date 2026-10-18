@@ -3,6 +3,7 @@ import {
   Logger,
   NotFoundException,
   ConflictException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
@@ -12,6 +13,9 @@ import {
   ProgressStatus,
   UserActivityType,
   EnrollmentStatus,
+  MemberStatus,
+  RoleName,
+  StudyGroupStatus,
 } from '@prisma/client';
 import { handleServiceError, getErrorMessage } from '#common/utils/error.utils';
 import { cacheKeys } from '#common/constants/cache-keys';
@@ -67,6 +71,120 @@ export class ProgressService {
     await this.clearCache(userId);
   }
 
+  private async authorizeMaterialProgress(
+    userId: string,
+    materialId: string,
+    associations: { courseId?: string; unitId?: string; topicId?: string },
+  ): Promise<void> {
+    const material = await this.prisma.material.findUnique({
+      where: { id: materialId },
+      select: {
+        id: true,
+        userId: true,
+        courseId: true,
+        unitId: true,
+        topicId: true,
+        metadata: true,
+        unit: { select: { courseId: true } },
+      },
+    });
+    if (!material) {
+      throw new NotFoundException(`Material with ID ${materialId} not found`);
+    }
+
+    const materialCourseId = material.courseId ?? material.unit?.courseId ?? undefined;
+    if (
+      (associations.courseId && associations.courseId !== materialCourseId) ||
+      (associations.unitId && associations.unitId !== material.unitId) ||
+      (associations.topicId && associations.topicId !== material.topicId)
+    ) {
+      throw new ForbiddenException(
+        'Progress associations do not match the selected material.',
+      );
+    }
+
+    if (material.userId === userId) return;
+
+    const directShare = await this.prisma.materialShare.findUnique({
+      where: { materialId_userId: { materialId, userId } },
+      select: { id: true },
+    });
+    if (directShare) return;
+
+    const metadata =
+      material.metadata &&
+      typeof material.metadata === 'object' &&
+      !Array.isArray(material.metadata)
+        ? (material.metadata as Record<string, unknown>)
+        : {};
+    if (metadata.shareWithCourse === false || !materialCourseId) {
+      throw new ForbiddenException('This material has not been shared with you.');
+    }
+
+    const [
+      course,
+      instructorAssignment,
+      enrollment,
+      groupMemberships,
+      roles,
+    ] = await Promise.all([
+      this.prisma.course.findUnique({
+        where: { id: materialCourseId },
+        select: { createdById: true },
+      }),
+      this.prisma.courseInstructor.findUnique({
+        where: {
+          courseId_userId: { courseId: materialCourseId, userId },
+        },
+        select: { id: true },
+      }),
+      this.prisma.courseEnrollment.findUnique({
+        where: {
+          userId_courseId: { userId, courseId: materialCourseId },
+        },
+        select: { status: true },
+      }),
+      this.prisma.studyGroupMember.findMany({
+        where: {
+          userId,
+          status: MemberStatus.active,
+          studyGroup: { is: { status: StudyGroupStatus.active } },
+        },
+        select: { studyGroup: { select: { metadata: true } } },
+      }),
+      this.prisma.userRole.findMany({
+        where: { userId },
+        select: { role: { select: { name: true } } },
+      }),
+    ]);
+
+    const isAdmin = roles.some(({ role }) => role.name === RoleName.admin);
+    const isInstructor =
+      course?.createdById === userId || Boolean(instructorAssignment);
+    const isEnrolled =
+      enrollment?.status === EnrollmentStatus.active ||
+      enrollment?.status === EnrollmentStatus.completed;
+    const isCourseGroupMember = groupMemberships.some(({ studyGroup }) => {
+      const groupMetadata = studyGroup.metadata;
+      return (
+        groupMetadata !== null &&
+        typeof groupMetadata === 'object' &&
+        !Array.isArray(groupMetadata) &&
+        (groupMetadata as Record<string, unknown>).courseId === materialCourseId
+      );
+    });
+
+    if (
+      !isAdmin &&
+      !isInstructor &&
+      !(isEnrolled || isCourseGroupMember)
+    ) {
+      throw new ForbiddenException(
+        'Enroll in this course to access its materials.',
+      );
+    }
+  }
+
   async updateUnitMaterialTopicProgress(
     userId: string,
     updateDto: ProgressUpdateDto,
@@ -83,7 +201,13 @@ export class ProgressService {
         clientTimestamp,
       } = updateDto;
 
-      if (courseId) {
+      if (materialId) {
+        await this.authorizeMaterialProgress(userId, materialId, {
+          courseId,
+          unitId,
+          topicId,
+        });
+      } else if (courseId) {
         const enrollment = await this.prisma.courseEnrollment.findUnique({
           where: { userId_courseId: { userId, courseId } },
         });

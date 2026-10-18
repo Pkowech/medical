@@ -72,6 +72,7 @@ export default function MaterialViewPage() {
       title: material.title,
       description: material.description || `${material.type || 'Study'} resource`,
       icon: '📄',
+      presentation: 'metadata',
     });
     return () => setHeader(null);
   }, [material, setHeader]);
@@ -403,15 +404,17 @@ export default function MaterialViewPage() {
               </CardContent>
             </Card>
 
-            {!focusMode && material.description && (
+            {!focusMode && (
               <details className="mt-3 shrink-0">
                 <summary className="flex cursor-pointer list-none items-center gap-2 py-2 text-sm font-semibold text-muted-foreground marker:hidden dark:text-muted-foreground">
                   <Eye className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                   About this material
                 </summary>
                 <Card className="rounded-xl border-border bg-card py-0 shadow-sm dark:border-border dark:bg-card">
-                  <CardContent className="py-3 text-sm leading-relaxed text-muted-foreground dark:text-muted-foreground">
-                    {material.description}
+                  <CardContent className="space-y-1 py-3 text-sm leading-relaxed text-muted-foreground dark:text-muted-foreground">
+                    <p className="font-medium text-foreground dark:text-foreground">{material.title}</p>
+                    <p>{material.type || 'Study resource'}</p>
+                    {material.description && <p>{material.description}</p>}
                   </CardContent>
                 </Card>
               </details>

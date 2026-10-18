@@ -40,13 +40,8 @@ class FlashcardsService {
   }
 
   async getDueCards(userId: string): Promise<Flashcard[]> {
-    try {
-      const response = await apiService.get<Flashcard[]>(`${this.BASE_URL}/due/${userId}`);
-      return Array.isArray(response.data) ? response.data : [];
-    } catch (error) {
-      console.error('Failed to fetch due cards:', error);
-      return [];
-    }
+    const response = await apiService.get<Flashcard[]>(`${this.BASE_URL}/due/${userId}`);
+    return response.data;
   }
 
   async updateCard(cardId: string, quality: number): Promise<Flashcard> {
@@ -57,13 +52,8 @@ class FlashcardsService {
   }
 
   async getCardStats(userId: string): Promise<CardStats> {
-    try {
-      const response = await apiService.get<CardStats>(`${this.BASE_URL}/overview/${userId}`);
-      return response.data;
-    } catch (error) {
-      console.error('Failed to fetch card stats:', error);
-      return { total: 0, due: 0, upcoming: 0, averageInterval: 0 };
-    }
+    const response = await apiService.get<CardStats>(`${this.BASE_URL}/overview/${userId}`);
+    return response.data;
   }
 
   async getHighRiskTopics(userId: string): Promise<HighRiskTopic[]> {
@@ -90,15 +80,10 @@ class FlashcardsService {
       updatedAt: string;
     }>
   ): Promise<{ success: boolean }> {
-    try {
-      const response = await apiService.post<{ success: boolean }>(`${this.BASE_URL}/sync/${userId}`, {
-        cards,
-      });
-      return response.data;
-    } catch (error) {
-      console.error('Failed to sync cards:', error);
-      return { success: false };
-    }
+    const response = await apiService.post<{ success: boolean }>(`${this.BASE_URL}/sync/${userId}`, {
+      cards,
+    });
+    return response.data;
   }
 }
 

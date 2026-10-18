@@ -21,16 +21,27 @@ export interface Flashcard {
   questionId?: string;
 }
 
-// User flashcard progress tracking
-export interface UserFlashcardProgress extends SM2Card {
+export interface UserFlashcardProgress {
   id: string;
   userId: string;
   flashcardId: string;
+  easeFactor: number;
+  interval: number;
+  repetitions: number;
+  correctStreak: number;
   nextReview: string | Date;
   lastReview?: string | Date | null;
-  createdAt?: Date;
-  updatedAt?: Date;
+  updatedAt?: string | Date;
   flashcard: Flashcard;
+}
+
+export interface ScheduledReview {
+  date: string;
+  title: string;
+  description: string;
+  count: number;
+  courseId: string | null;
+  topicId: string | null;
 }
 
 export interface CardStats {
@@ -48,7 +59,7 @@ export interface CardStats {
 class FlashcardApiService {
   async createFlashcard(
     userId: string,
-    dto: { front: string; back: string; questionId?: string; difficulty?: string; tags?: string[] }
+    dto: { front?: string; back?: string; questionId?: string; difficulty?: string; tags?: string[] }
   ): Promise<Flashcard> {
     const response = await api.post('/flashcards/create', {
       userId,
@@ -60,6 +71,21 @@ class FlashcardApiService {
   async getDueCards(userId: string): Promise<UserFlashcardProgress[]> {
     const response = await api.get(`/flashcards/due/${userId}`);
     return response.data as UserFlashcardProgress[];
+  }
+
+  async getScheduledReviews(
+    userId: string,
+    startDate: Date,
+    endDate: Date,
+  ): Promise<ScheduledReview[]> {
+    const params = new URLSearchParams({
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString(),
+    });
+    const response = await api.get(
+      `/flashcards/schedule/${userId}?${params.toString()}`,
+    );
+    return response.data as ScheduledReview[];
   }
 
   async updateCard(cardId: string, quality: number): Promise<UserFlashcardProgress> {
