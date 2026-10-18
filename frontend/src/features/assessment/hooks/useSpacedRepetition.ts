@@ -30,7 +30,7 @@ export function useSpacedRepetition(
     try {
       const [cards, cardStats] = await Promise.all([
         flashcardApi.getDueCards(userId, { courseId, topicId }),
-        flashcardApi.getCardStats(userId),
+        flashcardApi.getCardStats(userId, { courseId, topicId }),
       ]);
       setDueCards(cards);
       setCurrentCard(cards[0] ?? null);
