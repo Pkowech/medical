@@ -87,7 +87,27 @@ export const validationSchema = Joi.object({
   CLOUDINARY_API_SECRET: Joi.string().optional(),
   CLOUDINARY_URL: Joi.string().uri().optional(),
   CLOUDINARY_FOLDER: Joi.string().default('medtrack'),
-  FILE_STORAGE_PROVIDER: Joi.string().valid('cloudinary', 's3', 'local').default('cloudinary'),
+  MATERIAL_FILE_STORAGE_PROVIDER: Joi.string().valid('r2', 'local').default('r2'),
+  R2_ENDPOINT: Joi.when('MATERIAL_FILE_STORAGE_PROVIDER', {
+    is: 'r2',
+    then: Joi.string().uri().required(),
+    otherwise: Joi.string().allow('').optional(),
+  }),
+  R2_ACCESS_KEY_ID: Joi.when('MATERIAL_FILE_STORAGE_PROVIDER', {
+    is: 'r2',
+    then: Joi.string().required(),
+    otherwise: Joi.string().allow('').optional(),
+  }),
+  R2_SECRET_ACCESS_KEY: Joi.when('MATERIAL_FILE_STORAGE_PROVIDER', {
+    is: 'r2',
+    then: Joi.string().required(),
+    otherwise: Joi.string().allow('').optional(),
+  }),
+  R2_BUCKET_NAME: Joi.when('MATERIAL_FILE_STORAGE_PROVIDER', {
+    is: 'r2',
+    then: Joi.string().required(),
+    otherwise: Joi.string().allow('').optional(),
+  }),
   GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON: Joi.string().optional(),
   GOOGLE_DRIVE_SHARED_DRIVE_ID: Joi.string().optional(),
   GOOGLE_CLIENT_ID: Joi.string().optional(),

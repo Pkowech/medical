@@ -1,4 +1,3 @@
-export const FILE_STORAGE = 'IFileStorage';
 export const MATERIAL_FILE_STORAGE = 'IMaterialFileStorage';
 export const PROFILE_IMAGE_STORAGE = 'IProfileImageStorage';
 

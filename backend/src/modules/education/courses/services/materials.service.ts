@@ -76,7 +76,7 @@ export class MaterialsService {
     private readonly googleDrive: GoogleDriveService,
   ) {
     this.storageProvider =
-      this.configService.get<string>('FILE_STORAGE_PROVIDER') === 'local'
+      this.configService.get<string>('MATERIAL_FILE_STORAGE_PROVIDER') === 'local'
         ? 'local'
         : 's3';
     this.localStoragePath =

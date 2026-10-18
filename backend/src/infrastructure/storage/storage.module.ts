@@ -7,7 +7,6 @@ import { LocalStorageService } from './local-storage.service';
 import { CloudinaryStorageAdapter } from './cloudinary-storage.adapter';
 import { GoogleDriveService } from './google-drive.service';
 import {
-  FILE_STORAGE,
   MATERIAL_FILE_STORAGE,
   PROFILE_IMAGE_STORAGE,
 } from './file-storage.interface';
@@ -21,29 +20,13 @@ import {
     CloudinaryStorageAdapter,
     GoogleDriveService,
     {
-      provide: FILE_STORAGE,
-      useFactory: (
-        config: ConfigService,
-        s3: S3StorageAdapter,
-        local: LocalStorageService,
-        cloudinary: CloudinaryStorageAdapter,
-      ) => {
-        const provider = config.get<string>('FILE_STORAGE_PROVIDER') || 'cloudinary';
-        if (provider === 'local') return local;
-        if (provider === 'cloudinary') return cloudinary;
-        return s3;
-      },
-      inject: [ConfigService, S3StorageAdapter, LocalStorageService, CloudinaryStorageAdapter],
-    },
-    {
       provide: MATERIAL_FILE_STORAGE,
       useFactory: (
         config: ConfigService,
         s3: S3StorageAdapter,
         local: LocalStorageService,
       ) => {
-        // Course materials stay in R2 regardless of the profile-image provider.
-        return config.get<string>('FILE_STORAGE_PROVIDER') === 'local'
+        return config.get<string>('MATERIAL_FILE_STORAGE_PROVIDER') === 'local'
           ? local
           : s3;
       },
@@ -55,7 +38,6 @@ import {
     },
   ],
   exports: [
-    FILE_STORAGE,
     MATERIAL_FILE_STORAGE,
     PROFILE_IMAGE_STORAGE,
     StorageService,

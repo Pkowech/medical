@@ -126,7 +126,7 @@ The Node backend uses up to 3 PostgreSQL connections by default, and Rust analyt
 
 ### Google Shared Drive course materials
 
-Uploaded course/library files and generated previews use R2 through the S3-compatible adapter (or local storage when `FILE_STORAGE_PROVIDER=local`); they do not use Cloudinary. Profile images use Cloudinary independently of `FILE_STORAGE_PROVIDER`. This separation keeps existing R2 file keys readable even when the legacy `FILE_STORAGE_PROVIDER` value is `cloudinary`.
+Uploaded course/library files and generated previews use R2 through the S3-compatible adapter by default. Set `MATERIAL_FILE_STORAGE_PROVIDER=local` only for local development. Configure `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, and `R2_BUCKET_NAME` in the backend environment. Profile images use Cloudinary independently; Cloudinary is not used for course files.
 
 Instructors can also attach an existing file from the institution's Shared Drive without copying its bytes into R2. Drive-backed materials are streamed through the authenticated materials preview endpoint; only course creators, assigned instructors, admins, active/completed course enrollees, and active members of an active study group explicitly linked to that course can read them.
 
