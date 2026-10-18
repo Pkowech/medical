@@ -1,6 +1,6 @@
 'use client';
 
-import React, { ReactNode, Suspense, useEffect, useRef } from 'react';
+import React, { ReactNode, Suspense, useCallback, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { useLayoutStore } from '@/core/stores/useLayoutStore';
 import { useTheme } from '@/app/providers';
@@ -14,7 +14,6 @@ import { LoadingSpinner } from '@/shared/components/ui/loading-spinner';
 import { usePathname } from 'next/navigation';
 import { NavigationItem } from '@/shared/types/navigationInterface';
 import { User } from '@/shared/types/authInterface';
-import { Notification as AppNotification } from '@/shared/types/notificationsInterface';
 import { usePageHeader } from '@/core/providers/HeaderContext';
 
 interface DashboardLayoutProps {
@@ -38,27 +37,17 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
     // Notifications logic
     const { data, refetch } = useFetchNotifications();
-    const notifications = (data as unknown as AppNotification[]) || [];
+    const notifications = data ?? [];
 
-    const refreshNotifications = () => {
-        try {
-            refetch();
-        } catch {
-            // ignore
-        }
-    };
+    const refreshNotifications = useCallback(() => {
+        void refetch();
+    }, [refetch]);
 
     useEffect(() => {
-        const handler = () => {
-            try {
-                refetch();
-            } catch {
-                // ignore
-            }
-        };
+        const handler = () => refreshNotifications();
         window.addEventListener(NOTIFICATIONS_REFRESH_EVENT, handler);
         return () => window.removeEventListener(NOTIFICATIONS_REFRESH_EVENT, handler);
-    }, [refetch]);
+    }, [refreshNotifications]);
 
     // Close mobile sidebar on navigation
     useEffect(() => {
@@ -96,22 +85,23 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
             <div className="flex h-screen h-dvh overflow-hidden bg-background">
                 {!isQuizSessionPage && !isImmersive && (
                     <div className={cn(isFullHeightPage && 'lg:hidden')}>
-                        <Sidebar theme={colorScheme} user={user} navigationItems={navigationItems} />
+                        <Sidebar
+                            theme={colorScheme}
+                            toggleTheme={toggleTheme}
+                            user={user}
+                            navigationItems={navigationItems}
+                            notifications={notifications}
+                            notificationsOpen={notificationsOpen}
+                            setNotificationsOpen={setNotificationsOpen}
+                            onNotificationRefresh={refreshNotifications}
+                        />
                     </div>
                 )}
 
                 {/* Main app column (center) */}
                 <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
                     {!isQuizSessionPage && !isImmersive && (
-                        <AppHeader
-                            theme={colorScheme}
-                            toggleTheme={toggleTheme}
-                            user={user}
-                            notifications={notifications}
-                            notificationsOpen={notificationsOpen}
-                            setNotificationsOpen={setNotificationsOpen}
-                            onNotificationRefresh={refreshNotifications}
-                        />
+                        <AppHeader />
                     )}
 
                     {/* content area */}

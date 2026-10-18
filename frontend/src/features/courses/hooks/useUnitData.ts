@@ -116,6 +116,7 @@ const normalizeUnitToChapters = (
 
   return {
     id: unit.id,
+    courseId: unit.courseId,
     title: unit.title || unit.name,
     description: unit.description || '',
     chapters,          // ← now N chapters (one per topic), not 1

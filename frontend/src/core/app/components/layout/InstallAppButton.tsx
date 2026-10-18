@@ -15,7 +15,7 @@ function isStandalone(): boolean {
   );
 }
 
-export function InstallAppButton() {
+export function InstallAppButton({ compact = false }: { compact?: boolean }) {
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isIOSDevice, setIsIOSDevice] = useState(false);
   const [showIOSInstructions, setShowIOSInstructions] = useState(false);
@@ -78,11 +78,14 @@ export function InstallAppButton() {
       <button
         type="button"
         onClick={() => void handleInstall()}
-        className="inline-flex min-h-10 items-center gap-1.5 rounded-lg px-2 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-50 active:scale-95 dark:text-blue-300 dark:hover:bg-card motion-reduce:transition-none"
+        className={`inline-flex min-h-10 items-center gap-1.5 rounded-lg px-2 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-50 active:scale-95 dark:text-blue-300 dark:hover:bg-card motion-reduce:transition-none ${
+          compact ? 'w-10 justify-center px-0' : ''
+        }`}
         aria-label="Install MedTrack"
+        title="Install MedTrack Hub"
       >
         <Download aria-hidden="true" className="h-4 w-4" />
-        <span className="hidden sm:inline">Install</span>
+        {!compact && <span className="hidden sm:inline">Install</span>}
       </button>
 
       {installError && (

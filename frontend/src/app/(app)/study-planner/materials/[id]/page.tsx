@@ -3,9 +3,9 @@
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import Image from 'next/image';
 import { useRouter, useParams } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import { Card, CardContent } from '@/shared/components/ui/card';
 import { Button } from '@/shared/components/ui/button';
-import { ArrowLeft, ExternalLink, File, Share, Trash, Maximize2, Minimize2, Eye, Download } from 'lucide-react';
+import { ArrowLeft, File, Share, Trash, Maximize2, Minimize2, Eye, Download } from 'lucide-react';
 import materialService from '@/features/courses/services/materialService';
 import useMaterialProgressTracker from '@/features/learning-management/hooks/useMaterialProgressTracker';
 import PDFViewer from '@/shared/components/pdf/PDFViewer';
@@ -387,40 +387,6 @@ export default function MaterialViewPage() {
                     <Minimize2 className="mr-2 h-4 w-4" /> Exit Focus
                   </Button>
                 </div>
-              )}
-              
-              {!focusMode && (
-                <CardHeader className="shrink-0 border-b border-border bg-card px-4 py-3 dark:border-border dark:bg-card sm:px-6">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0">
-                      <div className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-300">
-                        <File className="h-4 w-4" />
-                        <span>{material.type || 'DOCUMENT'}</span>
-                      </div>
-                      <CardTitle className="line-clamp-2 text-base font-semibold leading-snug text-foreground dark:text-foreground">
-                        {material.title}
-                      </CardTitle>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button type="button" variant="outline" size="icon" onClick={handleShare} aria-label="Share material">
-                        <Share className="h-4 w-4" />
-                      </Button>
-                      {(material.fileUrl || material.url) && (
-                        <Button variant="outline" size="icon" asChild>
-                          <a
-                            href={material.fileUrl || material.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            aria-label="Open original file"
-                            onClick={trackMaterialDownload}
-                          >
-                            <ExternalLink className="h-4 w-4" />
-                          </a>
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </CardHeader>
               )}
               
               <CardContent className="p-0 flex-1 min-h-0 overflow-hidden">

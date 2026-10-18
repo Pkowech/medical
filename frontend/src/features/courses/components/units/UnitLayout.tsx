@@ -171,7 +171,12 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
     navigatePrev,
     isFirstLesson,
     isLastLesson,
-  } = useCourseNavigation(unitData?.chapters || [], unitId, selectedTopicId);
+  } = useCourseNavigation(
+    unitData?.chapters || [],
+    unitId,
+    selectedTopicId,
+    courseId || unitData?.courseId,
+  );
 
   const selectTopic = (chapterIndex: number, lessonIndex: number) => {
     closeCoursePanel('quiz');

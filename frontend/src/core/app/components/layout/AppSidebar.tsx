@@ -1,21 +1,43 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { X, Stethoscope, ChevronDown, ChevronLeft } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import {
+  Bell,
+  ChevronDown,
+  ChevronLeft,
+  Flame,
+  Moon,
+  Sun,
+  Stethoscope,
+  X,
+} from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { SidebarProps } from '@/shared/types/navigationInterface';
 import { NavigationItemComponent } from './NavigationItem';
 import { useLayoutStore } from '@/core/stores/useLayoutStore';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { UserMenu } from './UserMenu';
+import { InstallAppButton } from './InstallAppButton';
 import { useMediaQuery } from '@/shared/hooks/useMediaQuery';
 import { mobilePrimaryNavigation } from './mobileNavigationConfig';
 import { healthcareProfileLabel } from '@/shared/utils/healthcareProfile';
+import { markNotificationAsRead } from '@/features/community/notificationService';
+import { useLearningStreak } from '@/shared/hooks/useProgress';
 
 const SIDEBAR_COLLAPSED_STORAGE_KEY = 'medtrack.sidebar-collapsed.v1';
 
-export function Sidebar({ user, navigationItems }: SidebarProps) {
+export function Sidebar({
+  theme,
+  toggleTheme,
+  user,
+  navigationItems,
+  notifications,
+  notificationsOpen,
+  setNotificationsOpen,
+  onNotificationRefresh,
+}: SidebarProps) {
   const {
     sidebarOpen,
     setSidebarOpen,
@@ -29,7 +51,14 @@ export function Sidebar({ user, navigationItems }: SidebarProps) {
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const previouslyFocusedElement = useRef<HTMLElement | null>(null);
   const hasRestoredSidebarState = useRef(false);
+  const notificationsButtonRef = useRef<HTMLButtonElement>(null);
+  const notificationsMenuRef = useRef<HTMLDivElement>(null);
   const { logout } = useAuth();
+  const router = useRouter();
+  const [notificationActionError, setNotificationActionError] = useState<string | null>(null);
+  const { streak, longestStreak, isLoading: isStreakLoading, error: streakError } =
+    useLearningStreak();
+  const unreadNotifications = notifications.filter(notification => !notification.read);
   const visibleNavigationItems = isDesktop
     ? navigationItems
     : navigationItems.filter(
@@ -107,6 +136,43 @@ export function Sidebar({ user, navigationItems }: SidebarProps) {
     };
   }, [isDesktop, setSidebarOpen, sidebarOpen]);
 
+  useEffect(() => {
+    if (!notificationsOpen) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (
+        !notificationsMenuRef.current?.contains(target) &&
+        !notificationsButtonRef.current?.contains(target)
+      ) {
+        setNotificationsOpen(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setNotificationsOpen(false);
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [notificationsOpen, setNotificationsOpen]);
+
+  const openNotification = async (notificationId: string) => {
+    setNotificationActionError(null);
+    try {
+      await markNotificationAsRead(notificationId);
+      onNotificationRefresh?.();
+      router.push('/notifications');
+      setNotificationsOpen(false);
+    } catch (error) {
+      console.error('Failed to open notification:', error);
+      setNotificationActionError('Could not open this notification. Please try again.');
+    }
+  };
+
   return (
     <>
       {sidebarOpen && !isDesktop && (
@@ -179,59 +245,215 @@ export function Sidebar({ user, navigationItems }: SidebarProps) {
           ))}
         </div>
 
+        <div className={cn(
+          'shrink-0 border-t border-border py-3 dark:border-border',
+          isDesktop && sidebarCollapsed ? 'space-y-2 px-2' : 'space-y-2 px-3',
+        )}>
+          <div className="relative">
+            <button
+              ref={notificationsButtonRef}
+              type="button"
+              onClick={() => {
+                setNotificationActionError(null);
+                setNotificationsOpen(!notificationsOpen);
+              }}
+              className={cn(
+                'relative flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:bg-secondary',
+                isDesktop && sidebarCollapsed && 'justify-center px-0',
+              )}
+              aria-label={`Notifications${unreadNotifications.length ? ` (${unreadNotifications.length} unread)` : ''}`}
+              aria-expanded={notificationsOpen}
+              aria-haspopup="dialog"
+              aria-controls="sidebar-notifications"
+              title={isDesktop && sidebarCollapsed ? 'Notifications' : undefined}
+            >
+              <Bell aria-hidden="true" className="h-5 w-5 shrink-0" />
+              {(!isDesktop || !sidebarCollapsed) && <span className="flex-1 text-left">Notifications</span>}
+              {unreadNotifications.length > 0 && (
+                <span
+                  className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-semibold text-white"
+                  aria-live="polite"
+                >
+                  {unreadNotifications.length}
+                </span>
+              )}
+            </button>
+
+            {notificationsOpen && (
+              <div
+                ref={notificationsMenuRef}
+                id="sidebar-notifications"
+                className={cn(
+                  'absolute z-[60] overflow-hidden rounded-xl border border-border bg-card shadow-xl dark:bg-card',
+                  isDesktop && sidebarCollapsed
+                    ? 'left-full top-0 ml-2 w-80'
+                    : 'bottom-full left-0 mb-2 w-full',
+                )}
+                role="dialog"
+                aria-label="Unread notifications"
+              >
+                <div className="flex items-center justify-between border-b border-border bg-muted/50 px-4 py-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      router.push('/notifications');
+                      setNotificationsOpen(false);
+                    }}
+                    className="font-semibold text-foreground"
+                  >
+                    Notifications
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNotificationsOpen(false)}
+                    className="rounded p-1 text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                    aria-label="Close notifications"
+                  >
+                    <X aria-hidden="true" className="h-4 w-4" />
+                  </button>
+                </div>
+                {notificationActionError && (
+                  <p className="px-4 py-2 text-sm text-destructive" role="alert">
+                    {notificationActionError}
+                  </p>
+                )}
+                <div className="max-h-[50vh] overflow-y-auto">
+                  {unreadNotifications.length === 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        router.push('/notifications');
+                        setNotificationsOpen(false);
+                      }}
+                      className="w-full px-4 py-6 text-left text-sm text-muted-foreground hover:bg-muted"
+                    >
+                      No unread notifications. View all notifications
+                    </button>
+                  ) : (
+                    unreadNotifications.map(notification => (
+                      <button
+                        key={notification.id}
+                        type="button"
+                        onClick={() => void openNotification(notification.id)}
+                        className="w-full border-b border-border bg-blue-50/60 px-4 py-3 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:bg-blue-900/20"
+                      >
+                        <span className="block truncate text-sm font-medium text-foreground">
+                          {notification.title}
+                        </span>
+                        <span className="mt-1 block line-clamp-2 text-sm text-muted-foreground">
+                          {notification.message}
+                        </span>
+                        <span className="mt-2 block text-xs text-muted-foreground">
+                          {notification.createdAt
+                            ? new Date(notification.createdAt).toLocaleDateString()
+                            : ''}
+                        </span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div
+            className={cn(
+              'flex items-center gap-1',
+              isDesktop && sidebarCollapsed ? 'flex-col' : 'justify-between',
+            )}
+          >
+            <div
+              className={cn(
+                'flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm text-orange-700 dark:text-orange-300',
+                isDesktop && sidebarCollapsed && 'justify-center px-0',
+              )}
+              title={
+                typeof streak === 'number' && typeof longestStreak === 'number'
+                  ? `Current learning streak: ${streak} days. Longest: ${longestStreak} days.`
+                  : streakError?.message ?? 'Learning streak unavailable'
+              }
+              aria-label={
+                isStreakLoading
+                  ? 'Learning streak loading'
+                  : `Learning streak: ${typeof streak === 'number' ? `${streak} days` : 'unavailable'}`
+              }
+            >
+              <Flame aria-hidden="true" className="h-5 w-5 shrink-0 text-orange-500" />
+              {(!isDesktop || !sidebarCollapsed) && (
+                <span>{isStreakLoading ? 'Streak …' : `Streak ${typeof streak === 'number' ? `${streak}d` : '—'}`}</span>
+              )}
+            </div>
+            <div className={cn(
+              'flex items-center gap-1',
+              isDesktop && sidebarCollapsed && 'flex-col',
+            )}>
+              <InstallAppButton compact={isDesktop && sidebarCollapsed} />
+              <button
+                type="button"
+                onClick={toggleTheme}
+                className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:bg-secondary"
+                aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+                title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+              >
+                {theme === 'dark' ? (
+                  <Sun aria-hidden="true" className="h-5 w-5 text-yellow-500" />
+                ) : (
+                  <Moon aria-hidden="true" className="h-5 w-5" />
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+
         {user && (
           <div className={cn(
             'relative shrink-0 border-t border-border dark:border-border',
             isDesktop && sidebarCollapsed ? 'p-2' : 'p-3',
           )}>
-            <div className={cn(
-              'flex items-center gap-3 rounded-xl p-2 transition-colors hover:bg-muted dark:hover:bg-card',
-              isDesktop && sidebarCollapsed && 'justify-center',
-            )}>
-              <div
-                title={isDesktop && sidebarCollapsed ? user.fullName || `${user.firstName} ${user.lastName}` : undefined}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-200"
-              >
+            <button
+              type="button"
+              onClick={() => setSidebarUserMenuOpen(!sidebarUserMenuOpen)}
+              onKeyDown={event => {
+                if (event.key === 'Escape' && sidebarUserMenuOpen) {
+                  setSidebarUserMenuOpen(false);
+                }
+              }}
+              className={cn(
+                'flex min-h-12 w-full items-center gap-3 rounded-xl p-2 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:bg-secondary',
+                isDesktop && sidebarCollapsed && 'justify-center',
+              )}
+              aria-label="Account menu"
+              aria-expanded={sidebarUserMenuOpen}
+              aria-haspopup="menu"
+              title={isDesktop && sidebarCollapsed ? user.fullName || `${user.firstName} ${user.lastName}` : undefined}
+            >
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-200">
                 <span className="text-sm font-semibold">
                   {(user.fullName || user.firstName)?.charAt(0).toUpperCase() || 'U'}
                 </span>
-              </div>
-              {(!isDesktop || !sidebarCollapsed) && <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-foreground dark:text-muted-foreground truncate">
-                  {user.fullName || `${user.firstName} ${user.lastName}`}
-                </p>
-                <p className="text-xs text-muted-foreground dark:text-muted-foreground truncate">
-                  {healthcareProfileLabel(user)}
-                </p>
-              </div>}
-              {!isDesktop && (
-                <button
-                  type="button"
-                  onClick={() => setSidebarUserMenuOpen(!sidebarUserMenuOpen)}
-                  onKeyDown={e => {
-                    if (e.key === 'Escape' && sidebarUserMenuOpen) {
-                      setSidebarUserMenuOpen(false);
-                    }
-                  }}
-                  className="shrink-0 rounded-md p-1 transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:bg-secondary"
-                  aria-label="User menu"
-                  {...{ 'aria-expanded': sidebarUserMenuOpen ? 'true' : 'false' }}
-                  aria-haspopup="menu"
-                >
-                  <ChevronDown aria-hidden="true" className="h-4 w-4 text-muted-foreground dark:text-muted-foreground" />
-                </button>
+              </span>
+              {(!isDesktop || !sidebarCollapsed) && (
+                <>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium text-foreground">
+                      {user.fullName || `${user.firstName} ${user.lastName}`}
+                    </span>
+                    <span className="block truncate text-xs text-muted-foreground">
+                      {healthcareProfileLabel(user)}
+                    </span>
+                  </span>
+                  <ChevronDown aria-hidden="true" className="h-4 w-4 shrink-0 text-muted-foreground" />
+                </>
               )}
-            </div>
-
-            {!isDesktop && (
-              <UserMenu
-                user={user}
-                logout={logout}
-                isOpen={sidebarUserMenuOpen}
-                setIsOpen={setSidebarUserMenuOpen}
-                direction="up"
-              />
-            )}
+            </button>
+            <UserMenu
+              user={user}
+              logout={logout}
+              isOpen={sidebarUserMenuOpen}
+              setIsOpen={setSidebarUserMenuOpen}
+              direction="up"
+              className={cn(isDesktop && sidebarCollapsed && 'left-0 right-auto')}
+            />
             {isDesktop && sidebarCollapsed && (
               <button
                 type="button"

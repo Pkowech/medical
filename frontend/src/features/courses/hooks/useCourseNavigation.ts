@@ -12,11 +12,12 @@ export const useCourseNavigation = (
   chapters: NavChapter[] = [],
   parentUnitId?: string,
   selectedTopicId?: string,
+  courseIdOverride?: string,
 ) => {
   const params = useParams();
   const router = useRouter();
 
-  const courseId = params?.courseId as string;
+  const courseId = (params?.courseId as string | undefined) || courseIdOverride;
   const slug = params?.slug as string[] | undefined;
 
   let unitIdFromUrl: string | undefined;
@@ -92,7 +93,10 @@ export const useCourseNavigation = (
       const query = targetLesson
         ? `?topicId=${encodeURIComponent(String(targetLesson.id))}`
         : '';
-      router.push(`/courses/${courseId}/units/${parentUnitId}${query}`);
+      const unitPath = courseId
+        ? `/courses/${courseId}/units/${parentUnitId}`
+        : `/unit/${parentUnitId}`;
+      router.push(`${unitPath}${query}`);
       return;
     }
 

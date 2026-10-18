@@ -254,6 +254,7 @@ export interface CourseFilter {
 
 export interface CourseData {
   id: string;
+  courseId?: string;
   title: string;
   description: string;
   units?: CourseUnit[];
