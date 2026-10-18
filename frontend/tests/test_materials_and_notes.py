@@ -109,7 +109,10 @@ def test_resource_type_filter_is_compact_and_applied_to_material_query():
 def test_pdf_page_navigation_scrolls_inside_the_document_viewer():
     """Changing PDF pages should not scroll the outer page on touch screens."""
     pdf_viewer = read_frontend("src/shared/components/pdf/PDFViewer.tsx")
+    dashboard_layout = read_frontend("src/core/app/components/layout/DashboardLayout.tsx")
 
     assert 'scrollContainerRef.current' in pdf_viewer
     assert 'scrollRoot.scrollTo(' in pdf_viewer
     assert 'scrollIntoView(' not in pdf_viewer
+    assert "isMaterialViewPage && 'h-full flex flex-col'" in dashboard_layout
+    assert "isMaterialViewPage && 'h-full py-0'" in dashboard_layout

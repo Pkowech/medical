@@ -158,7 +158,7 @@ def test_offline_replay_only_queues_allowlisted_learning_posts_not_admin_deletes
     assert "isOfflineQueueableRequest(" in api_client
     assert "if (isQueueableRequest && isNetworkOrServerTemp)" in api_client
     assert "if (!isOfflineQueueableRequest(item.method, item.url))" in sync_service
-    assert "if (item.status === 'failed' && isOfflineQueueableRequest" in sync_service
+    assert "if (item.status === 'failed' && isRetryableFailedItem(item))" in sync_service
     assert "Please perform it again while online." in worker
     assert '"/progress/sync"' in worker
     assert '"/quizzes/submit"' in worker

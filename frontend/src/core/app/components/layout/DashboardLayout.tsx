@@ -120,6 +120,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                                 `w-full transition-all duration-300 pt-0`,
                                 !isFocusedPage && "px-3 sm:px-4 md:px-6 lg:px-8 py-4 lg:py-6",
                                 isQuizSessionPage && 'h-full flex flex-col',
+                                isMaterialViewPage && 'h-full flex flex-col',
                                 isFullHeightPage && "lg:h-full lg:flex lg:flex-col",
                                 sidebarOpen && !isFullHeightPage && 'lg:pl-0'
                             )}
@@ -127,11 +128,13 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                             <main className={cn(
                                 'min-h-0 min-w-0 flex-1 py-2 transition-all duration-300',
                                 isQuizSessionPage && 'h-full py-0',
+                                isMaterialViewPage && 'h-full py-0',
                                 isFullHeightPage && 'lg:h-full lg:py-0',
                             )}>
                                 <div className={cn(
                                     'min-h-0 space-y-6',
                                     isFullHeightPage && 'lg:h-full lg:space-y-0',
+                                    isMaterialViewPage && 'h-full space-y-0',
                                     isQuizSessionPage && 'h-full space-y-0',
                                 )}>
                                     <Suspense fallback={<LoadingSpinner />}>{children}</Suspense>
