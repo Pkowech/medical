@@ -130,6 +130,13 @@ export const useCourseNavigation = (
   const isLastLesson =
     currentChapterIndex === chapters.length - 1 &&
     currentLessonIndex === (currentChapter?.lessons?.length || 1) - 1;
+  const isNextTopicLocked = Boolean(
+    parentUnitId &&
+    currentLessonIndex >= (currentChapter?.lessons?.length || 1) - 1 &&
+    currentChapterIndex < chapters.length - 1 &&
+    !currentChapter?.lessons?.at(-1)?.nextTopicUnlocked &&
+    !currentChapter?.lessons?.at(-1)?.masteryUnlocked,
+  );
 
   return {
     currentChapter,
@@ -142,5 +149,7 @@ export const useCourseNavigation = (
     navigatePrev,
     isFirstLesson,
     isLastLesson,
+    canNavigateNext: !isLastLesson && !isNextTopicLocked,
+    isNextTopicLocked,
   };
 };

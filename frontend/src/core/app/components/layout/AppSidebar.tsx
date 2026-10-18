@@ -224,56 +224,53 @@ export function Sidebar({
         </div>
 
         <div
+          role="group"
           className={cn(
-            'mx-3 mt-3 shrink-0 rounded-xl border border-orange-200 bg-gradient-to-br from-orange-50 via-amber-50 to-yellow-50 text-orange-950 shadow-sm dark:border-orange-400/20 dark:from-orange-950/40 dark:via-amber-950/30 dark:to-yellow-950/20 dark:text-orange-100',
+            'mx-3 mt-3 shrink-0 rounded-xl border border-orange-200 bg-gradient-to-r from-orange-50 to-amber-100 text-orange-950 shadow-sm dark:border-orange-400/20 dark:from-orange-950/40 dark:to-amber-950/30 dark:text-orange-100',
             isDesktop && sidebarCollapsed
               ? 'mx-2 flex min-h-12 items-center justify-center p-2'
-              : 'p-3',
+              : 'px-3 py-2',
           )}
           title={
             typeof streak === 'number' && typeof longestStreak === 'number'
               ? `Current learning streak: ${streak} days. Longest: ${longestStreak} days.`
               : streakError?.message ?? 'Learning streak unavailable'
           }
-          aria-label={
-            isStreakLoading
-              ? 'Learning streak loading'
-              : `Learning streak: ${typeof streak === 'number' ? `${streak} days` : 'unavailable'}`
-          }
+          aria-label={isStreakLoading
+            ? 'Learning streak loading'
+            : `Learning streak: ${typeof streak === 'number' ? `${streak} days` : streakError ? 'unavailable' : 'not started'}`}
         >
           <div className={cn(
-            'flex items-center gap-3',
+            'flex min-h-10 items-center gap-3',
             isDesktop && sidebarCollapsed && 'justify-center',
           )}>
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-orange-100 text-orange-600 dark:bg-orange-400/15 dark:text-orange-300">
-              <Flame aria-hidden="true" className="h-6 w-6" />
+            <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-orange-200/80 text-orange-700 dark:bg-orange-400/15 dark:text-orange-300">
+              <Flame aria-hidden="true" className="h-5 w-5" />
+              {isDesktop && sidebarCollapsed && typeof streak === 'number' && streak > 0 && (
+                <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-orange-600 px-1 text-[10px] font-bold text-white">
+                  {streak}
+                </span>
+              )}
             </span>
             {(!isDesktop || !sidebarCollapsed) && (
-              <div className="min-w-0">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-orange-800 dark:text-orange-200">
-                  Learning streak
-                </p>
-                <p className="mt-0.5 text-lg font-extrabold leading-tight">
+              <div className="flex min-w-0 flex-1 items-baseline justify-between gap-2">
+                <p className="truncate text-sm font-bold">
                   {isStreakLoading
-                    ? 'Loading…'
+                    ? 'Loading streak…'
                     : typeof streak === 'number'
                       ? `${streak} ${streak === 1 ? 'day' : 'days'}`
-                      : 'Unavailable'}
+                      : streakError
+                        ? 'Streak unavailable'
+                        : 'No streak yet'}
                 </p>
+                {typeof streak === 'number' && streak >= 0 && (
+                  <span className="shrink-0 text-[11px] font-medium text-orange-800/80 dark:text-orange-100/70">
+                    {streak === 0 ? 'Start today' : 'Keep it going'}
+                  </span>
+                )}
               </div>
             )}
           </div>
-          {(!isDesktop || !sidebarCollapsed) && (
-            <p className="mt-2 text-xs leading-4 text-orange-800/90 dark:text-orange-100/80">
-              {streakError
-                ? 'Your streak could not be loaded.'
-                : isStreakLoading
-                  ? 'Checking your progress…'
-                  : streak === 0
-                    ? 'Complete a learning activity today to start your streak.'
-                    : 'Keep showing up every day!'}
-            </p>
-          )}
         </div>
 
         <div className={cn(

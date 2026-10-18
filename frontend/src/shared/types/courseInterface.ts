@@ -158,6 +158,8 @@ export interface Lesson extends Omit<BaseEntity, 'id'> {
   onOpenMasteryQuiz: () => void;
   isFirstLesson: boolean;
   isLastLesson: boolean;
+  canNavigateNext?: boolean;
+  isNextTopicLocked?: boolean;
   materials?: Material[];
   openMaterial: (id: string) => void;
   masteryPassingScore?: number;

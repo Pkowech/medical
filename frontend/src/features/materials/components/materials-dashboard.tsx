@@ -14,16 +14,10 @@ import { RecommendationCard } from './RecommendationCard'; // New Component
 import { Button } from '@/shared/components/ui/button';
 import { toast } from 'sonner';
 import { 
-  Search, Plus, LayoutGrid, LayoutList, ChevronDown,
+  Search, Plus, LayoutGrid, LayoutList, ChevronDown, CheckCircle2,
   BrainCircuit, Database, BookOpen, Sparkles, Upload, FolderOpen,
-  CalendarDays, Download, FileText, MoreVertical, UserRound, ArrowLeft
+  ArrowLeft, Clock, Layers, Play
 } from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/shared/components/ui/dropdown-menu';
 import { getInstructorDisplayName } from '@/lib/utils';
 
 interface MaterialsPageData {
@@ -152,9 +146,9 @@ export default function MaterialsDashboard() {
   useEffect(() => {
     const courseTitle = selectedCourse?.title || selectedCourse?.name;
     setHeader({
-      title: selectedCourseId ? courseTitle || 'Course materials' : 'Knowledge Vault',
+      title: selectedCourseId ? 'Course roadmap' : 'Knowledge Vault',
       description: selectedCourseId
-        ? 'Course stream and shared learning materials'
+        ? courseTitle || 'Follow your course units and topics'
         : 'Centralized intelligence for your medical mastery',
       icon: selectedCourseId
         ? <BookOpen className="h-6 w-6 text-indigo-500" />
@@ -413,29 +407,21 @@ export default function MaterialsDashboard() {
     </div>
   );
 
-  const formatStreamDate = (date?: string) => {
-    if (!date) return 'Date not available';
-    const parsedDate = new Date(date);
-    if (Number.isNaN(parsedDate.getTime())) return 'Date not available';
-    return new Intl.DateTimeFormat(undefined, {
-      day: 'numeric',
-      month: 'short',
-      year: parsedDate.getFullYear() === new Date().getFullYear() ? undefined : 'numeric',
-    }).format(parsedDate);
-  };
-
   const courseInstructor = selectedCourse
     ? getInstructorDisplayName(selectedCourse.instructor ?? selectedCourse.createdBy)
     : '';
-  const courseBannerPalettes = [
-    'from-slate-600 via-slate-600 to-slate-800',
-    'from-blue-700 via-blue-700 to-indigo-900',
-    'from-teal-700 via-cyan-700 to-slate-800',
-    'from-violet-700 via-indigo-700 to-slate-800',
-  ];
-  const coursePaletteIndex = selectedCourseId
-    ? Array.from(selectedCourseId).reduce((sum, character) => sum + character.charCodeAt(0), 0) % courseBannerPalettes.length
-    : 0;
+  const courseUnits = selectedCourse?.units ?? [];
+  const courseTopicCount = courseUnits.reduce(
+    (count, unit) => count + (unit.topics?.length ?? 0),
+    0,
+  );
+  const getMaterialUnitId = (material: Material) =>
+    material.unitId ?? material.unit?.id;
+  const getMaterialTopicId = (material: Material) =>
+    material.topicId ?? material.topic?.id;
+  const courseLevelMaterials = allMaterials.filter(
+    material => !getMaterialUnitId(material),
+  );
 
   const contextTitle = filterContext === 'owned'
     ? 'My materials'
@@ -575,7 +561,7 @@ export default function MaterialsDashboard() {
       )}
 
       {selectedCourseId && (
-        <section className="mx-auto w-full max-w-5xl space-y-5">
+        <section className="mx-auto w-full max-w-screen-xl space-y-5">
           <button
             type="button"
             onClick={() => {
@@ -583,236 +569,279 @@ export default function MaterialsDashboard() {
               setFilterContext('shared');
               router.replace('/study-planner/materials');
             }}
-            className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-blue-700 dark:text-muted-foreground dark:hover:text-blue-300"
+            className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-blue-700 dark:hover:text-blue-300"
           >
             <ArrowLeft className="h-4 w-4" />
             All materials
           </button>
 
-          <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm dark:border-border dark:bg-card">
-            {isCourseLoading ? (
-              <div className="h-44 animate-pulse bg-secondary dark:bg-card" />
-            ) : isCourseError ? (
-              <div role="alert" className="p-6 text-sm text-rose-700 dark:text-rose-300">
-                Could not load course details: {courseError instanceof Error ? courseError.message : 'Please try again later.'}
-              </div>
-            ) : (
-              <>
-                <div className={`relative flex min-h-44 items-end overflow-hidden bg-gradient-to-br ${courseBannerPalettes[coursePaletteIndex]} px-6 py-6 text-white sm:px-8`}>
-                  <BookOpen className="absolute -bottom-10 -right-3 h-48 w-48 rotate-[-12deg] text-white/10 sm:h-56 sm:w-56" aria-hidden="true" />
-                  <div className="relative min-w-0 max-w-3xl">
-                    {selectedCourse?.code && (
-                      <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-white/75">
-                        {selectedCourse.code}
-                      </p>
-                    )}
-                    <h1 className="line-clamp-2 text-2xl font-medium leading-tight sm:text-3xl">
-                      {selectedCourse?.title || selectedCourse?.name || 'Course materials'}
-                    </h1>
-                    {courseInstructor && (
-                      <p className="mt-2 text-sm text-white/85">{courseInstructor}</p>
-                    )}
-                  </div>
-                </div>
-                <div className="border-t border-border bg-muted px-6 py-3 text-sm text-muted-foreground dark:border-border dark:bg-card dark:text-muted-foreground sm:px-8">
-                  {selectedCourse?.category?.name || selectedCourse?.description || 'Course learning materials'}
-                </div>
-                <nav aria-label="Course sections" className="flex items-center gap-7 border-t border-border px-5 dark:border-border sm:px-8">
-                  <a
-                    href="#course-stream"
-                    aria-current="page"
-                    className="border-b-2 border-blue-600 py-3 text-sm font-semibold text-blue-700 dark:text-blue-300"
-                  >
-                    Stream
-                  </a>
-                  <button
-                    type="button"
-                    onClick={() => router.push(`/courses/${selectedCourseId}`)}
-                    className="border-b-2 border-transparent py-3 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground dark:text-muted-foreground dark:hover:text-foreground"
-                  >
-                    Classwork
-                  </button>
-                  <a
-                    href="#course-people"
-                    className="border-b-2 border-transparent py-3 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground dark:text-muted-foreground dark:hover:text-foreground"
-                  >
-                    People
-                  </a>
-                </nav>
-              </>
-            )}
-          </div>
-
-          {isCourseError ? null : (
-            <div id="course-stream" className="grid grid-cols-1 items-start gap-5 md:grid-cols-[minmax(170px,0.75fr)_minmax(0,2.5fr)]">
-              <aside className="space-y-4">
-                <section className="rounded-xl border border-border bg-card p-4 shadow-sm dark:border-border dark:bg-card">
-                  <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground dark:text-muted-foreground">
-                    <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                    Upcoming
-                  </div>
-                  <p className="mt-3 text-sm leading-relaxed text-muted-foreground dark:text-muted-foreground">
-                    No upcoming work has been added.
-                  </p>
-                </section>
-                <section id="course-people" className="scroll-mt-6 rounded-xl border border-border bg-card p-4 shadow-sm dark:border-border dark:bg-card">
-                  <h2 className="text-sm font-semibold text-muted-foreground dark:text-muted-foreground">Instructor</h2>
-                  <div className="mt-3 flex items-center gap-3">
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
-                      <UserRound className="h-4 w-4" />
+          {isCourseLoading ? (
+            <div className="h-48 animate-pulse rounded-2xl bg-muted dark:bg-card" aria-label="Loading course" />
+          ) : isCourseError ? (
+            <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-200">
+              Could not load course details: {courseError instanceof Error ? courseError.message : 'Please try again later.'}
+            </div>
+          ) : selectedCourse ? (
+            <>
+              <section className="overflow-hidden rounded-2xl border border-border bg-card dark:border-border dark:bg-card">
+                <div className="p-5 sm:p-8">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
+                      {selectedCourse.category?.name || 'Category unavailable'}
                     </span>
-                    <p className="min-w-0 truncate text-sm text-muted-foreground dark:text-muted-foreground">
-                      {courseInstructor || 'Instructor information unavailable'}
+                    {selectedCourse.code && (
+                      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground dark:text-muted-foreground">
+                        {selectedCourse.code}
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                    <div className="min-w-0">
+                      <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl dark:text-foreground">
+                        {selectedCourse.title || selectedCourse.name}
+                      </h1>
+                      {selectedCourse.description && (
+                        <p className="mt-2 max-w-3xl text-sm leading-relaxed text-muted-foreground dark:text-muted-foreground">
+                          {selectedCourse.description}
+                        </p>
+                      )}
+                      {courseInstructor && (
+                        <p className="mt-3 text-sm text-muted-foreground dark:text-muted-foreground">
+                          Instructor · {courseInstructor}
+                        </p>
+                      )}
+                    </div>
+                    <Button
+                      type="button"
+                      onClick={() => router.push(`/courses/${selectedCourse.id}`)}
+                      className="shrink-0 gap-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700"
+                    >
+                      <Play className="h-4 w-4" />
+                      Continue learning
+                    </Button>
+                  </div>
+                  <div className="mt-6 flex flex-wrap gap-x-6 gap-y-2 border-t border-border pt-4 text-sm text-muted-foreground dark:border-border dark:text-muted-foreground">
+                    <span className="inline-flex items-center gap-2">
+                      <Layers className="h-4 w-4" />
+                      {courseUnits.length} {courseUnits.length === 1 ? 'unit' : 'units'}
+                    </span>
+                    <span className="inline-flex items-center gap-2">
+                      <BookOpen className="h-4 w-4" />
+                      {courseTopicCount} {courseTopicCount === 1 ? 'topic' : 'topics'}
+                    </span>
+                    <span>{totalCount} {totalCount === 1 ? 'resource' : 'resources'}</span>
+                    {selectedCourse.estimatedHours != null && (
+                      <span className="inline-flex items-center gap-2">
+                        <Clock className="h-4 w-4" />
+                        {selectedCourse.estimatedHours} study hours
+                      </span>
+                    )}
+                    {typeof selectedCourse.progressPercentage === 'number' && (
+                      <span>{Math.round(selectedCourse.progressPercentage)}% complete</span>
+                    )}
+                  </div>
+                </div>
+              </section>
+
+              <section className="space-y-4" aria-labelledby="course-roadmap-heading">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <h2 id="course-roadmap-heading" className="text-xl font-semibold text-foreground dark:text-foreground">
+                      Learning roadmap
+                    </h2>
+                    <p className="mt-1 text-sm text-muted-foreground dark:text-muted-foreground">
+                      Work through each unit and open its topics to study or review linked resources.
                     </p>
                   </div>
-                </section>
-              </aside>
-
-              <div className="min-w-0 space-y-3">
-                <div className="flex flex-wrap items-center justify-between gap-3 px-1">
-                  <h2 className="text-base font-semibold text-muted-foreground dark:text-muted-foreground">Class stream</h2>
-                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  <div className="flex min-w-0 flex-col gap-2 sm:flex-row">
                     <label htmlFor="course-material-search" className="sr-only">
-                      Search course materials by title, content, unit, or topic
+                      Search course resources
                     </label>
                     <input
                       id="course-material-search"
                       type="search"
-                      placeholder="Search this course…"
+                      placeholder="Search resources…"
                       value={searchTerm}
                       onChange={event => setSearchTerm(event.target.value)}
-                      className="h-9 w-full min-w-0 rounded-lg border border-border bg-card px-3 text-sm text-foreground outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-border dark:bg-background dark:text-foreground dark:focus:ring-blue-950 sm:w-52"
+                      className="h-10 min-w-0 rounded-lg border border-border bg-card px-3 text-sm text-foreground outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:bg-background dark:focus:ring-blue-950 sm:w-56"
                     />
                     <label htmlFor="course-material-type" className="sr-only">
-                      Filter course materials by resource type
+                      Filter resources by type
                     </label>
                     <select
                       id="course-material-type"
                       value={materialTypeFilter}
                       onChange={event => setMaterialTypeFilter(event.target.value)}
-                      className="h-9 min-w-28 rounded-lg border border-border bg-card px-2 text-sm text-muted-foreground outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-border dark:bg-background dark:text-muted-foreground dark:focus:ring-blue-950"
+                      className="h-10 rounded-lg border border-border bg-card px-3 text-sm text-muted-foreground outline-none focus:border-blue-500 dark:bg-background dark:text-muted-foreground sm:w-36"
                     >
                       {MATERIAL_TYPE_FILTERS.map(filter => (
-                        <option key={filter.id} value={filter.id}>
-                          {filter.label}
-                        </option>
+                        <option key={filter.id} value={filter.id}>{filter.label}</option>
                       ))}
                     </select>
-                    <span className="shrink-0 text-sm text-muted-foreground dark:text-muted-foreground">
-                      {totalCount} {totalCount === 1 ? 'item' : 'items'}
-                    </span>
                   </div>
                 </div>
 
-                {(!courseFilterInitialized || isLoading) && !allMaterials.length ? (
-                  <div className="space-y-3" aria-label="Loading course materials">
-                    {[0, 1, 2].map((item) => (
-                      <div key={item} className="h-20 animate-pulse rounded-xl bg-muted dark:bg-card" />
-                    ))}
-                  </div>
-                ) : isMaterialsError ? (
-                  <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-200">
-                    Could not load course materials: {materialsError instanceof Error ? materialsError.message : 'Please try again later.'}
-                  </div>
-                ) : allMaterials.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-border bg-card px-5 py-10 text-center dark:border-border dark:bg-card">
-                    <FolderOpen className="mx-auto h-8 w-8 text-muted-foreground" />
-                    <h3 className="mt-3 font-semibold text-muted-foreground dark:text-muted-foreground">
-                      {debouncedSearch || materialTypeFilter !== 'all'
-                        ? 'No matching materials'
-                        : 'No materials in this stream yet'}
+                {courseLevelMaterials.length > 0 && (
+                  <section className="overflow-hidden rounded-xl border border-border bg-card dark:bg-card">
+                    <h3 className="px-4 pt-4 text-sm font-semibold text-foreground dark:text-foreground">
+                      Course resources
                     </h3>
+                    {renderMaterialItems(courseLevelMaterials)}
+                  </section>
+                )}
+                {courseUnits.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-border bg-card p-8 text-center dark:bg-card">
+                    <h3 className="font-semibold text-foreground dark:text-foreground">No units in this course yet</h3>
                     <p className="mt-1 text-sm text-muted-foreground dark:text-muted-foreground">
-                      {debouncedSearch || materialTypeFilter !== 'all'
-                        ? 'Try another search or resource type.'
-                        : 'Materials shared with this class will appear here.'}
+                      Course units and topics will appear here when they are added to the curriculum.
                     </p>
-                    {(debouncedSearch || materialTypeFilter !== 'all') && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => {
-                          setSearchTerm('');
-                          setDebouncedSearch('');
-                          setMaterialTypeFilter('all');
-                        }}
-                        className="mt-4 rounded-lg"
-                      >
-                        Clear filters
-                      </Button>
-                    )}
                   </div>
                 ) : (
-                  allMaterials.map((material) => {
-                    const ownerName = material.user
-                      ? [material.user.firstName, material.user.lastName].filter(Boolean).join(' ')
-                      : material.author || courseInstructor || 'Course instructor';
-                    const fileUrl = material.fileUrl || material.url;
+                  <div className="space-y-3">
+                    {courseUnits.map((unit, unitIndex) => {
+                      const unitId = String(unit.id);
+                      const unitMaterials = allMaterials.filter(
+                        material => String(getMaterialUnitId(material) ?? '') === unitId,
+                      );
+                      const unitOnlyMaterials = unitMaterials.filter(material => !getMaterialTopicId(material));
+                      const topics = unit.topics ?? [];
+                      const unitResourceCount = unitMaterials.length;
 
-                    return (
-                      <article
-                        key={material.id}
-                        className="flex min-h-20 items-center gap-3 rounded-xl border border-border bg-muted px-3 py-3 transition-colors hover:bg-secondary/70 dark:border-border dark:bg-card/80 dark:hover:bg-card sm:gap-4 sm:px-4"
-                      >
-                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300">
-                          <FileText className="h-5 w-5" />
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => router.push(`/study-planner/materials/${material.id}`)}
-                          className="min-w-0 flex-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                      return (
+                        <details
+                          key={unitId}
+                          open={unitIndex === 0}
+                          className="overflow-hidden rounded-xl border border-border bg-card dark:bg-card"
                         >
-                          <p className="line-clamp-2 text-sm font-medium text-muted-foreground dark:text-muted-foreground">
-                            <span className="font-semibold">{ownerName}</span>
-                            {' posted a new material: '}
-                            <span>{material.title}</span>
-                          </p>
-                          <p className="mt-1 text-xs text-muted-foreground dark:text-muted-foreground">
-                            {formatStreamDate(material.uploadDate || material.createdAt)}
-                          </p>
-                        </button>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <button
-                              type="button"
-                              aria-label={`Options for ${material.title}`}
-                              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-card hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-muted-foreground dark:hover:bg-secondary dark:hover:text-foreground"
-                            >
-                              <MoreVertical className="h-5 w-5" />
-                            </button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onSelect={() => router.push(`/study-planner/materials/${material.id}`)}>
-                              Open material
-                            </DropdownMenuItem>
-                            {fileUrl && (
-                              <DropdownMenuItem onSelect={() => window.open(fileUrl, '_blank', 'noopener,noreferrer')}>
-                                <Download className="mr-2 h-4 w-4" />
-                                Open file
-                              </DropdownMenuItem>
+                          <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-4 marker:hidden hover:bg-muted/50 dark:hover:bg-secondary/50 sm:px-5">
+                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-sm font-semibold text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
+                              {String(unitIndex + 1).padStart(2, '0')}
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block text-sm font-semibold text-foreground dark:text-foreground">
+                                {unit.title || unit.name || `Unit ${unitIndex + 1}`}
+                              </span>
+                              <span className="mt-1 block text-xs text-muted-foreground dark:text-muted-foreground">
+                                {topics.length} {topics.length === 1 ? 'topic' : 'topics'}
+                                {unitResourceCount > 0 && ` · ${unitResourceCount} ${unitResourceCount === 1 ? 'resource' : 'resources'}`}
+                              </span>
+                            </span>
+                            <ChevronDown aria-hidden="true" className="h-4 w-4 shrink-0 text-muted-foreground" />
+                          </summary>
+                          <div className="space-y-3 border-t border-border p-3 sm:p-5 dark:border-border">
+                            {unit.description && (
+                              <p className="text-sm leading-relaxed text-muted-foreground dark:text-muted-foreground">
+                                {unit.description}
+                              </p>
                             )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </article>
-                    );
-                  })
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <span className="text-xs font-medium text-muted-foreground dark:text-muted-foreground">
+                                {unit.estimatedMinutes ? `${unit.estimatedMinutes} min` : ''}
+                              </span>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => router.push(`/courses/${selectedCourse.id}/units/${encodeURIComponent(unitId)}`)}
+                                className="rounded-lg"
+                              >
+                                Open unit
+                              </Button>
+                            </div>
+                            {unitOnlyMaterials.length > 0 && (
+                              <div className="rounded-lg border border-border dark:border-border">
+                                <h3 className="px-3 pt-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground dark:text-muted-foreground">
+                                  Unit resources
+                                </h3>
+                                {renderMaterialItems(unitOnlyMaterials)}
+                              </div>
+                            )}
+                            {topics.length > 0 && (
+                              <ol className="space-y-2" aria-label={`${unit.title || unit.name} topics`}>
+                                {topics.map((topic, topicIndex) => {
+                                  const topicId = String(topic.id);
+                                  const topicMaterials = unitMaterials.filter(
+                                    material => String(getMaterialTopicId(material) ?? '') === topicId,
+                                  );
+                                  const topicTitle = topic.title || topic.name || `Topic ${topicIndex + 1}`;
+
+                                  return (
+                                    <li key={topicId}>
+                                      <div className="rounded-lg border border-border px-3 py-3 dark:border-border">
+                                        <div className="flex items-center gap-3">
+                                          {topic.isCompleted ? (
+                                            <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                                          ) : (
+                                            <span className="h-2 w-2 shrink-0 rounded-full bg-blue-500" aria-hidden="true" />
+                                          )}
+                                          <div className="min-w-0 flex-1">
+                                            <p className="text-sm font-medium text-foreground dark:text-foreground">
+                                              {topicIndex + 1}. {topicTitle}
+                                            </p>
+                                            <p className="mt-1 text-xs text-muted-foreground dark:text-muted-foreground">
+                                              {topic.estimatedMinutes ? `${topic.estimatedMinutes} min` : 'Topic'}
+                                              {topicMaterials.length > 0 && ` · ${topicMaterials.length} ${topicMaterials.length === 1 ? 'resource' : 'resources'}`}
+                                            </p>
+                                          </div>
+                                          <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => router.push(`/courses/${selectedCourse.id}/units/${encodeURIComponent(unitId)}?topicId=${encodeURIComponent(topicId)}`)}
+                                            className="shrink-0 rounded-lg px-2"
+                                          >
+                                            Study
+                                          </Button>
+                                        </div>
+                                        {topicMaterials.length > 0 && (
+                                          <details className="mt-2 border-t border-border pt-2 dark:border-border">
+                                            <summary className="cursor-pointer text-xs font-medium text-blue-700 dark:text-blue-300">
+                                              View resources
+                                            </summary>
+                                            {renderMaterialItems(topicMaterials)}
+                                          </details>
+                                        )}
+                                      </div>
+                                    </li>
+                                  );
+                                })}
+                              </ol>
+                            )}
+                          </div>
+                        </details>
+                      );
+                    })}
+                  </div>
                 )}
 
+                {allMaterials.length === 0 && !isLoading && !isMaterialsError && (
+                  <p className="rounded-lg bg-muted px-4 py-3 text-sm text-muted-foreground dark:bg-card dark:text-muted-foreground">
+                    {debouncedSearch || materialTypeFilter !== 'all'
+                      ? 'No resources match these filters. Clear the search or choose another type to see course resources.'
+                      : 'There are no resources linked to this course yet.'}
+                  </p>
+                )}
+                {isMaterialsError && (
+                  <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-200">
+                    Could not load course resources: {materialsError instanceof Error ? materialsError.message : 'Please try again later.'}
+                  </div>
+                )}
                 {hasNextPage && (
-                  <div className="flex justify-center pt-2">
+                  <div className="flex justify-center">
                     <Button
+                      type="button"
                       variant="outline"
-                      onClick={() => fetchNextPage()}
+                      onClick={() => void fetchNextPage()}
                       disabled={isFetchingNextPage}
                       className="rounded-lg"
                     >
-                      {isFetchingNextPage ? 'Loading more…' : 'Show older materials'}
+                      {isFetchingNextPage ? 'Loading resources…' : 'Load more resources'}
                     </Button>
                   </div>
                 )}
-              </div>
-            </div>
-          )}
+              </section>
+            </>
+          ) : null}
         </section>
       )}
       

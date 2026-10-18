@@ -171,6 +171,8 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
     navigatePrev,
     isFirstLesson,
     isLastLesson,
+    canNavigateNext,
+    isNextTopicLocked,
   } = useCourseNavigation(
     unitData?.chapters || [],
     unitId,
@@ -650,6 +652,8 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
                   onOpenMasteryQuiz={() => toggleCoursePanel('quiz')}
                   isFirstLesson={isFirstLesson}
                   isLastLesson={isLastLesson}
+                  canNavigateNext={canNavigateNext}
+                  isNextTopicLocked={isNextTopicLocked}
                   materials={materialsForCurrentTopic as unknown as Material[]}
                   openMaterial={openMaterial}
                   masteryPassingScore={70}

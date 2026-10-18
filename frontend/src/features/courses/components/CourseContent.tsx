@@ -30,6 +30,8 @@ export const CourseContent = ({
   onOpenMasteryQuiz,
   isFirstLesson,
   isLastLesson,
+  canNavigateNext = !isLastLesson,
+  isNextTopicLocked = false,
   materials = [],
   openMaterial,
   masteryPassingScore = 80,
@@ -275,9 +277,15 @@ export const CourseContent = ({
         </button>
         <button
           onClick={navigateNext}
-          disabled={isLastLesson}
+          disabled={!canNavigateNext}
           className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-500/20"
-          title="Next Lesson"
+          title={
+            isNextTopicLocked
+              ? 'Complete the mastery quiz to unlock the next topic'
+              : isLastLesson
+                ? 'End of course content'
+                : 'Next Lesson'
+          }
         >
           <span>Next</span>
           <ChevronRight className="w-4 h-4" />

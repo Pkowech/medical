@@ -99,6 +99,8 @@ export const EducationalCourseLayout = ({ courseId: propCourseId }: EducationalC
     navigatePrev,
     isFirstLesson,
     isLastLesson,
+    canNavigateNext,
+    isNextTopicLocked,
   } = useCourseNavigation(courseData?.chapters || []);
 
   // ✅ HOOKS MUST BE CALLED BEFORE ANY EARLY RETURNS
@@ -338,6 +340,8 @@ export const EducationalCourseLayout = ({ courseId: propCourseId }: EducationalC
                   onOpenMasteryQuiz={() => toggleCoursePanel('quiz')}
                   isFirstLesson={isFirstLesson}
                   isLastLesson={isLastLesson}
+                  canNavigateNext={canNavigateNext}
+                  isNextTopicLocked={isNextTopicLocked}
                   materials={materialsForCurrentLesson}
                   openMaterial={openMaterial}
                 />
