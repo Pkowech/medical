@@ -11,12 +11,15 @@ import {
 import { Button } from '@/shared/components/ui/button';
 import {
   AlertCircle,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   Download,
   ExternalLink,
   FileText,
   Loader2,
+  X,
   Youtube,
 } from 'lucide-react';
 import { VideoPlayer } from './VideoPlayer';
@@ -60,6 +63,7 @@ export const MaterialPreviewModal = ({
   const [pdfContent, setPdfContent] = useState<Uint8Array | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [retryAttempt, setRetryAttempt] = useState(0);
+  const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
   const trackedViewKeyRef = useRef<string | null>(null);
   const xapiContext = useMemo(() => ({
     extensions: {
@@ -306,12 +310,15 @@ export const MaterialPreviewModal = ({
             {material.description || 'This file opens outside the built-in PDF reader.'}
           </p>
           {resolvedEffectiveUrl && (
-            <Button
-              type="button"
-              onClick={() => window.open(resolvedEffectiveUrl, '_blank', 'noopener,noreferrer')}
-              className="mt-5 w-full"
-            >
-              <ExternalLink className="mr-2 h-4 w-4" /> Open file
+            <Button asChild className="mt-5 w-full">
+              <a
+                href={resolvedEffectiveUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={trackDownload}
+              >
+                <ExternalLink className="mr-2 h-4 w-4" /> Open file
+              </a>
             </Button>
           )}
         </div>
@@ -395,102 +402,172 @@ export const MaterialPreviewModal = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="fixed inset-0 left-0 top-0 right-0 bottom-0 z-[70] grid h-dvh max-h-dvh w-screen max-w-none translate-x-0 translate-y-0 grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden rounded-none border-none bg-card p-0 shadow-2xl dark:bg-card">
-        <DialogHeader className="sticky top-0 z-10 flex flex-col items-stretch justify-between space-y-2 border-b bg-card p-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] dark:border-border dark:bg-card sm:flex-row sm:items-center sm:space-y-0 sm:p-4">
-          <div className="flex min-w-0 items-center gap-3">
-            <div className={`p-2 rounded-lg ${isVideo ? 'bg-red-50 dark:bg-red-500/10 text-red-600' : 'bg-blue-50 dark:bg-blue-500/10 text-blue-600'}`}>
-              {isVideo ? <Youtube className="w-5 h-5" /> : <FileText className="w-5 h-5" />}
-            </div>
-            <div>
-              <DialogTitle className="max-w-full break-words text-base font-bold leading-snug sm:line-clamp-2 sm:max-w-[min(50vw,36rem)] sm:text-lg">
-                {material?.title || (previewError ? 'Unable to open material' : 'Loading material...')}
+      <DialogContent
+        showCloseButton={false}
+        className={`fixed inset-0 left-0 top-0 right-0 bottom-0 z-[70] grid h-dvh max-h-dvh w-screen max-w-none translate-x-0 translate-y-0 ${
+          isHeaderCollapsed
+            ? 'grid-rows-[auto_minmax(0,1fr)]'
+            : 'grid-rows-[auto_minmax(0,1fr)_auto]'
+        } gap-0 overflow-hidden rounded-none border-none bg-card p-0 shadow-2xl dark:bg-card`}
+      >
+        {isHeaderCollapsed ? (
+          <div className="z-10 flex min-w-0 items-center justify-between gap-2 border-b bg-card/95 px-3 pb-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] shadow-sm backdrop-blur dark:border-border dark:bg-card/95">
+            <div className="min-w-0">
+              <DialogTitle className="truncate text-sm font-semibold">
+                {material?.title || 'Loading material...'}
               </DialogTitle>
-              <DialogDescription className="sr-only">
-                {material?.description || `${material?.type || 'Study'} resource`}
-              </DialogDescription>
-              <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">
-                {material?.type || 'Material'} • {material?.size || 'Study Resource'}
-              </p>
+              <DialogDescription className="sr-only">Focus mode</DialogDescription>
             </div>
-          </div>
-          <div className="flex shrink-0 items-center gap-1 pr-8">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={onClose}
-              title="Back to study"
-              aria-label="Back to study"
-              className="gap-2 border-border bg-card text-muted-foreground shadow-sm hover:bg-background dark:border-border dark:bg-card dark:text-muted-foreground dark:hover:bg-card"
-            >
-              <ChevronLeft className="h-4 w-4" />
-              <span>Back</span>
-            </Button>
-            {materials.length > 1 && (
-              <>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => navigateMaterial(-1)}
-                  disabled={materialIndex <= 0}
-                  aria-label="Open previous material"
-                  title="Previous material"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <span className="whitespace-nowrap text-xs text-muted-foreground">
-                  {materialIndex >= 0 ? `${materialIndex + 1} / ${materials.length}` : ''}
-                </span>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => navigateMaterial(1)}
-                  disabled={materialIndex < 0 || materialIndex >= materials.length - 1}
-                  aria-label="Open next material"
-                  title="Next material"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </>
-            )}
-            {material?.fileUrl && (
+            <div className="flex shrink-0 items-center gap-1">
               <Button
                 type="button"
                 variant="ghost"
-                size="sm"
-                onClick={downloadOriginal}
-                title="Download original file"
-                aria-label="Download original file"
-                className="gap-2"
+                size="icon"
+                onClick={onClose}
+                title="Back to topic"
+                aria-label="Back to topic"
               >
-                <Download className="h-4 w-4" />
-                <span className="hidden sm:inline">Download</span>
+                <ChevronLeft className="h-4 w-4" />
               </Button>
-            )}
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={onClose}
-              title="Close preview"
-              aria-label="Close preview"
-              className="h-9 w-9 rounded-full border border-border bg-card text-muted-foreground hover:bg-muted dark:border-border dark:bg-card dark:text-muted-foreground dark:hover:bg-card"
-            >
-              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                <path d="M6 6l12 12M18 6L6 18" />
-              </svg>
-            </Button>
+              {material?.fileUrl && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={downloadOriginal}
+                  title="Download original file"
+                  aria-label="Download original file"
+                >
+                  <Download className="h-4 w-4" />
+                </Button>
+              )}
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={() => setIsHeaderCollapsed(false)}
+                title="Show viewer controls"
+                aria-label="Show viewer controls"
+              >
+                <ChevronDown className="h-4 w-4" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={onClose}
+                title="Close preview"
+                aria-label="Close preview"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
-        </DialogHeader>
+        ) : (
+          <DialogHeader className="sticky top-0 z-10 flex flex-col items-stretch justify-between space-y-2 border-b bg-card p-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] dark:border-border dark:bg-card sm:flex-row sm:items-center sm:space-y-0 sm:p-4">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className={`p-2 rounded-lg ${isVideo ? 'bg-red-50 dark:bg-red-500/10 text-red-600' : 'bg-blue-50 dark:bg-blue-500/10 text-blue-600'}`}>
+                {isVideo ? <Youtube className="w-5 h-5" /> : <FileText className="w-5 h-5" />}
+              </div>
+              <div className="min-w-0">
+                <DialogTitle className="max-w-full break-words text-base font-bold leading-snug sm:line-clamp-2 sm:max-w-[min(50vw,36rem)] sm:text-lg">
+                  {material?.title || (previewError ? 'Unable to open material' : 'Loading material...')}
+                </DialogTitle>
+                <DialogDescription className="sr-only">
+                  {material?.description || `${material?.type || 'Study'} resource`}
+                </DialogDescription>
+                <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">
+                  {material?.type || 'Material'} • {material?.size || 'Study Resource'}
+                </p>
+              </div>
+            </div>
+            <div className="flex shrink-0 items-center gap-1">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={onClose}
+                title="Back to topic"
+                aria-label="Back to topic"
+                className="gap-2 border-border bg-card text-muted-foreground shadow-sm hover:bg-background dark:border-border dark:bg-card dark:text-muted-foreground dark:hover:bg-card"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                <span>Back</span>
+              </Button>
+              {materials.length > 1 && (
+                <>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => navigateMaterial(-1)}
+                    disabled={materialIndex <= 0}
+                    aria-label="Open previous material"
+                    title="Previous material"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <span className="whitespace-nowrap text-xs text-muted-foreground">
+                    {materialIndex >= 0 ? `${materialIndex + 1} / ${materials.length}` : ''}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => navigateMaterial(1)}
+                    disabled={materialIndex < 0 || materialIndex >= materials.length - 1}
+                    aria-label="Open next material"
+                    title="Next material"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </>
+              )}
+              {material?.fileUrl && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={downloadOriginal}
+                  title="Download original file"
+                  aria-label="Download original file"
+                  className="gap-2"
+                >
+                  <Download className="h-4 w-4" />
+                  <span className="hidden sm:inline">Download</span>
+                </Button>
+              )}
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsHeaderCollapsed(true)}
+                title="Enter focus mode"
+                aria-label="Enter focus mode"
+              >
+                <ChevronUp className="h-4 w-4" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={onClose}
+                title="Close preview"
+                aria-label="Close preview"
+                className="h-9 w-9 rounded-full border border-border bg-card text-muted-foreground hover:bg-muted dark:border-border dark:bg-card dark:text-muted-foreground dark:hover:bg-card"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </DialogHeader>
+        )}
         
         <div className="relative h-full min-h-0 min-w-0 overflow-hidden">
           {renderContent()}
         </div>
         
         {/* Footer with basic info */}
-        {!isLoading && material && (
+        {!isHeaderCollapsed && !isLoading && material && (
           <div className="flex items-center justify-between border-t bg-background p-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] text-[10px] text-muted-foreground dark:border-border dark:bg-card/30 sm:p-4 sm:text-xs">
             <div className="flex items-center gap-4">
               <span>Added on {new Date(material.createdAt).toLocaleDateString()}</span>
