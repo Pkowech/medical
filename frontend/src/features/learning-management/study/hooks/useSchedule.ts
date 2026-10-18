@@ -21,7 +21,7 @@ export default function useSchedule(initialDate: Date = new Date()) {
       const year = date.getFullYear();
       const month = date.getMonth();
       const startDate = new Date(year, month, 1);
-      const endDate = new Date(year, month + 1, 0);
+      const endDate = new Date(year, month + 1, 0, 23, 59, 59, 999);
       const data = await scheduleService.getSessions(session?.user?.id, startDate, endDate);
 
       const processed = (data || []).map(e => ({

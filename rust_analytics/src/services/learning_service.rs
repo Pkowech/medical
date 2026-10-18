@@ -285,7 +285,7 @@ impl LearningService {
         .await
         .map_err(|e| Status::internal(format!("DB error: {}", e)))?;
 
-        let avg_progress: f32 = sqlx::query_scalar::<_, Option<f32>>(
+        let avg_progress: f64 = sqlx::query_scalar::<_, Option<f64>>(
             "SELECT AVG(progress_percentage) FROM course_enrollments WHERE user_id = $1"
         )
         .bind(&user_id)
@@ -298,7 +298,7 @@ impl LearningService {
             total_courses: total as i32,
             completed_courses: completed as i32,
             total_study_time_minutes: total_time.min(i32::MAX as i64) as i32,
-            average_course_progress: avg_progress,
+            average_course_progress: avg_progress as f32,
         };
 
         Ok(Response::new(CourseStatsResultResponse {
@@ -341,7 +341,7 @@ impl LearningService {
         .await
         .map_err(|e| Status::internal(format!("DB error: {}", e)))?;
 
-        let avg_progress: f32 = sqlx::query_scalar::<_, Option<f32>>(
+        let avg_progress: f64 = sqlx::query_scalar::<_, Option<f64>>(
             "SELECT AVG(overall_progress_percentage) FROM learning_path_progress WHERE user_id = $1"
         )
         .bind(&user_id)
@@ -354,7 +354,7 @@ impl LearningService {
             total_learning_paths: total as i32,
             completed_learning_paths: completed as i32,
             total_study_time_minutes: total_time as i32,
-            average_path_progress: avg_progress,
+            average_path_progress: avg_progress as f32,
         };
 
         Ok(Response::new(LearningPathStatsResultResponse {
@@ -685,4 +685,3 @@ impl LearningService {
         }))
     }
 }
-
