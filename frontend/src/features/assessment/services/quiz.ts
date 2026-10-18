@@ -7,6 +7,37 @@ export interface TopicQuizSubmission {
   masteryUnlocked: boolean;
   nextTopicUnlocked: boolean;
   nextTopicId?: string;
+  recommendations?: QuizPerformanceRecommendations;
+}
+
+export interface QuizPerformanceRecommendations {
+  topics: Array<{
+    topicId: string;
+    topicName: string;
+    accuracy: number;
+    diagnosis: 'prerequisite_gap' | 'target_content_gap' | 'insufficient_evidence';
+    confidence: 'low' | 'medium' | 'high';
+    prerequisiteEvidence: Array<{
+      unitId: string;
+      unitName: string;
+      sampleSize: number;
+      accuracy: number | null;
+    }>;
+    recommendations: Array<{
+      kind: string;
+      id: string;
+      title: string;
+      href: string;
+      reason: string;
+    }>;
+  }>;
+  recommendations: Array<{
+    kind: string;
+    id: string;
+    title: string;
+    href: string;
+    reason: string;
+  }>;
 }
 
 class QuizService {
@@ -51,8 +82,16 @@ class QuizService {
   async submitUnitQuiz(
     unitId: string | number,
     answers: Array<{ questionId: string; selectedOption: string }>,
-  ): Promise<{ percentage: number; isPassed: boolean }> {
-    const response = await apiService.post<{ percentage: number; isPassed: boolean }>(
+  ): Promise<{
+    percentage: number;
+    isPassed: boolean;
+    recommendations?: QuizPerformanceRecommendations;
+  }> {
+    const response = await apiService.post<{
+      percentage: number;
+      isPassed: boolean;
+      recommendations?: QuizPerformanceRecommendations;
+    }>(
       `${this.baseUrl}/submit?type=full`,
       { unitId, answers },
     );

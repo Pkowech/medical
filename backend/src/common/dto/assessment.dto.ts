@@ -681,6 +681,12 @@ export class AdaptiveQuizSessionDto {
   @ApiProperty()
   userId!: string;
 
+  @ApiPropertyOptional()
+  courseId?: string;
+
+  @ApiPropertyOptional()
+  unitId?: string;
+
   @ApiProperty({ type: [Object] })
   questions!: Question[];
 

@@ -1,7 +1,11 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { quizService } from '@/features/assessment/services/quiz';
+import Link from 'next/link';
+import {
+  quizService,
+  type QuizPerformanceRecommendations,
+} from '@/features/assessment/services/quiz';
 import { useXapi } from '@/lib/xapi/useXapi';
 import { URLS } from '@/lib/urls';
 import { CheckCircle, XCircle, AlertCircle, RefreshCw, Send } from 'lucide-react';
@@ -58,6 +62,7 @@ export const QuizPanel = ({
     masteryUnlocked?: boolean;
     nextTopicUnlocked?: boolean;
     nextTopicId?: string;
+    recommendations?: QuizPerformanceRecommendations;
   } | null>(null);
 
   useEffect(() => {
@@ -139,6 +144,7 @@ export const QuizPanel = ({
         masteryUnlocked: boolean;
         nextTopicUnlocked: boolean;
         nextTopicId?: string;
+        recommendations?: QuizPerformanceRecommendations;
       } = {
         score: Math.round((score / questions.length) * 100),
         passed: score / questions.length >= 0.7,
@@ -167,6 +173,7 @@ export const QuizPanel = ({
           ...result,
           score: unitResult.percentage,
           passed: unitResult.isPassed,
+          recommendations: unitResult.recommendations,
         };
       }
 
@@ -276,6 +283,52 @@ export const QuizPanel = ({
             The next topic is now unlocked.
           </p>
         )}
+
+        {finalResult?.recommendations?.topics.map((topic) => (
+          <section
+            key={topic.topicId}
+            className="mb-6 rounded-xl border border-border bg-background/70 p-4 text-left"
+          >
+            <h4 className="font-semibold">
+              Learning diagnosis: {topic.topicName}
+            </h4>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {topic.diagnosis === 'prerequisite_gap'
+                ? 'Prior quiz evidence suggests a gap in mapped prerequisite knowledge.'
+                : topic.diagnosis === 'target_content_gap'
+                  ? 'Mapped prerequisites look sufficiently strong; the current difficulty is more likely specific to this topic.'
+                  : 'There is not enough prerequisite evidence to tell whether the difficulty is foundational or specific to this topic.'}
+              {' '}Topic accuracy: {Math.round(topic.accuracy * 100)}%; confidence: {topic.confidence}.
+            </p>
+            {topic.prerequisiteEvidence.length > 0 && (
+              <ul className="mt-3 space-y-1 text-xs text-muted-foreground">
+                {topic.prerequisiteEvidence.map((evidence) => (
+                  <li key={evidence.unitId}>
+                    {evidence.unitName}: {evidence.accuracy === null
+                      ? 'no prior answers'
+                      : `${Math.round(evidence.accuracy * 100)}% accuracy`}
+                    {' '}({evidence.sampleSize} responses)
+                  </li>
+                ))}
+              </ul>
+            )}
+            {topic.recommendations.length > 0 && (
+              <ul className="mt-3 space-y-2">
+                {topic.recommendations.map((recommendation) => (
+                  <li key={`${recommendation.kind}:${recommendation.id}`}>
+                    <Link
+                      href={recommendation.href}
+                      className="font-medium text-blue-700 underline dark:text-blue-300"
+                    >
+                      {recommendation.title}
+                    </Link>
+                    <p className="text-xs text-muted-foreground">{recommendation.reason}</p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        ))}
 
         <button
           onClick={() => {

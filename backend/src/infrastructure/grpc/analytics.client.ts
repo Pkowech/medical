@@ -102,6 +102,15 @@ export interface AnalyticsService {
     score: number;
   }>;
 
+  analyzeQuestionDifficulty(data: {
+    userId: string;
+    questionId: string;
+  }): Observable<{
+    difficultyScore: number;
+    suggestion: string;
+    sampleSize: number;
+  }>;
+
   getEngagementMetrics(data: { userId: string }): Observable<{
     user_id: string;
     time_spent: number;
@@ -225,7 +234,12 @@ export interface AnalyticsService {
     responseTimeMs: number;
   }): Observable<any>;
 
-  getNextAdaptiveQuestion(data: { userId: string }): Observable<{
+  getNextAdaptiveQuestion(data: {
+    userId: string;
+    topicId?: string;
+    courseId?: string;
+    unitId?: string;
+  }): Observable<{
     question_id: string;
     recommended_difficulty: number;
   }>;
@@ -239,14 +253,6 @@ export interface AnalyticsService {
     avg_ease_factor: number;
     avg_interval_days: number;
     recent_pass_rate: number;
-  }>;
-
-  analyzeQuestionDifficulty(data: {
-    userId: string;
-    question: any;
-  }): Observable<{
-    difficulty_score: number;
-    suggestion: string;
   }>;
 
   getQuizAttemptHistory(data: {

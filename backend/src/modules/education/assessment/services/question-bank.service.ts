@@ -61,6 +61,10 @@ export class QuestionBankService {
           difficulty: dto.difficulty,
           category: dto.category,
           explanation: dto.explanation,
+          conceptsCovered: dto.conceptsCovered ?? [],
+          tags: dto.tags ?? [],
+          topicIds: dto.topicIds ?? [],
+          points: dto.points ?? 1,
           isActive: true,
           courseId: dto.courseId,
           unitId: dto.unitId,
@@ -75,8 +79,8 @@ export class QuestionBankService {
         await tx.option.createMany({
           data: dto.options.map((opt, index) => ({
             questionId: question.id,
-            text: (opt as any).text || (opt as any).optionText,
-            isCorrect: (opt as any).isCorrect,
+            text: opt.text,
+            isCorrect: opt.isCorrect ?? false,
             order: index,
           })),
         });
@@ -98,6 +102,18 @@ export class QuestionBankService {
       JSON.stringify(question),
       24 * 60 * 60,
     );
+    await Promise.all([
+      this.redisService.delPattern('questions:*'),
+      ...(dto.unitId
+        ? [
+            this.redisService.del(`unit:${dto.unitId}:questions:v2`),
+            this.redisService.del(`unit_quiz:${dto.unitId}`),
+          ]
+        : []),
+      ...(dto.topicIds ?? []).map((topicId) =>
+        this.redisService.del(`topic:${topicId}:questions:v2`),
+      ),
+    ]);
     return question as Question;
   }
 
@@ -284,6 +300,18 @@ export class QuestionBankService {
         difficultyIndex: 1 - newAverageScore,
       },
     });
+    await Promise.all([
+      this.redisService.delPattern('questions:*'),
+      ...(question.unitId
+        ? [
+            this.redisService.del(`unit:${question.unitId}:questions:v2`),
+            this.redisService.del(`unit_quiz:${question.unitId}`),
+          ]
+        : []),
+      ...question.topicIds.map((topicId) =>
+        this.redisService.del(`topic:${topicId}:questions:v2`),
+      ),
+    ]);
 
     // Fire-and-forget gRPC call to Rust for async analytics
     void this.analyticsService.updateQuestionStats(
@@ -304,7 +332,7 @@ export class QuestionBankService {
     }
   }
 
-  private async validateCourseAndUnit(courseId?: string, unitId?: string) {
+  async validateCourseAndUnit(courseId?: string, unitId?: string) {
     if (courseId) {
       const course = await this.prisma.course.findUnique({
         where: { id: courseId },
@@ -314,14 +342,25 @@ export class QuestionBankService {
       }
     }
     if (unitId) {
-      const unit = await this.prisma.unit.findUnique({ where: { id: unitId } });
+      const unit = await this.prisma.unit.findUnique({
+        where: { id: unitId },
+        select: { id: true, courseId: true },
+      });
       if (!unit) {
         throw new NotFoundException('Unit not found');
+      }
+      if (courseId && courseId !== unit.courseId) {
+        throw new InvalidQuestionTypeException(
+          'The selected unit does not belong to the selected course',
+        );
       }
     }
   }
 
-  private validateQuestionOptions(type: QuestionType, options: any[]): void {
+  validateQuestionOptions(
+    type: QuestionType,
+    options: Array<{ isCorrect?: boolean }>,
+  ): void {
     if (!options || options.length === 0) {
       throw new InvalidQuestionTypeException(
         'Question must have at least one option',

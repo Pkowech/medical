@@ -1,10 +1,10 @@
-use sqlx::{Pool, Postgres, Row};
-use tonic::{Request, Response, Status};
 use crate::analytics_proto::{
-    GetNextAdaptiveQuestionRequest, GetNextAdaptiveQuestionResponse,
-    GetUserAbilityRequest, GetUserAbilityResponse,
+    GetNextAdaptiveQuestionRequest, GetNextAdaptiveQuestionResponse, GetUserAbilityRequest,
+    GetUserAbilityResponse,
 };
 use crate::observability::metrics as obs_metrics;
+use sqlx::{Pool, Postgres, Row};
+use tonic::{Request, Response, Status};
 
 const DEFAULT_USER_ABILITY: f64 = 0.5;
 const DIFFICULTY_OFFSET: f64 = 0.1;
@@ -29,193 +29,155 @@ impl AdaptiveService {
         Ok(())
     }
 
-    /// Get user's estimated ability across all skills
-    /// 
-    /// Computes overall ability as the average of p_known (probability known) 
-    /// across all skill competencies in user_skill_states table.
-    /// Used by backend for adaptive quiz initialization and user profiling.
+    fn difficulty_value(difficulty: &str) -> Result<f64, Status> {
+        match difficulty {
+            "easy" => Ok(0.2),
+            "medium" => Ok(0.5),
+            "hard" => Ok(0.8),
+            _ => Err(Status::internal(format!(
+                "Unsupported question difficulty: {difficulty}"
+            ))),
+        }
+    }
+
     pub async fn get_user_ability(
         &self,
         request: Request<GetUserAbilityRequest>,
     ) -> Result<Response<GetUserAbilityResponse>, Status> {
-        let req = request.into_inner();
-        let user_id = req.user_id;
-
+        let user_id = request.into_inner().user_id;
         Self::validate_user_id(&user_id)?;
 
-        // Get all skills for the user
-        let skills: Vec<(String, f64)> = sqlx::query_as(
-            "SELECT skill_id, p_known FROM user_skill_states WHERE user_id = $1"
-        )
-        .bind(&user_id)
-        .fetch_all(&self.pool)
-        .await
-        .unwrap_or_default();
+        let skills: Vec<(String, f64)> =
+            sqlx::query_as("SELECT skill_id, p_known FROM user_skill_states WHERE user_id = $1")
+                .bind(&user_id)
+                .fetch_all(&self.pool)
+                .await
+                .map_err(|error| {
+                    Status::internal(format!("Failed to load user skill states: {error}"))
+                })?;
 
-        // Calculate overall ability as average p_known across all skills
-        let overall_ability = if !skills.is_empty() {
-            let sum: f64 = skills.iter().map(|(_, p)| p).sum();
-            sum / skills.len() as f64
-        } else {
+        let estimated_ability = if skills.is_empty() {
             DEFAULT_USER_ABILITY
+        } else {
+            (skills.iter().map(|(_, p_known)| p_known).sum::<f64>() / skills.len() as f64)
+                .clamp(0.0, 1.0)
         };
-
-        let p_known_by_skill: std::collections::HashMap<String, f64> = skills.into_iter().collect();
+        let p_known_by_skill = skills.into_iter().collect();
 
         Ok(Response::new(GetUserAbilityResponse {
             user_id,
-            estimated_ability: overall_ability,
+            estimated_ability,
             p_known_by_skill,
         }))
     }
 
-    /// Get next adaptive question for user based on IRT (Item Response Theory)
-    /// 
-    /// Selects a question at difficulty close to user's estimated ability.
-    /// Uses BKT (Bayesian Knowledge Tracing) skill states to compute target difficulty.
-    /// Ensures questions have not been answered before by this user.
     pub async fn get_next_adaptive_question(
         &self,
         request: Request<GetNextAdaptiveQuestionRequest>,
     ) -> Result<Response<GetNextAdaptiveQuestionResponse>, Status> {
         let req = request.into_inner();
-        let user_id = req.user_id;
+        Self::validate_user_id(&req.user_id)?;
 
-        Self::validate_user_id(&user_id)?;
-
-        // Get user's skill distribution
         let skills: Vec<(String, f64)> = sqlx::query_as(
-            "SELECT skill_id, p_known FROM user_skill_states WHERE user_id = $1"
+            r#"
+            SELECT state.skill_id, state.p_known
+            FROM user_skill_states state
+            LEFT JOIN topics topic ON topic.id = state.skill_id
+            LEFT JOIN units unit ON unit.id = topic.unit_id
+            WHERE state.user_id = $1
+              AND ($2 = '' OR state.skill_id = $2)
+              AND ($3 = '' OR unit.course_id = $3)
+              AND ($4 = '' OR topic.unit_id = $4)
+            "#,
         )
-        .bind(&user_id)
+        .bind(&req.user_id)
+        .bind(&req.topic_id)
+        .bind(&req.course_id)
+        .bind(&req.unit_id)
         .fetch_all(&self.pool)
         .await
-        .unwrap_or_default();
+        .map_err(|error| {
+            Status::internal(format!("Failed to load scoped user skill states: {error}"))
+        })?;
 
-        // Calculate average ability
-        let avg_ability = if !skills.is_empty() {
-            let sum: f64 = skills.iter().map(|(_, p)| p).sum();
-            (sum / skills.len() as f64).min(1.0).max(0.0)
+        let ability = if !skills.is_empty() {
+            (skills.iter().map(|(_, p_known)| p_known).sum::<f64>() / skills.len() as f64)
+                .clamp(0.0, 1.0)
         } else {
             DEFAULT_USER_ABILITY
         };
+        let target_difficulty = (ability + DIFFICULTY_OFFSET).clamp(MIN_DIFFICULTY, MAX_DIFFICULTY);
 
-        // Target difficulty slightly above current ability
-        let target_difficulty = (avg_ability + DIFFICULTY_OFFSET).min(MAX_DIFFICULTY).max(MIN_DIFFICULTY);
-
-        // Fetch a batch of candidate questions (difficulty enum as text), map to numeric in Rust,
-        // and choose a question within the target difficulty range that the user hasn't answered.
-        let rows = sqlx::query(
+        let row = sqlx::query(
             r#"
-            SELECT id, difficulty FROM questions
-            WHERE id NOT IN (SELECT question_id FROM user_responses WHERE user_id = $1)
-            ORDER BY RANDOM()
-            LIMIT 50
+            SELECT q.id, q.difficulty::text AS difficulty
+            FROM questions q
+            WHERE q.is_active = TRUE
+              AND q.type IN ('multiple_choice', 'true_false')
+                AND ($2 = '' OR q.course_id = $2)
+              AND ($3 = '' OR q.unit_id = $3)
+              AND ($4 = '' OR $4 = ANY(q.topic_ids))
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM user_responses ur
+                  WHERE ur.user_id = $1 AND ur.question_id = q.id
+              )
+              AND ABS(
+                  CASE q.difficulty::text
+                      WHEN 'easy' THEN 0.2
+                      WHEN 'medium' THEN 0.5
+                      WHEN 'hard' THEN 0.8
+                  END - $5
+              ) <= $6
+            ORDER BY ABS(
+                CASE q.difficulty::text
+                    WHEN 'easy' THEN 0.2
+                    WHEN 'medium' THEN 0.5
+                    WHEN 'hard' THEN 0.8
+                END - $5
+            ), RANDOM()
+            LIMIT 1
             "#,
         )
-        .bind(&user_id)
-        .fetch_all(&self.pool)
+        .bind(&req.user_id)
+        .bind(&req.course_id)
+        .bind(&req.unit_id)
+        .bind(&req.topic_id)
+        .bind(target_difficulty)
+        .bind(DIFFICULTY_RANGE)
+        .fetch_optional(&self.pool)
         .await
-        .map_err(|e| Status::internal(format!("Database query failed: {}", e)))?;
+        .map_err(|error| Status::internal(format!("Question selection failed: {error}")))?;
 
-        let mut chosen: Option<(String, f64)> = None;
-        for row in rows {
-            let qid: String = row.try_get("id").unwrap_or_default();
-            let diff_text: Option<String> = row.try_get("difficulty").ok();
-            let diff_val = match diff_text.as_deref() {
-                Some("easy") => 0.2,
-                Some("medium") => 0.5,
-                Some("hard") => 0.8,
-                _ => continue,
-            };
-            if diff_val >= (target_difficulty - DIFFICULTY_RANGE) && diff_val <= (target_difficulty + DIFFICULTY_RANGE) {
-                chosen = Some((qid, diff_val));
-                break;
-            }
-        }
+        let Some(row) = row else {
+            return Ok(Response::new(GetNextAdaptiveQuestionResponse {
+                question_id: String::new(),
+                recommended_difficulty: target_difficulty,
+            }));
+        };
 
-        if let Some((question_id, difficulty)) = chosen {
-            // Try to find topic name (first tag) for metrics label
-            let topic_name: Option<String> = sqlx::query_scalar(
-                "SELECT (tags->>0) FROM questions WHERE id = $1"
-            )
-            .bind(&question_id)
-            .fetch_optional(&self.pool)
-            .await
-            .unwrap_or(None);
-            let t = topic_name.unwrap_or_else(|| UNKNOWN_TOPIC.to_string());
-            obs_metrics::inc_adaptive_question_selected(&t);
-            Ok(Response::new(GetNextAdaptiveQuestionResponse {
-                question_id,
-                recommended_difficulty: difficulty,
-            }))
+        let question_id: String = row
+            .try_get("id")
+            .map_err(|error| Status::internal(format!("Invalid question row: {error}")))?;
+        let difficulty: String = row
+            .try_get("difficulty")
+            .map_err(|error| Status::internal(format!("Invalid difficulty value: {error}")))?;
+        let recommended_difficulty = Self::difficulty_value(&difficulty)?;
+
+        let metric_topic = if !req.topic_id.is_empty() {
+            req.topic_id
+        } else if !req.unit_id.is_empty() {
+            req.unit_id
+        } else if !req.course_id.is_empty() {
+            req.course_id
         } else {
-            // Fallback: pick any unanswered question for the user (ignore difficulty)
-            let fallback_row = sqlx::query("SELECT id, difficulty FROM questions WHERE id NOT IN (SELECT question_id FROM user_responses WHERE user_id = $1) ORDER BY RANDOM() LIMIT 1")
-                .bind(&user_id)
-                .fetch_optional(&self.pool)
-                .await
-                .map_err(|e| Status::internal(format!("Database query failed: {}", e)))?;
+            UNKNOWN_TOPIC.to_string()
+        };
+        obs_metrics::inc_adaptive_question_selected(&metric_topic);
 
-            if let Some(row) = fallback_row {
-                let question_id: String = row.try_get("id").unwrap_or_default();
-                let diff_text: Option<String> = row.try_get("difficulty").ok();
-                let difficulty = match diff_text.as_deref() {
-                    Some("easy") => 0.2,
-                    Some("medium") => 0.5,
-                    Some("hard") => 0.8,
-                    _ => DEFAULT_USER_ABILITY,
-                };
-
-                let topic_name: Option<String> = sqlx::query_scalar(
-                    "SELECT (tags->>0) FROM questions WHERE id = $1"
-                )
-                .bind(&question_id)
-                .fetch_optional(&self.pool)
-                .await
-                .unwrap_or(None);
-                let t = topic_name.unwrap_or_else(|| UNKNOWN_TOPIC.to_string());
-                obs_metrics::inc_adaptive_question_selected(&t);
-
-                Ok(Response::new(GetNextAdaptiveQuestionResponse {
-                    question_id,
-                    recommended_difficulty: difficulty,
-                }))
-            } else {
-                // As a last resort, return any question regardless of user history.
-                let any_row = sqlx::query("SELECT id, difficulty FROM questions ORDER BY RANDOM() LIMIT 1")
-                    .fetch_optional(&self.pool)
-                    .await
-                    .map_err(|e| Status::internal(format!("Database query failed: {}", e)))?;
-
-                if let Some(row) = any_row {
-                    let question_id: String = row.try_get("id").unwrap_or_default();
-                    let diff_text: Option<String> = row.try_get("difficulty").ok();
-                    let difficulty = match diff_text.as_deref() {
-                        Some("easy") => 0.2,
-                        Some("medium") => 0.5,
-                        Some("hard") => 0.8,
-                        _ => DEFAULT_USER_ABILITY,
-                    };
-
-                    let topic_name: Option<String> = sqlx::query_scalar(
-                        "SELECT (tags->>0) FROM questions WHERE id = $1"
-                    )
-                    .bind(&question_id)
-                    .fetch_optional(&self.pool)
-                    .await
-                    .unwrap_or(None);
-                    let t = topic_name.unwrap_or_else(|| UNKNOWN_TOPIC.to_string());
-                    obs_metrics::inc_adaptive_question_selected(&t);
-
-                    Ok(Response::new(GetNextAdaptiveQuestionResponse {
-                        question_id,
-                        recommended_difficulty: difficulty,
-                    }))
-                } else {
-                    Err(Status::not_found("No suitable questions found for user"))
-                }
-            }
-        }
+        Ok(Response::new(GetNextAdaptiveQuestionResponse {
+            question_id,
+            recommended_difficulty,
+        }))
     }
 }

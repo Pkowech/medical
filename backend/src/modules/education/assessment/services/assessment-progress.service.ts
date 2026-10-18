@@ -46,6 +46,7 @@ export class AssessmentProgressService {
 
     const quiz = await this.prisma.quiz.findUnique({
       where: { id: assessmentId },
+      include: { unit: { select: { courseId: true } } },
     });
     if (!quiz) {
       this.logger.error(`Assessment ${assessmentId} not found`);
@@ -107,17 +108,27 @@ export class AssessmentProgressService {
     );
 
     // Emit event for orchestration services (weakness detection, etc.)
-    this.eventEmitter.emit('assessment.completed', {
-      userId,
-      assessmentId,
-      attemptData: {
-        score: result.bestScore ?? 0,
-        passed: result.isPassed,
-        progressPercentage: result.completionPercentage,
-        timeSpentMinutes: 0,
-        timestamp: new Date().toISOString(),
-      },
-    });
+    if (result.completionPercentage >= 100) {
+      const timestamp = new Date();
+      const score = result.bestScore ?? 0;
+      this.eventEmitter.emit('assessment.completed', {
+        userId,
+        assessmentId,
+        courseId: quiz.unit?.courseId,
+        topicId: quiz.topicId ?? undefined,
+        score,
+        maxScore: 100,
+        timestamp,
+        attemptData: {
+          score,
+          maxScore: 100,
+          passed: result.isPassed,
+          progressPercentage: result.completionPercentage,
+          timeSpentMinutes: 0,
+          timestamp: timestamp.toISOString(),
+        },
+      });
+    }
 
     return result;
   }

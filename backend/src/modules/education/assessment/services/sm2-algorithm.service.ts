@@ -167,10 +167,8 @@ export class SM2AlgorithmService {
       newRepetitions += 1;
       newCorrectStreak += 1;
     } else {
-      // Failed response: reset repetitions counter but keep repetitions for history
+      newRepetitions = 0;
       newCorrectStreak = 0;
-      // Note: in some SM-2 variants, failed responses don't increment repetitions
-      // We keep them for analytics, but streak resets
     }
 
     // Calculate next review date

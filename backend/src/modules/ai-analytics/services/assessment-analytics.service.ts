@@ -1,4 +1,11 @@
-import { Injectable, Logger, Inject, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  Inject,
+  OnModuleInit,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { ClientGrpc } from '@nestjs/microservices';
 import { RedisService } from '#infrastructure/redis/redis.service';
 import { firstValueFrom, timeout, Observable } from 'rxjs';
@@ -21,7 +28,9 @@ import { PrismaService } from '#infrastructure/prisma/prisma.service';
 import { PredictionValidatorService } from './prediction-validator.service';
 import { QuizUtils } from '#common/utils/quiz.utils';
 import { v4 as uuidv4 } from 'uuid';
-import { Question, Prisma } from '@prisma/client';
+import { Option, Question, Prisma, QuestionType } from '@prisma/client';
+
+type AdaptiveQuestionWithOptions = Question & { options: Option[] };
 
 /**
  * AssessmentAnalyticsService
@@ -29,7 +38,7 @@ import { Question, Prisma } from '@prisma/client';
  * Domain-specific service for assessment and quiz-related analytics operations.
  * Provides performance predictions, BKT (Bayesian Knowledge Tracing) updates,
  * and assessment-specific analytics and recommendations.
- * Uses gRPC-first approach with HTTP fallback for Rust analytics service integration.
+ * Proxies assessment analytics to the Rust service over gRPC.
  *
  * Used by:
  * - assessment-recommendations.service.ts (personalized assessment recommendations)
@@ -85,6 +94,24 @@ export class AssessmentAnalyticsService implements OnModuleInit {
     courseId?: string,
     unitId?: string,
   ): Promise<AdaptiveQuizSession> {
+    if (unitId) {
+      const unit = await this.prisma.unit.findUnique({
+        where: { id: unitId },
+        select: { id: true, courseId: true },
+      });
+      if (!unit) throw new NotFoundException(`Unit ${unitId} not found`);
+      if (courseId && courseId !== unit.courseId) {
+        throw new BadRequestException('The selected unit does not belong to the course');
+      }
+      courseId = unit.courseId;
+    } else if (courseId) {
+      const course = await this.prisma.course.findUnique({
+        where: { id: courseId },
+        select: { id: true },
+      });
+      if (!course) throw new NotFoundException(`Course ${courseId} not found`);
+    }
+
     const startTime = Date.now();
     const cacheKey = ANALYTICS_CACHE_CONFIG.ASSESSMENT.ADAPTIVE_QUIZ(
       userId,
@@ -103,15 +130,19 @@ export class AssessmentAnalyticsService implements OnModuleInit {
     return await this.requestDeduplicationService.executeWithDedup(
       dedupKey,
       async () => {
-        // Use gRPC-first to get user performance profile and ability
-        const userProfile = await this.getUserPerformanceProfile(userId);
+        const userAbility = await this.callGrpcWithTimeout(
+          this.analyticsServiceGrpc.getUserAbility({ userId }),
+          this.grpcTimeoutMs,
+        );
         const sessionId = uuidv4();
         const session: AdaptiveQuizSession = {
           sessionId,
           userId,
+          courseId,
+          unitId,
           questions: [],
           currentQuestionIndex: 0,
-          userAbility: userProfile.overallAbility,
+          userAbility: userAbility.estimated_ability,
           confidenceInterval: 2.0,
           targetPrecision: 0.3,
           responses: [],
@@ -120,34 +151,48 @@ export class AssessmentAnalyticsService implements OnModuleInit {
           recommendations: [],
         };
 
-        // Fetch initial question
-        try {
-          const grpcResp = await this.callGrpcWithTimeout(
-            this.analyticsServiceGrpc.getNextAdaptiveQuestion({
-              userId: userId,
-            }),
-            this.grpcTimeoutMs,
+        const grpcResp = await this.callGrpcWithTimeout(
+          this.analyticsServiceGrpc.getNextAdaptiveQuestion({
+            userId,
+            courseId: session.courseId ?? '',
+            unitId: session.unitId ?? '',
+          }),
+          this.grpcTimeoutMs,
+        );
+        const initialQuestion = grpcResp.question_id
+          ? await this.findAdaptiveQuestion(grpcResp.question_id, session)
+          : null;
+        if (!initialQuestion) {
+          throw new NotFoundException(
+            'Rust analytics returned no eligible question for this assessment scope',
           );
-
-          if ((grpcResp as any).question_id) {
-            const initialQuestion = await this.prisma.question.findUnique({
-              where: { id: (grpcResp as any).question_id },
-              include: { options: true },
-            });
-            if (initialQuestion) {
-              session.questions.push(initialQuestion);
-            }
-          }
-        } catch (initialErr) {
-          this.logger.warn(
-            `Failed to get initial gRPC question: ${getErrorMessage(initialErr)}, using local fallback`,
-          );
-          const fallbackQuestion =
-            await this.selectNextQuestionFallback(session);
-          if (fallbackQuestion) {
-            session.questions.push(fallbackQuestion);
-          }
         }
+        session.questions.push(initialQuestion);
+
+        await this.prisma.$transaction(async (tx) => {
+          const quiz = await tx.quiz.create({
+            data: {
+              title: 'Adaptive quiz session',
+              description: 'Private adaptive assessment session',
+              unitId,
+              questionCount: 0,
+              maxAttempts: 1,
+              isAdaptive: true,
+              isPublished: false,
+              createdBy: userId,
+            },
+          });
+          await tx.quizAttempt.create({
+            data: {
+              id: sessionId,
+              userId,
+              quizId: quiz.id,
+              startedAt: new Date(),
+              totalQuestions: 0,
+              answers: [],
+            },
+          });
+        });
 
         const sessionCacheKey =
           ANALYTICS_CACHE_CONFIG.ASSESSMENT.ADAPTIVE_SESSION(userId, sessionId);
@@ -201,11 +246,23 @@ export class AssessmentAnalyticsService implements OnModuleInit {
     const session: AdaptiveQuizSession = JSON.parse(sessionData);
 
     try {
-      const currentQuestion = session.questions[session.currentQuestionIndex];
+      const currentQuestion = session.questions[
+        session.currentQuestionIndex
+      ] as AdaptiveQuestionWithOptions | undefined;
       if (!currentQuestion || currentQuestion.id !== dto.questionId) {
-        throw new Error(`Question ${dto.questionId} not found in session`);
+        throw new BadRequestException(
+          `Question ${dto.questionId} is not the current question in this session`,
+        );
       }
 
+      if (
+        typeof dto.answerData !== 'string' ||
+        !currentQuestion.options?.some((option) => option.id === dto.answerData)
+      ) {
+        throw new BadRequestException(
+          'The selected option does not belong to the current question',
+        );
+      }
       const gradingResult = QuizUtils.gradeAnswer(
         currentQuestion,
         dto.answerData,
@@ -246,6 +303,15 @@ export class AssessmentAnalyticsService implements OnModuleInit {
           createdAt: new Date(),
         },
       });
+      await Promise.all(
+        currentQuestion.topicIds.map((topicId) =>
+          this.updateBktForAssessment(
+            session.userId,
+            topicId,
+            gradingResult.isCorrect,
+          ),
+        ),
+      );
 
       // Advance question index
       session.currentQuestionIndex++;
@@ -253,49 +319,33 @@ export class AssessmentAnalyticsService implements OnModuleInit {
       let nextQuestion: Question | undefined;
 
       if (shouldContinue) {
-        // Use gRPC to get next adaptive question from Rust
-        try {
-          const grpcResp = await this.callGrpcWithTimeout(
-            this.analyticsServiceGrpc.getNextAdaptiveQuestion({
-              userId: session.userId,
-            }),
-            this.grpcTimeoutMs,
-          );
-
-          if ((grpcResp as any).question_id) {
-            nextQuestion =
-              (await this.prisma.question.findUnique({
-                where: { id: (grpcResp as any).question_id },
-                include: { options: true },
-              })) || undefined;
-
-            if (nextQuestion) {
-              session.questions.push(nextQuestion);
-            }
-          }
-
-          await this.performanceMetrics.recordMetric({
-            endpoint: ANALYTICS_METRICS_CONFIG.ENDPOINTS.ASSESSMENT,
-            method: 'submitAnswer/getNextAdaptiveQuestion',
-            provider: ANALYTICS_METRICS_CONFIG.PROVIDERS.GRPC,
+        const grpcResp = await this.callGrpcWithTimeout(
+          this.analyticsServiceGrpc.getNextAdaptiveQuestion({
             userId: session.userId,
-            responseTimeMs: Date.now() - startTime,
-            cacheHit: false,
-            success: true,
-            timestamp: new Date(),
-          });
-        } catch (grpcErr) {
-          this.logger.warn(
-            `gRPC getNextAdaptiveQuestion failed: ${getErrorMessage(grpcErr)}, falling back to local selection`,
-          );
-
-          // Local fallback selection
+            courseId: session.courseId ?? '',
+            unitId: session.unitId ?? '',
+          }),
+          this.grpcTimeoutMs,
+        );
+        if (grpcResp.question_id) {
           nextQuestion =
-            (await this.selectNextQuestionFallback(session)) || undefined;
-          if (nextQuestion) {
-            session.questions.push(nextQuestion);
-          }
+            (await this.findAdaptiveQuestion(
+              grpcResp.question_id,
+              session,
+            )) || undefined;
         }
+        await this.performanceMetrics.recordMetric({
+          endpoint: ANALYTICS_METRICS_CONFIG.ENDPOINTS.ASSESSMENT,
+          method: 'submitAnswer/getNextAdaptiveQuestion',
+          provider: ANALYTICS_METRICS_CONFIG.PROVIDERS.GRPC,
+          userId: session.userId,
+          responseTimeMs: Date.now() - startTime,
+          cacheHit: false,
+          success: true,
+          timestamp: new Date(),
+        });
+        if (!nextQuestion) session.isComplete = true;
+        else session.questions.push(nextQuestion);
       } else {
         session.isComplete = true;
       }
@@ -329,23 +379,37 @@ export class AssessmentAnalyticsService implements OnModuleInit {
           ? (correct / session.responses.length) * 100
           : 0;
 
-      await this.prisma.quizAttempt.create({
-        data: {
-          userId: session.userId,
-          quizId: session.sessionId,
-          answers: session.responses,
-          score: session.finalScore,
-          maxScore: 100,
-          percentage: session.finalScore,
-          timeTaken: session.responses.reduce(
-            (sum, r) => sum + r.responseTime,
-            0,
-          ),
-          isPassed: session.finalScore >= 70,
-          startedAt: new Date(),
-          completedAt: new Date(),
-        },
+      const attempt = await this.prisma.quizAttempt.findFirst({
+        where: { id: session.sessionId, userId: session.userId },
+        select: { id: true, quizId: true, startedAt: true },
       });
+      if (!attempt) {
+        throw new Error(`Adaptive quiz attempt ${session.sessionId} was not found`);
+      }
+
+      await this.prisma.$transaction([
+        this.prisma.quizAttempt.update({
+          where: { id: attempt.id },
+          data: {
+            answers: session.responses as Prisma.InputJsonValue,
+            score: session.finalScore,
+            maxScore: 100,
+            percentage: session.finalScore,
+            timeTaken: session.responses.reduce(
+              (sum, response) => sum + response.responseTime,
+              0,
+            ),
+            isPassed: session.finalScore >= 70,
+            correctAnswers: correct,
+            totalQuestions: session.responses.length,
+            completedAt: new Date(),
+          },
+        }),
+        this.prisma.quiz.update({
+          where: { id: attempt.quizId },
+          data: { questionCount: session.responses.length },
+        }),
+      ]);
 
       const sessionCacheKey =
         ANALYTICS_CACHE_CONFIG.ASSESSMENT.ADAPTIVE_SESSION(
@@ -387,39 +451,33 @@ export class AssessmentAnalyticsService implements OnModuleInit {
   async getNextAdaptiveQuestion(userId: string): Promise<{
     questionId: string;
     recommendedDifficulty: number;
-  } | null> {
+  }> {
     const startTime = Date.now();
-
-    try {
-      // Try gRPC
-      const grpcResp = await this.callGrpcWithTimeout(
-        this.analyticsServiceGrpc.getNextAdaptiveQuestion({
-          userId: userId,
-        }),
-        this.grpcTimeoutMs,
+    const grpcResp = await this.callGrpcWithTimeout(
+      this.analyticsServiceGrpc.getNextAdaptiveQuestion({ userId }),
+      this.grpcTimeoutMs,
+    );
+    if (!grpcResp.question_id) {
+      throw new NotFoundException(
+        'Rust analytics found no eligible adaptive question',
       );
-
-      await this.performanceMetrics.recordMetric({
-        endpoint: ANALYTICS_METRICS_CONFIG.ENDPOINTS.ASSESSMENT,
-        method: 'getNextAdaptiveQuestion',
-        provider: ANALYTICS_METRICS_CONFIG.PROVIDERS.GRPC,
-        userId,
-        responseTimeMs: Date.now() - startTime,
-        cacheHit: false,
-        success: true,
-        timestamp: new Date(),
-      });
-
-      return {
-        questionId: (grpcResp as any).question_id,
-        recommendedDifficulty: (grpcResp as any).recommended_difficulty || 0.5,
-      };
-    } catch (grpcErr) {
-      this.logger.warn(
-        `gRPC getNextAdaptiveQuestion failed: ${getErrorMessage(grpcErr)}`,
-      );
-      return null;
     }
+
+    await this.performanceMetrics.recordMetric({
+      endpoint: ANALYTICS_METRICS_CONFIG.ENDPOINTS.ASSESSMENT,
+      method: 'getNextAdaptiveQuestion',
+      provider: ANALYTICS_METRICS_CONFIG.PROVIDERS.GRPC,
+      userId,
+      responseTimeMs: Date.now() - startTime,
+      cacheHit: false,
+      success: true,
+      timestamp: new Date(),
+    });
+
+    return {
+      questionId: grpcResp.question_id,
+      recommendedDifficulty: grpcResp.recommended_difficulty,
+    };
   }
 
   // ----------------- Recommendations helpers (gRPC-first) -----------------
@@ -436,7 +494,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
       this.logger.error(
         `getRelatedResources gRPC failure: ${getErrorMessage(error)}`,
       );
-      return [];
+      throw error;
     }
   }
 
@@ -456,7 +514,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
       this.logger.error(
         `generateStudyRecommendations gRPC failure: ${getErrorMessage(error)}`,
       );
-      return [];
+      throw error;
     }
   }
 
@@ -470,7 +528,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
       this.logger.error(
         `generateNextSteps gRPC failure: ${getErrorMessage(error)}`,
       );
-      return [];
+      throw error;
     }
   }
 
@@ -500,38 +558,26 @@ export class AssessmentAnalyticsService implements OnModuleInit {
     };
   }
 
-  /**
-   * Local fallback for selecting the next adaptive question when gRPC is unavailable.
-   * Uses basic difficulty matching based on user ability.
-   */
-  private async selectNextQuestionFallback(
+  private async findAdaptiveQuestion(
+    questionId: string,
     session: AdaptiveQuizSession,
   ): Promise<Question | null> {
-    const usedQuestionIds = session.questions.map((q) => q.id);
-
-    // Simple difficulty mapping: userAbility (0-1) -> QuestionDifficulty
-    let targetDifficulty: 'easy' | 'medium' | 'hard' = 'medium';
-    if (session.userAbility < 0.4) {
-      targetDifficulty = 'easy';
-    } else if (session.userAbility > 0.7) {
-      targetDifficulty = 'hard';
-    }
-
-    const questions = await this.prisma.question.findMany({
+    return this.prisma.question.findFirst({
       where: {
+        id: {
+          equals: questionId,
+          notIn: session.questions.map((question) => question.id),
+        },
         isActive: true,
-        difficulty: targetDifficulty as any,
-        id: { notIn: usedQuestionIds },
+        type: { in: [QuestionType.multiple_choice, QuestionType.true_false] },
+        ...(session.unitId
+          ? { unitId: session.unitId }
+          : session.courseId
+            ? { courseId: session.courseId }
+            : {}),
       },
-      take: 5,
+      include: { options: true },
     });
-
-    if (questions.length === 0) {
-      return null;
-    }
-
-    // Pick a random one from the top 5
-    return questions[Math.floor(Math.random() * questions.length)];
   }
 
   onModuleInit() {
@@ -624,6 +670,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
       this.logger.warn(
         `Could not record prediction outcome for assessment ${assessmentId}: ${getErrorMessage(error)}`,
       );
+      throw error;
     }
   }
 
@@ -716,29 +763,18 @@ export class AssessmentAnalyticsService implements OnModuleInit {
     skillId: string,
     isCorrect: boolean,
   ): Promise<void> {
-    try {
-      // Fire-and-forget gRPC call
-      this.callGrpc(
-        this.analyticsServiceGrpc.updateBkt({
-          userId: userId,
-          skillId: skillId,
-          isCorrect: isCorrect,
-        }),
-      ).catch((err) => {
-        this.logger.warn(
-          `Failed to update BKT for assessment: ${getErrorMessage(err)}`,
-        );
-      });
-
-      // Invalidate prediction cache
-      const cacheKey = ANALYTICS_CACHE_CONFIG.ASSESSMENT.PREDICTIONS(
+    await this.callGrpc(
+      this.analyticsServiceGrpc.updateBkt({
         userId,
         skillId,
-      );
-      await this.redisService.del(cacheKey);
-    } catch (error) {
-      this.logger.error(`Failed to update BKT: ${getErrorMessage(error)}`);
-    }
+        isCorrect,
+      }),
+    );
+    const cacheKey = ANALYTICS_CACHE_CONFIG.ASSESSMENT.PREDICTIONS(
+      userId,
+      skillId,
+    );
+    await this.redisService.del(cacheKey);
   }
 
   /**
@@ -793,7 +829,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
           error,
         )}`,
       );
-      return [];
+      throw error;
     }
   }
 
@@ -852,12 +888,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
           error,
         )}`,
       );
-      return {
-        averageScore: 0,
-        passRate: 0,
-        weaknessAreas: [],
-        strengthAreas: [],
-      };
+      throw error;
     }
   }
 
@@ -906,7 +937,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
       this.logger.error(
         `Failed to get focus recommendations via gRPC: ${getErrorMessage(error)}`,
       );
-      return [];
+      throw error;
     }
   }
 
@@ -923,7 +954,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
       this.logger.error(
         `Failed to get due cards via gRPC: ${getErrorMessage(error)}`,
       );
-      return [];
+      throw error;
     }
   }
 
@@ -960,6 +991,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
           error,
         )}`,
       );
+      throw error;
     }
   }
 
@@ -1017,7 +1049,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
       this.logger.error(
         `Error in predictPerformance via gRPC: ${getErrorMessage(error)}`,
       );
-      return { score: 0 };
+      throw error;
     }
   }
 
@@ -1073,20 +1105,15 @@ export class AssessmentAnalyticsService implements OnModuleInit {
         return analytics;
       } catch (grpcErr) {
         this.logger.warn(
-          `gRPC getPerformanceAnalytics failed, returning default: ${getErrorMessage(grpcErr)}`,
+          `gRPC getPerformanceAnalytics failed: ${getErrorMessage(grpcErr)}`,
         );
-        return {
-          userId,
-          totalAssessments: 0,
-          averageScore: 0,
-          performanceBySkill: {},
-        };
+        throw grpcErr;
       }
     } catch (error) {
       this.logger.error(
         `Error in getPerformanceAnalytics: ${getErrorMessage(error)}`,
       );
-      return null;
+      throw error;
     }
   }
 
@@ -1110,9 +1137,10 @@ export class AssessmentAnalyticsService implements OnModuleInit {
       try {
         const startTime = Date.now();
         const grpcResp = await this.callGrpc(
-          this.analyticsServiceGrpc.updateBktSkillMetrics({
-            userId: userId,
-            skillId: skillId,
+          this.analyticsServiceGrpc.predictBkt({
+            userId,
+            skillId,
+            featureVector: [],
           }),
         );
         const responseTimeMs = Date.now() - startTime;
@@ -1130,8 +1158,9 @@ export class AssessmentAnalyticsService implements OnModuleInit {
 
         const result = {
           skillId,
-          probabilityKnown: (grpcResp as any).probability_known || 0,
-          attempts: previousAttempts || 0,
+          probabilityKnown: grpcResp.p_known,
+          probabilityNextCorrect: grpcResp.p_next_correct,
+          attempts: previousAttempts,
         };
 
         await this.redisService.set(
@@ -1142,17 +1171,13 @@ export class AssessmentAnalyticsService implements OnModuleInit {
         return result;
       } catch (grpcErr) {
         this.logger.warn(
-          `gRPC predictWithBKT failed, returning default: ${getErrorMessage(grpcErr)}`,
+          `gRPC predictWithBKT failed: ${getErrorMessage(grpcErr)}`,
         );
-        return {
-          skillId,
-          probabilityKnown: 0,
-          attempts: previousAttempts || 0,
-        };
+        throw grpcErr;
       }
     } catch (error) {
       this.logger.error(`Error in predictWithBKT: ${getErrorMessage(error)}`);
-      return null;
+      throw error;
     }
   }
 
@@ -1189,7 +1214,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
           timestamp: new Date(),
         });
 
-        const data = grpcResp || { burnoutScore: 0, riskLevel: 'low' };
+        const data = grpcResp;
         await this.redisService.set(
           cacheKey,
           JSON.stringify(data),
@@ -1200,13 +1225,13 @@ export class AssessmentAnalyticsService implements OnModuleInit {
         this.logger.warn(
           `gRPC predictWithBurnModel failed: ${getErrorMessage(grpcErr)}`,
         );
-        return { burnoutScore: 0, riskLevel: 'low' };
+        throw grpcErr;
       }
     } catch (error) {
       this.logger.error(
         `Error in predictWithBurnModel: ${getErrorMessage(error)}`,
       );
-      return null;
+      throw error;
     }
   }
 
@@ -1253,18 +1278,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
       this.logger.warn(
         `generateAnalytics gRPC failure: ${getErrorMessage(error)}`,
       );
-      return {
-        userId,
-        overallScore: 0,
-        totalAttempts: 0,
-        correctAnswers: 0,
-        weakAreas: [],
-        progressTrend: {},
-        averageTimePerQuestion: 0,
-        timePerQuestion: 0,
-        strengths: [],
-        weaknesses: [],
-      };
+      throw error;
     }
   }
 
@@ -1278,34 +1292,21 @@ export class AssessmentAnalyticsService implements OnModuleInit {
     return analytics.weaknessAreas || [];
   }
 
-  /**
-   * Analyze the difficulty of a question for the given user. This is gRPC-first
-   * but has a local heuristic fallback based on question.difficulty and recent
-   * user history.
-   */
-  async analyzeDifficulty(userId: string, question: any): Promise<any> {
-    try {
-      // Strictly gRPC
-      const resp: any = await this.callGrpc(
-        this.grpc().analyzeQuestionDifficulty({ userId, question }),
-      );
-      return resp;
-    } catch (error) {
-      this.logger.warn(
-        `analyzeDifficulty gRPC failure: ${getErrorMessage(error)}`,
-      );
-      return {
-        difficultyScore: 0.5,
-        suggestion: 'Unable to analyze via gRPC.',
-      };
-    }
+  async analyzeDifficulty(
+    userId: string,
+    question: Pick<Question, 'id'>,
+  ): Promise<{ difficultyScore: number; suggestion: string; sampleSize: number }> {
+    return this.callGrpc(
+      this.analyticsServiceGrpc.analyzeQuestionDifficulty({
+        userId,
+        questionId: question.id,
+      }),
+    );
   }
 
   /**
    * Backwards-compatible wrapper used by education callers to fetch
-   * a user performance profile. This prefers gRPC but will fall back
-   * to a lightweight local profile derived from the DB when gRPC is
-   * unavailable.
+   * a user performance profile from Rust analytics.
    */
   async getUserPerformanceProfile(userId: string): Promise<any> {
     try {
@@ -1323,13 +1324,12 @@ export class AssessmentAnalyticsService implements OnModuleInit {
       this.logger.warn(
         `getUserPerformanceProfile gRPC failure: ${getErrorMessage(error)}`,
       );
-      return { userId, overallScore: 0, strengths: [], weaknesses: [] };
+      throw error;
     }
   }
 
   /**
-   * Wrapper to fetch a user's quiz/assessment attempt history. Prefers gRPC, falls
-   * back to reading a small slice from the DB so callers can continue to function.
+   * Fetch a user's quiz/assessment attempt history from Rust analytics.
    */
   async getQuizAttemptHistory(
     userId: string,
@@ -1349,7 +1349,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
       this.logger.warn(
         `getQuizAttemptHistory gRPC failure: ${getErrorMessage(error)}`,
       );
-      return [];
+      throw error;
     }
   }
 
@@ -1403,7 +1403,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
       this.logger.error(
         `Failed to get mastery via gRPC: ${getErrorMessage(error)}`,
       );
-      return {};
+      throw error;
     }
   }
 
@@ -1473,17 +1473,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
       this.logger.warn(
         `getSpacedRepetitionStats gRPC failure: ${getErrorMessage(error)}`,
       );
-      // Return safe defaults
-      return {
-        totalCards: 0,
-        dueToday: 0,
-        masteredCards: 0,
-        learningCards: 0,
-        relearningCards: 0,
-        avgEaseFactor: 2.5,
-        avgIntervalDays: 0,
-        recentPassRate: 0,
-      };
+      throw error;
     }
   }
 
@@ -1491,28 +1481,22 @@ export class AssessmentAnalyticsService implements OnModuleInit {
    * Update question statistics after answer.
    * Proxies to Rust for async difficulty recalculation.
    */
-  updateQuestionStats(
+  async updateQuestionStats(
     questionId: string,
     isCorrect: boolean,
     responseTimeMs: number,
   ): Promise<void> {
     try {
-      // Fire-and-forget gRPC call
-      void this.callGrpc(
+      await this.callGrpc(
         this.analyticsServiceGrpc.updateQuestionStatistics({
           questionId: questionId,
           isCorrect: isCorrect,
           responseTimeMs: responseTimeMs,
         }),
-      ).catch((err) => {
-        this.logger.warn(
-          `Failed to update question stats via gRPC: ${getErrorMessage(err)}`,
-        );
-      });
-      return Promise.resolve();
+      );
     } catch (error) {
       this.logger.error(`updateQuestionStats error: ${getErrorMessage(error)}`);
-      return Promise.resolve();
+      throw error;
     }
   }
 

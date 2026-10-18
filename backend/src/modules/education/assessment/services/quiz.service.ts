@@ -16,13 +16,24 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { QuizUtils } from '#common/utils/quiz.utils';
 import { QuizAnswerDto, CreateQuizDto } from '#common/dto/assessment.dto';
+import {
+  ImportQuizDto,
+  QuestionBankFilters,
+} from '#common/dto/question-bank.dto';
 import { QuestionBankService } from './question-bank.service';
 import { FlashcardsService } from './flashcards.service';
+import {
+  AssessmentRecommendationService,
+  QuizPerformanceRecommendations,
+} from './assessment-recommendation.service';
 
 import { GlobalSearchSyncService } from '../../../../infrastructure/search/services/global-search-sync.service';
 import { MaxAttemptsExceededException } from '#common/exceptions/quiz.exception';
 
-type PublicQuizQuestion = Omit<Question, 'options'> & {
+type PublicQuizQuestion = Omit<
+  Question,
+  'options' | 'explanation' | 'choices' | 'metadata'
+> & {
   options: Array<Pick<Option, 'id' | 'text' | 'order'>>;
 };
 
@@ -41,7 +52,219 @@ export class QuizService {
     private readonly searchSync: GlobalSearchSyncService,
     private readonly eventEmitter: EventEmitter2,
     private readonly flashcardsService: FlashcardsService,
+    private readonly recommendationService: AssessmentRecommendationService,
   ) {}
+
+  async importQuiz(data: ImportQuizDto, creatorId: string): Promise<Quiz> {
+    let { courseId, unitId, topicId } = data;
+    if (unitId) {
+      const unit = await this.prisma.unit.findUnique({
+        where: { id: unitId },
+        select: { id: true, courseId: true },
+      });
+      if (!unit) throw new NotFoundException(`Unit ${unitId} not found`);
+      if (courseId && courseId !== unit.courseId) {
+        throw new BadRequestException('The selected unit does not belong to the course');
+      }
+      courseId = unit.courseId;
+    }
+
+    if (topicId) {
+      const topic = await this.prisma.topic.findUnique({
+        where: { id: topicId },
+        select: { id: true, unitId: true, unit: { select: { courseId: true } } },
+      });
+      if (!topic) throw new NotFoundException(`Topic ${topicId} not found`);
+      if (unitId && unitId !== topic.unitId) {
+        throw new BadRequestException('The selected topic does not belong to the unit');
+      }
+      unitId = topic.unitId;
+      courseId = topic.unit.courseId;
+    }
+
+    const preparedQuestions = data.questions.map((question) => {
+      this.questionBankService.validateQuestionOptions(
+        question.type,
+        question.options,
+      );
+      return {
+        ...question,
+        courseId: question.courseId ?? courseId,
+        unitId: question.unitId ?? unitId,
+        topicIds:
+          question.topicIds?.length
+            ? question.topicIds
+            : data.topicId
+              ? [data.topicId]
+              : [],
+      };
+    });
+    for (const question of preparedQuestions) {
+      await this.questionBankService.validateCourseAndUnit(
+        question.courseId,
+        question.unitId,
+      );
+    }
+
+    const topicIds = [...new Set(preparedQuestions.flatMap((q) => q.topicIds))];
+    if (topicIds.length > 0) {
+      const topics = await this.prisma.topic.findMany({
+        where: { id: { in: topicIds } },
+        select: { id: true, unitId: true, unit: { select: { courseId: true } } },
+      });
+      if (topics.length !== topicIds.length) {
+        throw new BadRequestException('One or more question topic IDs do not exist');
+      }
+      const topicsById = new Map(topics.map((topic) => [topic.id, topic]));
+      for (const question of preparedQuestions) {
+        for (const topicId of question.topicIds) {
+          const topic = topicsById.get(topicId)!;
+          if (question.unitId && topic.unitId !== question.unitId) {
+            throw new BadRequestException(
+              `Topic ${topicId} does not belong to question unit ${question.unitId}`,
+            );
+          }
+          if (question.courseId && topic.unit.courseId !== question.courseId) {
+            throw new BadRequestException(
+              `Topic ${topicId} does not belong to question course ${question.courseId}`,
+            );
+          }
+        }
+      }
+    }
+
+    const quiz = await this.prisma.$transaction(async (tx) => {
+      const questionRecords: Array<{ questionId: string; order: number }> = [];
+      for (const [index, question] of preparedQuestions.entries()) {
+        const createdQuestion = await tx.question.create({
+          data: {
+            text: question.questionText,
+            type: question.type,
+            difficulty: question.difficulty,
+            category: question.category,
+            explanation: question.explanation,
+            conceptsCovered: question.conceptsCovered ?? [],
+            tags: question.tags ?? [],
+            topicIds: question.topicIds,
+            points: question.points ?? 1,
+            courseId: question.courseId,
+            unitId: question.unitId,
+            difficultyIndex: QuizUtils.getDifficultyIndex(question.difficulty),
+            createdBy: creatorId,
+            isActive: true,
+            options: {
+              create: question.options.map((option, optionOrder) => ({
+                text: option.text,
+                isCorrect: option.isCorrect ?? false,
+                order: optionOrder,
+              })),
+            },
+          },
+          select: { id: true },
+        });
+        questionRecords.push({ questionId: createdQuestion.id, order: index + 1 });
+      }
+
+      const createdQuiz = await tx.quiz.create({
+        data: {
+          title: data.title,
+          description: data.description,
+          unitId,
+          topicId,
+          passingScore: data.passingScore ?? 70,
+          isPublished: data.isPublished ?? false,
+          publishedAt: data.isPublished ? new Date() : null,
+          createdBy: creatorId,
+          questionCount: questionRecords.length,
+          questions: { create: questionRecords },
+        },
+      });
+      return createdQuiz;
+    });
+
+    await this.invalidateAssessmentCaches(
+      [
+        ...new Set(preparedQuestions.map((question) => question.unitId).filter(
+          (id): id is string => Boolean(id),
+        )),
+        ...(unitId ? [unitId] : []),
+      ],
+      [
+        ...new Set(preparedQuestions.flatMap((question) => question.topicIds)),
+        ...(topicId ? [topicId] : []),
+      ],
+    );
+    await this.searchSync.syncEntity('quiz', quiz.id);
+    return quiz;
+  }
+
+  private async invalidateAssessmentCaches(
+    unitIds: string[] = [],
+    topicIds: string[] = [],
+  ): Promise<void> {
+    await Promise.all([
+      this.redisService.delPattern('questions:*'),
+      this.redisService.delPattern('quizzes:*'),
+      ...unitIds.flatMap((unitId) => [
+        this.redisService.del(`unit:${unitId}:questions:v2`),
+        this.redisService.del(`unit_quiz:${unitId}`),
+      ]),
+      ...topicIds.map((topicId) =>
+        this.redisService.del(`topic:${topicId}:questions:v2`),
+      ),
+    ]);
+  }
+
+  async getQuestionBank(filters: QuestionBankFilters) {
+    return this.questionBankService.findQuestions({
+      ...filters,
+      page: Math.max(1, Number(filters.page) || 1),
+      limit: Math.min(100, Math.max(1, Number(filters.limit) || 20)),
+    });
+  }
+
+  private toPublicQuizQuestion(
+    question: Question & {
+      options: Array<Pick<Option, 'id' | 'text' | 'order'>>;
+    },
+  ): PublicQuizQuestion {
+    const {
+      options,
+      explanation,
+      choices,
+      metadata,
+      ...publicQuestion
+    } = question;
+    void explanation;
+    void choices;
+    void metadata;
+    return {
+      ...publicQuestion,
+      options: options.map(({ id, text, order }) => ({ id, text, order })),
+    };
+  }
+
+  async publishQuiz(quizId: string, creatorId: string): Promise<Quiz> {
+    const quiz = await this.prisma.quiz.findUnique({ where: { id: quizId } });
+    if (!quiz) throw new NotFoundException(`Quiz ${quizId} not found`);
+    if (quiz.createdBy !== creatorId) {
+      throw new BadRequestException('Only the quiz creator can publish this quiz');
+    }
+    if (quiz.questionCount < 1) {
+      throw new BadRequestException('A quiz must contain at least one question before publishing');
+    }
+
+    const publishedQuiz = await this.prisma.quiz.update({
+      where: { id: quizId },
+      data: { isPublished: true, publishedAt: quiz.publishedAt ?? new Date() },
+    });
+    await this.invalidateAssessmentCaches(
+      quiz.unitId ? [quiz.unitId] : [],
+      quiz.topicId ? [quiz.topicId] : [],
+    );
+    await this.searchSync.syncEntity('quiz', quizId);
+    return publishedQuiz;
+  }
 
   @ApiOperation({ summary: 'Create a new quiz' })
   @ApiResponse({ status: 201, description: 'Quiz created successfully' })
@@ -337,12 +560,14 @@ export class QuizService {
     });
 
     const questions: PublicQuizQuestion[] = quiz
-      ? quiz.questions.map(({ question }) => question)
+      ? quiz.questions.map(({ question }) =>
+          this.toPublicQuizQuestion(question),
+        )
       : await this.prisma.question.findMany({
-          where: { unitId },
+          where: { unitId, isActive: true },
           orderBy: { createdAt: 'desc' },
           include: optionInclude,
-        });
+        }).then((items) => items.map((question) => this.toPublicQuizQuestion(question)));
 
     // Return an empty array when no questions exist for the unit instead of throwing
     // This allows callers (and tests) to handle empty quizzes gracefully.
@@ -352,9 +577,16 @@ export class QuizService {
 
   async getQuestionsByAssessmentId(
     assessmentId: string,
+    userId: string,
   ): Promise<PublicQuizQuestion[]> {
     const quiz = await this.prisma.quiz.findFirst({
-      where: { id: assessmentId, isPublished: true },
+      where: {
+        id: assessmentId,
+        OR: [
+          { isPublished: true },
+          { autoGeneratedQuizzes: { some: { userId } } },
+        ],
+      },
       include: {
         questions: {
           orderBy: { order: 'asc' },
@@ -378,7 +610,9 @@ export class QuizService {
       );
     }
 
-    return quiz.questions.map(({ question }) => question);
+    return quiz.questions.map(({ question }) =>
+      this.toPublicQuizQuestion(question),
+    );
   }
 
   @ApiOperation({ summary: 'Get questions for a topic' })
@@ -398,6 +632,7 @@ export class QuizService {
 
     const questions = await this.prisma.question.findMany({
       where: {
+        isActive: true,
         topicIds: {
           has: topicId,
         },
@@ -411,8 +646,11 @@ export class QuizService {
       },
     });
 
-    await this.redisService.set(cacheKey, JSON.stringify(questions), 3600);
-    return questions;
+    const publicQuestions = questions.map((question) =>
+      this.toPublicQuizQuestion(question),
+    );
+    await this.redisService.set(cacheKey, JSON.stringify(publicQuestions), 3600);
+    return publicQuestions;
   }
 
   @ApiOperation({ summary: 'Get rapid review questions for a user' })
@@ -515,7 +753,7 @@ export class QuizService {
     userId: string,
     unitId: string,
     answers: QuizAnswerDto[],
-  ): Promise<QuizAttempt> {
+  ): Promise<QuizAttempt & { recommendations: QuizPerformanceRecommendations }> {
     const quizInclude = {
       questions: {
         include: {
@@ -526,8 +764,14 @@ export class QuizService {
       },
       unit: { select: { courseId: true } },
     };
-    let quiz = await this.prisma.quiz.findUnique({
-      where: { id: unitId },
+    let quiz = await this.prisma.quiz.findFirst({
+      where: {
+        id: unitId,
+        OR: [
+          { isPublished: true },
+          { autoGeneratedQuizzes: { some: { userId } } },
+        ],
+      },
       include: quizInclude,
     });
     if (!quiz) {
@@ -547,6 +791,20 @@ export class QuizService {
     }
 
     const activeQuiz = quiz;
+
+    const submittedQuestionIds = answers.map((answer) => answer.questionId);
+    const expectedQuestionIds = activeQuiz.questions.map(
+      (quizQuestion) => quizQuestion.questionId,
+    );
+    if (
+      submittedQuestionIds.length !== expectedQuestionIds.length ||
+      new Set(submittedQuestionIds).size !== submittedQuestionIds.length ||
+      expectedQuestionIds.some((questionId) => !submittedQuestionIds.includes(questionId))
+    ) {
+      throw new BadRequestException(
+        'A quiz submission must contain exactly one answer for every quiz question',
+      );
+    }
 
     const existingAttempts = await this.prisma.quizAttempt.count({
       where: { userId, quizId: activeQuiz.id },
@@ -667,7 +925,7 @@ export class QuizService {
 
       await this.progressService.updateProgress(userId, activeQuiz.id, {
         isPassed,
-        completionPercentage: scorePercentage,
+        completionPercentage: 100,
         bestScore: scorePercentage,
         totalAttempts: existingAttempts + 1,
       });
@@ -747,7 +1005,17 @@ export class QuizService {
       }),
     );
 
-    return result.attempt;
+    const recommendations = await this.recommendationService.recommendForAnswers(
+      userId,
+      {
+        topicId: activeQuiz.topicId,
+        unitId: activeQuiz.unitId,
+        courseId: activeQuiz.unit?.courseId,
+      },
+      [...reviewAnswersByTopic.values()].flat(),
+    );
+
+    return { ...result.attempt, recommendations };
   }
 
   @ApiOperation({ summary: 'Submit a topic-level quiz' })
@@ -755,7 +1023,7 @@ export class QuizService {
   async submitTopicQuiz(
     userId: string,
     topicId: string,
-    responses: any[],
+    responses: Array<{ questionId: string; selectedAnswers: string[] }>,
   ): Promise<{
     score: number;
     feedback: string;
@@ -764,51 +1032,129 @@ export class QuizService {
     nextTopicUnlocked: boolean;
     nextTopicId?: string;
     reviewCardsScheduled: number;
+    recommendations: QuizPerformanceRecommendations;
   }> {
     try {
       const topic = await this.prisma.topic.findUnique({
         where: { id: topicId },
-        select: { id: true },
+        select: {
+          id: true,
+          unitId: true,
+          unit: { select: { courseId: true } },
+        },
       });
       if (!topic) throw new NotFoundException(`Topic with ID ${topicId} not found`);
-      if (!Array.isArray(responses) || responses.length === 0) {
-        throw new BadRequestException('At least one topic quiz response is required');
+      if (
+        !Array.isArray(responses) ||
+        responses.length === 0 ||
+        responses.length > 100 ||
+        responses.some((response) => !response || typeof response !== 'object')
+      ) {
+        throw new BadRequestException('Topic quiz responses must contain 1–100 answer objects');
       }
 
-      // Batch-fetch all submitted questions in a single query (prevents N+1)
       const questionIds = responses.map((r) => r.questionId);
+      if (
+        questionIds.some((id) => typeof id !== 'string' || !id) ||
+        new Set(questionIds).size !== questionIds.length
+      ) {
+        throw new BadRequestException('Topic quiz responses contain invalid or duplicate question IDs');
+      }
       const fetchedQuestions = await this.prisma.question.findMany({
-        where: { id: { in: questionIds } },
+        where: { topicIds: { has: topicId }, isActive: true },
         include: { options: true },
       });
+      if (
+        fetchedQuestions.length !== questionIds.length ||
+        fetchedQuestions.some((question) => !questionIds.includes(question.id))
+      ) {
+        throw new BadRequestException(
+          'A topic quiz must answer every current question exactly once',
+        );
+      }
       const questionMap = new Map(fetchedQuestions.map((q) => [q.id, q]));
+      const selectedAnswersByQuestion = new Map<string, string[]>();
 
       let score = 0;
+      let correctAnswers = 0;
       let totalPoints = 0;
       const reviewAnswers: Array<{ questionId: string; isCorrect: boolean }> = [];
 
       for (const response of responses) {
         const question = questionMap.get(response.questionId);
-        if (!question || !question.topicIds.includes(topicId)) {
+        if (!question || !Array.isArray(response.selectedAnswers)) {
           throw new BadRequestException('A submitted question does not belong to this topic');
+        }
+
+        const selectedIds = response.selectedAnswers;
+        if (
+          selectedIds.some((id) => typeof id !== 'string') ||
+          new Set(selectedIds).size !== selectedIds.length
+        ) {
+          throw new BadRequestException('A topic quiz response contains invalid or duplicate options');
+        }
+        const optionIds = new Set(question.options.map((option) => option.id));
+        if (selectedIds.some((id) => !optionIds.has(id))) {
+          throw new BadRequestException('A selected option does not belong to its question');
         }
 
         totalPoints += question.points || 1;
         const correctOptions = question.options.filter(option => option.isCorrect);
-        const selectedIds: string[] = Array.isArray(response.selectedAnswers)
-          ? response.selectedAnswers
-          : [];
         const isCorrect =
           correctOptions.length === selectedIds.length &&
           correctOptions.every(option => selectedIds.includes(option.id));
         if (isCorrect) {
           score += question.points || 1;
+          correctAnswers += 1;
         }
         reviewAnswers.push({ questionId: question.id, isCorrect });
+        selectedAnswersByQuestion.set(question.id, selectedIds);
       }
 
       const scorePercentage = totalPoints > 0 ? Math.round((score / totalPoints) * 100) : 0;
       const passed = scorePercentage >= 70;
+      await this.prisma.topicQuizAttempt.create({
+        data: {
+          userId,
+          topicId,
+          score: scorePercentage,
+          questionCount: responses.length,
+          correctAnswers,
+          responses: reviewAnswers.map((answer) => ({
+            questionId: answer.questionId,
+            isCorrect: answer.isCorrect,
+            selectedAnswers: selectedAnswersByQuestion.get(answer.questionId) ?? [],
+          })) as Prisma.InputJsonValue,
+        },
+      });
+      const recommendations = await this.recommendationService.recommendForAnswers(
+        userId,
+        { topicId, unitId: topic.unitId, courseId: topic.unit.courseId },
+        reviewAnswers,
+      );
+      this.eventEmitter.emit('assessment.completed', {
+        userId,
+        assessmentId: topicId,
+        courseId: topic.unit.courseId,
+        topicId,
+        score: scorePercentage,
+        maxScore: 100,
+        timestamp: new Date(),
+        attemptData: {
+          score: scorePercentage,
+          maxScore: 100,
+          passed,
+          progressPercentage: 100,
+          timestamp: new Date().toISOString(),
+        },
+      });
+      for (const answer of reviewAnswers) {
+        void this.analyticsService
+          .updateBktForAssessment(userId, topicId, answer.isCorrect)
+          .catch((error) =>
+            this.logger.warn(`Could not update topic mastery for ${topicId}: ${String(error)}`),
+          );
+      }
       const reviewCardsScheduled =
         await this.flashcardsService.recordTopicQuizReviews(
           userId,
@@ -845,6 +1191,7 @@ export class QuizService {
         nextTopicUnlocked: mastery.nextTopicUnlocked,
         nextTopicId: mastery.nextTopicId,
         reviewCardsScheduled,
+        recommendations,
       };
     } catch (error) {
       this.logger.error(`Error submitting topic quiz: ${String(error)}`);
@@ -878,6 +1225,7 @@ export class QuizService {
 
     const questions = await this.prisma.question.findMany({
       where: {
+        isActive: true,
         topicIds: { has: topicId },
       },
       select: {
@@ -1038,13 +1386,7 @@ export class QuizService {
         })),
       });
 
-      return tx.quiz.findUnique({
-        where: { id: createdQuiz.id },
-        include: {
-          questions: { include: { question: { include: { options: true } } } },
-          unit: true,
-        },
-      });
+      return createdQuiz;
     });
 
     if (!quiz) {

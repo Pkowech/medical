@@ -159,7 +159,7 @@ export class AdaptiveQuizAnalyticsService implements OnModuleInit {
   async getNextAdaptiveQuestion(userId: string): Promise<{
     questionId: string;
     recommendedDifficulty: number;
-  } | null> {
+  }> {
     return this.assessmentAnalyticsService.getNextAdaptiveQuestion(userId);
   }
 }

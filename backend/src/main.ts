@@ -15,6 +15,7 @@ import { AllExceptionsFilter } from '#common/filters/all-exceptions.filter';
 import { ConfigService } from '@nestjs/config';
 import helmet from 'helmet';
 import { rateLimit } from 'express-rate-limit';
+import { json, urlencoded } from 'express';
 
 async function logRoutes(app: INestApplication) {
   // Defer slightly to allow Nest/Express to finish wiring the router
@@ -64,7 +65,10 @@ async function logRoutes(app: INestApplication) {
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     bufferLogs: true,
+    bodyParser: false,
   });
+  app.use(json({ limit: '3mb' }));
+  app.use(urlencoded({ extended: true, limit: '3mb' }));
 
   const pinoLogger = app.get(PinoLogger);
   app.useLogger(pinoLogger);

@@ -33,7 +33,7 @@ impl QuizRepository for PostgresQuizRepository {
             query_str.push_str(
                 " AND EXISTS (SELECT 1 FROM quiz_questions qq \
                  JOIN questions q ON q.id = qq.question_id \
-                 WHERE qq.quiz_id = quiz_attempts.quiz_id AND q.skill_id = $2)",
+                 WHERE qq.quiz_id = quiz_attempts.quiz_id AND $2 = ANY(q.topic_ids))",
             );
             param_index += 1;
         }
@@ -64,21 +64,40 @@ impl QuizRepository for PostgresQuizRepository {
 
         let attempts = rows
             .into_iter()
-            .map(|row| {
-                let quiz_id: String = row.try_get("quiz_id").unwrap_or_default();
-                let score: Option<f64> = row.try_get("score").unwrap_or(None);
+            .map(|row| -> Result<QuizAttempt, AnalyticsError> {
+                let quiz_id: String = row.try_get("quiz_id").map_err(|e| {
+                    AnalyticsError::DatabaseError(format!("Invalid quiz ID in history: {}", e))
+                })?;
+                let score: Option<f64> = row.try_get("score").map_err(|e| {
+                    AnalyticsError::DatabaseError(format!("Invalid quiz score in history: {}", e))
+                })?;
                 let completed_at: Option<chrono::NaiveDateTime> =
-                    row.try_get("completed_at").unwrap_or(None);
+                    row.try_get("completed_at").map_err(|e| {
+                        AnalyticsError::DatabaseError(format!(
+                            "Invalid completion time in history: {}",
+                            e
+                        ))
+                    })?;
+                let score = score.ok_or_else(|| {
+                    AnalyticsError::DatabaseError(format!(
+                        "Completed quiz attempt for quiz {} has no score",
+                        quiz_id
+                    ))
+                })?;
+                let completed_at = completed_at.ok_or_else(|| {
+                    AnalyticsError::DatabaseError(format!(
+                        "Completed quiz attempt for quiz {} has no completion time",
+                        quiz_id
+                    ))
+                })?;
 
-                QuizAttempt {
+                Ok(QuizAttempt {
                     quiz_id,
-                    score: score.unwrap_or(0.0),
-                    date: completed_at
-                        .map(|dt| dt.and_utc().to_rfc3339())
-                        .unwrap_or_default(),
-                }
+                    score,
+                    date: completed_at.and_utc().to_rfc3339(),
+                })
             })
-            .collect();
+            .collect::<Result<Vec<_>, _>>()?;
 
         Ok(attempts)
     }
@@ -94,9 +113,12 @@ impl QuizRepository for PostgresQuizRepository {
 
         sqlx::query(
             r#"
-            INSERT INTO quiz_attempts (id, user_id, quiz_id, score, correct, attempted_at, attempt_date)
-            VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
-            "#
+            INSERT INTO quiz_attempts (
+                id, user_id, quiz_id, score, percentage, started_at, completed_at,
+                total_questions, correct_answers
+            )
+            VALUES ($1, $2, $3, $4, $4, NOW(), NOW(), 1, CASE WHEN $5 THEN 1 ELSE 0 END)
+            "#,
         )
         .bind(&id)
         .bind(user_id)
@@ -105,7 +127,9 @@ impl QuizRepository for PostgresQuizRepository {
         .bind(is_correct)
         .execute(&*self.pool)
         .await
-        .map_err(|e| AnalyticsError::DatabaseError(format!("Failed to record quiz attempt: {}", e)))?;
+        .map_err(|e| {
+            AnalyticsError::DatabaseError(format!("Failed to record quiz attempt: {}", e))
+        })?;
 
         Ok(id)
     }
@@ -116,53 +140,47 @@ impl QuizRepository for PostgresQuizRepository {
         skill_id: &str,
         limit: i64,
     ) -> Result<(i64, i64), AnalyticsError> {
-        // Get correct count
-        let correct_count: i64 = sqlx::query_scalar(
+        let row = sqlx::query(
             r#"
-            SELECT COUNT(*)
-            FROM quiz_attempts
-            WHERE user_id = $1
-            AND question_id IN (
-                SELECT id FROM questions WHERE skill_id = $2
+            SELECT
+                COUNT(*) FILTER (WHERE recent.is_correct) AS correct_count,
+                COUNT(*) AS total_count
+            FROM (
+                SELECT ur.is_correct
+                FROM user_responses ur
+                JOIN questions q ON q.id = ur.question_id
+                WHERE ur.user_id = $1
+                  AND $2 = ANY(q.topic_ids)
+                ORDER BY ur.created_at DESC
+                LIMIT $3
             )
-            AND correct = true
-            ORDER BY attempt_date DESC
-            LIMIT $3
+            AS recent
             "#,
         )
         .bind(user_id)
         .bind(skill_id)
-        .bind(limit)
+        .bind(limit.max(0))
         .fetch_one(&*self.pool)
         .await
-        .unwrap_or(0);
-
-        // Get total count
-        let total_count: i64 = sqlx::query_scalar(
-            r#"
-            SELECT COUNT(*)
-            FROM quiz_attempts
-            WHERE user_id = $1
-            AND question_id IN (
-                SELECT id FROM questions WHERE skill_id = $2
-            )
-            ORDER BY attempt_date DESC
-            LIMIT $3
-            "#,
-        )
-        .bind(user_id)
-        .bind(skill_id)
-        .bind(limit)
-        .fetch_one(&*self.pool)
-        .await
-        .unwrap_or(1);
+        .map_err(|e| {
+            AnalyticsError::DatabaseError(format!(
+                "Failed to fetch recent topic performance: {}",
+                e
+            ))
+        })?;
+        let correct_count: i64 = row.try_get("correct_count").map_err(|e| {
+            AnalyticsError::DatabaseError(format!("Invalid correct-response count: {}", e))
+        })?;
+        let total_count: i64 = row
+            .try_get("total_count")
+            .map_err(|e| AnalyticsError::DatabaseError(format!("Invalid response count: {}", e)))?;
 
         Ok((correct_count, total_count))
     }
 
     async fn get_average_quiz_score(&self, user_id: &str) -> Result<f32, AnalyticsError> {
         let avg_opt: Option<f64> = sqlx::query_scalar::<_, Option<f64>>(
-            "SELECT AVG(CAST(score AS FLOAT)) FROM quiz_attempts WHERE user_id = $1",
+            "SELECT AVG(CAST(score AS FLOAT)) FROM quiz_attempts WHERE user_id = $1 AND completed_at IS NOT NULL",
         )
         .bind(user_id)
         .fetch_one(&*self.pool)

@@ -11,6 +11,7 @@ import {
   IsNotEmpty,
   IsEnum,
   IsNumber,
+  IsBoolean,
   IsOptional,
   IsArray,
   IsUUID,
@@ -19,6 +20,7 @@ import {
   ArrayMinSize,
   IsUrl,
   MinLength,
+  ArrayMaxSize,
 } from 'class-validator';
 import { QuestionOptionDto } from './base';
 
@@ -161,6 +163,16 @@ export class CreateQuestionBankDto {
   @IsOptional()
   tags?: string[];
 
+  @IsArray()
+  @IsUUID('all', { each: true })
+  @IsOptional()
+  topicIds?: string[];
+
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  conceptsCovered?: string[];
+
   @IsUUID()
   @IsOptional()
   courseId?: string;
@@ -174,6 +186,44 @@ export class CreateQuestionBankDto {
   @ArrayMinSize(1)
   @Type(() => QuestionOptionDto)
   options!: QuestionOptionDto[];
+}
+
+export class ImportQuizDto {
+  @IsString()
+  @MinLength(1)
+  title!: string;
+
+  @IsString()
+  @IsOptional()
+  description?: string;
+
+  @IsUUID()
+  @IsOptional()
+  courseId?: string;
+
+  @IsUUID()
+  @IsOptional()
+  unitId?: string;
+
+  @IsUUID()
+  @IsOptional()
+  topicId?: string;
+
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  passingScore?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  isPublished?: boolean;
+
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(100)
+  @ValidateNested({ each: true })
+  @Type(() => CreateQuestionBankDto)
+  questions!: CreateQuestionBankDto[];
 }
 
 export class UpdateQuestionBankDto {

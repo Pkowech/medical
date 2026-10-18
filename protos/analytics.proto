@@ -198,6 +198,7 @@ message GetDetailedLearningAnalyticsResponse {
 service AnalyticsService {
   rpc GetHealth (HealthRequest) returns (HealthResponse);
   rpc PredictPerformance(PredictPerformanceRequest) returns (PredictPerformanceResponse);
+  rpc AnalyzeQuestionDifficulty(AnalyzeQuestionDifficultyRequest) returns (AnalyzeQuestionDifficultyResponse);
   rpc GetEngagementMetrics(GetEngagementMetricsRequest) returns (GetEngagementMetricsResponse);
   rpc GetRecommendations(GetRecommendationsRequest) returns (GetRecommendationsResponse);
   rpc UpdateAttemptMetrics (AttemptMetricsRequest) returns (UpdateAttemptMetricsResponse);
@@ -573,11 +574,24 @@ message GetUserAbilityResponse {
 message GetNextAdaptiveQuestionRequest {
   string user_id = 1;
   string topic_id = 2;
+  string course_id = 3;
+  string unit_id = 4;
 }
 
 message GetNextAdaptiveQuestionResponse {
   string question_id = 1;
   double recommended_difficulty = 2;
+}
+
+message AnalyzeQuestionDifficultyRequest {
+  string user_id = 1;
+  string question_id = 2;
+}
+
+message AnalyzeQuestionDifficultyResponse {
+  double difficulty_score = 1;
+  string suggestion = 2;
+  int32 sample_size = 3;
 }
 
 message GetFocusRecommendationsRequest {

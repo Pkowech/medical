@@ -20,14 +20,13 @@ import { apiService } from '@/features/auth/services/apiClient';
 
 export interface QuizQuestion {
   id: string;
-  question_text: string;
+  text: string;
   type: 'multiple_choice' | 'multiple_select' | 'true_false';
   difficulty: 'easy' | 'medium' | 'hard';
   category: string;
   options: {
     id: string;
-    option_text: string;
-    is_correct: boolean;
+    text: string;
   }[];
   explanation?: string;
   points: number;
@@ -265,7 +264,7 @@ export function AdaptiveQuiz({ courseId, unitId, onComplete }: AdaptiveQuizProps
       {/* Question Card */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg leading-relaxed">{currentQuestion.question_text}</CardTitle>
+          <CardTitle className="text-lg leading-relaxed">{currentQuestion.text}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {!showFeedback ? (
@@ -289,7 +288,7 @@ export function AdaptiveQuiz({ courseId, unitId, onComplete }: AdaptiveQuizProps
                       onChange={e => setCurrentAnswer(e.target.value)}
                       className="sr-only"
                     />
-                    <div className="flex-1">{option.option_text}</div>
+                    <div className="flex-1">{option.text}</div>
                   </label>
                 ))}
               </div>

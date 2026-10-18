@@ -58,6 +58,7 @@ export class QuizGenerationService {
           questionCount: questions.length,
           timeLimit: 15 * questionCount, // 15 minutes per question
           createdBy: 'system-auto-generation',
+          isPublished: false,
           questions: {
             create: questions.map((q, index) => ({
               questionId: q.id,

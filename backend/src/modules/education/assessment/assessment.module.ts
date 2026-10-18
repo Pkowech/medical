@@ -11,6 +11,7 @@ import { AnalyticsServicesModule } from '../../ai-analytics/analytics-services.m
 import { EngagementCommunicationModule } from '../../engagement-communication/engagement-communication.module';
 
 import { QuizController } from './controllers/quiz.controller';
+import { AdaptiveQuizController } from './controllers/adaptive-quiz.controller';
 import { FlashcardsController } from './controllers/flashcards.controller';
 import { FeedbackController } from './controllers/feedback.controller';
 import { BlueprintController } from './controllers/blueprint.controller';
@@ -27,6 +28,7 @@ import { AssessmentProgressService } from './services/assessment-progress.servic
 import { BlueprintService } from './services/blueprint.service';
 import { QuizGenerationService } from './services/quiz-generation.service';
 import { WeaknessOrchestrationService } from './services/weakness-orchestration.service';
+import { AssessmentRecommendationService } from './services/assessment-recommendation.service';
 
 import { SM2AlgorithmService } from './services/sm2-algorithm.service';
 
@@ -44,6 +46,7 @@ import { SM2AlgorithmService } from './services/sm2-algorithm.service';
   ],
   controllers: [
     QuizController,
+    AdaptiveQuizController,
     FlashcardsController,
     FeedbackController,
     BlueprintController,
@@ -62,6 +65,7 @@ import { SM2AlgorithmService } from './services/sm2-algorithm.service';
     SM2AlgorithmService,
     QuizGenerationService,
     WeaknessOrchestrationService,
+    AssessmentRecommendationService,
   ],
   exports: [
     AssessmentsService,

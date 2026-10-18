@@ -10,16 +10,22 @@ import {
   HttpCode,
   HttpStatus,
   ForbiddenException,
+  UsePipes,
+  ValidationPipe,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { QuizService } from '../services/quiz.service';
 import { WeaknessOrchestrationService } from '../services/weakness-orchestration.service';
 import { JwtAuthGuard } from '#modules/auth/guards/jwt-auth.guard';
+import { RoleGuard } from '#common/guards/roles.guard';
+import { Roles } from '#common/decorators/roles.decorator';
+import { Role } from '#modules/auth/constants/role.constants';
 import { User } from '#common/decorators/user.decorator';
 import {
   SubmitQuizDto,
   SubmitQuizAnswerDto,
 } from '#common/dto/assessment.dto';
+import { ImportQuizDto, QuestionBankFilters } from '#common/dto/question-bank.dto';
 
 @ApiTags('Quiz')
 @ApiBearerAuth()
@@ -46,9 +52,38 @@ export class QuizController {
   @Get('assessment/:assessmentId')
   @ApiOperation({ summary: 'Get questions for a learning-path assessment' })
   async getQuestionsByAssessment(
+    @Request() req: any,
     @Param('assessmentId') assessmentId: string,
   ) {
-    return this.quizService.getQuestionsByAssessmentId(assessmentId);
+    return this.quizService.getQuestionsByAssessmentId(assessmentId, req.user.id);
+  }
+
+  @Get('bank')
+  @UseGuards(RoleGuard)
+  @Roles(Role.instructor, Role.admin)
+  @ApiOperation({ summary: 'Browse the question bank' })
+  async getQuestionBank(@Query() filters: QuestionBankFilters) {
+    return this.quizService.getQuestionBank(filters);
+  }
+
+  @Post('import')
+  @UseGuards(RoleGuard)
+  @Roles(Role.instructor, Role.admin)
+  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
+  @ApiOperation({ summary: 'Import a quiz and its questions into the question bank' })
+  async importQuiz(@Request() req: any, @Body() body: ImportQuizDto) {
+    return this.quizService.importQuiz(body, req.user.id);
+  }
+
+  @Post(':quizId/publish')
+  @UseGuards(RoleGuard)
+  @Roles(Role.instructor, Role.admin)
+  @ApiOperation({ summary: 'Publish a draft quiz' })
+  async publishQuiz(
+    @Request() req: any,
+    @Param('quizId') quizId: string,
+  ) {
+    return this.quizService.publishQuiz(quizId, req.user.id);
   }
 
   @Post('topic/:topicId/submit')

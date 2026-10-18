@@ -1,8 +1,7 @@
 /// Update BKT use case
 /// Clean Architecture implementation for updating user knowledge state via BKT
-
 use crate::domain::repositories::SkillStateRepository;
-use crate::modules::analytics::performance::bkt::{BKTParams, update_p_known};
+use crate::modules::analytics::performance::bkt::{update_p_known, BKTParams};
 use crate::observability::metrics as obs_metrics;
 use crate::shared::error::AnalyticsError;
 use serde::{Deserialize, Serialize};
@@ -58,7 +57,8 @@ impl<R: SkillStateRepository> UpdateBktUseCase<R> {
         }
 
         // Fetch current p_known
-        let p_known_prev = self.skill_state_repo
+        let p_known_prev = self
+            .skill_state_repo
             .get_user_skill_state(&request.user_id, &request.skill_id)
             .await?
             .unwrap_or(BKTParams::default().p_init);
@@ -75,8 +75,7 @@ impl<R: SkillStateRepository> UpdateBktUseCase<R> {
         // Increment attempt counter
         self.skill_state_repo
             .increment_attempts(&request.user_id, &request.skill_id)
-            .await
-            .ok(); // Non-critical, don't fail on error
+            .await?;
 
         // Record metrics
         let improved = p_known_new > p_known_prev;
@@ -144,9 +143,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_update_bkt_correct_answer() {
-        let repo = MockSkillStateRepository {
-            p_known: Some(0.5),
-        };
+        let repo = MockSkillStateRepository { p_known: Some(0.5) };
         let use_case = UpdateBktUseCase::new(repo);
 
         let request = UpdateBktRequest {
@@ -165,9 +162,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_update_bkt_incorrect_answer() {
-        let repo = MockSkillStateRepository {
-            p_known: Some(0.8),
-        };
+        let repo = MockSkillStateRepository { p_known: Some(0.8) };
         let use_case = UpdateBktUseCase::new(repo);
 
         let request = UpdateBktRequest {
@@ -205,9 +200,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_update_bkt_invalid_user_id() {
-        let repo = MockSkillStateRepository {
-            p_known: Some(0.5),
-        };
+        let repo = MockSkillStateRepository { p_known: Some(0.5) };
         let use_case = UpdateBktUseCase::new(repo);
 
         let request = UpdateBktRequest {
@@ -222,9 +215,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_update_bkt_invalid_skill_id() {
-        let repo = MockSkillStateRepository {
-            p_known: Some(0.5),
-        };
+        let repo = MockSkillStateRepository { p_known: Some(0.5) };
         let use_case = UpdateBktUseCase::new(repo);
 
         let request = UpdateBktRequest {

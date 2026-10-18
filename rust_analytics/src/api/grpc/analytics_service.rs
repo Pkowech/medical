@@ -2,13 +2,15 @@
 mod inner {
 
     use crate::analytics_proto::{
-        analytics_service_server::AnalyticsService, AttemptMetricsRequest, BatchEventRequest,
+        analytics_service_server::AnalyticsService, AnalyzeQuestionDifficultyRequest,
+        AnalyzeQuestionDifficultyResponse, AttemptMetricsRequest, BatchEventRequest,
         BatchEventResponse, CalculateCourseProgressRequest, CohortAnalyticsResponse,
         CollaborativeRecommendationRequest, CollaborativeRecommendationResponse, CourseProgress,
         CourseStatsResultResponse, DueCard, FocusArea, GetCohortAnalyticsRequest,
         GetCourseStatisticsRequest, GetDetailedLearningAnalyticsRequest,
         GetDetailedLearningAnalyticsResponse, GetDueCardsRequest, GetDueCardsResponse,
-        GetEngagementMetricsRequest, GetEngagementMetricsResponse, GetFocusRecommendationsRequest,
+        GetEngagementMetricsRequest, GetEngagementMetricsResponse, GetFocusCorrelationRequest,
+        GetFocusCorrelationResponse, GetFocusRecommendationsRequest,
         GetFocusRecommendationsResponse, GetGoalAnalyticsRequest, GetLearningPathStatisticsRequest,
         GetNextAdaptiveQuestionRequest, GetNextAdaptiveQuestionResponse, GetRecommendationsRequest,
         GetRecommendationsResponse, GetSpacedRepetitionStatsRequest,
@@ -22,7 +24,7 @@ mod inner {
         RelatedResourcesRequest, RelatedResourcesResponse, SpacedRepetitionStatsProto,
         StudyRecommendationsRequest, StudyRecommendationsResponse, TrendingPathsRequest,
         TrendingPathsResponse, UpdateAttemptMetricsResponse, UpdateBktRequest, UpdateBktResponse,
-        UserLearningSummaryResponse, GetFocusCorrelationRequest, GetFocusCorrelationResponse,
+        UserLearningSummaryResponse,
     };
 
     use crate::modules::analytics::performance::bkt;
@@ -71,6 +73,14 @@ mod inner {
         ) -> Result<Response<PredictPerformanceResponse>, Status> {
             let service = PerformanceService::new(self.pool.clone());
             service.predict_performance(request).await
+        }
+
+        async fn analyze_question_difficulty(
+            &self,
+            request: Request<AnalyzeQuestionDifficultyRequest>,
+        ) -> Result<Response<AnalyzeQuestionDifficultyResponse>, Status> {
+            let service = PerformanceService::new(self.pool.clone());
+            service.analyze_question_difficulty(request).await
         }
 
         async fn get_engagement_metrics(
@@ -468,10 +478,7 @@ mod inner {
                         .collect();
                     Ok(Response::new(GetDueCardsResponse { cards }))
                 }
-                Err(e) => Err(Status::internal(format!(
-                    "Failed to get due cards: {}",
-                    e
-                ))),
+                Err(e) => Err(Status::internal(format!("Failed to get due cards: {}", e))),
             }
         }
 
@@ -554,6 +561,13 @@ impl crate::analytics_proto::analytics_service_server::AnalyticsService for MyAn
         &self,
         _req: Request<PredictPerformanceRequest>,
     ) -> Result<Response<PredictPerformanceResponse>, Status> {
+        Err(Status::unimplemented("ML feature disabled"))
+    }
+
+    async fn analyze_question_difficulty(
+        &self,
+        _req: Request<crate::analytics_proto::AnalyzeQuestionDifficultyRequest>,
+    ) -> Result<Response<crate::analytics_proto::AnalyzeQuestionDifficultyResponse>, Status> {
         Err(Status::unimplemented("ML feature disabled"))
     }
 

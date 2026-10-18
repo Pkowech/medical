@@ -61,6 +61,12 @@ const adminNavigationConfig: NavigationItem[] = [
         href: '/admin/materials/upload',
         icon: FileText,
       },
+      {
+        id: 'quiz-authoring',
+        label: 'Quiz Authoring',
+        href: '/admin/assessment/quizzes',
+        icon: FileText,
+      },
     ],
   },
   {
@@ -80,6 +86,15 @@ const adminNavigationConfig: NavigationItem[] = [
     label: 'Profile',
     href: '/profile',
     icon: User,
+  },
+];
+
+export const instructorAssessmentNavigationConfig: NavigationItem[] = [
+  {
+    id: 'quiz-authoring',
+    label: 'Quiz Authoring',
+    href: '/admin/assessment/quizzes',
+    icon: FileText,
   },
 ];
 

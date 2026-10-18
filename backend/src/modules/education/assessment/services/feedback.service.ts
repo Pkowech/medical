@@ -64,7 +64,7 @@ export class FeedbackService {
     );
     const difficultyAnalysis = await this.analyticsService.analyzeDifficulty(
       userId,
-      question,
+      { id: question.id },
     );
     const timeAnalysis = this.analyzeResponseTime(responseTime, question);
 
