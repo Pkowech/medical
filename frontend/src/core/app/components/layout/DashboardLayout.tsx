@@ -15,6 +15,7 @@ import { usePathname } from 'next/navigation';
 import { NavigationItem } from '@/shared/types/navigationInterface';
 import { User } from '@/shared/types/authInterface';
 import { Notification as AppNotification } from '@/shared/types/notificationsInterface';
+import { usePageHeader } from '@/core/providers/HeaderContext';
 
 interface DashboardLayoutProps {
     children: ReactNode;
@@ -30,6 +31,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
     isLoading = false,
 }) => {
     const { colorScheme, toggleTheme } = useTheme();
+    const { isImmersive } = usePageHeader();
     const { sidebarOpen, setSidebarOpen, setNotificationsOpen, notificationsOpen } = useLayoutStore();
     const pathname = usePathname();
     const contentScrollRef = useRef<HTMLDivElement>(null);
@@ -92,7 +94,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
     return (
         <>
             <div className="flex h-screen h-dvh overflow-hidden bg-background">
-                {!isQuizSessionPage && (
+                {!isQuizSessionPage && !isImmersive && (
                     <div className={cn(isFullHeightPage && 'lg:hidden')}>
                         <Sidebar theme={colorScheme} user={user} navigationItems={navigationItems} />
                     </div>
@@ -100,7 +102,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
                 {/* Main app column (center) */}
                 <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-                    {!isQuizSessionPage && (
+                    {!isQuizSessionPage && !isImmersive && (
                         <AppHeader
                             theme={colorScheme}
                             toggleTheme={toggleTheme}
@@ -120,7 +122,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                             isFullHeightPage
                                 ? 'overflow-x-hidden overflow-y-auto lg:overflow-hidden'
                                 : 'overflow-auto',
-                            !isQuizSessionPage && 'pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0',
+                            !isQuizSessionPage && !isImmersive && 'pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0',
                         )}
                     >
                         <div
@@ -146,11 +148,11 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                                 </div>
                             </main>
                         </div>
-                        <AppFooter />
+                        {!isImmersive && <AppFooter />}
                     </div>
                 </div>
             </div>
-            {!isQuizSessionPage && !sidebarOpen && (
+            {!isQuizSessionPage && !isImmersive && !sidebarOpen && (
                 <MobileTabBar navigationItems={navigationItems} />
             )}
         </>

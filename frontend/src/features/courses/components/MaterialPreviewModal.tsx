@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useId, useLayoutEffect, useRef } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -30,6 +30,7 @@ import { Material, MaterialType } from '@/shared/types/materialInterface';
 import URLS from '@/lib/urls';
 import { offlineService } from '@/lib/core/offline/offlineService';
 import { useXapi } from '@/lib/xapi/useXapi';
+import { usePageHeader } from '@/core/providers/HeaderContext';
 
 interface MaterialPreviewModalProps {
   materialId: string | null;
@@ -65,6 +66,8 @@ export const MaterialPreviewModal = ({
   const [retryAttempt, setRetryAttempt] = useState(0);
   const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
   const trackedViewKeyRef = useRef<string | null>(null);
+  const immersiveOwner = useId();
+  const { setImmersive } = usePageHeader();
   const xapiContext = useMemo(() => ({
     extensions: {
       [URLS.XAPI_EXTENSIONS.COURSE_ID]: material?.courseId,
@@ -74,6 +77,16 @@ export const MaterialPreviewModal = ({
     },
   }), [material?.courseId, material?.topicId, material?.unitId, studySessionId]);
   const { trackAction, XAPI_VERBS } = useXapi(xapiContext);
+
+  useLayoutEffect(() => {
+    const enabled = isOpen && !inline;
+    setImmersive(immersiveOwner, enabled);
+    return () => setImmersive(immersiveOwner, false);
+  }, [immersiveOwner, inline, isOpen, setImmersive]);
+
+  useEffect(() => {
+    if (!isOpen) setIsHeaderCollapsed(false);
+  }, [isOpen]);
 
   useEffect(() => {
     if (isOpen && materialId) {

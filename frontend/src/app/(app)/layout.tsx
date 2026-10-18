@@ -8,7 +8,6 @@ import { DashboardLayout } from '@/core/app/components/layout/DashboardLayout';
 import { MarketingFooter } from '@/core/marketing/MarketingFooter';
 import { MarketingHeader } from '@/core/marketing/MarketingHeader';
 import { LayoutProvider } from '@/core/providers/LayoutContext';
-import { HeaderProvider } from '@/core/providers/HeaderContext';
 import AppErrorBoundary from '@/features/security/components/AppErrorBoundary';
 import { LoadingSpinner } from '@/shared/components/ui/loading-spinner';
 import { useAuth } from '@/features/auth/hooks/useAuth';
@@ -105,9 +104,7 @@ const AppLayoutContent: React.FC<AppLayoutProps> = ({ children }) => {
 const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   return (
     <LayoutProvider>
-      <HeaderProvider>
-        <AppLayoutContent>{children}</AppLayoutContent>
-      </HeaderProvider>
+      <AppLayoutContent>{children}</AppLayoutContent>
     </LayoutProvider>
   );
 };

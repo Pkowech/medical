@@ -22,6 +22,7 @@ import {
   restorePersistentQueryCache,
 } from '@/lib/core/queryCachePersistence';
 import { OfflineSessionManager } from '@/lib/core/offline/OfflineSessionManager';
+import { HeaderProvider } from '@/core/providers/HeaderContext';
 
 // Theme context interface
 interface ThemeContextType {
@@ -322,15 +323,17 @@ export function Providers({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <SimpleThemeProvider>
-      <QueryClientProvider client={client}>
-        <SessionWrapper>
-          <PersistentQueryCache />
-          <OfflineSessionManager />
-          {children}
-        </SessionWrapper>
-        <ReactQueryDevtools initialIsOpen={false} />
-      </QueryClientProvider>
-    </SimpleThemeProvider>
+    <HeaderProvider>
+      <SimpleThemeProvider>
+        <QueryClientProvider client={client}>
+          <SessionWrapper>
+            <PersistentQueryCache />
+            <OfflineSessionManager />
+            {children}
+          </SessionWrapper>
+          <ReactQueryDevtools initialIsOpen={false} />
+        </QueryClientProvider>
+      </SimpleThemeProvider>
+    </HeaderProvider>
   );
 }

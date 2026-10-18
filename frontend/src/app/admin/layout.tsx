@@ -7,7 +7,6 @@ import { useAuth } from '@/features/auth/hooks/useAuth';
 import AppErrorBoundary from '@/features/security/components/AppErrorBoundary';
 import { LoadingSpinner } from '@/shared/components/ui/loading-spinner';
 import { LayoutProvider } from '@/core/providers/LayoutContext';
-import { HeaderProvider } from '@/core/providers/HeaderContext';
 import { useLayoutStore } from '@/core/stores/useLayoutStore';
 import { usePathname } from 'next/navigation';
 import adminNavigationConfig from '@/core/app/components/layout/adminNavigationConfig';
@@ -72,9 +71,7 @@ const AdminLayoutContent: React.FC<AdminLayoutProps> = ({ children }) => {
 const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   return (
     <LayoutProvider>
-      <HeaderProvider>
-        <AdminLayoutContent>{children}</AdminLayoutContent>
-      </HeaderProvider>
+      <AdminLayoutContent>{children}</AdminLayoutContent>
     </LayoutProvider>
   );
 };
