@@ -9,7 +9,16 @@ import {
   DialogDescription,
 } from '@/shared/components/ui/dialog';
 import { Button } from '@/shared/components/ui/button';
-import { ChevronLeft, ChevronRight, ExternalLink, FileText, Youtube, Download } from 'lucide-react';
+import {
+  AlertCircle,
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  ExternalLink,
+  FileText,
+  Loader2,
+  Youtube,
+} from 'lucide-react';
 import { VideoPlayer } from './VideoPlayer';
 import PDFViewer from '@/shared/components/pdf/PDFViewer';
 import materialService from '@/features/courses/services/materialService';
@@ -50,6 +59,7 @@ export const MaterialPreviewModal = ({
   const [pdfNumPages, setPdfNumPages] = useState<number | null>(null);
   const [pdfContent, setPdfContent] = useState<Uint8Array | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const [retryAttempt, setRetryAttempt] = useState(0);
   const trackedViewKeyRef = useRef<string | null>(null);
   const xapiContext = useMemo(() => ({
     extensions: {
@@ -134,7 +144,7 @@ export const MaterialPreviewModal = ({
     } else if (!isOpen) {
       setMaterial(null);
     }
-  }, [isOpen, materialId, topicId, userId, fallbackMaterial]);
+  }, [isOpen, materialId, topicId, userId, fallbackMaterial, retryAttempt]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -207,15 +217,39 @@ export const MaterialPreviewModal = ({
     window.open(material.fileUrl, '_blank', 'noopener,noreferrer');
   };
 
+  const retryPreview = () => {
+    setPreviewError(null);
+    setRetryAttempt(attempt => attempt + 1);
+  };
+
+  const renderPreviewError = () => (
+    <div className="flex h-full min-h-[16rem] items-center justify-center p-6">
+      <div role="alert" className="max-w-md rounded-2xl border border-border bg-card p-6 text-center shadow-sm">
+        <AlertCircle className="mx-auto mb-3 h-10 w-10 text-destructive" />
+        <h3 className="text-lg font-semibold text-foreground">Unable to open this material</h3>
+        <p className="mt-2 text-sm text-muted-foreground">
+          {previewError || 'Check your connection and try again.'}
+        </p>
+        <div className="mt-5 flex flex-col justify-center gap-2 sm:flex-row">
+          <Button type="button" onClick={retryPreview}>Try again</Button>
+          <Button type="button" variant="outline" onClick={onClose}>Back to topic</Button>
+        </div>
+      </div>
+    </div>
+  );
+
   const renderContent = () => {
     if (isLoading) {
       return (
-        <div className="flex items-center justify-center h-[60vh]">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+        <div role="status" aria-live="polite" className="flex h-full min-h-[16rem] flex-col items-center justify-center gap-3 p-6 text-center">
+          <Loader2 className="h-10 w-10 animate-spin text-primary" />
+          <p className="font-medium text-foreground">Preparing your study material...</p>
+          <p className="text-sm text-muted-foreground">Loading securely from storage.</p>
         </div>
       );
     }
 
+    if (previewError && !material) return renderPreviewError();
     if (!material) return null;
 
     const effectiveUrl = material.previewFileUrl || material.fileUrl || material.url || material.content;
@@ -244,11 +278,7 @@ export const MaterialPreviewModal = ({
       );
 
     if (isPdfRenderable && previewError) {
-      return (
-        <div className="flex h-[60vh] items-center justify-center p-6 text-center text-sm text-red-600">
-          {previewError}
-        </div>
-      );
+      return renderPreviewError();
     }
 
     if (isPdfRenderable && pdfContent) {
@@ -266,13 +296,25 @@ export const MaterialPreviewModal = ({
     }
 
     return (
-      <div className="p-6 bg-background dark:bg-card/50 rounded-lg border border-border dark:border-border">
-        <p className="text-muted-foreground dark:text-muted-foreground mb-4">{material.description || 'No description available.'}</p>
-        {resolvedEffectiveUrl && (
-          <Button onClick={() => window.open(resolvedEffectiveUrl, '_blank')} className="w-full">
-            <ExternalLink className="mr-2 h-4 w-4" /> Open Resource
-          </Button>
-        )}
+      <div className="flex h-full min-h-[16rem] items-center justify-center p-6">
+        <div className="w-full max-w-lg rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
+          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <FileText className="h-6 w-6" />
+          </div>
+          <h3 className="text-lg font-semibold text-foreground">{material.title}</h3>
+          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+            {material.description || 'This file opens outside the built-in PDF reader.'}
+          </p>
+          {resolvedEffectiveUrl && (
+            <Button
+              type="button"
+              onClick={() => window.open(resolvedEffectiveUrl, '_blank', 'noopener,noreferrer')}
+              className="mt-5 w-full"
+            >
+              <ExternalLink className="mr-2 h-4 w-4" /> Open file
+            </Button>
+          )}
+        </div>
       </div>
     );
   };
@@ -353,14 +395,16 @@ export const MaterialPreviewModal = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="grid h-dvh max-h-dvh w-screen max-w-none grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden rounded-none border-none bg-card p-0 shadow-2xl dark:bg-card">
-        <DialogHeader className="sticky top-0 z-10 flex flex-col items-stretch justify-between space-y-2 border-b bg-card p-3 dark:border-border dark:bg-card sm:flex-row sm:items-center sm:space-y-0 sm:p-4">
+      <DialogContent className="fixed inset-0 left-0 top-0 right-0 bottom-0 z-[70] grid h-dvh max-h-dvh w-screen max-w-none translate-x-0 translate-y-0 grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden rounded-none border-none bg-card p-0 shadow-2xl dark:bg-card">
+        <DialogHeader className="sticky top-0 z-10 flex flex-col items-stretch justify-between space-y-2 border-b bg-card p-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] dark:border-border dark:bg-card sm:flex-row sm:items-center sm:space-y-0 sm:p-4">
           <div className="flex min-w-0 items-center gap-3">
             <div className={`p-2 rounded-lg ${isVideo ? 'bg-red-50 dark:bg-red-500/10 text-red-600' : 'bg-blue-50 dark:bg-blue-500/10 text-blue-600'}`}>
               {isVideo ? <Youtube className="w-5 h-5" /> : <FileText className="w-5 h-5" />}
             </div>
             <div>
-              <DialogTitle className="text-lg font-bold truncate max-w-[50vw]">{material?.title || 'Loading...'}</DialogTitle>
+              <DialogTitle className="max-w-[min(60vw,36rem)] truncate text-lg font-bold">
+                {material?.title || (previewError ? 'Unable to open material' : 'Loading material...')}
+              </DialogTitle>
               <DialogDescription className="sr-only">
                 {material?.description || `${material?.type || 'Study'} resource`}
               </DialogDescription>
@@ -412,8 +456,17 @@ export const MaterialPreviewModal = ({
               </>
             )}
             {material?.fileUrl && (
-              <Button variant="ghost" size="sm" onClick={downloadOriginal} title="Download">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={downloadOriginal}
+                title="Download original file"
+                aria-label="Download original file"
+                className="gap-2"
+              >
                 <Download className="h-4 w-4" />
+                <span className="hidden sm:inline">Download</span>
               </Button>
             )}
             <Button
@@ -438,7 +491,7 @@ export const MaterialPreviewModal = ({
         
         {/* Footer with basic info */}
         {!isLoading && material && (
-          <div className="flex items-center justify-between border-t bg-background p-2 text-[10px] text-muted-foreground dark:border-border dark:bg-card/30 sm:p-4 sm:text-xs">
+          <div className="flex items-center justify-between border-t bg-background p-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] text-[10px] text-muted-foreground dark:border-border dark:bg-card/30 sm:p-4 sm:text-xs">
             <div className="flex items-center gap-4">
               <span>Added on {new Date(material.createdAt).toLocaleDateString()}</span>
               {material.difficulty && (
