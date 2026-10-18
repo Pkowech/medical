@@ -37,8 +37,8 @@ export class PerformanceOptimizer {
   static optimizeFlashcards(cards: UserFlashcardProgress[]): UserFlashcardProgress[] {
     // Sort cards by next review date
     return cards.sort((a, b) => {
-      const dateA = new Date(a.nextReviewDate);
-      const dateB = new Date(b.nextReviewDate);
+      const dateA = new Date(a.nextReview);
+      const dateB = new Date(b.nextReview);
       return dateA.getTime() - dateB.getTime();
     });
   }

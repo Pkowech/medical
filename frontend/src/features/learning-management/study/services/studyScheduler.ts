@@ -21,7 +21,7 @@ export class StudyScheduler {
       date.setDate(date.getDate() + i);
 
       const cardsDue = cards.filter(card => {
-        const nextReview = new Date(card.nextReviewDate);
+        const nextReview = new Date(card.nextReview);
         return nextReview.toDateString() === date.toDateString();
       }).length;
 
@@ -55,7 +55,7 @@ export class StudyScheduler {
       checkTime.setHours(checkTime.getHours() + i);
 
       const cardsDue = cards.filter(card => {
-        const nextReview = new Date(card.nextReviewDate);
+        const nextReview = new Date(card.nextReview);
         return nextReview <= checkTime;
       }).length;
 
@@ -85,7 +85,7 @@ export class StudyScheduler {
       recommendations.push(`${highPriorityDays} high-priority study sessions in the next 3 days`);
     }
 
-    const totalCardsDue = cards.filter(card => new Date(card.nextReviewDate) <= new Date()).length;
+    const totalCardsDue = cards.filter(card => new Date(card.nextReview) <= new Date()).length;
     if (totalCardsDue > 20) {
       recommendations.push(
         `Consider breaking your study session into smaller chunks (${totalCardsDue} cards due)`

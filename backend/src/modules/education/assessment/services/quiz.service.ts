@@ -560,6 +560,10 @@ export class QuizService {
     }
 
     const bktUpdates: Array<{ skillId: string; isCorrect: boolean }> = [];
+    const reviewAnswersByTopic = new Map<
+      string,
+      Array<{ questionId: string; isCorrect: boolean }>
+    >();
 
     const result = await this.prisma.$transaction(async (tx) => {
       const prelimAttempt = await tx.quizAttempt.create({
@@ -601,6 +605,20 @@ export class QuizService {
 
         if (gradingResult.isCorrect) {
           correctAnswers++;
+        }
+
+        const topicIds = activeQuiz.topicId
+          ? question.topicIds.includes(activeQuiz.topicId)
+            ? [activeQuiz.topicId]
+            : []
+          : question.topicIds;
+        for (const topicId of topicIds) {
+          const topicAnswers = reviewAnswersByTopic.get(topicId) ?? [];
+          topicAnswers.push({
+            questionId: question.id,
+            isCorrect: gradingResult.isCorrect,
+          });
+          reviewAnswersByTopic.set(topicId, topicAnswers);
         }
 
         // Collect BKT update data — will be dispatched after transaction commits
@@ -712,6 +730,22 @@ export class QuizService {
           this.logger.warn(`Failed to update BKT for skill ${skillId}: ${String(err)}`),
         );
     }
+
+    await Promise.all(
+      Array.from(reviewAnswersByTopic.entries()).map(async ([topicId, reviewAnswers]) => {
+        try {
+          await this.flashcardsService.recordTopicQuizReviews(
+            userId,
+            topicId,
+            reviewAnswers,
+          );
+        } catch (error) {
+          this.logger.warn(
+            `Quiz ${activeQuiz.id} was recorded, but review cards could not be scheduled for topic ${topicId}: ${String(error)}`,
+          );
+        }
+      }),
+    );
 
     return result.attempt;
   }

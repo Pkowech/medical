@@ -1,4 +1,5 @@
 import { apiService } from '@/features/auth/services/apiClient';
+import { flashcardApi } from '@/features/assessment/services/flashcardApi';
 import type { ScheduleEvent } from '@/shared/types/studyInterface';
 export type { ScheduleEvent as Event };
 export type { ScheduleEvent };
@@ -48,15 +49,16 @@ const safeString = (val: unknown, fallback = ''): string => {
 const scheduleService = {
   async getSessions(userId?: string, _startDate?: Date, _endDate?: Date): Promise<ScheduleEvent[]> {
     try {
-      const [events, studySessions, goals, groups, deadlines] = await Promise.all([
+      const [events, studySessions, goals, groups, deadlines, reviews] = await Promise.all([
         this.getRawEvents(_startDate, _endDate),
         this.getStudySessions(userId, _startDate, _endDate),
         this.getGoals(userId, _startDate, _endDate),
         this.getStudyGroups(_startDate, _endDate),
         this.getDeadlines(userId, _startDate, _endDate),
+        this.getScheduledReviews(userId, _startDate, _endDate),
       ]);
 
-      const allMerged = [...events, ...studySessions, ...goals, ...groups, ...deadlines];
+      const allMerged = [...events, ...studySessions, ...goals, ...groups, ...deadlines, ...reviews];
       
       // Deduplicate by ID to prevent React key collision errors
       const seen = new Set<string>();
@@ -68,11 +70,43 @@ const scheduleService = {
       });
 
       console.warn(
-        `scheduleService: Total merged: ${allMerged.length}, Deduplicated: ${deduplicated.length} (ScheduleEvents: ${events.length}, Sessions: ${studySessions.length}, Goals: ${goals.length}, Groups: ${groups.length}, Deadlines: ${deadlines.length})`,
+        `scheduleService: Total merged: ${allMerged.length}, Deduplicated: ${deduplicated.length} (ScheduleEvents: ${events.length}, Sessions: ${studySessions.length}, Goals: ${goals.length}, Groups: ${groups.length}, Deadlines: ${deadlines.length}, Reviews: ${reviews.length})`,
       );
       return deduplicated;
     } catch (error) {
       console.error('Error fetching merged sessions:', error);
+      return [];
+    }
+  },
+
+  async getScheduledReviews(
+    userId?: string,
+    startDate?: Date,
+    endDate?: Date,
+  ): Promise<ScheduleEvent[]> {
+    if (!userId || !startDate || !endDate) return [];
+
+    try {
+      const reviews = await flashcardApi.getScheduledReviews(userId, startDate, endDate);
+      return reviews.map(review => {
+        const date = new Date(`${review.date}T00:00:00`);
+        return {
+          id: `review:${review.date}:${review.courseId ?? 'general'}:${review.topicId ?? 'general'}`,
+          title: review.title,
+          description: review.description,
+          date,
+          endDate: date,
+          type: 'review',
+          category: 'academic',
+          location: review.courseId ? 'Course review' : 'Spaced repetition',
+          allDay: true,
+          courseId: review.courseId,
+          topicId: review.topicId,
+          completed: false,
+        };
+      }).filter(review => !Number.isNaN(review.date.getTime()));
+    } catch (error) {
+      console.error('Error fetching scheduled course reviews:', serializeError(error));
       return [];
     }
   },
@@ -215,6 +249,8 @@ const scheduleService = {
             type: 'goal',
             location: safeString(g.category, 'Personal'),
             completed: safeString(g.status) === 'completed',
+            courseId: typeof g.courseId === 'string' ? g.courseId : null,
+            goalId: safeString(g.id),
           } as ScheduleEvent;
         })
         .filter(Boolean) as ScheduleEvent[];
