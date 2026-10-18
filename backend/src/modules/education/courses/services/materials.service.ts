@@ -724,8 +724,26 @@ export class MaterialsService {
         'video/x-msvideo',
         'video/webm',
       ];
+      const extensionMimeTypes: Record<string, string> = {
+        pdf: 'application/pdf',
+        doc: 'application/msword',
+        docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        ppt: 'application/vnd.ms-powerpoint',
+        pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        mp4: 'video/mp4',
+        mpg: 'video/mpeg',
+        mpeg: 'video/mpeg',
+        mov: 'video/quicktime',
+        avi: 'video/x-msvideo',
+        webm: 'video/webm',
+      };
+      const detectedMimeType = (file.mimetype || '').toLowerCase();
+      const extension = file.originalname?.split('.').pop()?.toLowerCase();
+      const resolvedMimeType =
+        detectedMimeType ||
+        (extension ? extensionMimeTypes[extension] || '' : '');
 
-      if (!allowedMimeTypes.includes(file.mimetype)) {
+      if (!allowedMimeTypes.includes(resolvedMimeType)) {
         throw new BadRequestException(
           `Invalid file type. Allowed: PDF, Office Documents, and Video files.`,
         );

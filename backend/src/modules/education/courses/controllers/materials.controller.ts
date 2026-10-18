@@ -54,6 +54,47 @@ export class MaterialsController {
   @UseInterceptors(
     FileInterceptor('file', {
       limits: { fileSize: 50 * 1024 * 1024 }, // 50MB max
+      fileFilter: (_req, file, callback) => {
+        const allowedMimeTypes = new Set([
+          'application/pdf',
+          'application/msword',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          'application/vnd.ms-powerpoint',
+          'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+          'video/mp4',
+          'video/mpeg',
+          'video/quicktime',
+          'video/x-msvideo',
+          'video/webm',
+        ]);
+        const extension = file.originalname.split('.').pop()?.toLowerCase() ?? '';
+        const normalizedMimeType = (file.mimetype || '').toLowerCase();
+        const allowedExtensions = new Set([
+          'pdf',
+          'doc',
+          'docx',
+          'ppt',
+          'pptx',
+          'mp4',
+          'mpg',
+          'mpeg',
+          'mov',
+          'avi',
+          'webm',
+        ]);
+
+        if (allowedMimeTypes.has(normalizedMimeType) || allowedExtensions.has(extension)) {
+          callback(null, true);
+          return;
+        }
+
+        callback(
+          new BadRequestException(
+            'Invalid file type. Allowed: PDF, Office Documents, and Video files.',
+          ),
+          false,
+        );
+      },
     }),
   )
   @ApiOperation({ summary: 'Upload a course material' })

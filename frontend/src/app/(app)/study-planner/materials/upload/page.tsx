@@ -69,6 +69,33 @@ export default function UploadMaterialPage() {
     'video/x-msvideo',
     'video/webm',
   ];
+  const EXTENSION_MIME_TYPES: Record<string, string> = {
+    pdf: 'application/pdf',
+    doc: 'application/msword',
+    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    ppt: 'application/vnd.ms-powerpoint',
+    pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    mp4: 'video/mp4',
+    mpg: 'video/mpeg',
+    mpeg: 'video/mpeg',
+    mov: 'video/quicktime',
+    avi: 'video/x-msvideo',
+    webm: 'video/webm',
+  };
+
+  const isAllowedMaterialFile = (selectedFile: File) => {
+    const normalizedType = selectedFile.type.toLowerCase();
+    if (ALLOWED_TYPES.includes(normalizedType)) {
+      return true;
+    }
+
+    const extension = selectedFile.name.split('.').pop()?.toLowerCase();
+    if (!extension) {
+      return false;
+    }
+
+    return ALLOWED_TYPES.includes(EXTENSION_MIME_TYPES[extension] ?? '');
+  };
 
   useEffect(() => {
     const loadCourses = async () => {
@@ -252,7 +279,7 @@ export default function UploadMaterialPage() {
       return;
     }
 
-    if (!ALLOWED_TYPES.includes(file.type)) {
+    if (!isAllowedMaterialFile(file)) {
       toast.error(
         'Unsupported file type. Choose a PDF, DOC, DOCX, PPT, PPTX, or supported video file.'
       );
@@ -300,13 +327,14 @@ export default function UploadMaterialPage() {
     if (!selectedFile) return;
 
     const filename = selectedFile.name.toLowerCase();
-    if (selectedFile.type === 'application/pdf' || filename.endsWith('.pdf')) {
+    const mimeType = selectedFile.type.toLowerCase();
+    if (mimeType === 'application/pdf' || filename.endsWith('.pdf')) {
       setType('pdf');
-    } else if (selectedFile.type.startsWith('video/') || /\.(mp4|mpeg|mpg|mov|avi|webm)$/.test(filename)) {
+    } else if (mimeType.startsWith('video/') || /\.(mp4|mpeg|mpg|mov|avi|webm)$/.test(filename)) {
       setType('video');
     } else if (
-      selectedFile.type === 'application/vnd.ms-powerpoint' ||
-      selectedFile.type === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' ||
+      mimeType === 'application/vnd.ms-powerpoint' ||
+      mimeType === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' ||
       /\.(ppt|pptx)$/.test(filename)
     ) {
       setType('slide');
