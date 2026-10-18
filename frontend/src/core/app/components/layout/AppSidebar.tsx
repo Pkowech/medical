@@ -223,6 +223,59 @@ export function Sidebar({
           </button>
         </div>
 
+        <div
+          className={cn(
+            'mx-3 mt-3 shrink-0 rounded-xl border border-orange-200 bg-gradient-to-br from-orange-50 via-amber-50 to-yellow-50 text-orange-950 shadow-sm dark:border-orange-400/20 dark:from-orange-950/40 dark:via-amber-950/30 dark:to-yellow-950/20 dark:text-orange-100',
+            isDesktop && sidebarCollapsed
+              ? 'mx-2 flex min-h-12 items-center justify-center p-2'
+              : 'p-3',
+          )}
+          title={
+            typeof streak === 'number' && typeof longestStreak === 'number'
+              ? `Current learning streak: ${streak} days. Longest: ${longestStreak} days.`
+              : streakError?.message ?? 'Learning streak unavailable'
+          }
+          aria-label={
+            isStreakLoading
+              ? 'Learning streak loading'
+              : `Learning streak: ${typeof streak === 'number' ? `${streak} days` : 'unavailable'}`
+          }
+        >
+          <div className={cn(
+            'flex items-center gap-3',
+            isDesktop && sidebarCollapsed && 'justify-center',
+          )}>
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-orange-100 text-orange-600 dark:bg-orange-400/15 dark:text-orange-300">
+              <Flame aria-hidden="true" className="h-6 w-6" />
+            </span>
+            {(!isDesktop || !sidebarCollapsed) && (
+              <div className="min-w-0">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-orange-800 dark:text-orange-200">
+                  Learning streak
+                </p>
+                <p className="mt-0.5 text-lg font-extrabold leading-tight">
+                  {isStreakLoading
+                    ? 'Loading…'
+                    : typeof streak === 'number'
+                      ? `${streak} ${streak === 1 ? 'day' : 'days'}`
+                      : 'Unavailable'}
+                </p>
+              </div>
+            )}
+          </div>
+          {(!isDesktop || !sidebarCollapsed) && (
+            <p className="mt-2 text-xs leading-4 text-orange-800/90 dark:text-orange-100/80">
+              {streakError
+                ? 'Your streak could not be loaded.'
+                : isStreakLoading
+                  ? 'Checking your progress…'
+                  : streak === 0
+                    ? 'Complete a learning activity today to start your streak.'
+                    : 'Keep showing up every day!'}
+            </p>
+          )}
+        </div>
+
         <div className={cn(
           'flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto overscroll-contain py-4',
           isDesktop && sidebarCollapsed ? 'px-2' : 'px-3',
@@ -362,27 +415,6 @@ export function Sidebar({
               isDesktop && sidebarCollapsed ? 'flex-col' : 'justify-between',
             )}
           >
-            <div
-              className={cn(
-                'flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm text-orange-700 dark:text-orange-300',
-                isDesktop && sidebarCollapsed && 'justify-center px-0',
-              )}
-              title={
-                typeof streak === 'number' && typeof longestStreak === 'number'
-                  ? `Current learning streak: ${streak} days. Longest: ${longestStreak} days.`
-                  : streakError?.message ?? 'Learning streak unavailable'
-              }
-              aria-label={
-                isStreakLoading
-                  ? 'Learning streak loading'
-                  : `Learning streak: ${typeof streak === 'number' ? `${streak} days` : 'unavailable'}`
-              }
-            >
-              <Flame aria-hidden="true" className="h-5 w-5 shrink-0 text-orange-500" />
-              {(!isDesktop || !sidebarCollapsed) && (
-                <span>{isStreakLoading ? 'Streak …' : `Streak ${typeof streak === 'number' ? `${streak}d` : '—'}`}</span>
-              )}
-            </div>
             <div className={cn(
               'flex items-center gap-1',
               isDesktop && sidebarCollapsed && 'flex-col',
