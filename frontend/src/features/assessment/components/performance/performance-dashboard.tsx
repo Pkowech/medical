@@ -58,12 +58,12 @@ export function PerformanceDashboard() {
   }, []);
 
   return (
-    <div className="p-6 space-y-8 bg-gray-50/50 dark:bg-slate-900/50 min-h-screen">
-      <h1 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">Performance Dashboard</h1>
+    <div className="p-6 space-y-8 bg-background/50 dark:bg-card/50 min-h-screen">
+      <h1 className="text-2xl font-bold mb-6 text-foreground dark:text-foreground">Performance Dashboard</h1>
 
       {/* Page Load Metrics */}
-      <div className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm rounded-lg shadow-sm border border-gray-100 dark:border-slate-700/50 p-6">
-        <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Page Load Performance</h2>
+      <div className="bg-card/80 dark:bg-card/50 backdrop-blur-sm rounded-lg shadow-sm border border-border dark:border-border/50 p-6">
+        <h2 className="text-xl font-semibold mb-4 text-foreground dark:text-foreground">Page Load Performance</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {pageLoadMetrics[0] ? (
             <>
@@ -85,7 +85,7 @@ export function PerformanceDashboard() {
               />
             </>
           ) : (
-            <p role="status" className="col-span-full text-sm text-slate-500 dark:text-slate-400">
+            <p role="status" className="col-span-full text-sm text-muted-foreground dark:text-muted-foreground">
               Page-load measurements are not available yet. They are recorded after a full page load.
             </p>
           )}
@@ -93,8 +93,8 @@ export function PerformanceDashboard() {
       </div>
 
       {/* API Performance */}
-      <div className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm rounded-lg shadow-sm border border-gray-100 dark:border-slate-700/50 p-6">
-        <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">API Performance</h2>
+      <div className="bg-card/80 dark:bg-card/50 backdrop-blur-sm rounded-lg shadow-sm border border-border dark:border-border/50 p-6">
+        <h2 className="text-xl font-semibold mb-4 text-foreground dark:text-foreground">API Performance</h2>
         <div className="h-80">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={apiMetrics}>
@@ -110,25 +110,25 @@ export function PerformanceDashboard() {
       </div>
 
       {/* Resource Loading */}
-      <div className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm rounded-lg shadow-sm border border-gray-100 dark:border-slate-700/50 p-6">
-        <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Resource Loading</h2>
+      <div className="bg-card/80 dark:bg-card/50 backdrop-blur-sm rounded-lg shadow-sm border border-border dark:border-border/50 p-6">
+        <h2 className="text-xl font-semibold mb-4 text-foreground dark:text-foreground">Resource Loading</h2>
         <div className="overflow-x-auto">
           <table className="min-w-full">
             <thead>
-              <tr className="border-b border-gray-100 dark:border-slate-700/50">
-                <th className="px-4 py-2 text-left text-gray-900 dark:text-white">Resource</th>
-                <th className="px-4 py-2 text-left text-gray-900 dark:text-white">Type</th>
-                <th className="px-4 py-2 text-left text-gray-900 dark:text-white">Size (KB)</th>
-                <th className="px-4 py-2 text-left text-gray-900 dark:text-white">Load Time (ms)</th>
+              <tr className="border-b border-border dark:border-border/50">
+                <th className="px-4 py-2 text-left text-foreground dark:text-foreground">Resource</th>
+                <th className="px-4 py-2 text-left text-foreground dark:text-foreground">Type</th>
+                <th className="px-4 py-2 text-left text-foreground dark:text-foreground">Size (KB)</th>
+                <th className="px-4 py-2 text-left text-foreground dark:text-foreground">Load Time (ms)</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-slate-700/50">
+            <tbody className="divide-y divide-border dark:divide-border/50">
               {resourceMetrics.map((resource, index) => (
                 <tr key={index}>
-                  <td className="px-4 py-2 text-gray-600 dark:text-slate-300">{resource.name}</td>
-                  <td className="px-4 py-2 text-gray-600 dark:text-slate-300">{resource.type}</td>
-                  <td className="px-4 py-2 text-gray-600 dark:text-slate-300">{(resource.size / 1024).toFixed(2)}</td>
-                  <td className="px-4 py-2 text-gray-600 dark:text-slate-300">{resource.loadTime.toFixed(2)}</td>
+                  <td className="px-4 py-2 text-muted-foreground dark:text-muted-foreground">{resource.name}</td>
+                  <td className="px-4 py-2 text-muted-foreground dark:text-muted-foreground">{resource.type}</td>
+                  <td className="px-4 py-2 text-muted-foreground dark:text-muted-foreground">{(resource.size / 1024).toFixed(2)}</td>
+                  <td className="px-4 py-2 text-muted-foreground dark:text-muted-foreground">{resource.loadTime.toFixed(2)}</td>
                 </tr>
               ))}
             </tbody>
@@ -137,8 +137,8 @@ export function PerformanceDashboard() {
       </div>
 
       {/* Custom Metrics */}
-      <div className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm rounded-lg shadow-sm border border-gray-100 dark:border-slate-700/50 p-6">
-        <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Custom Metrics</h2>
+      <div className="bg-card/80 dark:bg-card/50 backdrop-blur-sm rounded-lg shadow-sm border border-border dark:border-border/50 p-6">
+        <h2 className="text-xl font-semibold mb-4 text-foreground dark:text-foreground">Custom Metrics</h2>
         <div className="h-80">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={metrics}>
@@ -158,9 +158,9 @@ export function PerformanceDashboard() {
 
 function MetricCard({ title, value }: { title: string; value: string }) {
   return (
-    <div className="bg-gray-50/50 dark:bg-slate-900/50 rounded-lg p-4 border border-gray-100 dark:border-slate-700/50">
-      <h3 className="text-sm font-medium text-gray-500 dark:text-slate-400">{title}</h3>
-      <p className="text-2xl font-semibold text-gray-900 dark:text-white">{value}</p>
+    <div className="bg-background/50 dark:bg-card/50 rounded-lg p-4 border border-border dark:border-border/50">
+      <h3 className="text-sm font-medium text-muted-foreground dark:text-muted-foreground">{title}</h3>
+      <p className="text-2xl font-semibold text-foreground dark:text-foreground">{value}</p>
     </div>
   );
 }

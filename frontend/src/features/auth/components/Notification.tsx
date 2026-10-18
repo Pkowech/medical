@@ -50,7 +50,7 @@ export function Notification({
         </div>
         <button
           onClick={onClose}
-          className="ml-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+          className="ml-4 text-muted-foreground hover:text-muted-foreground dark:hover:text-muted-foreground"
         >
           <X className="h-4 w-4" />
         </button>

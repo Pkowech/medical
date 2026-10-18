@@ -113,7 +113,7 @@ export default function QuizHistoryPage() {
             <div className="flex items-center space-x-4">
               <Award className="w-8 h-8 text-blue-500" />
               <div>
-                <p className="text-sm text-gray-500">Total Attempts</p>
+                <p className="text-sm text-muted-foreground">Total Attempts</p>
                 <p className="text-2xl font-bold">{stats.totalAttempts}</p>
               </div>
             </div>
@@ -122,7 +122,7 @@ export default function QuizHistoryPage() {
             <div className="flex items-center space-x-4">
               <BarChart className="w-8 h-8 text-green-500" />
               <div>
-                <p className="text-sm text-gray-500">Average Score</p>
+                <p className="text-sm text-muted-foreground">Average Score</p>
                 <p className="text-2xl font-bold">
                   {stats.totalAttempts > 0 ? `${stats.averageScore.toFixed(1)}%` : '—'}
                 </p>
@@ -133,7 +133,7 @@ export default function QuizHistoryPage() {
             <div className="flex items-center space-x-4">
               <Award className="w-8 h-8 text-yellow-500" />
               <div>
-                <p className="text-sm text-gray-500">Best Score</p>
+                <p className="text-sm text-muted-foreground">Best Score</p>
                 <p className="text-2xl font-bold">
                   {stats.totalAttempts > 0 ? `${stats.bestScore.toFixed(1)}%` : '—'}
                 </p>
@@ -144,7 +144,7 @@ export default function QuizHistoryPage() {
             <div className="flex items-center space-x-4">
               <Clock className="w-8 h-8 text-purple-500" />
               <div>
-                <p className="text-sm text-gray-500">Total Time</p>
+                <p className="text-sm text-muted-foreground">Total Time</p>
                 <p className="text-2xl font-bold">{formatTime(stats.totalTimeSpent)}</p>
               </div>
             </div>
@@ -158,8 +158,8 @@ export default function QuizHistoryPage() {
               <div className="flex flex-col md:flex-row md:items-center md:justify-between">
                 <div className="space-y-2">
                   <h3 className="text-lg font-semibold">{attempt.quizTitle}</h3>
-                    <p className="text-sm text-gray-500">{attempt.unitTitle || 'Independent quiz'}</p>
-                  <div className="flex items-center space-x-4 text-sm text-gray-500">
+                    <p className="text-sm text-muted-foreground">{attempt.unitTitle || 'Independent quiz'}</p>
+                  <div className="flex items-center space-x-4 text-sm text-muted-foreground">
                     <div className="flex items-center">
                       <Calendar className="w-4 h-4 mr-1" />
                       {formatDate(attempt.completedAt)}
@@ -174,7 +174,7 @@ export default function QuizHistoryPage() {
                   <div className="text-2xl font-bold text-blue-600">
                     {attempt.score.toFixed(1)}%
                   </div>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-muted-foreground">
                     {attempt.correctAnswers} of {attempt.totalQuestions} correct
                   </p>
                   {attempt.unitId ? (
@@ -197,7 +197,7 @@ export default function QuizHistoryPage() {
                       </Button>
                     </div>
                   ) : (
-                    <p className="mt-2 text-xs text-gray-500">This quiz is no longer linked to a unit.</p>
+                    <p className="mt-2 text-xs text-muted-foreground">This quiz is no longer linked to a unit.</p>
                   )}
                 </div>
               </div>
@@ -206,7 +206,7 @@ export default function QuizHistoryPage() {
 
           {attempts.length === 0 && (
             <Card className="p-6 text-center">
-              <p className="text-gray-500">No quiz attempts found</p>
+              <p className="text-muted-foreground">No quiz attempts found</p>
               <Button className="mt-4" onClick={() => router.push('/courses')}>
                 Start Learning
               </Button>

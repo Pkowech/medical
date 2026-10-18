@@ -26,7 +26,7 @@ export const FormField = forwardRef<HTMLInputElement, FormFieldProps>(
       <div className="space-y-1">
         <label
           htmlFor={props.id || props.name}
-          className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+          className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground"
         >
           {label}
         </label>
@@ -35,13 +35,13 @@ export const FormField = forwardRef<HTMLInputElement, FormFieldProps>(
           <input
             ref={ref}
             className={`
-              w-full px-3 py-2 border rounded-lg shadow-sm placeholder-gray-400
+              w-full px-3 py-2 border rounded-lg shadow-sm placeholder-muted-foreground
               focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500
-              dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-500
+              dark:bg-secondary dark:border-border dark:text-foreground dark:placeholder-muted-foreground
               ${
                 error
                   ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
-                  : 'border-gray-300 dark:border-gray-600'
+                  : 'border-border dark:border-border'
               }
               ${isPasswordField ? 'pr-12' : ''}
               ${className}
@@ -58,7 +58,7 @@ export const FormField = forwardRef<HTMLInputElement, FormFieldProps>(
               onMouseDown={event => event.preventDefault()}
               aria-label={isPasswordVisible ? 'Hide password' : 'Show password'}
               aria-pressed={isPasswordVisible}
-              className="absolute inset-y-0 right-0 flex items-center px-3 text-gray-500 hover:text-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-gray-400 dark:hover:text-gray-200"
+              className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-muted-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-muted-foreground dark:hover:text-muted-foreground"
             >
               {isPasswordVisible ? (
                 <EyeOff className="h-5 w-5" aria-hidden="true" />
@@ -81,7 +81,7 @@ export const FormField = forwardRef<HTMLInputElement, FormFieldProps>(
         )}
 
         {helperText && !error && (
-          <p id={helperId} className="text-sm text-gray-500 dark:text-gray-400">
+          <p id={helperId} className="text-sm text-muted-foreground dark:text-muted-foreground">
             {helperText}
           </p>
         )}

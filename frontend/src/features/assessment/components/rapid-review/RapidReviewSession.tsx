@@ -117,8 +117,8 @@ export function RapidReviewSession({ userId, topics }: RapidReviewSessionProps) 
       <div className="text-center space-y-6">
         <div className="space-y-2">
           <Zap className="h-16 w-16 text-yellow-500 dark:text-yellow-400 mx-auto" />
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Ready for Rapid Review?</h2>
-          <p className="text-gray-600 dark:text-slate-400 max-w-md mx-auto">
+          <h2 className="text-2xl font-bold text-foreground dark:text-foreground">Ready for Rapid Review?</h2>
+          <p className="text-muted-foreground dark:text-muted-foreground max-w-md mx-auto">
             10 high-yield questions in 10 minutes. Perfect for last-minute review and reinforcing
             weak areas.
           </p>
@@ -127,18 +127,18 @@ export function RapidReviewSession({ userId, topics }: RapidReviewSessionProps) 
         <div className="grid grid-cols-3 gap-4 max-w-md mx-auto">
           <div className="text-center">
             <Target className="h-8 w-8 text-blue-500 dark:text-blue-400 mx-auto mb-2" />
-            <div className="text-sm font-medium text-gray-900 dark:text-slate-200">10 Questions</div>
-            <div className="text-xs text-gray-500 dark:text-slate-500">High-yield topics</div>
+            <div className="text-sm font-medium text-foreground dark:text-muted-foreground">10 Questions</div>
+            <div className="text-xs text-muted-foreground dark:text-muted-foreground">High-yield topics</div>
           </div>
           <div className="text-center">
             <Timer className="h-8 w-8 text-green-500 dark:text-green-400 mx-auto mb-2" />
-            <div className="text-sm font-medium text-gray-900 dark:text-slate-200">10 Minutes</div>
-            <div className="text-xs text-gray-500 dark:text-slate-500">Time limit</div>
+            <div className="text-sm font-medium text-foreground dark:text-muted-foreground">10 Minutes</div>
+            <div className="text-xs text-muted-foreground dark:text-muted-foreground">Time limit</div>
           </div>
           <div className="text-center">
             <CheckCircle className="h-8 w-8 text-purple-500 dark:text-purple-400 mx-auto mb-2" />
-            <div className="text-sm font-medium text-gray-900 dark:text-slate-200">Instant Feedback</div>
-            <div className="text-xs text-gray-500 dark:text-slate-500">Learn as you go</div>
+            <div className="text-sm font-medium text-foreground dark:text-muted-foreground">Instant Feedback</div>
+            <div className="text-xs text-muted-foreground dark:text-muted-foreground">Learn as you go</div>
           </div>
         </div>
 
@@ -179,22 +179,22 @@ export function RapidReviewSession({ userId, topics }: RapidReviewSessionProps) 
       <div className="text-center space-y-6">
         <div className="space-y-2">
           <CheckCircle className="h-16 w-16 text-green-500 dark:text-green-400 mx-auto" />
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Rapid Review Complete!</h2>
+          <h2 className="text-2xl font-bold text-foreground dark:text-foreground">Rapid Review Complete!</h2>
         </div>
 
         <div className="grid grid-cols-2 gap-4 max-w-md mx-auto">
-          <div className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm rounded-lg p-4 border border-gray-100 dark:border-slate-700/50">
+          <div className="bg-card/80 dark:bg-card/50 backdrop-blur-sm rounded-lg p-4 border border-border dark:border-border/50">
             <div className={`text-2xl font-bold ${getScoreColor(percentage)}`}>
               {correctCount}/{questions.length}
             </div>
-            <div className="text-sm text-gray-500 dark:text-slate-400">Questions Correct</div>
+            <div className="text-sm text-muted-foreground dark:text-muted-foreground">Questions Correct</div>
             <Badge className={`mt-2 ${getScoreBadgeColor(percentage)}`}>{percentage}%</Badge>
           </div>
 
-          <div className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm rounded-lg p-4 border border-gray-100 dark:border-slate-700/50">
+          <div className="bg-card/80 dark:bg-card/50 backdrop-blur-sm rounded-lg p-4 border border-border dark:border-border/50">
             <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{formatTime(totalTime)}</div>
-            <div className="text-sm text-gray-500 dark:text-slate-400">Total Time</div>
-            <div className="text-xs text-gray-400 dark:text-slate-500 mt-1">Avg: {averageTime}s per question</div>
+            <div className="text-sm text-muted-foreground dark:text-muted-foreground">Total Time</div>
+            <div className="text-xs text-muted-foreground dark:text-muted-foreground mt-1">Avg: {averageTime}s per question</div>
           </div>
         </div>
 
@@ -225,10 +225,10 @@ export function RapidReviewSession({ userId, topics }: RapidReviewSessionProps) 
   return (
     <div className="w-full max-w-2xl mx-auto space-y-4">
       {/* Header with timers and progress */}
-      <div className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm rounded-lg p-4 shadow-sm border border-gray-100 dark:border-slate-700/50">
+      <div className="bg-card/80 dark:bg-card/50 backdrop-blur-sm rounded-lg p-4 shadow-sm border border-border dark:border-border/50">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-4">
-            <Badge variant="outline" className="text-sm dark:border-slate-700 dark:text-slate-300">
+            <Badge variant="outline" className="text-sm dark:border-border dark:text-muted-foreground">
               Question {currentIndex + 1} / {questions.length}
             </Badge>
             {currentQuestion.topic && (
@@ -238,9 +238,9 @@ export function RapidReviewSession({ userId, topics }: RapidReviewSessionProps) 
 
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 text-sm">
-              <Clock className="h-4 w-4 text-gray-500 dark:text-slate-400" />
+              <Clock className="h-4 w-4 text-muted-foreground dark:text-muted-foreground" />
               <span
-                className={`font-mono ${questionTimeRemaining <= 10 ? 'text-red-600 dark:text-red-400 font-bold' : 'text-gray-700 dark:text-slate-300'}`}
+                className={`font-mono ${questionTimeRemaining <= 10 ? 'text-red-600 dark:text-red-400 font-bold' : 'text-muted-foreground dark:text-muted-foreground'}`}
               >
                 {questionTimeRemaining}s
               </span>
@@ -256,9 +256,9 @@ export function RapidReviewSession({ userId, topics }: RapidReviewSessionProps) 
       </div>
 
       {/* Question card */}
-      <div className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm rounded-xl shadow-sm border border-gray-100 dark:border-slate-700/50 p-6">
+      <div className="bg-card/80 dark:bg-card/50 backdrop-blur-sm rounded-xl shadow-sm border border-border dark:border-border/50 p-6">
         <div className="mb-6">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white leading-relaxed">
+          <h2 className="text-xl font-semibold text-foreground dark:text-foreground leading-relaxed">
             {currentQuestion.question_text}
           </h2>
         </div>
@@ -268,12 +268,12 @@ export function RapidReviewSession({ userId, topics }: RapidReviewSessionProps) 
             {currentQuestion.options.map((opt: string, idx: number) => (
               <Button
                 key={opt}
-                className="w-full text-left justify-start p-4 h-auto min-h-12 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 dark:hover:border-blue-700 dark:text-slate-200"
+                className="w-full text-left justify-start p-4 h-auto min-h-12 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 dark:hover:border-blue-700 dark:text-muted-foreground"
                 variant="outline"
                 onClick={() => handleAnswerSelect(opt, opt === currentQuestion.correctAnswer)}
               >
                 <span className="flex items-start gap-3 w-full">
-                  <span className="shrink-0 w-6 h-6 rounded-full bg-gray-100 dark:bg-slate-700 flex items-center justify-center text-sm font-medium text-gray-900 dark:text-slate-200">
+                  <span className="shrink-0 w-6 h-6 rounded-full bg-muted dark:bg-secondary flex items-center justify-center text-sm font-medium text-foreground dark:text-muted-foreground">
                     {String.fromCharCode(65 + idx)}
                   </span>
                   <span className="text-left">{opt}</span>

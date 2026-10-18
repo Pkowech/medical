@@ -22,11 +22,11 @@ export default function AssessmentDetailPage({ params }: AssessmentPageProps) {
   }, [params]);
 
   if (!assessmentId) {
-    return <div className="p-8 text-center text-slate-500">Loading assessment…</div>;
+    return <div className="p-8 text-center text-muted-foreground">Loading assessment…</div>;
   }
 
   return (
-    <main className="min-h-full bg-slate-50 p-4 dark:bg-slate-950 md:p-8">
+    <main className="min-h-full bg-background p-4 dark:bg-background md:p-8">
       <div className="mx-auto max-w-5xl">
         <QuizPanel
           lessonId={assessmentId}

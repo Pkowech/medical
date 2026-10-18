@@ -30,7 +30,7 @@ export default function FeedbackForm({ userId }: { userId: string }) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="p-4 bg-white rounded-lg shadow">
+    <form onSubmit={handleSubmit} className="p-4 bg-card rounded-lg shadow">
       <h2 className="text-xl font-semibold mb-4">Submit Feedback</h2>
       <textarea
         value={comments}

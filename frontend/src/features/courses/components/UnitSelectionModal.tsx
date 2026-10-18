@@ -103,24 +103,24 @@ export const UnitSelectionModal = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-      <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="bg-card dark:bg-card w-full max-w-2xl rounded-2xl shadow-2xl border border-border dark:border-border overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/30">
+        <div className="p-6 border-b border-border dark:border-border flex items-center justify-between bg-background/50 dark:bg-card/30">
           <div>
-            <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <h2 className="text-xl font-bold text-foreground dark:text-foreground flex items-center gap-2">
               <LayoutGrid className="w-5 h-5 text-blue-500" />
               Manage your units
             </h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-              Course: <span className="font-medium text-slate-700 dark:text-slate-200">{course.title || course.name}</span>
+            <p className="text-sm text-muted-foreground dark:text-muted-foreground mt-1">
+              Course: <span className="font-medium text-muted-foreground dark:text-muted-foreground">{course.title || course.name}</span>
             </p>
           </div>
           <button 
             onClick={onClose}
             title="Close modal"
-            className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full transition-colors"
+            className="p-2 hover:bg-secondary dark:hover:bg-secondary rounded-full transition-colors"
           >
-            <X className="w-5 h-5 text-slate-500" />
+            <X className="w-5 h-5 text-muted-foreground" />
           </button>
         </div>
 
@@ -135,9 +135,9 @@ export const UnitSelectionModal = ({
           </div>
 
           <div className="space-y-3">
-            <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Available Units</h3>
+            <h3 className="text-sm font-bold text-muted-foreground dark:text-muted-foreground uppercase tracking-wider">Available Units</h3>
             {units.length === 0 ? (
-              <p className="text-center py-8 text-slate-400">No units available for this course.</p>
+              <p className="text-center py-8 text-muted-foreground">No units available for this course.</p>
             ) : (
               <div className="grid gap-3">
                 {units.map((unit) => {
@@ -148,7 +148,7 @@ export const UnitSelectionModal = ({
                       className={`flex items-center justify-between gap-4 p-4 rounded-xl border transition-all ${
                         isActive
                           ? 'border-emerald-300 bg-emerald-50/70 dark:border-emerald-800 dark:bg-emerald-900/10'
-                          : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900'
+                          : 'border-border dark:border-border bg-card dark:bg-card'
                       }`}
                     >
                       <div className="flex items-center gap-4">
@@ -156,10 +156,10 @@ export const UnitSelectionModal = ({
                           <BookOpen className="w-5 h-5" />
                         </div>
                         <div className="min-w-0">
-                          <p className={`font-bold text-sm ${isActive ? 'text-emerald-800 dark:text-emerald-300' : 'text-slate-900 dark:text-slate-200'}`}>
+                          <p className={`font-bold text-sm ${isActive ? 'text-emerald-800 dark:text-emerald-300' : 'text-foreground dark:text-muted-foreground'}`}>
                             {unit.title}
                           </p>
-                          <p className="text-xs text-slate-500 dark:text-slate-500 line-clamp-1">
+                          <p className="text-xs text-muted-foreground dark:text-muted-foreground line-clamp-1">
                             {unit.description || 'Comprehensive learning module'}
                           </p>
                         </div>
@@ -176,7 +176,7 @@ export const UnitSelectionModal = ({
                               )
                             }
                             disabled={isSubmitting}
-                            className="rounded-lg border border-slate-200 px-2.5 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                            className="rounded-lg border border-border px-2.5 py-2 text-xs font-semibold text-muted-foreground hover:bg-background disabled:opacity-50 dark:border-border dark:text-muted-foreground dark:hover:bg-card"
                           >
                             {deactivatingUnitId === unit.id ? 'Removing…' : 'Remove'}
                           </button>
@@ -209,18 +209,18 @@ export const UnitSelectionModal = ({
             <section className="mt-8 space-y-3">
               <div className="flex items-center gap-2">
                 <Sparkles className="h-4 w-4 text-indigo-500" />
-                <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground dark:text-muted-foreground">
                   Related units to explore
                 </h3>
               </div>
               {relatedUnits.isLoading ? (
-                <p className="text-sm text-slate-500" role="status">Finding units related to your active learning…</p>
+                <p className="text-sm text-muted-foreground" role="status">Finding units related to your active learning…</p>
               ) : relatedUnits.isError ? (
                 <p className="text-sm text-amber-700 dark:text-amber-300" role="alert">
                   Related unit recommendations are temporarily unavailable.
                 </p>
               ) : relatedToOtherCourses.length === 0 ? (
-                <p className="text-sm text-slate-500">
+                <p className="text-sm text-muted-foreground">
                   Related unit suggestions will appear when published units have prerequisite or similarity links.
                 </p>
               ) : (
@@ -228,8 +228,8 @@ export const UnitSelectionModal = ({
                   {relatedToOtherCourses.map(recommendation => (
                     <div key={recommendation.unitId} className="flex items-center justify-between gap-4 rounded-xl border border-indigo-100 bg-indigo-50/50 p-4 dark:border-indigo-900/50 dark:bg-indigo-950/20">
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">{recommendation.title}</p>
-                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                        <p className="truncate text-sm font-semibold text-foreground dark:text-foreground">{recommendation.title}</p>
+                        <p className="mt-1 text-xs text-muted-foreground dark:text-muted-foreground">
                           {recommendation.courseTitle} · {recommendation.relationType.replace('_', ' ')} to your active unit
                         </p>
                       </div>
@@ -250,7 +250,7 @@ export const UnitSelectionModal = ({
         </div>
 
         {/* Footer */}
-        <div className="p-6 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900">
+        <div className="p-6 border-t border-border dark:border-border bg-card dark:bg-card">
           {error && (
             <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 text-xs rounded-lg border border-red-100 dark:border-red-800/30 flex items-center gap-2">
               <AlertCircle className="w-4 h-4" />
@@ -263,7 +263,7 @@ export const UnitSelectionModal = ({
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="px-6 py-2.5 bg-slate-100 text-slate-700 font-bold rounded-lg hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 disabled:opacity-50"
+              className="px-6 py-2.5 bg-muted text-muted-foreground font-bold rounded-lg hover:bg-secondary dark:bg-card dark:text-muted-foreground dark:hover:bg-secondary disabled:opacity-50"
             >
               Done
             </button>

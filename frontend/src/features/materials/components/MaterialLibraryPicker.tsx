@@ -55,7 +55,7 @@ const TYPE_ICONS: Record<string, React.ReactNode> = {
 };
 
 const getTypeIcon = (type?: string) =>
-  TYPE_ICONS[(type ?? '').toLowerCase()] ?? <FileText className="w-4 h-4 text-gray-400" />;
+  TYPE_ICONS[(type ?? '').toLowerCase()] ?? <FileText className="w-4 h-4 text-muted-foreground" />;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Component
@@ -144,30 +144,30 @@ export const MaterialLibraryPicker: React.FC<MaterialLibraryPickerProps> = ({
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
       onClick={handleBackdrop}
     >
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col">
+      <div className="bg-card rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col">
 
         {/* ── Header ──────────────────────────────────────────────────────── */}
         <div className="flex items-start justify-between px-6 py-4 border-b">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">
+            <h2 className="text-lg font-semibold text-foreground">
               Attach from R2 Library
             </h2>
-            <p className="text-sm text-gray-500 mt-0.5">
+            <p className="text-sm text-muted-foreground mt-0.5">
               Reuse an existing textbook or file — zero re-upload, zero extra storage cost.
             </p>
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded hover:bg-gray-100 transition-colors ml-4 flex-shrink-0"
+            className="p-1 rounded hover:bg-muted transition-colors ml-4 flex-shrink-0"
           >
-            <X className="w-5 h-5 text-gray-500" />
+            <X className="w-5 h-5 text-muted-foreground" />
           </button>
         </div>
 
         {/* ── Search bar ──────────────────────────────────────────────────── */}
         <div className="px-6 py-3 border-b">
           <div className="relative">
-            <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400 pointer-events-none" />
+            <Search className="absolute left-3 top-2.5 w-4 h-4 text-muted-foreground pointer-events-none" />
             <Input
               className="pl-9"
               placeholder="Search existing materials by title, type…"
@@ -182,13 +182,13 @@ export const MaterialLibraryPicker: React.FC<MaterialLibraryPickerProps> = ({
         <div className="flex-1 overflow-y-auto px-4 py-2">
           {loading ? (
             <div className="flex items-center justify-center py-16 gap-2">
-              <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
-              <span className="text-sm text-gray-500">Loading library…</span>
+              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">Loading library…</span>
             </div>
           ) : materials.length === 0 ? (
             <div className="py-16 text-center">
               <FileText className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-              <p className="text-sm text-gray-400">
+              <p className="text-sm text-muted-foreground">
                 {search ? `No materials matching "${search}"` : 'No materials in the library yet.'}
               </p>
             </div>
@@ -201,13 +201,13 @@ export const MaterialLibraryPicker: React.FC<MaterialLibraryPickerProps> = ({
                   className={`flex items-start gap-3 py-3 px-3 rounded-lg cursor-pointer transition-colors ${
                     selected?.id === m.id
                       ? 'bg-blue-50 border border-blue-200'
-                      : 'hover:bg-gray-50'
+                      : 'hover:bg-background'
                   }`}
                 >
                   <div className="mt-0.5 flex-shrink-0">{getTypeIcon(m.type)}</div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">{m.title}</p>
-                    <p className="text-xs text-gray-500 mt-0.5 truncate">
+                    <p className="text-sm font-medium text-foreground truncate">{m.title}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">
                       {m.type?.toUpperCase()}
                       {m.description ? ` · ${m.description.slice(0, 70)}` : ''}
                     </p>
@@ -223,8 +223,8 @@ export const MaterialLibraryPicker: React.FC<MaterialLibraryPickerProps> = ({
 
         {/* ── Confirm panel ────────────────────────────────────────────────── */}
         {selected && (
-          <div className="px-6 py-4 border-t bg-gray-50 rounded-b-xl">
-            <p className="text-xs font-medium text-gray-600 mb-1">
+          <div className="px-6 py-4 border-t bg-background rounded-b-xl">
+            <p className="text-xs font-medium text-muted-foreground mb-1">
               Display title in this course / topic:
             </p>
             <Input
@@ -248,7 +248,7 @@ export const MaterialLibraryPicker: React.FC<MaterialLibraryPickerProps> = ({
             )}
 
             <div className="flex items-center gap-2 justify-between">
-              <p className="text-xs text-gray-400">
+              <p className="text-xs text-muted-foreground">
                 Original file: <span className="font-medium">{selected.title}</span> ({selected.type?.toUpperCase()})
               </p>
               <div className="flex gap-2">

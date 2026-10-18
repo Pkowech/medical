@@ -222,12 +222,12 @@ export default function SettingsPage() {
             <CardContent>
               <div className="space-y-4">
                 <div className="flex items-center space-x-4">
-                  <div className="h-16 w-16 rounded-full bg-gray-200 text-gray-600 dark:bg-slate-700 dark:text-slate-200 flex items-center justify-center text-xl font-bold">
+                  <div className="h-16 w-16 rounded-full bg-secondary text-muted-foreground dark:bg-secondary dark:text-muted-foreground flex items-center justify-center text-xl font-bold">
                     {session?.user?.name?.charAt(0) || 'U'}
                   </div>
                   <div>
                     <h3 className="font-medium">{session?.user?.name || 'User'}</h3>
-                    <p className="text-sm text-gray-500 dark:text-slate-400">
+                    <p className="text-sm text-muted-foreground dark:text-muted-foreground">
                       {session?.user?.email || 'user@example.com'}
                     </p>
                   </div>
@@ -253,7 +253,7 @@ export default function SettingsPage() {
                 <div>
                   <label className="block text-sm font-medium mb-2">Email Address</label>
                   <Input type="email" value={settings.email} readOnly disabled />
-                  <p className="mt-1 text-xs text-gray-500 dark:text-slate-400">
+                  <p className="mt-1 text-xs text-muted-foreground dark:text-muted-foreground">
                     Contact support to change the email address on your account.
                   </p>
                 </div>
@@ -280,7 +280,7 @@ export default function SettingsPage() {
                       className={`px-4 py-2 rounded-md ${
                         settings.theme === 'light'
                           ? 'bg-blue-100 text-blue-700 border border-blue-300 dark:bg-blue-950 dark:text-blue-200 dark:border-blue-700'
-                          : 'bg-gray-100 text-gray-700 border border-gray-200 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700'
+                          : 'bg-muted text-muted-foreground border border-border dark:bg-card dark:text-muted-foreground dark:border-border'
                       }`}
                       onClick={() => handleThemeChange('light')}
                     >
@@ -293,7 +293,7 @@ export default function SettingsPage() {
                       className={`px-4 py-2 rounded-md ${
                         settings.theme === 'dark'
                           ? 'bg-blue-100 text-blue-700 border border-blue-300 dark:bg-blue-950 dark:text-blue-200 dark:border-blue-700'
-                          : 'bg-gray-100 text-gray-700 border border-gray-200 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700'
+                          : 'bg-muted text-muted-foreground border border-border dark:bg-card dark:text-muted-foreground dark:border-border'
                       }`}
                       onClick={() => handleThemeChange('dark')}
                     >
@@ -306,7 +306,7 @@ export default function SettingsPage() {
                       className={`px-4 py-2 rounded-md ${
                         settings.theme === 'system'
                           ? 'bg-blue-100 text-blue-700 border border-blue-300 dark:bg-blue-950 dark:text-blue-200 dark:border-blue-700'
-                          : 'bg-gray-100 text-gray-700 border border-gray-200 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700'
+                          : 'bg-muted text-muted-foreground border border-border dark:bg-card dark:text-muted-foreground dark:border-border'
                       }`}
                       onClick={() => handleThemeChange('system')}
                     >
@@ -321,7 +321,7 @@ export default function SettingsPage() {
                   </label>
                   <select
                     id="language-select"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-slate-900 dark:text-slate-100 dark:border-slate-700"
+                    className="w-full px-3 py-2 border border-border rounded-md dark:bg-card dark:text-muted-foreground dark:border-border"
                     value={settings.language}
                     onChange={e => handleInputChange('language', e.target.value)}
                   >
@@ -339,7 +339,7 @@ export default function SettingsPage() {
                   </label>
                   <select
                     id="timezone-select"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-slate-900 dark:text-slate-100 dark:border-slate-700"
+                    className="w-full px-3 py-2 border border-border rounded-md dark:bg-card dark:text-muted-foreground dark:border-border"
                     value={settings.timezone}
                     onChange={e => handleInputChange('timezone', e.target.value)}
                   >
@@ -366,7 +366,7 @@ export default function SettingsPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="font-medium">Email Notifications</h3>
-                    <p className="text-sm text-gray-500 dark:text-slate-400">
+                    <p className="text-sm text-muted-foreground dark:text-muted-foreground">
                       Receive notifications via email
                     </p>
                   </div>
@@ -379,7 +379,7 @@ export default function SettingsPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="font-medium">Push Notifications</h3>
-                    <p className="text-sm text-gray-500 dark:text-slate-400">
+                    <p className="text-sm text-muted-foreground dark:text-muted-foreground">
                       Receive push notifications in browser
                     </p>
                   </div>
@@ -392,7 +392,7 @@ export default function SettingsPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="font-medium">Weekly Digest</h3>
-                    <p className="text-sm text-gray-500 dark:text-slate-400">
+                    <p className="text-sm text-muted-foreground dark:text-muted-foreground">
                       Receive a weekly summary of your progress
                     </p>
                   </div>
@@ -405,7 +405,7 @@ export default function SettingsPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="font-medium">Show Progress Updates</h3>
-                    <p className="text-sm text-gray-500 dark:text-slate-400">
+                    <p className="text-sm text-muted-foreground dark:text-muted-foreground">
                       Receive notifications about your progress
                     </p>
                   </div>
@@ -435,7 +435,7 @@ export default function SettingsPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="font-medium">Login Notifications</h3>
-                    <p className="text-sm text-gray-500 dark:text-slate-400">
+                    <p className="text-sm text-muted-foreground dark:text-muted-foreground">
                       Get notified of new login attempts
                     </p>
                   </div>
@@ -480,7 +480,7 @@ export default function SettingsPage() {
                     }
                     required
                   />
-                  <p className="text-xs text-gray-500 dark:text-slate-400">
+                  <p className="text-xs text-muted-foreground dark:text-muted-foreground">
                     Use at least 8 characters with uppercase and lowercase letters, a number, and a
                     special character.
                   </p>
@@ -494,7 +494,7 @@ export default function SettingsPage() {
                   </Button>
                 </form>
 
-                <p className="text-sm text-gray-500 dark:text-slate-400">
+                <p className="text-sm text-muted-foreground dark:text-muted-foreground">
                   To request account deletion, contact{' '}
                   <a
                     className="underline"
@@ -524,7 +524,7 @@ export default function SettingsPage() {
                   </label>
                   <select
                     id="visibility-select"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-slate-900 dark:text-slate-100 dark:border-slate-700"
+                    className="w-full px-3 py-2 border border-border rounded-md dark:bg-card dark:text-muted-foreground dark:border-border"
                     value={settings.profileVisibility}
                     onChange={e => handleInputChange('profileVisibility', e.target.value)}
                   >
@@ -536,7 +536,7 @@ export default function SettingsPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="font-medium">Show Email</h3>
-                    <p className="text-sm text-gray-500 dark:text-slate-400">
+                    <p className="text-sm text-muted-foreground dark:text-muted-foreground">
                       Display email on your profile
                     </p>
                   </div>
@@ -549,7 +549,7 @@ export default function SettingsPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="font-medium">Show Phone</h3>
-                    <p className="text-sm text-gray-500 dark:text-slate-400">
+                    <p className="text-sm text-muted-foreground dark:text-muted-foreground">
                       Display phone number on your profile
                     </p>
                   </div>
@@ -562,7 +562,7 @@ export default function SettingsPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="font-medium">Show Location</h3>
-                    <p className="text-sm text-gray-500 dark:text-slate-400">
+                    <p className="text-sm text-muted-foreground dark:text-muted-foreground">
                       Display location on your profile
                     </p>
                   </div>
@@ -575,7 +575,7 @@ export default function SettingsPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="font-medium">Allow Messages</h3>
-                    <p className="text-sm text-gray-500 dark:text-slate-400">
+                    <p className="text-sm text-muted-foreground dark:text-muted-foreground">
                       Allow others to message you
                     </p>
                   </div>

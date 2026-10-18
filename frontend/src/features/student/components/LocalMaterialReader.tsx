@@ -160,7 +160,7 @@ export function LocalMaterialReader() {
             <CardContent>
               {fileUrl ? (
                 // render PDF viewer for local pdf
-                <div className="p-4 border rounded-md bg-gray-50 h-96 overflow-y-auto">
+                <div className="p-4 border rounded-md bg-background h-96 overflow-y-auto">
                   {/* PDF viewer for local file */}
                   {/* Lazy load to avoid SSR */}
                   <div className="w-full h-[70vh]">
@@ -177,7 +177,7 @@ export function LocalMaterialReader() {
               ) : (
                 <div
                   ref={viewerRef}
-                  className="p-4 border rounded-md bg-gray-50 h-96 overflow-y-auto"
+                  className="p-4 border rounded-md bg-background h-96 overflow-y-auto"
                 >
                   <pre>{fileContent}</pre>
                 </div>
@@ -186,14 +186,14 @@ export function LocalMaterialReader() {
           </Card>
         )}
         <div className="flex gap-4 items-center">
-          <div className="text-sm text-gray-500">
+          <div className="text-sm text-muted-foreground">
             <span
-              className={`inline-block h-2 w-2 rounded-full mr-2 ${isTracking ? 'bg-green-500' : 'bg-gray-300'}`}
+              className={`inline-block h-2 w-2 rounded-full mr-2 ${isTracking ? 'bg-green-500' : 'bg-secondary'}`}
             />
             {isTracking ? 'Tracking' : 'Not tracking'}
           </div>
-          <div className="text-sm text-gray-500">Progress: {currentPercent ?? 0}%</div>
-          <div className="text-sm text-gray-500">
+          <div className="text-sm text-muted-foreground">Progress: {currentPercent ?? 0}%</div>
+          <div className="text-sm text-muted-foreground">
             Elapsed: {Math.floor(elapsedSeconds / 60)}m {elapsedSeconds % 60}s
           </div>
           {!isTracking ? (

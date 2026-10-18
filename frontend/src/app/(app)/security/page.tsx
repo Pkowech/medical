@@ -13,16 +13,16 @@ export default function SecurityPage() {
     <section className="flex flex-col gap-8 py-10">
       <header className="space-y-3 text-center">
         <p className="text-sm uppercase tracking-wide text-blue-600">Security Center</p>
-        <h1 className="text-3xl font-semibold text-gray-900">Keep your account protected</h1>
-        <p className="text-gray-600">
+        <h1 className="text-3xl font-semibold text-foreground">Keep your account protected</h1>
+        <p className="text-muted-foreground">
           Review the recommendations below to make sure your MedTrackHub account stays secure.
         </p>
       </header>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <article className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-gray-900">Security health</h2>
-          <p className="mt-2 text-sm text-gray-500">
+        <article className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-foreground">Security health</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
             Set up MFA and review trusted devices for best protection.
           </p>
           <Link
@@ -33,9 +33,9 @@ export default function SecurityPage() {
           </Link>
         </article>
 
-        <article className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-gray-900">Active sessions</h2>
-          <p className="mt-2 text-sm text-gray-500">
+        <article className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-foreground">Active sessions</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
             View and revoke devices that currently have access to your account.
           </p>
           <Link
@@ -46,9 +46,9 @@ export default function SecurityPage() {
           </Link>
         </article>
 
-        <article className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-gray-900">Recent activity</h2>
-          <p className="mt-2 text-sm text-gray-500">
+        <article className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-foreground">Recent activity</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
             Check login attempts, password changes, and other sensitive actions.
           </p>
           <Link

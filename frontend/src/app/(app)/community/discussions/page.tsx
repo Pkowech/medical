@@ -129,8 +129,8 @@ export default function DiscussionsPage() {
     <div className="mx-auto max-w-6xl space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Discussions</h1>
-          <p className="mt-2 text-gray-600 dark:text-gray-400">
+          <h1 className="text-3xl font-bold text-foreground dark:text-foreground">Discussions</h1>
+          <p className="mt-2 text-muted-foreground dark:text-muted-foreground">
             Share questions and ideas with the MedTrack community.
           </p>
         </div>

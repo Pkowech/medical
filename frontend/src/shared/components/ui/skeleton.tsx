@@ -9,7 +9,7 @@ interface SkeletonProps {
 export const Skeleton = ({ className }: SkeletonProps) => {
   return (
     <div
-      className={cn('animate-pulse bg-gray-200 rounded', className)}
+      className={cn('animate-pulse bg-secondary rounded', className)}
       role="status"
       aria-label="Loading"
     />

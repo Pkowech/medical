@@ -40,7 +40,7 @@ const CourseProgressList = ({ courses }: { courses?: CourseProgress[] }) => {
               </div>
 
               <div className="mt-2 flex items-center justify-between">
-                <p className="text-xs text-gray-400">Last synced: {formatLastUpdatedSafe((course as CourseWithSync).lastUpdated)}</p>
+                <p className="text-xs text-muted-foreground">Last synced: {formatLastUpdatedSafe((course as CourseWithSync).lastUpdated)}</p>
                 <div>{(course as CourseWithSync).syncStatus && <SyncBadge status={(course as CourseWithSync).syncStatus} />}</div>
               </div>
             </CardContent>

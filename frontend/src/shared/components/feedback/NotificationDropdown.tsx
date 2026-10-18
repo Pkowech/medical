@@ -115,15 +115,15 @@ export default function NotificationDropdown() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white">
+        <Button variant="ghost" size="icon" className="relative text-muted-foreground hover:text-foreground dark:text-muted-foreground dark:hover:text-foreground">
           <Bell className="h-5 w-5" />
           {unreadCount > 0 && (
-            <span className="absolute top-1.5 right-1.5 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white dark:ring-gray-900" />
+            <span className="absolute top-1.5 right-1.5 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white dark:ring-ring" />
           )}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-96 p-0 shadow-xl border-gray-100 dark:border-gray-800">
-        <div className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-950 rounded-t-lg">
+      <DropdownMenuContent align="end" className="w-96 p-0 shadow-xl border-border dark:border-border">
+        <div className="flex items-center justify-between p-4 border-b border-border dark:border-border bg-card dark:bg-background rounded-t-lg">
           <div className="flex items-center gap-2">
             <h3 className="font-semibold text-sm">Notifications</h3>
             {unreadCount > 0 && (
@@ -145,7 +145,7 @@ export default function NotificationDropdown() {
             )}
             <Button variant="ghost" size="icon" className="h-7 w-7" asChild>
               <Link href="/notifications">
-                <Settings className="h-3.5 w-3.5 text-gray-500" />
+                <Settings className="h-3.5 w-3.5 text-muted-foreground" />
               </Link>
             </Button>
           </div>
@@ -153,10 +153,10 @@ export default function NotificationDropdown() {
 
         <ScrollArea className="h-[400px]">
           {sortedNotifications.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-[300px] text-gray-500">
-              <Bell className="h-12 w-12 text-gray-200 dark:text-gray-800 mb-3" />
+            <div className="flex flex-col items-center justify-center h-[300px] text-muted-foreground">
+              <Bell className="h-12 w-12 text-gray-200 dark:text-muted-foreground mb-3" />
               <p className="text-sm font-medium">No notifications</p>
-              <p className="text-xs text-gray-400">You're all caught up!</p>
+              <p className="text-xs text-muted-foreground">You're all caught up!</p>
             </div>
           ) : (
             <div className="py-1">
@@ -166,7 +166,7 @@ export default function NotificationDropdown() {
                   <div
                     key={notification.id}
                     className={cn(
-                      "group relative flex gap-3 p-4 transition-all hover:bg-gray-50 dark:hover:bg-gray-900/50 cursor-pointer border-l-2",
+                      "group relative flex gap-3 p-4 transition-all hover:bg-background dark:hover:bg-card/50 cursor-pointer border-l-2",
                       !notification.read 
                         ? "border-l-blue-500 bg-blue-50/30 dark:bg-blue-900/10" 
                         : "border-l-transparent opacity-80 hover:opacity-100"
@@ -175,8 +175,8 @@ export default function NotificationDropdown() {
                   >
                     <div className="shrink-0 mt-0.5">
                       <div className={cn(
-                        "h-8 w-8 rounded-full flex items-center justify-center ring-4 ring-white dark:ring-gray-950",
-                        !notification.read ? "bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-400" : "bg-gray-100 text-gray-500 dark:bg-gray-800"
+                        "h-8 w-8 rounded-full flex items-center justify-center ring-4 ring-white dark:ring-ring",
+                        !notification.read ? "bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-400" : "bg-muted text-muted-foreground dark:bg-card"
                       )}>
                         <Bell className="h-4 w-4" />
                       </div>
@@ -184,15 +184,15 @@ export default function NotificationDropdown() {
                     
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
-                        <p className={cn("text-sm font-medium leading-none", !notification.read ? "text-gray-900 dark:text-gray-100" : "text-gray-600 dark:text-gray-400")}>
+                        <p className={cn("text-sm font-medium leading-none", !notification.read ? "text-foreground dark:text-muted-foreground" : "text-muted-foreground dark:text-muted-foreground")}>
                           {notification.title || notification.metadata?.title || 'System Notification'}
                         </p>
-                        <span className="text-[10px] text-gray-400 tabular-nums shrink-0">
+                        <span className="text-[10px] text-muted-foreground tabular-nums shrink-0">
                           {getTimeAgo(notification.createdAt)}
                         </span>
                       </div>
                       
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2 leading-relaxed">
+                      <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-1 line-clamp-2 leading-relaxed">
                         {notification.message}
                       </p>
 
@@ -201,7 +201,7 @@ export default function NotificationDropdown() {
                           <Button 
                             size="sm" 
                             variant="outline" 
-                            className="h-7 text-xs px-3 bg-white dark:bg-gray-900 border-blue-200 dark:border-blue-900 text-blue-600 dark:text-blue-400 hover:bg-blue-50 hover:text-blue-700"
+                            className="h-7 text-xs px-3 bg-card dark:bg-card border-blue-200 dark:border-blue-900 text-blue-600 dark:text-blue-400 hover:bg-blue-50 hover:text-blue-700"
                             onClick={(e) => {
                               e.stopPropagation();
                               handleNotificationClick(notification.id, action);
@@ -251,8 +251,8 @@ export default function NotificationDropdown() {
           )}
         </ScrollArea>
 
-        <div className="p-2 border-t border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/20">
-          <Button variant="ghost" className="w-full text-xs h-8 text-gray-500 hover:text-gray-900 dark:hover:text-gray-300" asChild>
+        <div className="p-2 border-t border-border dark:border-border bg-background/50 dark:bg-card/20">
+          <Button variant="ghost" className="w-full text-xs h-8 text-muted-foreground hover:text-foreground dark:hover:text-muted-foreground" asChild>
             <Link href="/notifications">
               View all notification history
             </Link>

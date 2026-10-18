@@ -112,7 +112,7 @@ export default function NotificationsPage() {
       {notifications.length === 0 ? (
         <Card>
           <CardContent className="p-6 text-center text-muted-foreground">
-            <Bell className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+            <Bell className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
             <p>You don't have any notifications yet.</p>
           </CardContent>
         </Card>
@@ -133,7 +133,7 @@ export default function NotificationsPage() {
                     <div className="flex-1">
                       <p className="font-medium">{notification.title}</p>
                       <p className="text-sm text-muted-foreground">{notification.message}</p>
-                      <p className="text-xs text-gray-500 mt-1">
+                      <p className="text-xs text-muted-foreground mt-1">
                         {getTimeAgo(notification.createdAt)}
                       </p>
                       <div className="mt-2 space-x-2">
@@ -167,7 +167,7 @@ export default function NotificationsPage() {
                     <div className="flex-1">
                       <p className="font-medium">{notification.title}</p>
                       <p className="text-sm text-muted-foreground">{notification.message}</p>
-                      <p className="text-xs text-gray-500 mt-1">
+                      <p className="text-xs text-muted-foreground mt-1">
                         {getTimeAgo(notification.createdAt)}
                       </p>
                       <div className="mt-2">

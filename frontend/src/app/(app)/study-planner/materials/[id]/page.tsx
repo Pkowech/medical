@@ -252,12 +252,12 @@ export default function MaterialViewPage() {
     if (isPdfRenderable && effectiveUrl) {
       if (isLocalFileUrl && !localFile) {
         return (
-          <div className="flex flex-col items-center justify-center p-12 text-center h-[70vh] bg-gray-50 dark:bg-slate-800/50 rounded-xl">
+          <div className="flex flex-col items-center justify-center p-12 text-center h-[70vh] bg-background dark:bg-card/50 rounded-xl">
             <div className="bg-blue-100 dark:bg-blue-900/30 p-4 rounded-full mb-4 flex items-center justify-center">
               <File className="h-10 w-10 text-blue-600 dark:text-blue-400" />
             </div>
-            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Personal Study Material</h3>
-            <p className="text-gray-600 dark:text-slate-400 max-w-md mb-6 leading-relaxed">
+            <h3 className="text-xl font-bold text-foreground dark:text-foreground mb-2">Personal Study Material</h3>
+            <p className="text-muted-foreground dark:text-muted-foreground max-w-md mb-6 leading-relaxed">
               This material references a file on your local computer (<span className="text-xs break-all">{effectiveUrl}</span>).<br /><br />
               For security reasons, web browsers cannot open local files automatically. Please select the file manually to view it and track your progress.
             </p>
@@ -306,7 +306,7 @@ export default function MaterialViewPage() {
     }
 
     return (
-      <div id="material-content" className="prose dark:prose-invert max-w-none h-full overflow-auto p-6 md:p-8 [&_table]:border-collapse [&_table]:w-full [&_table]:border-slate-200 [&_table]:rounded-lg [&_th]:border-slate-200 [&_th]:border [&_th]:py-3 [&_th]:px-4 [&_th]:bg-slate-50 [&_th]:dark:bg-slate-800 [&_td]:border-slate-200 [&_td]:border [&_td]:py-3 [&_td]:px-4">
+      <div id="material-content" className="prose dark:prose-invert max-w-none h-full overflow-auto p-6 md:p-8 [&_table]:border-collapse [&_table]:w-full [&_table]:border-border [&_table]:rounded-lg [&_th]:border-border [&_th]:border [&_th]:py-3 [&_th]:px-4 [&_th]:bg-background [&_th]:dark:bg-card [&_td]:border-border [&_td]:border [&_td]:py-3 [&_td]:px-4">
         {material.content || 'No content available for this material.'}
       </div>
     );
@@ -330,7 +330,7 @@ export default function MaterialViewPage() {
   }
 
   return (
-    <div className={`flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-slate-50 transition-colors duration-300 dark:bg-slate-950 ${focusMode ? 'py-0' : 'p-3 sm:p-4 md:p-6'}`}>
+    <div className={`flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-background transition-colors duration-300 dark:bg-background ${focusMode ? 'py-0' : 'p-3 sm:p-4 md:p-6'}`}>
       <div className={`flex flex-col h-full mx-auto w-full transition-all duration-300 ${focusMode ? 'max-w-full' : 'max-w-7xl'}`}>
         <AnimatePresence>
           {!focusMode && (
@@ -371,7 +371,7 @@ export default function MaterialViewPage() {
         <div className="flex min-h-0 min-w-0 flex-1 gap-4 overflow-hidden sm:gap-6">
           {/* Main Document Area */}
           <div className="flex-1 flex flex-col min-w-0">
-            <Card className={`flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 ${focusMode ? 'rounded-none' : 'rounded-xl'}`}>
+            <Card className={`flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border border-border bg-card shadow-sm dark:border-border dark:bg-card ${focusMode ? 'rounded-none' : 'rounded-xl'}`}>
               {focusMode && (
                 <div className="absolute top-4 right-4 z-50">
                   <Button variant="secondary" size="sm" onClick={() => setFocusMode(false)}>
@@ -381,14 +381,14 @@ export default function MaterialViewPage() {
               )}
               
               {!focusMode && (
-                <CardHeader className="shrink-0 border-b border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900 sm:px-6">
+                <CardHeader className="shrink-0 border-b border-border bg-card px-4 py-3 dark:border-border dark:bg-card sm:px-6">
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
                       <div className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-300">
                         <File className="h-4 w-4" />
                         <span>{material.type || 'DOCUMENT'}</span>
                       </div>
-                      <CardTitle className="line-clamp-2 text-base font-semibold leading-snug text-slate-900 dark:text-white">
+                      <CardTitle className="line-clamp-2 text-base font-semibold leading-snug text-foreground dark:text-foreground">
                         {material.title}
                       </CardTitle>
                     </div>
@@ -423,11 +423,11 @@ export default function MaterialViewPage() {
 
             {!focusMode && material.description && (
               <section className="mt-4 shrink-0">
-                <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-100">
+                <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold text-muted-foreground dark:text-muted-foreground">
                   <Eye className="h-4 w-4 text-blue-600 dark:text-blue-400" /> About this material
                 </h2>
-                <Card className="rounded-xl border-slate-200 bg-white py-0 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                  <CardContent className="py-3 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                <Card className="rounded-xl border-border bg-card py-0 shadow-sm dark:border-border dark:bg-card">
+                  <CardContent className="py-3 text-sm leading-relaxed text-muted-foreground dark:text-muted-foreground">
                     {material.description}
                   </CardContent>
                 </Card>
@@ -438,10 +438,10 @@ export default function MaterialViewPage() {
       </div>
 
       <Dialog open={showDeleteConfirm} onOpenChange={open => !isDeleting && setShowDeleteConfirm(open)}>
-        <DialogContent className="max-w-md rounded-xl border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+        <DialogContent className="max-w-md rounded-xl border-border bg-card dark:border-border dark:bg-card">
           <DialogHeader className="text-left">
-            <DialogTitle className="text-slate-900 dark:text-white">Delete this material?</DialogTitle>
-            <DialogDescription className="pt-2 text-slate-600 dark:text-slate-300">
+            <DialogTitle className="text-foreground dark:text-foreground">Delete this material?</DialogTitle>
+            <DialogDescription className="pt-2 text-muted-foreground dark:text-muted-foreground">
               “{material.title}” will be permanently removed from the materials library.
             </DialogDescription>
           </DialogHeader>

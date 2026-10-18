@@ -25,7 +25,7 @@ export default function FlashcardStudyPage() {
         <h1 className="text-2xl font-bold">Review Session</h1>
       </div>
 
-      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-lg border border-gray-100 dark:border-slate-800 p-6">
+      <div className="bg-card dark:bg-card rounded-xl shadow-lg border border-border dark:border-border p-6">
         {user?.id ? (
           <SpacedRepetitionReview 
             questionId="" // The index/current card is handled inside the component
@@ -34,12 +34,12 @@ export default function FlashcardStudyPage() {
           />
         ) : (
           <div className="text-center py-12">
-            <p className="text-gray-500">Please log in to review flashcards.</p>
+            <p className="text-muted-foreground">Please log in to review flashcards.</p>
           </div>
         )}
       </div>
 
-      <div className="mt-8 text-center text-sm text-gray-500">
+      <div className="mt-8 text-center text-sm text-muted-foreground">
         <p>Pro Tip: Press "1" for Hard, "2" for Good, and "3" for Easy.</p>
       </div>
     </div>

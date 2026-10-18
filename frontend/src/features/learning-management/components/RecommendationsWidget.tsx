@@ -83,7 +83,7 @@ export const RecommendationsWidget = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-gray-600 dark:text-gray-400 text-center py-4">
+          <p className="text-muted-foreground dark:text-muted-foreground text-center py-4">
             Complete more courses to get personalized recommendations
           </p>
         </CardContent>
@@ -98,7 +98,7 @@ export const RecommendationsWidget = () => {
           <Sparkles className="w-5 h-5" />
           Recommended For You
         </CardTitle>
-        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+        <p className="text-sm text-muted-foreground dark:text-muted-foreground mt-1">
           Based on your learning progress and mastery level
         </p>
       </CardHeader>
@@ -107,19 +107,19 @@ export const RecommendationsWidget = () => {
           {recommendations.map((path) => (
             <div
               key={path.id}
-              className="flex items-start justify-between p-4 bg-white dark:bg-slate-800 rounded-lg border border-purple-100 dark:border-purple-900 hover:shadow-md transition-shadow"
+              className="flex items-start justify-between p-4 bg-card dark:bg-card rounded-lg border border-purple-100 dark:border-purple-900 hover:shadow-md transition-shadow"
             >
               <div className="flex-1">
                 <div className="flex items-start gap-2">
                   <BookOpen className="w-5 h-5 text-purple-600 dark:text-purple-400 flex-shrink-0 mt-0.5" />
                   <div>
-                    <h4 className="font-semibold text-gray-900 dark:text-white">
+                    <h4 className="font-semibold text-foreground dark:text-foreground">
                       {path.title}
                     </h4>
-                    <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                    <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-1">
                       {path.description}
                     </p>
-                    <div className="flex items-center gap-3 mt-2 text-xs text-gray-500 dark:text-gray-400">
+                    <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground dark:text-muted-foreground">
                       <span className="px-2 py-1 bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 rounded">
                         {path.difficulty || 'Intermediate'}
                       </span>

@@ -72,7 +72,7 @@ function AuthErrorContent() {
   }, [searchParams]);
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-50">
+    <div className="flex items-center justify-center min-h-screen bg-background">
       <Card className="w-full max-w-md">
         <CardHeader className="bg-red-50 border-b border-red-100">
           <div className="flex items-center">
@@ -82,10 +82,10 @@ function AuthErrorContent() {
         </CardHeader>
         <CardContent className="pt-6">
           <div className="space-y-4">
-            <p className="text-gray-700">{errorMessage}</p>
+            <p className="text-muted-foreground">{errorMessage}</p>
 
             {errorType && (
-              <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded">
+              <div className="text-xs text-muted-foreground bg-background p-2 rounded">
                 Error code: {errorType}
               </div>
             )}
@@ -100,7 +100,7 @@ function AuthErrorContent() {
 
               <Link
                 href="/"
-                className="group relative w-full flex justify-center py-2 px-4 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                className="group relative w-full flex justify-center py-2 px-4 border border-border text-sm font-medium rounded-md text-muted-foreground bg-card hover:bg-background focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               >
                 Go to Homepage
               </Link>
@@ -116,7 +116,7 @@ export default function AuthErrorPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex items-center justify-center min-h-screen bg-gray-50">
+        <div className="flex items-center justify-center min-h-screen bg-background">
           <Card className="w-full max-w-md">
             <CardHeader className="bg-red-50 border-b border-red-100">
               <div className="flex items-center">
@@ -125,7 +125,7 @@ export default function AuthErrorPage() {
               </div>
             </CardHeader>
             <CardContent className="pt-6">
-              <p className="text-gray-700">Retrieving the latest error information.</p>
+              <p className="text-muted-foreground">Retrieving the latest error information.</p>
             </CardContent>
           </Card>
         </div>

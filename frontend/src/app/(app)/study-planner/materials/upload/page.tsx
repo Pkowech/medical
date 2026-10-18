@@ -324,30 +324,30 @@ export default function UploadMaterialPage() {
       <button
         type="button"
         onClick={() => router.push('/study-planner/materials')}
-        className="mb-5 inline-flex items-center gap-2 text-sm font-medium text-slate-600 transition-colors hover:text-blue-700 dark:text-slate-300 dark:hover:text-blue-300"
+        className="mb-5 inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-blue-700 dark:text-muted-foreground dark:hover:text-blue-300"
       >
         <ArrowLeft className="h-4 w-4" />
         Back to materials
       </button>
       <div className="mb-5">
         <p className="text-sm font-medium text-blue-700 dark:text-blue-300">Study library</p>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">
+        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-foreground dark:text-foreground">
           {canManagePlatformLibrary ? 'Add a study material' : 'Add personal study material'}
         </h1>
-        <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+        <p className="mt-2 text-sm text-muted-foreground dark:text-muted-foreground">
           Add a file or link, then place it in a course. Unit and topic placement can be added when relevant.
         </p>
       </div>
-      <form onSubmit={handleSubmit} className="space-y-7 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6" aria-label="Upload material form">
+      <form onSubmit={handleSubmit} className="space-y-7 rounded-xl border border-border bg-card p-4 shadow-sm dark:border-border dark:bg-card sm:p-6" aria-label="Upload material form">
         <div>
-          <span className="mb-2 block text-sm font-medium text-slate-800 dark:text-slate-200">Material source</span>
-          <div className="flex w-full flex-wrap gap-1 rounded-lg bg-slate-100 p-1 dark:bg-slate-800 sm:w-fit" role="group" aria-label="Material source">
+          <span className="mb-2 block text-sm font-medium text-muted-foreground dark:text-muted-foreground">Material source</span>
+          <div className="flex w-full flex-wrap gap-1 rounded-lg bg-muted p-1 dark:bg-card sm:w-fit" role="group" aria-label="Material source">
             {canManagePlatformLibrary && (
               <button
                 type="button"
                 aria-pressed={source === 'upload'}
                 onClick={() => setSource('upload')}
-                className={`inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors sm:flex-none ${source === 'upload' ? 'bg-white text-blue-700 shadow-sm dark:bg-slate-700 dark:text-blue-300' : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'}`}
+                className={`inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors sm:flex-none ${source === 'upload' ? 'bg-card text-blue-700 shadow-sm dark:bg-secondary dark:text-blue-300' : 'text-muted-foreground hover:text-foreground dark:text-muted-foreground dark:hover:text-foreground'}`}
               >
                 <FileUp className="h-4 w-4" /> Upload to library
               </button>
@@ -356,7 +356,7 @@ export default function UploadMaterialPage() {
               type="button"
               aria-pressed={source === 'drive'}
               onClick={() => setSource('drive')}
-              className={`inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors sm:flex-none ${source === 'drive' ? 'bg-white text-blue-700 shadow-sm dark:bg-slate-700 dark:text-blue-300' : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'}`}
+              className={`inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors sm:flex-none ${source === 'drive' ? 'bg-card text-blue-700 shadow-sm dark:bg-secondary dark:text-blue-300' : 'text-muted-foreground hover:text-foreground dark:text-muted-foreground dark:hover:text-foreground'}`}
             >
               <HardDrive className="h-4 w-4" /> Google Drive
             </button>
@@ -364,7 +364,7 @@ export default function UploadMaterialPage() {
               type="button"
               aria-pressed={source === 'folder'}
               onClick={() => setSource('folder')}
-              className={`inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors sm:flex-none ${source === 'folder' ? 'bg-white text-blue-700 shadow-sm dark:bg-slate-700 dark:text-blue-300' : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'}`}
+              className={`inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors sm:flex-none ${source === 'folder' ? 'bg-card text-blue-700 shadow-sm dark:bg-secondary dark:text-blue-300' : 'text-muted-foreground hover:text-foreground dark:text-muted-foreground dark:hover:text-foreground'}`}
             >
               <FolderOpen className="h-4 w-4" /> Import folder
             </button>
@@ -380,14 +380,14 @@ export default function UploadMaterialPage() {
         ) : (
           <>
         <div>
-          <label htmlFor="title" className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+          <label htmlFor="title" className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground mb-1">
             Title <span className="text-red-500">*</span>
           </label>
           <input
             id="title"
             value={title}
             onChange={e => setTitle(e.target.value)}
-            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:ring-blue-950"
+            className="w-full rounded-lg border border-border bg-card px-3 py-2.5 text-sm text-foreground outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-border dark:bg-background dark:text-foreground dark:focus:ring-blue-950"
             required
             aria-required="true"
             placeholder="e.g. Introduction to Pharmacology"
@@ -395,28 +395,28 @@ export default function UploadMaterialPage() {
         </div>
 
         <div>
-          <label htmlFor="description" className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+          <label htmlFor="description" className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground mb-1">
             Description
           </label>
           <textarea
             id="description"
             value={description}
             onChange={e => setDescription(e.target.value)}
-            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:ring-blue-950"
+            className="w-full rounded-lg border border-border bg-card px-3 py-2.5 text-sm text-foreground outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-border dark:bg-background dark:text-foreground dark:focus:ring-blue-950"
             rows={4}
             placeholder="Brief description of the material..."
           />
         </div>
 
-        <div className="space-y-4 rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/60 sm:p-5">
-          <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+        <div className="space-y-4 rounded-xl border border-border bg-background p-4 dark:border-border dark:bg-background/60 sm:p-5">
+          <h3 className="text-sm font-semibold text-muted-foreground dark:text-muted-foreground">
             {canManagePlatformLibrary ? 'Placement' : source === 'drive' ? 'Private course assignment' : 'Personal storage'}
           </h3>
           
           {canManagePlatformLibrary || source === 'drive' ? (
             <>
           <div>
-            <label htmlFor="course-select" className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">
+            <label htmlFor="course-select" className="mb-1.5 block text-sm font-medium text-muted-foreground dark:text-muted-foreground">
               Course <span className="text-red-500">*</span>
             </label>
             <select
@@ -426,7 +426,7 @@ export default function UploadMaterialPage() {
               required
               disabled={isLoadingCourses || courses.length === 0}
               aria-busy={isLoadingCourses}
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:ring-blue-950"
+              className="w-full rounded-lg border border-border bg-card px-3 py-2.5 text-sm text-foreground outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-border dark:bg-background dark:text-foreground dark:focus:ring-blue-950"
             >
               <option value="">Select a course…</option>
               {courses.map(c => (
@@ -436,7 +436,7 @@ export default function UploadMaterialPage() {
               ))}
             </select>
             {isLoadingCourses && (
-              <p className="mt-1 text-xs text-gray-500 dark:text-slate-400" role="status">Loading available courses…</p>
+              <p className="mt-1 text-xs text-muted-foreground dark:text-muted-foreground" role="status">Loading available courses…</p>
             )}
             {courseLoadError && (
               <p className="mt-1 text-xs text-amber-700 dark:text-amber-300" role="status">{courseLoadError}</p>
@@ -444,8 +444,8 @@ export default function UploadMaterialPage() {
           </div>
 
           <div>
-            <label htmlFor="unit-select" className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">
-              Unit <span className="text-gray-400">(optional; select to add topic placement)</span>
+            <label htmlFor="unit-select" className="mb-1.5 block text-sm font-medium text-muted-foreground dark:text-muted-foreground">
+              Unit <span className="text-muted-foreground">(optional; select to add topic placement)</span>
             </label>
             <select
               id="unit-select"
@@ -453,7 +453,7 @@ export default function UploadMaterialPage() {
               onChange={e => setUnitId(e.target.value)}
               disabled={!selectedCourseId || isLoadingUnits || units.length === 0}
               aria-busy={isLoadingUnits}
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:ring-blue-950"
+              className="w-full rounded-lg border border-border bg-card px-3 py-2.5 text-sm text-foreground outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-border dark:bg-background dark:text-foreground dark:focus:ring-blue-950"
             >
               <option value="">
                 {isLoadingUnits ? 'Loading units…' : units.length === 0 && selectedCourseId ? 'No units found' : '-- Select a Unit --'}
@@ -470,7 +470,7 @@ export default function UploadMaterialPage() {
           </div>
             </>
           ) : (
-            <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+            <p className="text-sm leading-relaxed text-muted-foreground dark:text-muted-foreground">
               Personal files stay in your Google Drive. MedTrack stores a private link only; uploading
               to the MedTrack library and sharing with classmates is reserved for instructors.
             </p>
@@ -499,7 +499,7 @@ export default function UploadMaterialPage() {
 
           {(canManagePlatformLibrary || source === 'drive') && (
             <div>
-            <label htmlFor="topic-select" className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">
+            <label htmlFor="topic-select" className="mb-1.5 block text-sm font-medium text-muted-foreground dark:text-muted-foreground">
               Topic / Lesson (optional)
             </label>
             <select
@@ -507,7 +507,7 @@ export default function UploadMaterialPage() {
               value={topicId}
               onChange={e => setTopicId(e.target.value)}
               disabled={!unitId || topics.length === 0}
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:ring-blue-950"
+              className="w-full rounded-lg border border-border bg-card px-3 py-2.5 text-sm text-foreground outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-border dark:bg-background dark:text-foreground dark:focus:ring-blue-950"
             >
               <option value="">{topics.length === 0 && unitId ? 'No topics found' : '-- Select a Topic --'}</option>
               {topics.map(t => (
@@ -516,7 +516,7 @@ export default function UploadMaterialPage() {
                 </option>
               ))}
             </select>
-            <p className="mt-1.5 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+            <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground dark:text-muted-foreground">
             {canManagePlatformLibrary
               ? 'A course is required. Leave the unit blank for course-level resources such as textbooks; select a unit to optionally place the material under a topic.'
               : 'Choose a course you are enrolled in to organize this personal Drive link. It remains private to you and is not shared with classmates.'}
@@ -524,24 +524,24 @@ export default function UploadMaterialPage() {
             </div>
           )}
           {canManagePlatformLibrary && <>
-          <label className={`flex items-start gap-3 rounded-lg border p-3 ${selectedCourseId ? 'cursor-pointer border-blue-200 bg-white dark:border-blue-900 dark:bg-slate-900' : 'cursor-not-allowed border-gray-200 opacity-60 dark:border-slate-700'}`}>
+          <label className={`flex items-start gap-3 rounded-lg border p-3 ${selectedCourseId ? 'cursor-pointer border-blue-200 bg-card dark:border-blue-900 dark:bg-card' : 'cursor-not-allowed border-border opacity-60 dark:border-border'}`}>
             <input
               type="checkbox"
               checked={shareWithCourse}
               disabled={!selectedCourseId}
               onChange={(event) => setShareWithCourse(event.target.checked)}
-              className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              className="mt-0.5 h-4 w-4 rounded border-border text-blue-600 focus:ring-blue-500"
             />
             <span>
-              <span className="block text-sm font-semibold text-gray-800 dark:text-slate-200">Share with enrolled class</span>
-              <span className="mt-0.5 block text-xs text-gray-500 dark:text-slate-400">
+              <span className="block text-sm font-semibold text-muted-foreground dark:text-muted-foreground">Share with enrolled class</span>
+              <span className="mt-0.5 block text-xs text-muted-foreground dark:text-muted-foreground">
                 Private by default. Students enrolled in this course can see it only when you turn sharing on.
               </span>
             </span>
           </label>
           </>}
           {!canManagePlatformLibrary && source === 'drive' && (
-            <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+            <p className="text-sm leading-relaxed text-muted-foreground dark:text-muted-foreground">
               Course assignment is for your own organization only. The Drive file stays in your account, and classmates cannot access this link through MedTrack.
             </p>
           )}
@@ -549,14 +549,14 @@ export default function UploadMaterialPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {source === 'upload' && <div>
-            <label htmlFor="type-select" className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+            <label htmlFor="type-select" className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground mb-1">
               Material Type
             </label>
             <select
               id="type-select"
               value={type}
               onChange={e => setType(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:ring-blue-950"
+              className="w-full rounded-lg border border-border bg-card px-3 py-2.5 text-sm text-foreground outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-border dark:bg-background dark:text-foreground dark:focus:ring-blue-950"
             >
               <option value="pdf">PDF Document</option>
               <option value="video">Video</option>
@@ -566,33 +566,33 @@ export default function UploadMaterialPage() {
           </div>}
 
           {source === 'upload' ? <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">File <span className="text-red-500">*</span></label>
+            <label className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground mb-1">File <span className="text-red-500">*</span></label>
             <input
               type="file"
               onChange={e => handleFileChange(e.target.files?.[0] ?? null)}
-              className="block w-full text-sm text-gray-500 dark:text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-blue-900/30 dark:file:text-blue-400"
+              className="block w-full text-sm text-muted-foreground dark:text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-blue-900/30 dark:file:text-blue-400"
               aria-label="Select file to upload"
               accept=".pdf,.doc,.docx,.ppt,.pptx,.mp4,.mpeg,.mpg,.mov,.avi,.webm"
               required
             />
-            <div className="text-xs text-gray-500 dark:text-slate-500 mt-2">Max size: 50MB. Supported: PDF, DOC, PPT, and common video formats. Title and material type are suggested from the selected file.</div>
+            <div className="text-xs text-muted-foreground dark:text-muted-foreground mt-2">Max size: 50MB. Supported: PDF, DOC, PPT, and common video formats. Title and material type are suggested from the selected file.</div>
           </div> : <div>
-            <label htmlFor="drive-url" className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+            <label htmlFor="drive-url" className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground mb-1">
               Shared Drive file URL <span className="text-red-500">*</span>
             </label>
             <div className="relative">
-              <Link2 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Link2 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <input
                 id="drive-url"
                 type="url"
                 value={driveUrl}
                 onChange={e => setDriveUrl(e.target.value)}
                 placeholder="https://drive.google.com/file/d/..."
-                className="w-full rounded-lg border border-slate-300 bg-white py-2.5 pl-10 pr-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:ring-blue-950"
+                className="w-full rounded-lg border border-border bg-card py-2.5 pl-10 pr-3 text-sm text-foreground outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-border dark:bg-background dark:text-foreground dark:focus:ring-blue-950"
                 required={source === 'drive'}
               />
             </div>
-            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+            <p className="mt-2 text-xs text-muted-foreground dark:text-muted-foreground">
               {canManagePlatformLibrary
                 ? 'Drive files remain in Drive; MedTrack stores a link and reads it through your connected Google account. Course-level textbooks are supported.'
                 : 'Your file stays in your Google Drive. MedTrack saves a private reference and reads it through your connected account; no file copy is uploaded to R2.'}
@@ -601,7 +601,7 @@ export default function UploadMaterialPage() {
               <button
                 type="button"
                 onClick={handleConnectDrive}
-                className="mt-2 rounded-md border border-blue-200 px-3 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-50 dark:border-blue-900 dark:text-blue-300 dark:hover:bg-slate-800"
+                className="mt-2 rounded-md border border-blue-200 px-3 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-50 dark:border-blue-900 dark:text-blue-300 dark:hover:bg-card"
               >
                 Connect personal Google Drive
               </button>
@@ -609,7 +609,7 @@ export default function UploadMaterialPage() {
           </div>}
         </div>
 
-        <div className="flex justify-end pt-4 border-t border-gray-200 dark:border-slate-800">
+        <div className="flex justify-end pt-4 border-t border-border dark:border-border">
           <div className="flex items-center gap-4">
             {isUploading && (
               <div aria-live="polite" className="text-sm font-medium text-blue-600 dark:text-blue-400">

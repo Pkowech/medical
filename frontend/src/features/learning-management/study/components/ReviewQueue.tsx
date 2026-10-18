@@ -43,7 +43,7 @@ export const ReviewQueue: React.FC = () => {
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-[200px]">
-        <p className="text-gray-500 dark:text-gray-400">Loading review queue...</p>
+        <p className="text-muted-foreground dark:text-muted-foreground">Loading review queue...</p>
       </div>
     );
   }
@@ -68,7 +68,7 @@ export const ReviewQueue: React.FC = () => {
       </CardHeader>
       <CardContent>
         {dueCards.length === 0 ? (
-          <p className="text-center text-gray-500 dark:text-gray-400">No cards due for review</p>
+          <p className="text-center text-muted-foreground dark:text-muted-foreground">No cards due for review</p>
         ) : (
           <ScrollArea className="h-[300px] pr-4">
             <div className="space-y-4">
@@ -77,7 +77,7 @@ export const ReviewQueue: React.FC = () => {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-medium">Card #{card.id.slice(0, 8)}</p>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                      <p className="text-sm text-muted-foreground dark:text-muted-foreground">
                         Last review:{' '}
                         {card.lastReviewDate ? formatDate(card.lastReviewDate) : 'Never'}
                       </p>

@@ -126,22 +126,22 @@ export default function AnalyticsDashboard() {
       <div className="container mx-auto px-4 py-8">
         <div className="space-y-6">
           <div className="animate-pulse">
-            <div className="h-8 bg-gray-200 rounded w-1/3 mb-4"></div>
-            <div className="h-4 bg-gray-200 rounded w-2/3 mb-8"></div>
+            <div className="h-8 bg-secondary rounded w-1/3 mb-4"></div>
+            <div className="h-4 bg-secondary rounded w-2/3 mb-8"></div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[...Array(6)].map((_, i) => (
               <Card key={i}>
                 <CardHeader>
                   <div className="animate-pulse space-y-2">
-                    <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                    <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                    <div className="h-4 bg-secondary rounded w-3/4"></div>
+                    <div className="h-3 bg-secondary rounded w-1/2"></div>
                   </div>
                 </CardHeader>
                 <CardContent>
                   <div className="animate-pulse space-y-2">
-                    <div className="h-3 bg-gray-200 rounded"></div>
-                    <div className="h-3 bg-gray-200 rounded w-5/6"></div>
+                    <div className="h-3 bg-secondary rounded"></div>
+                    <div className="h-3 bg-secondary rounded w-5/6"></div>
                   </div>
                 </CardContent>
               </Card>
@@ -272,7 +272,7 @@ export default function AnalyticsDashboard() {
               {userAnalytics?.progressOverTime && userAnalytics.progressOverTime.length > 0 ? (
                 <LineChart data={progressData} />
               ) : (
-                <p className="text-center text-gray-500">No progress data available.</p>
+                <p className="text-center text-muted-foreground">No progress data available.</p>
               )}
             </CardContent>
           </Card>
@@ -284,7 +284,7 @@ export default function AnalyticsDashboard() {
               {userAnalytics?.moduleCompletion && userAnalytics.moduleCompletion.length > 0 ? (
                 <BarChart data={moduleCompletionData} />
               ) : (
-                <p className="text-center text-gray-500">No module completion data available.</p>
+                <p className="text-center text-muted-foreground">No module completion data available.</p>
               )}
             </CardContent>
           </Card>
@@ -305,9 +305,9 @@ export default function AnalyticsDashboard() {
           ) : (
             <Card>
               <CardContent className="p-8 text-center">
-                <FlaskConical className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                <FlaskConical className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
                 <h3 className="text-lg font-medium mb-2">No Performance Analytics Data</h3>
-                <p className="text-gray-600">
+                <p className="text-muted-foreground">
                   Complete some assessments to see your performance analytics.
                 </p>
               </CardContent>
@@ -332,13 +332,13 @@ export default function AnalyticsDashboard() {
                   </CardHeader>
                   <CardContent>
                     <p>{rec.description}</p>
-                    <p className="text-sm text-gray-500">Difficulty: {rec.difficulty}</p>
+                    <p className="text-sm text-muted-foreground">Difficulty: {rec.difficulty}</p>
                   </CardContent>
                 </Card>
               ))
             ) : (
               <Card>
-                <CardContent className="p-6 text-center text-gray-500">
+                <CardContent className="p-6 text-center text-muted-foreground">
                   <Lightbulb className="h-10 w-10 mx-auto mb-3" />
                   <p>No learning path recommendations available at the moment.</p>
                 </CardContent>

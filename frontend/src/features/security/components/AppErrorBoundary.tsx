@@ -37,7 +37,7 @@ export class AppErrorBoundary extends Component<Props, State> {
       return (
         <div className="p-6 text-center">
           <h2 className="text-xl font-semibold">Something went wrong.</h2>
-          <p className="text-sm text-gray-600 mt-2">Please try again or refresh the page.</p>
+          <p className="text-sm text-muted-foreground mt-2">Please try again or refresh the page.</p>
         </div>
       );
     }

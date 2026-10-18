@@ -13,10 +13,10 @@ const ActivitiesList = ({ activities }: { activities?: ProgressActivity[] }) => 
           <ul className="space-y-4">
             {activities.map((activity) => (
               <li key={activity.id} className="flex items-start">
-                <div className="shrink-0 h-4 w-4 rounded-full bg-slate-400 dark:bg-slate-600 mt-1" />
+                <div className="shrink-0 h-4 w-4 rounded-full bg-slate-400 dark:bg-secondary mt-1" />
                 <div className="ml-3">
                   <p className="text-sm font-medium">{activity.title}</p>
-                  <p className="text-xs text-gray-500">{formatDateSafe(activity.date)}</p>
+                  <p className="text-xs text-muted-foreground">{formatDateSafe(activity.date)}</p>
                 </div>
               </li>
             ))}

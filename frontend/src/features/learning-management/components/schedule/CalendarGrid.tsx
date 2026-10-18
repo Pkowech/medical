@@ -26,34 +26,34 @@ const CalendarGrid: React.FC<Props> = ({ currentDate, events, onOpenAddForDay, o
   for (let i = 1; i <= daysInMonth; i++) days.push(i);
 
   return (
-    <div className="grid grid-cols-7 border-t border-l border-gray-100 dark:border-slate-700 rounded-lg overflow-hidden bg-white dark:bg-slate-800 shadow-sm">
+    <div className="grid grid-cols-7 border-t border-l border-border dark:border-border rounded-lg overflow-hidden bg-card dark:bg-card shadow-sm">
       {['SUN','MON','TUE','WED','THU','FRI','SAT'].map(d => (
-        <div key={d} className="bg-gray-50/50 dark:bg-slate-900/50 p-3 text-center text-xs font-bold text-gray-400 dark:text-slate-500 tracking-wider border-r border-b border-gray-100 dark:border-slate-700">{d}</div>
+        <div key={d} className="bg-background/50 dark:bg-card/50 p-3 text-center text-xs font-bold text-muted-foreground dark:text-muted-foreground tracking-wider border-r border-b border-border dark:border-border">{d}</div>
       ))}
 
       {days.map((day, idx) => {
-        if (day === null) return <div key={`empty-${idx}`} className="bg-gray-50/30 dark:bg-slate-900/30 border-r border-b border-gray-100 dark:border-slate-700 h-32" />;
+        if (day === null) return <div key={`empty-${idx}`} className="bg-background/30 dark:bg-card/30 border-r border-b border-border dark:border-border h-32" />;
 
         const date = new Date(year, month, day);
         const isToday = new Date().toDateString() === date.toDateString();
         const dayEvents = events.filter(e => isSameDay(e.date, year, month, day));
 
         return (
-          <div key={day} onClick={() => onOpenAddForDay(day)} className={`bg-white dark:bg-slate-800 h-32 p-2 transition-colors hover:bg-gray-50 dark:hover:bg-slate-750 cursor-pointer relative group border-r border-b border-gray-100 dark:border-slate-700 ${isToday ? 'bg-blue-50/30 dark:bg-blue-900/20' : ''}`}>
+          <div key={day} onClick={() => onOpenAddForDay(day)} className={`bg-card dark:bg-card h-32 p-2 transition-colors hover:bg-background dark:hover:bg-secondary cursor-pointer relative group border-r border-b border-border dark:border-border ${isToday ? 'bg-blue-50/30 dark:bg-blue-900/20' : ''}`}>
             <div className="flex justify-between items-start mb-1">
-              <span className={`text-sm font-semibold inline-flex items-center justify-center w-7 h-7 rounded-full transition-colors ${isToday ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 dark:text-slate-300 group-hover:bg-gray-100 dark:group-hover:bg-slate-700'}`}>{day}</span>
-              {dayEvents.length > 5 && (<span className="text-[10px] bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400 px-1.5 py-0.5 rounded-full font-medium">+{dayEvents.length - 5}</span>)}
+              <span className={`text-sm font-semibold inline-flex items-center justify-center w-7 h-7 rounded-full transition-colors ${isToday ? 'bg-blue-600 text-white shadow-sm' : 'text-muted-foreground dark:text-muted-foreground group-hover:bg-muted dark:group-hover:bg-secondary'}`}>{day}</span>
+              {dayEvents.length > 5 && (<span className="text-[10px] bg-muted dark:bg-secondary text-muted-foreground dark:text-muted-foreground px-1.5 py-0.5 rounded-full font-medium">+{dayEvents.length - 5}</span>)}
             </div>
 
             <div className="space-y-1 overflow-y-auto max-h-20 scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-slate-700">
               {dayEvents.slice(0,5).map(ev => {
                 const TypeIcon = Clock; // keep a simple icon fallback here to keep the component focused
                 return (
-                  <div key={`${ev.id}-${ev.type}-${ev.date.getTime()}`} onClick={(e) => { e.stopPropagation(); onSelectEvent(ev); }} className={`text-[10px] px-1.5 py-0.5 rounded border border-transparent hover:border-gray-200 dark:hover:border-slate-600 transition-all cursor-pointer bg-gray-100 dark:bg-slate-700 dark:text-slate-200 ${ev.completed ? 'opacity-50 grayscale-[0.5]' : ''}`}>
+                  <div key={`${ev.id}-${ev.type}-${ev.date.getTime()}`} onClick={(e) => { e.stopPropagation(); onSelectEvent(ev); }} className={`text-[10px] px-1.5 py-0.5 rounded border border-transparent hover:border-border dark:hover:border-border transition-all cursor-pointer bg-muted dark:bg-secondary dark:text-muted-foreground ${ev.completed ? 'opacity-50 grayscale-[0.5]' : ''}`}>
                     <div className="flex items-center justify-between gap-1 overflow-hidden">
                       <div className="flex items-center gap-1 truncate">
                         {ev.completed ? (
-                          <div className="w-2.5 h-2.5 bg-green-500 rounded-full flex items-center justify-center"><div className="w-1 h-1 bg-white rounded-full" /></div>
+                          <div className="w-2.5 h-2.5 bg-green-500 rounded-full flex items-center justify-center"><div className="w-1 h-1 bg-card rounded-full" /></div>
                         ) : (
                           <TypeIcon className="w-2.5 h-2.5 shrink-0" />
                         )}

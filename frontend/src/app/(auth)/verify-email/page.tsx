@@ -41,18 +41,18 @@ function VerifyEmailContent() {
   }, [router, searchParams]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-background py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+          <h2 className="mt-6 text-center text-3xl font-extrabold text-foreground">
             Email Verification
           </h2>
         </div>
 
         <div className="mt-8 space-y-6">
-          <div className="rounded-md bg-white px-6 py-5 shadow-sm">
+          <div className="rounded-md bg-card px-6 py-5 shadow-sm">
             <div className="flex flex-col items-center space-y-4">
-              <div className="rounded-full bg-gray-100 p-3">
+              <div className="rounded-full bg-muted p-3">
                 {status === 'verifying' && (
                   <FaSpinner className="h-6 w-6 text-blue-500 animate-spin" />
                 )}
@@ -74,7 +74,7 @@ function VerifyEmailContent() {
               </div>
               {status === 'error' && (
                 <div className="text-center space-y-3">
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-muted-foreground">
                     If you're having trouble verifying your email, you can:
                   </p>
                   <Link href="/resend-verification" className="text-blue-600 hover:text-blue-500">
@@ -99,7 +99,7 @@ export default function VerifyEmailPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+        <div className="min-h-screen flex items-center justify-center bg-background py-12 px-4 sm:px-6 lg:px-8">
           <div className="max-w-md w-full space-y-8 text-center">
             <FaEnvelope className="mx-auto h-10 w-10 text-blue-500 animate-pulse" />
             <p className="text-lg text-blue-600">Preparing verification details...</p>

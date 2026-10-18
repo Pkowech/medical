@@ -45,7 +45,7 @@ export function GoalBlockedBadge({
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full border border-slate-300 bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-400 ${className}`}
+      className={`inline-flex items-center gap-1.5 rounded-full border border-border bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground dark:border-border dark:bg-card dark:text-muted-foreground ${className}`}
       title={`This goal is currently blocked: ${message}`}
       role="status"
       aria-label={`Goal blocked: ${message}`}

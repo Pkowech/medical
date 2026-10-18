@@ -245,7 +245,7 @@ export function InteractiveCaseInterface({ caseId, onComplete: _onComplete }: In
       case 'expert':
         return 'bg-red-100 text-red-800';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-muted text-muted-foreground';
     }
   };
 
@@ -273,7 +273,7 @@ export function InteractiveCaseInterface({ caseId, onComplete: _onComplete }: In
           <CardContent className="p-8 text-center">
             <Brain className="h-12 w-12 mx-auto mb-4 text-blue-500 animate-pulse" />
             <h3 className="text-lg font-medium mb-2">Loading Clinical Case</h3>
-            <p className="text-gray-600">Preparing your interactive medical scenario...</p>
+            <p className="text-muted-foreground">Preparing your interactive medical scenario...</p>
           </CardContent>
         </Card>
       </div>
@@ -286,7 +286,7 @@ export function InteractiveCaseInterface({ caseId, onComplete: _onComplete }: In
         <CardContent className="p-8 text-center">
           <AlertCircle className="h-12 w-12 mx-auto mb-4 text-red-500" />
           <h3 className="text-lg font-medium mb-2">Case Not Available</h3>
-          <p className="text-gray-600">Unable to load the clinical case.</p>
+          <p className="text-muted-foreground">Unable to load the clinical case.</p>
         </CardContent>
       </Card>
     );
@@ -312,18 +312,18 @@ export function InteractiveCaseInterface({ caseId, onComplete: _onComplete }: In
                   {clinicalCase.complexity}
                 </Badge>
                 <Badge variant="outline">{clinicalCase.specialty}</Badge>
-                <div className="flex items-center gap-1 text-sm text-gray-600">
+                <div className="flex items-center gap-1 text-sm text-muted-foreground">
                   <Timer className="h-4 w-4" />
                   {clinicalCase.estimated_duration_minutes} min
                 </div>
               </div>
-              <p className="text-gray-600">{clinicalCase.description}</p>
+              <p className="text-muted-foreground">{clinicalCase.description}</p>
             </div>
             <div className="text-right">
               <div className="text-2xl font-bold text-blue-600">
                 {attempt.percentage.toFixed(0)}%
               </div>
-              <p className="text-sm text-gray-600">Score</p>
+              <p className="text-sm text-muted-foreground">Score</p>
             </div>
           </div>
           <Progress value={progress} className="h-2" />
@@ -351,20 +351,20 @@ export function InteractiveCaseInterface({ caseId, onComplete: _onComplete }: In
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <h4 className="font-medium text-gray-900 mb-2">Demographics</h4>
-                <p className="text-sm text-gray-600">
+                <h4 className="font-medium text-foreground mb-2">Demographics</h4>
+                <p className="text-sm text-muted-foreground">
                   {clinicalCase.patient_info.age} year old {clinicalCase.patient_info.gender}
                 </p>
               </div>
 
               <div>
-                <h4 className="font-medium text-gray-900 mb-2">Chief Complaint</h4>
-                <p className="text-sm text-gray-600">{clinicalCase.patient_info.chief_complaint}</p>
+                <h4 className="font-medium text-foreground mb-2">Chief Complaint</h4>
+                <p className="text-sm text-muted-foreground">{clinicalCase.patient_info.chief_complaint}</p>
               </div>
 
               {clinicalCase.patient_info.vital_signs && (
                 <div>
-                  <h4 className="font-medium text-gray-900 mb-2">Vital Signs</h4>
+                  <h4 className="font-medium text-foreground mb-2">Vital Signs</h4>
                   <div className="space-y-1 text-sm">
                     {clinicalCase.patient_info.vital_signs.temperature && (
                       <div className="flex items-center gap-2">
@@ -390,7 +390,7 @@ export function InteractiveCaseInterface({ caseId, onComplete: _onComplete }: In
 
               {/* Section Navigation */}
               <div>
-                <h4 className="font-medium text-gray-900 mb-2">Case Sections</h4>
+                <h4 className="font-medium text-foreground mb-2">Case Sections</h4>
                 <div className="space-y-1">
                   {clinicalCase.case_flow.sections
                     .sort((a, b) => a.order - b.order)
@@ -408,8 +408,8 @@ export function InteractiveCaseInterface({ caseId, onComplete: _onComplete }: In
                             isCurrent
                               ? 'bg-blue-100 text-blue-900'
                               : isUnlocked
-                                ? 'hover:bg-gray-100 text-gray-700'
-                                : 'text-gray-400 cursor-not-allowed'
+                                ? 'hover:bg-muted text-muted-foreground'
+                                : 'text-muted-foreground cursor-not-allowed'
                           }`}
                         >
                           {getSectionIcon(section.type)}
@@ -449,7 +449,7 @@ export function InteractiveCaseInterface({ caseId, onComplete: _onComplete }: In
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      <p className="font-medium text-gray-900">{decisionPoint.question}</p>
+                      <p className="font-medium text-foreground">{decisionPoint.question}</p>
 
                       <div className="space-y-3">
                         {decisionPoint.options.map(option => {
@@ -466,7 +466,7 @@ export function InteractiveCaseInterface({ caseId, onComplete: _onComplete }: In
                                         ? 'border-green-500 bg-green-50'
                                         : 'border-red-500 bg-red-50'
                                       : 'border-blue-500 bg-blue-50'
-                                    : 'border-gray-200 hover:border-gray-300'
+                                    : 'border-border hover:border-border'
                                 }`}
                               >
                                 <input
@@ -498,7 +498,7 @@ export function InteractiveCaseInterface({ caseId, onComplete: _onComplete }: In
                                   className="sr-only"
                                 />
                                 <div className="flex-1">
-                                  <span className="text-gray-900">{option.text}</span>
+                                  <span className="text-foreground">{option.text}</span>
                                   {showingFeedback && isSelected && (
                                     <div
                                       className={`mt-2 p-3 rounded ${

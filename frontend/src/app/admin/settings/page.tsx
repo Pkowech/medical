@@ -75,7 +75,7 @@ export default function AdminSettingsPage() {
     return (
       <div className="py-8 text-center">
         <h2 className="mb-2 text-2xl font-bold text-red-600">Access Denied</h2>
-        <p className="text-gray-600">You must be an administrator to access this page.</p>
+        <p className="text-muted-foreground">You must be an administrator to access this page.</p>
       </div>
     );
   }
@@ -88,7 +88,7 @@ export default function AdminSettingsPage() {
     <main className="mx-auto max-w-4xl space-y-6 p-6">
       <header>
         <h1 className="text-2xl font-bold">System Settings</h1>
-        <p className="mt-1 text-sm text-gray-600">
+        <p className="mt-1 text-sm text-muted-foreground">
           Persisted settings are applied globally to platform authentication and availability.
         </p>
       </header>
@@ -100,7 +100,7 @@ export default function AdminSettingsPage() {
       )}
 
       <form onSubmit={saveSettings} className="space-y-6">
-        <section className="space-y-5 rounded-lg border bg-white p-6 shadow-sm">
+        <section className="space-y-5 rounded-lg border bg-card p-6 shadow-sm">
           <h2 className="flex items-center gap-2 text-lg font-semibold">
             <Settings className="h-5 w-5" aria-hidden="true" />
             General
@@ -137,14 +137,14 @@ export default function AdminSettingsPage() {
             />
             <span>
               <span className="block text-sm font-medium">Maintenance mode</span>
-              <span className="block text-sm text-gray-600">
+              <span className="block text-sm text-muted-foreground">
                 Blocks platform API routes while preserving authentication and admin access.
               </span>
             </span>
           </label>
         </section>
 
-        <section className="space-y-5 rounded-lg border bg-white p-6 shadow-sm">
+        <section className="space-y-5 rounded-lg border bg-card p-6 shadow-sm">
           <h2 className="flex items-center gap-2 text-lg font-semibold">
             <Shield className="h-5 w-5" aria-hidden="true" />
             Security
@@ -211,7 +211,7 @@ export default function AdminSettingsPage() {
             />
             <span>
               <span className="block text-sm font-medium">Require two-factor authentication</span>
-              <span className="block text-sm text-gray-600">
+              <span className="block text-sm text-muted-foreground">
                 Users without 2FA are restricted to authenticator setup until verified.
               </span>
             </span>

@@ -58,7 +58,7 @@ export default function MaterialUploadPage() {
         <h1 className="text-3xl font-bold tracking-tight">Materials Library</h1>
         <p className="text-muted-foreground mt-2">
           Upload a new file{' '}
-          <span className="text-gray-400 mx-1">·</span> or attach an existing R2
+          <span className="text-muted-foreground mx-1">·</span> or attach an existing R2
           textbook to another course or topic — no re-upload needed.
         </p>
       </div>

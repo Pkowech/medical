@@ -19,7 +19,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
   const style = { width: `${safe}%` };
 
   return (
-    <div className={`w-full bg-gray-200 dark:bg-slate-700 rounded-full ${className}`}>
+    <div className={`w-full bg-secondary dark:bg-secondary rounded-full ${className}`}>
       <div className={`${colorClass} h-full rounded-full transition-all duration-300`} style={style} />
     </div>
   );

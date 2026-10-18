@@ -126,7 +126,7 @@ export const LearningGoalsWidget = () => {
             <Target className="w-5 h-5" />
             Learning Goals
           </CardTitle>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
+          <p className="text-sm text-muted-foreground dark:text-muted-foreground">
             Track and achieve your learning objectives
           </p>
         </div>
@@ -135,30 +135,30 @@ export const LearningGoalsWidget = () => {
         {/* Stats Overview */}
         {stats && (
           <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-            <div className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-indigo-100 dark:border-indigo-900">
+            <div className="bg-card dark:bg-card p-3 rounded-lg border border-indigo-100 dark:border-indigo-900">
               <div className="text-lg font-bold text-indigo-600 dark:text-indigo-400">
                 {stats.activeGoals}
               </div>
-              <div className="text-xs text-gray-600 dark:text-gray-400">Active</div>
+              <div className="text-xs text-muted-foreground dark:text-muted-foreground">Active</div>
             </div>
-            <div className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-indigo-100 dark:border-indigo-900">
+            <div className="bg-card dark:bg-card p-3 rounded-lg border border-indigo-100 dark:border-indigo-900">
               <div className="text-lg font-bold text-green-600 dark:text-green-400">
                 {stats.completedGoals}
               </div>
-              <div className="text-xs text-gray-600 dark:text-gray-400">Completed</div>
+              <div className="text-xs text-muted-foreground dark:text-muted-foreground">Completed</div>
             </div>
-            <div className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-indigo-100 dark:border-indigo-900">
+            <div className="bg-card dark:bg-card p-3 rounded-lg border border-indigo-100 dark:border-indigo-900">
               <div className="flex items-center gap-1">
                 <Flame className="w-4 h-4 text-orange-500" />
                 <div className="text-lg font-bold">{stats.currentStreak}</div>
               </div>
-              <div className="text-xs text-gray-600 dark:text-gray-400">Streak</div>
+              <div className="text-xs text-muted-foreground dark:text-muted-foreground">Streak</div>
             </div>
-            <div className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-indigo-100 dark:border-indigo-900">
+            <div className="bg-card dark:bg-card p-3 rounded-lg border border-indigo-100 dark:border-indigo-900">
               <div className="text-lg font-bold text-blue-600 dark:text-blue-400">
                 {Math.round(stats.completionRate)}%
               </div>
-              <div className="text-xs text-gray-600 dark:text-gray-400">Rate</div>
+              <div className="text-xs text-muted-foreground dark:text-muted-foreground">Rate</div>
             </div>
           </div>
         )}
@@ -169,11 +169,11 @@ export const LearningGoalsWidget = () => {
             {goals.slice(0, 4).map((goal) => (
               <div
                 key={goal.id}
-                className="flex items-start justify-between p-3 bg-white dark:bg-slate-800 rounded-lg border border-indigo-100 dark:border-indigo-900 hover:shadow-md transition-shadow"
+                className="flex items-start justify-between p-3 bg-card dark:bg-card rounded-lg border border-indigo-100 dark:border-indigo-900 hover:shadow-md transition-shadow"
               >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <h4 className="font-semibold text-gray-900 dark:text-white truncate text-sm">
+                    <h4 className="font-semibold text-foreground dark:text-foreground truncate text-sm">
                       {goal.title}
                     </h4>
                     <Badge
@@ -194,14 +194,14 @@ export const LearningGoalsWidget = () => {
                   {goal.progress !== undefined && (
                     <div className="mb-2">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs text-gray-600 dark:text-gray-400">
+                        <span className="text-xs text-muted-foreground dark:text-muted-foreground">
                           Progress
                         </span>
                         <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-400">
                           {Math.round(goal.progress)}%
                         </span>
                       </div>
-                      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
+                      <div className="w-full bg-secondary dark:bg-secondary rounded-full h-1.5">
                         <div
                           className="h-1.5 rounded-full bg-gradient-to-r from-indigo-500 to-blue-500 transition-all"
                           style={{ width: `${goal.progress}%` }}
@@ -211,7 +211,7 @@ export const LearningGoalsWidget = () => {
                   )}
 
                   {/* Target Date */}
-                  <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground dark:text-muted-foreground">
                     <Clock className="w-3 h-3" />
                     <span>
                       Due:{' '}
@@ -241,7 +241,7 @@ export const LearningGoalsWidget = () => {
                     onClick={() => handlePauseGoal(goal.id)}
                     title="Pause"
                   >
-                    <AlertCircle className="w-4 h-4 text-gray-400" />
+                    <AlertCircle className="w-4 h-4 text-muted-foreground" />
                   </Button>
                 </div>
               </div>
@@ -259,7 +259,7 @@ export const LearningGoalsWidget = () => {
             )}
           </div>
         ) : (
-          <div className="text-center py-6 text-gray-600 dark:text-gray-400">
+          <div className="text-center py-6 text-muted-foreground dark:text-muted-foreground">
             <Target className="w-8 h-8 mx-auto mb-2 opacity-50" />
             <p className="text-sm mb-3">No active goals yet</p>
             <Button

@@ -123,13 +123,13 @@ export function PrerequisitesChecker({ courseId, onPrerequisitesMet }: Prerequis
       <Card>
         <CardHeader>
           <div className="animate-pulse">
-            <div className="h-4 bg-gray-200 rounded w-1/3"></div>
+            <div className="h-4 bg-secondary rounded w-1/3"></div>
           </div>
         </CardHeader>
         <CardContent>
           <div className="animate-pulse space-y-2">
-            <div className="h-3 bg-gray-200 rounded"></div>
-            <div className="h-3 bg-gray-200 rounded w-5/6"></div>
+            <div className="h-3 bg-secondary rounded"></div>
+            <div className="h-3 bg-secondary rounded w-5/6"></div>
           </div>
         </CardContent>
       </Card>
@@ -184,13 +184,13 @@ export function PrerequisitesChecker({ courseId, onPrerequisitesMet }: Prerequis
       </CardHeader>
       <CardContent className="space-y-4">
         {prerequisites.description && (
-          <p className="text-sm text-gray-600">{prerequisites.description}</p>
+          <p className="text-sm text-muted-foreground">{prerequisites.description}</p>
         )}
 
         {/* Course Prerequisites */}
         {(prerequisites.courseIds?.length || 0) > 0 && (
           <div>
-            <h4 className="font-medium text-gray-900 mb-3">Required Courses</h4>
+            <h4 className="font-medium text-foreground mb-3">Required Courses</h4>
             <div className="space-y-2">
               {prerequisites.prerequisiteCourses.map(course => {
                 const isCompleted = checkCourseCompletion(course.id);
@@ -198,18 +198,18 @@ export function PrerequisitesChecker({ courseId, onPrerequisitesMet }: Prerequis
                   <div
                     key={course.id}
                     className={`flex items-center justify-between p-3 rounded-lg border ${
-                      isCompleted ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-gray-50'
+                      isCompleted ? 'border-green-200 bg-green-50' : 'border-border bg-background'
                     }`}
                   >
                     <div className="flex items-center gap-3">
                       {isCompleted ? (
                         <CheckCircle className="h-5 w-5 text-green-500" />
                       ) : (
-                        <XCircle className="h-5 w-5 text-gray-400" />
+                        <XCircle className="h-5 w-5 text-muted-foreground" />
                       )}
                       <div>
-                        <p className="font-medium text-gray-900">{course.title}</p>
-                        <p className="text-sm text-gray-500">{course.code}</p>
+                        <p className="font-medium text-foreground">{course.title}</p>
+                        <p className="text-sm text-muted-foreground">{course.code}</p>
                       </div>
                     </div>
                     {!isCompleted && (
@@ -229,7 +229,7 @@ export function PrerequisitesChecker({ courseId, onPrerequisitesMet }: Prerequis
         {/* Skill Prerequisites */}
         {(prerequisites.skills?.length || 0) > 0 && (
           <div>
-            <h4 className="font-medium text-gray-900 mb-3">Required Skills</h4>
+            <h4 className="font-medium text-foreground mb-3">Required Skills</h4>
             <div className="flex flex-wrap gap-2">
               {prerequisites.skills.map((skill, index) => (
                 <Badge key={index} variant="outline">
@@ -272,7 +272,7 @@ export function PrerequisitesChecker({ courseId, onPrerequisitesMet }: Prerequis
           <div className="flex justify-end pt-2">
             <Dialog open={isOverriding} onOpenChange={setIsOverriding}>
               <DialogTrigger asChild>
-                <Button variant="ghost" size="sm" className="text-gray-400 hover:text-amber-600 text-[10px] uppercase tracking-widest font-bold">
+                <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-amber-600 text-[10px] uppercase tracking-widest font-bold">
                   <ShieldAlert className="h-3 w-3 mr-1" />
                   Override Requirements
                 </Button>

@@ -33,7 +33,7 @@ export default function ShareMaterial({
   };
 
   return (
-    <div className="p-4 bg-white rounded-lg shadow">
+    <div className="p-4 bg-card rounded-lg shadow">
       <h2 className="text-xl font-semibold mb-2">Share Material</h2>
       <input
         value={sharedWithUserId}

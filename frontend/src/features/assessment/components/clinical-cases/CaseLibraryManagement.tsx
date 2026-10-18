@@ -254,7 +254,7 @@ export function CaseLibraryManagement({ userRole: _userRole, courseId, unitId }:
       case 'expert':
         return 'bg-red-100 text-red-800';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-muted text-muted-foreground';
     }
   };
 
@@ -265,9 +265,9 @@ export function CaseLibraryManagement({ userRole: _userRole, courseId, unitId }:
       case 'draft':
         return 'bg-yellow-100 text-yellow-800';
       case 'archived':
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-muted text-muted-foreground';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-muted text-muted-foreground';
     }
   };
 
@@ -279,11 +279,11 @@ export function CaseLibraryManagement({ userRole: _userRole, courseId, unitId }:
           <Card key={i}>
             <CardContent className="p-6">
               <div className="animate-pulse space-y-3">
-                <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                <div className="h-4 bg-secondary rounded w-3/4"></div>
+                <div className="h-3 bg-secondary rounded w-1/2"></div>
                 <div className="flex gap-2">
-                  <div className="h-6 bg-gray-200 rounded w-16"></div>
-                  <div className="h-6 bg-gray-200 rounded w-20"></div>
+                  <div className="h-6 bg-secondary rounded w-16"></div>
+                  <div className="h-6 bg-secondary rounded w-20"></div>
                 </div>
               </div>
             </CardContent>
@@ -298,8 +298,8 @@ export function CaseLibraryManagement({ userRole: _userRole, courseId, unitId }:
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Clinical Case Library</h2>
-          <p className="text-gray-600">Manage and organize your clinical case studies</p>
+          <h2 className="text-2xl font-bold text-foreground">Clinical Case Library</h2>
+          <p className="text-muted-foreground">Manage and organize your clinical case studies</p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm">
@@ -328,7 +328,7 @@ export function CaseLibraryManagement({ userRole: _userRole, courseId, unitId }:
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search cases..."
                 value={filters.search}
@@ -428,16 +428,16 @@ export function CaseLibraryManagement({ userRole: _userRole, courseId, unitId }:
               </div>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-gray-600 mb-4 line-clamp-3">{case_.description}</p>
+              <p className="text-sm text-muted-foreground mb-4 line-clamp-3">{case_.description}</p>
 
               <div className="space-y-3">
                 <div className="flex items-center justify-between text-sm">
                   <div className="flex items-center gap-1">
-                    <Clock className="h-4 w-4 text-gray-400" />
+                    <Clock className="h-4 w-4 text-muted-foreground" />
                     <span>{case_.estimated_duration_minutes} min</span>
                   </div>
                   <div className="flex items-center gap-1">
-                    <Users className="h-4 w-4 text-gray-400" />
+                    <Users className="h-4 w-4 text-muted-foreground" />
                     <span>{case_.attempts_count} attempts</span>
                   </div>
                 </div>
@@ -445,11 +445,11 @@ export function CaseLibraryManagement({ userRole: _userRole, courseId, unitId }:
                 {case_.attempts_count > 0 && (
                   <div className="flex items-center justify-between text-sm">
                     <div className="flex items-center gap-1">
-                      <Target className="h-4 w-4 text-gray-400" />
+                      <Target className="h-4 w-4 text-muted-foreground" />
                       <span>Avg Score: {case_.average_score.toFixed(1)}%</span>
                     </div>
                     <div className="flex items-center gap-1">
-                      <BarChart3 className="h-4 w-4 text-gray-400" />
+                      <BarChart3 className="h-4 w-4 text-muted-foreground" />
                       <span>Avg Time: {Math.round(case_.average_completion_time / 60)}m</span>
                     </div>
                   </div>
@@ -469,8 +469,8 @@ export function CaseLibraryManagement({ userRole: _userRole, courseId, unitId }:
                 </div>
 
                 <div className="flex items-center justify-between pt-2 border-t">
-                  <span className="text-xs text-gray-500">By {case_.creator_name}</span>
-                  <span className="text-xs text-gray-500">
+                  <span className="text-xs text-muted-foreground">By {case_.creator_name}</span>
+                  <span className="text-xs text-muted-foreground">
                     {new Date(case_.updated_at).toLocaleDateString()}
                   </span>
                 </div>
@@ -493,9 +493,9 @@ export function CaseLibraryManagement({ userRole: _userRole, courseId, unitId }:
       {filteredCases.length === 0 && (
         <Card>
           <CardContent className="p-8 text-center">
-            <BookOpen className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+            <BookOpen className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
             <h3 className="text-lg font-medium mb-2">No Cases Found</h3>
-            <p className="text-gray-600 mb-4">
+            <p className="text-muted-foreground mb-4">
               {cases.length === 0
                 ? 'Create your first clinical case to get started.'
                 : 'Try adjusting your filters to find more cases.'}

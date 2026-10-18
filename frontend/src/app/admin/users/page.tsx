@@ -140,7 +140,7 @@ export default function AdminUsersPage() {
     return (
       <div className="container mx-auto px-4 py-8 text-center">
         <h2 className="text-2xl font-bold text-red-600 mb-2">Access Denied</h2>
-        <p className="text-gray-600">You must be an administrator to access this page.</p>
+        <p className="text-muted-foreground">You must be an administrator to access this page.</p>
       </div>
     );
   }

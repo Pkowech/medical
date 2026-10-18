@@ -163,39 +163,39 @@ export const GoalsManagementInterface: React.FC = () => {
 
   const getPriorityColor = (priority: string | undefined | null) => {
     if (!priority || typeof priority !== 'string') {
-      return 'bg-gray-100 text-gray-800 border-gray-200';
+      return 'bg-muted text-muted-foreground border-border';
     }
     switch (priority.toLowerCase()) {
       case 'critical':
-        return 'bg-red-100 text-red-800 border-red-200';
+        return 'bg-red-100 text-red-800 border-red-200 dark:bg-red-950/50 dark:text-red-300 dark:border-red-900';
       case 'high':
-        return 'bg-orange-100 text-orange-800 border-orange-200';
+        return 'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-950/50 dark:text-orange-300 dark:border-orange-900';
       case 'medium':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-950/50 dark:text-yellow-300 dark:border-yellow-900';
       case 'low':
-        return 'bg-green-100 text-green-800 border-green-200';
+        return 'bg-green-100 text-green-800 border-green-200 dark:bg-green-950/50 dark:text-green-300 dark:border-green-900';
       default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+        return 'bg-muted text-muted-foreground border-border';
     }
   };
 
   const getStatusColor = (status: string | undefined | null) => {
     if (!status || typeof status !== 'string') {
-      return 'bg-gray-100 text-gray-800';
+      return 'bg-muted text-muted-foreground';
     }
     switch (status.toLowerCase()) {
       case 'active':
-        return 'bg-indigo-100 text-indigo-800';
+        return 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950/50 dark:text-indigo-300';
       case 'completed':
-        return 'bg-green-100 text-green-800';
+        return 'bg-green-100 text-green-800 dark:bg-green-950/50 dark:text-green-300';
       case 'paused':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-950/50 dark:text-yellow-300';
       case 'cancelled':
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-muted text-muted-foreground';
       case 'overdue':
-        return 'bg-red-100 text-red-800';
+        return 'bg-red-100 text-red-800 dark:bg-red-950/50 dark:text-red-300';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-muted text-muted-foreground';
     }
   };
 
@@ -251,13 +251,13 @@ export const GoalsManagementInterface: React.FC = () => {
     return (
       <div
         key={goal.id}
-        className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 hover:shadow-md transition-all duration-300 overflow-hidden flex flex-col"
+        className="bg-card text-card-foreground rounded-2xl shadow-sm border border-border hover:shadow-md transition-all duration-300 overflow-hidden flex flex-col"
       >
         <div className="p-6">
           <div className="flex items-start justify-between mb-4">
             <div className="flex-1">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">{goal.title}</h3>
-              <p className="text-gray-600 text-sm mb-3 line-clamp-2">{goal.description}</p>
+              <h3 className="text-lg font-semibold text-foreground mb-2">{goal.title}</h3>
+              <p className="text-muted-foreground text-sm mb-3 line-clamp-2">{goal.description}</p>
 
               <div className="flex flex-wrap gap-2 mb-3">
                 <span
@@ -270,7 +270,7 @@ export const GoalsManagementInterface: React.FC = () => {
                 >
                   {goal.status}
                 </span>
-                <span className="px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                <span className="px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-950/50 dark:text-purple-300">
                   {goal.category.replace('_', ' ')}
                 </span>
               </div>
@@ -288,11 +288,11 @@ export const GoalsManagementInterface: React.FC = () => {
 
           {/* Progress bar */}
           <div className="mb-4">
-            <div className="flex items-center justify-between text-sm text-gray-600 mb-1">
+            <div className="flex items-center justify-between text-sm text-muted-foreground mb-1">
               <span>Progress</span>
               <span>{Math.round(goal.progressPercentage)}%</span>
             </div>
-            <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2 overflow-hidden">
+            <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
               <div
                 className={`h-full rounded-full transition-all duration-500 ease-out ${
                   goal.status === 'completed' ? 'bg-emerald-500' : 'bg-indigo-600'
@@ -302,7 +302,7 @@ export const GoalsManagementInterface: React.FC = () => {
           </div>
 
           {/* Target and current values */}
-          <div className="flex items-center justify-between text-sm text-gray-600 mb-4">
+          <div className="flex items-center justify-between text-sm text-muted-foreground mb-4">
             <div>
               <span className="font-medium">Current: </span>
               {goal.targetCriteria?.currentValue || 0} {goal.targetCriteria?.unit || ''}
@@ -316,18 +316,18 @@ export const GoalsManagementInterface: React.FC = () => {
           {/* Milestones */}
           {goal.milestones && goal.milestones.length > 0 && (
             <div className="mb-4">
-              <div className="text-sm font-medium text-gray-700 mb-2">Milestones</div>
+              <div className="text-sm font-medium text-foreground mb-2">Milestones</div>
               <div className="space-y-1">
                 {goal.milestones.slice(0, 3).map(milestone => (
                   <div key={milestone.id} className="flex items-center space-x-2 text-sm">
                     <div
                       className={`w-2 h-2 rounded-full ${
-                        milestone.completed ? 'bg-green-500' : 'bg-gray-300'
+                        milestone.completed ? 'bg-green-500' : 'bg-secondary'
                       }`}
                     />
                     <span
                       className={
-                        milestone.completed ? 'text-green-700 line-through' : 'text-gray-600'
+                        milestone.completed ? 'text-green-700 dark:text-green-400 line-through' : 'text-muted-foreground'
                       }
                     >
                       {milestone.title}
@@ -335,7 +335,7 @@ export const GoalsManagementInterface: React.FC = () => {
                   </div>
                 ))}
                 {goal.milestones.length > 3 && (
-                  <div className="text-xs text-gray-500">
+                  <div className="text-xs text-muted-foreground">
                     +{goal.milestones.length - 3} more milestones
                   </div>
                 )}
@@ -344,7 +344,7 @@ export const GoalsManagementInterface: React.FC = () => {
           )}
 
           {/* Timeline */}
-          <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
+          <div className="flex items-center justify-between text-sm text-muted-foreground mb-4">
             <div className="flex items-center space-x-1">
               <Calendar className="w-4 h-4" />
               <span>Due {new Date(goal.targetDate).toLocaleDateString()}</span>
@@ -352,7 +352,7 @@ export const GoalsManagementInterface: React.FC = () => {
 
             <div
               className={`flex items-center space-x-1 ${
-                isOverdue ? 'text-red-600' : isDueSoon ? 'text-orange-600' : 'text-gray-500'
+                isOverdue ? 'text-red-600 dark:text-red-400' : isDueSoon ? 'text-orange-600 dark:text-orange-400' : 'text-muted-foreground'
               }`}
             >
               <Clock className="w-4 h-4" />
@@ -367,13 +367,13 @@ export const GoalsManagementInterface: React.FC = () => {
           {/* Actions */}
           <div className="flex items-center justify-between">
             <div className="flex space-x-2">
-              <button type="button" title="Edit goal" aria-label="Edit goal" className="p-2 text-gray-400 hover:text-indigo-600 transition-colors">
+              <button type="button" title="Edit goal" aria-label="Edit goal" className="p-2 text-muted-foreground hover:text-indigo-600 transition-colors">
                 <Edit className="w-4 h-4" />
               </button>
-              <button type="button" title="Delete goal" aria-label="Delete goal" className="p-2 text-gray-400 hover:text-red-600 transition-colors">
+              <button type="button" title="Delete goal" aria-label="Delete goal" className="p-2 text-muted-foreground hover:text-red-600 transition-colors">
                 <Trash2 className="w-4 h-4" />
               </button>
-              <button type="button" title="View analytics" aria-label="View goal analytics" className="p-2 text-gray-400 hover:text-green-600 transition-colors">
+              <button type="button" title="View analytics" aria-label="View goal analytics" className="p-2 text-muted-foreground hover:text-green-600 transition-colors">
                 <BarChart3 className="w-4 h-4" />
               </button>
             </div>
@@ -403,17 +403,17 @@ export const GoalsManagementInterface: React.FC = () => {
   };
 
   const renderFilters = () => (
-    <div className="bg-slate-50/50 dark:bg-slate-800/30 rounded-2xl border border-slate-200/60 dark:border-slate-700/50 p-5 mb-10 shadow-sm backdrop-blur-xs">
+    <div className="bg-muted/50 rounded-2xl border border-border p-5 mb-10 shadow-sm backdrop-blur-xs">
       <div className="flex flex-col lg:flex-row gap-6">
         <div className="flex-1">
           <div className="relative group">
-            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 w-4 h-4 transition-colors" />
+            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground group-focus-within:text-indigo-500 w-4 h-4 transition-colors" />
             <input
               type="text"
               placeholder="Filter goals by title or description..."
               value={filters.search}
               onChange={e => setFilters({ ...filters, search: e.target.value })}
-              className="w-full pl-11 pr-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all"
+              className="w-full pl-11 pr-4 py-2.5 bg-background text-foreground border border-input rounded-xl text-sm focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all"
             />
           </div>
         </div>
@@ -424,7 +424,7 @@ export const GoalsManagementInterface: React.FC = () => {
             onChange={e => setFilters({ ...filters, category: e.target.value })}
             aria-label="Filter by category"
             title="Filter by category"
-            className="select-custom-arrow px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all appearance-none cursor-pointer pr-10 min-w-40 font-medium"
+            className="select-custom-arrow px-4 py-2.5 bg-background text-foreground border border-input rounded-xl text-sm focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all appearance-none cursor-pointer pr-10 min-w-40 font-medium"
           >
             <option value="">All Categories</option>
             <option value="study_time">Study Time</option>
@@ -436,7 +436,7 @@ export const GoalsManagementInterface: React.FC = () => {
             onChange={e => setFilters({ ...filters, priority: e.target.value })}
             aria-label="Filter by priority"
             title="Filter by priority"
-            className="select-custom-arrow px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all appearance-none cursor-pointer pr-10 min-w-40 font-medium"
+            className="select-custom-arrow px-4 py-2.5 bg-background text-foreground border border-input rounded-xl text-sm focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all appearance-none cursor-pointer pr-10 min-w-40 font-medium"
           >
             <option value="">All Priorities</option>
             <option value="critical">Critical</option>
@@ -451,9 +451,9 @@ export const GoalsManagementInterface: React.FC = () => {
                 type="checkbox"
                 checked={filters.dueSoon}
                 onChange={e => setFilters({ ...filters, dueSoon: e.target.checked })}
-                className="w-4 h-4 rounded-sm border-slate-300 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-0 transition-all"
+                className="w-4 h-4 rounded-sm border-border text-indigo-600 focus:ring-indigo-500 focus:ring-offset-0 transition-all"
               />
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-500 group-hover:text-slate-900 dark:group-hover:text-white transition-colors">Due Soon</span>
+              <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground group-hover:text-foreground transition-colors">Due Soon</span>
             </label>
 
             <label className="flex items-center gap-2 cursor-pointer group">
@@ -461,9 +461,9 @@ export const GoalsManagementInterface: React.FC = () => {
                 type="checkbox"
                 checked={filters.overdue}
                 onChange={e => setFilters({ ...filters, overdue: e.target.checked })}
-                className="w-4 h-4 rounded-sm border-slate-300 text-red-600 focus:ring-red-500 focus:ring-offset-0 transition-all"
+                className="w-4 h-4 rounded-sm border-border text-red-600 focus:ring-red-500 focus:ring-offset-0 transition-all"
               />
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-500 group-hover:text-slate-900 dark:group-hover:text-white transition-colors">Overdue</span>
+              <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground group-hover:text-foreground transition-colors">Overdue</span>
             </label>
           </div>
         </div>
@@ -492,7 +492,7 @@ export const GoalsManagementInterface: React.FC = () => {
 
       {renderAnalyticsCards()}
 
-      <div className="flex items-center space-x-2 bg-slate-100/80 dark:bg-slate-800/80 p-1.5 rounded-2xl mb-10 w-fit border border-slate-200/60 dark:border-slate-700/50 shadow-xs backdrop-blur-md">
+      <div className="flex items-center space-x-2 bg-muted p-1.5 rounded-2xl mb-10 w-fit border border-border shadow-xs backdrop-blur-md">
         {( [
           { id: 'active', label: 'In Progress', count: analytics?.activeGoals },
           { id: 'completed', label: 'Archived', count: analytics?.completedGoals },
@@ -505,15 +505,15 @@ export const GoalsManagementInterface: React.FC = () => {
               px-6 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all
               ${
                 activeTab === tab.id
-                  ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-black/5'
-                  : 'text-gray-500 hover:text-gray-700 hover:bg-white/50'
+                  ? 'bg-card text-indigo-600 shadow-sm ring-1 ring-border'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
               }
             `}
           >
             {tab.label}
             {tab.count !== undefined && (
               <span className={`ml-2 px-1.5 py-0.5 rounded text-[10px] ${
-                activeTab === tab.id ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-200 text-gray-500'
+                activeTab === tab.id ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300' : 'bg-secondary text-muted-foreground'
               }`}>
                 {tab.count}
               </span>
@@ -537,12 +537,12 @@ export const GoalsManagementInterface: React.FC = () => {
           )}
 
           {goals.length === 0 && !loading && (
-            <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-gray-200 shadow-xs">
-              <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Target className="w-10 h-10 text-gray-300" />
+            <div className="text-center py-20 bg-card rounded-3xl border border-dashed border-border shadow-xs">
+              <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center mx-auto mb-6">
+                <Target className="w-10 h-10 text-muted-foreground/50" />
               </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">Focus on what matters</h3>
-              <p className="text-gray-500 mb-8 max-w-sm mx-auto">
+              <h3 className="text-xl font-bold text-foreground mb-2">Focus on what matters</h3>
+              <p className="text-muted-foreground mb-8 max-w-sm mx-auto">
                 {activeTab === 'active'
                   ? "Set structured goals to track your progress and stay motivated on your academic journey."
                   : 'No goals found matching your selected criteria.'}
@@ -553,7 +553,7 @@ export const GoalsManagementInterface: React.FC = () => {
                     setRecommendationToAccept(null);
                     setShowCreateModal(true);
                   }}
-                  className="bg-gray-900 text-white px-8 py-3 rounded-2xl hover:bg-gray-800 transition-all font-bold shadow-md active:scale-95"
+                  className="bg-gray-900 text-white px-8 py-3 rounded-2xl hover:bg-gray-800 dark:bg-indigo-600 dark:hover:bg-indigo-500 transition-all font-bold shadow-md active:scale-95"
                 >
                   Create Your First Goal
                 </button>

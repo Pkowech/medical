@@ -95,7 +95,7 @@ export const SpacedRepetitionWidget = () => {
           <Calendar className="w-5 h-5" />
           Due for Review
         </CardTitle>
-        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+        <p className="text-sm text-muted-foreground dark:text-muted-foreground mt-1">
           Spaced repetition schedule using SM-2 algorithm
         </p>
       </CardHeader>
@@ -103,38 +103,38 @@ export const SpacedRepetitionWidget = () => {
         <div className="space-y-4">
           {/* Review Stats */}
           <div className="grid grid-cols-3 gap-3">
-            <div className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-orange-100 dark:border-orange-900">
+            <div className="bg-card dark:bg-card p-3 rounded-lg border border-orange-100 dark:border-orange-900">
               <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
                 {dueCards}
               </div>
-              <p className="text-xs text-gray-600 dark:text-gray-400">Due Today</p>
+              <p className="text-xs text-muted-foreground dark:text-muted-foreground">Due Today</p>
             </div>
-            <div className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-orange-100 dark:border-orange-900">
+            <div className="bg-card dark:bg-card p-3 rounded-lg border border-orange-100 dark:border-orange-900">
               <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
                 {cardStats?.upcoming || 0}
               </div>
-              <p className="text-xs text-gray-600 dark:text-gray-400">Upcoming</p>
+              <p className="text-xs text-muted-foreground dark:text-muted-foreground">Upcoming</p>
             </div>
-            <div className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-orange-100 dark:border-orange-900">
+            <div className="bg-card dark:bg-card p-3 rounded-lg border border-orange-100 dark:border-orange-900">
               <div className="text-2xl font-bold text-green-600 dark:text-green-400">
                 {totalCards}
               </div>
-              <p className="text-xs text-gray-600 dark:text-gray-400">Total</p>
+              <p className="text-xs text-muted-foreground dark:text-muted-foreground">Total</p>
             </div>
           </div>
 
           {/* Review Progress */}
           {totalCards > 0 && (
-            <div className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-orange-100 dark:border-orange-900">
+            <div className="bg-card dark:bg-card p-3 rounded-lg border border-orange-100 dark:border-orange-900">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                <span className="text-sm font-medium text-muted-foreground dark:text-muted-foreground">
                   Review Progress
                 </span>
                 <span className="text-sm font-bold text-orange-600 dark:text-orange-400">
                   {reviewPercentage}%
                 </span>
               </div>
-              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+              <div className="w-full bg-secondary dark:bg-secondary rounded-full h-2">
                 <div
                   className={`h-2 rounded-full transition-all ${
                     reviewPercentage > 50
@@ -160,13 +160,13 @@ export const SpacedRepetitionWidget = () => {
                 {highRiskTopics.slice(0, 3).map((topic) => (
                   <div
                     key={topic.topicId}
-                    className="flex items-start justify-between p-3 bg-white dark:bg-slate-800 rounded-lg border border-red-200 dark:border-red-900"
+                    className="flex items-start justify-between p-3 bg-card dark:bg-card rounded-lg border border-red-200 dark:border-red-900"
                   >
                     <div>
-                      <p className="font-medium text-gray-900 dark:text-white text-sm">
+                      <p className="font-medium text-foreground dark:text-foreground text-sm">
                         {topic.topicName}
                       </p>
-                      <div className="flex items-center gap-2 mt-1 text-xs text-gray-600 dark:text-gray-400">
+                      <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground dark:text-muted-foreground">
                         <span>
                           Mastery: {Math.round(topic.masteryLevel * 100)}%
                         </span>
@@ -203,14 +203,14 @@ export const SpacedRepetitionWidget = () => {
 
           {/* Empty State */}
           {dueCards === 0 && totalCards > 0 && (
-            <div className="text-center py-4 text-gray-600 dark:text-gray-400">
+            <div className="text-center py-4 text-muted-foreground dark:text-muted-foreground">
               <div className="text-sm">✓ All caught up! Great work!</div>
               <div className="text-xs mt-1">Next reviews in {cardStats?.averageInterval || 1} days on average</div>
             </div>
           )}
 
           {totalCards === 0 && (
-            <div className="text-center py-4 text-gray-600 dark:text-gray-400">
+            <div className="text-center py-4 text-muted-foreground dark:text-muted-foreground">
               <BookMarked className="w-6 h-6 mx-auto mb-2 opacity-50" />
               <p className="text-sm">Start studying to create review cards</p>
             </div>

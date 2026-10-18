@@ -10,7 +10,7 @@ export const MarketingFooter: React.FC = () => {
       {/* Skip link for keyboard users to jump to main content when footer is focused */}
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 bg-white text-gray-900 px-3 py-2 rounded-md z-50"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 bg-card text-foreground px-3 py-2 rounded-md z-50"
       >
         Skip to content
       </a>
@@ -25,7 +25,7 @@ export const MarketingFooter: React.FC = () => {
               </div>
               <span className="ml-3 text-2xl font-bold text-white">MedTrack Hub</span>
             </div>
-            <p className="text-gray-400 mb-6 leading-relaxed max-w-md">
+            <p className="text-muted-foreground mb-6 leading-relaxed max-w-md">
               A platform for medical courses, practice, study planning, and progress tracking.
             </p>
           </div>
@@ -38,7 +38,7 @@ export const MarketingFooter: React.FC = () => {
                 <li>
                   <Link
                     href="/features"
-                    className="hover:text-white transition-colors text-gray-400"
+                    className="hover:text-white transition-colors text-muted-foreground"
                   >
                     Features
                   </Link>
@@ -46,7 +46,7 @@ export const MarketingFooter: React.FC = () => {
                 <li>
                   <Link
                     href="/courses"
-                    className="hover:text-white transition-colors text-gray-400"
+                    className="hover:text-white transition-colors text-muted-foreground"
                   >
                     Medical Curriculum
                   </Link>
@@ -54,7 +54,7 @@ export const MarketingFooter: React.FC = () => {
                 <li>
                   <Link
                     href="/register"
-                    className="hover:text-white transition-colors text-gray-400"
+                    className="hover:text-white transition-colors text-muted-foreground"
                   >
                     Get Started
                   </Link>
@@ -69,14 +69,14 @@ export const MarketingFooter: React.FC = () => {
               <h3 className="text-white font-semibold mb-6 text-lg">Company</h3>
               <ul className="space-y-3">
                 <li>
-                  <Link href="/about" className="hover:text-white transition-colors text-gray-400">
+                  <Link href="/about" className="hover:text-white transition-colors text-muted-foreground">
                     About Us
                   </Link>
                 </li>
                 <li>
                   <Link
                     href="/contact"
-                    className="hover:text-white transition-colors text-gray-400"
+                    className="hover:text-white transition-colors text-muted-foreground"
                   >
                     Contact Sales
                   </Link>
@@ -89,28 +89,28 @@ export const MarketingFooter: React.FC = () => {
       </div>
 
       {/* Bottom Footer */}
-      <div className="border-t border-gray-800 py-8">
+      <div className="border-t border-border py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row justify-between items-center">
-            <div className="text-sm text-gray-400 mb-4 md:mb-0" suppressHydrationWarning>
+            <div className="text-sm text-muted-foreground mb-4 md:mb-0" suppressHydrationWarning>
               © {new Date().getFullYear()} MedTrack Hub. All rights reserved.
             </div>
             <div className="flex space-x-6 text-sm">
-              <Link href="/privacy" className="text-gray-400 hover:text-white transition-colors">
+              <Link href="/privacy" className="text-muted-foreground hover:text-white transition-colors">
                 Privacy Policy
               </Link>
-              <Link href="/terms" className="text-gray-400 hover:text-white transition-colors">
+              <Link href="/terms" className="text-muted-foreground hover:text-white transition-colors">
                 Terms of Service
               </Link>
               <Link
                 href="/cookie-policy"
-                className="text-gray-400 hover:text-white transition-colors"
+                className="text-muted-foreground hover:text-white transition-colors"
               >
                 Cookie Policy
               </Link>
               <Link
                 href="/accessibility"
-                className="text-gray-400 hover:text-white transition-colors"
+                className="text-muted-foreground hover:text-white transition-colors"
               >
                 Accessibility
               </Link>

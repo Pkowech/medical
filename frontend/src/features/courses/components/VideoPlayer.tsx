@@ -125,7 +125,7 @@ export const VideoPlayer = ({ url, title, lessonId, theaterMode = false }: Video
   return (
     <div className={theaterMode
       ? 'relative h-full w-full overflow-hidden bg-black'
-      : 'relative group aspect-video w-full overflow-hidden rounded-xl border border-slate-800 bg-black shadow-2xl animate-in fade-in zoom-in duration-700'}>
+      : 'relative group aspect-video w-full overflow-hidden rounded-xl border border-border bg-black shadow-2xl animate-in fade-in zoom-in duration-700'}>
       {!isReady && (
         <div className="absolute inset-0 flex items-center justify-center bg-slate-900 z-10">
           <RefreshCw className="w-8 h-8 text-blue-500 animate-spin" />

@@ -66,7 +66,7 @@ const ContinuousPDFPage = ({ pageNumber, width, scrollRoot }: ContinuousPDFPageP
       id={`pdf-page-${pageNumber}`}
       data-pdf-page={pageNumber}
       style={{ width, aspectRatio }}
-      className="shrink-0 bg-white shadow-xl"
+      className="shrink-0 bg-card shadow-xl"
     >
       {isNearViewport && (
         <Page
@@ -76,7 +76,7 @@ const ContinuousPDFPage = ({ pageNumber, width, scrollRoot }: ContinuousPDFPageP
           renderTextLayer={false}
           renderAnnotationLayer={false}
           onLoadSuccess={handlePageLoad}
-          className="overflow-hidden border border-gray-200 dark:border-slate-700"
+          className="overflow-hidden border border-border dark:border-border"
         />
       )}
     </div>
@@ -302,7 +302,7 @@ const PDFViewer = React.memo(({ file, onPageChange, initialPage = 1, headers }: 
 
   if (!file) {
     return (
-      <div className="flex flex-col items-center justify-center p-12 text-gray-500 bg-gray-50 dark:bg-slate-800/50 rounded-lg border-2 border-dashed border-gray-200 dark:border-slate-700">
+      <div className="flex flex-col items-center justify-center p-12 text-muted-foreground bg-background dark:bg-card/50 rounded-lg border-2 border-dashed border-border dark:border-border">
         <AlertCircle className="h-12 w-12 mb-4 opacity-20" />
         <p>No PDF file provided.</p>
       </div>
@@ -313,8 +313,8 @@ const PDFViewer = React.memo(({ file, onPageChange, initialPage = 1, headers }: 
     return (
       <div className="flex flex-col items-center justify-center p-12 text-center bg-red-50 dark:bg-red-500/5 rounded-lg border border-red-100 dark:border-red-500/20">
         <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
-        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">Error Loading PDF</h3>
-        <p className="text-sm text-gray-600 dark:text-slate-400 max-w-xs mb-6">{error}</p>
+        <h3 className="text-lg font-bold text-foreground dark:text-foreground mb-2">Error Loading PDF</h3>
+        <p className="text-sm text-muted-foreground dark:text-muted-foreground max-w-xs mb-6">{error}</p>
         <Button variant="outline" onClick={() => window.open(typeof file === 'string' ? file : '', '_blank')}>
           <Download className="h-4 w-4 mr-2" />
           Download to View
@@ -324,8 +324,8 @@ const PDFViewer = React.memo(({ file, onPageChange, initialPage = 1, headers }: 
   }
 
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border border-gray-200 bg-gray-100/50 dark:border-slate-800 dark:bg-slate-900/50">
-      <div className="flex justify-between items-center p-3 bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 z-10">
+    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-muted/50 dark:border-border dark:bg-card/50">
+      <div className="flex justify-between items-center p-3 bg-card dark:bg-card border-b border-border dark:border-border z-10">
         <div className="flex gap-2">
           <Button 
             type="button"
@@ -352,7 +352,7 @@ const PDFViewer = React.memo(({ file, onPageChange, initialPage = 1, headers }: 
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
-        <div className="text-sm font-medium text-gray-700 dark:text-slate-300">
+        <div className="text-sm font-medium text-muted-foreground dark:text-muted-foreground">
           {loading ? 'Loading...' : (
             <label className="inline-flex items-center gap-1">
               <span>Page</span>
@@ -371,7 +371,7 @@ const PDFViewer = React.memo(({ file, onPageChange, initialPage = 1, headers }: 
                     goToEnteredPage();
                   }
                 }}
-                className="w-10 border-b border-gray-300 bg-transparent text-center outline-none focus:border-blue-500 dark:border-slate-600"
+                className="w-10 border-b border-border bg-transparent text-center outline-none focus:border-blue-500 dark:border-border"
               />
               <span>of {numPages || '?'}</span>
             </label>
@@ -393,7 +393,7 @@ const PDFViewer = React.memo(({ file, onPageChange, initialPage = 1, headers }: 
           <button
             type="button"
             onClick={() => setZoom(1)}
-            className="min-w-12 px-1 text-xs text-gray-600 hover:text-blue-600 dark:text-slate-300"
+            className="min-w-12 px-1 text-xs text-muted-foreground hover:text-blue-600 dark:text-muted-foreground"
             aria-label="Reset zoom"
             title="Reset zoom"
           >
@@ -430,7 +430,7 @@ const PDFViewer = React.memo(({ file, onPageChange, initialPage = 1, headers }: 
       <div ref={setScrollContainer} onScroll={handleScroll} className="flex min-h-0 min-w-0 flex-1 justify-center overflow-x-auto overflow-y-auto overscroll-contain p-4 touch-pan-y scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-slate-700">
         <div className="relative flex w-max min-w-full flex-col items-center gap-4">
           {showLoadingUI && (
-            <div className="absolute inset-0 flex items-center justify-center bg-white/50 dark:bg-slate-900/50 z-20 backdrop-blur-[2px] rounded-lg">
+            <div className="absolute inset-0 flex items-center justify-center bg-card/50 dark:bg-card/50 z-20 backdrop-blur-[2px] rounded-lg">
               <div className="flex flex-col items-center">
                 <Loader2 className="h-10 w-10 text-blue-500 animate-spin mb-2" />
                 <span className="text-sm font-medium">Processing Document...</span>

@@ -117,8 +117,8 @@ export default function QuizResultsPage() {
         <SEO title="Quiz Results" description="View your quiz results and performance analytics" />
         <div className="mx-auto max-w-3xl px-4 py-8">
           <Card className="p-8 text-center">
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Quiz Results</h1>
-            <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+            <h1 className="text-2xl font-bold text-foreground dark:text-foreground">Quiz Results</h1>
+            <p className="mt-2 text-sm text-muted-foreground dark:text-muted-foreground">
               Choose a quiz from your history to review results for its unit.
             </p>
             <Button className="mt-5" onClick={() => router.push('/quiz/history')}>
@@ -138,10 +138,10 @@ export default function QuizResultsPage() {
         <SEO title="Quiz Results" description="View your quiz results and performance analytics" />
         <div className="mx-auto max-w-3xl px-4 py-8">
           <Card className="p-8 text-center">
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
+            <h1 className="text-2xl font-bold text-foreground dark:text-foreground">
               Unable to load results
             </h1>
-            <p role="alert" className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+            <p role="alert" className="mt-2 text-sm text-muted-foreground dark:text-muted-foreground">
               {error}
             </p>
             <div className="mt-5 flex flex-col justify-center gap-2 sm:flex-row">
@@ -164,8 +164,8 @@ export default function QuizResultsPage() {
       <div className="mx-auto max-w-5xl px-4 py-8">
         <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Quiz Results</h1>
-            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+            <h1 className="text-2xl font-bold text-foreground dark:text-foreground">Quiz Results</h1>
+            <p className="mt-1 text-sm text-muted-foreground dark:text-muted-foreground">
               Your recent attempts for this unit.
             </p>
           </div>
@@ -176,20 +176,20 @@ export default function QuizResultsPage() {
 
         <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
           <Card className="p-4">
-            <p className="text-sm text-slate-500 dark:text-slate-400">Total attempts</p>
-            <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-white">
+            <p className="text-sm text-muted-foreground dark:text-muted-foreground">Total attempts</p>
+            <p className="mt-1 text-2xl font-bold text-foreground dark:text-foreground">
               {results.totalQuizzes}
             </p>
           </Card>
           <Card className="p-4">
-            <p className="text-sm text-slate-500 dark:text-slate-400">Completed attempts</p>
-            <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-white">
+            <p className="text-sm text-muted-foreground dark:text-muted-foreground">Completed attempts</p>
+            <p className="mt-1 text-2xl font-bold text-foreground dark:text-foreground">
               {results.completedQuizzes}
             </p>
           </Card>
           <Card className="p-4">
-            <p className="text-sm text-slate-500 dark:text-slate-400">Average score</p>
-            <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-white">
+            <p className="text-sm text-muted-foreground dark:text-muted-foreground">Average score</p>
+            <p className="mt-1 text-2xl font-bold text-foreground dark:text-foreground">
               {Math.round(results.averageScore)}%
             </p>
           </Card>
@@ -198,7 +198,7 @@ export default function QuizResultsPage() {
         <section aria-labelledby="attempts-heading" className="space-y-3">
           <h2
             id="attempts-heading"
-            className="text-lg font-semibold text-slate-900 dark:text-white"
+            className="text-lg font-semibold text-foreground dark:text-foreground"
           >
             Attempts
           </h2>
@@ -208,20 +208,20 @@ export default function QuizResultsPage() {
               className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
             >
               <div>
-                <h3 className="font-semibold text-slate-900 dark:text-white">
+                <h3 className="font-semibold text-foreground dark:text-foreground">
                   Attempt {results.attempts.length - index}
                 </h3>
-                <p className="text-sm text-slate-500 dark:text-slate-400">
+                <p className="text-sm text-muted-foreground dark:text-muted-foreground">
                   {attempt.completedAt
                     ? new Date(attempt.completedAt).toLocaleString()
                     : 'In progress'}
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                <span className="text-lg font-bold text-slate-900 dark:text-white">
+                <span className="text-lg font-bold text-foreground dark:text-foreground">
                   {Math.round(attempt.percentage)}%
                 </span>
-                <span className="text-sm text-slate-600 dark:text-slate-400">
+                <span className="text-sm text-muted-foreground dark:text-muted-foreground">
                   {attempt.correctAnswers}/{attempt.totalQuestions} correct
                 </span>
                 <span
@@ -244,7 +244,7 @@ export default function QuizResultsPage() {
 
           {results.attempts.length === 0 && (
             <Card className="p-6 text-center">
-              <p className="text-slate-600 dark:text-slate-400">
+              <p className="text-muted-foreground dark:text-muted-foreground">
                 No quiz attempts have been recorded for this unit yet.
               </p>
               <Button className="mt-4" onClick={() => router.push(`/quiz/unit/${unitId}`)}>

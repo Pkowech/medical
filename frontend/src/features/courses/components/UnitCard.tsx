@@ -22,7 +22,7 @@ const getUnitStatusBadge = (unit: CourseUnit) => {
 export const UnitCard = ({ unit, index, onClick }: UnitCardProps) => {
   return (
     <Card 
-      className="h-full hover:shadow-lg hover:border-blue-400 dark:hover:border-blue-500 transition-all duration-300 cursor-pointer overflow-hidden group bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm border border-gray-200 dark:border-slate-700/50"
+      className="h-full hover:shadow-lg hover:border-blue-400 dark:hover:border-blue-500 transition-all duration-300 cursor-pointer overflow-hidden group bg-card/80 dark:bg-card/50 backdrop-blur-sm border border-border dark:border-border/50"
       onClick={() => onClick(unit.id)}
     >
       <CardHeader className="pb-3">
@@ -45,19 +45,19 @@ export const UnitCard = ({ unit, index, onClick }: UnitCardProps) => {
         {/* Unit Stats */}
         <div className="space-y-2">
           {unit.estimatedMinutes && (
-            <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-slate-400">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground dark:text-muted-foreground">
               <Clock className="w-4 h-4 shrink-0" />
               <span>{unit.estimatedMinutes} minutes</span>
             </div>
           )}
           {unit.topics && unit.topics.length > 0 && (
-            <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-slate-400">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground dark:text-muted-foreground">
               <BookOpen className="w-4 h-4 shrink-0" />
               <span>{unit.topics.length} topic{unit.topics.length !== 1 ? 's' : ''}</span>
             </div>
           )}
           {unit.materials && unit.materials.length > 0 && (
-            <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-slate-400">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground dark:text-muted-foreground">
               <Lock className="w-4 h-4 shrink-0" />
               <span>{unit.materials.length} material{unit.materials.length !== 1 ? 's' : ''}</span>
             </div>
@@ -66,9 +66,9 @@ export const UnitCard = ({ unit, index, onClick }: UnitCardProps) => {
 
         {/* Learning Objectives */}
         {Array.isArray(unit.learningObjectives) && unit.learningObjectives.length > 0 && (
-          <div className="pt-3 border-t border-gray-200 dark:border-slate-700">
-            <p className="text-xs font-semibold text-gray-700 dark:text-slate-300 mb-2">Learning Objectives:</p>
-            <ul className="text-xs text-gray-600 dark:text-slate-400 space-y-1">
+          <div className="pt-3 border-t border-border dark:border-border">
+            <p className="text-xs font-semibold text-muted-foreground dark:text-muted-foreground mb-2">Learning Objectives:</p>
+            <ul className="text-xs text-muted-foreground dark:text-muted-foreground space-y-1">
               {unit.learningObjectives.slice(0, 2).map((obj: string, i: number) => (
                 <li key={i} className="flex items-start gap-2">
                   <span className="text-blue-500 shrink-0 mt-0.5">✓</span>

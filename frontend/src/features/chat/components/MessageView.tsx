@@ -41,19 +41,19 @@ export const MessageView: React.FC<MessageViewProps> = ({
   };
 
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-col bg-white shadow-md">
+    <div className="flex h-full min-h-0 min-w-0 flex-col bg-card shadow-md">
       {onBack && (
-        <div className="flex min-w-0 items-center gap-3 border-b border-gray-200 px-3 py-2 md:hidden">
+        <div className="flex min-w-0 items-center gap-3 border-b border-border px-3 py-2 md:hidden">
           <button
             type="button"
             onClick={onBack}
-            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-gray-700 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
             aria-label="Back to conversations"
           >
             <ArrowLeft className="h-5 w-5" aria-hidden="true" />
           </button>
           {conversationTitle && (
-            <h2 className="min-w-0 truncate font-semibold text-gray-900">
+            <h2 className="min-w-0 truncate font-semibold text-foreground">
               {conversationTitle}
             </h2>
           )}
@@ -69,7 +69,7 @@ export const MessageView: React.FC<MessageViewProps> = ({
               className={`max-w-[85%] break-words rounded-lg px-3 py-2 sm:max-w-[75%] sm:px-4 lg:max-w-md ${
                 message.sender.id === currentUserId
                   ? 'bg-blue-500 text-white rounded-br-none'
-                  : 'bg-gray-200 text-gray-800 rounded-bl-none'
+                  : 'bg-secondary text-muted-foreground rounded-bl-none'
               }`}
             >
               <p className="whitespace-pre-wrap text-sm [overflow-wrap:anywhere]">
@@ -85,11 +85,11 @@ export const MessageView: React.FC<MessageViewProps> = ({
       </div>
       <form
         onSubmit={handleSubmit}
-        className="flex min-w-0 items-center gap-2 border-t border-gray-200 p-3 sm:p-4"
+        className="flex min-w-0 items-center gap-2 border-t border-border p-3 sm:p-4"
       >
         <input
           type="text"
-          className="min-w-0 flex-1 rounded-full border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="min-w-0 flex-1 rounded-full border border-border px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
           placeholder="Type your message..."
           aria-label="Type your message"
           value={newMessage}

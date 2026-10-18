@@ -79,7 +79,7 @@ export default function AdminRolesPage() {
     return (
       <div className="text-center py-8">
         <h2 className="text-2xl font-bold text-red-600 mb-2">Access Denied</h2>
-        <p className="text-gray-600">You must be an administrator to access this page.</p>
+        <p className="text-muted-foreground">You must be an administrator to access this page.</p>
       </div>
     );
   }

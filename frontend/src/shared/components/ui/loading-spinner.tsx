@@ -30,22 +30,22 @@ export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
   const spinner = (
     <div className={`flex items-center justify-center ${className}`}>
       <div
-        className={`animate-spin rounded-full ${sizeClasses[size]} border-4 border-gray-200 dark:border-slate-700 ${colorClasses[color]}`}
+        className={`animate-spin rounded-full ${sizeClasses[size]} border-4 border-border dark:border-border ${colorClasses[color]}`}
         role="status"
         aria-label="Loading"
       >
         <span className="sr-only">Loading...</span>
       </div>
-      {message ? <p className="ml-3 text-gray-600 dark:text-slate-400">{message}</p> : null}
+      {message ? <p className="ml-3 text-muted-foreground dark:text-muted-foreground">{message}</p> : null}
     </div>
   );
 
   if (fullScreen) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm z-50">
+      <div className="fixed inset-0 flex items-center justify-center bg-card/80 dark:bg-card/80 backdrop-blur-sm z-50">
         <div className="text-center">
           <div className="mb-4">{spinner}</div>
-          <p className="text-gray-600 dark:text-slate-400 font-medium">{message ?? 'Loading...'}</p>
+          <p className="text-muted-foreground dark:text-muted-foreground font-medium">{message ?? 'Loading...'}</p>
         </div>
       </div>
     );

@@ -43,16 +43,16 @@ export function SessionManager() {
 
   return (
     <div className="space-y-4">
-      <Card className="p-6 bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm border-gray-100 dark:border-slate-700/50">
+      <Card className="p-6 bg-card/80 dark:bg-card/50 backdrop-blur-sm border-border dark:border-border/50">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h3 className="font-semibold text-gray-900 dark:text-white mb-1">{userName}</h3>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              <span className="font-medium text-slate-400 uppercase text-[10px] tracking-wider mr-2">Email</span>
+            <h3 className="font-semibold text-foreground dark:text-foreground mb-1">{userName}</h3>
+            <p className="text-sm text-muted-foreground dark:text-muted-foreground">
+              <span className="font-medium text-muted-foreground uppercase text-[10px] tracking-wider mr-2">Email</span>
               {session.user?.email || 'Not available'}
             </p>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-              <span className="font-medium text-slate-400 uppercase text-[10px] tracking-wider mr-2">Expires</span>
+            <p className="text-sm text-muted-foreground dark:text-muted-foreground mt-1">
+              <span className="font-medium text-muted-foreground uppercase text-[10px] tracking-wider mr-2">Expires</span>
               {new Date(session.expires).toLocaleString()}
             </p>
           </div>

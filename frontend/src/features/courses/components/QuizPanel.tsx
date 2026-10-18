@@ -217,9 +217,9 @@ export const QuizPanel = ({
 
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center p-12 bg-white/80 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700/50">
+      <div className="flex flex-col items-center justify-center p-12 bg-card/80 dark:bg-card/50 rounded-xl border border-border dark:border-border/50">
         <RefreshCw className="w-8 h-8 text-blue-500 animate-spin mb-4" />
-        <p className="text-slate-500">Loading quiz questions...</p>
+        <p className="text-muted-foreground">Loading quiz questions...</p>
       </div>
     );
   }
@@ -234,7 +234,7 @@ export const QuizPanel = ({
 
   if (!questions.length) {
     return (
-      <div className="p-6 text-center text-slate-500">
+      <div className="p-6 text-center text-muted-foreground">
         No quiz questions are available for this {scope} yet.
       </div>
     );
@@ -244,13 +244,13 @@ export const QuizPanel = ({
     const scorePercentage = finalResult?.score ?? Math.round((score / questions.length) * 100);
     const passed = finalResult?.passed ?? scorePercentage >= (scope === 'topic' ? 70 : 80);
     return (
-      <div className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm rounded-xl p-8 shadow-sm border border-gray-200 dark:border-slate-700/50 text-center animate-in fade-in zoom-in duration-500 motion-reduce:animate-none">
+      <div className="bg-card/80 dark:bg-card/50 backdrop-blur-sm rounded-xl p-8 shadow-sm border border-border dark:border-border/50 text-center animate-in fade-in zoom-in duration-500 motion-reduce:animate-none">
         <div className={`w-20 h-20 mx-auto rounded-full flex items-center justify-center mb-6 ${passed ? 'bg-green-100 dark:bg-green-500/20' : 'bg-red-100 dark:bg-red-500/20'}`}>
           {passed ? <CheckCircle className="w-10 h-10 text-green-600" /> : <AlertCircle className="w-10 h-10 text-red-600" />}
         </div>
-        <h3 className="text-2xl font-bold text-slate-900 dark:text-white">Quiz Complete!</h3>
-        <p className="text-slate-500 mt-2 mb-6 text-lg">
-          Your score: <span className="font-bold text-slate-900 dark:text-white">{scorePercentage}%</span>
+        <h3 className="text-2xl font-bold text-foreground dark:text-foreground">Quiz Complete!</h3>
+        <p className="text-muted-foreground mt-2 mb-6 text-lg">
+          Your score: <span className="font-bold text-foreground dark:text-foreground">{scorePercentage}%</span>
         </p>
         
         {passed ? (
@@ -300,25 +300,25 @@ export const QuizPanel = ({
   return (
     <div className={`${
       immersive
-        ? 'mt-0 rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm backdrop-blur-sm dark:border-slate-700 dark:bg-slate-900/70 sm:p-6'
-        : 'mt-6 rounded-xl border border-gray-200 bg-white/80 p-6 shadow-sm backdrop-blur-sm dark:border-slate-700/50 dark:bg-slate-800/50'
+        ? 'mt-0 rounded-2xl border border-border bg-card/80 p-4 shadow-sm backdrop-blur-sm dark:border-border dark:bg-card/70 sm:p-6'
+        : 'mt-6 rounded-xl border border-border bg-card/80 p-6 shadow-sm backdrop-blur-sm dark:border-border/50 dark:bg-card/50'
     } animate-in slide-in-from-bottom-4 duration-500 motion-reduce:animate-none`}>
       <div className="flex items-center justify-between mb-6">
-        <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+        <h3 className="text-lg font-bold text-foreground dark:text-foreground">
           {scope === 'topic'
             ? 'Topic Mastery Quiz'
             : scope === 'assessment'
               ? 'Assessment'
               : 'Unit Quiz'}
         </h3>
-        <span className="text-sm font-medium text-slate-500 bg-slate-100 dark:bg-slate-700 px-3 py-1 rounded-full">
+        <span className="text-sm font-medium text-muted-foreground bg-muted dark:bg-secondary px-3 py-1 rounded-full">
           Question {currentQuestionIndex + 1} of {questions.length}
         </span>
       </div>
 
       {immersive && (
         <div
-          className="mb-5 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700"
+          className="mb-5 h-1.5 overflow-hidden rounded-full bg-muted dark:bg-secondary"
           role="progressbar"
           aria-label="Quiz progress"
           aria-valuemin={0}
@@ -333,8 +333,8 @@ export const QuizPanel = ({
       )}
 
       <div className="space-y-6">
-        <div className="p-6 bg-slate-50/50 dark:bg-slate-900/30 border border-slate-100 dark:border-slate-700/50 rounded-xl">
-          <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-6 leading-snug">
+        <div className="p-6 bg-background/50 dark:bg-card/30 border border-border dark:border-border/50 rounded-xl">
+          <h4 className="text-lg font-semibold text-foreground dark:text-foreground mb-6 leading-snug">
             {currentQuestion.text}
           </h4>
           <div className="space-y-3">
@@ -342,9 +342,9 @@ export const QuizPanel = ({
               const isSelected = selectedOption === option.id;
               const isCorrect = isSubmitted && isSelected && answerCorrect === true;
               const isIncorrect = isSubmitted && isSelected && answerCorrect === false;
-              let borderClass = 'border-gray-100 dark:border-slate-700/50';
-              let bgClass = 'bg-white dark:bg-slate-800';
-              let textClass = 'text-gray-700 dark:text-slate-300';
+              let borderClass = 'border-border dark:border-border/50';
+              let bgClass = 'bg-card dark:bg-card';
+              let textClass = 'text-muted-foreground dark:text-muted-foreground';
 
               if (isSubmitted) {
                 if (isCorrect) {
@@ -381,7 +381,7 @@ export const QuizPanel = ({
           {isSubmitted && (
             <div className="mt-6 p-4 bg-blue-50/50 dark:bg-blue-500/5 border border-blue-100 dark:border-blue-800/30 rounded-xl animate-in fade-in slide-in-from-top-2 duration-300">
               <p className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-1">Explanation</p>
-              <p className="text-sm text-slate-700 dark:text-slate-300">{currentQuestion.explanation || 'Answer recorded.'}</p>
+              <p className="text-sm text-muted-foreground dark:text-muted-foreground">{currentQuestion.explanation || 'Answer recorded.'}</p>
             </div>
           )}
         </div>

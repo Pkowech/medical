@@ -65,48 +65,48 @@ export default function AchievementsPage() {
 
   return (
     <AppErrorBoundary>
-      <div className="container mx-auto px-4 py-8 bg-gray-50/50 dark:bg-slate-900/50 min-h-screen">
-        <h1 className="text-3xl font-bold mb-8 text-gray-900 dark:text-white">Achievements</h1>
+      <div className="container mx-auto px-4 py-8 bg-background/50 dark:bg-card/50 min-h-screen">
+        <h1 className="text-3xl font-bold mb-8 text-foreground dark:text-foreground">Achievements</h1>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <Card className="p-4 bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm border-gray-100 dark:border-slate-700/50">
+          <Card className="p-4 bg-card/80 dark:bg-card/50 backdrop-blur-sm border-border dark:border-border/50">
             <div className="flex items-center space-x-4">
               <Trophy className="w-8 h-8 text-yellow-500" />
               <div>
-                <p className="text-xs font-semibold text-gray-400 dark:text-slate-500 uppercase tracking-wider">Total Points</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.points}</p>
+                <p className="text-xs font-semibold text-muted-foreground dark:text-muted-foreground uppercase tracking-wider">Total Points</p>
+                <p className="text-2xl font-bold text-foreground dark:text-foreground">{stats.points}</p>
               </div>
             </div>
           </Card>
-          <Card className="p-4 bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm border-gray-100 dark:border-slate-700/50">
+          <Card className="p-4 bg-card/80 dark:bg-card/50 backdrop-blur-sm border-border dark:border-border/50">
             <div className="flex items-center space-x-4">
               <Star className="w-8 h-8 text-blue-500" />
               <div>
-                <p className="text-xs font-semibold text-gray-400 dark:text-slate-500 uppercase tracking-wider">Current Rank</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.rank}</p>
+                <p className="text-xs font-semibold text-muted-foreground dark:text-muted-foreground uppercase tracking-wider">Current Rank</p>
+                <p className="text-2xl font-bold text-foreground dark:text-foreground">{stats.rank}</p>
               </div>
             </div>
           </Card>
-          <Card className="p-4 bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm border-gray-100 dark:border-slate-700/50">
+          <Card className="p-4 bg-card/80 dark:bg-card/50 backdrop-blur-sm border-border dark:border-border/50">
             <div className="flex items-center space-x-4">
               <Target className="w-8 h-8 text-green-500" />
               <div>
-                <p className="text-xs font-semibold text-gray-400 dark:text-slate-500 uppercase tracking-wider">Achievements</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                <p className="text-xs font-semibold text-muted-foreground dark:text-muted-foreground uppercase tracking-wider">Achievements</p>
+                <p className="text-2xl font-bold text-foreground dark:text-foreground">
                     {stats.totalEarned}/{stats.totalPossible}
                 </p>
               </div>
             </div>
           </Card>
-          <Card className="p-4 bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm border-gray-100 dark:border-slate-700/50">
+          <Card className="p-4 bg-card/80 dark:bg-card/50 backdrop-blur-sm border-border dark:border-border/50">
             <div className="flex items-center space-x-4">
               <Clock className="w-8 h-8 text-purple-500" />
               <div>
-                <p className="text-xs font-semibold text-gray-400 dark:text-slate-500 uppercase tracking-wider">Next Rank</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                <p className="text-xs font-semibold text-muted-foreground dark:text-muted-foreground uppercase tracking-wider">Next Rank</p>
+                <p className="text-2xl font-bold text-foreground dark:text-foreground">
                   {Math.round(stats.nextRankProgress)}%
                 </p>
-                <p className="text-xs text-gray-500 dark:text-slate-500">progress to next rank</p>
+                <p className="text-xs text-muted-foreground dark:text-muted-foreground">progress to next rank</p>
               </div>
             </div>
           </Card>
@@ -116,21 +116,21 @@ export default function AchievementsPage() {
           {achievements.map(achievement => (
             <Card
               key={achievement.id}
-              className={`p-6 transition-all bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm border-gray-100 dark:border-slate-700/50 hover:border-slate-300 dark:hover:border-slate-600 ${achievement.isUnlocked ? 'ring-1 ring-green-500/20 shadow-[0_0_15px_-3px_rgba(34,197,94,0.1)]' : ''}`}
+              className={`p-6 transition-all bg-card/80 dark:bg-card/50 backdrop-blur-sm border-border dark:border-border/50 hover:border-border dark:hover:border-border ${achievement.isUnlocked ? 'ring-1 ring-green-500/20 shadow-[0_0_15px_-3px_rgba(34,197,94,0.1)]' : ''}`}
             >
               <div className="flex items-start space-x-4">
                 <div className="shrink-0">
                   <Trophy className="w-8 h-8 text-yellow-500" aria-hidden="true" />
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{achievement.title}</h3>
-                  <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">{achievement.description}</p>
+                  <h3 className="text-lg font-semibold text-foreground dark:text-foreground">{achievement.title}</h3>
+                  <p className="text-sm text-muted-foreground dark:text-muted-foreground mt-1">{achievement.description}</p>
                   <div className="mt-4">
-                    <div className="flex justify-between text-xs font-medium text-gray-400 dark:text-slate-500 mb-2">
+                    <div className="flex justify-between text-xs font-medium text-muted-foreground dark:text-muted-foreground mb-2">
                       <span>Progress</span>
                       <span>{achievement.progress}%</span>
                     </div>
-                    <div className="w-full bg-gray-100 dark:bg-slate-700/50 rounded-full h-2">
+                    <div className="w-full bg-muted dark:bg-secondary/50 rounded-full h-2">
                       <div
                         className="bg-blue-500 h-2 rounded-full"
                         style={{ width: `${achievement.progress}%` }}
@@ -142,7 +142,7 @@ export default function AchievementsPage() {
                       <Trophy className="w-4 h-4 mr-1.5" />
                       Unlocked
                       {achievement.unlockedAt && (
-                        <span className="ml-2 font-normal text-gray-400 dark:text-slate-500">
+                        <span className="ml-2 font-normal text-muted-foreground dark:text-muted-foreground">
                           on {new Date(achievement.unlockedAt).toLocaleDateString()}
                         </span>
                       )}
@@ -155,10 +155,10 @@ export default function AchievementsPage() {
         </div>
 
         {achievements.length === 0 && (
-          <Card className="p-8 text-center bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm border-gray-100 dark:border-slate-700/50">
-            <Trophy className="w-12 h-12 mx-auto mb-4 text-gray-300 dark:text-slate-600" />
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No Achievements Yet</h3>
-            <p className="text-gray-500 dark:text-slate-400 mb-6">
+          <Card className="p-8 text-center bg-card/80 dark:bg-card/50 backdrop-blur-sm border-border dark:border-border/50">
+            <Trophy className="w-12 h-12 mx-auto mb-4 text-gray-300 dark:text-muted-foreground" />
+            <h3 className="text-lg font-medium text-foreground dark:text-foreground mb-2">No Achievements Yet</h3>
+            <p className="text-muted-foreground dark:text-muted-foreground mb-6">
               Start your learning journey to unlock badges and milestones!
             </p>
             <Button onClick={() => router.push('/courses')}>

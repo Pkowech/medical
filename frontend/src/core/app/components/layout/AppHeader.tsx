@@ -96,7 +96,7 @@ export const AppHeader: React.FC<HeaderProps> = ({
   }, [headerUserMenuOpen, setHeaderUserMenuOpen]);
 
   return (
-    <header className="sticky top-0 z-50 bg-white/80 pt-[env(safe-area-inset-top)] shadow-sm backdrop-blur-md dark:bg-slate-900/80 border-b border-gray-200 dark:border-slate-800">
+    <header className="sticky top-0 z-50 bg-card/80 pt-[env(safe-area-inset-top)] shadow-sm backdrop-blur-md dark:bg-card/80 border-b border-border dark:border-border">
       {' '}
       {/* Header z-50 */}
       <div className="px-3 sm:px-4 md:px-6 lg:px-8 py-3 sm:py-4 transition-all duration-300">
@@ -109,7 +109,7 @@ export const AppHeader: React.FC<HeaderProps> = ({
             <button
               type="button"
               onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="lg:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors mr-1 text-gray-500 dark:text-slate-400"
+              className="lg:hidden p-2 rounded-lg hover:bg-muted dark:hover:bg-card transition-colors mr-1 text-muted-foreground dark:text-muted-foreground"
               aria-label="Toggle sidebar"
               aria-expanded={sidebarOpen}
               aria-controls="app-sidebar"
@@ -119,7 +119,7 @@ export const AppHeader: React.FC<HeaderProps> = ({
             <button
               type="button"
               onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              className="hidden lg:inline-flex rounded-lg p-2 text-slate-500 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-slate-400 dark:hover:bg-slate-800"
+              className="hidden lg:inline-flex rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-muted-foreground dark:hover:bg-card"
               aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
               title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
               aria-expanded={!sidebarCollapsed}
@@ -136,11 +136,11 @@ export const AppHeader: React.FC<HeaderProps> = ({
               <div className="flex min-w-0 items-center gap-2 sm:gap-3">
                 {header.icon && <div className="text-xl sm:text-2xl shrink-0">{header.icon}</div>}
                 <div className="min-w-0">
-                  <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white truncate">
+                  <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-foreground dark:text-foreground truncate">
                     {header.title}
                   </h1>
                   {header.description && (
-                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate hidden md:block max-w-50 lg:max-w-md">
+                    <p className="text-xs sm:text-sm text-muted-foreground dark:text-muted-foreground truncate hidden md:block max-w-50 lg:max-w-md">
                       {header.description}
                     </p>
                   )}
@@ -148,10 +148,10 @@ export const AppHeader: React.FC<HeaderProps> = ({
               </div>
             ) : (
               <div className="hidden sm:block">
-                <h1 className="text-lg font-bold text-gray-900 dark:text-white truncate">
+                <h1 className="text-lg font-bold text-foreground dark:text-foreground truncate">
                   Welcome back, {user?.firstName}! 👋
                 </h1>
-                <p className="text-xs text-gray-600 dark:text-gray-400">Track your progress</p>
+                <p className="text-xs text-muted-foreground dark:text-muted-foreground">Track your progress</p>
               </div>
             )}
 
@@ -161,7 +161,7 @@ export const AppHeader: React.FC<HeaderProps> = ({
                 - shows a small dash when no streak */}
             <div className="hidden lg:flex items-center shrink-0">
               {isStreakLoading ? (
-                <div className="animate-pulse bg-gray-200 dark:bg-gray-700 w-16 h-6 rounded-full" />
+                <div className="animate-pulse bg-secondary dark:bg-secondary w-16 h-6 rounded-full" />
               ) : (
                 <div
                   className="items-center gap-1.5 px-3 py-1 bg-orange-50/50 dark:bg-orange-500/10 rounded-full border border-orange-100 dark:border-orange-500/20 flex shadow-sm"
@@ -194,14 +194,14 @@ export const AppHeader: React.FC<HeaderProps> = ({
                     setNotificationsOpen(false);
                   }
                 }}
-                className="notifications-button relative p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                className="notifications-button relative p-2 rounded-md hover:bg-muted dark:hover:bg-secondary transition-colors"
                 title="Toggle notifications"
                 aria-label="Toggle notifications"
                 {...{ 'aria-expanded': notificationsOpen ? 'true' : 'false' }}
                 aria-haspopup="menu"
                 aria-controls="notifications-menu"
               >
-                <Bell className="h-5 w-5 text-gray-600 dark:text-gray-300" />
+                <Bell className="h-5 w-5 text-muted-foreground dark:text-muted-foreground" />
                 {unreadCount > 0 && (
                   <span
                     className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center"
@@ -217,11 +217,11 @@ export const AppHeader: React.FC<HeaderProps> = ({
                 <div
                   ref={notificationsMenuRef}
                   id="notifications-menu"
-                  className="notifications-menu absolute right-0 top-full mt-2 w-[min(20rem,calc(100vw-1rem))] rounded-md border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-800 z-[60]"
+                  className="notifications-menu absolute right-0 top-full mt-2 w-[min(20rem,calc(100vw-1rem))] rounded-md border border-border bg-card shadow-xl dark:border-border dark:bg-card z-[60]"
                   role="region"
                   aria-label="Notifications list"
                 >
-                  <div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-750 sticky top-0">
+                  <div className="p-4 border-b border-border dark:border-border bg-background dark:bg-secondary sticky top-0">
                     <div className="flex items-center justify-between">
                       <button
                         type="button"
@@ -229,7 +229,7 @@ export const AppHeader: React.FC<HeaderProps> = ({
                           router.push('/notifications');
                           setNotificationsOpen(false);
                         }}
-                        className="font-semibold text-gray-900 dark:text-white text-left"
+                        className="font-semibold text-foreground dark:text-foreground text-left"
                         title="View all notifications"
                       >
                         Notifications
@@ -237,7 +237,7 @@ export const AppHeader: React.FC<HeaderProps> = ({
                       <button
                         type="button"
                         onClick={() => setNotificationsOpen(false)}
-                        className="sm:hidden p-1 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+                        className="sm:hidden p-1 text-muted-foreground dark:text-muted-foreground hover:text-foreground dark:hover:text-foreground"
                         aria-label="Close notifications"
                       >
                         ✕
@@ -252,7 +252,7 @@ export const AppHeader: React.FC<HeaderProps> = ({
                           router.push('/notifications');
                           setNotificationsOpen(false);
                         }}
-                        className="w-full text-left p-6 text-sm text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full text-left p-6 text-sm text-muted-foreground dark:text-muted-foreground hover:bg-background dark:hover:bg-secondary transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
                         title="View all notifications"
                       >
                         No unread notifications
@@ -270,18 +270,18 @@ export const AppHeader: React.FC<HeaderProps> = ({
                               router.push(`/notifications`);
                               setNotificationsOpen(false);
                             }}
-                            className="w-full text-left p-4 border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-blue-100 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 bg-blue-50 dark:bg-blue-900/20"
+                            className="w-full text-left p-4 border-b border-border dark:border-border hover:bg-background dark:hover:bg-blue-100 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 bg-blue-50 dark:bg-blue-900/20"
                           >
                             <div className="flex items-start space-x-3">
                               <div className="shrink-0 w-2 h-2 rounded-full mt-2 bg-blue-500"></div>
                               <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                                <p className="text-sm font-medium text-foreground dark:text-foreground truncate">
                                   {notification.title}
                                 </p>
-                                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">
+                                <p className="text-sm text-muted-foreground dark:text-muted-foreground mt-1 line-clamp-2">
                                   {notification.message}
                                 </p>
-                                <p className="text-xs text-gray-500 dark:text-gray-500 mt-2">
+                                <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-2">
                                   {notification.createdAt
                                     ? new Date(notification.createdAt).toLocaleDateString()
                                     : ''}
@@ -307,7 +307,7 @@ export const AppHeader: React.FC<HeaderProps> = ({
                       setHeaderUserMenuOpen(false);
                     }
                   }}
-                  className="user-menu-button flex items-center space-x-2 p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  className="user-menu-button flex items-center space-x-2 p-2 rounded-md hover:bg-muted dark:hover:bg-secondary transition-colors"
                   aria-label="User menu"
                   {...{ 'aria-expanded': headerUserMenuOpen ? 'true' : 'false' }}
                   aria-haspopup="menu"
@@ -318,7 +318,7 @@ export const AppHeader: React.FC<HeaderProps> = ({
                   <span className="hidden lg:inline text-sm font-medium truncate">
                     {user?.firstName}
                   </span>
-                  <ChevronDown className="h-4 w-4 text-gray-500" />
+                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
                 </button>
 
                 {/* User Menu Dropdown */}
@@ -335,14 +335,14 @@ export const AppHeader: React.FC<HeaderProps> = ({
             <button
               type="button"
               onClick={toggleTheme}
-              className="inline-flex p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              className="inline-flex p-2 rounded-md hover:bg-muted dark:hover:bg-secondary transition-colors"
               aria-label="Toggle theme"
               title="Toggle theme"
             >
               {theme === 'dark' ? (
                 <Sun className="h-5 w-5 text-yellow-500" />
               ) : (
-                <Moon className="h-5 w-5 text-gray-600" />
+                <Moon className="h-5 w-5 text-muted-foreground" />
               )}
             </button>
           </div>

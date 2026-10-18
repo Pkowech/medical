@@ -603,7 +603,7 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
           <div className="flex items-center justify-center min-h-screen">
             <div className="text-center space-y-4">
               <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mx-auto" />
-              <p className="text-slate-600 dark:text-slate-400 font-medium">Loading topic...</p>
+              <p className="text-muted-foreground dark:text-muted-foreground font-medium">Loading topic...</p>
             </div>
           </div>
         </div>
@@ -617,10 +617,10 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
         <div className="max-w-5xl mx-auto">
           <div className="flex flex-col items-center justify-center min-h-screen space-y-4">
             <AlertCircle className="w-12 h-12 text-red-500" />
-            <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
+            <h2 className="text-2xl font-bold text-foreground dark:text-foreground">
               {loadError || 'Topic not found'}
             </h2>
-            <p className="text-slate-600 dark:text-slate-400">
+            <p className="text-muted-foreground dark:text-muted-foreground">
               {loadError ? 'Complete the preceding topic quiz before opening this topic.' : "The topic you're looking for doesn't exist."}
             </p>
             <Button onClick={handleGoBack} variant="outline">
@@ -635,7 +635,7 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
       {/* Header with Navigation */}
-      <div className="sticky top-0 z-40 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 shadow-sm">
+      <div className="sticky top-0 z-40 bg-card dark:bg-card border-b border-border dark:border-border shadow-sm">
         <div className="max-w-5xl mx-auto px-4 md:px-8 py-4">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-4 min-w-0">
@@ -648,7 +648,7 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
                 <ChevronLeft className="w-5 h-5" />
               </Button>
               <div className="min-w-0">
-                <h1 className="text-xl font-bold text-slate-900 dark:text-white truncate">
+                <h1 className="text-xl font-bold text-foreground dark:text-foreground truncate">
                   {topic.title}
                 </h1>
                 {topic.isMandatory && (
@@ -737,11 +737,11 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
 
         {/* Topic Description */}
         {topic.description && (
-          <div className="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border border-slate-200 dark:border-slate-700">
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">
+          <div className="bg-card dark:bg-card rounded-xl p-6 shadow-sm border border-border dark:border-border">
+            <h2 className="text-lg font-semibold text-foreground dark:text-foreground mb-3">
               Overview
             </h2>
-            <p className="text-slate-700 dark:text-slate-300 leading-relaxed">
+            <p className="text-muted-foreground dark:text-muted-foreground leading-relaxed">
               {topic.description}
             </p>
           </div>
@@ -752,7 +752,7 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
           <div className="space-y-4">
             <div className="flex items-center gap-2">
               <BookOpen className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-              <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+              <h2 className="text-xl font-bold text-foreground dark:text-foreground">
                 Study Materials
               </h2>
               <Badge variant="outline">{materials.length}</Badge>
@@ -762,7 +762,7 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
               {materials.map((material) => (
                 <div
                   key={material.id}
-                  className="bg-white dark:bg-slate-800 rounded-xl p-5 shadow-sm border border-slate-200 dark:border-slate-700 hover:shadow-md transition-shadow group cursor-pointer"
+                  className="bg-card dark:bg-card rounded-xl p-5 shadow-sm border border-border dark:border-border hover:shadow-md transition-shadow group cursor-pointer"
                   onClick={() => handleOpenMaterial(material.id)}
                 >
                   {/* Material Header */}
@@ -776,19 +776,19 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
                   </div>
 
                   {/* Material Info */}
-                  <h3 className="font-semibold text-slate-900 dark:text-white mb-2 line-clamp-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                  <h3 className="font-semibold text-foreground dark:text-foreground mb-2 line-clamp-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                     {material.title}
                   </h3>
 
                   {material.description && (
-                    <p className="text-sm text-slate-600 dark:text-slate-400 line-clamp-2 mb-3">
+                    <p className="text-sm text-muted-foreground dark:text-muted-foreground line-clamp-2 mb-3">
                       {material.description}
                     </p>
                   )}
 
                   {/* Material Footer */}
-                  <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-700">
-                    <div className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
+                  <div className="flex items-center justify-between pt-3 border-t border-border dark:border-border">
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground dark:text-muted-foreground">
                       {material.duration && (
                         <>
                           <Clock className="w-3.5 h-3.5" />
@@ -813,9 +813,9 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
             </div>
           </div>
         ) : (
-          <div className="bg-white dark:bg-slate-800 rounded-xl p-8 shadow-sm border border-slate-200 dark:border-slate-700 text-center">
-            <BookOpen className="w-12 h-12 text-slate-400 mx-auto mb-3" />
-            <p className="text-slate-600 dark:text-slate-400 font-medium">
+          <div className="bg-card dark:bg-card rounded-xl p-8 shadow-sm border border-border dark:border-border text-center">
+            <BookOpen className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+            <p className="text-muted-foreground dark:text-muted-foreground font-medium">
               No materials available for this topic yet
             </p>
           </div>

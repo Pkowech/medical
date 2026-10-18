@@ -379,7 +379,7 @@ export default function MaterialsDashboard() {
   };
 
   const renderMaterialItems = (materials: Material[]) => viewMode === 'list' ? (
-    <div className="divide-y divide-slate-100 dark:divide-slate-800">
+    <div className="divide-y divide-border dark:divide-border">
       {materials.map((material) => (
         <MaterialListItem
           key={material.id}
@@ -446,10 +446,10 @@ export default function MaterialsDashboard() {
           <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
             <div>
               <p className="text-sm font-medium text-blue-700 dark:text-blue-300">Study library</p>
-              <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">
+              <h1 className="mt-1 text-2xl font-semibold tracking-tight text-foreground dark:text-foreground">
                 {contextTitle}
               </h1>
-              <p className="mt-1 max-w-2xl text-sm text-slate-600 dark:text-slate-400">
+              <p className="mt-1 max-w-2xl text-sm text-muted-foreground dark:text-muted-foreground">
                 {contextDescription}
               </p>
             </div>
@@ -464,9 +464,9 @@ export default function MaterialsDashboard() {
             )}
           </div>
 
-          <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-4">
+          <div className="rounded-xl border border-border bg-card p-3 shadow-sm dark:border-border dark:bg-card sm:p-4">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-              <div className="flex w-full flex-wrap gap-1 rounded-lg bg-slate-100 p-1 dark:bg-slate-800 lg:w-auto">
+              <div className="flex w-full flex-wrap gap-1 rounded-lg bg-muted p-1 dark:bg-card lg:w-auto">
                 {[
                   { id: 'owned', label: 'My Drive', icon: Database },
                   { id: 'shared', label: 'Shared with me', icon: BookOpen },
@@ -489,8 +489,8 @@ export default function MaterialsDashboard() {
                       }}
                       className={`inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 lg:flex-none ${
                         isActive
-                          ? 'bg-white text-blue-700 shadow-sm dark:bg-slate-700 dark:text-blue-300'
-                          : 'text-slate-600 hover:bg-white/70 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-700/70 dark:hover:text-white'
+                          ? 'bg-card text-blue-700 shadow-sm dark:bg-secondary dark:text-blue-300'
+                          : 'text-muted-foreground hover:bg-card/70 hover:text-foreground dark:text-muted-foreground dark:hover:bg-secondary/70 dark:hover:text-foreground'
                       }`}
                     >
                       <Icon className="h-4 w-4" />
@@ -503,14 +503,14 @@ export default function MaterialsDashboard() {
               <div className="flex min-w-0 flex-col gap-2 sm:flex-row lg:flex-1 lg:justify-end">
                 {filterContext !== 'for_you' && (
                   <div className="group relative min-w-0 flex-1 sm:max-w-sm">
-                    <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 transition-colors group-focus-within:text-blue-600" />
+                    <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-blue-600" />
                     <input
                       type="search"
                       aria-label="Search materials by title, content, course, unit, or topic"
                       placeholder="Search title, course, unit, topic…"
                       value={searchTerm}
                       onChange={(event) => setSearchTerm(event.target.value)}
-                      className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-10 pr-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:ring-blue-950"
+                      className="h-10 w-full rounded-lg border border-border bg-card pl-10 pr-3 text-sm text-foreground outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-border dark:bg-background dark:text-foreground dark:focus:ring-blue-950"
                     />
                   </div>
                 )}
@@ -526,20 +526,20 @@ export default function MaterialsDashboard() {
                         setSortBy(value === 'title' ? 'title' : 'createdAt');
                         setSortOrder(value === 'oldest' || value === 'title' ? 'asc' : 'desc');
                       }}
-                      className="h-10 min-w-28 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:focus:ring-blue-950"
+                      className="h-10 min-w-28 rounded-lg border border-border bg-card px-3 text-sm text-muted-foreground outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-border dark:bg-background dark:text-muted-foreground dark:focus:ring-blue-950"
                     >
                       <option value="newest">Newest</option>
                       <option value="oldest">Oldest</option>
                       <option value="title">A–Z</option>
                     </select>
-                    <div className="flex h-10 items-center rounded-lg border border-slate-200 bg-white p-1 dark:border-slate-700 dark:bg-slate-950">
+                    <div className="flex h-10 items-center rounded-lg border border-border bg-card p-1 dark:border-border dark:bg-background">
                       <button
                         type="button"
                         onClick={() => setViewMode('list')}
                         aria-label="Switch to list view"
                         aria-pressed={viewMode === 'list'}
                         className={`inline-flex h-8 w-8 items-center justify-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
-                          viewMode === 'list' ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
+                          viewMode === 'list' ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-muted-foreground hover:bg-muted dark:text-muted-foreground dark:hover:bg-card'
                         }`}
                       >
                         <LayoutList className="h-4 w-4" />
@@ -550,7 +550,7 @@ export default function MaterialsDashboard() {
                         aria-label="Switch to grid view"
                         aria-pressed={viewMode === 'grid'}
                         className={`inline-flex h-8 w-8 items-center justify-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
-                          viewMode === 'grid' ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
+                          viewMode === 'grid' ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-muted-foreground hover:bg-muted dark:text-muted-foreground dark:hover:bg-card'
                         }`}
                       >
                         <LayoutGrid className="h-4 w-4" />
@@ -573,15 +573,15 @@ export default function MaterialsDashboard() {
               setFilterContext('shared');
               router.replace('/study-planner/materials');
             }}
-            className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 transition-colors hover:text-blue-700 dark:text-slate-300 dark:hover:text-blue-300"
+            className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-blue-700 dark:text-muted-foreground dark:hover:text-blue-300"
           >
             <ArrowLeft className="h-4 w-4" />
             All materials
           </button>
 
-          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm dark:border-border dark:bg-card">
             {isCourseLoading ? (
-              <div className="h-44 animate-pulse bg-slate-200 dark:bg-slate-800" />
+              <div className="h-44 animate-pulse bg-secondary dark:bg-card" />
             ) : isCourseError ? (
               <div role="alert" className="p-6 text-sm text-rose-700 dark:text-rose-300">
                 Could not load course details: {courseError instanceof Error ? courseError.message : 'Please try again later.'}
@@ -604,10 +604,10 @@ export default function MaterialsDashboard() {
                     )}
                   </div>
                 </div>
-                <div className="border-t border-slate-100 bg-slate-100 px-6 py-3 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-200 sm:px-8">
+                <div className="border-t border-border bg-muted px-6 py-3 text-sm text-muted-foreground dark:border-border dark:bg-card dark:text-muted-foreground sm:px-8">
                   {selectedCourse?.category?.name || selectedCourse?.description || 'Course learning materials'}
                 </div>
-                <nav aria-label="Course sections" className="flex items-center gap-7 border-t border-slate-200 px-5 dark:border-slate-800 sm:px-8">
+                <nav aria-label="Course sections" className="flex items-center gap-7 border-t border-border px-5 dark:border-border sm:px-8">
                   <a
                     href="#course-stream"
                     aria-current="page"
@@ -618,13 +618,13 @@ export default function MaterialsDashboard() {
                   <button
                     type="button"
                     onClick={() => router.push(`/courses/${selectedCourseId}`)}
-                    className="border-b-2 border-transparent py-3 text-sm font-medium text-slate-600 transition-colors hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+                    className="border-b-2 border-transparent py-3 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground dark:text-muted-foreground dark:hover:text-foreground"
                   >
                     Classwork
                   </button>
                   <a
                     href="#course-people"
-                    className="border-b-2 border-transparent py-3 text-sm font-medium text-slate-600 transition-colors hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+                    className="border-b-2 border-transparent py-3 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground dark:text-muted-foreground dark:hover:text-foreground"
                   >
                     People
                   </a>
@@ -636,22 +636,22 @@ export default function MaterialsDashboard() {
           {isCourseError ? null : (
             <div id="course-stream" className="grid grid-cols-1 items-start gap-5 md:grid-cols-[minmax(170px,0.75fr)_minmax(0,2.5fr)]">
               <aside className="space-y-4">
-                <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                  <div className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-100">
-                    <CalendarDays className="h-4 w-4 text-slate-500" />
+                <section className="rounded-xl border border-border bg-card p-4 shadow-sm dark:border-border dark:bg-card">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground dark:text-muted-foreground">
+                    <CalendarDays className="h-4 w-4 text-muted-foreground" />
                     Upcoming
                   </div>
-                  <p className="mt-3 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
+                  <p className="mt-3 text-sm leading-relaxed text-muted-foreground dark:text-muted-foreground">
                     No upcoming work has been added.
                   </p>
                 </section>
-                <section id="course-people" className="scroll-mt-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                  <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Instructor</h2>
+                <section id="course-people" className="scroll-mt-6 rounded-xl border border-border bg-card p-4 shadow-sm dark:border-border dark:bg-card">
+                  <h2 className="text-sm font-semibold text-muted-foreground dark:text-muted-foreground">Instructor</h2>
                   <div className="mt-3 flex items-center gap-3">
                     <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
                       <UserRound className="h-4 w-4" />
                     </span>
-                    <p className="min-w-0 truncate text-sm text-slate-700 dark:text-slate-300">
+                    <p className="min-w-0 truncate text-sm text-muted-foreground dark:text-muted-foreground">
                       {courseInstructor || 'Instructor information unavailable'}
                     </p>
                   </div>
@@ -660,7 +660,7 @@ export default function MaterialsDashboard() {
 
               <div className="min-w-0 space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-3 px-1">
-                  <h2 className="text-base font-semibold text-slate-800 dark:text-slate-100">Class stream</h2>
+                  <h2 className="text-base font-semibold text-muted-foreground dark:text-muted-foreground">Class stream</h2>
                   <div className="flex min-w-0 flex-wrap items-center gap-2">
                     <label htmlFor="course-material-search" className="sr-only">
                       Search course materials by title, content, unit, or topic
@@ -671,7 +671,7 @@ export default function MaterialsDashboard() {
                       placeholder="Search this course…"
                       value={searchTerm}
                       onChange={event => setSearchTerm(event.target.value)}
-                      className="h-9 w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:ring-blue-950 sm:w-52"
+                      className="h-9 w-full min-w-0 rounded-lg border border-border bg-card px-3 text-sm text-foreground outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-border dark:bg-background dark:text-foreground dark:focus:ring-blue-950 sm:w-52"
                     />
                     <label htmlFor="course-material-type" className="sr-only">
                       Filter course materials by resource type
@@ -680,7 +680,7 @@ export default function MaterialsDashboard() {
                       id="course-material-type"
                       value={materialTypeFilter}
                       onChange={event => setMaterialTypeFilter(event.target.value)}
-                      className="h-9 min-w-28 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:focus:ring-blue-950"
+                      className="h-9 min-w-28 rounded-lg border border-border bg-card px-2 text-sm text-muted-foreground outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-border dark:bg-background dark:text-muted-foreground dark:focus:ring-blue-950"
                     >
                       {MATERIAL_TYPE_FILTERS.map(filter => (
                         <option key={filter.id} value={filter.id}>
@@ -688,7 +688,7 @@ export default function MaterialsDashboard() {
                         </option>
                       ))}
                     </select>
-                    <span className="shrink-0 text-sm text-slate-500 dark:text-slate-400">
+                    <span className="shrink-0 text-sm text-muted-foreground dark:text-muted-foreground">
                       {totalCount} {totalCount === 1 ? 'item' : 'items'}
                     </span>
                   </div>
@@ -697,7 +697,7 @@ export default function MaterialsDashboard() {
                 {(!courseFilterInitialized || isLoading) && !allMaterials.length ? (
                   <div className="space-y-3" aria-label="Loading course materials">
                     {[0, 1, 2].map((item) => (
-                      <div key={item} className="h-20 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800" />
+                      <div key={item} className="h-20 animate-pulse rounded-xl bg-muted dark:bg-card" />
                     ))}
                   </div>
                 ) : isMaterialsError ? (
@@ -705,14 +705,14 @@ export default function MaterialsDashboard() {
                     Could not load course materials: {materialsError instanceof Error ? materialsError.message : 'Please try again later.'}
                   </div>
                 ) : allMaterials.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-slate-300 bg-white px-5 py-10 text-center dark:border-slate-700 dark:bg-slate-900">
-                    <FolderOpen className="mx-auto h-8 w-8 text-slate-400" />
-                    <h3 className="mt-3 font-semibold text-slate-800 dark:text-slate-100">
+                  <div className="rounded-xl border border-dashed border-border bg-card px-5 py-10 text-center dark:border-border dark:bg-card">
+                    <FolderOpen className="mx-auto h-8 w-8 text-muted-foreground" />
+                    <h3 className="mt-3 font-semibold text-muted-foreground dark:text-muted-foreground">
                       {debouncedSearch || materialTypeFilter !== 'all'
                         ? 'No matching materials'
                         : 'No materials in this stream yet'}
                     </h3>
-                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                    <p className="mt-1 text-sm text-muted-foreground dark:text-muted-foreground">
                       {debouncedSearch || materialTypeFilter !== 'all'
                         ? 'Try another search or resource type.'
                         : 'Materials shared with this class will appear here.'}
@@ -742,7 +742,7 @@ export default function MaterialsDashboard() {
                     return (
                       <article
                         key={material.id}
-                        className="flex min-h-20 items-center gap-3 rounded-xl border border-slate-100 bg-slate-100 px-3 py-3 transition-colors hover:bg-slate-200/70 dark:border-slate-800 dark:bg-slate-800/80 dark:hover:bg-slate-800 sm:gap-4 sm:px-4"
+                        className="flex min-h-20 items-center gap-3 rounded-xl border border-border bg-muted px-3 py-3 transition-colors hover:bg-secondary/70 dark:border-border dark:bg-card/80 dark:hover:bg-card sm:gap-4 sm:px-4"
                       >
                         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300">
                           <FileText className="h-5 w-5" />
@@ -752,12 +752,12 @@ export default function MaterialsDashboard() {
                           onClick={() => router.push(`/study-planner/materials/${material.id}`)}
                           className="min-w-0 flex-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                         >
-                          <p className="line-clamp-2 text-sm font-medium text-slate-800 dark:text-slate-100">
+                          <p className="line-clamp-2 text-sm font-medium text-muted-foreground dark:text-muted-foreground">
                             <span className="font-semibold">{ownerName}</span>
                             {' posted a new material: '}
                             <span>{material.title}</span>
                           </p>
-                          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                          <p className="mt-1 text-xs text-muted-foreground dark:text-muted-foreground">
                             {formatStreamDate(material.uploadDate || material.createdAt)}
                           </p>
                         </button>
@@ -766,7 +766,7 @@ export default function MaterialsDashboard() {
                             <button
                               type="button"
                               aria-label={`Options for ${material.title}`}
-                              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-slate-600 transition-colors hover:bg-white hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-white"
+                              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-card hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-muted-foreground dark:hover:bg-secondary dark:hover:text-foreground"
                             >
                               <MoreVertical className="h-5 w-5" />
                             </button>
@@ -809,7 +809,7 @@ export default function MaterialsDashboard() {
       {/* Material type filters (only show on library views) */}
       {!selectedCourseId && filterContext !== 'for_you' && (
         <section aria-label="Filter by resource type" className="space-y-2">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground dark:text-muted-foreground">
             Resource type
           </h2>
           <div className="flex min-w-0 flex-wrap gap-2">
@@ -822,7 +822,7 @@ export default function MaterialsDashboard() {
               className={`min-h-9 rounded-full border px-4 py-2 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
                 materialTypeFilter === filter.id
                   ? 'border-blue-600 bg-blue-600 text-white dark:border-blue-500 dark:bg-blue-500'
-                  : 'border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-blue-800 dark:hover:bg-slate-800'
+                  : 'border-border bg-card text-muted-foreground hover:border-blue-300 hover:bg-blue-50 dark:border-border dark:bg-card dark:text-muted-foreground dark:hover:border-blue-800 dark:hover:bg-card'
               }`}
             >
               {filter.label}
@@ -841,14 +841,14 @@ export default function MaterialsDashboard() {
               <BrainCircuit className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-slate-900 dark:text-white">Curated for your goals</h2>
-              <p className="text-sm text-slate-500">Matched to topics where your recorded quiz scores show room to improve</p>
+              <h2 className="text-xl font-bold text-foreground dark:text-foreground">Curated for your goals</h2>
+              <p className="text-sm text-muted-foreground">Matched to topics where your recorded quiz scores show room to improve</p>
             </div>
           </div>
           
           {isRecLoading && !recommendations ? (
              <div className="flex justify-center py-20">
-               <div className="animate-spin rounded-full h-12 w-12 border-4 border-slate-200 border-t-indigo-500" />
+               <div className="animate-spin rounded-full h-12 w-12 border-4 border-border border-t-indigo-500" />
              </div>
           ) : isRecError ? (
             <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-200">
@@ -861,9 +861,9 @@ export default function MaterialsDashboard() {
               ))}
             </div>
           ) : (
-            <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center dark:border-slate-700 dark:bg-slate-900">
-              <h3 className="font-semibold text-slate-900 dark:text-white">No targeted review suggestions yet</h3>
-              <p className="mx-auto mt-2 max-w-xl text-sm text-slate-500">
+            <div className="rounded-xl border border-dashed border-border bg-card p-8 text-center dark:border-border dark:bg-card">
+              <h3 className="font-semibold text-foreground dark:text-foreground">No targeted review suggestions yet</h3>
+              <p className="mx-auto mt-2 max-w-xl text-sm text-muted-foreground">
                 Recommendations appear when recorded quiz scores identify a topic below 70% and there is a matching course, unit, or topic resource that you own or can access through sharing.
               </p>
             </div>
@@ -874,7 +874,7 @@ export default function MaterialsDashboard() {
         <div className="min-w-0 space-y-5">
           {(!courseFilterInitialized || isLoading) && !allMaterials.length ? (
             <div className="flex justify-center py-20">
-              <div className="animate-spin rounded-full h-12 w-12 border-4 border-slate-200 border-t-indigo-500" />
+              <div className="animate-spin rounded-full h-12 w-12 border-4 border-border border-t-indigo-500" />
             </div>
           ) : isMaterialsError ? (
             <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-200">
@@ -882,16 +882,16 @@ export default function MaterialsDashboard() {
             </div>
           ) : allMaterials.length === 0 ? (
             // Strategic Empty State
-            <div className="rounded-xl border border-dashed border-slate-300 bg-white px-5 py-16 text-center dark:border-slate-700 dark:bg-slate-900">
+            <div className="rounded-xl border border-dashed border-border bg-card px-5 py-16 text-center dark:border-border dark:bg-card">
               <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
                 <Upload className="h-6 w-6" />
               </div>
-              <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
+              <h3 className="text-lg font-semibold text-foreground dark:text-foreground">
                 {debouncedSearch || materialTypeFilter !== 'all'
                   ? 'No matching materials'
                   : filterContext === 'shared' ? 'Nothing shared with you yet' : 'Your library is ready'}
               </h3>
-              <p className="mx-auto mt-2 mb-6 max-w-md text-sm leading-relaxed text-slate-600 dark:text-slate-400">
+              <p className="mx-auto mt-2 mb-6 max-w-md text-sm leading-relaxed text-muted-foreground dark:text-muted-foreground">
                 {debouncedSearch || materialTypeFilter !== 'all'
                   ? 'Try a different search or clear the resource type filter.'
                   : filterContext === 'shared'
@@ -918,13 +918,13 @@ export default function MaterialsDashboard() {
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3 dark:border-slate-800">
-                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3 dark:border-border">
+                <span className="text-sm font-medium text-muted-foreground dark:text-muted-foreground">
                   {totalCount} {totalCount === 1 ? 'resource' : 'resources'}
                 </span>
                 <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
                   {debouncedSearch && (
-                    <span className="max-w-full truncate text-xs text-slate-500 dark:text-slate-400">
+                    <span className="max-w-full truncate text-xs text-muted-foreground dark:text-muted-foreground">
                       Results for “{debouncedSearch}”
                     </span>
                   )}
@@ -947,23 +947,23 @@ export default function MaterialsDashboard() {
                     key={course.id}
                     open={isSectionOpen(`course:${course.id}`, false)}
                     onToggle={event => handleSectionToggle(`course:${course.id}`, event)}
-                    className="group/course overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900"
+                    className="group/course overflow-hidden rounded-xl border border-border bg-card shadow-sm dark:border-border dark:bg-card"
                   >
-                    <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-3.5 marker:hidden transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 dark:hover:bg-slate-800/60 sm:gap-4 sm:px-5">
+                    <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-3.5 marker:hidden transition-colors hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 dark:hover:bg-card/60 sm:gap-4 sm:px-5">
                       <div className="flex min-w-0 items-center gap-3">
                         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
                           <BookOpen className="h-5 w-5" />
                         </span>
                         <div className="min-w-0">
-                          <h3 className="truncate text-sm font-semibold text-slate-900 dark:text-white">{course.title}</h3>
-                          <p className="text-xs text-slate-500 dark:text-slate-400">
+                          <h3 className="truncate text-sm font-semibold text-foreground dark:text-foreground">{course.title}</h3>
+                          <p className="text-xs text-muted-foreground dark:text-muted-foreground">
                             {course.units.length} {course.units.length === 1 ? 'unit' : 'units'} · {course.resourceCount} {course.resourceCount === 1 ? 'resource' : 'resources'}
                           </p>
                         </div>
                       </div>
-                      <ChevronDown aria-hidden="true" className="h-4 w-4 shrink-0 text-slate-500 transition-transform group-open/course:rotate-180 dark:text-slate-400" />
+                      <ChevronDown aria-hidden="true" className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open/course:rotate-180 dark:text-muted-foreground" />
                     </summary>
-                    <div className="space-y-3 border-t border-slate-100 px-3 py-3 dark:border-slate-800 sm:px-5">
+                    <div className="space-y-3 border-t border-border px-3 py-3 dark:border-border sm:px-5">
                       {course.units.map((unit) => {
                         const unitResourceCount = unit.materials.length
                           + unit.topics.reduce((count, topic) => count + topic.materials.length, 0);
@@ -975,16 +975,16 @@ export default function MaterialsDashboard() {
                             onToggle={event =>
                               handleSectionToggle(`unit:${course.id}:${unit.id}`, event)
                             }
-                            className="group/unit overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700"
+                            className="group/unit overflow-hidden rounded-lg border border-border dark:border-border"
                           >
-                            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-3 marker:hidden transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 dark:hover:bg-slate-800/60">
-                              <h4 className="min-w-0 flex-1 break-words text-sm font-medium text-slate-800 dark:text-slate-100">{unit.title}</h4>
-                              <span className="shrink-0 text-xs text-slate-500 dark:text-slate-400">
+                            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-3 marker:hidden transition-colors hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 dark:hover:bg-card/60">
+                              <h4 className="min-w-0 flex-1 break-words text-sm font-medium text-muted-foreground dark:text-muted-foreground">{unit.title}</h4>
+                              <span className="shrink-0 text-xs text-muted-foreground dark:text-muted-foreground">
                                 {unitResourceCount} {unitResourceCount === 1 ? 'resource' : 'resources'}
                               </span>
-                              <ChevronDown aria-hidden="true" className="h-4 w-4 shrink-0 text-slate-500 transition-transform group-open/unit:rotate-180 dark:text-slate-400" />
+                              <ChevronDown aria-hidden="true" className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open/unit:rotate-180 dark:text-muted-foreground" />
                             </summary>
-                            <div className="space-y-3 border-t border-slate-100 p-3 dark:border-slate-700">
+                            <div className="space-y-3 border-t border-border p-3 dark:border-border">
                               {unit.materials.length > 0 && renderMaterialItems(unit.materials)}
                               {unit.topics.map((topic) => (
                                 <details
@@ -999,16 +999,16 @@ export default function MaterialsDashboard() {
                                       event,
                                     )
                                   }
-                                  className="group/topic overflow-hidden rounded-md border border-slate-200 dark:border-slate-700"
+                                  className="group/topic overflow-hidden rounded-md border border-border dark:border-border"
                                 >
-                                  <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 marker:hidden transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 dark:hover:bg-slate-800/60">
-                                    <h5 className="min-w-0 flex-1 break-words text-xs font-medium text-slate-700 dark:text-slate-200">{topic.title}</h5>
-                                    <span className="shrink-0 text-xs text-slate-500 dark:text-slate-400">
+                                  <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 marker:hidden transition-colors hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 dark:hover:bg-card/60">
+                                    <h5 className="min-w-0 flex-1 break-words text-xs font-medium text-muted-foreground dark:text-muted-foreground">{topic.title}</h5>
+                                    <span className="shrink-0 text-xs text-muted-foreground dark:text-muted-foreground">
                                       {topic.materials.length} {topic.materials.length === 1 ? 'resource' : 'resources'}
                                     </span>
-                                    <ChevronDown aria-hidden="true" className="h-4 w-4 shrink-0 text-slate-500 transition-transform group-open/topic:rotate-180 dark:text-slate-400" />
+                                    <ChevronDown aria-hidden="true" className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open/topic:rotate-180 dark:text-muted-foreground" />
                                   </summary>
-                                  <div className="border-t border-slate-100 dark:border-slate-700">
+                                  <div className="border-t border-border dark:border-border">
                                     {renderMaterialItems(topic.materials)}
                                   </div>
                                 </details>
@@ -1025,24 +1025,24 @@ export default function MaterialsDashboard() {
                   <details
                     open={isSectionOpen('personal-unassigned', false)}
                     onToggle={event => handleSectionToggle('personal-unassigned', event)}
-                    className="group overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900"
+                    className="group overflow-hidden rounded-xl border border-border bg-card shadow-sm dark:border-border dark:bg-card"
                   >
-                    <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-4 py-3.5 marker:hidden transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/60 sm:px-5">
+                    <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-4 py-3.5 marker:hidden transition-colors hover:bg-background dark:hover:bg-card/60 sm:px-5">
                       <div className="flex min-w-0 items-center gap-3">
-                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground dark:bg-card dark:text-muted-foreground">
                           <FolderOpen className="h-5 w-5" />
                         </span>
                         <div>
-                          <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Personal &amp; unassigned</h3>
-                          <p className="text-xs text-slate-500 dark:text-slate-400">
+                          <h3 className="text-sm font-semibold text-foreground dark:text-foreground">Personal &amp; unassigned</h3>
+                          <p className="text-xs text-muted-foreground dark:text-muted-foreground">
                             {organizedMaterials.unassigned.length} resources not linked to a course
                           </p>
                         </div>
                       </div>
-                      <ChevronDown aria-hidden="true" className="h-4 w-4 shrink-0 text-slate-500 transition-transform group-open:rotate-180 dark:text-slate-400" />
+                      <ChevronDown aria-hidden="true" className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180 dark:text-muted-foreground" />
                     </summary>
                     {viewMode === 'list' ? (
-                      <div className="divide-y divide-slate-100 border-t border-slate-100 dark:divide-slate-800 dark:border-slate-800">
+                      <div className="divide-y divide-border border-t border-border dark:divide-border dark:border-border">
                         {organizedMaterials.unassigned.map((material) => (
                           <MaterialListItem
                             key={material.id}
@@ -1054,7 +1054,7 @@ export default function MaterialsDashboard() {
                         ))}
                       </div>
                     ) : (
-                      <div className="grid grid-cols-1 gap-4 border-t border-slate-100 p-4 sm:grid-cols-2 xl:grid-cols-3 dark:border-slate-800">
+                      <div className="grid grid-cols-1 gap-4 border-t border-border p-4 sm:grid-cols-2 xl:grid-cols-3 dark:border-border">
                         {organizedMaterials.unassigned.map((material) => (
                           <MaterialCard
                             key={material.id}
@@ -1076,7 +1076,7 @@ export default function MaterialsDashboard() {
                     variant="outline"
                     onClick={() => fetchNextPage()}
                     disabled={isFetchingNextPage}
-                    className="w-full max-w-xs h-12 rounded-xl font-bold border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all"
+                    className="w-full max-w-xs h-12 rounded-xl font-bold border-border dark:border-border hover:bg-background dark:hover:bg-card transition-all"
                   >
                     {isFetchingNextPage ? 'Loading more...' : 'Load more resources'}
                   </Button>

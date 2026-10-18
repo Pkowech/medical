@@ -182,21 +182,21 @@ export default function FinishSetupPage() {
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-100 dark:bg-blue-900/30 mb-4">
             <UserIcon className="w-8 h-8 text-blue-600 dark:text-blue-400" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+          <h1 className="text-3xl font-bold text-foreground dark:text-foreground mb-2">
             Complete Your Profile
           </h1>
-          <p className="text-gray-600 dark:text-gray-400">
+          <p className="text-muted-foreground dark:text-muted-foreground">
             Add optional information to help personalize your experience
           </p>
         </div>
 
         {/* Main Card */}
-        <Card className="bg-white/95 dark:bg-slate-800/95 backdrop-blur-sm border-gray-100 dark:border-slate-700 shadow-lg">
-          <CardHeader className="border-b border-gray-100 dark:border-slate-700">
-            <CardTitle className="text-gray-900 dark:text-white">
+        <Card className="bg-card/95 dark:bg-card/95 backdrop-blur-sm border-border dark:border-border shadow-lg">
+          <CardHeader className="border-b border-border dark:border-border">
+            <CardTitle className="text-foreground dark:text-foreground">
               Profile Information
             </CardTitle>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+            <p className="text-sm text-muted-foreground dark:text-muted-foreground mt-1">
               Help others find and connect with you
             </p>
           </CardHeader>
@@ -206,7 +206,7 @@ export default function FinishSetupPage() {
             {isFetching && (
               <div className="flex flex-col items-center justify-center py-12">
                 <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-600 border-b-transparent mb-4" />
-                <p className="text-gray-600 dark:text-gray-400">Loading your profile...</p>
+                <p className="text-muted-foreground dark:text-muted-foreground">Loading your profile...</p>
               </div>
             )}
 
@@ -226,8 +226,8 @@ export default function FinishSetupPage() {
             {/* Form - visible even if fetch failed */}
             <form onSubmit={handleSubmit} className="space-y-5">
               {/* Personal Information Section */}
-              <div className="bg-gray-50/50 dark:bg-slate-700/20 rounded-lg p-4 mb-4">
-                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+              <div className="bg-background/50 dark:bg-secondary/20 rounded-lg p-4 mb-4">
+                <h3 className="text-sm font-semibold text-muted-foreground dark:text-muted-foreground mb-3">
                   Personal Information
                 </h3>
 
@@ -243,7 +243,7 @@ export default function FinishSetupPage() {
                 />
 
                 <div className="mt-4">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground mb-2">
                     Bio
                   </label>
                   <textarea
@@ -252,10 +252,10 @@ export default function FinishSetupPage() {
                     onChange={handleChange}
                     placeholder="Tell us about yourself..."
                     disabled={isLoading}
-                    className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full px-4 py-2 rounded-lg border border-border dark:border-border bg-card dark:bg-card text-foreground dark:text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                     rows={3}
                   />
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-1">
                     Optional • max 500 characters
                   </p>
                 </div>
@@ -275,8 +275,8 @@ export default function FinishSetupPage() {
               </div>
 
               {/* Professional Information Section */}
-              <div className="bg-gray-50/50 dark:bg-slate-700/20 rounded-lg p-4">
-                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+              <div className="bg-background/50 dark:bg-secondary/20 rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-muted-foreground dark:text-muted-foreground mb-3">
                   Professional Information
                 </h3>
 
@@ -308,7 +308,7 @@ export default function FinishSetupPage() {
               </div>
 
               {/* Action Buttons */}
-              <div className="flex gap-3 pt-4 mt-8 border-t border-gray-100 dark:border-slate-700">
+              <div className="flex gap-3 pt-4 mt-8 border-t border-border dark:border-border">
                 <Button
                   type="submit"
                   disabled={isLoading || isFetching}

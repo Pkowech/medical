@@ -22,10 +22,10 @@ export default function RequiredMfaSetupPage() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-xl items-center px-6 py-12">
-      <section className="w-full space-y-5 rounded-lg border bg-white p-6 shadow-sm">
+      <section className="w-full space-y-5 rounded-lg border bg-card p-6 shadow-sm">
         <div>
           <h1 className="text-2xl font-bold">Secure your account</h1>
-          <p className="mt-2 text-sm text-gray-600">
+          <p className="mt-2 text-sm text-muted-foreground">
             Your organization requires two-factor authentication. Set up an authenticator app to
             continue to the platform.
           </p>

@@ -369,10 +369,10 @@ export const StudySession: React.FC<StudySessionProps> = ({
     if (!studyCourseId || !sessionId) return null;
 
     return (
-      <section className={`space-y-3 rounded-xl border p-4 ${focusMode ? 'border-slate-700 bg-slate-900/70 text-white' : 'bg-muted/20'}`}>
+      <section className={`space-y-3 rounded-xl border p-4 ${focusMode ? 'border-border bg-slate-900/70 text-white' : 'bg-muted/20'}`}>
         <div>
           <h3 className={`font-semibold ${focusMode ? 'text-white' : ''}`}>Course materials</h3>
-          <p className={`mt-1 text-xs ${focusMode ? 'text-slate-400' : 'text-muted-foreground'}`}>
+          <p className={`mt-1 text-xs ${focusMode ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
             Open a resource here; reading time and material progress are tracked during the session.
           </p>
         </div>
@@ -402,11 +402,11 @@ export const StudySession: React.FC<StudySessionProps> = ({
               {courseMaterials.map(material => (
                 <div
                   key={material.id}
-                  className={`flex items-center justify-between gap-3 rounded-lg border p-3 ${focusMode ? 'border-slate-700 bg-slate-950/70' : 'bg-background'}`}
+                  className={`flex items-center justify-between gap-3 rounded-lg border p-3 ${focusMode ? 'border-border bg-slate-950/70' : 'bg-background'}`}
                 >
                   <div className="min-w-0">
                     <p className={`truncate text-sm font-medium ${focusMode ? 'text-white' : ''}`}>{material.title}</p>
-                    <p className={`mt-0.5 text-xs capitalize ${focusMode ? 'text-slate-400' : 'text-muted-foreground'}`}>
+                    <p className={`mt-0.5 text-xs capitalize ${focusMode ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
                       {material.type || material.contentType}
                     </p>
                   </div>
@@ -457,7 +457,7 @@ export const StudySession: React.FC<StudySessionProps> = ({
           ) : (
             <>
               <div className="absolute right-6 top-6">
-                <Button variant="outline" onClick={() => setIsFocusMode(false)} className="border-slate-700 bg-slate-900 text-white hover:bg-slate-800">
+                <Button variant="outline" onClick={() => setIsFocusMode(false)} className="border-border bg-slate-900 text-white hover:bg-slate-800">
                   <Minimize2 className="mr-2 h-4 w-4" />
                   Exit focus mode
                 </Button>
@@ -471,14 +471,14 @@ export const StudySession: React.FC<StudySessionProps> = ({
                 <p className="mt-12 font-mono text-7xl font-semibold tabular-nums sm:text-8xl" aria-live="off">
                   {formatTime(Math.max(0, focusGoalMinutes * 60 - elapsedTime))}
                 </p>
-                <p className="mt-3 text-slate-400">
+                <p className="mt-3 text-muted-foreground">
                   {elapsedTime >= focusGoalMinutes * 60
                     ? `${formatTime(elapsedTime)} focused · goal reached`
                     : `${formatTime(elapsedTime)} focused · ${focusGoalMinutes}-minute goal`}
                 </p>
                 <div className="mt-10 flex justify-center gap-3">
                   {isActive ? (
-                    <Button variant="outline" onClick={handlePause} className="border-slate-700 bg-slate-900 text-white hover:bg-slate-800">
+                    <Button variant="outline" onClick={handlePause} className="border-border bg-slate-900 text-white hover:bg-slate-800">
                       <Pause className="mr-2 h-4 w-4" />
                       Pause
                     </Button>
@@ -493,7 +493,7 @@ export const StudySession: React.FC<StudySessionProps> = ({
                     End session
                   </Button>
                 </div>
-                <p className="mt-8 text-sm text-slate-500">Press Escape to leave focus mode. Your session timer keeps its place.</p>
+                <p className="mt-8 text-sm text-muted-foreground">Press Escape to leave focus mode. Your session timer keeps its place.</p>
               </div>
               <div className="mt-8 w-full max-w-2xl text-left">
                 {renderCourseMaterials(true)}

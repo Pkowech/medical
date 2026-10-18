@@ -91,7 +91,7 @@ export default function SearchBar() {
       case 'quiz': return 'bg-purple-100 text-purple-700';
       case 'case': return 'bg-green-100 text-green-700';
       case 'material': return 'bg-orange-100 text-orange-700';
-      default: return 'bg-gray-100 text-gray-700';
+      default: return 'bg-muted text-muted-foreground';
     }
   };
 
@@ -105,39 +105,39 @@ export default function SearchBar() {
           onChange={handleInputChange}
           onFocus={() => setIsOpen(true)}
           placeholder="Search by course name, subject, or year... (Cmd+K)"
-          className="w-full px-4 py-3 pl-12 rounded-lg border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-colors bg-white shadow-sm"
+          className="w-full px-4 py-3 pl-12 rounded-lg border border-border focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-colors bg-card shadow-sm"
         />
         <div className="absolute left-4 top-1/2 transform -translate-y-1/2">
           {loading ? (
             <AiOutlineLoading3Quarters className="animate-spin text-blue-500 h-4 w-4" />
           ) : (
-            <FaSearch className="text-gray-400 h-4 w-4" />
+            <FaSearch className="text-muted-foreground h-4 w-4" />
           )}
         </div>
       </div>
 
       {isOpen && (
-        <div className="absolute mt-2 w-full bg-white rounded-xl shadow-2xl border border-gray-100 py-2 z-50 overflow-hidden max-h-100 overflow-y-auto">
+        <div className="absolute mt-2 w-full bg-card rounded-xl shadow-2xl border border-border py-2 z-50 overflow-hidden max-h-100 overflow-y-auto">
           {/* Search History Section */}
           {!query && searchHistoryService.getRecentSearches(5).length > 0 && (
             <>
-              <div className="px-4 py-2 bg-gray-50 border-b border-gray-100 sticky top-0 flex items-center gap-2">
-                <Clock className="h-3 w-3 text-gray-400" />
-                <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">Recent Searches</span>
+              <div className="px-4 py-2 bg-background border-b border-border sticky top-0 flex items-center gap-2">
+                <Clock className="h-3 w-3 text-muted-foreground" />
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Recent Searches</span>
               </div>
               {searchHistoryService.getRecentSearches(5).map((item) => (
                 <button
                   key={item.query}
                   onClick={() => handleSelectFromHistory(item.query)}
-                  className="w-full px-4 py-3 text-left hover:bg-blue-50 flex items-center justify-between group transition-colors border-b border-gray-50 last:border-0 text-sm text-gray-700"
+                  className="w-full px-4 py-3 text-left hover:bg-blue-50 flex items-center justify-between group transition-colors border-b border-border last:border-0 text-sm text-muted-foreground"
                 >
                   <span>{item.query}</span>
                   {item.resultCount !== undefined && (
-                    <span className="text-xs text-gray-400">{item.resultCount} results</span>
+                    <span className="text-xs text-muted-foreground">{item.resultCount} results</span>
                   )}
                 </button>
               ))}
-              <div className="h-1 bg-gray-100" />
+              <div className="h-1 bg-muted" />
             </>
           )}
 
@@ -169,14 +169,14 @@ export default function SearchBar() {
                   router.push(getHref(result));
                   setIsOpen(false);
                 }}
-                className="w-full px-4 py-3 text-left hover:bg-blue-50 flex items-center justify-between group transition-colors border-b border-gray-50 last:border-0"
+                className="w-full px-4 py-3 text-left hover:bg-blue-50 flex items-center justify-between group transition-colors border-b border-border last:border-0"
               >
                 <div className="flex-1 min-w-0 pr-4">
-                  <div className="font-semibold text-gray-900 truncate group-hover:text-blue-700 transition-colors">
+                  <div className="font-semibold text-foreground truncate group-hover:text-blue-700 transition-colors">
                     {result.title}
                   </div>
                   {result.description && (
-                    <div className="text-xs text-gray-500 truncate mt-0.5">
+                    <div className="text-xs text-muted-foreground truncate mt-0.5">
                       {result.description}
                     </div>
                   )}
@@ -188,8 +188,8 @@ export default function SearchBar() {
             ))
           ) : query.length >= 2 && !loading ? (
             <div className="px-4 py-8 text-center">
-              <div className="text-gray-400 mb-1">No results found for "{query}"</div>
-              <div className="text-xs text-gray-500 italic">Try different keywords or check spelling</div>
+              <div className="text-muted-foreground mb-1">No results found for "{query}"</div>
+              <div className="text-xs text-muted-foreground italic">Try different keywords or check spelling</div>
             </div>
           ) : null}
         </div>

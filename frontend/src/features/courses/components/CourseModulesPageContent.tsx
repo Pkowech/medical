@@ -16,11 +16,11 @@ export function CourseModulesPageContent() {
 
   if (error && modules.length === 0) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-lg shadow-lg">
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="max-w-md w-full space-y-8 p-8 bg-card rounded-lg shadow-lg">
           <div className="text-center">
-            <h2 className="mt-6 text-3xl font-extrabold text-gray-900">Error Loading Modules</h2>
-            <p className="mt-2 text-sm text-gray-600">{error}</p>
+            <h2 className="mt-6 text-3xl font-extrabold text-foreground">Error Loading Modules</h2>
+            <p className="mt-2 text-sm text-muted-foreground">{error}</p>
             <div className="mt-5">
               <button
                 onClick={() => window.location.reload()}
@@ -40,10 +40,10 @@ export function CourseModulesPageContent() {
       <SEO title={`${courseTitle} - Modules`} description={`Course modules for ${courseTitle}`} />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+          <h1 className="text-2xl font-bold text-foreground dark:text-foreground">
             {courseTitle} - Modules
           </h1>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          <p className="mt-1 text-sm text-muted-foreground dark:text-muted-foreground">
             Complete all modules to finish the course
           </p>
         </div>
@@ -52,7 +52,7 @@ export function CourseModulesPageContent() {
           {modules.map(module => (
             <div
               key={module.id}
-              className={`bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden`}
+              className={`bg-card dark:bg-card shadow rounded-lg overflow-hidden`}
             >
               <div className="p-6">
                 <div className="flex items-center justify-between">
@@ -62,17 +62,17 @@ export function CourseModulesPageContent() {
                     ) : (
                       <BookOpen className="h-6 w-6 text-indigo-500" />
                     )}
-                    <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                    <h3 className="text-lg font-medium text-foreground dark:text-foreground">
                       {module.title}
                     </h3>
                   </div>
-                  <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
+                  <div className="flex items-center text-sm text-muted-foreground dark:text-muted-foreground">
                     <Clock className="h-4 w-4 mr-1" />
                     {module.duration}
                   </div>
                 </div>
 
-                <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                <p className="mt-2 text-sm text-muted-foreground dark:text-muted-foreground">
                   {module.description}
                 </p>
 
@@ -156,11 +156,11 @@ export function CourseModulesPageContent() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-lg shadow-lg">
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="max-w-md w-full space-y-8 p-8 bg-card rounded-lg shadow-lg">
           <div className="text-center">
-            <h2 className="mt-6 text-3xl font-extrabold text-gray-900">Error Loading Modules</h2>
-            <p className="mt-2 text-sm text-gray-600">{error}</p>
+            <h2 className="mt-6 text-3xl font-extrabold text-foreground">Error Loading Modules</h2>
+            <p className="mt-2 text-sm text-muted-foreground">{error}</p>
             <div className="mt-5">
               <button
                 onClick={() => window.location.reload()}
@@ -180,10 +180,10 @@ export function CourseModulesPageContent() {
       <SEO title={`${courseTitle} - Modules`} description={`Course modules for ${courseTitle}`} />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+          <h1 className="text-2xl font-bold text-foreground dark:text-foreground">
             {courseTitle} - Modules
           </h1>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          <p className="mt-1 text-sm text-muted-foreground dark:text-muted-foreground">
             Complete all modules to finish the course
           </p>
         </div>
@@ -192,7 +192,7 @@ export function CourseModulesPageContent() {
           {modules.map(module => (
             <div
               key={module.id}
-              className={`bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden`}
+              className={`bg-card dark:bg-card shadow rounded-lg overflow-hidden`}
             >
               <div className="p-6">
                 <div className="flex items-center justify-between">
@@ -202,17 +202,17 @@ export function CourseModulesPageContent() {
                     ) : (
                       <BookOpen className="h-6 w-6 text-indigo-500" />
                     )}
-                    <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                    <h3 className="text-lg font-medium text-foreground dark:text-foreground">
                       {module.title}
                     </h3>
                   </div>
-                  <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
+                  <div className="flex items-center text-sm text-muted-foreground dark:text-muted-foreground">
                     <Clock className="h-4 w-4 mr-1" />
                     {module.duration}
                   </div>
                 </div>
 
-                <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                <p className="mt-2 text-sm text-muted-foreground dark:text-muted-foreground">
                   {module.description}
                 </p>
 

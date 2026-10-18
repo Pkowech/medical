@@ -78,7 +78,7 @@ export function InstallAppButton() {
       <button
         type="button"
         onClick={() => void handleInstall()}
-        className="inline-flex min-h-10 items-center gap-1.5 rounded-lg px-2 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-50 active:scale-95 dark:text-blue-300 dark:hover:bg-slate-800 motion-reduce:transition-none"
+        className="inline-flex min-h-10 items-center gap-1.5 rounded-lg px-2 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-50 active:scale-95 dark:text-blue-300 dark:hover:bg-card motion-reduce:transition-none"
         aria-label="Install MedTrack"
       >
         <Download aria-hidden="true" className="h-4 w-4" />
@@ -99,7 +99,7 @@ export function InstallAppButton() {
         ref={installDialogRef}
         aria-labelledby="install-instructions-title"
         aria-describedby="install-instructions-description"
-        className="install-instructions-dialog fixed inset-x-4 bottom-[calc(1rem+env(safe-area-inset-bottom))] m-0 w-[calc(100%-2rem)] max-w-sm rounded-2xl bg-white p-5 shadow-xl dark:bg-slate-900 sm:inset-0 sm:m-auto"
+        className="install-instructions-dialog fixed inset-x-4 bottom-[calc(1rem+env(safe-area-inset-bottom))] m-0 w-[calc(100%-2rem)] max-w-sm rounded-2xl bg-card p-5 shadow-xl dark:bg-card sm:inset-0 sm:m-auto"
         onCancel={event => {
           event.preventDefault();
           setShowIOSInstructions(false);
@@ -110,7 +110,7 @@ export function InstallAppButton() {
         </h2>
         <p
           id="install-instructions-description"
-          className="mt-2 flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300"
+          className="mt-2 flex items-center gap-2 text-sm text-muted-foreground dark:text-muted-foreground"
         >
           <Share aria-hidden="true" className="h-4 w-4 shrink-0" />
           Tap Share in your browser, then choose “Add to Home Screen”.

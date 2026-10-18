@@ -91,7 +91,7 @@ export default function AdminDashboardPage() {
       description: 'Monitor system changes and security events.',
       icon: Clock,
       href: '/admin/audit-logs',
-      color: 'text-slate-500',
+      color: 'text-muted-foreground',
       bgColor: 'bg-slate-500/10',
     },
   ];
@@ -105,16 +105,16 @@ export default function AdminDashboardPage() {
   }
 
   const StatCard = ({ title, value, icon: Icon, trend, subValue }: StatCardProps) => (
-    <Card className="overflow-hidden border-none shadow-md bg-white dark:bg-slate-800/50 backdrop-blur-sm">
+    <Card className="overflow-hidden border-none shadow-md bg-card dark:bg-card/50 backdrop-blur-sm">
       <CardContent className="p-6">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">{title}</p>
-            <h3 className="text-3xl font-bold mt-1 text-slate-900 dark:text-white">
+            <p className="text-sm font-medium text-muted-foreground dark:text-muted-foreground uppercase tracking-wider">{title}</p>
+            <h3 className="text-3xl font-bold mt-1 text-foreground dark:text-foreground">
               {loading ? <Skeleton className="h-9 w-20" /> : (value === null || value === undefined ? '—' : value)}
             </h3>
             {subValue && (
-              <p className="text-xs text-slate-400 mt-1 flex items-center gap-1">
+              <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
                 {trend === 'up' ? <TrendingUp className="h-3 w-3 text-green-500" /> : null}
                 {subValue}
               </p>
@@ -133,11 +133,11 @@ export default function AdminDashboardPage() {
       {/* Header Section */}
       <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">Admin Control Center</h1>
-          <p className="text-slate-500 dark:text-slate-400 mt-1">Monitor and manage your medical education ecosystem.</p>
+          <h1 className="text-3xl font-bold text-foreground dark:text-foreground tracking-tight">Admin Control Center</h1>
+          <p className="text-muted-foreground dark:text-muted-foreground mt-1">Monitor and manage your medical education ecosystem.</p>
         </div>
         <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm" onClick={fetchStats} className="bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm">
+          <Button variant="outline" size="sm" onClick={fetchStats} className="bg-card/50 dark:bg-card/50 backdrop-blur-sm">
             <RefreshCcw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Refresh Data
           </Button>
@@ -165,7 +165,7 @@ export default function AdminDashboardPage() {
                     size="sm" 
                     variant="outline" 
                     onClick={fetchStats}
-                    className="bg-white dark:bg-slate-800 hover:bg-amber-100 dark:hover:bg-slate-700"
+                    className="bg-card dark:bg-card hover:bg-amber-100 dark:hover:bg-secondary"
                   >
                     <RefreshCcw className="h-3 w-3 mr-2" />
                     Try Again
@@ -217,8 +217,8 @@ export default function AdminDashboardPage() {
       {/* Main Admin Actions */}
       <div className="space-y-6">
         <div className="flex items-center gap-2">
-          <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Management Hub</h2>
-          <div className="h-1 flex-1 bg-slate-100 dark:bg-slate-800 rounded-full"></div>
+          <h2 className="text-xl font-semibold text-foreground dark:text-foreground">Management Hub</h2>
+          <div className="h-1 flex-1 bg-muted dark:bg-card rounded-full"></div>
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -228,7 +228,7 @@ export default function AdminDashboardPage() {
               href={action.href}
               className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
             >
-              <Card className="group cursor-pointer hover:border-blue-500/50 transition-all duration-300 shadow-sm hover:shadow-xl bg-white dark:bg-slate-800/50 border-slate-100 dark:border-slate-700/50">
+              <Card className="group cursor-pointer hover:border-blue-500/50 transition-all duration-300 shadow-sm hover:shadow-xl bg-card dark:bg-card/50 border-border dark:border-border/50">
               <CardContent className="p-6">
                 <div className="flex items-start gap-4">
                   <div className={`p-4 rounded-2xl ${action.bgColor} transition-transform group-hover:scale-110 duration-300`}>
@@ -236,10 +236,10 @@ export default function AdminDashboardPage() {
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center justify-between">
-                      <h3 className="font-bold text-lg text-slate-900 dark:text-white">{action.title}</h3>
+                      <h3 className="font-bold text-lg text-foreground dark:text-foreground">{action.title}</h3>
                       <ArrowUpRight className="h-4 w-4 text-slate-300 group-hover:text-blue-500 transition-colors" />
                     </div>
-                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                    <p className="text-sm text-muted-foreground dark:text-muted-foreground mt-1 leading-relaxed">
                       {action.description}
                     </p>
                   </div>
@@ -262,7 +262,7 @@ export default function AdminDashboardPage() {
             <CardDescription className="text-blue-100">User activity trends over the last 30 days.</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="h-50 flex items-center justify-center border border-white/10 rounded-lg bg-white/5 backdrop-blur-sm">
+            <div className="h-50 flex items-center justify-center border border-white/10 rounded-lg bg-card/5 backdrop-blur-sm">
               <p className="text-blue-100/80 text-sm text-center px-4">
                 Activity trends are not available yet; live reporting is not configured.
               </p>
@@ -270,7 +270,7 @@ export default function AdminDashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-none shadow-md bg-white dark:bg-slate-800/50">
+        <Card className="border-none shadow-md bg-card dark:bg-card/50">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Clock className="h-5 w-5 text-blue-500" />

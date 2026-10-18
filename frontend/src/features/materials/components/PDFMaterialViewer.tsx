@@ -109,28 +109,28 @@ export const PDFMaterialViewer: React.FC<PDFMaterialViewerProps> = ({
   }
 
   return (
-    <div className="w-full h-full flex flex-col bg-gray-100 dark:bg-slate-800 rounded-lg overflow-hidden">
+    <div className="w-full h-full flex flex-col bg-muted dark:bg-card rounded-lg overflow-hidden">
       {/* Controls Bar */}
-      <div className="bg-white dark:bg-slate-700 border-b border-gray-200 dark:border-slate-600 p-4 flex items-center justify-between">
+      <div className="bg-card dark:bg-secondary border-b border-border dark:border-border p-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           {/* Navigation */}
           <button
             onClick={handlePrevPage}
             disabled={currentPage <= 1}
-            className="p-2 rounded hover:bg-gray-100 dark:hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition"
+            className="p-2 rounded hover:bg-muted dark:hover:bg-secondary disabled:opacity-50 disabled:cursor-not-allowed transition"
             aria-label="Previous page"
           >
             <ChevronLeft size={20} />
           </button>
 
-          <span className="text-sm font-medium px-4 py-2 bg-gray-100 dark:bg-slate-600 rounded">
+          <span className="text-sm font-medium px-4 py-2 bg-muted dark:bg-secondary rounded">
             {currentPage} / {numPages}
           </span>
 
           <button
             onClick={handleNextPage}
             disabled={currentPage >= numPages}
-            className="p-2 rounded hover:bg-gray-100 dark:hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition"
+            className="p-2 rounded hover:bg-muted dark:hover:bg-secondary disabled:opacity-50 disabled:cursor-not-allowed transition"
             aria-label="Next page"
           >
             <ChevronRight size={20} />
@@ -142,20 +142,20 @@ export const PDFMaterialViewer: React.FC<PDFMaterialViewerProps> = ({
           <button
             onClick={handleZoomOut}
             disabled={scale <= 0.5}
-            className="p-2 rounded hover:bg-gray-100 dark:hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition"
+            className="p-2 rounded hover:bg-muted dark:hover:bg-secondary disabled:opacity-50 disabled:cursor-not-allowed transition"
             aria-label="Zoom out"
           >
             <ZoomOut size={20} />
           </button>
 
-          <span className="text-sm font-medium px-4 py-2 bg-gray-100 dark:bg-slate-600 rounded">
+          <span className="text-sm font-medium px-4 py-2 bg-muted dark:bg-secondary rounded">
             {Math.round(scale * 100)}%
           </span>
 
           <button
             onClick={handleZoomIn}
             disabled={scale >= 2}
-            className="p-2 rounded hover:bg-gray-100 dark:hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition"
+            className="p-2 rounded hover:bg-muted dark:hover:bg-secondary disabled:opacity-50 disabled:cursor-not-allowed transition"
             aria-label="Zoom in"
           >
             <ZoomIn size={20} />
@@ -164,7 +164,7 @@ export const PDFMaterialViewer: React.FC<PDFMaterialViewerProps> = ({
           {/* Download */}
           <button
             onClick={handleDownload}
-            className="p-2 rounded hover:bg-gray-100 dark:hover:bg-slate-600 transition ml-2"
+            className="p-2 rounded hover:bg-muted dark:hover:bg-secondary transition ml-2"
             aria-label="Download PDF"
           >
             <Download size={20} />
@@ -175,7 +175,7 @@ export const PDFMaterialViewer: React.FC<PDFMaterialViewerProps> = ({
       {/* PDF Viewer */}
       <div className="flex-1 overflow-auto flex items-center justify-center">
         {isLoading ? (
-          <div className="text-gray-600 dark:text-slate-400">
+          <div className="text-muted-foreground dark:text-muted-foreground">
             <p>Loading PDF...</p>
           </div>
         ) : (
@@ -186,7 +186,7 @@ export const PDFMaterialViewer: React.FC<PDFMaterialViewerProps> = ({
               setError(error.message || 'Failed to load PDF');
               setIsLoading(false);
             }}
-            loading={<p className="text-gray-600 dark:text-slate-400">Loading document...</p>}
+            loading={<p className="text-muted-foreground dark:text-muted-foreground">Loading document...</p>}
           >
             <Page
               pageNumber={currentPage}
@@ -204,7 +204,7 @@ export const PDFMaterialViewer: React.FC<PDFMaterialViewerProps> = ({
       </div>
 
       {/* Status Bar */}
-      <div className="bg-white dark:bg-slate-700 border-t border-gray-200 dark:border-slate-600 px-4 py-2 text-sm text-gray-600 dark:text-slate-400">
+      <div className="bg-card dark:bg-secondary border-t border-border dark:border-border px-4 py-2 text-sm text-muted-foreground dark:text-muted-foreground">
         <p>{materialTitle}</p>
       </div>
     </div>

@@ -37,8 +37,8 @@ export const ForgotPasswordForm: React.FC = () => {
   if (success) {
     return (
       <div className="text-center">
-        <h3 className="text-lg font-medium text-gray-900">Check your email</h3>
-        <p className="mt-2 text-sm text-gray-500">
+        <h3 className="text-lg font-medium text-foreground">Check your email</h3>
+        <p className="mt-2 text-sm text-muted-foreground">
           We have sent a password reset link to your email address.
         </p>
       </div>
@@ -48,7 +48,7 @@ export const ForgotPasswordForm: React.FC = () => {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+        <label htmlFor="email" className="block text-sm font-medium text-muted-foreground">
           Email
         </label>
         <input
@@ -56,7 +56,7 @@ export const ForgotPasswordForm: React.FC = () => {
           id="email"
           value={email}
           onChange={e => setEmail(e.target.value)}
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+          className="mt-1 block w-full rounded-md border-border shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
           required
         />
       </div>

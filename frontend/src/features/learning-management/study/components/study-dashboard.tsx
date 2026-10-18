@@ -95,20 +95,20 @@ export const StudyDashboard: React.FC = () => {
     return (
       <div className="min-h-[60vh] space-y-4" aria-label="Loading study planner">
         <div className="grid gap-4 md:grid-cols-2">
-          <div className="h-32 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />
-          <div className="h-32 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />
+          <div className="h-32 animate-pulse rounded-xl bg-secondary dark:bg-card" />
+          <div className="h-32 animate-pulse rounded-xl bg-secondary dark:bg-card" />
         </div>
-        <div className="h-48 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />
-        <div className="h-48 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />
+        <div className="h-48 animate-pulse rounded-xl bg-secondary dark:bg-card" />
+        <div className="h-48 animate-pulse rounded-xl bg-secondary dark:bg-card" />
       </div>
     );
   }
 
   if (isError) {
     return (
-      <div role="alert" className="rounded-2xl border border-red-200 bg-white p-8 text-center dark:border-red-900 dark:bg-slate-900">
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Study data is unavailable</h2>
-        <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+      <div role="alert" className="rounded-2xl border border-red-200 bg-card p-8 text-center dark:border-red-900 dark:bg-card">
+        <h2 className="text-lg font-semibold text-foreground dark:text-foreground">Study data is unavailable</h2>
+        <p className="mt-2 text-sm text-muted-foreground dark:text-muted-foreground">
           {error instanceof Error ? error.message : 'We could not load your study progress.'}
         </p>
         <button
@@ -137,7 +137,7 @@ export const StudyDashboard: React.FC = () => {
   };
 
   return (
-    <div className="p-3 bg-gray-50/50 dark:bg-slate-900/50 min-h-screen">
+    <div className="p-3 bg-background/50 dark:bg-card/50 min-h-screen">
       <nav aria-label="Study planner shortcuts" className="mb-4 grid grid-cols-3 gap-2 sm:gap-3">
         {[
           { href: '/study-planner/schedule', label: 'Schedule', icon: CalendarDays },
@@ -147,7 +147,7 @@ export const StudyDashboard: React.FC = () => {
           <Link
             key={href}
             href={href}
-            className="flex min-h-20 flex-col items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white/80 p-3 text-center text-xs font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-200 dark:hover:bg-slate-800"
+            className="flex min-h-20 flex-col items-center justify-center gap-2 rounded-xl border border-border bg-card/80 p-3 text-center text-xs font-semibold text-muted-foreground shadow-sm transition-colors hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-border dark:bg-card/70 dark:text-muted-foreground dark:hover:bg-card"
           >
             <Icon aria-hidden="true" className="h-5 w-5 text-blue-600 dark:text-blue-400" />
             <span>{label}</span>
@@ -163,7 +163,7 @@ export const StudyDashboard: React.FC = () => {
       )}
       {autoQuizzes.length > 0 && (
         <div className="mb-6">
-          <h5 className="text-lg font-semibold mb-3 text-gray-900 dark:text-white flex items-center gap-2">
+          <h5 className="text-lg font-semibold mb-3 text-foreground dark:text-foreground flex items-center gap-2">
             <span>✨</span>
             AI-Generated Practice Quizzes
           </h5>
@@ -190,26 +190,26 @@ export const StudyDashboard: React.FC = () => {
 
       {/* Stats Overview */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
-        <div className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm rounded-lg shadow-sm border border-gray-100 dark:border-slate-700/50 p-4">
-          <h6 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">Total Study Time</h6>
+        <div className="bg-card/80 dark:bg-card/50 backdrop-blur-sm rounded-lg shadow-sm border border-border dark:border-border/50 p-4">
+          <h6 className="text-lg font-semibold mb-2 text-foreground dark:text-foreground">Total Study Time</h6>
           <p className="text-4xl font-bold text-blue-600 dark:text-blue-400">
             {Math.round((stats?.totalTime || 0) / 60)}h
           </p>
-          <p className="text-sm text-gray-500 dark:text-slate-400">this week</p>
+          <p className="text-sm text-muted-foreground dark:text-muted-foreground">this week</p>
         </div>
-        <div className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm rounded-lg shadow-sm border border-gray-100 dark:border-slate-700/50 p-4">
-          <h6 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">Study Sessions</h6>
+        <div className="bg-card/80 dark:bg-card/50 backdrop-blur-sm rounded-lg shadow-sm border border-border dark:border-border/50 p-4">
+          <h6 className="text-lg font-semibold mb-2 text-foreground dark:text-foreground">Study Sessions</h6>
           <p className="text-4xl font-bold text-blue-600 dark:text-blue-400">{stats?.totalSessions || 0}</p>
-          <p className="text-sm text-gray-500 dark:text-slate-400">completed</p>
+          <p className="text-sm text-muted-foreground dark:text-muted-foreground">completed</p>
         </div>
       </div>
 
       {/* Course Progress */}
-      <div className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm rounded-lg shadow-sm border border-gray-100 dark:border-slate-700/50 p-4 mb-4">
-        <h6 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">Course Progress</h6>
+      <div className="bg-card/80 dark:bg-card/50 backdrop-blur-sm rounded-lg shadow-sm border border-border dark:border-border/50 p-4 mb-4">
+        <h6 className="text-lg font-semibold mb-2 text-foreground dark:text-foreground">Course Progress</h6>
         {courseProgress.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-slate-300 p-5 dark:border-slate-700">
-            <p className="text-sm text-slate-500 dark:text-slate-400">
+          <div className="rounded-lg border border-dashed border-border p-5 dark:border-border">
+            <p className="text-sm text-muted-foreground dark:text-muted-foreground">
               No enrolled courses yet. Browse courses to start building your learning progress.
             </p>
             <button
@@ -225,16 +225,16 @@ export const StudyDashboard: React.FC = () => {
             key={course.id}
             type="button"
             onClick={() => router.push(`/courses/${course.id}`)}
-            className="mb-3 block w-full rounded-lg p-2 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/70"
+            className="mb-3 block w-full rounded-lg p-2 text-left transition-colors hover:bg-background dark:hover:bg-card/70"
           >
             <div className="flex justify-between mb-1">
-              <p className="text-base text-gray-900 dark:text-slate-200">{course.name}</p>
-              <p className="text-sm text-gray-500 dark:text-slate-400">{course.progressPercentage}%</p>
+              <p className="text-base text-foreground dark:text-muted-foreground">{course.name}</p>
+              <p className="text-sm text-muted-foreground dark:text-muted-foreground">{course.progressPercentage}%</p>
             </div>
             <div className="w-full h-2">
               <ProgressBar value={course.progressPercentage} className="h-2 rounded-full" />
             </div>
-            <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">
+            <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-1">
               Last synced: {formatLastUpdated(course.lastUpdated)}
             </p>
           </button>
@@ -242,10 +242,10 @@ export const StudyDashboard: React.FC = () => {
       </div>
 
       {/* Unit Progress */}
-      <div className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm rounded-lg shadow-sm border border-gray-100 dark:border-slate-700/50 p-4 mb-4">
-        <h6 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">Unit Progress</h6>
+      <div className="bg-card/80 dark:bg-card/50 backdrop-blur-sm rounded-lg shadow-sm border border-border dark:border-border/50 p-4 mb-4">
+        <h6 className="text-lg font-semibold mb-2 text-foreground dark:text-foreground">Unit Progress</h6>
         {unitProgress.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-slate-300 p-5 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
+          <p className="rounded-lg border border-dashed border-border p-5 text-sm text-muted-foreground dark:border-border dark:text-muted-foreground">
             Unit progress appears here after you begin lessons in an enrolled course.
           </p>
         ) : unitProgress.map(unit => {
@@ -263,19 +263,19 @@ export const StudyDashboard: React.FC = () => {
                   router.push(`/unit/${unit.id}`);
                 }
               }}
-              className="mb-3 block w-full rounded-lg p-2 text-left transition-colors hover:bg-slate-50 disabled:cursor-default disabled:hover:bg-transparent dark:hover:bg-slate-800/70"
+              className="mb-3 block w-full rounded-lg p-2 text-left transition-colors hover:bg-background disabled:cursor-default disabled:hover:bg-transparent dark:hover:bg-card/70"
             >
               <div className="flex justify-between mb-1">
-                <p className="text-base text-gray-900 dark:text-slate-200">
+                <p className="text-base text-foreground dark:text-muted-foreground">
                   {unit.name}
                   {courseName ? ` (${courseName})` : ''}
                 </p>
-                <p className="text-sm text-gray-500 dark:text-slate-400">{unit.progressPercentage}%</p>
+                <p className="text-sm text-muted-foreground dark:text-muted-foreground">{unit.progressPercentage}%</p>
               </div>
               <div className="w-full h-2">
                 <ProgressBar value={unit.progressPercentage} className="h-2 rounded-full" />
               </div>
-              <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">
+              <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-1">
                 Last synced: {formatLastUpdated(unit.lastUpdated)}
               </p>
             </button>
@@ -284,25 +284,25 @@ export const StudyDashboard: React.FC = () => {
       </div>
 
       {/* Peer Comparison */}
-      <div className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm rounded-lg shadow-sm border border-gray-100 dark:border-slate-700/50 p-4">
-        <h6 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">Peer Comparison</h6>
+      <div className="bg-card/80 dark:bg-card/50 backdrop-blur-sm rounded-lg shadow-sm border border-border dark:border-border/50 p-4">
+        <h6 className="text-lg font-semibold mb-2 text-foreground dark:text-foreground">Peer Comparison</h6>
         {peerStats && (
           <div>
-            <p className="text-sm text-gray-500 dark:text-slate-400 mb-2">
+            <p className="text-sm text-muted-foreground dark:text-muted-foreground mb-2">
               You're in the top {Math.round(peerStats.userPercentile)}%
             </p>
             <div className="mt-2">
-              <p className="text-sm text-gray-600 dark:text-slate-300">
+              <p className="text-sm text-muted-foreground dark:text-muted-foreground">
                 Average Completion: {Math.round(peerStats.averageScore)}%
               </p>
-              <p className="text-sm text-gray-600 dark:text-slate-300">
+              <p className="text-sm text-muted-foreground dark:text-muted-foreground">
                 Your Completion: {Math.round(peerStats.userScore)}%
               </p>
             </div>
           </div>
         )}
         {!peerStats && (
-          <p className="text-sm text-gray-500 dark:text-slate-400">
+          <p className="text-sm text-muted-foreground dark:text-muted-foreground">
             Peer comparisons will appear when enough cohort progress data is available.
           </p>
         )}

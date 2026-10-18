@@ -70,7 +70,7 @@ export function SyncIndicator({
               />
             </svg>
           </div>
-          {showLabel && <span className={`${textSizeClasses[size]} text-gray-600`}>Syncing...</span>}
+          {showLabel && <span className={`${textSizeClasses[size]} text-muted-foreground`}>Syncing...</span>}
         </>
       )}
 

@@ -32,9 +32,9 @@ export function SpacedRepetitionReview({
   if (isLoading) {
     return (
       <div className="animate-pulse space-y-4">
-        <div className="h-8 bg-gray-200 rounded w-1/4"></div>
-        <div className="h-32 bg-gray-200 rounded"></div>
-        <div className="h-8 bg-gray-200 rounded w-1/2"></div>
+        <div className="h-8 bg-secondary rounded w-1/4"></div>
+        <div className="h-32 bg-secondary rounded"></div>
+        <div className="h-8 bg-secondary rounded w-1/2"></div>
       </div>
     );
   }
@@ -52,7 +52,7 @@ export function SpacedRepetitionReview({
       <div className="text-center py-8">
         <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto mb-4" />
         <h3 className="text-lg font-semibold mb-2">No cards due for review!</h3>
-        <p className="text-gray-500">
+        <p className="text-muted-foreground">
           {stats?.upcoming ? `${stats.upcoming} cards coming up soon` : 'All caught up!'}
         </p>
       </div>
@@ -63,30 +63,30 @@ export function SpacedRepetitionReview({
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div className="space-y-1">
-          <h3 className="text-sm font-medium text-gray-500">Review Progress</h3>
+          <h3 className="text-sm font-medium text-muted-foreground">Review Progress</h3>
           <div className="flex items-center space-x-2">
             <Progress
               value={(stats?.total ? (stats.total - stats.due) / stats.total : 0) * 100}
               className="w-32"
             />
-            <span className="text-sm text-gray-500">
+            <span className="text-sm text-muted-foreground">
               {stats?.total ? `${stats.total - stats.due}/${stats.total}` : '0/0'}
             </span>
           </div>
         </div>
         <div className="text-right">
-          <div className="text-sm font-medium text-gray-500">Next Review</div>
-          <div className="flex items-center space-x-1 text-sm text-gray-500">
+          <div className="text-sm font-medium text-muted-foreground">Next Review</div>
+          <div className="flex items-center space-x-1 text-sm text-muted-foreground">
             <Clock className="h-4 w-4" />
             <span>{currentCard.nextReview.toLocaleDateString()}</span>
           </div>
         </div>
       </div>
 
-      <Card className="p-8 min-h-[300px] flex flex-col justify-center items-center text-center cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors shadow-inner" onClick={() => !showAnswer && setShowAnswer(true)}>
+      <Card className="p-8 min-h-[300px] flex flex-col justify-center items-center text-center cursor-pointer hover:bg-background dark:hover:bg-card/50 transition-colors shadow-inner" onClick={() => !showAnswer && setShowAnswer(true)}>
         <div className="space-y-6 w-full">
           <div className="space-y-4">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white leading-relaxed">
+            <h2 className="text-2xl font-bold text-foreground dark:text-foreground leading-relaxed">
               {displayQuestion}
             </h2>
           </div>
@@ -94,7 +94,7 @@ export function SpacedRepetitionReview({
           {showAnswer ? (
             <div className="space-y-8 mt-8 animate-in fade-in slide-in-from-bottom-4 duration-300">
               <div className="p-6 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-100 dark:border-blue-800/50">
-                <p className="text-lg text-gray-800 dark:text-slate-200 font-medium">
+                <p className="text-lg text-muted-foreground dark:text-muted-foreground font-medium">
                   {displayAnswer}
                 </p>
               </div>
@@ -138,7 +138,7 @@ export function SpacedRepetitionReview({
               </div>
             </div>
           ) : (
-            <div className="mt-12 text-gray-400 text-sm animate-pulse">
+            <div className="mt-12 text-muted-foreground text-sm animate-pulse">
               Click or press space to reveal answer
             </div>
           )}

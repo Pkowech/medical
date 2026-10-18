@@ -99,7 +99,7 @@ export const TwoFactorAuth: React.FC<{ requiredSetup?: boolean }> = ({
     <div className="space-y-3 border-t pt-4">
       <div>
         <h3 className="font-medium">Two-Factor Authentication</h3>
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-muted-foreground">
           {enabled
             ? 'Two-factor authentication is enabled.'
             : 'Add an authenticator app as a second sign-in step.'}
@@ -119,7 +119,7 @@ export const TwoFactorAuth: React.FC<{ requiredSetup?: boolean }> = ({
             value={token}
             onChange={event => setToken(event.target.value)}
             required
-            className="w-full rounded-md border border-gray-300 px-3 py-2"
+            className="w-full rounded-md border border-border px-3 py-2"
           />
           <button type="submit" disabled={isUpdating} className="text-sm underline disabled:opacity-50">
             {isUpdating ? 'Updating...' : 'Disable 2FA'}
@@ -134,7 +134,7 @@ export const TwoFactorAuth: React.FC<{ requiredSetup?: boolean }> = ({
             height={192}
             unoptimized
           />
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-muted-foreground">
             Scan the code with your authenticator app. If scanning is unavailable, enter this
             setup key: <code>{setup.secret}</code>
           </p>
@@ -150,7 +150,7 @@ export const TwoFactorAuth: React.FC<{ requiredSetup?: boolean }> = ({
             value={token}
             onChange={event => setToken(event.target.value)}
             required
-            className="w-full rounded-md border border-gray-300 px-3 py-2"
+            className="w-full rounded-md border border-border px-3 py-2"
           />
           <button type="submit" disabled={isUpdating} className="text-sm underline disabled:opacity-50">
             {isUpdating

@@ -359,7 +359,7 @@ export const CoursesDashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#f8f9fa] p-4 dark:bg-slate-950 md:p-8">
+    <div className="min-h-screen bg-[#f8f9fa] p-4 dark:bg-background md:p-8">
       <div className="mx-auto flex max-w-7xl flex-col space-y-6">
         
         {/* Stats Grid */}
@@ -391,10 +391,10 @@ export const CoursesDashboard = () => {
         </div>}
 
         {/* Search & Tabs Header */}
-        <div className="order-2 flex flex-col justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:flex-row sm:items-center">
+        <div className="order-2 flex flex-col justify-between gap-4 rounded-2xl border border-border bg-card p-4 shadow-sm dark:border-border dark:bg-card sm:flex-row sm:items-center">
           <div className="flex min-w-0 flex-col gap-3">
-            <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-white">Classes</h1>
-            <div className="flex w-fit max-w-full items-center gap-1 overflow-x-auto rounded-full bg-slate-100 p-1 dark:bg-slate-800">
+            <h1 className="text-xl font-semibold tracking-tight text-foreground dark:text-foreground">Classes</h1>
+            <div className="flex w-fit max-w-full items-center gap-1 overflow-x-auto rounded-full bg-muted p-1 dark:bg-card">
               {user && <TabButton
                 active={activeTab === 'enrolled'} 
                 onClick={() => {
@@ -423,20 +423,20 @@ export const CoursesDashboard = () => {
               />}
             </div>
             {activeTab === 'recommended' && (
-              <p className="text-xs text-slate-500 dark:text-slate-400 ml-2 animate-in fade-in slide-in-from-left-2">
+              <p className="text-xs text-muted-foreground dark:text-muted-foreground ml-2 animate-in fade-in slide-in-from-left-2">
                 Uses subjects from your active or completed classes, then ranks by rating and learner count. Without matching class history, it suggests popular or featured courses.
               </p>
             )}
           </div>
 
           <form onSubmit={handleSearch} className="relative w-full sm:max-w-sm">
-            <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <input
               type="text"
               placeholder="Search classes"
               value={filters.searchTerm}
               onChange={e => setFilters({ ...filters, searchTerm: e.target.value })}
-              className="w-full rounded-full border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:ring-blue-950"
+              className="w-full rounded-full border border-border bg-card py-2.5 pl-10 pr-4 text-sm text-foreground outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-border dark:bg-background dark:text-foreground dark:focus:ring-blue-950"
             />
           </form>
         </div>
@@ -457,11 +457,11 @@ export const CoursesDashboard = () => {
             ].map(section => (
               <section key={section.title} aria-label={section.title}>
                 <div className="mb-4 flex items-center justify-between">
-                  <h2 className="text-lg font-bold text-slate-900 dark:text-white">{section.title}</h2>
-                  <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">{section.units.length}</span>
+                  <h2 className="text-lg font-bold text-foreground dark:text-foreground">{section.title}</h2>
+                  <span className="text-sm font-semibold text-muted-foreground dark:text-muted-foreground">{section.units.length}</span>
                 </div>
                 {section.units.length === 0 ? (
-                  <p className="rounded-lg border border-dashed border-slate-300 p-5 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                  <p className="rounded-lg border border-dashed border-border p-5 text-sm text-muted-foreground dark:border-border dark:text-muted-foreground">
                     {section.completed ? 'No completed units yet.' : 'No ongoing units yet. Start a unit from a course.'}
                   </p>
                 ) : (
@@ -471,13 +471,13 @@ export const CoursesDashboard = () => {
                       const courseId = String(unit.courseId ?? '');
                       const percentage = Math.min(100, Math.max(0, Number(unit.progressPercentage) || 0));
                       return (
-                        <article key={unitId} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
-                          <p className="mb-1 text-xs font-semibold uppercase text-slate-500 dark:text-slate-400">{String(unit.courseTitle ?? 'Course')}</p>
-                          <h3 className="font-bold text-slate-900 dark:text-white">{String(unit.unitTitle ?? 'Unit')}</h3>
-                          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                        <article key={unitId} className="rounded-lg border border-border bg-card p-5 shadow-sm dark:border-border dark:bg-card">
+                          <p className="mb-1 text-xs font-semibold uppercase text-muted-foreground dark:text-muted-foreground">{String(unit.courseTitle ?? 'Course')}</p>
+                          <h3 className="font-bold text-foreground dark:text-foreground">{String(unit.unitTitle ?? 'Unit')}</h3>
+                          <p className="mt-2 text-sm text-muted-foreground dark:text-muted-foreground">
                             {Number(unit.completedTopics) || 0} of {Number(unit.totalTopics) || 0} topics complete
                           </p>
-                          <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700">
+                          <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted dark:bg-secondary">
                             <div className={`h-full ${section.completed ? 'bg-emerald-500' : 'bg-blue-600'}`} style={{ width: `${percentage}%` }} />
                           </div>
                           <div className="mt-4 flex flex-wrap gap-2">
@@ -494,7 +494,7 @@ export const CoursesDashboard = () => {
                               onClick={() => router.push(`/courses/${courseId}`)}
                               disabled={!courseId}
                               aria-label={`View all units in ${String(unit.courseTitle ?? 'course')}`}
-                              className="inline-flex items-center gap-1 rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700"
+                              className="inline-flex items-center gap-1 rounded-md border border-border px-3 py-2 text-sm font-semibold text-muted-foreground hover:bg-background disabled:cursor-not-allowed disabled:opacity-50 dark:border-border dark:text-muted-foreground dark:hover:bg-secondary"
                             >
                               <BookOpen className="h-4 w-4" />
                               Course units
@@ -503,7 +503,7 @@ export const CoursesDashboard = () => {
                               <button
                                 type="button"
                                 onClick={() => router.push(`/quiz/unit/${unitId}`)}
-                                className="inline-flex items-center gap-1 rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700"
+                                className="inline-flex items-center gap-1 rounded-md border border-border px-3 py-2 text-sm font-semibold text-muted-foreground hover:bg-background dark:border-border dark:text-muted-foreground dark:hover:bg-secondary"
                               >
                                 Unit quiz
                                 <ChevronRight className="h-4 w-4" />
@@ -528,15 +528,15 @@ export const CoursesDashboard = () => {
         ) : coursesLoading ? (
           <div className="order-3 flex flex-col items-center justify-center py-20">
             <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent" />
-            <p className="mt-4 text-slate-500 font-medium">Curating your courses...</p>
+            <p className="mt-4 text-muted-foreground font-medium">Curating your courses...</p>
           </div>
         ) : (
           <div className="order-3 space-y-6">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">
+              <h2 className="text-lg font-semibold text-muted-foreground dark:text-muted-foreground">
                 {activeTab === 'enrolled' ? 'Enrolled classes' : activeTab === 'recommended' ? 'Recommended classes' : 'Explore classes'}
               </h2>
-              <span className="text-sm text-slate-500 dark:text-slate-400">
+              <span className="text-sm text-muted-foreground dark:text-muted-foreground">
                 {(infiniteData as any)?.pages?.flatMap((page: any) => page.courses)?.length ?? 0}
               </span>
             </div>
@@ -568,12 +568,12 @@ export const CoursesDashboard = () => {
                 ))}
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center py-20 bg-white dark:bg-slate-800 rounded-3xl border-2 border-dashed border-slate-200 dark:border-slate-700">
-                <div className="p-4 bg-slate-50 dark:bg-slate-900 rounded-full mb-4">
-                  <AlertCircle className="w-10 h-10 text-slate-400" />
+              <div className="flex flex-col items-center justify-center py-20 bg-card dark:bg-card rounded-3xl border-2 border-dashed border-border dark:border-border">
+                <div className="p-4 bg-background dark:bg-card rounded-full mb-4">
+                  <AlertCircle className="w-10 h-10 text-muted-foreground" />
                 </div>
-                <h3 className="text-xl font-bold text-slate-900 dark:text-white">No courses found</h3>
-                <p className="text-slate-500 max-w-xs text-center mt-2">
+                <h3 className="text-xl font-bold text-foreground dark:text-foreground">No courses found</h3>
+                <p className="text-muted-foreground max-w-xs text-center mt-2">
                   {activeTab === 'enrolled' 
                     ? "You haven't enrolled in any courses yet. Start exploring the catalog!"
                     : "We couldn't find any courses matching your search. Try different keywords."}
@@ -593,7 +593,7 @@ export const CoursesDashboard = () => {
               <div className="flex justify-center pt-8">
                 <button
                   onClick={() => fetchNextPage()}
-                  className="px-8 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all shadow-sm"
+                  className="px-8 py-3 bg-card dark:bg-card border border-border dark:border-border rounded-2xl font-bold text-muted-foreground dark:text-muted-foreground hover:bg-background dark:hover:bg-secondary transition-all shadow-sm"
                 >
                   Show More Courses
                 </button>
@@ -625,11 +625,11 @@ export const CoursesDashboard = () => {
           if (!open && !isUnenrolling) setCourseToUnenroll(null);
         }}
       >
-        <DialogContent className="max-w-md rounded-2xl border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-900">
+        <DialogContent className="max-w-md rounded-2xl border-border bg-card p-6 dark:border-border dark:bg-card">
           <DialogHeader className="text-left">
-            <DialogTitle className="text-lg text-slate-900 dark:text-white">Unenroll from this class?</DialogTitle>
-            <DialogDescription className="pt-2 leading-relaxed text-slate-600 dark:text-slate-300">
-              You’ll be unenrolled from <span className="font-semibold text-slate-900 dark:text-white">{courseToUnenroll?.title || courseToUnenroll?.name}</span>.
+            <DialogTitle className="text-lg text-foreground dark:text-foreground">Unenroll from this class?</DialogTitle>
+            <DialogDescription className="pt-2 leading-relaxed text-muted-foreground dark:text-muted-foreground">
+              You’ll be unenrolled from <span className="font-semibold text-foreground dark:text-foreground">{courseToUnenroll?.title || courseToUnenroll?.name}</span>.
               Your course progress will be kept, and you can enroll again later.
             </DialogDescription>
           </DialogHeader>
@@ -638,7 +638,7 @@ export const CoursesDashboard = () => {
               type="button"
               onClick={() => setCourseToUnenroll(null)}
               disabled={isUnenrolling}
-              className="inline-flex h-10 items-center justify-center rounded-lg border border-slate-300 px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+              className="inline-flex h-10 items-center justify-center rounded-lg border border-border px-4 text-sm font-semibold text-muted-foreground transition hover:bg-background disabled:opacity-50 dark:border-border dark:text-muted-foreground dark:hover:bg-card"
             >
               Cancel
             </button>
@@ -672,11 +672,11 @@ const TabButton = ({ active, onClick, label, icon: Icon }: TabButtonProps) => (
     aria-pressed={active}
     className={`flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
       active
-        ? 'bg-white text-blue-700 shadow-sm dark:bg-slate-700 dark:text-blue-300'
-        : 'text-slate-600 hover:bg-white/70 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-700/70 dark:hover:text-white'
+        ? 'bg-card text-blue-700 shadow-sm dark:bg-secondary dark:text-blue-300'
+        : 'text-muted-foreground hover:bg-card/70 hover:text-foreground dark:text-muted-foreground dark:hover:bg-secondary/70 dark:hover:text-foreground'
     }`}
   >
-    <Icon className={`h-4 w-4 ${active ? 'text-blue-600 dark:text-blue-300' : 'text-slate-400'}`} />
+    <Icon className={`h-4 w-4 ${active ? 'text-blue-600 dark:text-blue-300' : 'text-muted-foreground'}`} />
     {label}
   </button>
 );
@@ -689,15 +689,15 @@ interface StatCardProps {
 }
 
 const StatCard = ({ icon: Icon, title, value, description }: StatCardProps) => (
-  <div className="flex min-w-0 items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:px-4">
+  <div className="flex min-w-0 items-center gap-3 rounded-xl border border-border bg-card px-3 py-3 shadow-sm dark:border-border dark:bg-card sm:px-4">
     <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
       <Icon className="h-4 w-4" />
     </span>
     <div className="min-w-0">
-      <p className="truncate text-xs font-medium text-slate-500 dark:text-slate-400">{title}</p>
+      <p className="truncate text-xs font-medium text-muted-foreground dark:text-muted-foreground">{title}</p>
       <div className="flex items-baseline gap-2">
-        <p className="text-lg font-semibold leading-tight text-slate-900 dark:text-white">{value}</p>
-        {description && <p className="hidden truncate text-[11px] text-slate-500 dark:text-slate-400 sm:block">{description}</p>}
+        <p className="text-lg font-semibold leading-tight text-foreground dark:text-foreground">{value}</p>
+        {description && <p className="hidden truncate text-[11px] text-muted-foreground dark:text-muted-foreground sm:block">{description}</p>}
       </div>
     </div>
   </div>
@@ -761,7 +761,7 @@ const CourseCard = ({
   };
 
   return (
-    <article className="group flex min-h-[21rem] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md dark:border-slate-800 dark:bg-slate-900">
+    <article className="group flex min-h-[21rem] flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm transition-shadow hover:shadow-md dark:border-border dark:bg-card">
       <div className={`relative flex h-36 flex-col justify-between overflow-hidden bg-linear-to-br ${bannerPalettes[paletteIndex]} px-5 py-4 text-white`}>
         <BookOpen className="absolute -bottom-8 -right-4 h-36 w-36 rotate-[-12deg] text-white/10" aria-hidden="true" />
         <div className="relative flex items-start justify-between gap-3">
@@ -775,7 +775,7 @@ const CourseCard = ({
                   type="button"
                   aria-label={`Class options for ${courseName}`}
                   onClick={event => event.stopPropagation()}
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-full text-white transition-colors hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-full text-white transition-colors hover:bg-card/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
                 >
                   <MoreVertical className="h-5 w-5" />
                 </button>
@@ -819,33 +819,33 @@ const CourseCard = ({
 
       <div className="flex flex-1 flex-col gap-4 p-4">
         <div className="flex min-w-0 items-center gap-3">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground dark:bg-card dark:text-muted-foreground">
             <UserRound className="h-4 w-4" />
           </span>
           <div className="min-w-0">
-            <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-100">{owner}</p>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Instructor</p>
+            <p className="truncate text-sm font-medium text-muted-foreground dark:text-muted-foreground">{owner}</p>
+            <p className="text-xs text-muted-foreground dark:text-muted-foreground">Instructor</p>
           </div>
         </div>
 
         {enrolledView && isEnrolled ? (
           <>
             {course.description && (
-              <p className="line-clamp-2 min-h-10 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
+              <p className="line-clamp-2 min-h-10 text-sm leading-relaxed text-muted-foreground dark:text-muted-foreground">
                 {course.description}
               </p>
             )}
             <div className="mt-auto space-y-2">
-              <div className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-300">
+              <div className="flex items-center justify-between text-xs text-muted-foreground dark:text-muted-foreground">
                 <span>Course progress</span>
                 <span className="font-semibold">{Math.round(progress)}%</span>
               </div>
-              <Progress value={progress} className="h-1.5 bg-slate-100 dark:bg-slate-800" />
+              <Progress value={progress} className="h-1.5 bg-muted dark:bg-card" />
             </div>
           </>
         ) : (
           <>
-            <p className="line-clamp-2 min-h-10 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
+            <p className="line-clamp-2 min-h-10 text-sm leading-relaxed text-muted-foreground dark:text-muted-foreground">
               {course.description || 'Explore course units and learning materials.'}
             </p>
             {course.recommendationReason && (
@@ -856,7 +856,7 @@ const CourseCard = ({
           </>
         )}
 
-        <div className="mt-auto flex items-center justify-between border-t border-slate-100 pt-3 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
+        <div className="mt-auto flex items-center justify-between border-t border-border pt-3 text-xs text-muted-foreground dark:border-border dark:text-muted-foreground">
           <span>{course.estimatedHours ?? 0} study hours</span>
           <span>{course.enrollmentCount ?? 0} learners</span>
           <span className="inline-flex items-center gap-1">
@@ -866,7 +866,7 @@ const CourseCard = ({
         </div>
       </div>
 
-      <div className="flex items-center gap-2 border-t border-slate-100 px-4 py-3 dark:border-slate-800">
+      <div className="flex items-center gap-2 border-t border-border px-4 py-3 dark:border-border">
         <button
           type="button"
           onClick={() => void openCourse()}
@@ -881,7 +881,7 @@ const CourseCard = ({
             aria-label={`Open materials for ${courseName}`}
             title="Course materials"
             onClick={() => router.push(`/study-planner/materials?courseId=${encodeURIComponent(course.id)}&scope=enrolled`)}
-            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-background hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-border dark:text-muted-foreground dark:hover:bg-card dark:hover:text-foreground"
           >
             <Layers className="h-4 w-4" />
           </button>

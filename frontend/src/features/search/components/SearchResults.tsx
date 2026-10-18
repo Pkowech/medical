@@ -65,15 +65,15 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Medical Search</h1>
-        <p className="text-gray-500 italic">Access your structured curriculum with professional-grade intelligence.</p>
+        <h1 className="text-3xl font-bold text-foreground mb-2">Medical Search</h1>
+        <p className="text-muted-foreground italic">Access your structured curriculum with professional-grade intelligence.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
         {/* Sidebar Facets */}
         <div className="lg:col-span-1 space-y-6">
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-            <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4">Categories</h3>
+          <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
+            <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-4">Categories</h3>
             <div className="space-y-1">
               {['all', 'course', 'unit', 'topic', 'material', 'quiz', 'case', 'user'].map((f) => (
                 <button
@@ -85,16 +85,16 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
                   className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-all ${
                     filter === f 
                       ? 'bg-blue-50 text-blue-700 font-semibold' 
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                      : 'text-muted-foreground hover:bg-background hover:text-foreground'
                   }`}
                 >
                   <span className="capitalize">{f === 'all' ? 'All Results' : f.replace('_', ' ')}</span>
                   {f === 'all' ? (
-                    <span className="text-[10px] bg-gray-100 px-1.5 py-0.5 rounded-md font-bold">{total}</span>
+                    <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded-md font-bold">{total}</span>
                   ) : (
                     facets[f] !== undefined && (
                       <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold ${
-                        filter === f ? 'bg-blue-200 text-blue-800' : 'bg-gray-100 text-gray-500'
+                        filter === f ? 'bg-blue-200 text-blue-800' : 'bg-muted text-muted-foreground'
                       }`}>
                         {facets[f]}
                       </span>
@@ -126,7 +126,7 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
               }}
               onKeyDown={handleInputKeyDown}
               placeholder="Search for courses, materials, subjects..."
-              className="w-full px-6 py-4 text-lg rounded-2xl border-none shadow-sm ring-1 ring-gray-200 focus:ring-2 focus:ring-blue-500 transition-all bg-white"
+              className="w-full px-6 py-4 text-lg rounded-2xl border-none shadow-sm ring-1 ring-ring focus:ring-2 focus:ring-blue-500 transition-all bg-card"
             />
             {loading && (
               <div className="absolute right-4 top-1/2 -translate-y-1/2">
@@ -169,10 +169,10 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
           )}
 
           <div className="mb-4 flex justify-between items-center px-2">
-            <div className="text-sm text-gray-500">
-              Found <span className="font-bold text-gray-900">{total}</span> results
+            <div className="text-sm text-muted-foreground">
+              Found <span className="font-bold text-foreground">{total}</span> results
               {metrics?.totalTime && (
-                <span className="ml-3 text-gray-400">
+                <span className="ml-3 text-muted-foreground">
                   ({formatSearchMetrics(metrics.totalTime).display})
                 </span>
               )}
@@ -195,7 +195,7 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
               return (
                 <div 
                   key={`${r.type}-${r.id}`} 
-                  className={`group relative bg-white p-6 rounded-2xl shadow-sm border hover:shadow-md hover:border-blue-100 transition-all ${relevanceColors.border || 'border-gray-100'}`}
+                  className={`group relative bg-card p-6 rounded-2xl shadow-sm border hover:shadow-md hover:border-blue-100 transition-all ${relevanceColors.border || 'border-border'}`}
                 >
                   <Link 
                     ref={el => { if (el) itemRefs.current[idx] = el; }}
@@ -210,7 +210,7 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
                             r.type === 'course' ? 'bg-blue-100 text-blue-700' :
                             r.type === 'material' ? 'bg-orange-100 text-orange-700' :
                             r.type === 'quiz' ? 'bg-purple-100 text-purple-700' :
-                            'bg-gray-100 text-gray-700'
+                            'bg-muted text-muted-foreground'
                           }`}>
                             {r.type}
                           </span>
@@ -222,12 +222,12 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
                             <span className={relevanceColors.text}>{relevanceLevel}</span>
                           </span>
                         </div>
-                        <h2 className="text-xl font-bold text-gray-900 group-hover:text-blue-600 transition-colors">
+                        <h2 className="text-xl font-bold text-foreground group-hover:text-blue-600 transition-colors">
                           {r.title}
                         </h2>
                       </div>
-                      <div className="bg-gray-50 p-2 rounded-xl group-hover:bg-blue-50 transition-colors">
-                        <svg className="w-5 h-5 text-gray-400 group-hover:text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <div className="bg-background p-2 rounded-xl group-hover:bg-blue-50 transition-colors">
+                        <svg className="w-5 h-5 text-muted-foreground group-hover:text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
                         </svg>
                       </div>
@@ -235,7 +235,7 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
                     
                     {/* Use snippet if available (with highlights), otherwise description */}
                     <div 
-                      className="text-gray-600 text-sm leading-relaxed"
+                      className="text-muted-foreground text-sm leading-relaxed"
                       dangerouslySetInnerHTML={{ 
                         __html: sanitizeHtml(((r as unknown as { snippet?: string }).snippet) || r.description || '')
                       }}
@@ -248,10 +248,10 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
             })}
 
             {results.length === 0 && !loading && !error && (
-              <div className="text-center py-20 bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200">
+              <div className="text-center py-20 bg-background rounded-3xl border-2 border-dashed border-border">
                 <Zap className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                <div className="text-gray-400 mb-2">No matches found for your query.</div>
-                <p className="text-sm text-gray-500">Try broadening your search or using medical terminology.</p>
+                <div className="text-muted-foreground mb-2">No matches found for your query.</div>
+                <p className="text-sm text-muted-foreground">Try broadening your search or using medical terminology.</p>
               </div>
             )}
           </div>
@@ -259,7 +259,7 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
           {/* Pagination */}
           {total > limit && (
             <div className="mt-4 flex items-center justify-between">
-              <div className="text-sm text-gray-600">
+              <div className="text-sm text-muted-foreground">
                 Showing page {page} of {Math.ceil(total / limit)}
               </div>
               <div className="space-x-2">

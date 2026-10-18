@@ -54,7 +54,7 @@ export function EventCard({
         <div className="flex-1">
           <h3
             className={`font-semibold text-sm ${
-              event.completed || event.status === 'completed' ? 'line-through text-gray-400' : ''
+              event.completed || event.status === 'completed' ? 'line-through text-muted-foreground' : ''
             } ${isOverdue ? 'text-red-600' : ''}`}
           >
             {event.title}
@@ -100,20 +100,20 @@ export function EventCard({
         {onToggleCompletion && event.status !== 'cancelled' && (
           <button
             onClick={() => onToggleCompletion(event)}
-            className="ml-2 p-1 hover:bg-gray-100 rounded"
+            className="ml-2 p-1 hover:bg-muted rounded"
             title={event.completed ? 'Mark as incomplete' : 'Mark as complete'}
           >
             {event.completed ? (
               <CheckCircle className="w-5 h-5 text-green-600" />
             ) : (
-              <AlertCircle className="w-5 h-5 text-gray-400" />
+              <AlertCircle className="w-5 h-5 text-muted-foreground" />
             )}
           </button>
         )}
       </div>
 
       {/* Main event info */}
-      <div className="space-y-1 mb-3 text-sm text-gray-600">
+      <div className="space-y-1 mb-3 text-sm text-muted-foreground">
         <div className="flex items-center gap-2">
           <Clock className="w-4 h-4" />
           <span>
@@ -138,7 +138,7 @@ export function EventCard({
 
       {/* Description - show only in detail view */}
       {showDetails && event.description && (
-        <p className="text-sm text-gray-700 mb-3 bg-gray-50 p-2 rounded">
+        <p className="text-sm text-muted-foreground mb-3 bg-background p-2 rounded">
           {event.description}
         </p>
       )}
@@ -146,7 +146,7 @@ export function EventCard({
       {/* Attendees */}
       {showDetails && event.attendees && event.attendees.length > 0 && (
         <div className="mb-3 text-sm">
-          <p className="font-semibold text-gray-700 mb-1">Attendees:</p>
+          <p className="font-semibold text-muted-foreground mb-1">Attendees:</p>
           <div className="flex flex-wrap gap-2">
             {event.attendees.map((attendee) => (
               <Badge key={attendee} variant="outline" className="text-xs">
@@ -162,7 +162,7 @@ export function EventCard({
         <div className="mb-3 text-sm">
           <div className="flex items-center gap-2 mb-1">
             <Bell className="w-4 h-4" />
-            <p className="font-semibold text-gray-700">Reminders:</p>
+            <p className="font-semibold text-muted-foreground">Reminders:</p>
           </div>
           <div className="flex flex-wrap gap-2">
             {event.reminders.map((reminder) => (
@@ -177,7 +177,7 @@ export function EventCard({
       {/* Recurrence Info */}
       {showDetails && event.isRecurring && event.recurrencePattern && (
         <div className="mb-3 text-sm bg-blue-50 p-2 rounded">
-          <p className="text-gray-700">
+          <p className="text-muted-foreground">
             <strong>Repeats:</strong> {event.recurrencePattern.frequency}
             {event.recurrencePattern.endDate && ` until ${formatDate(event.recurrencePattern.endDate)}`}
           </p>

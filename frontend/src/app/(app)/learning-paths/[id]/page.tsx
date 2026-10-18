@@ -11,7 +11,7 @@ export default function LearningPathDetailPage() {
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-background">
         {id && <LearningPathVisualization pathId={id} />}
       </div>
     </ProtectedRoute>

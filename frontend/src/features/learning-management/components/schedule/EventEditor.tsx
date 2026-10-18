@@ -219,7 +219,7 @@ export function EventEditor({
                   <button
                     key={value}
                     className={`w-8 h-8 rounded-full border-2 transition-all ${
-                      formData.color === value ? 'border-gray-900 scale-110' : 'border-gray-300'
+                      formData.color === value ? 'border-border scale-110' : 'border-border'
                     }`}
                     style={{ backgroundColor: value }}  
                     onClick={() => handleChange('color', value)}
@@ -304,7 +304,7 @@ export function EventEditor({
                 <Badge
                   key={idx}
                   variant="outline"
-                  className="cursor-pointer hover:bg-gray-100"
+                  className="cursor-pointer hover:bg-muted"
                   onClick={() => {
                     const updated = (formData.reminders || []).filter((_, i) => i !== idx);
                     handleChange('reminders', updated);

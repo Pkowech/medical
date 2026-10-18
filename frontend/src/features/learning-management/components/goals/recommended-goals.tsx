@@ -57,16 +57,6 @@ const RecommendedGoals: React.FC<RecommendedGoalsProps> = ({ onAccept }) => {
     }
   };
 
-  const getGradient = (category: string) => {
-    switch (category.toLowerCase()) {
-      case 'study_time': return 'from-blue-50 to-indigo-50 border-blue-100';
-      case 'course_completion': return 'from-green-50 to-emerald-50 border-green-100';
-      case 'assessment_score': return 'from-purple-50 to-fuchsia-50 border-purple-100';
-      case 'streak_maintenance': return 'from-orange-50 to-yellow-50 border-orange-100';
-      default: return 'from-gray-50 to-slate-50 border-gray-100';
-    }
-  };
-
   if (loading) {
     return (
       <div className="space-y-4">
@@ -90,7 +80,7 @@ const RecommendedGoals: React.FC<RecommendedGoalsProps> = ({ onAccept }) => {
 
   if (error) {
     return (
-      <Card className="border-red-100 bg-red-50">
+      <Card className="border-destructive/30 bg-destructive/10 text-destructive">
         <CardContent className="p-4 text-center">
           <p className="text-sm text-red-600">Failed to load recommendations</p>
           <Button variant="ghost" size="sm" onClick={() => window.location.reload()} className="mt-2 text-red-700 hover:text-red-800 hover:bg-red-100">
@@ -108,11 +98,11 @@ const RecommendedGoals: React.FC<RecommendedGoalsProps> = ({ onAccept }) => {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between px-1">
-        <h2 className="text-xl font-bold text-gray-900 flex items-center">
+        <h2 className="text-xl font-bold text-foreground flex items-center">
           <Lightbulb className="mr-2 h-5 w-5 text-yellow-500 fill-yellow-50" />
           Recommended Goals
         </h2>
-        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+        <Badge variant="outline" className="bg-secondary text-secondary-foreground border-border">
           AI Powered
         </Badge>
       </div>
@@ -121,27 +111,27 @@ const RecommendedGoals: React.FC<RecommendedGoalsProps> = ({ onAccept }) => {
         {recommendations.map((rec, index) => (
           <Card 
             key={index} 
-            className={`group hover:shadow-lg transition-all duration-300 border overflow-hidden bg-linear-to-br ${getGradient(rec.category)}`}
+            className="group hover:shadow-lg transition-all duration-300 border border-border overflow-hidden bg-card text-card-foreground"
           >
             <CardContent className="p-5">
               <div className="flex items-start justify-between">
                 <div className="flex items-start space-x-4">
-                  <div className="p-2.5 bg-white rounded-xl shadow-sm group-hover:scale-110 transition-transform duration-300 border border-inherit">
+                  <div className="p-2.5 bg-background rounded-xl shadow-sm group-hover:scale-110 transition-transform duration-300 border border-border">
                     {getCategoryIcon(rec.category)}
                   </div>
                   <div className="space-y-1">
-                    <h3 className="font-bold text-gray-900 group-hover:text-blue-700 transition-colors">{rec.title}</h3>
-                    <p className="text-sm text-gray-600 line-clamp-2 leading-relaxed">{rec.description}</p>
+                    <h3 className="font-bold text-foreground group-hover:text-primary transition-colors">{rec.title}</h3>
+                    <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">{rec.description}</p>
                   </div>
                 </div>
               </div>
 
               <div className="mt-4 flex flex-wrap gap-2">
-                <Badge variant="secondary" className="bg-white/80 backdrop-blur-sm text-gray-600 border-gray-100">
+                <Badge variant="secondary" className="bg-secondary/80 backdrop-blur-sm text-secondary-foreground border-border">
                   {rec.category.replace('_', ' ')}
                 </Badge>
                 {rec.recommendationReason && (
-                  <div className="text-xs text-blue-600 font-medium flex items-center bg-blue-100/50 px-2 py-0.5 rounded-full">
+                  <div className="text-xs text-primary font-medium flex items-center bg-primary/10 px-2 py-0.5 rounded-full">
                     <Sparkles className="w-3 h-3 mr-1" />
                     {rec.recommendationReason}
                   </div>
@@ -149,13 +139,13 @@ const RecommendedGoals: React.FC<RecommendedGoalsProps> = ({ onAccept }) => {
               </div>
 
               <div className="mt-5 flex items-center justify-between pt-4 border-t border-inherit">
-                <span className="text-[10px] uppercase tracking-wider font-semibold text-gray-400">
+                <span className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">
                   Source: {rec.recommendationSource}
                 </span>
                 <Button 
                   size="sm" 
                   onClick={() => onAccept(rec)}
-                  className="bg-white hover:bg-blue-600 text-blue-600 hover:text-white border-blue-200 hover:border-blue-600 shadow-sm transition-all duration-300 group/btn"
+                  className="bg-card hover:bg-primary text-primary hover:text-primary-foreground border-border hover:border-primary shadow-sm transition-all duration-300 group/btn"
                 >
                   <span>Try this goal</span>
                   <ArrowRight className="ml-2 w-4 h-4 group-hover/btn:translate-x-1 transition-transform" />

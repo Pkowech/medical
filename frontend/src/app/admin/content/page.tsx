@@ -279,7 +279,7 @@ export default function AdminContentPage() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold">Content Management</h1>
-          <p className="text-gray-600 mt-1">Create and manage courses, units, and topics</p>
+          <p className="text-muted-foreground mt-1">Create and manage courses, units, and topics</p>
         </div>
         <Button
           onClick={() => setFormContext({ mode: 'course' })}

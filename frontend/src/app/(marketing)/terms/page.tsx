@@ -50,7 +50,7 @@ export default function TermsPage() {
         <p className="mb-2 text-sm font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-300">
           MedTrack Hub
         </p>
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-4xl">
+        <h1 className="text-3xl font-bold tracking-tight text-foreground dark:text-foreground sm:text-4xl">
           Terms of use
         </h1>
       </header>
@@ -66,7 +66,7 @@ export default function TermsPage() {
           <section key={term.title} aria-labelledby={`terms-${index}`}>
             <h2
               id={`terms-${index}`}
-              className="mb-3 text-xl font-semibold text-slate-900 dark:text-white"
+              className="mb-3 text-xl font-semibold text-foreground dark:text-foreground"
             >
               {term.title}
             </h2>

@@ -5,7 +5,7 @@ const Breadcrumb: React.FC<{ items?: { label: string; href?: string }[] }> = ({ 
   if (!items || items.length === 0) return null;
 
   return (
-    <nav aria-label="breadcrumb" className="mb-4 text-sm text-gray-600">
+    <nav aria-label="breadcrumb" className="mb-4 text-sm text-muted-foreground">
       <ol className="flex items-center gap-2">
         {items.map((item, idx) => (
           <li key={idx} className="flex items-center">

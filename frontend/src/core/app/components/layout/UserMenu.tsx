@@ -46,19 +46,19 @@ export const UserMenu: React.FC<UserMenuProps> = ({
         <div
             ref={menuRef}
             className={`absolute ${direction === 'up' ? 'bottom-full mb-2' : 'top-full mt-2'
-                } right-0 w-64 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl py-2 z-50 border border-gray-100 dark:border-slate-800 ${className}`}
+                } right-0 w-64 bg-card dark:bg-card rounded-2xl shadow-2xl py-2 z-50 border border-border dark:border-border ${className}`}
             role="menu"
         >
-            <div className="px-5 py-4 border-b border-gray-50 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-800/20 rounded-t-2xl">
-                <p className="text-sm font-bold text-gray-900 dark:text-white truncate">
+            <div className="px-5 py-4 border-b border-border dark:border-border bg-background/50 dark:bg-card/20 rounded-t-2xl">
+                <p className="text-sm font-bold text-foreground dark:text-foreground truncate">
                     {user?.firstName && user?.lastName
                         ? `${user.firstName} ${user.lastName}`
                         : user?.firstName || 'User'}
                 </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">
+                <p className="text-xs text-muted-foreground dark:text-muted-foreground truncate mt-0.5">
                     {user?.email}
                 </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-1">
+                <p className="text-xs text-muted-foreground dark:text-muted-foreground truncate mt-1">
                     {healthcareProfileLabel(user ?? {})}
                 </p>
             </div>
@@ -66,25 +66,25 @@ export const UserMenu: React.FC<UserMenuProps> = ({
             <div className="py-1">
                 <Link
                     href="/profile"
-                    className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                    className="flex items-center px-4 py-2 text-sm text-muted-foreground dark:text-muted-foreground hover:bg-background dark:hover:bg-secondary transition-colors"
                     onClick={() => setIsOpen(false)}
                     role="menuitem"
                 >
-                    <User className="mr-3 h-4 w-4 text-gray-400" />
+                    <User className="mr-3 h-4 w-4 text-muted-foreground" />
                     Profile
                 </Link>
                 <Link
                     href="/settings"
-                    className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                    className="flex items-center px-4 py-2 text-sm text-muted-foreground dark:text-muted-foreground hover:bg-background dark:hover:bg-secondary transition-colors"
                     onClick={() => setIsOpen(false)}
                     role="menuitem"
                 >
-                    <Settings className="mr-3 h-4 w-4 text-gray-400" />
+                    <Settings className="mr-3 h-4 w-4 text-muted-foreground" />
                     Settings
                 </Link>
             </div>
 
-            <div className="border-t border-gray-100 dark:border-gray-700 py-1">
+            <div className="border-t border-border dark:border-border py-1">
                 <button
                     onClick={async () => {
                         if (isLoggingOut) return;

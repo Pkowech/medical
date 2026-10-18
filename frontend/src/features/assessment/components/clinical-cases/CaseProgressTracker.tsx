@@ -140,7 +140,7 @@ export function CaseProgressTracker({
       case 'abandoned':
         return 'bg-red-100 text-red-800';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-muted text-muted-foreground';
     }
   };
 
@@ -178,9 +178,9 @@ export function CaseProgressTracker({
           <Card key={i}>
             <CardContent className="p-6">
               <div className="animate-pulse space-y-3">
-                <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                <div className="h-3 bg-gray-200 rounded w-1/2"></div>
-                <div className="h-2 bg-gray-200 rounded"></div>
+                <div className="h-4 bg-secondary rounded w-3/4"></div>
+                <div className="h-3 bg-secondary rounded w-1/2"></div>
+                <div className="h-2 bg-secondary rounded"></div>
               </div>
             </CardContent>
           </Card>
@@ -193,9 +193,9 @@ export function CaseProgressTracker({
     return (
       <Card>
         <CardContent className="p-8 text-center">
-          <BarChart3 className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+          <BarChart3 className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
           <h3 className="text-lg font-medium mb-2">No Progress Data</h3>
-          <p className="text-gray-600">
+          <p className="text-muted-foreground">
             Start working on clinical cases to see your progress here.
           </p>
         </CardContent>
@@ -207,7 +207,7 @@ export function CaseProgressTracker({
     <div className="space-y-6">
       {/* Timeframe Selector */}
       <div className="flex items-center gap-2">
-        <span className="text-sm font-medium text-gray-700">Timeframe:</span>
+        <span className="text-sm font-medium text-muted-foreground">Timeframe:</span>
         {(['week', 'month', 'all'] as const).map(period => (
           <Button
             key={period}
@@ -226,7 +226,7 @@ export function CaseProgressTracker({
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-2">
               <BookOpen className="h-4 w-4 text-blue-500" />
-              <span className="text-sm font-medium text-gray-700">Cases Started</span>
+              <span className="text-sm font-medium text-muted-foreground">Cases Started</span>
             </div>
             <div className="text-2xl font-bold text-blue-600">{progress.length}</div>
           </CardContent>
@@ -236,7 +236,7 @@ export function CaseProgressTracker({
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-2">
               <CheckCircle className="h-4 w-4 text-green-500" />
-              <span className="text-sm font-medium text-gray-700">Completed</span>
+              <span className="text-sm font-medium text-muted-foreground">Completed</span>
             </div>
             <div className="text-2xl font-bold text-green-600">
               {progress.filter(p => p.status === 'completed').length}
@@ -248,7 +248,7 @@ export function CaseProgressTracker({
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-2">
               <Target className="h-4 w-4 text-purple-500" />
-              <span className="text-sm font-medium text-gray-700">Avg Score</span>
+              <span className="text-sm font-medium text-muted-foreground">Avg Score</span>
             </div>
             <div className="text-2xl font-bold text-purple-600">
               {progress.length > 0
@@ -263,7 +263,7 @@ export function CaseProgressTracker({
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-2">
               <Clock className="h-4 w-4 text-orange-500" />
-              <span className="text-sm font-medium text-gray-700">Total Time</span>
+              <span className="text-sm font-medium text-muted-foreground">Total Time</span>
             </div>
             <div className="text-2xl font-bold text-orange-600">
               {formatTime(progress.reduce((sum, p) => sum + p.total_time_spent, 0))}
@@ -288,11 +288,11 @@ export function CaseProgressTracker({
                     <Badge className={getStatusColor(progressItem.status)}>
                       {progressItem.status.replace('_', ' ')}
                     </Badge>
-                    <span className="text-sm text-gray-600">
+                    <span className="text-sm text-muted-foreground">
                       Started {new Date(progressItem.started_at).toLocaleDateString()}
                     </span>
                     {progressItem.completed_at && (
-                      <span className="text-sm text-gray-600">
+                      <span className="text-sm text-muted-foreground">
                         • Completed {new Date(progressItem.completed_at).toLocaleDateString()}
                       </span>
                     )}
@@ -304,7 +304,7 @@ export function CaseProgressTracker({
                   >
                     {progressItem.percentage.toFixed(0)}%
                   </div>
-                  <p className="text-sm text-gray-600">Score</p>
+                  <p className="text-sm text-muted-foreground">Score</p>
                 </div>
               </div>
             </CardHeader>
@@ -312,8 +312,8 @@ export function CaseProgressTracker({
               <div className="space-y-4">
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-gray-700">Overall Progress</span>
-                    <span className="text-sm text-gray-600">
+                    <span className="text-sm font-medium text-muted-foreground">Overall Progress</span>
+                    <span className="text-sm text-muted-foreground">
                       {progressItem.completed_sections.length}/{progressItem.total_sections}{' '}
                       sections
                     </span>
@@ -323,21 +323,21 @@ export function CaseProgressTracker({
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                   <div>
-                    <span className="text-gray-600">Time Spent</span>
+                    <span className="text-muted-foreground">Time Spent</span>
                     <div className="font-medium">{formatTime(progressItem.total_time_spent)}</div>
                   </div>
                   <div>
-                    <span className="text-gray-600">Decisions Made</span>
+                    <span className="text-muted-foreground">Decisions Made</span>
                     <div className="font-medium">{progressItem.decisions_made.length}</div>
                   </div>
                   <div>
-                    <span className="text-gray-600">Optimal Decisions</span>
+                    <span className="text-muted-foreground">Optimal Decisions</span>
                     <div className="font-medium">
                       {progressItem.decisions_made.filter(d => d.is_optimal).length}
                     </div>
                   </div>
                   <div>
-                    <span className="text-gray-600">Points Earned</span>
+                    <span className="text-muted-foreground">Points Earned</span>
                     <div className="font-medium">
                       {progressItem.score}/{progressItem.max_score}
                     </div>
@@ -361,7 +361,7 @@ export function CaseProgressTracker({
           <CardContent className="space-y-6">
             {/* Section Performance */}
             <div>
-              <h4 className="font-medium text-gray-900 mb-4">Section Performance</h4>
+              <h4 className="font-medium text-foreground mb-4">Section Performance</h4>
               <div className="space-y-3">
                 {selectedProgress.section_performance.map(section => (
                   <div
@@ -372,7 +372,7 @@ export function CaseProgressTracker({
                       {getSectionIcon(section.section_type)}
                       <span className="font-medium">{section.section_title}</span>
                     </div>
-                    <div className="text-sm text-gray-600">{formatTime(section.time_spent)}</div>
+                    <div className="text-sm text-muted-foreground">{formatTime(section.time_spent)}</div>
                     <div className="text-sm font-medium">
                       {section.points_earned}/{section.max_points} pts
                     </div>
@@ -386,7 +386,7 @@ export function CaseProgressTracker({
 
             {/* Learning Objectives Progress */}
             <div>
-              <h4 className="font-medium text-gray-900 mb-4">Learning Objectives</h4>
+              <h4 className="font-medium text-foreground mb-4">Learning Objectives</h4>
               <div className="space-y-3">
                 {selectedProgress.learning_objectives_progress.map((objective, index) => (
                   <div key={index} className="p-3 border rounded-lg">
@@ -398,7 +398,7 @@ export function CaseProgressTracker({
                     </div>
                     <Progress value={objective.progress} className="h-2 mb-2" />
                     {objective.evidence.length > 0 && (
-                      <div className="text-xs text-gray-600">
+                      <div className="text-xs text-muted-foreground">
                         <span className="font-medium">Evidence: </span>
                         {objective.evidence.join(', ')}
                       </div>
@@ -410,7 +410,7 @@ export function CaseProgressTracker({
 
             {/* Clinical Skills Radar Chart */}
             <div>
-              <h4 className="font-medium text-gray-900 mb-4">Clinical Skills Assessment</h4>
+              <h4 className="font-medium text-foreground mb-4">Clinical Skills Assessment</h4>
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
                   <RadarChart

@@ -174,7 +174,7 @@ export default function OnboardingPage() {
   // Loading state if user not yet available
   if (!user && step > 0) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
+      <div className="min-h-screen flex items-center justify-center bg-background dark:bg-card">
         <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
       </div>
     );
@@ -183,16 +183,16 @@ export default function OnboardingPage() {
   // Step 0: Welcome
   if (step === 0) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-900 p-8">
-        <div className="w-full max-w-lg bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 p-10 flex flex-col items-center">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-background dark:bg-card p-8">
+        <div className="w-full max-w-lg bg-card dark:bg-card rounded-2xl shadow-xl border border-border dark:border-border p-10 flex flex-col items-center">
           <div className="w-20 h-20 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center mb-6">
             <CheckCircle2 className="h-10 w-10 text-blue-600 dark:text-blue-400" />
           </div>
-          <h1 className="text-3xl font-bold mb-4 text-slate-900 dark:text-white text-center">Welcome to MedTrack Hub!</h1>
-          <p className="text-slate-600 dark:text-slate-400 mb-8 text-center leading-relaxed">
+          <h1 className="text-3xl font-bold mb-4 text-foreground dark:text-foreground text-center">Welcome to MedTrack Hub!</h1>
+          <p className="text-muted-foreground dark:text-muted-foreground mb-8 text-center leading-relaxed">
             We&apos;re excited to support your healthcare learning and career. Let&apos;s personalize your experience.
           </p>
-          <p className="mb-6 text-sm leading-relaxed text-slate-500 dark:text-slate-400">
+          <p className="mb-6 text-sm leading-relaxed text-muted-foreground dark:text-muted-foreground">
             Personalization asks for your career stage, healthcare field, study year or experience,
             optional specialty, and study targets. These details help tailor learning suggestions
             and goals; they are not patient records. You can skip this setup and review our{' '}
@@ -212,7 +212,7 @@ export default function OnboardingPage() {
             <Button
               type="button"
               variant="ghost"
-              className="w-full text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+              className="w-full text-muted-foreground hover:text-muted-foreground dark:hover:text-muted-foreground"
               onClick={handleSkip}
             >
               Skip for now
@@ -226,14 +226,14 @@ export default function OnboardingPage() {
   // Step 1: Profile Setup
   if (step === 1) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-900 p-6">
-        <div className="w-full max-w-lg bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 p-8 flex flex-col">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-background dark:bg-card p-6">
+        <div className="w-full max-w-lg bg-card dark:bg-card rounded-2xl shadow-xl border border-border dark:border-border p-8 flex flex-col">
           <div className="mb-8">
             <div className="flex justify-between items-center mb-2">
-              <h2 className="text-2xl font-bold text-slate-900 dark:text-white text-left">Your Healthcare Path</h2>
+              <h2 className="text-2xl font-bold text-foreground dark:text-foreground text-left">Your Healthcare Path</h2>
               <span className="text-sm font-medium text-blue-600 dark:text-blue-400">Step 1 of 3</span>
             </div>
-            <div className="w-full bg-slate-100 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
+            <div className="w-full bg-muted dark:bg-secondary h-1.5 rounded-full overflow-hidden">
               <div className="bg-blue-600 h-full w-1/3 transition-all"></div>
             </div>
           </div>
@@ -246,24 +246,24 @@ export default function OnboardingPage() {
             }}
           >
             <div>
-              <label htmlFor="full-name" className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Full Name</label>
+              <label htmlFor="full-name" className="block text-sm font-semibold text-muted-foreground dark:text-muted-foreground mb-2">Full Name</label>
               <input
                 id="full-name"
                 type="text"
                 disabled
                 title="Full Name (read-only)"
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-500 dark:text-slate-500 cursor-not-allowed"
+                className="w-full px-4 py-3 rounded-xl border border-border dark:border-border bg-background dark:bg-card/50 text-muted-foreground dark:text-muted-foreground cursor-not-allowed"
                 value={profile.name}
               />
-              <p className="text-xs text-slate-400 mt-1">Name can be changed from your profile.</p>
+              <p className="text-xs text-muted-foreground mt-1">Name can be changed from your profile.</p>
             </div>
 
             <div>
-              <label htmlFor="career-stage" className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Current stage</label>
+              <label htmlFor="career-stage" className="block text-sm font-semibold text-muted-foreground dark:text-muted-foreground mb-2">Current stage</label>
               <select
                 id="career-stage"
                 title="Current stage"
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                className="w-full px-4 py-3 rounded-xl border border-border dark:border-border bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
                 value={profile.careerStage}
                 onChange={e =>
                   setProfile(p => ({
@@ -280,13 +280,13 @@ export default function OnboardingPage() {
             </div>
 
             <div>
-              <label htmlFor="healthcare-field" className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+              <label htmlFor="healthcare-field" className="block text-sm font-semibold text-muted-foreground dark:text-muted-foreground mb-2">
                 Healthcare field
               </label>
               <select
                 id="healthcare-field"
                 title="Healthcare field"
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                className="w-full px-4 py-3 rounded-xl border border-border dark:border-border bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
                 value={profile.healthcareField}
                 onChange={e => setProfile(p => ({ ...p, healthcareField: e.target.value }))}
                 required
@@ -302,7 +302,7 @@ export default function OnboardingPage() {
 
             {profile.healthcareField === 'other' && (
               <div>
-                <label htmlFor="other-healthcare-field" className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                <label htmlFor="other-healthcare-field" className="block text-sm font-semibold text-muted-foreground dark:text-muted-foreground mb-2">
                   Your healthcare field
                 </label>
                 <input
@@ -313,14 +313,14 @@ export default function OnboardingPage() {
                   onChange={e => setProfile(p => ({ ...p, otherHealthcareField: e.target.value }))}
                   required
                   placeholder="Enter your field"
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                  className="w-full px-4 py-3 rounded-xl border border-border dark:border-border bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
                 />
               </div>
             )}
 
             {profile.careerStage === 'student' && (
               <div>
-                <label htmlFor="study-year" className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                <label htmlFor="study-year" className="block text-sm font-semibold text-muted-foreground dark:text-muted-foreground mb-2">
                   Current year of study
                 </label>
                 <select
@@ -328,7 +328,7 @@ export default function OnboardingPage() {
                   value={profile.studyYear}
                   onChange={e => setProfile(p => ({ ...p, studyYear: e.target.value }))}
                   required
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                  className="w-full px-4 py-3 rounded-xl border border-border dark:border-border bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
                 >
                   <option value="">Select year</option>
                   {Array.from({ length: 12 }, (_, index) => index + 1).map(year => (
@@ -340,7 +340,7 @@ export default function OnboardingPage() {
 
             {profile.careerStage === 'professional' && (
               <div>
-                <label htmlFor="years-experience" className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                <label htmlFor="years-experience" className="block text-sm font-semibold text-muted-foreground dark:text-muted-foreground mb-2">
                   Years of professional experience
                 </label>
                 <input
@@ -352,13 +352,13 @@ export default function OnboardingPage() {
                   value={profile.yearsExperience}
                   onChange={e => setProfile(p => ({ ...p, yearsExperience: e.target.value }))}
                   required
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                  className="w-full px-4 py-3 rounded-xl border border-border dark:border-border bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
                 />
               </div>
             )}
 
             <div>
-              <label htmlFor="specialty" className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+              <label htmlFor="specialty" className="block text-sm font-semibold text-muted-foreground dark:text-muted-foreground mb-2">
                 Specialty or area of interest (optional)
               </label>
               <input
@@ -368,7 +368,7 @@ export default function OnboardingPage() {
                 value={profile.specialty}
                 onChange={e => setProfile(p => ({ ...p, specialty: e.target.value }))}
                 placeholder="e.g. Cardiology, oncology pharmacy"
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                className="w-full px-4 py-3 rounded-xl border border-border dark:border-border bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
               />
             </div>
 
@@ -380,7 +380,7 @@ export default function OnboardingPage() {
               >
                 Continue
               </Button>
-              <Button type="button" variant="ghost" className="text-slate-400" onClick={handleSkip}>
+              <Button type="button" variant="ghost" className="text-muted-foreground" onClick={handleSkip}>
                 Skip for now
               </Button>
             </div>
@@ -393,14 +393,14 @@ export default function OnboardingPage() {
   // Step 2: Learning Goals
   if (step === 2) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-900 p-6">
-        <div className="w-full max-w-lg bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 p-8 flex flex-col">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-background dark:bg-card p-6">
+        <div className="w-full max-w-lg bg-card dark:bg-card rounded-2xl shadow-xl border border-border dark:border-border p-8 flex flex-col">
           <div className="mb-8">
             <div className="flex justify-between items-center mb-2">
-              <h2 className="text-2xl font-bold text-slate-900 dark:text-white text-left">Study Goals</h2>
+              <h2 className="text-2xl font-bold text-foreground dark:text-foreground text-left">Study Goals</h2>
               <span className="text-sm font-medium text-blue-600 dark:text-blue-400">Step 2 of 3</span>
             </div>
-            <div className="w-full bg-slate-100 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
+            <div className="w-full bg-muted dark:bg-secondary h-1.5 rounded-full overflow-hidden">
               <div className="bg-blue-600 h-full w-2/3 transition-all"></div>
             </div>
           </div>
@@ -420,7 +420,7 @@ export default function OnboardingPage() {
 
             <div>
               <div className="flex justify-between items-center mb-2">
-                <label htmlFor="daily-target" className="text-sm font-semibold text-slate-700 dark:text-slate-300">Daily Target (mins)</label>
+                <label htmlFor="daily-target" className="text-sm font-semibold text-muted-foreground dark:text-muted-foreground">Daily Target (mins)</label>
                 <span className="text-lg font-bold text-blue-600 dark:text-blue-400">{goals.daily}m</span>
               </div>
               <input
@@ -430,7 +430,7 @@ export default function OnboardingPage() {
                 min="15"
                 max="300"
                 step="15"
-                className="w-full h-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                className="w-full h-1.5 bg-muted dark:bg-secondary rounded-lg appearance-none cursor-pointer accent-blue-600"
                 value={goals.daily}
                 onChange={e => setGoals(g => {
                   const val = e.target.value;
@@ -441,7 +441,7 @@ export default function OnboardingPage() {
 
             <div>
               <div className="flex justify-between items-center mb-2">
-                <label htmlFor="weekly-target" className="text-sm font-semibold text-slate-700 dark:text-slate-300">Weekly Target (mins)</label>
+                <label htmlFor="weekly-target" className="text-sm font-semibold text-muted-foreground dark:text-muted-foreground">Weekly Target (mins)</label>
                 <span className="text-lg font-bold text-blue-600 dark:text-blue-400">{goals.weekly}m</span>
               </div>
               <input
@@ -451,7 +451,7 @@ export default function OnboardingPage() {
                 min="60"
                 max="2100"
                 step="60"
-                className="w-full h-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                className="w-full h-1.5 bg-muted dark:bg-secondary rounded-lg appearance-none cursor-pointer accent-blue-600"
                 value={goals.weekly}
                 onChange={e => setGoals(g => ({ ...g, weekly: e.target.value }))}
               />
@@ -469,7 +469,7 @@ export default function OnboardingPage() {
                   Continue
                 </Button>
               </div>
-              <Button type="button" variant="ghost" className="text-slate-400" onClick={handleSkip}>
+              <Button type="button" variant="ghost" className="text-muted-foreground" onClick={handleSkip}>
                 Skip for now
               </Button>
             </div>
@@ -482,16 +482,16 @@ export default function OnboardingPage() {
   // Step 3: Quick Tour
   if (step === 3) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-900 p-6">
-        <div className="w-full max-w-lg bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 p-10 flex flex-col items-center">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-background dark:bg-card p-6">
+        <div className="w-full max-w-lg bg-card dark:bg-card rounded-2xl shadow-xl border border-border dark:border-border p-10 flex flex-col items-center">
           <div className="mb-4">
              <span className="text-sm font-medium text-blue-600 dark:text-blue-400">Step 3 of 3</span>
           </div>
           
           <div className="w-full text-center mb-10">
             <div className="text-5xl mb-6">{tourSlides[tourIndex].icon}</div>
-            <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-4">{tourSlides[tourIndex].title}</h2>
-            <p className="text-slate-600 dark:text-slate-400 leading-relaxed min-h-[4rem]">
+            <h2 className="text-2xl font-bold text-foreground dark:text-foreground mb-4">{tourSlides[tourIndex].title}</h2>
+            <p className="text-muted-foreground dark:text-muted-foreground leading-relaxed min-h-[4rem]">
               {tourSlides[tourIndex].description}
             </p>
           </div>
@@ -501,7 +501,7 @@ export default function OnboardingPage() {
               <div
                 key={i}
                 className={`h-2 rounded-full transition-all ${
-                  i === tourIndex ? 'w-8 bg-blue-600' : 'w-2 bg-slate-200 dark:bg-slate-700'
+                  i === tourIndex ? 'w-8 bg-blue-600' : 'w-2 bg-secondary dark:bg-secondary'
                 }`}
               />
             ))}
@@ -537,7 +537,7 @@ export default function OnboardingPage() {
               )}
             </div>
             {tourIndex === 0 && (
-              <Button variant="ghost" className="w-full text-slate-400" onClick={prevStep}>
+              <Button variant="ghost" className="w-full text-muted-foreground" onClick={prevStep}>
                 Back to Goals
               </Button>
             )}
@@ -550,13 +550,13 @@ export default function OnboardingPage() {
   // Step 4: Confirmation
   if (finished) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-900 p-8">
-        <div className="w-full max-w-lg bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 p-12 flex flex-col items-center text-center">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-background dark:bg-card p-8">
+        <div className="w-full max-w-lg bg-card dark:bg-card rounded-2xl shadow-xl border border-border dark:border-border p-12 flex flex-col items-center text-center">
           <div className="w-20 h-20 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mb-8">
             <CheckCircle2 className="h-10 w-10 text-green-600 dark:text-green-400" />
           </div>
-          <h2 className="text-3xl font-bold mb-4 text-slate-900 dark:text-white text-center text-pretty">You&apos;re All Set!</h2>
-          <p className="text-slate-600 dark:text-slate-400 mb-10 text-center leading-relaxed">
+          <h2 className="text-3xl font-bold mb-4 text-foreground dark:text-foreground text-center text-pretty">You&apos;re All Set!</h2>
+          <p className="text-muted-foreground dark:text-muted-foreground mb-10 text-center leading-relaxed">
             Your profile and goals have been personalized. Explore your dashboard and start your learning journey today!
           </p>
           <Button

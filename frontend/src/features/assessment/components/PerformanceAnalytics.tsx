@@ -44,7 +44,7 @@ export function PerformanceAnalyticsContent({
       case 'low':
         return 'bg-blue-100 dark:bg-blue-500/10 text-blue-800 dark:text-blue-400 border-blue-200 dark:border-blue-800/50';
       default:
-        return 'bg-gray-100 dark:bg-slate-800 text-gray-800 dark:text-slate-200 border-gray-200 dark:border-slate-700';
+        return 'bg-muted dark:bg-card text-muted-foreground dark:text-muted-foreground border-border dark:border-border';
     }
   };
 
@@ -57,7 +57,7 @@ export function PerformanceAnalyticsContent({
       case 'low':
         return <BookOpen className="h-4 w-4 text-blue-500" />;
       default:
-        return <BookOpen className="h-4 w-4 text-gray-500" />;
+        return <BookOpen className="h-4 w-4 text-muted-foreground" />;
     }
   };
 
@@ -74,9 +74,9 @@ export function PerformanceAnalyticsContent({
   return (
     <div className="space-y-6">
       {/* Overall Performance */}
-      <Card className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm border-gray-100 dark:border-slate-700/50">
+      <Card className="bg-card/80 dark:bg-card/50 backdrop-blur-sm border-border dark:border-border/50">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-white">
+          <CardTitle className="flex items-center gap-2 text-foreground dark:text-foreground">
             <Target className="h-5 w-5 text-blue-500" />
             Overall Performance
           </CardTitle>
@@ -87,15 +87,15 @@ export function PerformanceAnalyticsContent({
               <div className={`text-3xl font-bold ${getScoreColor(overallScore ?? 0)}`}>
                 {overallScore === null ? 'No score yet' : `${overallScore.toFixed(1)}%`}
               </div>
-              <p className="text-gray-600 dark:text-slate-400">Average Score</p>
+              <p className="text-muted-foreground dark:text-muted-foreground">Average Score</p>
             </div>
             <div className="text-right">
-              <div className="text-lg font-semibold text-gray-900 dark:text-white">
+              <div className="text-lg font-semibold text-foreground dark:text-foreground">
                 {data.questionsAttempted ??
                   data.categoryBreakdown?.reduce((sum, cat) => sum + (cat.questionsAnswered || 0), 0) ??
                   0}
               </div>
-              <p className="text-gray-600 dark:text-slate-400">Questions Attempted</p>
+              <p className="text-muted-foreground dark:text-muted-foreground">Questions Attempted</p>
             </div>
           </div>
           <Progress value={overallScore ?? 0} className="h-3" />
@@ -107,9 +107,9 @@ export function PerformanceAnalyticsContent({
 
       {/* Learning Trends */}
       {(data.learningTrends?.length ?? 0) > 0 && (
-        <Card className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm border-gray-100 dark:border-slate-700/50">
+        <Card className="bg-card/80 dark:bg-card/50 backdrop-blur-sm border-border dark:border-border/50">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-white">
+            <CardTitle className="flex items-center gap-2 text-foreground dark:text-foreground">
               <TrendingUp className="h-5 w-5 text-green-500" />
               Learning Trends
             </CardTitle>
@@ -147,9 +147,9 @@ export function PerformanceAnalyticsContent({
       )}
 
       {/* Category Breakdown */}
-      <Card className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm border-gray-100 dark:border-slate-700/50">
+      <Card className="bg-card/80 dark:bg-card/50 backdrop-blur-sm border-border dark:border-border/50">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-white">
+          <CardTitle className="flex items-center gap-2 text-foreground dark:text-foreground">
             <BarChart3 className="h-5 w-5 text-purple-500" />
             Performance by Category
           </CardTitle>
@@ -160,8 +160,8 @@ export function PerformanceAnalyticsContent({
               <div key={index} className="space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <h4 className="font-medium text-gray-900 dark:text-slate-200">{category.category}</h4>
-                    <Badge variant="outline" className="dark:border-slate-700 dark:text-slate-400">{category.questionsAnswered} questions</Badge>
+                    <h4 className="font-medium text-foreground dark:text-muted-foreground">{category.category}</h4>
+                    <Badge variant="outline" className="dark:border-border dark:text-muted-foreground">{category.questionsAnswered} questions</Badge>
                   </div>
                   <div className={`font-semibold ${getScoreColor(category.score ?? 0)}`}>
                     {typeof category.score === 'number' && Number.isFinite(category.score)
@@ -170,7 +170,7 @@ export function PerformanceAnalyticsContent({
                   </div>
                 </div>
                 <Progress value={category.score ?? 0} className="h-2" />
-                <div className="flex items-center justify-between text-sm text-gray-600 dark:text-slate-400">
+                <div className="flex items-center justify-between text-sm text-muted-foreground dark:text-muted-foreground">
                   <span>Avg. time: {typeof category.averageTime === 'number' ? `${Math.round(category.averageTime)}s` : '—'}</span>
                   {(category.score ?? 0) >= 80 ? (
                     <span className="flex items-center gap-1 text-green-600 dark:text-green-400">
@@ -186,7 +186,7 @@ export function PerformanceAnalyticsContent({
                 </div>
               </div>
             )) : (
-              <p className="text-sm text-gray-500">No category-level response data yet.</p>
+              <p className="text-sm text-muted-foreground">No category-level response data yet.</p>
             )}
           </div>
         </CardContent>
@@ -217,7 +217,7 @@ export function PerformanceAnalyticsContent({
                   <ul className="text-sm space-y-1">
                     {gap.recommendedActions.map((action, actionIndex) => (
                       <li key={actionIndex} className="flex items-start gap-2">
-                        <span className="text-gray-400">•</span>
+                        <span className="text-muted-foreground">•</span>
                         <span>{action}</span>
                       </li>
                     ))}
@@ -247,14 +247,14 @@ export function PerformanceAnalyticsContent({
                       {getPriorityIcon(rec.priority)}
                       <h4 className="font-medium">{rec.topic}</h4>
                     </div>
-                    <div className="text-sm text-gray-600">~{rec.estimatedStudyTime} min</div>
+                    <div className="text-sm text-muted-foreground">~{rec.estimatedStudyTime} min</div>
                   </div>
                   <div className="space-y-2">
-                    <p className="text-sm text-gray-600">Recommended resources:</p>
+                    <p className="text-sm text-muted-foreground">Recommended resources:</p>
                     <ul className="text-sm space-y-1">
                       {rec.resources.map((resource, resourceIndex) => (
                         <li key={resourceIndex} className="flex items-center gap-2">
-                          <BookOpen className="h-3 w-3 text-gray-400" />
+                          <BookOpen className="h-3 w-3 text-muted-foreground" />
                           <span>{resource}</span>
                         </li>
                       ))}
@@ -283,7 +283,7 @@ export function PerformanceAnalyticsContent({
                   <div className="shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-sm font-medium">
                     {index + 1}
                   </div>
-                  <span className="text-gray-700">{step}</span>
+                  <span className="text-muted-foreground">{step}</span>
                 </li>
               ))}
             </ul>

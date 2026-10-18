@@ -328,7 +328,7 @@ export const LearningPathVisualization: React.FC<LearningPathVisualizationProps>
   const statusMap = {
     completed: { color: 'text-emerald-500', bg: 'bg-emerald-50 dark:bg-emerald-500/10', border: 'border-emerald-200 dark:border-emerald-500/20' },
     inProgress: { color: 'text-sky-500', bg: 'bg-sky-50 dark:bg-sky-500/10', border: 'border-sky-200 dark:border-sky-500/20' },
-    notStarted: { color: 'text-neutral-400', bg: 'bg-neutral-50 dark:bg-neutral-500/5', border: 'border-neutral-200 dark:border-neutral-700' },
+    notStarted: { color: 'text-muted-foreground', bg: 'bg-background dark:bg-secondary/5', border: 'border-border dark:border-border' },
     skipped: { color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-500/10', border: 'border-amber-200 dark:border-amber-500/20' },
     failed: { color: 'text-rose-500', bg: 'bg-rose-50 dark:bg-rose-500/10', border: 'border-rose-200 dark:border-rose-500/20' },
   };
@@ -358,7 +358,7 @@ export const LearningPathVisualization: React.FC<LearningPathVisualizationProps>
           transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
           className="w-10 h-10 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full"
         />
-        <p className="text-neutral-500 animate-pulse font-medium">Preparing your journey...</p>
+        <p className="text-muted-foreground animate-pulse font-medium">Preparing your journey...</p>
       </div>
     );
   }
@@ -366,7 +366,7 @@ export const LearningPathVisualization: React.FC<LearningPathVisualizationProps>
   if (!learningPath) {
     return (
       <div className="text-center py-24">
-        <p className="text-neutral-500">Learning path not found</p>
+        <p className="text-muted-foreground">Learning path not found</p>
       </div>
     );
   }
@@ -381,7 +381,7 @@ export const LearningPathVisualization: React.FC<LearningPathVisualizationProps>
       >
         <button
           onClick={() => router.back()}
-          className="flex items-center gap-2 text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 font-medium text-sm mb-6 transition-colors group"
+          className="flex items-center gap-2 text-muted-foreground hover:text-foreground dark:hover:text-muted-foreground font-medium text-sm mb-6 transition-colors group"
         >
           <ChevronLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" /> 
           Back to Specializations
@@ -389,10 +389,10 @@ export const LearningPathVisualization: React.FC<LearningPathVisualizationProps>
         
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div className="space-y-2">
-            <h1 className="text-4xl font-extrabold text-neutral-900 dark:text-white tracking-tight leading-tight">
+            <h1 className="text-4xl font-extrabold text-foreground dark:text-foreground tracking-tight leading-tight">
               {learningPath.title}
             </h1>
-            <p className="text-lg text-neutral-500 dark:text-neutral-400 max-w-2xl leading-relaxed">
+            <p className="text-lg text-muted-foreground dark:text-muted-foreground max-w-2xl leading-relaxed">
               {learningPath.description}
             </p>
           </div>
@@ -400,12 +400,12 @@ export const LearningPathVisualization: React.FC<LearningPathVisualizationProps>
           <div className="flex items-center gap-4">
             <div className="flex -space-x-2">
               {[1,2,3].map(i => (
-                <div key={i} className="w-8 h-8 rounded-full border-2 border-white dark:border-neutral-900 bg-neutral-200 dark:bg-neutral-800 flex items-center justify-center overflow-hidden">
-                  <Users className="w-4 h-4 text-neutral-400" />
+                <div key={i} className="w-8 h-8 rounded-full border-2 border-white dark:border-border bg-secondary dark:bg-card flex items-center justify-center overflow-hidden">
+                  <Users className="w-4 h-4 text-muted-foreground" />
                 </div>
               ))}
             </div>
-            <p className="text-xs font-semibold text-neutral-400 uppercase tracking-widest">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
               Join {learningPath.analytics.totalEnrollments}+ Learners
             </p>
           </div>
@@ -423,7 +423,7 @@ export const LearningPathVisualization: React.FC<LearningPathVisualizationProps>
               <div className="w-10 h-10 rounded-2xl bg-indigo-500/10 flex items-center justify-center">
                 <Target className="w-5 h-5 text-indigo-500" />
               </div>
-              <h2 className="text-2xl font-bold text-neutral-900 dark:text-white">Learning Journey</h2>
+              <h2 className="text-2xl font-bold text-foreground dark:text-foreground">Learning Journey</h2>
             </div>
 
             <div className="relative pl-12 space-y-10">
@@ -446,10 +446,10 @@ export const LearningPathVisualization: React.FC<LearningPathVisualizationProps>
                   >
                     {/* Phase Circle Icon */}
                     <div className={cn(
-                      "absolute -left-12 top-0 w-12 h-12 rounded-full border-4 border-white dark:border-neutral-950 z-10 flex items-center justify-center transition-all duration-500",
+                      "absolute -left-12 top-0 w-12 h-12 rounded-full border-4 border-white dark:border-border z-10 flex items-center justify-center transition-all duration-500",
                       isCompleted ? "bg-emerald-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.3)]" :
                       isActive ? "bg-indigo-500 text-white shadow-[0_0_20px_rgba(99,102,241,0.3)] scale-110" :
-                      "bg-neutral-100 dark:bg-neutral-800 text-neutral-400"
+                      "bg-muted dark:bg-card text-muted-foreground"
                     )}>
                       {isCompleted ? <CheckCircle className="w-6 h-6" /> : 
                        isActive ? <Play className="w-5 h-5 ml-0.5" /> : 
@@ -459,32 +459,32 @@ export const LearningPathVisualization: React.FC<LearningPathVisualizationProps>
                     {/* Phase Card */}
                     <div className={cn(
                       "rounded-3xl p-6 transition-all duration-300 border",
-                      isActive ? "bg-white dark:bg-neutral-900 border-indigo-200 dark:border-indigo-500/30 shadow-xl shadow-indigo-500/5" :
-                      "bg-neutral-50/50 dark:bg-neutral-900/50 border-neutral-200 dark:border-neutral-800 opacity-80"
+                      isActive ? "bg-card dark:bg-card border-indigo-200 dark:border-indigo-500/30 shadow-xl shadow-indigo-500/5" :
+                      "bg-background/50 dark:bg-card/50 border-border dark:border-border opacity-80"
                     )}>
                       <div className="flex items-start justify-between mb-4">
                         <div>
                           <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mb-1">Phase {idx + 1}</p>
-                          <h3 className="text-xl font-bold text-neutral-900 dark:text-neutral-100">{phase.title}</h3>
+                          <h3 className="text-xl font-bold text-foreground dark:text-muted-foreground">{phase.title}</h3>
                         </div>
-                        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-neutral-100 dark:bg-neutral-800 text-xs font-semibold text-neutral-500">
+                        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-muted dark:bg-card text-xs font-semibold text-muted-foreground">
                           <Clock className="w-3.5 h-3.5" />
                           {phase.estimatedWeeks}w
                         </div>
                       </div>
 
-                      <p className="text-neutral-500 dark:text-neutral-400 text-sm mb-6 leading-relaxed">
+                      <p className="text-muted-foreground dark:text-muted-foreground text-sm mb-6 leading-relaxed">
                         {phase.description}
                       </p>
 
                       {/* Phase Progress Bar */}
                       {phaseProgress && (
                         <div className="mb-6">
-                          <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-neutral-400 mb-2">
+                          <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-2">
                             <span>Phase Completion</span>
                             <span className="text-indigo-500">{Math.round(phaseProgress.progressPercentage)}%</span>
                           </div>
-                          <div className="h-1.5 w-full bg-neutral-200 dark:bg-neutral-800 rounded-full overflow-hidden">
+                          <div className="h-1.5 w-full bg-secondary dark:bg-card rounded-full overflow-hidden">
                             <motion.div 
                               initial={{ width: 0 }}
                               whileInView={{ width: getProgressBarWidth(phaseProgress.progressPercentage) }}
@@ -496,7 +496,7 @@ export const LearningPathVisualization: React.FC<LearningPathVisualizationProps>
 
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-4">
-                          <div className="flex items-center gap-1.5 text-xs font-medium text-neutral-400">
+                          <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
                             <BookOpen className="w-3.5 h-3.5" />
                             {phase.modules.length} Modules
                           </div>
@@ -507,7 +507,7 @@ export const LearningPathVisualization: React.FC<LearningPathVisualizationProps>
                           className={cn(
                             "flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all",
                             selectedPhase === phase.id 
-                            ? "bg-neutral-900 dark:bg-white text-white dark:text-neutral-900" 
+                            ? "bg-neutral-900 dark:bg-card text-white dark:text-foreground"
                             : "bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100"
                           )}
                         >
@@ -524,7 +524,7 @@ export const LearningPathVisualization: React.FC<LearningPathVisualizationProps>
                             exit={{ height: 0, opacity: 0 }}
                             className="mt-6 space-y-3 overflow-hidden"
                           >
-                            <div className="h-px bg-neutral-200 dark:bg-neutral-800 mb-6" />
+                            <div className="h-px bg-secondary dark:bg-card mb-6" />
                             {phase.modules.map((module, mIdx) => {
                               const moduleProgress = getModuleProgress(module.id);
                               const isUnlocked = isModuleUnlocked(module, phase);
@@ -541,25 +541,25 @@ export const LearningPathVisualization: React.FC<LearningPathVisualizationProps>
                                   className={cn(
                                     "group/module flex items-center gap-4 p-4 rounded-2xl border transition-all duration-200",
                                     isUnlocked 
-                                    ? "bg-white dark:bg-neutral-800/50 border-neutral-100 dark:border-neutral-800 cursor-pointer hover:border-indigo-300 dark:hover:border-indigo-500/30 hover:shadow-lg hover:shadow-indigo-500/5" 
-                                    : "bg-neutral-50/50 dark:bg-neutral-900/50 border-neutral-100 dark:border-neutral-800 cursor-not-allowed opacity-60"
+                                    ? "bg-card dark:bg-card/50 border-border dark:border-border cursor-pointer hover:border-indigo-300 dark:hover:border-indigo-500/30 hover:shadow-lg hover:shadow-indigo-500/5"
+                                    : "bg-background/50 dark:bg-card/50 border-border dark:border-border cursor-not-allowed opacity-60"
                                   )}
                                 >
                                   <div className={cn(
                                     "w-10 h-10 rounded-xl flex items-center justify-center transition-colors",
                                     status.bg
                                   )}>
-                                    {isUnlocked ? <Icon className={cn("w-5 h-5", status.color)} /> : <Lock className="w-5 h-5 text-neutral-400" />}
+                                    {isUnlocked ? <Icon className={cn("w-5 h-5", status.color)} /> : <Lock className="w-5 h-5 text-muted-foreground" />}
                                   </div>
 
                                   <div className="flex-1">
-                                    <h4 className="text-sm font-bold text-neutral-900 dark:text-neutral-100 group-hover/module:text-indigo-500 transition-colors">
+                                    <h4 className="text-sm font-bold text-foreground dark:text-muted-foreground group-hover/module:text-indigo-500 transition-colors">
                                       {module.title}
                                     </h4>
                                     <div className="flex items-center gap-3 mt-1">
-                                      <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">{module.type.replace('_', ' ')}</span>
-                                      <span className="w-1 h-1 rounded-full bg-neutral-200 dark:bg-neutral-700" />
-                                      <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">{module.estimatedHours} Hours</span>
+                                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{module.type.replace('_', ' ')}</span>
+                                      <span className="w-1 h-1 rounded-full bg-secondary dark:bg-secondary" />
+                                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{module.estimatedHours} Hours</span>
                                     </div>
                                   </div>
 
@@ -569,7 +569,7 @@ export const LearningPathVisualization: React.FC<LearningPathVisualizationProps>
                                         <CheckCircle className="w-4 h-4" />
                                       </div>
                                     ) : (
-                                      <p className="text-sm font-black text-neutral-900 dark:text-white tabular-nums">
+                                      <p className="text-sm font-black text-foreground dark:text-foreground tabular-nums">
                                         {Math.round(moduleProgress?.progressPercentage || 0)}%
                                       </p>
                                     )}
@@ -592,17 +592,17 @@ export const LearningPathVisualization: React.FC<LearningPathVisualizationProps>
         <div className="space-y-8">
           
           {/* Progress Card */}
-          <section className="bg-neutral-900 dark:bg-neutral-950 rounded-4xl p-8 text-white relative overflow-hidden shadow-2xl shadow-indigo-500/10">
+          <section className="bg-neutral-900 dark:bg-background rounded-4xl p-8 text-white relative overflow-hidden shadow-2xl shadow-indigo-500/10">
             <div className="absolute -top-10 -right-10 w-40 h-40 bg-indigo-500/20 rounded-full blur-[60px]" />
             <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-violet-500/20 rounded-full blur-[60px]" />
             
             <div className="relative z-10">
               <div className="flex items-baseline justify-between mb-8">
-                <h3 className="text-sm font-bold uppercase tracking-[0.2em] text-neutral-400">Total Mastery</h3>
+                <h3 className="text-sm font-bold uppercase tracking-[0.2em] text-muted-foreground">Total Mastery</h3>
                 <span className="text-5xl font-black text-white italic">{Math.round(progress?.overallProgressPercentage || 0)}%</span>
               </div>
 
-              <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden mb-8">
+              <div className="h-2 w-full bg-card/10 rounded-full overflow-hidden mb-8">
                 <motion.div 
                   initial={{ width: 0 }}
                   animate={{ width: getProgressBarWidth(progress?.overallProgressPercentage || 0) }}
@@ -613,21 +613,21 @@ export const LearningPathVisualization: React.FC<LearningPathVisualizationProps>
               <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-1">
                   <p className="text-3xl font-black text-white">{(progress?.phaseProgress || []).filter(p => p.status === 'completed').length}</p>
-                  <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Phases completed</p>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Phases completed</p>
                 </div>
                 <div className="space-y-1">
                   <p className="text-3xl font-black text-white">{(progress?.moduleProgress || []).filter(m => m.status === 'completed').length}</p>
-                  <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Modules completed</p>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Modules completed</p>
                 </div>
                 <div className="space-y-1">
                   <p className="text-3xl font-black text-white">
                     {Math.floor((progress?.totalTimeSpentMinutes ?? 0) / 60)}h
                   </p>
-                  <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Path study time</p>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Path study time</p>
                 </div>
                 <div className="space-y-1">
                   <p className="text-3xl font-black text-white">{progress?.streakDays ?? 0}</p>
-                  <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Path streak days</p>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Path streak days</p>
                 </div>
               </div>
             </div>
@@ -637,7 +637,7 @@ export const LearningPathVisualization: React.FC<LearningPathVisualizationProps>
           {learningPath.milestones && learningPath.milestones.length > 0 && (
             <section>
               <div className="flex items-center justify-between mb-6 px-1">
-                <h3 className="text-lg font-bold text-neutral-900 dark:text-white">Milestones</h3>
+                <h3 className="text-lg font-bold text-foreground dark:text-foreground">Milestones</h3>
                 <span className="text-xs font-bold text-indigo-500">{(progress?.milestonesAchieved || []).length} / {learningPath.milestones.length}</span>
               </div>
 
@@ -652,19 +652,19 @@ export const LearningPathVisualization: React.FC<LearningPathVisualizationProps>
                       className={cn(
                         "flex items-center gap-4 p-4 rounded-2xl border transition-all duration-300",
                         isAchieved 
-                        ? "bg-white dark:bg-neutral-900 border-indigo-100 dark:border-indigo-500/20 shadow-lg shadow-indigo-500/5" 
-                        : "bg-neutral-50/50 dark:bg-neutral-900/50 border-neutral-100 dark:border-neutral-800 opacity-60"
+                        ? "bg-card dark:bg-card border-indigo-100 dark:border-indigo-500/20 shadow-lg shadow-indigo-500/5"
+                        : "bg-background/50 dark:bg-card/50 border-border dark:border-border opacity-60"
                       )}
                     >
                       <div className={cn(
                         "w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 transition-all duration-500",
-                        isAchieved ? "bg-indigo-500 text-white shadow-lg shadow-indigo-500/20" : "bg-neutral-200 dark:bg-neutral-800 text-neutral-400"
+                        isAchieved ? "bg-indigo-500 text-white shadow-lg shadow-indigo-500/20" : "bg-secondary dark:bg-card text-muted-foreground"
                       )}>
                         <Award className={cn("w-6 h-6", isAchieved ? "animate-pulse" : "")} />
                       </div>
                       <div className="flex-1">
-                        <h4 className="text-sm font-black text-neutral-900 dark:text-neutral-100">{milestone.title}</h4>
-                        <p className="text-[11px] text-neutral-500 dark:text-neutral-400 font-medium line-clamp-1">{milestone.description}</p>
+                        <h4 className="text-sm font-black text-foreground dark:text-muted-foreground">{milestone.title}</h4>
+                        <p className="text-[11px] text-muted-foreground dark:text-muted-foreground font-medium line-clamp-1">{milestone.description}</p>
                       </div>
                       {isAchieved && (
                         <div className="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center">
@@ -682,16 +682,16 @@ export const LearningPathVisualization: React.FC<LearningPathVisualizationProps>
           <section className="bg-indigo-50 dark:bg-indigo-500/10 rounded-3xl p-6 border border-indigo-100 dark:border-indigo-500/20">
             <div className="flex items-center gap-2 mb-4">
               <Sparkles className="w-4 h-4 text-indigo-500" />
-              <h4 className="text-sm font-bold text-neutral-900 dark:text-white uppercase tracking-widest">Path Insights</h4>
+              <h4 className="text-sm font-bold text-foreground dark:text-foreground uppercase tracking-widest">Path Insights</h4>
             </div>
             <div className="space-y-4">
               <div className="flex items-center gap-3">
                 <div className="w-2 h-2 rounded-full bg-indigo-500" />
-                <p className="text-xs font-semibold text-neutral-600 dark:text-neutral-400">Target Level: <span className="text-neutral-900 dark:text-white">{learningPath.difficulty}</span></p>
+                <p className="text-xs font-semibold text-muted-foreground dark:text-muted-foreground">Target Level: <span className="text-foreground dark:text-foreground">{learningPath.difficulty}</span></p>
               </div>
               <div className="flex items-center gap-3">
                 <div className="w-2 h-2 rounded-full bg-indigo-500" />
-                <p className="text-xs font-semibold text-neutral-600 dark:text-neutral-400">Estimated Total: <span className="text-neutral-900 dark:text-white">{learningPath.estimatedDurationWeeks} Weeks</span></p>
+                <p className="text-xs font-semibold text-muted-foreground dark:text-muted-foreground">Estimated Total: <span className="text-foreground dark:text-foreground">{learningPath.estimatedDurationWeeks} Weeks</span></p>
               </div>
             </div>
           </section>

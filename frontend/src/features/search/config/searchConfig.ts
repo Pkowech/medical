@@ -101,7 +101,7 @@ export const SEARCH_RESULT_COLORS: Record<SearchResultType, { bg: string; text: 
   topic: { bg: 'bg-pink-100', text: 'text-pink-700' },
   quiz: { bg: 'bg-purple-100', text: 'text-purple-700' },
   clinical_case: { bg: 'bg-green-100', text: 'text-green-700' },
-  user: { bg: 'bg-gray-100', text: 'text-gray-700' },
+  user: { bg: 'bg-muted', text: 'text-muted-foreground' },
 };
 
 /**

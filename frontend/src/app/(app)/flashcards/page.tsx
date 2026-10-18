@@ -26,8 +26,8 @@ export default function FlashcardsPage() {
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Flashcard Decks</h1>
-          <p className="text-gray-600 dark:text-slate-400">Master medical concepts with spaced repetition.</p>
+          <h1 className="text-3xl font-bold text-foreground dark:text-foreground">Flashcard Decks</h1>
+          <p className="text-muted-foreground dark:text-muted-foreground">Master medical concepts with spaced repetition.</p>
         </div>
         <Button variant="outline" onClick={() => syncCards()}>
           <RefreshCw className="h-4 w-4 mr-2" />
@@ -39,7 +39,7 @@ export default function FlashcardsPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500 uppercase tracking-wider">Due for Review</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Due for Review</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center">
@@ -50,7 +50,7 @@ export default function FlashcardsPage() {
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500 uppercase tracking-wider">Total Mastered</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Total Mastered</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center">
@@ -61,7 +61,7 @@ export default function FlashcardsPage() {
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500 uppercase tracking-wider">Retention Rate</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Retention Rate</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center">
@@ -83,11 +83,11 @@ export default function FlashcardsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-gray-600 dark:text-slate-400 mb-4">
+            <p className="text-sm text-muted-foreground dark:text-muted-foreground mb-4">
               Comprehensive review including all topics from your active courses.
             </p>
             <div className="space-y-1">
-              <div className="flex justify-between text-xs text-gray-500 mb-1">
+              <div className="flex justify-between text-xs text-muted-foreground mb-1">
                 <span>Mastery Progress</span>
                 <span>{stats?.total ? Math.round(((stats.total - stats.due) / stats.total) * 100) : 0}%</span>
               </div>
@@ -104,10 +104,10 @@ export default function FlashcardsPage() {
         {/* Placeholder for dynamic decks if we had categorisation */}
         <Card className="border-dashed border-2 opacity-60">
           <CardHeader>
-            <CardTitle className="text-gray-400 text-sm">More Decks Coming Soon</CardTitle>
+            <CardTitle className="text-muted-foreground text-sm">More Decks Coming Soon</CardTitle>
           </CardHeader>
           <CardContent className="h-24 flex items-center justify-center">
-            <p className="text-xs text-center text-gray-400">Complete more units to unlock specialized flashcard decks.</p>
+            <p className="text-xs text-center text-muted-foreground">Complete more units to unlock specialized flashcard decks.</p>
           </CardContent>
         </Card>
       </div>

@@ -5,11 +5,11 @@ import { FeatureCard } from '@/core/marketing/cards/FeatureCard';
 
 export default function FeaturesPage() {
   return (
-    <main className="min-h-[60vh] bg-gray-50 py-12 sm:py-20">
+    <main className="min-h-[60vh] bg-background py-12 sm:py-20">
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
         <header className="mx-auto mb-10 max-w-3xl text-center sm:mb-16">
-          <h1 className="text-3xl font-bold text-gray-900 sm:text-4xl">Learning tools available today</h1>
-          <p className="mt-4 text-base text-gray-600 sm:text-lg">
+          <h1 className="text-3xl font-bold text-foreground sm:text-4xl">Learning tools available today</h1>
+          <p className="mt-4 text-base text-muted-foreground sm:text-lg">
             Explore current course, practice, progress, study-group, and offline capabilities.
           </p>
         </header>

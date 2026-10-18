@@ -322,18 +322,18 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
 
   if (isUnitLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50/50 dark:bg-slate-900/50">
-        <p className="text-gray-600 dark:text-slate-400">Loading unit content…</p>
+      <div className="min-h-screen flex items-center justify-center bg-background/50 dark:bg-card/50">
+        <p className="text-muted-foreground dark:text-muted-foreground">Loading unit content…</p>
       </div>
     );
   }
 
   if (unitError && !unitData) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50/50 dark:bg-slate-900/50">
+      <div className="min-h-screen flex items-center justify-center bg-background/50 dark:bg-card/50">
         <div className="text-center">
           <p className="text-red-600 dark:text-red-400 font-semibold">Error loading unit</p>
-          <p className="text-gray-600 dark:text-slate-400 text-sm mt-2">
+          <p className="text-muted-foreground dark:text-muted-foreground text-sm mt-2">
             {unitError instanceof Error ? unitError.message : 'Failed to load unit data'}
           </p>
         </div>
@@ -343,8 +343,8 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
 
   if (!unitData) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50/50 dark:bg-slate-900/50">
-        <p className="text-gray-600 dark:text-slate-400">Unit not found.</p>
+      <div className="min-h-screen flex items-center justify-center bg-background/50 dark:bg-card/50">
+        <p className="text-muted-foreground dark:text-muted-foreground">Unit not found.</p>
       </div>
     );
   }
@@ -385,7 +385,7 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
 
   // ── Render ─────────────────────────────────────────────────────────────
   return (
-    <div className="flex h-full flex-col flex-1 min-h-0 bg-gray-50/50 dark:bg-slate-900">
+    <div className="flex h-full flex-col flex-1 min-h-0 bg-background/50 dark:bg-card">
       <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden relative">
 
         {/*
@@ -433,7 +433,7 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
                   <button
                     type="button"
                     onClick={() => setSidebarCollapsed(false)}
-                    className="rounded-md border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+                    className="rounded-md border border-border bg-card p-2 text-muted-foreground hover:bg-background dark:border-border dark:bg-card dark:text-muted-foreground dark:hover:bg-card"
                     aria-label="Open course sidebar"
                     title="Open course sidebar"
                   >
@@ -490,7 +490,7 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
                   <button
                     type="button"
                     onClick={() => toggleCoursePanel('unit-quiz')}
-                    className="flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-blue-600"
+                    className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-blue-600"
                   >
                     <ChevronLeft className="h-4 w-4" />
                     Back to Unit
@@ -505,20 +505,20 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
                 />
               </div>
             ) : !hasSelectedTopic ? (
-              <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{unitData.title}</h1>
-                <p className="mt-2 text-slate-600 dark:text-slate-400">{unitData.description || 'Choose a topic to begin.'}</p>
+              <section className="rounded-xl border border-border bg-card p-6 shadow-sm dark:border-border dark:bg-card">
+                <h1 className="text-2xl font-bold text-foreground dark:text-foreground">{unitData.title}</h1>
+                <p className="mt-2 text-muted-foreground dark:text-muted-foreground">{unitData.description || 'Choose a topic to begin.'}</p>
                 <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:hidden">
                   {(unitData.chapters || []).map((chapter, chapterIndex) => (
                     <button
                       key={chapter.id}
                       type="button"
                       onClick={() => selectTopic(chapterIndex, 0)}
-                      className="flex w-full items-center justify-between rounded-lg border border-slate-200 p-4 text-left hover:border-blue-400 hover:bg-blue-50/50 dark:border-slate-700 dark:hover:bg-blue-950/20"
+                      className="flex w-full items-center justify-between rounded-lg border border-border p-4 text-left hover:border-blue-400 hover:bg-blue-50/50 dark:border-border dark:hover:bg-blue-950/20"
                     >
                       <span>
-                        <span className="block font-semibold text-slate-900 dark:text-white">{chapter.title}</span>
-                        <span className="text-sm text-slate-500 dark:text-slate-400">{chapter.duration}</span>
+                        <span className="block font-semibold text-foreground dark:text-foreground">{chapter.title}</span>
+                        <span className="text-sm text-muted-foreground dark:text-muted-foreground">{chapter.duration}</span>
                       </span>
                       <span className="text-sm font-semibold text-blue-600">Open topic</span>
                     </button>
@@ -530,7 +530,7 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
                 <div className="flex items-center justify-between mb-4">
                   <button
                     onClick={() => toggleCoursePanel('quiz')}
-                    className="flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-blue-600 transition-colors"
+                    className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-blue-600 transition-colors"
                   >
                     <ChevronLeft className="w-4 h-4" />
                     Back to Topic

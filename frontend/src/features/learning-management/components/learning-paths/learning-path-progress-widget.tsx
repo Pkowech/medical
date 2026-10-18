@@ -80,7 +80,7 @@ export const LearningPathProgressWidget: React.FC = () => {
       case 'failed':
         return 'text-red-600 bg-red-100';
       default:
-        return 'text-gray-600 bg-gray-100';
+        return 'text-muted-foreground bg-muted';
     }
   };
 
@@ -99,16 +99,16 @@ export const LearningPathProgressWidget: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+      <div className="bg-card rounded-lg shadow-sm border border-border p-6">
         <div className="flex items-center space-x-3 mb-4">
           <div className="p-2 bg-blue-100 rounded-lg">
             <Route className="w-5 h-5 text-blue-600" />
           </div>
-          <h3 className="text-lg font-semibold text-gray-900">Learning Paths</h3>
+          <h3 className="text-lg font-semibold text-foreground">Learning Paths</h3>
         </div>
         <div className="animate-pulse space-y-4">
           {[...Array(3)].map((_, i) => (
-            <div key={i} className="h-16 bg-gray-100 rounded-lg"></div>
+            <div key={i} className="h-16 bg-muted rounded-lg"></div>
           ))}
         </div>
       </div>
@@ -116,13 +116,13 @@ export const LearningPathProgressWidget: React.FC = () => {
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+    <div className="bg-card rounded-lg shadow-sm border border-border p-6">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center space-x-3">
           <div className="p-2 bg-blue-100 rounded-lg">
             <Route className="w-5 h-5 text-blue-600" />
           </div>
-          <h3 className="text-lg font-semibold text-gray-900">Learning Paths</h3>
+          <h3 className="text-lg font-semibold text-foreground">Learning Paths</h3>
         </div>
         <Link
           href="/learning-paths"
@@ -135,9 +135,9 @@ export const LearningPathProgressWidget: React.FC = () => {
 
       {pathProgress.length === 0 ? (
         <div className="text-center py-8">
-          <Route className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-          <h4 className="text-lg font-medium text-gray-900 mb-2">No Active Learning Paths</h4>
-          <p className="text-gray-500 mb-4">
+          <Route className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+          <h4 className="text-lg font-medium text-foreground mb-2">No Active Learning Paths</h4>
+          <p className="text-muted-foreground mb-4">
             Start your structured learning journey with curated educational paths
           </p>
           <Link
@@ -170,12 +170,12 @@ export const LearningPathProgressWidget: React.FC = () => {
               <Link
                 key={progress.id}
                 href={`/learning-paths/${progress.learningPath.id}`}
-                className="block p-4 border border-gray-200 rounded-lg hover:border-blue-300 hover:shadow-sm transition-all"
+                className="block p-4 border border-border rounded-lg hover:border-blue-300 hover:shadow-sm transition-all"
               >
               <div className="flex items-start justify-between mb-3">
                 <div className="flex-1">
-                  <h4 className="font-medium text-gray-900 mb-1">{progress.learningPath.title}</h4>
-                  <div className="flex items-center space-x-3 text-sm text-gray-500">
+                  <h4 className="font-medium text-foreground mb-1">{progress.learningPath.title}</h4>
+                  <div className="flex items-center space-x-3 text-sm text-muted-foreground">
                     <span className="capitalize">
                       {progress.learningPath.category.replace('_', ' ')}
                     </span>
@@ -237,7 +237,7 @@ export const LearningPathProgressWidget: React.FC = () => {
               </div>
 
               <div className="mb-3">
-                <div className="flex items-center justify-between text-sm text-gray-600 mb-1">
+                <div className="flex items-center justify-between text-sm text-muted-foreground mb-1">
                   <span>Progress</span>
                   <span>
                     {completedModules}/{totalModules} modules · {Math.round(progress.overallProgressPercentage)}%
@@ -253,7 +253,7 @@ export const LearningPathProgressWidget: React.FC = () => {
               </div>
 
               {achievedMilestones.length > 0 && (
-                <div className="flex items-center space-x-2 text-sm text-gray-600">
+                <div className="flex items-center space-x-2 text-sm text-muted-foreground">
                   <Award className="w-4 h-4 text-yellow-600" />
                   <span>
                     {achievedMilestones.length} of{' '}
@@ -265,7 +265,7 @@ export const LearningPathProgressWidget: React.FC = () => {
             );
           })}
 
-          <div className="pt-2 border-t border-gray-100">
+          <div className="pt-2 border-t border-border">
             <Link
               href="/learning-paths"
               className="flex items-center justify-center space-x-2 text-blue-600 hover:text-blue-700 text-sm font-medium py-2"

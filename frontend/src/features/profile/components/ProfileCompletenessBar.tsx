@@ -68,10 +68,10 @@ export function ProfileCompletenessBar({ profile, variant = 'compact' }: Profile
     return (
       <div className="space-y-1.5">
         <div className="flex items-center justify-between text-sm">
-          <span className="font-medium text-gray-700 dark:text-slate-300">Profile Completeness</span>
-          <span className="text-gray-500 dark:text-slate-400">{percentage}%</span>
+          <span className="font-medium text-muted-foreground dark:text-muted-foreground">Profile Completeness</span>
+          <span className="text-muted-foreground dark:text-muted-foreground">{percentage}%</span>
         </div>
-        <div className="h-2 w-full rounded-full bg-gray-200 dark:bg-slate-700 overflow-hidden">
+        <div className="h-2 w-full rounded-full bg-secondary dark:bg-secondary overflow-hidden">
           <div
             className={`h-full rounded-full transition-all duration-500 ease-out ${barColor}`}
             style={{ width: `${percentage}%` }}
@@ -85,16 +85,16 @@ export function ProfileCompletenessBar({ profile, variant = 'compact' }: Profile
   const missingFields = fields.filter(f => !f.filled);
 
   return (
-    <div className="rounded-xl border border-gray-100 dark:border-slate-700/50 bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm p-5 space-y-4">
+    <div className="rounded-xl border border-border dark:border-border/50 bg-card/80 dark:bg-card/50 backdrop-blur-sm p-5 space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Profile Completeness</h3>
-          <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">{label}</p>
+          <h3 className="text-sm font-semibold text-foreground dark:text-foreground">Profile Completeness</h3>
+          <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-0.5">{label}</p>
         </div>
-        <span className="text-2xl font-bold text-gray-900 dark:text-white">{percentage}%</span>
+        <span className="text-2xl font-bold text-foreground dark:text-foreground">{percentage}%</span>
       </div>
 
-      <div className="h-3 w-full rounded-full bg-gray-200 dark:bg-slate-700 overflow-hidden">
+      <div className="h-3 w-full rounded-full bg-secondary dark:bg-secondary overflow-hidden">
         <div
           className={`h-full rounded-full transition-all duration-700 ease-out ${barColor}`}
           style={{ width: `${percentage}%` }}
@@ -103,7 +103,7 @@ export function ProfileCompletenessBar({ profile, variant = 'compact' }: Profile
 
       {missingFields.length > 0 && (
         <div className="pt-2">
-          <p className="text-xs font-medium text-gray-500 dark:text-slate-400 mb-2">
+          <p className="text-xs font-medium text-muted-foreground dark:text-muted-foreground mb-2">
             Complete these to strengthen your profile:
           </p>
           <div className="flex flex-wrap gap-2">
@@ -113,7 +113,7 @@ export function ProfileCompletenessBar({ profile, variant = 'compact' }: Profile
                 className={`inline-flex items-center text-xs px-2.5 py-1 rounded-full ${
                   f.required
                     ? 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border border-red-100 dark:border-red-800/50'
-                    : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300'
+                    : 'bg-muted dark:bg-secondary text-muted-foreground dark:text-muted-foreground'
                 }`}
               >
                 {f.label}

@@ -60,8 +60,8 @@ function ResetPasswordContent() {
               />
             </svg>
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Invalid Reset Link</h2>
-          <p className="text-gray-600 dark:text-gray-400">
+          <h2 className="text-2xl font-bold text-foreground dark:text-foreground">Invalid Reset Link</h2>
+          <p className="text-muted-foreground dark:text-muted-foreground">
             This password reset link is invalid or has expired. Please request a new password reset
             link.
           </p>
@@ -138,10 +138,10 @@ function ResetPasswordContent() {
               />
             </svg>
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+          <h2 className="text-2xl font-bold text-foreground dark:text-foreground">
             Password Reset Successful
           </h2>
-          <p className="text-gray-600 dark:text-gray-400">
+          <p className="text-muted-foreground dark:text-muted-foreground">
             Your password has been reset successfully. You will be redirected to the login page
             shortly.
           </p>

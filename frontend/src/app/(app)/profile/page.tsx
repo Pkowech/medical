@@ -82,7 +82,7 @@ export default function ProfilePage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[80vh] bg-gray-50/50 dark:bg-slate-900/50">
+      <div className="flex items-center justify-center min-h-[80vh] bg-background/50 dark:bg-card/50">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
       </div>
     );
@@ -95,20 +95,20 @@ export default function ProfilePage() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 bg-gray-50/50 dark:bg-slate-900/50 min-h-screen">
+    <div className="container mx-auto px-4 py-8 bg-background/50 dark:bg-card/50 min-h-screen">
       {/* Header Section */}
       <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div className="flex items-center gap-4">
-          <div className="h-16 w-16 rounded-full bg-white dark:bg-slate-800 shadow-sm border border-gray-200 dark:border-slate-700 flex items-center justify-center overflow-hidden">
+          <div className="h-16 w-16 rounded-full bg-card dark:bg-card shadow-sm border border-border dark:border-border flex items-center justify-center overflow-hidden">
             {profile.profileImage ? (
               <Image src={profile.profileImage as string} alt={getDisplayName()} width={64} height={64} className="h-full w-full object-cover" />
             ) : (
-              <User className="h-8 w-8 text-gray-400 dark:text-slate-500" />
+              <User className="h-8 w-8 text-muted-foreground dark:text-muted-foreground" />
             )}
           </div>
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white capitalize">{getDisplayName()}</h1>
-            <p className="text-gray-600 dark:text-slate-400">{profile.email}</p>
+            <h1 className="text-3xl font-bold text-foreground dark:text-foreground capitalize">{getDisplayName()}</h1>
+            <p className="text-muted-foreground dark:text-muted-foreground">{profile.email}</p>
           </div>
         </div>
         <Button onClick={() => router.push('/profile/edit')} className="w-full md:w-auto">
@@ -123,36 +123,36 @@ export default function ProfilePage() {
 
       {/* Stats Section */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <Card className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm border-gray-100 dark:border-slate-700/50">
+        <Card className="bg-card/80 dark:bg-card/50 backdrop-blur-sm border-border dark:border-border/50">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium text-gray-500 dark:text-slate-500 uppercase">Enrolled</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{profile.coursesEnrolled || 0}</p>
+                <p className="text-xs font-medium text-muted-foreground dark:text-muted-foreground uppercase">Enrolled</p>
+                <p className="text-2xl font-bold text-foreground dark:text-foreground mt-1">{profile.coursesEnrolled || 0}</p>
               </div>
               <BookOpen className="h-8 w-8 text-blue-500 opacity-20" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm border-gray-100 dark:border-slate-700/50">
+        <Card className="bg-card/80 dark:bg-card/50 backdrop-blur-sm border-border dark:border-border/50">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium text-gray-500 dark:text-slate-500 uppercase">Completed</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{profile.coursesCompleted || 0}</p>
+                <p className="text-xs font-medium text-muted-foreground dark:text-muted-foreground uppercase">Completed</p>
+                <p className="text-2xl font-bold text-foreground dark:text-foreground mt-1">{profile.coursesCompleted || 0}</p>
               </div>
               <TrendingUp className="h-8 w-8 text-green-500 opacity-20" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm border-gray-100 dark:border-slate-700/50">
+        <Card className="bg-card/80 dark:bg-card/50 backdrop-blur-sm border-border dark:border-border/50">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium text-gray-500 dark:text-slate-500 uppercase">Study Time</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
+                <p className="text-xs font-medium text-muted-foreground dark:text-muted-foreground uppercase">Study Time</p>
+                <p className="text-2xl font-bold text-foreground dark:text-foreground mt-1">
                   {profile.totalStudyTime ? Math.round(profile.totalStudyTime / 60) : 0}h
                 </p>
               </div>
@@ -161,12 +161,12 @@ export default function ProfilePage() {
           </CardContent>
         </Card>
 
-        <Card className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm border-gray-100 dark:border-slate-700/50">
+        <Card className="bg-card/80 dark:bg-card/50 backdrop-blur-sm border-border dark:border-border/50">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium text-gray-500 dark:text-slate-500 uppercase">Avg Score</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
+                <p className="text-xs font-medium text-muted-foreground dark:text-muted-foreground uppercase">Avg Score</p>
+                <p className="text-2xl font-bold text-foreground dark:text-foreground mt-1">
                   {profile.averageScore ? Math.round(profile.averageScore) : 0}%
                 </p>
               </div>
@@ -177,9 +177,9 @@ export default function ProfilePage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <Card className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm border-gray-100 dark:border-slate-700/50">
+        <Card className="bg-card/80 dark:bg-card/50 backdrop-blur-sm border-border dark:border-border/50">
           <CardHeader>
-            <CardTitle className="flex items-center text-gray-900 dark:text-white">
+            <CardTitle className="flex items-center text-foreground dark:text-foreground">
               <User className="h-5 w-5 mr-3 text-blue-500" />
               Personal Information
             </CardTitle>
@@ -187,34 +187,34 @@ export default function ProfilePage() {
           <CardContent className="space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div>
-                <p className="text-xs font-semibold text-gray-400 dark:text-slate-500 uppercase tracking-wider">Full Name</p>
-                <p className="text-base font-medium text-gray-900 dark:text-slate-200">{`${profile.firstName} ${profile.lastName}`.trim() || 'Not set'}</p>
+                <p className="text-xs font-semibold text-muted-foreground dark:text-muted-foreground uppercase tracking-wider">Full Name</p>
+                <p className="text-base font-medium text-foreground dark:text-muted-foreground">{`${profile.firstName} ${profile.lastName}`.trim() || 'Not set'}</p>
               </div>
               <div>
-                <p className="text-xs font-semibold text-gray-400 dark:text-slate-500 uppercase tracking-wider">Email Address</p>
-                <p className="text-base font-medium text-gray-900 dark:text-slate-200">{profile.email}</p>
+                <p className="text-xs font-semibold text-muted-foreground dark:text-muted-foreground uppercase tracking-wider">Email Address</p>
+                <p className="text-base font-medium text-foreground dark:text-muted-foreground">{profile.email}</p>
               </div>
               <div>
-                <p className="text-xs font-semibold text-gray-400 dark:text-slate-500 uppercase tracking-wider">Phone Number</p>
-                <p className="text-base font-medium text-gray-900 dark:text-slate-200">{profile.phoneNumber || 'Not set'}</p>
+                <p className="text-xs font-semibold text-muted-foreground dark:text-muted-foreground uppercase tracking-wider">Phone Number</p>
+                <p className="text-base font-medium text-foreground dark:text-muted-foreground">{profile.phoneNumber || 'Not set'}</p>
               </div>
               <div>
-                <p className="text-xs font-semibold text-gray-400 dark:text-slate-500 uppercase tracking-wider">Location</p>
-                <p className="text-base font-medium text-gray-900 dark:text-slate-200">{profile.location || 'Not set'}</p>
+                <p className="text-xs font-semibold text-muted-foreground dark:text-muted-foreground uppercase tracking-wider">Location</p>
+                <p className="text-base font-medium text-foreground dark:text-muted-foreground">{profile.location || 'Not set'}</p>
               </div>
             </div>
             {profile.bio && (
               <div>
-                <p className="text-xs font-semibold text-gray-400 dark:text-slate-500 uppercase tracking-wider">Bio</p>
-                <p className="text-sm text-gray-600 dark:text-slate-400 mt-1 leading-relaxed">{profile.bio}</p>
+                <p className="text-xs font-semibold text-muted-foreground dark:text-muted-foreground uppercase tracking-wider">Bio</p>
+                <p className="text-sm text-muted-foreground dark:text-muted-foreground mt-1 leading-relaxed">{profile.bio}</p>
               </div>
             )}
           </CardContent>
         </Card>
 
-        <Card className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm border-gray-100 dark:border-slate-700/50">
+        <Card className="bg-card/80 dark:bg-card/50 backdrop-blur-sm border-border dark:border-border/50">
           <CardHeader>
-            <CardTitle className="flex items-center text-gray-900 dark:text-white">
+            <CardTitle className="flex items-center text-foreground dark:text-foreground">
               <Award className="h-5 w-5 mr-3 text-purple-500" />
               Healthcare Profile
             </CardTitle>
@@ -222,14 +222,14 @@ export default function ProfilePage() {
           <CardContent className="space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div>
-                <p className="text-xs font-semibold text-gray-400 dark:text-slate-500 uppercase tracking-wider">Healthcare field</p>
-                <p className="text-base font-medium text-gray-900 dark:text-slate-200">
+                <p className="text-xs font-semibold text-muted-foreground dark:text-muted-foreground uppercase tracking-wider">Healthcare field</p>
+                <p className="text-base font-medium text-foreground dark:text-muted-foreground">
                   {healthcareFieldLabel(profile.healthcareField) || 'Not set'}
                 </p>
               </div>
               <div>
-                <p className="text-xs font-semibold text-gray-400 dark:text-slate-500 uppercase tracking-wider">Current stage</p>
-                <p className="text-base font-medium text-gray-900 dark:text-slate-200">
+                <p className="text-xs font-semibold text-muted-foreground dark:text-muted-foreground uppercase tracking-wider">Current stage</p>
+                <p className="text-base font-medium text-foreground dark:text-muted-foreground">
                   {profile.careerStage === 'student'
                     ? 'Student or trainee'
                     : profile.careerStage === 'professional'
@@ -238,14 +238,14 @@ export default function ProfilePage() {
                 </p>
               </div>
               <div>
-                <p className="text-xs font-semibold text-gray-400 dark:text-slate-500 uppercase tracking-wider">Specialty or area of interest</p>
-                <p className="text-base font-medium text-gray-900 dark:text-slate-200">{profile.specialization || 'Not set'}</p>
+                <p className="text-xs font-semibold text-muted-foreground dark:text-muted-foreground uppercase tracking-wider">Specialty or area of interest</p>
+                <p className="text-base font-medium text-foreground dark:text-muted-foreground">{profile.specialization || 'Not set'}</p>
               </div>
               <div>
-                <p className="text-xs font-semibold text-gray-400 dark:text-slate-500 uppercase tracking-wider">
+                <p className="text-xs font-semibold text-muted-foreground dark:text-muted-foreground uppercase tracking-wider">
                   {profile.careerStage === 'student' ? 'Year of study' : 'Professional experience'}
                 </p>
-                <p className="text-base font-medium text-gray-900 dark:text-slate-200">
+                <p className="text-base font-medium text-foreground dark:text-muted-foreground">
                   {profile.careerStage === 'student'
                     ? profile.studyYear ? `Year ${profile.studyYear}` : 'Not set'
                     : profile.careerStage === 'professional' &&
@@ -260,47 +260,47 @@ export default function ProfilePage() {
         </Card>
       </div>
 
-      <h2 className="text-2xl font-bold mt-12 mb-6 text-gray-900 dark:text-white">Account Management</h2>
+      <h2 className="text-2xl font-bold mt-12 mb-6 text-foreground dark:text-foreground">Account Management</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-        <Card className="hover:border-blue-500/50 transition-colors bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm border-gray-100 dark:border-slate-700/50">
+        <Card className="hover:border-blue-500/50 transition-colors bg-card/80 dark:bg-card/50 backdrop-blur-sm border-border dark:border-border/50">
           <CardHeader>
-            <CardTitle className="flex items-center text-gray-900 dark:text-white">
-              <Settings className="h-5 w-5 mr-2 text-gray-400" />
+            <CardTitle className="flex items-center text-foreground dark:text-foreground">
+              <Settings className="h-5 w-5 mr-2 text-muted-foreground" />
               Settings
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-gray-500 dark:text-slate-400 mb-6">
+            <p className="text-sm text-muted-foreground dark:text-muted-foreground mb-6">
               Manage your account settings, notifications, and privacy preferences.
             </p>
             <Button variant="outline" className="w-full" onClick={() => router.push('/settings')}>Go to Settings</Button>
           </CardContent>
         </Card>
 
-        <Card className="hover:border-purple-500/50 transition-colors bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm border-gray-100 dark:border-slate-700/50">
+        <Card className="hover:border-purple-500/50 transition-colors bg-card/80 dark:bg-card/50 backdrop-blur-sm border-border dark:border-border/50">
           <CardHeader>
-            <CardTitle className="flex items-center text-gray-900 dark:text-white">
-              <Award className="h-5 w-5 mr-2 text-gray-400" />
+            <CardTitle className="flex items-center text-foreground dark:text-foreground">
+              <Award className="h-5 w-5 mr-2 text-muted-foreground" />
               Achievements
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-gray-500 dark:text-slate-400 mb-6">
+            <p className="text-sm text-muted-foreground dark:text-muted-foreground mb-6">
               View your earned achievements, badges, and milestones progress.
             </p>
             <Button variant="outline" className="w-full" onClick={() => router.push('/profile/achievements')}>View Achievements</Button>
           </CardContent>
         </Card>
 
-        <Card className="hover:border-green-500/50 transition-colors bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm border-gray-100 dark:border-slate-700/50">
+        <Card className="hover:border-green-500/50 transition-colors bg-card/80 dark:bg-card/50 backdrop-blur-sm border-border dark:border-border/50">
           <CardHeader>
-            <CardTitle className="flex items-center text-gray-900 dark:text-white">
-              <Clock className="h-5 w-5 mr-2 text-gray-400" />
+            <CardTitle className="flex items-center text-foreground dark:text-foreground">
+              <Clock className="h-5 w-5 mr-2 text-muted-foreground" />
               Sessions
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-gray-500 dark:text-slate-400 mb-6">
+            <p className="text-sm text-muted-foreground dark:text-muted-foreground mb-6">
               Manage your active login sessions and verify connected devices.
             </p>
             <Button variant="outline" className="w-full" onClick={() => router.push('/profile/sessions')}>Manage Sessions</Button>

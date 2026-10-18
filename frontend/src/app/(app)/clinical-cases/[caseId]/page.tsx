@@ -20,11 +20,11 @@ export default function ClinicalCaseDetailPage({ params }: ClinicalCasePageProps
   }, [params]);
 
   if (!caseId) {
-    return <div className="p-8 text-center text-slate-500">Loading clinical case…</div>;
+    return <div className="p-8 text-center text-muted-foreground">Loading clinical case…</div>;
   }
 
   return (
-    <main className="min-h-full bg-slate-50 p-4 dark:bg-slate-950 md:p-8">
+    <main className="min-h-full bg-background p-4 dark:bg-background md:p-8">
       <div className="mx-auto max-w-6xl">
         <InteractiveCaseInterface caseId={caseId} />
       </div>

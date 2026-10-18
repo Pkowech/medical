@@ -89,11 +89,11 @@ const MedicalEducationDashboard = () => {
   // Error state with retry capability
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-slate-900 p-6 flex items-center justify-center">
+      <div className="min-h-screen bg-background p-6 flex items-center justify-center">
         <div className="text-center max-w-md">
           <XCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Failed to load dashboard</h2>
-          <p className="text-gray-600 dark:text-slate-400 mb-4">
+          <h2 className="text-xl font-bold text-foreground dark:text-foreground mb-2">Failed to load dashboard</h2>
+          <p className="text-muted-foreground dark:text-muted-foreground mb-4">
             {error instanceof Error ? error.message : 'An unexpected error occurred'}
           </p>
           <button
@@ -110,20 +110,20 @@ const MedicalEducationDashboard = () => {
   // Loading state with better UX
   if (isLoading || !data) {
     return (
-      <div className="min-h-screen bg-slate-50 p-4 dark:bg-slate-950 sm:p-6" aria-label="Loading student dashboard">
+      <div className="min-h-screen bg-background p-4 sm:p-6" aria-label="Loading student dashboard">
         <div className="mx-auto max-w-screen-2xl space-y-6">
           <div className="grid gap-4 lg:grid-cols-12">
-            <div className="h-64 animate-pulse rounded-3xl bg-slate-200 dark:bg-slate-800 lg:col-span-8" />
-            <div className="h-64 animate-pulse rounded-3xl bg-slate-200 dark:bg-slate-800 lg:col-span-4" />
+            <div className="h-64 animate-pulse rounded-3xl bg-secondary dark:bg-card lg:col-span-8" />
+            <div className="h-64 animate-pulse rounded-3xl bg-secondary dark:bg-card lg:col-span-4" />
           </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {Array.from({ length: 4 }, (_, index) => (
-              <div key={index} className="h-28 animate-pulse rounded-2xl bg-slate-200 dark:bg-slate-800" />
+              <div key={index} className="h-28 animate-pulse rounded-2xl bg-secondary dark:bg-card" />
             ))}
           </div>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {Array.from({ length: 4 }, (_, index) => (
-              <div key={index} className="h-20 animate-pulse rounded-2xl bg-slate-200 dark:bg-slate-800" />
+              <div key={index} className="h-20 animate-pulse rounded-2xl bg-secondary dark:bg-card" />
             ))}
           </div>
         </div>
@@ -287,15 +287,15 @@ const MedicalEducationDashboard = () => {
   };
 
   return (
-    <div className="min-h-[calc(100dvh-4rem)] w-full min-w-0 bg-slate-50 dark:bg-slate-950 p-3 sm:p-4 md:p-6">
+    <div className="min-h-[calc(100dvh-4rem)] w-full min-w-0 bg-background p-3 sm:p-4 md:p-6">
       <div className="mx-auto w-full max-w-screen-2xl min-w-0 space-y-4 sm:space-y-6">
         <section className="grid grid-cols-1 gap-4 lg:grid-cols-12" aria-label="Study overview">
-          <div className="relative isolate overflow-hidden rounded-3xl border border-slate-200 bg-linear-to-br from-white via-indigo-50 to-cyan-50 p-6 text-slate-900 shadow-sm dark:border-slate-800 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 dark:text-white sm:p-8 lg:col-span-8">
+          <div className="relative isolate overflow-hidden rounded-3xl border border-border bg-linear-to-br from-white via-indigo-50 to-cyan-50 p-6 text-foreground shadow-sm dark:border-border dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 dark:text-foreground sm:p-8 lg:col-span-8">
             <div className="pointer-events-none absolute -right-16 -top-24 -z-10 h-72 w-72 rounded-full bg-indigo-500/20 blur-3xl" />
             <div className="pointer-events-none absolute -bottom-32 right-1/4 -z-10 h-64 w-64 rounded-full bg-cyan-400/10 blur-3xl" />
             <div className="flex h-full flex-col justify-between gap-8">
               <div>
-                <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/70 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
+                <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-border bg-card/70 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground dark:border-white/10 dark:bg-card/5 dark:text-muted-foreground">
                   <GraduationCap className="h-4 w-4 text-cyan-600 dark:text-cyan-300" />
                   My learning
                 </div>
@@ -306,7 +306,7 @@ const MedicalEducationDashboard = () => {
                       ? 'Your courses are ready to review'
                       : 'Build your next study habit'}
                 </h2>
-                <p className="mt-2 max-w-xl text-sm leading-6 text-slate-600 dark:text-slate-300 sm:text-base">
+                <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground dark:text-muted-foreground sm:text-base">
                   {activeCourse
                     ? 'Pick up your course progress and keep moving through the next lesson.'
                     : firstCourse
@@ -317,16 +317,16 @@ const MedicalEducationDashboard = () => {
 
               <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
                 <div className="min-w-0">
-                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground dark:text-muted-foreground">
                     {activeCourse ? 'Up next in your learning' : firstCourse ? 'Ready to review' : 'Your course library'}
                   </p>
-                  <p className="mt-1 truncate text-lg font-semibold text-slate-900 dark:text-white">
+                  <p className="mt-1 truncate text-lg font-semibold text-foreground dark:text-foreground">
                     {displayCourse?.name || 'Browse available courses'}
                   </p>
                   {displayCourse && (
                     <div className="mt-4 flex items-center gap-3">
                       <div
-                        className="h-2 w-48 max-w-[55vw] overflow-hidden rounded-full bg-slate-200 dark:bg-white/15"
+                        className="h-2 w-48 max-w-[55vw] overflow-hidden rounded-full bg-secondary dark:bg-card/15"
                         role="progressbar"
                         aria-label={`${displayCourse.name} progress`}
                         aria-valuemin={0}
@@ -338,7 +338,7 @@ const MedicalEducationDashboard = () => {
                           style={{ width: `${Math.min(100, Math.max(0, displayCourse.progressPercentage))}%` }}
                         />
                       </div>
-                      <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                      <span className="text-xs font-medium text-muted-foreground dark:text-muted-foreground">
                         {Math.round(displayCourse.progressPercentage)}% complete
                       </span>
                     </div>
@@ -347,7 +347,7 @@ const MedicalEducationDashboard = () => {
                 <button
                   type="button"
                   onClick={handleContinueLearning}
-                  className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-cyan-500 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-cyan-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:bg-cyan-300 dark:text-slate-950 dark:hover:bg-cyan-200 dark:focus-visible:ring-cyan-200 dark:focus-visible:ring-offset-slate-950"
+                  className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-cyan-500 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-cyan-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:bg-cyan-300 dark:text-foreground dark:hover:bg-cyan-200 dark:focus-visible:ring-cyan-200 dark:focus-visible:ring-offset-slate-950"
                 >
                   {activeCourse ? 'Continue learning' : firstCourse ? 'Review a course' : 'Explore courses'}
                   <ArrowRight className="h-4 w-4" />
@@ -356,30 +356,30 @@ const MedicalEducationDashboard = () => {
             </div>
           </div>
 
-          <div className="flex flex-col justify-between gap-5 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 lg:col-span-4">
+          <div className="flex flex-col justify-between gap-5 rounded-3xl border border-border bg-card p-6 text-card-foreground shadow-sm lg:col-span-4">
             <div>
-              <div className="flex items-center gap-2 text-sm font-semibold text-slate-500 dark:text-slate-400">
+              <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground dark:text-muted-foreground">
                 <Target className="h-4 w-4 text-indigo-500" />
                 Your study rhythm
               </div>
-              <div className="mt-5 grid grid-cols-2 divide-x divide-slate-200 dark:divide-slate-800">
+              <div className="mt-5 grid grid-cols-2 divide-x divide-border dark:divide-border">
                 <div className="pr-4">
-                  <p className="text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">
+                  <p className="text-3xl font-semibold tracking-tight text-foreground dark:text-foreground">
                     {stats.streak || 0}
-                    <span className="ml-1 text-sm font-medium text-slate-500 dark:text-slate-400">
+                    <span className="ml-1 text-sm font-medium text-muted-foreground dark:text-muted-foreground">
                       {(stats.streak || 0) === 1 ? 'day' : 'days'}
                     </span>
                   </p>
-                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Current streak</p>
+                  <p className="mt-1 text-xs text-muted-foreground dark:text-muted-foreground">Current streak</p>
                 </div>
                 <div className="pl-4">
-                  <p className="text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">
+                  <p className="text-3xl font-semibold tracking-tight text-foreground dark:text-foreground">
                     {stats.studyHours || 0}
-                    <span className="ml-1 text-sm font-medium text-slate-500 dark:text-slate-400">
+                    <span className="ml-1 text-sm font-medium text-muted-foreground dark:text-muted-foreground">
                       {(stats.studyHours || 0) === 1 ? 'hr' : 'hrs'}
                     </span>
                   </p>
-                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Study time</p>
+                  <p className="mt-1 text-xs text-muted-foreground dark:text-muted-foreground">Study time</p>
                 </div>
               </div>
             </div>
@@ -390,11 +390,11 @@ const MedicalEducationDashboard = () => {
                 setStudySessionStarted(false);
                 setShowStudySession(true);
               }}
-              className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-left transition-colors hover:border-indigo-200 hover:bg-indigo-50 dark:border-slate-800 dark:bg-slate-950 dark:hover:border-indigo-900 dark:hover:bg-indigo-950/30"
+              className="flex w-full items-center justify-between rounded-xl border border-border bg-muted px-4 py-3 text-left transition-colors hover:border-indigo-300 hover:bg-indigo-50 dark:hover:border-indigo-900 dark:hover:bg-indigo-950/30"
             >
               <span>
-                <span className="block text-sm font-semibold text-slate-900 dark:text-white">Start a focus session</span>
-                <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">Track time spent studying</span>
+                <span className="block text-sm font-semibold text-foreground dark:text-foreground">Start a focus session</span>
+                <span className="mt-0.5 block text-xs text-muted-foreground dark:text-muted-foreground">Track time spent studying</span>
               </span>
               <Clock className="h-5 w-5 text-indigo-500" />
             </button>
@@ -438,8 +438,8 @@ const MedicalEducationDashboard = () => {
         <section aria-label="Focused study activities">
           <div className="mb-3 flex items-end justify-between gap-4">
             <div>
-              <h2 className="text-lg font-semibold tracking-tight text-slate-900 dark:text-white">Choose a study activity</h2>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Take a short, focused step that supports your learning.</p>
+              <h2 className="text-lg font-semibold tracking-tight text-foreground dark:text-foreground">Choose a study activity</h2>
+              <p className="mt-1 text-sm text-muted-foreground dark:text-muted-foreground">Take a short, focused step that supports your learning.</p>
             </div>
             <button
               type="button"
@@ -453,30 +453,30 @@ const MedicalEducationDashboard = () => {
             <button
               type="button"
               onClick={handlePracticeQuiz}
-              className="group flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-emerald-900"
+              className="group flex items-center gap-4 rounded-2xl border border-border bg-card p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md dark:hover:border-emerald-900"
             >
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400">
                 <PlayCircle className="h-5 w-5" />
               </span>
               <span>
-                <span className="block text-sm font-semibold text-slate-900 dark:text-white">Practice a quiz</span>
-                <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">Strengthen recall and check understanding</span>
+                <span className="block text-sm font-semibold text-foreground dark:text-foreground">Practice a quiz</span>
+                <span className="mt-0.5 block text-xs text-muted-foreground dark:text-muted-foreground">Strengthen recall and check understanding</span>
               </span>
-              <ChevronRight className="ml-auto h-4 w-4 text-slate-400 transition group-hover:translate-x-0.5" />
+              <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground transition group-hover:translate-x-0.5" />
             </button>
             <button
               type="button"
               onClick={() => router.push('/study-planner')}
-              className="group flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-cyan-200 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-cyan-900"
+              className="group flex items-center gap-4 rounded-2xl border border-border bg-card p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-cyan-300 hover:shadow-md dark:hover:border-cyan-900"
             >
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-cyan-50 text-cyan-700 dark:bg-cyan-950/50 dark:text-cyan-400">
                 <Calendar className="h-5 w-5" />
               </span>
               <span>
-                <span className="block text-sm font-semibold text-slate-900 dark:text-white">Plan your next session</span>
-                <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">Set a realistic study goal</span>
+                <span className="block text-sm font-semibold text-foreground dark:text-foreground">Plan your next session</span>
+                <span className="mt-0.5 block text-xs text-muted-foreground dark:text-muted-foreground">Set a realistic study goal</span>
               </span>
-              <ChevronRight className="ml-auto h-4 w-4 text-slate-400 transition group-hover:translate-x-0.5" />
+              <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground transition group-hover:translate-x-0.5" />
             </button>
           </div>
         </section>
@@ -484,11 +484,11 @@ const MedicalEducationDashboard = () => {
         <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-3">
           <div className="space-y-6 lg:col-span-2">
             {/* Daily Flashcards */}
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div className="rounded-2xl border border-border bg-card p-6 text-card-foreground shadow-sm">
               <div className="mb-4 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <BookMarked className="h-5 w-5 text-indigo-500" />
-                  <h3 className="font-semibold text-slate-900 dark:text-white">Daily flashcards</h3>
+                  <h3 className="font-semibold text-foreground dark:text-foreground">Daily flashcards</h3>
                 </div>
                 {(data.flashcards?.due || 0) > 0 && (
                   <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300">
@@ -496,18 +496,18 @@ const MedicalEducationDashboard = () => {
                   </span>
                 )}
               </div>
-              <div className="grid grid-cols-3 divide-x divide-slate-200 rounded-xl bg-slate-50 py-4 text-center dark:divide-slate-800 dark:bg-slate-950">
+              <div className="grid grid-cols-3 divide-x divide-border rounded-xl bg-muted py-4 text-center">
                 <div>
-                  <p className="text-xl font-semibold text-slate-900 dark:text-white">{data.flashcards?.due || 0}</p>
-                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Due today</p>
+                  <p className="text-xl font-semibold text-foreground dark:text-foreground">{data.flashcards?.due || 0}</p>
+                  <p className="mt-1 text-xs text-muted-foreground dark:text-muted-foreground">Due today</p>
                 </div>
                 <div>
-                  <p className="text-xl font-semibold text-slate-900 dark:text-white">{data.flashcards?.mastered || 0}</p>
-                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Mastered</p>
+                  <p className="text-xl font-semibold text-foreground dark:text-foreground">{data.flashcards?.mastered || 0}</p>
+                  <p className="mt-1 text-xs text-muted-foreground dark:text-muted-foreground">Mastered</p>
                 </div>
                 <div>
-                  <p className="text-xl font-semibold text-slate-900 dark:text-white">{data.flashcards?.learning || 0}</p>
-                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">In progress</p>
+                  <p className="text-xl font-semibold text-foreground dark:text-foreground">{data.flashcards?.learning || 0}</p>
+                  <p className="mt-1 text-xs text-muted-foreground dark:text-muted-foreground">In progress</p>
                 </div>
               </div>
               <button
@@ -526,11 +526,11 @@ const MedicalEducationDashboard = () => {
 
         {/* Recommended Study Sessions - Improved empty state */}
         {(data.recommendedStudy?.length || 0) > 0 ? (
-          <div className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-gray-200 dark:border-slate-700/50">
+          <div className="bg-card text-card-foreground backdrop-blur-sm rounded-2xl p-6 border border-border">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <Target className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white">Recommended For You</h3>
+                <h3 className="text-lg font-bold text-foreground dark:text-foreground">Recommended For You</h3>
               </div>
               <span className="text-xs bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 px-3 py-1 rounded-full">Smart Analytics</span>
             </div>
@@ -543,10 +543,10 @@ const MedicalEducationDashboard = () => {
                       router.push(`/learning-paths/${item.id}`);
                     }
                   }}
-                  className={`bg-gray-50 dark:bg-slate-700/50 rounded-xl p-4 border transition-all cursor-pointer group ${
+                  className={`bg-background dark:bg-secondary/50 rounded-xl p-4 border transition-all cursor-pointer group ${
                     item.specializationMatch 
                       ? 'border-amber-400 dark:border-amber-500/50 shadow-sm shadow-amber-500/10' 
-                      : 'border-gray-200 dark:border-slate-600/50 hover:border-emerald-400 dark:hover:border-emerald-500/50'
+                      : 'border-border dark:border-border/50 hover:border-emerald-400 dark:hover:border-emerald-500/50'
                   }`}
                 >
                   <div className="flex items-start justify-between mb-2">
@@ -568,12 +568,12 @@ const MedicalEducationDashboard = () => {
                         </span>
                       )}
                     </div>
-                    <Clock className="w-4 h-4 text-gray-400 dark:text-slate-500" />
+                    <Clock className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
                   </div>
-                  <h4 className="font-semibold text-gray-900 dark:text-white mb-1 text-sm line-clamp-1">{item.title}</h4>
-                  <p className="text-xs text-gray-600 dark:text-slate-400 mb-3 line-clamp-2">{item.reason}</p>
+                  <h4 className="font-semibold text-foreground dark:text-foreground mb-1 text-sm line-clamp-1">{item.title}</h4>
+                  <p className="text-xs text-muted-foreground dark:text-muted-foreground mb-3 line-clamp-2">{item.reason}</p>
                   <div className="flex items-center justify-between text-[10px]">
-                    <span className="text-gray-500 dark:text-slate-500">{item.estimatedTime}</span>
+                    <span className="text-muted-foreground dark:text-muted-foreground">{item.estimatedTime}</span>
                     <span className={`${item.priority === 'high' ? 'text-red-600 font-bold' : 'text-emerald-600'} dark:text-emerald-400 group-hover:translate-x-1 transition-transform`}>
                       {item.priority === 'high' ? 'Review Now →' : 'Start →'}
                     </span>
@@ -583,12 +583,12 @@ const MedicalEducationDashboard = () => {
             </div>
           </div>
         ) : (
-          <div className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm rounded-2xl p-8 border border-gray-200 dark:border-slate-700/50 text-center">
+          <div className="bg-card text-card-foreground rounded-2xl p-8 border border-border text-center">
             <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
               <Target className="w-8 h-8 text-emerald-600 dark:text-emerald-400" />
             </div>
-            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Start Your Learning Journey</h3>
-            <p className="text-gray-600 dark:text-slate-400 mb-6 max-w-md mx-auto">
+            <h3 className="text-xl font-bold text-foreground dark:text-foreground mb-2">Start Your Learning Journey</h3>
+            <p className="text-muted-foreground dark:text-muted-foreground mb-6 max-w-md mx-auto">
               Complete a few lessons and our Smart Analytics will recommend personalized study sessions just for you.
             </p>
             <button 
@@ -603,26 +603,26 @@ const MedicalEducationDashboard = () => {
         {/* Note: Stats are now in the hero section above */}
 
         {/* Performance Trends Over Time */}
-        <div className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-gray-200 dark:border-slate-700/50 shadow-sm relative overflow-hidden">
+        <div className="bg-card text-card-foreground rounded-2xl p-6 border border-border shadow-sm relative overflow-hidden">
           {/* Subtle Background Grid Line */}
-          <div className="absolute inset-x-0 top-32 border-t border-slate-100 dark:border-slate-700/30 z-0" />
-          <div className="absolute inset-x-0 top-44 border-t border-slate-100 dark:border-slate-700/30 z-0" />
-          <div className="absolute inset-x-0 top-56 border-t border-slate-100 dark:border-slate-700/30 z-0" />
+          <div className="absolute inset-x-0 top-32 border-t border-border z-0" />
+          <div className="absolute inset-x-0 top-44 border-t border-border z-0" />
+          <div className="absolute inset-x-0 top-56 border-t border-border z-0" />
           
           <div className="relative z-10 mb-6 flex flex-col gap-3 sm:mb-8 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+              <h3 className="text-lg font-bold text-foreground dark:text-foreground flex items-center gap-2">
                 <TrendingUp className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
                 Performance Trends
               </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Recorded assessment scores and study hours</p>
+              <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-0.5">Recorded assessment scores and study hours</p>
             </div>
-            <div className="flex w-fit max-w-full bg-slate-100 dark:bg-slate-900/50 p-1 rounded-xl border border-slate-200 dark:border-slate-700/50">
+            <div className="flex w-fit max-w-full bg-muted p-1 rounded-xl border border-border">
               <button
                 onClick={() => setSelectedTrendMetric('score')}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 sm:px-4 ${selectedTrendMetric === 'score'
-                  ? 'bg-white dark:bg-indigo-500 text-indigo-600 dark:text-white shadow-sm'
-                  : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                  ? 'bg-card dark:bg-indigo-500 text-indigo-600 dark:text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-muted-foreground dark:hover:text-muted-foreground'
                   }`}
               >
                 Avg. Score
@@ -630,8 +630,8 @@ const MedicalEducationDashboard = () => {
               <button
                 onClick={() => setSelectedTrendMetric('hours')}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 sm:px-4 ${selectedTrendMetric === 'hours'
-                  ? 'bg-white dark:bg-indigo-500 text-indigo-600 dark:text-white shadow-sm'
-                  : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                  ? 'bg-card dark:bg-indigo-500 text-indigo-600 dark:text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-muted-foreground dark:hover:text-muted-foreground'
                   }`}
               >
                 Study Hours
@@ -662,19 +662,19 @@ const MedicalEducationDashboard = () => {
                             : 'bg-linear-to-t from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300'
                         }`}
                       >
-                        <div className="absolute -top-10 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all transform scale-90 group-hover:scale-100 bg-slate-900 dark:bg-slate-800 text-white px-2.5 py-1.5 rounded-lg text-[10px] font-bold whitespace-nowrap border border-slate-700 shadow-xl z-20">
+                        <div className="absolute -top-10 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all transform scale-90 group-hover:scale-100 bg-slate-900 dark:bg-card text-white px-2.5 py-1.5 rounded-lg text-[10px] font-bold whitespace-nowrap border border-border shadow-xl z-20">
                           {point.value}{selectedTrendMetric === 'score' ? '%' : 'h'}
                         </div>
                       </motion.div>
                     </div>
-                    <span className="text-[10px] md:text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-tighter">{point.label}</span>
+                    <span className="text-[10px] md:text-xs font-bold text-muted-foreground dark:text-muted-foreground uppercase tracking-tighter">{point.label}</span>
                   </div>
                 );
               })}
             </div>
           ) : (
-            <div className="h-64 flex flex-col items-center justify-center gap-2 text-center text-slate-500 dark:text-slate-400">
-              <BarChart3 className="h-8 w-8 text-slate-300 dark:text-slate-600" />
+            <div className="h-64 flex flex-col items-center justify-center gap-2 text-center text-muted-foreground dark:text-muted-foreground">
+              <BarChart3 className="h-8 w-8 text-slate-300 dark:text-muted-foreground" />
               <p className="text-sm font-medium">
                 {selectedTrendMetric === 'score'
                   ? performanceSummaryError
@@ -685,11 +685,11 @@ const MedicalEducationDashboard = () => {
             </div>
           )}
           
-          <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-700/50 flex flex-wrap items-center justify-between gap-4 text-sm relative z-10">
+          <div className="mt-8 pt-6 border-t border-border dark:border-border/50 flex flex-wrap items-center justify-between gap-4 text-sm relative z-10">
             <div className="flex items-center gap-6">
               <div className="flex items-center gap-2">
                 <div className={`w-3 h-3 rounded-full ${selectedTrendMetric === 'score' ? 'bg-indigo-500' : 'bg-emerald-500'}`}></div>
-                <span className="text-slate-600 dark:text-slate-400 font-medium">
+                <span className="text-muted-foreground dark:text-muted-foreground font-medium">
                   {selectedTrendMetric === 'score' ? 'Assessment Average' : 'Study Engagement'}
                 </span>
               </div>
@@ -698,11 +698,11 @@ const MedicalEducationDashboard = () => {
         </div>
 
         {/* Upcoming Deadlines */}
-        <div className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-gray-200 dark:border-slate-700/50">
+        <div className="bg-card text-card-foreground rounded-2xl p-6 border border-border">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <AlertCircle className="w-5 h-5 text-orange-500" />
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Upcoming Deadlines</h3>
+              <h3 className="text-lg font-semibold text-foreground dark:text-foreground">Upcoming Deadlines</h3>
             </div>
             <button
               onClick={() => router.push('/study-planner/schedule')}
@@ -733,41 +733,41 @@ const MedicalEducationDashboard = () => {
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <h4 className="font-semibold text-gray-900 dark:text-white">{deadline.title}</h4>
+                        <h4 className="font-semibold text-foreground dark:text-foreground">{deadline.title}</h4>
                         <span
                           className={`px-2 py-0.5 rounded-full text-xs font-bold ${getPriorityBadge(deadline.priority)}`}
                         >
                           {deadline.priority}
                         </span>
                       </div>
-                      <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-slate-400">
+                      <div className="flex items-center gap-4 text-sm text-muted-foreground dark:text-muted-foreground">
                         <span className="flex items-center gap-1">
                           <Calendar className="w-4 h-4" />
                           {deadline.daysLeft} days left
                         </span>
                         <span className="capitalize">{deadline.type}</span>
-                        <span className="text-gray-400">•</span>
+                        <span className="text-muted-foreground">•</span>
                         <span>{deadline.course}</span>
                       </div>
                     </div>
-                    <ChevronRight className="w-5 h-5 text-gray-400" />
+                    <ChevronRight className="w-5 h-5 text-muted-foreground" />
                   </div>
                 </div>
               ))
             ) : (
-              <div className="text-center py-8 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-dashed border-slate-200 dark:border-slate-700">
+              <div className="text-center py-8 bg-muted rounded-xl border border-dashed border-border">
                 <Calendar className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-                <p className="text-sm font-medium text-slate-900 dark:text-slate-100">No upcoming deadlines</p>
-                <p className="text-xs text-slate-500 max-w-[200px] mx-auto mt-1">You're all caught up! Enjoy your free time or start ahead.</p>
+                <p className="text-sm font-medium text-foreground dark:text-muted-foreground">No upcoming deadlines</p>
+                <p className="text-xs text-muted-foreground max-w-[200px] mx-auto mt-1">You're all caught up! Enjoy your free time or start ahead.</p>
               </div>
             )}
           </div>
         </div>
 
         {/* Enrolled Units */}
-        <div className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-gray-200 dark:border-slate-700/50">
+        <div className="bg-card text-card-foreground rounded-2xl p-6 border border-border">
           <div className="mb-5 flex flex-col items-start gap-2 sm:mb-6 sm:flex-row sm:items-center sm:justify-between">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Enrolled Units</h3>
+            <h3 className="text-lg font-semibold text-foreground dark:text-foreground">Enrolled Units</h3>
             <button 
               onClick={() => router.push('/courses')}
               className="text-sm font-medium text-indigo-600 dark:text-blue-400 hover:text-indigo-700 dark:hover:text-blue-300"
@@ -782,14 +782,14 @@ const MedicalEducationDashboard = () => {
               <div
                 key={`${course.id ?? 'course'}-${course.unitId ?? index}`}
                 onClick={() => openCourse(course)}
-                className="bg-gray-50/50 dark:bg-slate-700/50 rounded-xl p-5 border border-gray-200 dark:border-slate-600/50 hover:shadow-lg dark:hover:border-indigo-500/50 transition-all duration-300 group cursor-pointer"
+                className="bg-muted/50 rounded-xl p-5 border border-border hover:shadow-lg dark:hover:border-indigo-500/50 transition-all duration-300 group cursor-pointer"
               >
                 <div className="flex items-start justify-between mb-4">
                   <div>
-                    <h4 className="font-bold text-gray-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-blue-400 transition-colors">
+                    <h4 className="font-bold text-foreground dark:text-foreground group-hover:text-indigo-600 dark:group-hover:text-blue-400 transition-colors">
                       {course.name}
                     </h4>
-                    <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">Next: {course.nextTopic}</p>
+                    <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-1">Next: {course.nextTopic}</p>
                   </div>
                   <button
                     type="button"
@@ -806,19 +806,19 @@ const MedicalEducationDashboard = () => {
                 </div>
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-600 dark:text-slate-400">Progress</span>
-                    <span className="font-semibold text-gray-900 dark:text-white">
+                    <span className="text-muted-foreground dark:text-muted-foreground">Progress</span>
+                    <span className="font-semibold text-foreground dark:text-foreground">
                       {course.progressPercentage ?? 0}%
                     </span>
                   </div>
-                    <div className="h-2 bg-gray-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                    <div className="h-2 bg-secondary dark:bg-secondary rounded-full overflow-hidden">
                       <div
                         className={`h-full bg-linear-to-r ${course.color} rounded-full transition-all duration-1000 ease-out dynamic-width`}
                         style={{ '--width': `${course.progressPercentage ?? 0}%` } as React.CSSProperties}
                       />
                     </div>
                   <div className="flex items-center justify-between">
-                    <p className="text-xs text-gray-500 dark:text-slate-400 flex items-center gap-1">
+                    <p className="text-xs text-muted-foreground dark:text-muted-foreground flex items-center gap-1">
                       <Clock className="w-3 h-3" />
                       {course.timeLeft} left
                     </p>
@@ -829,8 +829,8 @@ const MedicalEducationDashboard = () => {
                     )}
                   </div>
                   {/* Last Synced Timestamp */}
-                  <div className="mt-2 pt-2 border-t border-gray-200 dark:border-slate-700/50">
-                    <p className="text-xs text-gray-400">Last synced: {formatLastUpdated(course.lastUpdated)}</p>
+                  <div className="mt-2 pt-2 border-t border-border dark:border-border/50">
+                    <p className="text-xs text-muted-foreground">Last synced: {formatLastUpdated(course.lastUpdated)}</p>
                   </div>
                 </div>
               </div>
@@ -842,22 +842,22 @@ const MedicalEducationDashboard = () => {
       
       {showStudySession && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-gray-200 dark:border-slate-700">
+          <div className="bg-card dark:bg-card rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-border dark:border-border">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-2xl font-bold text-gray-900 dark:text-white">Study Session</h3>
+              <h3 className="text-2xl font-bold text-foreground dark:text-foreground">Study Session</h3>
               {!studySessionStarted && (
                 <button
                   onClick={() => setShowStudySession(false)}
-                  className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                  className="p-2 hover:bg-muted dark:hover:bg-secondary rounded-lg transition-colors"
                   title="Close"
                   aria-label="Close study session setup"
                 >
-                  <X className="w-5 h-5 dark:text-slate-400" />
+                  <X className="w-5 h-5 dark:text-muted-foreground" />
                 </button>
               )}
             </div>
             <div className="mb-5">
-              <label htmlFor="study-course-context" className="mb-2 block text-sm font-medium text-gray-700 dark:text-slate-300">
+              <label htmlFor="study-course-context" className="mb-2 block text-sm font-medium text-muted-foreground dark:text-muted-foreground">
                 Study context
               </label>
               <select
@@ -865,14 +865,14 @@ const MedicalEducationDashboard = () => {
                 value={selectedStudyCourse?.id ?? ''}
                 onChange={event => setSelectedStudyCourseId(event.target.value)}
                 disabled={studySessionStarted}
-                className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                className="w-full rounded-xl border border-border bg-card px-3 py-2.5 text-sm text-foreground focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-border dark:bg-card dark:text-foreground"
               >
                 <option value="">General study (not linked to a course)</option>
                 {(data.courseData ?? []).map(course => (
                   <option key={course.id} value={course.id}>{course.name}</option>
                 ))}
               </select>
-              <p className="mt-2 text-xs text-gray-500 dark:text-slate-400">
+              <p className="mt-2 text-xs text-muted-foreground dark:text-muted-foreground">
                 Linking a course session associates the time with its next incomplete topic.
               </p>
             </div>

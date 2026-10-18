@@ -49,9 +49,9 @@ export default function QuizPage({ params }: QuizPageProps) {
     return (
       <div className="container mx-auto p-6">
         <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-gray-200 rounded w-1/4"></div>
-          <div className="h-32 bg-gray-200 rounded"></div>
-          <div className="h-8 bg-gray-200 rounded w-1/2"></div>
+          <div className="h-8 bg-secondary rounded w-1/4"></div>
+          <div className="h-32 bg-secondary rounded"></div>
+          <div className="h-8 bg-secondary rounded w-1/2"></div>
         </div>
       </div>
     );
@@ -91,7 +91,7 @@ export default function QuizPage({ params }: QuizPageProps) {
 
       <div className="mb-6">
         <Progress value={progress} className="h-2" />
-        <p className="text-sm text-gray-500 mt-2">
+        <p className="text-sm text-muted-foreground mt-2">
           Question{' '}
           {(currentState?.currentQuestionIndex !== undefined
             ? currentState.currentQuestionIndex
@@ -110,7 +110,7 @@ export default function QuizPage({ params }: QuizPageProps) {
               onClick={() => answerQuestion(currentQuestion.id, option.id)}
               className={`w-full p-4 text-left rounded-lg border transition-colors ${currentState?.answers[currentQuestion.id] === option.id
                 ? 'border-blue-500 bg-blue-50'
-                : 'border-gray-200 hover:border-gray-300'
+                : 'border-border hover:border-border'
                 }`}
             >
               {option.text}

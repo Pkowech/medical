@@ -66,12 +66,12 @@ export const CourseContent = ({
 
   if (!lesson) {
     return (
-      <div className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm rounded-lg p-12 shadow-sm border border-gray-200 dark:border-slate-700/50 flex flex-col items-center justify-center text-center animate-in fade-in zoom-in duration-500">
-        <div className="w-20 h-20 bg-slate-100 dark:bg-slate-900 rounded-full flex items-center justify-center mb-6">
-          <FileText className="w-10 h-10 text-slate-400" />
+      <div className="bg-card/80 dark:bg-card/50 backdrop-blur-sm rounded-lg p-12 shadow-sm border border-border dark:border-border/50 flex flex-col items-center justify-center text-center animate-in fade-in zoom-in duration-500">
+        <div className="w-20 h-20 bg-muted dark:bg-card rounded-full flex items-center justify-center mb-6">
+          <FileText className="w-10 h-10 text-muted-foreground" />
         </div>
-        <h3 className="text-xl font-bold text-slate-900 dark:text-white">Start Your Learning Journey</h3>
-        <p className="text-slate-500 max-w-sm mt-3 leading-relaxed">
+        <h3 className="text-xl font-bold text-foreground dark:text-foreground">Start Your Learning Journey</h3>
+        <p className="text-muted-foreground max-w-sm mt-3 leading-relaxed">
           Select a topic from the course curriculum on the left to view lessons, videos, and study materials.
         </p>
       </div>
@@ -79,9 +79,9 @@ export const CourseContent = ({
   }
 
   return (
-    <div className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm rounded-lg p-6 shadow-sm border border-gray-200 dark:border-slate-700/50">
+    <div className="bg-card/80 dark:bg-card/50 backdrop-blur-sm rounded-lg p-6 shadow-sm border border-border dark:border-border/50">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{lesson.title}</h2>
+        <h2 className="text-2xl font-bold text-foreground dark:text-foreground">{lesson.title}</h2>
         <div className="flex shrink-0 items-center gap-2">
           <button
             type="button"
@@ -91,7 +91,7 @@ export const CourseContent = ({
             className={`p-2 rounded-lg transition-colors ${
               bookmarks.has(lessonKey)
                 ? 'bg-yellow-100 dark:bg-yellow-500/20 text-yellow-600 dark:text-yellow-400'
-                : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-600'
+                : 'bg-muted dark:bg-secondary text-muted-foreground dark:text-muted-foreground hover:bg-secondary dark:hover:bg-secondary'
             }`}
             title={bookmarks.has(lessonKey) ? 'Remove bookmark' : 'Bookmark for later'}
           >
@@ -105,7 +105,7 @@ export const CourseContent = ({
             className={`p-2 rounded-lg transition-colors ${
               progress[lessonKey]
                 ? 'bg-green-100 dark:bg-green-500/20 text-green-600 dark:text-green-400'
-                : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-600'
+                : 'bg-muted dark:bg-secondary text-muted-foreground dark:text-muted-foreground hover:bg-secondary dark:hover:bg-secondary'
             }`}
             title={progress[lessonKey] ? 'Clear studied status' : 'Mark as studied'}
           >
@@ -114,7 +114,7 @@ export const CourseContent = ({
         </div>
       </div>
 
-      <div className="flex items-center space-x-4 mb-6 text-sm text-gray-500 dark:text-slate-400">
+      <div className="flex items-center space-x-4 mb-6 text-sm text-muted-foreground dark:text-muted-foreground">
         <span className="flex items-center space-x-1">
           <Clock className="w-4 h-4" />
           <span>{lesson.duration}</span>
@@ -143,19 +143,19 @@ export const CourseContent = ({
 
       {lesson.content?.text && (
         <div className="prose dark:prose-invert max-w-none mb-6">
-          <p className="text-gray-700 dark:text-slate-300 leading-relaxed">{lesson.content?.text}</p>
+          <p className="text-muted-foreground dark:text-muted-foreground leading-relaxed">{lesson.content?.text}</p>
         </div>
       )}
 
       {/* Materials for this lesson/unit - Moved above Mastery Gate for visibility */}
       {materials.length > 0 && (
-        <div className="mt-8 pt-8 border-t border-slate-100 dark:border-slate-800">
+        <div className="mt-8 pt-8 border-t border-border dark:border-border">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
+            <h3 className="font-bold text-foreground dark:text-foreground flex items-center gap-2">
               <Bookmark className="w-5 h-5 text-blue-500" />
               Relevant Study Materials
             </h3>
-            <span className="text-xs text-gray-500 dark:text-slate-400 font-medium bg-gray-100 dark:bg-slate-800 px-2 py-1 rounded-full">
+            <span className="text-xs text-muted-foreground dark:text-muted-foreground font-medium bg-muted dark:bg-card px-2 py-1 rounded-full">
               {materials.length} {materials.length === 1 ? 'Resource' : 'Resources'}
             </span>
           </div>
@@ -166,7 +166,7 @@ export const CourseContent = ({
                 <div 
                   key={m.id} 
                   onClick={() => openMaterial(String(m.id))}
-                  className="relative p-4 border border-slate-200 dark:border-slate-700/50 rounded-xl bg-white dark:bg-slate-800/50 hover:shadow-md hover:border-blue-200 dark:hover:border-blue-500/30 transition-all group overflow-hidden cursor-pointer"
+                  className="relative p-4 border border-border dark:border-border/50 rounded-xl bg-card dark:bg-card/50 hover:shadow-md hover:border-blue-200 dark:hover:border-blue-500/30 transition-all group overflow-hidden cursor-pointer"
                 >
                   <div className="flex items-start gap-4">
                     <div className={`p-3 rounded-lg shrink-0 ${
@@ -177,7 +177,7 @@ export const CourseContent = ({
                       {isVideo ? <PlayCircle className="w-5 h-5" /> : <FileText className="w-5 h-5" />}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-bold text-gray-900 dark:text-white text-sm truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                      <p className="font-bold text-foreground dark:text-foreground text-sm truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                         {m.title}
                       </p>
                       <div className="flex items-center gap-2 mt-1">
@@ -188,14 +188,14 @@ export const CourseContent = ({
                         }`}>
                           {isVideo ? 'Video' : 'Document'}
                         </span>
-                        {m.size && <span className="text-[10px] text-gray-400 dark:text-slate-500">{m.size}</span>}
+                        {m.size && <span className="text-[10px] text-muted-foreground dark:text-muted-foreground">{m.size}</span>}
                       </div>
                     </div>
                   </div>
                   <div className="mt-4 flex items-center justify-between">
                     <div className="flex -space-x-1">
-                       <div className="w-5 h-5 rounded-full border-2 border-white dark:border-slate-800 bg-slate-200 dark:bg-slate-700" />
-                       <div className="w-5 h-5 rounded-full border-2 border-white dark:border-slate-800 bg-slate-300 dark:bg-slate-600" />
+                       <div className="w-5 h-5 rounded-full border-2 border-white dark:border-border bg-secondary dark:bg-secondary" />
+                       <div className="w-5 h-5 rounded-full border-2 border-white dark:border-border bg-secondary dark:bg-secondary" />
                     </div>
                     <button 
                       onClick={(e) => { e.stopPropagation(); openMaterial(String(m.id)); }}
@@ -220,12 +220,12 @@ export const CourseContent = ({
               <div className="p-2 bg-blue-600 text-white rounded-lg shadow-lg shadow-blue-500/20">
                 <CheckCircle className="w-6 h-6" />
               </div>
-              <h3 className="text-xl font-extrabold text-gray-900 dark:text-white tracking-tight">
+              <h3 className="text-xl font-extrabold text-foreground dark:text-foreground tracking-tight">
                 Mastery Gate: {lesson.title}
               </h3>
             </div>
             
-            <p className="text-gray-600 dark:text-slate-400 leading-relaxed max-w-xl">
+            <p className="text-muted-foreground dark:text-muted-foreground leading-relaxed max-w-xl">
               {lesson.masteryUnlocked 
                 ? "Excellent work! You have successfully mastered this topic. You can proceed or retake the assessment for a higher score." 
                 : `Verify your understanding of this topic to unlock the next part of your learning path. ${masteryPassingScore}% passing score required.`}
@@ -264,11 +264,11 @@ export const CourseContent = ({
         </div>
       </div>
 
-      <div className="flex justify-between items-center mt-8 pt-6 border-t border-gray-100 dark:border-slate-700/50">
+      <div className="flex justify-between items-center mt-8 pt-6 border-t border-border dark:border-border/50">
         <button
           onClick={navigatePrev}
           disabled={isFirstLesson}
-          className="flex items-center space-x-2 px-4 py-2 bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-slate-300 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex items-center space-x-2 px-4 py-2 bg-muted dark:bg-secondary text-muted-foreground dark:text-muted-foreground rounded-lg hover:bg-secondary dark:hover:bg-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           title="Previous Lesson"
         >
           <ChevronLeft className="w-4 h-4" />

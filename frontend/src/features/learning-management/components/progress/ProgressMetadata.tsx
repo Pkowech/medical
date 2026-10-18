@@ -9,9 +9,9 @@ const ProgressMetadata = ({ progressData }: { progressData?: ProgressData | null
   const lastActivity = getStringField(progressData, 'lastActivity');
 
   return (
-    <div className="mb-4 p-3 border rounded-md bg-white">
+    <div className="mb-4 p-3 border rounded-md bg-card">
       <h2 className="text-lg font-medium">Progress Metadata</h2>
-      <div className="mt-2 text-sm text-gray-700">
+      <div className="mt-2 text-sm text-muted-foreground">
         <div>Overall progress: {progressData.overallProgress}%</div>
         <div>Courses completed: {progressData.coursesCompleted} / {progressData.totalCourses}</div>
         <div>Last activity: {lastActivity ?? '—'}</div>

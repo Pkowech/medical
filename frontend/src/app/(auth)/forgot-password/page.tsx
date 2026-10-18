@@ -61,8 +61,8 @@ export default function ForgotPasswordPage() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
         </div>
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Check Your Email</h2>
-        <p className="text-gray-600 dark:text-gray-400">
+        <h2 className="text-2xl font-bold text-foreground dark:text-foreground">Check Your Email</h2>
+        <p className="text-muted-foreground dark:text-muted-foreground">
           If an account exists for {email}, password reset instructions will arrive shortly. Check your
           inbox and spam folder.
         </p>
@@ -86,7 +86,7 @@ export default function ForgotPasswordPage() {
         isLoading={isLoading}
         submitText="Send Reset Instructions"
         footer={
-          <p className="text-center text-sm text-gray-600 dark:text-gray-400">
+          <p className="text-center text-sm text-muted-foreground dark:text-muted-foreground">
             Remember your password?{' '}
             <Link href="/login" className="text-blue-600 hover:text-blue-700 font-medium">
               Sign in

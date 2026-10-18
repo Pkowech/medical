@@ -40,16 +40,16 @@ export function FormFieldWithValidation({
 
   const inputClassName = `
     w-full px-3 py-2 rounded-lg text-sm transition-colors
-    bg-gray-50 dark:bg-slate-900/50
+    bg-background dark:bg-card/50
     border
     ${hasErrors
       ? 'border-red-300 dark:border-red-700 focus:ring-red-500 focus:border-red-500'
       : showValid
         ? 'border-emerald-300 dark:border-emerald-700 focus:ring-emerald-500 focus:border-emerald-500'
-        : 'border-gray-200 dark:border-slate-700 focus:ring-blue-500 focus:border-blue-500'
+        : 'border-border dark:border-border focus:ring-blue-500 focus:border-blue-500'
     }
-    text-gray-900 dark:text-slate-200
-    placeholder:text-gray-400 dark:placeholder:text-slate-600
+    text-foreground dark:text-muted-foreground
+    placeholder:text-muted-foreground dark:placeholder:text-muted-foreground
     focus:outline-none focus:ring-2 focus:ring-offset-0
     disabled:opacity-50 disabled:cursor-not-allowed
   `.trim();
@@ -58,7 +58,7 @@ export function FormFieldWithValidation({
     <div className="space-y-1.5">
       <label
         htmlFor={name}
-        className="block text-sm font-medium text-gray-700 dark:text-slate-300"
+        className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground"
       >
         {label}
         {required && <span className="text-red-500 ml-0.5">*</span>}
@@ -91,7 +91,7 @@ export function FormFieldWithValidation({
       )}
 
       {maxLength && isTextarea && (
-        <p className="text-xs text-gray-400 dark:text-slate-600 text-right">
+        <p className="text-xs text-muted-foreground dark:text-muted-foreground text-right">
           {value.length}/{maxLength}
         </p>
       )}
@@ -107,7 +107,7 @@ export function FormFieldWithValidation({
       )}
 
       {helpText && !hasErrors && (
-        <p className="text-xs text-gray-400 dark:text-slate-500">{helpText}</p>
+        <p className="text-xs text-muted-foreground dark:text-muted-foreground">{helpText}</p>
       )}
     </div>
   );

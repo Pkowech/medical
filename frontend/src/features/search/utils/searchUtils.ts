@@ -18,7 +18,7 @@ export function getSearchResultRoute(type: string, id: string): string {
  * Get badge colors for a search result type
  */
 export function getSearchResultColors(type: string): { bg: string; text: string } {
-  return SEARCH_RESULT_COLORS[type as SearchResultType] || { bg: 'bg-gray-100', text: 'text-gray-700' };
+  return SEARCH_RESULT_COLORS[type as SearchResultType] || { bg: 'bg-muted', text: 'text-muted-foreground' };
 }
 
 /**
@@ -64,7 +64,7 @@ export function getRelevanceColorClasses(relevance: number): { bg: string; text:
     case 'medium':
       return { bg: 'bg-yellow-50', text: 'text-yellow-700', border: 'border-yellow-100' };
     case 'low':
-      return { bg: 'bg-gray-50', text: 'text-gray-600', border: 'border-gray-100' };
+      return { bg: 'bg-background', text: 'text-muted-foreground', border: 'border-border' };
   }
 }
 

@@ -140,7 +140,7 @@ export function AdaptiveQuiz({ courseId, unitId, onComplete }: AdaptiveQuizProps
       case 'hard':
         return 'bg-red-100 text-red-800';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-muted text-muted-foreground';
     }
   };
 
@@ -156,7 +156,7 @@ export function AdaptiveQuiz({ courseId, unitId, onComplete }: AdaptiveQuizProps
         <CardContent className="p-8 text-center">
           <Brain className="h-12 w-12 mx-auto mb-4 text-blue-500 animate-pulse" />
           <h3 className="text-lg font-medium mb-2">Preparing Your Adaptive Quiz</h3>
-          <p className="text-gray-600">Analyzing your learning profile...</p>
+          <p className="text-muted-foreground">Analyzing your learning profile...</p>
         </CardContent>
       </Card>
     );
@@ -168,7 +168,7 @@ export function AdaptiveQuiz({ courseId, unitId, onComplete }: AdaptiveQuizProps
         <CardContent className="p-8 text-center">
           <AlertCircle className="h-12 w-12 mx-auto mb-4 text-red-500" />
           <h3 className="text-lg font-medium mb-2">Unable to Start Quiz</h3>
-          <p className="text-gray-600 mb-4">There was an error starting your adaptive quiz.</p>
+          <p className="text-muted-foreground mb-4">There was an error starting your adaptive quiz.</p>
           <Button onClick={startQuiz}>Try Again</Button>
         </CardContent>
       </Card>
@@ -189,19 +189,19 @@ export function AdaptiveQuiz({ courseId, unitId, onComplete }: AdaptiveQuizProps
             <div className="text-4xl font-bold text-green-600 mb-2">
               {session.finalScore.toFixed(0)}%
             </div>
-            <p className="text-gray-600">Final Score</p>
+            <p className="text-muted-foreground">Final Score</p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="text-center p-4 bg-blue-50 rounded-lg">
               <div className="text-2xl font-bold text-blue-600">{session.responses.length}</div>
-              <p className="text-sm text-gray-600">Questions Answered</p>
+              <p className="text-sm text-muted-foreground">Questions Answered</p>
             </div>
             <div className="text-center p-4 bg-purple-50 rounded-lg">
               <div className="text-2xl font-bold text-purple-600">
                 {getAbilityLevel(session.userAbility).level}
               </div>
-              <p className="text-sm text-gray-600">Estimated Level</p>
+              <p className="text-sm text-muted-foreground">Estimated Level</p>
             </div>
           </div>
 
@@ -215,7 +215,7 @@ export function AdaptiveQuiz({ courseId, unitId, onComplete }: AdaptiveQuizProps
                 {session.recommendations.map((rec, index) => (
                   <li key={index} className="flex items-start gap-2">
                     <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
-                    <span className="text-sm text-gray-700">{rec}</span>
+                    <span className="text-sm text-muted-foreground">{rec}</span>
                   </li>
                 ))}
               </ul>
@@ -251,12 +251,12 @@ export function AdaptiveQuiz({ courseId, unitId, onComplete }: AdaptiveQuizProps
                 {currentQuestion.difficulty}
               </Badge>
               <Badge variant="outline">{currentQuestion.category}</Badge>
-              <div className="flex items-center gap-1 text-sm text-gray-600">
+              <div className="flex items-center gap-1 text-sm text-muted-foreground">
                 <Target className="h-4 w-4" />
                 <span className={abilityInfo.color}>{abilityInfo.level}</span>
               </div>
             </div>
-            <div className="text-sm text-gray-600">Question {session.currentQuestionIndex + 1}</div>
+            <div className="text-sm text-muted-foreground">Question {session.currentQuestionIndex + 1}</div>
           </div>
           <Progress value={progress} className="h-2" />
         </CardContent>
@@ -278,7 +278,7 @@ export function AdaptiveQuiz({ courseId, unitId, onComplete }: AdaptiveQuizProps
                     className={`flex items-center p-4 border rounded-lg cursor-pointer transition-colors ${
                       currentAnswer === option.id
                         ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-200 hover:border-gray-300'
+                        : 'border-border hover:border-border'
                     }`}
                   >
                     <input
@@ -296,11 +296,11 @@ export function AdaptiveQuiz({ courseId, unitId, onComplete }: AdaptiveQuizProps
 
               {/* Confidence Slider */}
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">
+                <label className="text-sm font-medium text-muted-foreground">
                   How confident are you in your answer?
                 </label>
                 <div className="flex items-center gap-4">
-                  <span className="text-sm text-gray-500">Not sure</span>
+                  <span className="text-sm text-muted-foreground">Not sure</span>
                   <input
                     type="range"
                     min="1"
@@ -310,7 +310,7 @@ export function AdaptiveQuiz({ courseId, unitId, onComplete }: AdaptiveQuizProps
                     className="flex-1"
                     aria-label="Confidence level"
                   />
-                  <span className="text-sm text-gray-500">Very confident</span>
+                  <span className="text-sm text-muted-foreground">Very confident</span>
                 </div>
                 <div className="text-center">
                   <Badge variant="outline">{confidence}/5</Badge>

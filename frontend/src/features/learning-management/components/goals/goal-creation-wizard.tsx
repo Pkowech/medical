@@ -324,13 +324,13 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
   const renderStep1 = () => (
     <div className="space-y-6">
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Goal Title *</label>
+        <label className="block text-sm font-medium text-muted-foreground mb-2">Goal Title *</label>
         <input
           type="text"
           value={goalData.title}
           onChange={e => setGoalData(prev => ({ ...prev, title: e.target.value }))}
           className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-            errors.title ? 'border-red-300' : 'border-gray-300'
+            errors.title ? 'border-red-300' : 'border-border'
           }`}
           placeholder="e.g., Complete USMLE Step 1 preparation"
         />
@@ -338,13 +338,13 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Description *</label>
+        <label className="block text-sm font-medium text-muted-foreground mb-2">Description *</label>
         <textarea
           value={goalData.description}
           onChange={e => setGoalData(prev => ({ ...prev, description: e.target.value }))}
           rows={3}
           className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-            errors.description ? 'border-red-300' : 'border-gray-300'
+            errors.description ? 'border-red-300' : 'border-border'
           }`}
           placeholder="Describe what you want to achieve and why it's important"
         />
@@ -353,11 +353,11 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
+          <label className="block text-sm font-medium text-muted-foreground mb-2">Category</label>
           <select
             value={goalData.category}
             onChange={e => setGoalData(prev => ({ ...prev, category: e.target.value }))}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             title="Goal Category"
           >
             <option value="study_time">Study Time</option>
@@ -375,11 +375,11 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Priority</label>
+          <label className="block text-sm font-medium text-muted-foreground mb-2">Priority</label>
           <select
             value={goalData.priority}
             onChange={e => setGoalData(prev => ({ ...prev, priority: e.target.value }))}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             title="Goal Priority"
           >
             <option value="low">Low</option>
@@ -390,11 +390,11 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Goal Type</label>
+          <label className="block text-sm font-medium text-muted-foreground mb-2">Goal Type</label>
           <select
             value={goalData.type}
             onChange={e => setGoalData(prev => ({ ...prev, type: e.target.value }))}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             title="Goal Type"
           >
             <option value="shortTerm">Short-Term</option>
@@ -407,7 +407,7 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Target Value *</label>
+          <label className="block text-sm font-medium text-muted-foreground mb-2">Target Value *</label>
           <input
             type="number"
             value={goalData.targetCriteria.targetValue}
@@ -421,7 +421,7 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
               }))
             }
             className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-              errors.targetValue ? 'border-red-300' : 'border-gray-300'
+              errors.targetValue ? 'border-red-300' : 'border-border'
             }`}
             placeholder="100"
           />
@@ -431,7 +431,7 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Unit</label>
+          <label className="block text-sm font-medium text-muted-foreground mb-2">Unit</label>
           <input
             type="text"
             value={goalData.targetCriteria.unit}
@@ -441,14 +441,14 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
                 targetCriteria: { ...prev.targetCriteria, unit: e.target.value },
               }))
             }
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="hours, points, %"
             title="Unit of Measurement"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Measurement Type</label>
+          <label className="block text-sm font-medium text-muted-foreground mb-2">Measurement Type</label>
           <select
             value={goalData.targetCriteria.type}
             onChange={e =>
@@ -457,7 +457,7 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
                 targetCriteria: { ...prev.targetCriteria, type: e.target.value },
               }))
             }
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             title="Measurement Type"
           >
             <option value="numeric">Numeric</option>
@@ -503,7 +503,7 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
 
       <div className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-muted-foreground mb-2">
             Specific - What exactly will you accomplish? *
           </label>
           <textarea
@@ -516,7 +516,7 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
             }
             rows={2}
             className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-              errors.specific ? 'border-red-300' : 'border-gray-300'
+              errors.specific ? 'border-red-300' : 'border-border'
             }`}
             placeholder="Be specific about what you want to achieve"
           />
@@ -524,7 +524,7 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-muted-foreground mb-2">
             Measurable - How will you measure progress? *
           </label>
           <textarea
@@ -537,7 +537,7 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
             }
             rows={2}
             className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-              errors.measurable ? 'border-red-300' : 'border-gray-300'
+              errors.measurable ? 'border-red-300' : 'border-border'
             }`}
             placeholder="Define how you'll track and measure success"
           />
@@ -545,7 +545,7 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-muted-foreground mb-2">
             Achievable - Is this goal realistic?
           </label>
           <textarea
@@ -557,13 +557,13 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
               }))
             }
             rows={2}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="Explain why this goal is achievable for you"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-muted-foreground mb-2">
             Relevant - Why is this goal important?
           </label>
           <textarea
@@ -575,13 +575,13 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
               }))
             }
             rows={2}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="Connect this goal to your broader objectives"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-muted-foreground mb-2">
             Time-bound - When will you complete this?
           </label>
           <textarea
@@ -593,7 +593,7 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
               }))
             }
             rows={2}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="Set a specific deadline and timeline"
           />
         </div>
@@ -605,24 +605,24 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
+          <label className="block text-sm font-medium text-muted-foreground mb-2">Start Date</label>
           <input
             type="date"
             value={goalData.startDate}
             onChange={e => setGoalData(prev => ({ ...prev, startDate: e.target.value }))}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             title="Goal Start Date"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Target Date *</label>
+          <label className="block text-sm font-medium text-muted-foreground mb-2">Target Date *</label>
           <input
             type="date"
             value={goalData.targetDate}
             onChange={e => setGoalData(prev => ({ ...prev, targetDate: e.target.value }))}
             className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-              errors.targetDate ? 'border-red-300' : 'border-gray-300'
+              errors.targetDate ? 'border-red-300' : 'border-border'
             }`}
             title="Goal Target Date"
           />
@@ -631,11 +631,11 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Pre-requisite (Depends On)</label>
+        <label className="block text-sm font-medium text-muted-foreground mb-2">Pre-requisite (Depends On)</label>
         <select
           value={goalData.dependsOnGoalId}
           onChange={e => setGoalData(prev => ({ ...prev, dependsOnGoalId: e.target.value }))}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           title="Dependency Goal"
         >
           <option value="">None (Independent)</option>
@@ -645,14 +645,14 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
             </option>
           ))}
         </select>
-        <p className="text-xs text-gray-500 mt-1">
+        <p className="text-xs text-muted-foreground mt-1">
           Blocking logic and deadline cascading will apply if a pre-requisite is selected.
         </p>
       </div>
 
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h4 className="text-lg font-medium text-gray-900">Milestones</h4>
+          <h4 className="text-lg font-medium text-foreground">Milestones</h4>
           <button
             type="button"
             onClick={addMilestone}
@@ -663,18 +663,18 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
         </div>
 
         {goalData.milestones.length === 0 ? (
-          <div className="text-center py-8 bg-gray-50 rounded-lg">
-            <Target className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-            <p className="text-gray-500 text-sm">
+          <div className="text-center py-8 bg-background rounded-lg">
+            <Target className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+            <p className="text-muted-foreground text-sm">
               Add milestones to break your goal into smaller, manageable steps
             </p>
           </div>
         ) : (
           <div className="space-y-4">
             {goalData.milestones.map((milestone, index) => (
-              <div key={index} className="border border-gray-200 rounded-lg p-4">
+              <div key={index} className="border border-border rounded-lg p-4">
                 <div className="flex items-start justify-between mb-3">
-                  <h5 className="font-medium text-gray-900">Milestone {index + 1}</h5>
+                  <h5 className="font-medium text-foreground">Milestone {index + 1}</h5>
                   <button
                     type="button"
                     onClick={() => removeMilestone(index)}
@@ -687,33 +687,33 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                    <label className="block text-sm font-medium text-muted-foreground mb-1">Title</label>
                     <input
                       type="text"
                       value={milestone.title}
                       onChange={e => updateMilestone(index, 'title', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       placeholder="Milestone title"
                       title="Milestone Title"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-muted-foreground mb-1">
                       Target Date
                     </label>
                     <input
                       type="date"
                       value={milestone.targetDate}
                       onChange={e => updateMilestone(index, 'targetDate', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       title="Milestone Target Date"
                     />
                   </div>
                 </div>
 
                 <div className="mt-3">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-muted-foreground mb-1">
                     Target Value
                   </label>
                   <input
@@ -722,7 +722,7 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
                     onChange={e =>
                       updateMilestone(index, 'targetValue', parseFloat(e.target.value) || 0)
                     }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="Target value for this milestone"
                     title="Milestone Target Value"
                   />
@@ -738,7 +738,7 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
   const renderStep4 = () => (
     <div className="space-y-6">
       <div>
-        <h4 className="text-lg font-medium text-gray-900 mb-4">Progress Tracking</h4>
+        <h4 className="text-lg font-medium text-foreground mb-4">Progress Tracking</h4>
 
         <div className="space-y-4">
           <div className="flex items-center space-x-3">
@@ -755,9 +755,9 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
                   },
                 }))
               }
-              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              className="rounded border-border text-blue-600 focus:ring-blue-500"
             />
-            <label htmlFor="manualUpdates" className="text-sm font-medium text-gray-700">
+            <label htmlFor="manualUpdates" className="text-sm font-medium text-muted-foreground">
               Allow manual progress updates
             </label>
           </div>
@@ -773,9 +773,9 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
                   progressTracking: { ...prev.progressTracking, autoTracking: e.target.checked },
                 }))
               }
-              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              className="rounded border-border text-blue-600 focus:ring-blue-500"
             />
-            <label htmlFor="autoTracking" className="text-sm font-medium text-gray-700">
+            <label htmlFor="autoTracking" className="text-sm font-medium text-muted-foreground">
               Enable automatic progress tracking (when possible)
             </label>
           </div>
@@ -783,7 +783,7 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
       </div>
 
       <div>
-        <h4 className="text-lg font-medium text-gray-900 mb-4">Reminders</h4>
+        <h4 className="text-lg font-medium text-foreground mb-4">Reminders</h4>
 
         <div className="space-y-4">
           <div className="flex items-center space-x-3">
@@ -797,9 +797,9 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
                   reminderSettings: { ...prev.reminderSettings, enabled: e.target.checked },
                 }))
               }
-              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              className="rounded border-border text-blue-600 focus:ring-blue-500"
             />
-            <label htmlFor="remindersEnabled" className="text-sm font-medium text-gray-700">
+            <label htmlFor="remindersEnabled" className="text-sm font-medium text-muted-foreground">
               Enable goal reminders
             </label>
           </div>
@@ -807,7 +807,7 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
           {goalData.reminderSettings.enabled && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 ml-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Frequency</label>
+                <label className="block text-sm font-medium text-muted-foreground mb-2">Frequency</label>
                 <select
                   value={goalData.reminderSettings.frequency}
                   onChange={e =>
@@ -819,7 +819,7 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
                       },
                     }))
                   }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   title="Reminder Frequency"
                 >
                   <option value="daily">Daily</option>
@@ -829,7 +829,7 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Time</label>
+                <label className="block text-sm font-medium text-muted-foreground mb-2">Time</label>
                 <input
                   type="time"
                   value={goalData.reminderSettings.time}
@@ -839,7 +839,7 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
                       reminderSettings: { ...prev.reminderSettings, time: e.target.value },
                     }))
                   }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   title="Reminder Time"
                 />
               </div>
@@ -852,36 +852,36 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
 
   const renderStep5 = () => (
     <div className="space-y-6">
-      <div className="bg-gray-50 rounded-lg p-6">
-        <h4 className="text-lg font-medium text-gray-900 mb-4">Goal Summary</h4>
+      <div className="bg-background rounded-lg p-6">
+        <h4 className="text-lg font-medium text-foreground mb-4">Goal Summary</h4>
 
         <div className="space-y-4">
           <div>
-            <h5 className="font-medium text-gray-700">Title</h5>
-            <p className="text-gray-900">{goalData.title}</p>
+            <h5 className="font-medium text-muted-foreground">Title</h5>
+            <p className="text-foreground">{goalData.title}</p>
           </div>
 
           <div>
-            <h5 className="font-medium text-gray-700">Description</h5>
-            <p className="text-gray-900">{goalData.description}</p>
+            <h5 className="font-medium text-muted-foreground">Description</h5>
+            <p className="text-foreground">{goalData.description}</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <h5 className="font-medium text-gray-700">Target</h5>
-              <p className="text-gray-900">
+              <h5 className="font-medium text-muted-foreground">Target</h5>
+              <p className="text-foreground">
                 {goalData.targetCriteria.targetValue} {goalData.targetCriteria.unit}
               </p>
             </div>
 
             <div>
-              <h5 className="font-medium text-gray-700">Deadline</h5>
-              <p className="text-gray-900">{new Date(goalData.targetDate).toLocaleDateString()}</p>
+              <h5 className="font-medium text-muted-foreground">Deadline</h5>
+              <p className="text-foreground">{new Date(goalData.targetDate).toLocaleDateString()}</p>
             </div>
           </div>
 
           <div>
-            <h5 className="font-medium text-gray-700">Priority</h5>
+            <h5 className="font-medium text-muted-foreground">Priority</h5>
             <span
               className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
                 goalData.priority === 'critical'
@@ -899,8 +899,8 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
 
           {goalData.milestones.length > 0 && (
             <div>
-              <h5 className="font-medium text-gray-700">Milestones</h5>
-              <ul className="list-disc list-inside text-gray-900 space-y-1">
+              <h5 className="font-medium text-muted-foreground">Milestones</h5>
+              <ul className="list-disc list-inside text-foreground space-y-1">
                 {goalData.milestones.map((milestone, index) => (
                   <li key={index}>{milestone.title}</li>
                 ))}
@@ -931,12 +931,12 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
           onClick={onClose}
         />
 
-        <div className="relative z-10 inline-block w-full max-w-4xl p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-white shadow-xl rounded-2xl">
+        <div className="relative z-10 inline-block w-full max-w-4xl p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-card shadow-xl rounded-2xl">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-gray-900">Create Learning Goal</h2>
+            <h2 className="text-2xl font-bold text-foreground">Create Learning Goal</h2>
             <button
               onClick={onClose}
-              className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+              className="p-2 text-muted-foreground hover:text-muted-foreground transition-colors"
               aria-label="Close goal creation wizard"
             >
               <X className="w-5 h-5" />
@@ -952,7 +952,7 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
                     className={`flex items-center justify-center w-8 h-8 rounded-full border-2 ${
                       currentStep >= step.id
                         ? 'bg-blue-600 border-blue-600 text-white'
-                        : 'border-gray-300 text-gray-500'
+                        : 'border-border text-muted-foreground'
                     }`}
                   >
                     {currentStep > step.id ? (
@@ -964,7 +964,7 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
                   {index < steps.length - 1 && (
                     <div
                       className={`w-16 h-0.5 mx-2 ${
-                        currentStep > step.id ? 'bg-blue-600' : 'bg-gray-300'
+                        currentStep > step.id ? 'bg-blue-600' : 'bg-secondary'
                       }`}
                     />
                   )}
@@ -972,8 +972,8 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
               ))}
             </div>
             <div className="mt-2">
-              <h3 className="text-lg font-medium text-gray-900">{steps[currentStep - 1].title}</h3>
-              <p className="text-sm text-gray-600">{steps[currentStep - 1].description}</p>
+              <h3 className="text-lg font-medium text-foreground">{steps[currentStep - 1].title}</h3>
+              <p className="text-sm text-muted-foreground">{steps[currentStep - 1].description}</p>
             </div>
           </div>
 
@@ -993,8 +993,8 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
               disabled={currentStep === 1}
               className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
                 currentStep === 1
-                  ? 'text-gray-400 cursor-not-allowed'
-                  : 'text-gray-600 hover:text-gray-800'
+                  ? 'text-muted-foreground cursor-not-allowed'
+                  : 'text-muted-foreground hover:text-muted-foreground'
               }`}
             >
               <ArrowLeft className="w-4 h-4" />
@@ -1004,7 +1004,7 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
             <div className="flex space-x-3">
               <button
                 onClick={onClose}
-                className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+                className="px-4 py-2 text-muted-foreground hover:text-muted-foreground transition-colors"
               >
                 Cancel
               </button>

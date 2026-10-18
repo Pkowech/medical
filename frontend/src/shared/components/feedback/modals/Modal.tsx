@@ -45,13 +45,13 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, 
           onClick={onClose}
         />
         <div
-          className={`relative transform overflow-hidden rounded-lg bg-white p-6 text-left shadow-xl transition-all ${sizeClasses[size]}`}
+          className={`relative transform overflow-hidden rounded-lg bg-card p-6 text-left shadow-xl transition-all ${sizeClasses[size]}`}
         >
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-medium text-gray-900">{title}</h3>
+            <h3 className="text-lg font-medium text-foreground">{title}</h3>
             <button
               onClick={onClose}
-              className="rounded-md text-gray-400 hover:text-gray-500 focus:outline-none"
+              className="rounded-md text-muted-foreground hover:text-muted-foreground focus:outline-none"
             >
               <span className="sr-only">Close</span>
               <svg

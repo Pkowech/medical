@@ -59,18 +59,18 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+        <h3 className="text-lg font-semibold text-foreground dark:text-foreground">
           Course Materials ({materials.length})
         </h3>
       </div>
 
       {isLoading ? (
         <div className="flex items-center justify-center py-8">
-          <p className="text-gray-600 dark:text-slate-400">Loading materials...</p>
+          <p className="text-muted-foreground dark:text-muted-foreground">Loading materials...</p>
         </div>
       ) : materials.length === 0 ? (
         <div className="text-center py-8">
-          <p className="text-gray-600 dark:text-slate-400">No materials available for this course</p>
+          <p className="text-muted-foreground dark:text-muted-foreground">No materials available for this course</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -79,21 +79,21 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({
             return (
               <div
                 key={material.materialId || material.id}
-                className="flex items-center justify-between p-4 bg-white dark:bg-slate-700 rounded-lg border border-gray-200 dark:border-slate-600 hover:shadow-md transition"
+                className="flex items-center justify-between p-4 bg-card dark:bg-secondary rounded-lg border border-border dark:border-border hover:shadow-md transition"
               >
                 <div className="flex items-start gap-3 flex-1 min-w-0">
                   <FileText className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0 mt-1" />
                   <div className="min-w-0 flex-1">
-                    <h4 className="font-medium text-gray-900 dark:text-white truncate">
+                    <h4 className="font-medium text-foreground dark:text-foreground truncate">
                       {material.title}
                     </h4>
                     {material.description && (
-                      <p className="text-sm text-gray-600 dark:text-slate-400 truncate">
+                      <p className="text-sm text-muted-foreground dark:text-muted-foreground truncate">
                         {material.description}
                       </p>
                     )}
                     {material.size && (
-                      <p className="text-xs text-gray-500 dark:text-slate-500 mt-1">
+                      <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-1">
                         {material.size}
                       </p>
                     )}
@@ -114,7 +114,7 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({
                     <a
                       href={materialUrl}
                       download
-                      className="p-2 text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-600 rounded transition"
+                      className="p-2 text-muted-foreground dark:text-muted-foreground hover:bg-muted dark:hover:bg-secondary rounded transition"
                       title="Download material"
                       aria-label={`Download ${material.title}`}
                     >

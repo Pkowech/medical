@@ -407,18 +407,18 @@ export default function DriveFolderImport({
 
   return (
     <section className="space-y-6" aria-label="Link files from a Drive folder">
-      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      <div className="rounded-xl border border-border bg-card p-5 shadow-sm dark:border-border dark:bg-card">
         <div className="mb-4 flex items-start gap-3">
           <div className="rounded-lg bg-blue-100 p-2 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
             <FolderOpen className="h-5 w-5" />
           </div>
           <div>
-            <h2 className="font-semibold text-slate-900 dark:text-white">
+            <h2 className="font-semibold text-foreground dark:text-foreground">
               {allowCourseSharing
                 ? 'Link a Year or subject folder'
                 : 'Link a personal Drive folder'}
             </h2>
-            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+            <p className="mt-1 text-sm text-muted-foreground dark:text-muted-foreground">
               {allowCourseSharing
                 ? 'Preview files and assign each folder to a course. Course codes are matched automatically; review optional unit and topic suggestions before linking.'
                 : 'Link personal Drive files to a course you are enrolled in. These links remain private to you and are not copied to MedTrack storage.'}
@@ -427,7 +427,7 @@ export default function DriveFolderImport({
         </div>
         <label
           htmlFor="drive-folder-url"
-          className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300"
+          className="mb-1 block text-sm font-medium text-muted-foreground dark:text-muted-foreground"
         >
           Google Drive folder link
         </label>
@@ -438,7 +438,7 @@ export default function DriveFolderImport({
             value={folderUrl}
             onChange={event => setFolderUrl(event.target.value)}
             placeholder="https://drive.google.com/drive/folders/..."
-            className="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-slate-900 focus:border-blue-500 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+            className="min-w-0 flex-1 rounded-lg border border-border bg-card px-3 py-2.5 text-foreground focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-card dark:text-foreground"
           />
           <button
             type="button"
@@ -454,12 +454,12 @@ export default function DriveFolderImport({
             {isPreviewing ? 'Scanning folder…' : 'Preview files'}
           </button>
         </div>
-        <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+        <p className="mt-2 text-xs text-muted-foreground dark:text-muted-foreground">
           Files stay in your Google Drive. Only PDFs and Google Docs, Sheets, and Slides can be
           linked; scan up to 500 files per folder.
         </p>
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-slate-50 p-3 dark:bg-slate-800/70">
-          <p className="text-sm text-slate-700 dark:text-slate-300" role="status">
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-background p-3 dark:bg-card/70">
+          <p className="text-sm text-muted-foreground dark:text-muted-foreground" role="status">
             {isCheckingConnection
               ? 'Checking Google Drive connection…'
               : driveConnected
@@ -470,7 +470,7 @@ export default function DriveFolderImport({
             <button
               type="button"
               onClick={handleDisconnect}
-              className="inline-flex items-center gap-2 rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-white dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-900"
+              className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-1.5 text-sm text-muted-foreground hover:bg-card dark:border-border dark:text-muted-foreground dark:hover:bg-card"
             >
               <Unplug className="h-4 w-4" /> Disconnect
             </button>
@@ -489,16 +489,16 @@ export default function DriveFolderImport({
 
       {preview && (
         <div className="space-y-4">
-          <div className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-2 rounded-xl border border-border bg-card p-4 dark:border-border dark:bg-card sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h3 className="font-semibold text-slate-900 dark:text-white">{preview.folderName}</h3>
-              <p className="text-sm text-slate-500 dark:text-slate-400">
+              <h3 className="font-semibold text-foreground dark:text-foreground">{preview.folderName}</h3>
+              <p className="text-sm text-muted-foreground dark:text-muted-foreground">
                 {preview.files.filter(file => file.supported).length} supported of{' '}
                 {preview.files.length} files · {selectedFiles.length} selected
               </p>
             </div>
             {allowCourseSharing && (
-              <label className="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+              <label className="inline-flex items-center gap-2 text-sm text-muted-foreground dark:text-muted-foreground">
                 <input
                   type="checkbox"
                   checked={shareWithCourse}
@@ -507,7 +507,7 @@ export default function DriveFolderImport({
                     selectedFiles.some(file => !placements[file.folderPath]?.courseId)
                   }
                   onChange={event => setShareWithCourse(event.target.checked)}
-                  className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                  className="h-4 w-4 rounded border-border text-blue-600 focus:ring-blue-500"
                 />
                 Share these Drive links with enrolled students
               </label>
@@ -531,21 +531,21 @@ export default function DriveFolderImport({
             return (
               <section
                 key={group.folderPath || '__root'}
-                className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
+                className="overflow-hidden rounded-xl border border-border bg-card dark:border-border dark:bg-card"
               >
-                <div className="border-b border-slate-100 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-800/60">
+                <div className="border-b border-border bg-background px-4 py-3 dark:border-border dark:bg-card/60">
                   <div className="flex items-center justify-between gap-3">
-                    <h4 className="truncate font-medium text-slate-800 dark:text-slate-100">
+                    <h4 className="truncate font-medium text-muted-foreground dark:text-muted-foreground">
                       <FolderOpen className="mr-2 inline h-4 w-4 text-amber-500" />
                       {group.folderPath || '(files directly in selected folder)'}
                     </h4>
-                    <span className="shrink-0 text-xs text-slate-500">
+                    <span className="shrink-0 text-xs text-muted-foreground">
                       {group.files.length} files
                     </span>
                   </div>
                   {groupHasSelectedFiles && (
                     <div className="mt-3 grid gap-3 md:grid-cols-2">
-                      <label className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                      <label className="text-xs font-medium text-muted-foreground dark:text-muted-foreground">
                         Course
                         <select
                           value={placement.courseId}
@@ -553,7 +553,7 @@ export default function DriveFolderImport({
                             void handleCourseChange(group.folderPath, event.target.value)
                           }
                           required
-                          className="mt-1 block w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                          className="mt-1 block w-full rounded-md border border-border bg-card px-2.5 py-2 text-sm text-foreground dark:border-border dark:bg-card dark:text-foreground"
                         >
                           <option value="">Select a course (required)</option>
                           {courses.map(course => (
@@ -572,7 +572,7 @@ export default function DriveFolderImport({
                           </span>
                         )}
                       </label>
-                      <label className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                      <label className="text-xs font-medium text-muted-foreground dark:text-muted-foreground">
                         Unit
                         <select
                           value={placement.unitId}
@@ -582,7 +582,7 @@ export default function DriveFolderImport({
                             availableUnits.length === 0
                           }
                           onChange={event => handleUnitChange(group.folderPath, event.target.value)}
-                          className="mt-1 block w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-900 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                          className="mt-1 block w-full rounded-md border border-border bg-card px-2.5 py-2 text-sm text-foreground disabled:opacity-50 dark:border-border dark:bg-card dark:text-foreground"
                         >
                           <option value="">
                             {loadingCourseIds.has(placement.courseId)
@@ -599,7 +599,7 @@ export default function DriveFolderImport({
                     </div>
                   )}
                 </div>
-                <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+                <ul className="divide-y divide-border dark:divide-border">
                   {group.files.map(file => (
                     <li key={file.id} className="flex items-start gap-3 px-4 py-3">
                       <input
@@ -608,21 +608,21 @@ export default function DriveFolderImport({
                         disabled={!file.supported || isLinking}
                         onChange={() => toggleFile(file.id)}
                         aria-label={`Select ${file.name}`}
-                        className="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 disabled:opacity-40"
+                        className="mt-1 h-4 w-4 rounded border-border text-blue-600 focus:ring-blue-500 disabled:opacity-40"
                       />
-                      <FileText className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+                      <FileText className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-100">
+                        <p className="truncate text-sm font-medium text-muted-foreground dark:text-muted-foreground">
                           {file.name}
                         </p>
-                        <p className="text-xs text-slate-500">
+                        <p className="text-xs text-muted-foreground">
                           {file.size ? `${(file.size / (1024 * 1024)).toFixed(1)} MB · ` : ''}
                           {file.supported
                             ? file.mimeType.replace('application/vnd.google-apps.', 'Google ')
                             : 'Unsupported file type'}
                         </p>
                         {file.supported && placement.unitId && (
-                          <label className="mt-2 block max-w-lg text-xs font-medium text-slate-600 dark:text-slate-300">
+                          <label className="mt-2 block max-w-lg text-xs font-medium text-muted-foreground dark:text-muted-foreground">
                             Topic (optional)
                             <select
                               value={fileTopics[file.id] ?? ''}
@@ -633,7 +633,7 @@ export default function DriveFolderImport({
                                   [file.id]: event.target.value,
                                 }))
                               }
-                              className="mt-1 block w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-900 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                              className="mt-1 block w-full rounded-md border border-border bg-card px-2.5 py-2 text-sm text-foreground disabled:opacity-50 dark:border-border dark:bg-card dark:text-foreground"
                             >
                               <option value="">No topic / unit-level material</option>
                               {availableTopics.map(topic => (
@@ -654,7 +654,7 @@ export default function DriveFolderImport({
                         />
                       )}
                       {!file.supported && (
-                        <span className="shrink-0 text-xs text-slate-400">Not supported</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">Not supported</span>
                       )}
                     </li>
                   ))}
@@ -695,7 +695,7 @@ export default function DriveFolderImport({
           )}
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-xs text-slate-500 dark:text-slate-400">
+            <p className="text-xs text-muted-foreground dark:text-muted-foreground">
               Files stay in Google Drive; MedTrack stores references and reads them through the
               configured Drive connection. Nothing is copied to MedTrack storage. Links remain
               private in MedTrack by default; sharing is optional.

@@ -78,7 +78,7 @@ const SelectContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTML
       <div
         ref={ref}
         className={cn(
-          'absolute z-50 max-h-96 min-w-[8rem] overflow-hidden rounded-md border bg-white text-gray-900 shadow-md top-full mt-1 w-full',
+          'absolute z-50 max-h-96 min-w-[8rem] overflow-hidden rounded-md border bg-card text-foreground shadow-md top-full mt-1 w-full',
           className
         )}
         {...props}
@@ -109,8 +109,8 @@ const SelectItem = React.forwardRef<HTMLDivElement, SelectItemProps>(
       <div
         ref={ref}
         className={cn(
-          'relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-2 pr-8 text-sm outline-none hover:bg-gray-100 focus:bg-gray-100',
-          selectedValue === value && 'bg-gray-100',
+          'relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-2 pr-8 text-sm outline-none hover:bg-muted focus:bg-muted',
+          selectedValue === value && 'bg-muted',
           className
         )}
         onClick={() => {
@@ -128,7 +128,7 @@ SelectItem.displayName = 'SelectItem';
 
 const SelectSeparator = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => (
-    <div ref={ref} className={cn('-mx-1 my-1 h-px bg-gray-200', className)} {...props} />
+    <div ref={ref} className={cn('-mx-1 my-1 h-px bg-secondary', className)} {...props} />
   )
 );
 SelectSeparator.displayName = 'SelectSeparator';

@@ -187,18 +187,18 @@ export const EducationalCourseLayout = ({ courseId: propCourseId }: EducationalC
   // --- EARLY RETURNS (AFTER ALL HOOKS) ---
   if (isCourseLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50/50 dark:bg-slate-900/50">
-        <p className="text-gray-600 dark:text-slate-400">Loading course content...</p>
+      <div className="min-h-screen flex items-center justify-center bg-background/50 dark:bg-card/50">
+        <p className="text-muted-foreground dark:text-muted-foreground">Loading course content...</p>
       </div>
     );
   }
 
   if (courseError && !courseData) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50/50 dark:bg-slate-900/50">
+      <div className="min-h-screen flex items-center justify-center bg-background/50 dark:bg-card/50">
         <div className="text-center">
           <p className="text-red-600 dark:text-red-400 font-semibold">Error loading course</p>
-          <p className="text-gray-600 dark:text-slate-400 text-sm mt-2">
+          <p className="text-muted-foreground dark:text-muted-foreground text-sm mt-2">
             {courseError instanceof Error ? courseError.message : 'Failed to load course data'}
           </p>
         </div>
@@ -208,8 +208,8 @@ export const EducationalCourseLayout = ({ courseId: propCourseId }: EducationalC
 
   if (!courseData) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50/50 dark:bg-slate-900/50">
-        <p className="text-gray-600 dark:text-slate-400">Course not found.</p>
+      <div className="min-h-screen flex items-center justify-center bg-background/50 dark:bg-card/50">
+        <p className="text-muted-foreground dark:text-muted-foreground">Course not found.</p>
       </div>
     );
   }
@@ -238,7 +238,7 @@ export const EducationalCourseLayout = ({ courseId: propCourseId }: EducationalC
   }));
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 bg-gray-50/50 dark:bg-slate-900">
+    <div className="flex flex-col flex-1 min-h-0 bg-background/50 dark:bg-card">
       <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden relative">
         <div className={cn(
           "fixed lg:static inset-y-0 left-0 z-60 lg:z-40 h-full min-h-0 w-80 shrink-0 overflow-hidden transition-[width,transform] duration-300 ease-in-out",
@@ -273,7 +273,7 @@ export const EducationalCourseLayout = ({ courseId: propCourseId }: EducationalC
                   <button
                     type="button"
                     onClick={() => setSidebarCollapsed(false)}
-                    className="rounded-md border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+                    className="rounded-md border border-border bg-card p-2 text-muted-foreground hover:bg-background dark:border-border dark:bg-card dark:text-muted-foreground dark:hover:bg-card"
                     aria-label="Open course sidebar"
                     title="Open course sidebar"
                   >
@@ -309,7 +309,7 @@ export const EducationalCourseLayout = ({ courseId: propCourseId }: EducationalC
                 <div className="flex items-center justify-between mb-4">
                    <button 
                     onClick={() => toggleCoursePanel('quiz')}
-                    className="flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-blue-600 transition-colors"
+                    className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-blue-600 transition-colors"
                    >
                      <ChevronLeft className="w-4 h-4" />
                      Back to Lesson
@@ -344,14 +344,14 @@ export const EducationalCourseLayout = ({ courseId: propCourseId }: EducationalC
 
                 {/* Lesson Materials Section */}
                 {materialsForCurrentLesson.length > 0 && (
-                  <div className="mt-8 pt-8 border-t border-gray-200 dark:border-slate-700">
-                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Lesson Materials</h2>
+                  <div className="mt-8 pt-8 border-t border-border dark:border-border">
+                    <h2 className="text-2xl font-bold text-foreground dark:text-foreground mb-4">Lesson Materials</h2>
                     
                     {/* Materials organized by type */}
                     {Object.entries(organizeMaterialsByType(materialsForCurrentLesson)).map(
                       ([type, materials]) => (
                         <div key={type} className="mb-6">
-                          <h3 className="text-lg font-semibold text-gray-800 dark:text-slate-200 mb-3 flex items-center gap-2">
+                          <h3 className="text-lg font-semibold text-muted-foreground dark:text-muted-foreground mb-3 flex items-center gap-2">
                             {getMaterialIcon(type)}
                             {type}s
                           </h3>
@@ -359,18 +359,18 @@ export const EducationalCourseLayout = ({ courseId: propCourseId }: EducationalC
                             {materials.map(material => (
                               <div
                                 key={material.id}
-                                className="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-slate-700/50 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors border border-gray-200 dark:border-slate-600"
+                                className="flex items-center justify-between p-3 rounded-lg bg-background dark:bg-secondary/50 hover:bg-muted dark:hover:bg-secondary transition-colors border border-border dark:border-border"
                               >
                                 <div className="flex items-center gap-3 flex-1 min-w-0">
-                                  <div className="text-gray-400 dark:text-slate-400 flex-shrink-0">
+                                  <div className="text-muted-foreground dark:text-muted-foreground flex-shrink-0">
                                     {getMaterialIcon(material.type || 'DOCUMENT')}
                                   </div>
                                   <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                                    <p className="text-sm font-medium text-foreground dark:text-foreground truncate">
                                       {material.title}
                                     </p>
                                     {material.description && (
-                                      <p className="text-xs text-gray-500 dark:text-slate-400 truncate">
+                                      <p className="text-xs text-muted-foreground dark:text-muted-foreground truncate">
                                         {material.description}
                                       </p>
                                     )}

@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 export default function AccessibilityPage() {
   return (
     <main className="container mx-auto max-w-4xl px-4 py-12 sm:py-16">
-      <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+      <h1 className="text-3xl font-bold tracking-tight text-foreground dark:text-foreground">
         Accessibility
       </h1>
       <p className="mt-4 leading-7 text-muted-foreground">

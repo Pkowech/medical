@@ -14,11 +14,11 @@ export default function AnalyticsPage() {
   return (
     <div className="w-full">
       {status === 'loading' ? (
-        <p className="text-sm text-slate-500">Loading your analytics...</p>
+        <p className="text-sm text-muted-foreground">Loading your analytics...</p>
       ) : userId ? (
         <AnalyticsDashboard />
       ) : (
-        <p role="alert" className="text-sm text-slate-600 dark:text-slate-400">
+        <p role="alert" className="text-sm text-muted-foreground dark:text-muted-foreground">
           Sign in to view your learning analytics.
         </p>
       )}

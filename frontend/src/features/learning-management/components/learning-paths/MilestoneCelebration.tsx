@@ -167,14 +167,14 @@ export const MilestoneCelebration: React.FC<MilestoneCelebrationProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
       <div
-        className={`relative bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden ${getAnimationClass()}`}
+        className={`relative bg-card rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden ${getAnimationClass()}`}
       >
         {/* Close button */}
         <button
           onClick={onClose}
           aria-label="Close milestone dialog"
           title="Close milestone dialog"
-          className="absolute top-4 right-4 z-10 p-2 text-gray-400 hover:text-gray-600 transition-colors"
+          className="absolute top-4 right-4 z-10 p-2 text-muted-foreground hover:text-muted-foreground transition-colors"
         >
           <X className="w-5 h-5" aria-hidden="true" focusable="false" />
         </button>
@@ -184,7 +184,7 @@ export const MilestoneCelebration: React.FC<MilestoneCelebrationProps> = ({
           <div className="absolute inset-0 bg-black bg-opacity-10"></div>
 
           <div className="relative z-10">
-            <div className="inline-flex items-center justify-center w-20 h-20 bg-white bg-opacity-20 rounded-full mb-4 backdrop-blur-sm">
+            <div className="inline-flex items-center justify-center w-20 h-20 bg-card bg-opacity-20 rounded-full mb-4 backdrop-blur-sm">
               <Icon className="w-10 h-10 text-white" />
             </div>
 
@@ -201,8 +201,8 @@ export const MilestoneCelebration: React.FC<MilestoneCelebrationProps> = ({
         {/* Content */}
         <div className="p-6">
           <div className="text-center mb-6">
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">{milestone.title}</h3>
-            <p className="text-gray-600">{milestone.description}</p>
+            <h3 className="text-xl font-semibold text-foreground mb-2">{milestone.title}</h3>
+            <p className="text-muted-foreground">{milestone.description}</p>
           </div>
 
           {/* Custom celebration message */}
@@ -243,7 +243,7 @@ export const MilestoneCelebration: React.FC<MilestoneCelebrationProps> = ({
 
           <button
             onClick={onClose}
-            className="w-full mt-3 px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+            className="w-full mt-3 px-4 py-2 text-muted-foreground hover:text-muted-foreground transition-colors"
           >
             Continue Learning
           </button>

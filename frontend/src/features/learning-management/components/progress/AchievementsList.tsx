@@ -19,9 +19,9 @@ const AchievementsList = ({ achievements }: { achievements?: Achievement[] }) =>
                 </div>
                 <div className="ml-3">
                   <p className="text-sm font-medium">{achievement.title}</p>
-                  <p className="text-xs text-gray-500">{achievement.description}</p>
+                  <p className="text-xs text-muted-foreground">{achievement.description}</p>
                 </div>
-                <div className="ml-auto text-xs text-gray-500">{formatDateSafe(achievement.dateEarned)}</div>
+                <div className="ml-auto text-xs text-muted-foreground">{formatDateSafe(achievement.dateEarned)}</div>
               </li>
             ))}
           </ul>

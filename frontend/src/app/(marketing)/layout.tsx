@@ -10,7 +10,7 @@ interface MarketingLayoutProps {
 
 export default function MarketingLayout({ children }: MarketingLayoutProps) {
   return (
-    <div className="bg-white">
+    <div className="bg-card">
       <MarketingHeader />
       <div id="main-content">{children}</div>
       <MarketingFooter />

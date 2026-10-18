@@ -15,7 +15,7 @@ export const RateLimitInfo: React.FC<RateLimitInfoProps> = ({ endpoint, classNam
   }
 
   return (
-    <div className={`text-sm text-gray-500 ${className}`}>
+    <div className={`text-sm text-muted-foreground ${className}`}>
       {isLimited ? (
         <div className="text-red-500">
           Rate limit exceeded. Please try again in {remainingTime} seconds.

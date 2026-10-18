@@ -91,7 +91,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
     return (
         <>
-            <div className="flex h-screen h-dvh overflow-hidden bg-gray-50 dark:bg-gray-900">
+            <div className="flex h-screen h-dvh overflow-hidden bg-background">
                 {!isQuizSessionPage && (
                     <div className={cn(isFullHeightPage && 'lg:hidden')}>
                         <Sidebar theme={colorScheme} user={user} navigationItems={navigationItems} />

@@ -30,20 +30,20 @@ export const SearchResultItem: React.FC<SearchResultItemProps> = ({ course, onSe
       <Link
         href={href}
         onClick={onSelect}
-        className="block px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-700"
+        className="block px-3 py-2 hover:bg-background dark:hover:bg-secondary"
       >
-        <div className="text-sm font-medium text-gray-900 dark:text-white truncate">
+        <div className="text-sm font-medium text-foreground dark:text-foreground truncate">
           {course.title || course.name}
         </div>
         {course.instructor && (
-          <div className="text-xs text-gray-500 dark:text-gray-400">
+          <div className="text-xs text-muted-foreground dark:text-muted-foreground">
             {getInstructorDisplayName({
               id: course.id,
               name: course.instructor.name,
             })}
           </div>
         )}
-        <div className="text-xs text-gray-400 mt-1">Type: {course.type || 'course'}</div>
+        <div className="text-xs text-muted-foreground mt-1">Type: {course.type || 'course'}</div>
       </Link>
     </li>
   );

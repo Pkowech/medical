@@ -25,8 +25,8 @@ export function AuthForm({
   return (
     <div className="space-y-6">
       <div className="text-center">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{title}</h1>
-        {subtitle && <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">{subtitle}</p>}
+        <h1 className="text-2xl font-bold text-foreground dark:text-foreground">{title}</h1>
+        {subtitle && <p className="mt-2 text-sm text-muted-foreground dark:text-muted-foreground">{subtitle}</p>}
       </div>
 
       <form method="post" onSubmit={onSubmit} noValidate={noValidate} className="space-y-4">

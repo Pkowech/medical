@@ -13,11 +13,11 @@ export const HighRiskTopicsCard: React.FC<HighRiskTopicsCardProps> = ({ userId }
 
   if (isLoading) {
     return (
-      <div className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-md rounded-2xl p-6 border border-gray-100 dark:border-slate-700/50 animate-pulse">
-        <div className="h-6 w-48 bg-gray-200 dark:bg-slate-700 rounded mb-4" />
+      <div className="bg-card/80 dark:bg-card/50 backdrop-blur-md rounded-2xl p-6 border border-border dark:border-border/50 animate-pulse">
+        <div className="h-6 w-48 bg-secondary dark:bg-secondary rounded mb-4" />
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-12 bg-gray-100 dark:bg-slate-800/50 rounded-xl" />
+            <div key={i} className="h-12 bg-muted dark:bg-card/50 rounded-xl" />
           ))}
         </div>
       </div>
@@ -29,7 +29,7 @@ export const HighRiskTopicsCard: React.FC<HighRiskTopicsCardProps> = ({ userId }
   }
 
   return (
-    <div className="bg-white/90 dark:bg-slate-800/60 backdrop-blur-md rounded-2xl shadow-sm border border-red-100 dark:border-red-900/20 overflow-hidden group">
+    <div className="bg-card/90 dark:bg-card/60 backdrop-blur-md rounded-2xl shadow-sm border border-red-100 dark:border-red-900/20 overflow-hidden group">
       <div className="p-6">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
@@ -37,8 +37,8 @@ export const HighRiskTopicsCard: React.FC<HighRiskTopicsCardProps> = ({ userId }
               <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white font-outfit">Critical Focus Areas</h3>
-              <p className="text-xs text-gray-500 dark:text-slate-400">Topics with lowest performance</p>
+              <h3 className="text-lg font-bold text-foreground dark:text-foreground font-outfit">Critical Focus Areas</h3>
+              <p className="text-xs text-muted-foreground dark:text-muted-foreground">Topics with lowest performance</p>
             </div>
           </div>
           <span className="px-2.5 py-1 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-[10px] font-bold uppercase tracking-wider rounded-full border border-red-100 dark:border-red-800/30">
@@ -50,23 +50,23 @@ export const HighRiskTopicsCard: React.FC<HighRiskTopicsCardProps> = ({ userId }
           {topics.map((topic, index) => (
             <div 
               key={index}
-              className="group/item flex items-center justify-between p-4 bg-gray-50/50 dark:bg-slate-900/40 rounded-xl border border-gray-100 dark:border-slate-700/30 hover:border-red-200 dark:hover:border-red-800/50 hover:bg-white dark:hover:bg-slate-800 transition-all cursor-pointer"
+              className="group/item flex items-center justify-between p-4 bg-background/50 dark:bg-card/40 rounded-xl border border-border dark:border-border/30 hover:border-red-200 dark:hover:border-red-800/50 hover:bg-card dark:hover:bg-card transition-all cursor-pointer"
               onClick={() => router.push('/flashcards')}
             >
               <div className="flex items-center gap-4">
                 <div className="relative">
-                  <BookOpen className="w-5 h-5 text-gray-400 dark:text-slate-500" />
+                  <BookOpen className="w-5 h-5 text-muted-foreground dark:text-muted-foreground" />
                   <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
                 </div>
                 <div>
-                  <h4 className="text-sm font-bold text-gray-900 dark:text-white group-hover/item:text-red-600 dark:group-hover/item:text-red-400 transition-colors">
+                  <h4 className="text-sm font-bold text-foreground dark:text-foreground group-hover/item:text-red-600 dark:group-hover/item:text-red-400 transition-colors">
                     {topic.topic}
                   </h4>
                   <div className="flex items-center gap-3 mt-1">
-                    <span className="text-[10px] font-medium text-gray-500 dark:text-slate-500">
+                    <span className="text-[10px] font-medium text-muted-foreground dark:text-muted-foreground">
                       {topic.cardCount} Cards
                     </span>
-                    <span className="w-1 h-1 bg-gray-300 dark:bg-slate-700 rounded-full" />
+                    <span className="w-1 h-1 bg-secondary dark:bg-secondary rounded-full" />
                     <span className="flex items-center gap-1 text-[10px] font-bold text-red-600 dark:text-red-400">
                       <TrendingDown className="w-2.5 h-2.5" />
                       {(topic.passRate * 100).toFixed(0)}% Mastery
@@ -74,8 +74,8 @@ export const HighRiskTopicsCard: React.FC<HighRiskTopicsCardProps> = ({ userId }
                   </div>
                 </div>
               </div>
-              <div className="p-2 rounded-lg bg-gray-100 dark:bg-slate-800 group-hover/item:bg-red-50 dark:group-hover/item:bg-red-900/30 transition-colors">
-                <ArrowRight className="w-4 h-4 text-gray-400 group-hover/item:text-red-600 transition-colors" />
+              <div className="p-2 rounded-lg bg-muted dark:bg-card group-hover/item:bg-red-50 dark:group-hover/item:bg-red-900/30 transition-colors">
+                <ArrowRight className="w-4 h-4 text-muted-foreground group-hover/item:text-red-600 transition-colors" />
               </div>
             </div>
           ))}

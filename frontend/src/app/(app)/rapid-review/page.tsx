@@ -11,10 +11,10 @@ export default function RapidReviewPage() {
   const { user } = useAuthStore();
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-8">
-      <div className="w-full max-w-xl bg-white rounded-xl shadow p-8 flex flex-col items-center">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-background p-8">
+      <div className="w-full max-w-xl bg-card rounded-xl shadow p-8 flex flex-col items-center">
         <h1 className="text-3xl font-bold mb-2 text-blue-700">Rapid Review Mode</h1>
-        <p className="text-gray-600 mb-6 text-center">
+        <p className="text-muted-foreground mb-6 text-center">
           High-yield, fast-paced review of your weakest topics. Answer quickly, get instant
           feedback, and reinforce what matters most.
         </p>
@@ -22,7 +22,7 @@ export default function RapidReviewPage() {
         {user?.id ? (
           <RapidReviewSession userId={user.id} />
         ) : (
-          <div className="text-gray-400 my-8">Please log in to start rapid review.</div>
+          <div className="text-muted-foreground my-8">Please log in to start rapid review.</div>
         )}
         <Button onClick={() => router.push('/dashboard')} variant="outline" className="mt-4">
           Back to Dashboard

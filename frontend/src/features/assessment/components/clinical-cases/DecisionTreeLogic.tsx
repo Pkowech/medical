@@ -183,7 +183,7 @@ export function DecisionTreeLogic({
       case 'consequence':
         return <AlertTriangle className="h-5 w-5 text-yellow-500" />;
       default:
-        return <GitBranch className="h-5 w-5 text-gray-500" />;
+        return <GitBranch className="h-5 w-5 text-muted-foreground" />;
     }
   };
 
@@ -196,7 +196,7 @@ export function DecisionTreeLogic({
       case 'error':
         return 'border-red-500 bg-red-50';
       default:
-        return 'border-gray-500 bg-gray-50';
+        return 'border-border bg-background';
     }
   };
 
@@ -212,7 +212,7 @@ export function DecisionTreeLogic({
         <CardContent className="p-8 text-center">
           <AlertTriangle className="h-12 w-12 mx-auto mb-4 text-red-500" />
           <h3 className="text-lg font-medium mb-2">Decision Tree Error</h3>
-          <p className="text-gray-600">Unable to load the current decision point.</p>
+          <p className="text-muted-foreground">Unable to load the current decision point.</p>
         </CardContent>
       </Card>
     );
@@ -231,19 +231,19 @@ export function DecisionTreeLogic({
             <div className="flex items-center gap-4">
               <div className="text-center">
                 <div className="text-lg font-bold text-blue-600">{decisionPath.total_points}</div>
-                <p className="text-xs text-gray-600">Points</p>
+                <p className="text-xs text-muted-foreground">Points</p>
               </div>
               <div className="text-center">
                 <div className="text-lg font-bold text-green-600">
                   {decisionPath.efficiency_score}%
                 </div>
-                <p className="text-xs text-gray-600">Efficiency</p>
+                <p className="text-xs text-muted-foreground">Efficiency</p>
               </div>
               <div className="text-center">
                 <div className="text-lg font-bold text-purple-600">
                   {decisionPath.clinical_reasoning_score}%
                 </div>
-                <p className="text-xs text-gray-600">Reasoning</p>
+                <p className="text-xs text-muted-foreground">Reasoning</p>
               </div>
             </div>
           </div>
@@ -266,7 +266,7 @@ export function DecisionTreeLogic({
           {/* Decision Options */}
           {currentNodeData.type === 'decision' && currentNodeData.options && (
             <div className="space-y-3">
-              <h4 className="font-medium text-gray-900 flex items-center gap-2">
+              <h4 className="font-medium text-foreground flex items-center gap-2">
                 <Lightbulb className="h-4 w-4 text-yellow-500" />
                 What is your next action?
               </h4>
@@ -282,7 +282,7 @@ export function DecisionTreeLogic({
                       className={`w-full text-left p-4 border rounded-lg transition-colors ${
                         isSelected
                           ? 'border-blue-500 bg-blue-50'
-                          : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                          : 'border-border hover:border-border hover:bg-background'
                       } ${showingConsequences ? 'cursor-not-allowed opacity-75' : 'cursor-pointer'}`}
                     >
                       <div className="flex items-start justify-between">
@@ -438,7 +438,7 @@ export function DecisionTreeLogic({
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Clock className="h-5 w-5 text-gray-500" />
+            <Clock className="h-5 w-5 text-muted-foreground" />
             Your Decision Path
           </CardTitle>
         </CardHeader>
@@ -457,7 +457,7 @@ export function DecisionTreeLogic({
                     {node?.title || `Node ${index + 1}`}
                   </Badge>
                   {index < decisionPath.nodes.length - 1 && (
-                    <ArrowRight className="h-4 w-4 text-gray-400" />
+                    <ArrowRight className="h-4 w-4 text-muted-foreground" />
                   )}
                 </div>
               );

@@ -165,10 +165,10 @@ export default function RegisterPage() {
         <>
           <div className="relative my-6">
             <div className="absolute inset-0 flex items-center" aria-hidden="true">
-              <div className="w-full border-t border-gray-300 dark:border-slate-700" />
+              <div className="w-full border-t border-border dark:border-border" />
             </div>
-            <div className="relative flex justify-center text-xs uppercase tracking-[0.2em] text-gray-500 dark:text-slate-400">
-              <span className="bg-white px-2 dark:bg-slate-900">Or continue with</span>
+            <div className="relative flex justify-center text-xs uppercase tracking-[0.2em] text-muted-foreground dark:text-muted-foreground">
+              <span className="bg-card px-2 dark:bg-card">Or continue with</span>
             </div>
           </div>
 
@@ -177,17 +177,17 @@ export default function RegisterPage() {
               type="button"
               onClick={() => void handleProviderSignIn()}
               disabled={isLoading || socialLoading}
-              className="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
+              className="flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium text-muted-foreground shadow-sm transition-colors hover:bg-background focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 dark:border-border dark:bg-card dark:text-muted-foreground dark:hover:bg-secondary"
             >
               <span aria-hidden="true">G</span>
               {socialLoading ? 'Connecting...' : 'Continue with Google'}
             </button>
-            <p className="text-center text-xs text-gray-500 dark:text-slate-400">
+            <p className="text-center text-xs text-muted-foreground dark:text-muted-foreground">
               New Google accounts will be asked to accept the Terms of Service and Privacy Policy after sign-in.
             </p>
           </div>
 
-          <p className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
+          <p className="mt-6 text-center text-sm text-muted-foreground dark:text-muted-foreground">
             Already have an account?{' '}
             <Link href="/login" className="text-blue-600 hover:text-blue-700 font-medium dark:text-blue-400 dark:hover:text-blue-300">
               Sign in
@@ -282,7 +282,7 @@ export default function RegisterPage() {
               onChange={handleChange}
               aria-invalid={!!fieldErrors.acceptTerms}
               aria-describedby={fieldErrors.acceptTerms ? 'acceptTerms-error' : undefined}
-              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded dark:border-slate-600 dark:bg-slate-800"
+              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-border rounded dark:border-border dark:bg-card"
             />
           </div>
           {fieldErrors.acceptTerms && (
@@ -291,7 +291,7 @@ export default function RegisterPage() {
             </p>
           )}
           <div className="ml-3 text-sm">
-            <label htmlFor="acceptTerms" className="text-gray-600 dark:text-slate-300">
+            <label htmlFor="acceptTerms" className="text-muted-foreground dark:text-muted-foreground">
               I agree to the{' '}
               <Link href="/terms" className="text-blue-600 hover:text-blue-700 font-medium dark:text-blue-400 dark:hover:text-blue-300">
                 Terms of Service

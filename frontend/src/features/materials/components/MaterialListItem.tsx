@@ -30,7 +30,7 @@ const getFileIcon = (type?: string) => {
   if (normalizedType.includes('video') || normalizedType.includes('mp4')) {
     return <Film className="h-5 w-5 text-violet-600 dark:text-violet-400" />;
   }
-  return <File className="h-5 w-5 text-slate-500 dark:text-slate-400" />;
+  return <File className="h-5 w-5 text-muted-foreground dark:text-muted-foreground" />;
 };
 
 const formatSize = (size?: string | number) => {
@@ -59,7 +59,7 @@ export const MaterialListItem: React.FC<MaterialListItemProps> = React.memo(({
   const fileUrl = material.fileUrl || material.url;
 
   return (
-    <article className="group flex min-w-0 items-center gap-3 rounded-lg px-3 py-3 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/60 sm:gap-4">
+    <article className="group flex min-w-0 items-center gap-3 rounded-lg px-3 py-3 transition-colors hover:bg-background dark:hover:bg-card/60 sm:gap-4">
       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-50 dark:bg-blue-950/50">
         {getFileIcon(material.type || material.contentType)}
       </span>
@@ -69,17 +69,17 @@ export const MaterialListItem: React.FC<MaterialListItemProps> = React.memo(({
         onClick={() => onView(material)}
         className="min-w-0 flex-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
       >
-        <span className="block truncate text-sm font-medium text-slate-900 transition-colors group-hover:text-blue-700 dark:text-slate-100 dark:group-hover:text-blue-300">
+        <span className="block truncate text-sm font-medium text-foreground transition-colors group-hover:text-blue-700 dark:text-muted-foreground dark:group-hover:text-blue-300">
           {material.title}
         </span>
-        <span className="mt-0.5 block truncate text-xs text-slate-500 dark:text-slate-400">
+        <span className="mt-0.5 block truncate text-xs text-muted-foreground dark:text-muted-foreground">
           {[material.type || material.contentType, formatSize(material.size), ownerName || 'Unknown author']
             .filter(Boolean)
             .join(' · ')}
         </span>
       </button>
 
-      <span className="hidden w-28 shrink-0 text-right text-xs text-slate-500 dark:text-slate-400 md:block">
+      <span className="hidden w-28 shrink-0 text-right text-xs text-muted-foreground dark:text-muted-foreground md:block">
         {formatDate(material.uploadDate || material.createdAt)}
       </span>
 
@@ -89,7 +89,7 @@ export const MaterialListItem: React.FC<MaterialListItemProps> = React.memo(({
             variant="ghost"
             size="icon"
             asChild
-            className="h-9 w-9 text-slate-600 hover:bg-blue-50 hover:text-blue-700 dark:text-slate-300 dark:hover:bg-blue-950/50 dark:hover:text-blue-300"
+            className="h-9 w-9 text-muted-foreground hover:bg-blue-50 hover:text-blue-700 dark:text-muted-foreground dark:hover:bg-blue-950/50 dark:hover:text-blue-300"
           >
             <a href={fileUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open file for ${material.title}`}>
               <Download className="h-4 w-4" />
@@ -102,7 +102,7 @@ export const MaterialListItem: React.FC<MaterialListItemProps> = React.memo(({
           size="icon"
           onClick={() => onView(material)}
           aria-label={`View ${material.title}`}
-          className="h-9 w-9 text-slate-600 hover:bg-blue-50 hover:text-blue-700 dark:text-slate-300 dark:hover:bg-blue-950/50 dark:hover:text-blue-300"
+          className="h-9 w-9 text-muted-foreground hover:bg-blue-50 hover:text-blue-700 dark:text-muted-foreground dark:hover:bg-blue-950/50 dark:hover:text-blue-300"
         >
           <Eye className="h-4 w-4" />
         </Button>
@@ -114,7 +114,7 @@ export const MaterialListItem: React.FC<MaterialListItemProps> = React.memo(({
                 variant="ghost"
                 size="icon"
                 aria-label={`More options for ${material.title}`}
-                className="h-9 w-9 text-slate-600 dark:text-slate-300"
+                className="h-9 w-9 text-muted-foreground dark:text-muted-foreground"
               >
                 <MoreHorizontal className="h-4 w-4" />
               </Button>

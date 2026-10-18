@@ -14,12 +14,12 @@ interface QuickLinkProps {
 const QuickLink: React.FC<QuickLinkProps> = ({ href, icon, title, subtitle }) => (
   <Link
     href={href}
-    className="flex items-start space-x-3 p-3 rounded-lg hover:bg-gray-50 transition-colors"
+    className="flex items-start space-x-3 p-3 rounded-lg hover:bg-background transition-colors"
   >
     <div className="flex-shrink-0">{icon}</div>
     <div>
-      <h3 className="font-medium text-gray-900">{title}</h3>
-      <p className="text-sm text-gray-500">{subtitle}</p>
+      <h3 className="font-medium text-foreground">{title}</h3>
+      <p className="text-sm text-muted-foreground">{subtitle}</p>
     </div>
   </Link>
 );
@@ -53,11 +53,11 @@ export default function QuickAccess() {
   ];
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100">
-      <div className="p-4 border-b border-gray-100">
-        <h2 className="font-semibold text-gray-900">Quick Access</h2>
+    <div className="bg-card rounded-xl shadow-sm border border-border">
+      <div className="p-4 border-b border-border">
+        <h2 className="font-semibold text-foreground">Quick Access</h2>
       </div>
-      <div className="divide-y divide-gray-100">
+      <div className="divide-y divide-border">
         {quickLinks.map((link, index) => (
           <QuickLink key={index} {...link} />
         ))}

@@ -24,7 +24,7 @@ export const FormInput: React.FC<FormInputProps> = ({
 }) => {
   return (
     <div className={`form-group ${className}`}>
-      <label htmlFor={name} className="block text-sm font-medium text-gray-700 mb-1">
+      <label htmlFor={name} className="block text-sm font-medium text-muted-foreground mb-1">
         {label}
         {required && <span className="text-red-500 ml-1">*</span>}
       </label>
@@ -34,7 +34,7 @@ export const FormInput: React.FC<FormInputProps> = ({
         {...register(name, { required })}
         placeholder={placeholder}
         className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-          error ? 'border-red-500' : 'border-gray-300'
+          error ? 'border-red-500' : 'border-border'
         }`}
       />
       {error && (

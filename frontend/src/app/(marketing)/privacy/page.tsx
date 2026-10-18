@@ -136,7 +136,7 @@ export default function PrivacyPage() {
         <p className="mb-2 text-sm font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-300">
           Data protection
         </p>
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-4xl">
+        <h1 className="text-3xl font-bold tracking-tight text-foreground dark:text-foreground sm:text-4xl">
           Privacy notice
         </h1>
       </header>
@@ -154,7 +154,7 @@ export default function PrivacyPage() {
       >
         <h2
           id="controller-heading"
-          className="text-lg font-semibold text-slate-900 dark:text-white"
+          className="text-lg font-semibold text-foreground dark:text-foreground"
         >
           Who is responsible
         </h2>
@@ -179,7 +179,7 @@ export default function PrivacyPage() {
           >
             <h2
               id={section.title.toLowerCase().replaceAll(' ', '-')}
-              className="mb-3 text-xl font-semibold text-slate-900 dark:text-white"
+              className="mb-3 text-xl font-semibold text-foreground dark:text-foreground"
             >
               {section.title}
             </h2>
@@ -191,7 +191,7 @@ export default function PrivacyPage() {
       </div>
 
       <section className="mt-10 border-t border-border pt-8" aria-labelledby="law-heading">
-        <h2 id="law-heading" className="text-xl font-semibold text-slate-900 dark:text-white">
+        <h2 id="law-heading" className="text-xl font-semibold text-foreground dark:text-foreground">
           Applicable framework and complaints
         </h2>
         <p className="mt-3 leading-7 text-muted-foreground">

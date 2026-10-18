@@ -7,7 +7,7 @@ import LearningPathInterface from '@/features/learning-management/components/lea
 export default function LearningPathsClient() {
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-gray-50/50 dark:bg-slate-900/50">
+      <div className="min-h-screen bg-background">
         <LearningPathInterface />
       </div>
     </ProtectedRoute>

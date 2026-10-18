@@ -21,7 +21,7 @@ export function MobileTabBar({ navigationItems }: MobileTabBarProps) {
   return (
     <nav
       aria-label="Primary navigation"
-      className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_18px_rgba(15,23,42,0.06)] backdrop-blur-lg dark:border-slate-800 dark:bg-slate-950/95 lg:hidden"
+      className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-card/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_18px_rgba(15,23,42,0.06)] backdrop-blur-lg dark:border-border dark:bg-background/95 lg:hidden"
     >
       <div
         className="mx-auto grid h-16 max-w-xl"
@@ -41,7 +41,7 @@ export function MobileTabBar({ navigationItems }: MobileTabBarProps) {
               className={`flex min-w-0 flex-col items-center justify-center gap-1 px-1 text-[11px] font-medium transition-colors active:scale-95 motion-reduce:transition-none ${
                 isActive
                   ? 'text-blue-700 dark:text-blue-300'
-                  : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
+                  : 'text-muted-foreground hover:text-foreground dark:text-muted-foreground dark:hover:text-foreground'
               }`}
             >
               <Icon

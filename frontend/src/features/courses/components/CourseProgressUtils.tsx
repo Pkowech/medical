@@ -42,13 +42,13 @@ export const CourseProgressOverview = ({
   courseName = 'Course',
 }: CourseProgressOverviewProps) => {
   return (
-    <div className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 shadow-sm border border-gray-200 dark:border-slate-700/50 animate-in fade-in slide-in-from-top-2 duration-500">
+    <div className="bg-card/80 dark:bg-card/50 backdrop-blur-sm rounded-2xl p-6 shadow-sm border border-border dark:border-border/50 animate-in fade-in slide-in-from-top-2 duration-500">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+          <h2 className="text-lg font-semibold text-foreground dark:text-foreground">
             {courseName} Progress
           </h2>
-          <p className="text-sm text-gray-600 dark:text-slate-400 mt-1">
+          <p className="text-sm text-muted-foreground dark:text-muted-foreground mt-1">
             {completedUnits} of {totalUnits} units completed
           </p>
         </div>

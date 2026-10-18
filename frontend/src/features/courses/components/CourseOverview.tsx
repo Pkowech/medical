@@ -47,7 +47,7 @@ export function CourseOverview() {
   });
 
   if (courseLoading) {
-    return <div className="flex min-h-screen items-center justify-center text-slate-500">Loading course units...</div>;
+    return <div className="flex min-h-screen items-center justify-center text-muted-foreground">Loading course units...</div>;
   }
 
   if (courseError || !course) {
@@ -72,16 +72,16 @@ export function CourseOverview() {
   const units = course.units || [];
 
   return (
-    <main className="min-h-full bg-[#f5f7fa] px-4 py-6 dark:bg-slate-950 md:px-8 md:py-9">
+    <main className="min-h-full bg-[#f5f7fa] px-4 py-6 dark:bg-background md:px-8 md:py-9">
       <div className="mx-auto max-w-7xl space-y-8">
-        <header className="flex flex-col gap-5 border-b border-slate-200 pb-6 dark:border-slate-800 sm:flex-row sm:items-end sm:justify-between">
+        <header className="flex flex-col gap-5 border-b border-border pb-6 dark:border-border sm:flex-row sm:items-end sm:justify-between">
           <div className="min-w-0">
-            <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
+            <p className="text-sm font-medium text-muted-foreground dark:text-muted-foreground">
               <Link href="/courses" className="hover:text-blue-700 dark:hover:text-blue-300">Courses</Link>
               <span className="px-1">/</span> {user ? 'Units' : 'Course preview'}
             </p>
-            <h1 className="mt-2 text-3xl font-semibold text-slate-900 dark:text-white">{course.title || course.name}</h1>
-            {course.description && <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-400">{course.description}</p>}
+            <h1 className="mt-2 text-3xl font-semibold text-foreground dark:text-foreground">{course.title || course.name}</h1>
+            {course.description && <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground dark:text-muted-foreground">{course.description}</p>}
           </div>
           {user ? (
             <button
@@ -105,8 +105,8 @@ export function CourseOverview() {
         <section className="space-y-5" aria-label="Course units">
           <div className="flex flex-wrap items-end justify-between gap-2">
             <div>
-              <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Units</h2>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{units.length} learning units</p>
+              <h2 className="text-xl font-semibold text-foreground dark:text-foreground">Units</h2>
+              <p className="mt-1 text-sm text-muted-foreground dark:text-muted-foreground">{units.length} learning units</p>
             </div>
           </div>
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
@@ -132,7 +132,7 @@ export function CourseOverview() {
                     setShowEnrollment(true);
                   }
                 }}
-                className="group flex min-h-85 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white text-left shadow-sm transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900"
+                className="group flex min-h-85 flex-col overflow-hidden rounded-lg border border-border bg-card text-left shadow-sm transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md dark:border-border dark:bg-card"
               >
                 <span className={`relative flex min-h-36 flex-col justify-between overflow-hidden p-5 text-white ${UNIT_HEADER_COLORS[index % UNIT_HEADER_COLORS.length]}`}>
                   <span aria-hidden="true" className="pointer-events-none absolute -right-7 -top-10 h-36 w-36 rounded-full border-18 border-white/10" />
@@ -149,10 +149,10 @@ export function CourseOverview() {
                   </span>
                 </span>
                 <span className="flex flex-1 flex-col p-5">
-                  <span className="line-clamp-2 min-h-10 text-sm leading-5 text-slate-600 dark:text-slate-300">
+                  <span className="line-clamp-2 min-h-10 text-sm leading-5 text-muted-foreground dark:text-muted-foreground">
                     {unit.description || 'Continue through the topics and resources in this unit.'}
                   </span>
-                  <span className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-slate-500 dark:text-slate-400">
+                  <span className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground dark:text-muted-foreground">
                     <span className="inline-flex items-center gap-1.5">
                       <BookOpen className="h-4 w-4" /> {topics.length} topics
                     </span>
@@ -163,7 +163,7 @@ export function CourseOverview() {
                     )}
                   </span>
                   <span className="mt-auto pt-6">
-                    <span className="flex items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
+                    <span className="flex items-center justify-between gap-3 text-xs text-muted-foreground dark:text-muted-foreground">
                       <span>
                         {user
                           ? percentage === 100 ? 'Unit completed' : `${completedTopics} of ${topics.length} topics complete`
@@ -171,10 +171,10 @@ export function CourseOverview() {
                       </span>
                       {user && percentage === 100 && <CheckCircle className="h-4 w-4 text-emerald-600" />}
                     </span>
-                    <span className="mt-2 block h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                    <span className="mt-2 block h-1.5 overflow-hidden rounded-full bg-muted dark:bg-card">
                       <span className="block h-full rounded-full bg-blue-600 transition-[width]" style={{ width: `${percentage}%` }} />
                     </span>
-                    <span className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 text-sm font-semibold text-blue-700 dark:border-slate-800 dark:text-blue-300">
+                    <span className="mt-4 flex items-center justify-between border-t border-border pt-3 text-sm font-semibold text-blue-700 dark:border-border dark:text-blue-300">
                       <span>{!user ? 'Sign in to access' : isActive ? 'Continue unit' : 'Enroll unit'}</span>
                       <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
                     </span>

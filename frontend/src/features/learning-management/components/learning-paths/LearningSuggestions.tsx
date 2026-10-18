@@ -51,7 +51,7 @@ export const LearningSuggestions: React.FC<LearningSuggestionsProps> = ({
                 </Button>
               </div>
 
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              <p className="text-sm text-muted-foreground dark:text-muted-foreground mb-4">
                 {suggestion.description}
               </p>
 
@@ -64,10 +64,10 @@ export const LearningSuggestions: React.FC<LearningSuggestionsProps> = ({
                   <Clock className="h-3 w-3 mr-1" />
                   {suggestion.estimatedTime} mins
                 </span>
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground dark:bg-card dark:text-muted-foreground">
                   {suggestion.unit.name}
                 </span>
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground dark:bg-card dark:text-muted-foreground">
                   {suggestion.unit.code}
                 </span>
               </div>

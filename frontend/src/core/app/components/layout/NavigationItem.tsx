@@ -33,7 +33,7 @@ export const NavigationItemComponent: React.FC<NavigationItemProps> = ({
   const effectiveActive = isItemActive || isChildActive || propActive;
   const activeStateClasses = effectiveActive
     ? 'bg-blue-50/80 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 shadow-sm'
-    : 'text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white';
+    : 'text-muted-foreground dark:text-muted-foreground hover:bg-background dark:hover:bg-card hover:text-foreground dark:hover:text-foreground';
 
   useEffect(() => {
     setIsExpanded(Boolean(isChildActive));
@@ -54,7 +54,7 @@ export const NavigationItemComponent: React.FC<NavigationItemProps> = ({
       <div className={`flex min-w-0 items-center ${showLabel ? 'space-x-3' : 'justify-center'}`}>
         <item.icon
           aria-hidden="true"
-          className={`h-5 w-5 shrink-0 ${item.color || 'text-gray-600 dark:text-gray-300'}`}
+          className={`h-5 w-5 shrink-0 ${item.color || 'text-muted-foreground dark:text-muted-foreground'}`}
         />
         {showLabel && (
           <>
@@ -97,7 +97,7 @@ export const NavigationItemComponent: React.FC<NavigationItemProps> = ({
               {itemLabel}
               <ChevronRight
                 aria-hidden="true"
-                className={`ml-auto h-4 w-4 text-gray-600 transition-transform dark:text-gray-300 ${isExpanded ? 'rotate-90' : ''}`}
+                className={`ml-auto h-4 w-4 text-muted-foreground transition-transform dark:text-muted-foreground ${isExpanded ? 'rotate-90' : ''}`}
               />
             </button>
           )}
@@ -112,12 +112,12 @@ export const NavigationItemComponent: React.FC<NavigationItemProps> = ({
             >
               <ChevronRight
                 aria-hidden="true"
-                className={`h-4 w-4 text-gray-600 transition-transform dark:text-gray-300 ${isExpanded ? 'rotate-90' : ''}`}
+                className={`h-4 w-4 text-muted-foreground transition-transform dark:text-muted-foreground ${isExpanded ? 'rotate-90' : ''}`}
               />
             </button>
           )}
         </div>
-        <div id={childrenId} hidden={!isExpanded || !showLabel} className="ml-4 mt-1 space-y-1 border-l border-slate-200 pl-2 dark:border-slate-700">
+        <div id={childrenId} hidden={!isExpanded || !showLabel} className="ml-4 mt-1 space-y-1 border-l border-border pl-2 dark:border-border">
           {item.children.map(child => (
             <NavigationItemComponent
               key={child.id}

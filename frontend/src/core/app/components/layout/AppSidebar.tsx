@@ -127,13 +127,13 @@ export function Sidebar({ user, navigationItems }: SidebarProps) {
         aria-hidden={!isDesktop && !sidebarOpen}
         inert={!isDesktop && !sidebarOpen}
         className={cn(
-          'fixed inset-x-0 bottom-0 top-[calc(4.5rem+env(safe-area-inset-top))] z-50 flex w-full max-w-sm flex-col border-r border-slate-200 bg-white shadow-2xl transition-[transform,width] duration-300 ease-out dark:border-slate-800 dark:bg-slate-900 lg:static lg:inset-auto lg:z-auto lg:h-full lg:w-64 lg:max-w-none lg:translate-x-0 lg:shadow-none',
+          'fixed inset-x-0 bottom-0 top-[calc(4.5rem+env(safe-area-inset-top))] z-50 flex w-full max-w-sm flex-col border-r border-border bg-card shadow-2xl transition-[transform,width] duration-300 ease-out dark:border-border dark:bg-card lg:static lg:inset-auto lg:z-auto lg:h-full lg:w-64 lg:max-w-none lg:translate-x-0 lg:shadow-none',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full',
           isDesktop && sidebarCollapsed && 'lg:w-[4.5rem]',
         )}
       >
         <div className={cn(
-          'flex h-14 shrink-0 items-center border-b border-slate-100 dark:border-slate-800',
+          'flex h-14 shrink-0 items-center border-b border-border dark:border-border',
           isDesktop && sidebarCollapsed ? 'justify-center px-2' : 'justify-between px-4',
         )}>
           <Link
@@ -150,7 +150,7 @@ export function Sidebar({ user, navigationItems }: SidebarProps) {
             ref={closeButtonRef}
             type="button"
             onClick={() => setSidebarOpen(false)}
-            className="rounded-lg p-2 text-slate-500 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-slate-400 dark:hover:bg-slate-800 lg:hidden"
+            className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-muted-foreground dark:hover:bg-card lg:hidden"
             aria-label="Close sidebar"
           >
             <X aria-hidden="true" className="h-5 w-5" />
@@ -162,7 +162,7 @@ export function Sidebar({ user, navigationItems }: SidebarProps) {
           isDesktop && sidebarCollapsed ? 'px-2' : 'px-3',
         )}>
           {!isDesktop && (
-            <p className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+            <p className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground dark:text-muted-foreground">
               More
             </p>
           )}
@@ -181,11 +181,11 @@ export function Sidebar({ user, navigationItems }: SidebarProps) {
 
         {user && (
           <div className={cn(
-            'relative shrink-0 border-t border-slate-200 dark:border-slate-800',
+            'relative shrink-0 border-t border-border dark:border-border',
             isDesktop && sidebarCollapsed ? 'p-2' : 'p-3',
           )}>
             <div className={cn(
-              'flex items-center gap-3 rounded-xl p-2 transition-colors hover:bg-slate-100 dark:hover:bg-slate-800',
+              'flex items-center gap-3 rounded-xl p-2 transition-colors hover:bg-muted dark:hover:bg-card',
               isDesktop && sidebarCollapsed && 'justify-center',
             )}>
               <div
@@ -197,10 +197,10 @@ export function Sidebar({ user, navigationItems }: SidebarProps) {
                 </span>
               </div>
               {(!isDesktop || !sidebarCollapsed) && <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                <p className="text-sm font-medium text-foreground dark:text-muted-foreground truncate">
                   {user.fullName || `${user.firstName} ${user.lastName}`}
                 </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                <p className="text-xs text-muted-foreground dark:text-muted-foreground truncate">
                   {healthcareProfileLabel(user)}
                 </p>
               </div>}
@@ -213,12 +213,12 @@ export function Sidebar({ user, navigationItems }: SidebarProps) {
                       setSidebarUserMenuOpen(false);
                     }
                   }}
-                  className="shrink-0 rounded-md p-1 transition-colors hover:bg-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:bg-gray-600"
+                  className="shrink-0 rounded-md p-1 transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:bg-secondary"
                   aria-label="User menu"
                   {...{ 'aria-expanded': sidebarUserMenuOpen ? 'true' : 'false' }}
                   aria-haspopup="menu"
                 >
-                  <ChevronDown aria-hidden="true" className="h-4 w-4 text-gray-600 dark:text-gray-300" />
+                  <ChevronDown aria-hidden="true" className="h-4 w-4 text-muted-foreground dark:text-muted-foreground" />
                 </button>
               )}
             </div>
@@ -236,7 +236,7 @@ export function Sidebar({ user, navigationItems }: SidebarProps) {
               <button
                 type="button"
                 onClick={() => setSidebarCollapsed(false)}
-                className="mt-2 hidden w-full items-center justify-center rounded-lg p-2 text-slate-500 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-slate-400 dark:hover:bg-slate-800 lg:flex"
+                className="mt-2 hidden w-full items-center justify-center rounded-lg p-2 text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-muted-foreground dark:hover:bg-card lg:flex"
                 aria-label="Expand sidebar"
                 title="Expand sidebar"
               >

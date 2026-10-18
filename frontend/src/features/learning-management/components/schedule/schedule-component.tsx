@@ -233,14 +233,14 @@ export default function ScheduleComponent() {
     return (
       <Card className="h-full border-none shadow-none bg-transparent">
         <CardHeader className="px-0 pt-0">
-          <CardTitle className="text-lg font-semibold flex items-center gap-2 text-gray-900 dark:text-white">
+          <CardTitle className="text-lg font-semibold flex items-center gap-2 text-foreground dark:text-foreground">
             <Clock className="w-5 h-5 text-blue-600 dark:text-blue-400" />
             Upcoming
           </CardTitle>
         </CardHeader>
         <CardContent className="px-0 space-y-3">
           {upcoming.length === 0 ? (
-            <div className="text-sm text-gray-500 dark:text-slate-400 italic p-4 text-center bg-gray-50 dark:bg-slate-800/50 rounded-lg">
+            <div className="text-sm text-muted-foreground dark:text-muted-foreground italic p-4 text-center bg-background dark:bg-card/50 rounded-lg">
               No upcoming events this week.
             </div>
           ) : (
@@ -256,30 +256,30 @@ export default function ScheduleComponent() {
                     setSelectedEvent(ev);
                     setIsDetailsOpen(true);
                   }}
-                  className={`flex gap-3 items-start p-3 bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm hover:shadow-md transition-all cursor-pointer ${
+                  className={`flex gap-3 items-start p-3 bg-card dark:bg-card rounded-xl border border-border dark:border-border shadow-sm hover:shadow-md transition-all cursor-pointer ${
                     ev.completed ? 'opacity-60' : ''
                   }`}
                 >
-                  <div className={`p-2 rounded-lg ${typeColor?.split(' ')[0] || 'bg-gray-100'}`}>
-                    <TypeIcon className={`w-4 h-4 ${typeColor?.split(' ')[1] || 'text-gray-700'}`} />
+                  <div className={`p-2 rounded-lg ${typeColor?.split(' ')[0] || 'bg-muted'}`}>
+                    <TypeIcon className={`w-4 h-4 ${typeColor?.split(' ')[1] || 'text-muted-foreground'}`} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-start">
                       <h4
-                        className={`text-sm font-semibold text-gray-900 dark:text-white truncate ${
+                        className={`text-sm font-semibold text-foreground dark:text-foreground truncate ${
                           ev.completed ? 'line-through' : ''
                         }`}
                       >
                         {ev.title || 'Untitled Event'}
                       </h4>
-                      <span className="text-[10px] text-gray-400 dark:text-slate-500 whitespace-nowrap">
+                      <span className="text-[10px] text-muted-foreground dark:text-muted-foreground whitespace-nowrap">
                         {eventDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
                     </div>
-                    <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5 line-clamp-1">
+                    <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-0.5 line-clamp-1">
                       {ev.location || 'Online'}
                     </p>
-                    <div className="text-[10px] text-gray-400 dark:text-slate-500 mt-1">
+                    <div className="text-[10px] text-muted-foreground dark:text-muted-foreground mt-1">
                       {eventDate.toLocaleDateString(undefined, {
                         weekday: 'short',
                         month: 'short',
@@ -297,7 +297,7 @@ export default function ScheduleComponent() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950/50 pb-20">
+    <div className="min-h-screen bg-background dark:bg-background/50 pb-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
         {/* Action Bar */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
@@ -355,21 +355,21 @@ export default function ScheduleComponent() {
           {/* Main Calendar Area */}
           <div className="lg:col-span-3 space-y-4">
             {/* Controls */}
-            <div className="flex items-center justify-between bg-white dark:bg-slate-800 p-2 rounded-lg border border-gray-100 dark:border-slate-700 shadow-sm">
+            <div className="flex items-center justify-between bg-card dark:bg-card p-2 rounded-lg border border-border dark:border-border shadow-sm">
               <div className="flex items-center gap-2">
                 <Button variant="ghost" size="icon" onClick={() => navigateDate('prev')}>
-                  <ChevronLeft className="w-5 h-5 text-gray-600 dark:text-slate-400" />
+                  <ChevronLeft className="w-5 h-5 text-muted-foreground dark:text-muted-foreground" />
                 </Button>
-                <h2 className="text-lg font-semibold w-40 text-center text-gray-900 dark:text-white">
+                <h2 className="text-lg font-semibold w-40 text-center text-foreground dark:text-foreground">
                   {currentDate.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
                 </h2>
                 <Button variant="ghost" size="icon" onClick={() => navigateDate('next')}>
-                  <ChevronRight className="w-5 h-5 text-gray-600 dark:text-slate-400" />
+                  <ChevronRight className="w-5 h-5 text-muted-foreground dark:text-muted-foreground" />
                 </Button>
               </div>
 
               <div className="flex items-center gap-2">
-                <Filter className="w-4 h-4 text-gray-400" />
+                <Filter className="w-4 h-4 text-muted-foreground" />
                 {/* Fix: removed invalid `value` prop from SelectValue — use only `placeholder` */}
                 <Select value={selectedType} onValueChange={setSelectedType}>
                   <SelectTrigger className="w-[140px] h-8 text-sm">
@@ -389,7 +389,7 @@ export default function ScheduleComponent() {
 
             {/* Calendar Grid */}
             {isLoading ? (
-              <div className="h-[500px] flex items-center justify-center bg-white dark:bg-slate-800 rounded-lg border dark:border-slate-700">
+              <div className="h-[500px] flex items-center justify-center bg-card dark:bg-card rounded-lg border dark:border-border">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
               </div>
             ) : (
@@ -429,12 +429,12 @@ export default function ScheduleComponent() {
                   </div>
                 </CardContent>
               </Card>
-              <Card className="bg-white dark:bg-slate-800 border-blue-100 dark:border-slate-700 shadow-sm">
+              <Card className="bg-card dark:bg-card border-blue-100 dark:border-border shadow-sm">
                 <CardContent className="p-4 flex flex-col items-center text-center">
-                  <div className="text-3xl font-bold text-gray-900 dark:text-white">
+                  <div className="text-3xl font-bold text-foreground dark:text-foreground">
                     {events.filter(e => e.type === 'lecture').length}
                   </div>
-                  <div className="text-xs text-gray-500 dark:text-slate-400 font-medium uppercase tracking-wider mt-1">
+                  <div className="text-xs text-muted-foreground dark:text-muted-foreground font-medium uppercase tracking-wider mt-1">
                     Lectures
                   </div>
                 </CardContent>

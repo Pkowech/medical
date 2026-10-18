@@ -38,7 +38,7 @@ export const MaterialCard: React.FC<MaterialCardProps> = React.memo(({
   const fileUrl = material.fileUrl || material.url;
 
   return (
-    <Card className="flex h-full min-w-0 flex-col rounded-xl border-slate-200 bg-white py-0 shadow-sm transition-shadow hover:shadow-md dark:border-slate-800 dark:bg-slate-900">
+    <Card className="flex h-full min-w-0 flex-col rounded-xl border-border bg-card py-0 shadow-sm transition-shadow hover:shadow-md dark:border-border dark:bg-card">
       <CardHeader className="px-4 pb-0 pt-4">
         <div className="mb-3 flex items-center justify-between gap-3">
           <span className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
@@ -46,20 +46,20 @@ export const MaterialCard: React.FC<MaterialCardProps> = React.memo(({
             {(material.type || material.contentType || 'File').toString().replaceAll('_', ' ')}
           </span>
           {material.size && (
-            <span className="truncate text-xs text-slate-500 dark:text-slate-400">{material.size}</span>
+            <span className="truncate text-xs text-muted-foreground dark:text-muted-foreground">{material.size}</span>
           )}
         </div>
-        <CardTitle className="line-clamp-2 min-h-10 text-base font-semibold leading-5 text-slate-900 dark:text-white">
+        <CardTitle className="line-clamp-2 min-h-10 text-base font-semibold leading-5 text-foreground dark:text-foreground">
           {material.title}
         </CardTitle>
       </CardHeader>
 
       <CardContent className="flex flex-1 flex-col px-4 pb-4 pt-2">
-        <p className="mb-4 line-clamp-2 min-h-10 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
+        <p className="mb-4 line-clamp-2 min-h-10 text-sm leading-relaxed text-muted-foreground dark:text-muted-foreground">
           {material.description || 'No description provided.'}
         </p>
 
-        <div className="mt-auto flex items-center justify-between gap-3 border-t border-slate-100 pt-3 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
+        <div className="mt-auto flex items-center justify-between gap-3 border-t border-border pt-3 text-xs text-muted-foreground dark:border-border dark:text-muted-foreground">
           <span className="flex min-w-0 items-center gap-1.5">
             <UserRound className="h-3.5 w-3.5 shrink-0" />
             <span className="truncate">{ownerName || 'Unknown author'}</span>
@@ -82,7 +82,7 @@ export const MaterialCard: React.FC<MaterialCardProps> = React.memo(({
               variant="ghost"
               size="icon"
               asChild
-              className="h-9 w-9 shrink-0 text-slate-600 dark:text-slate-300"
+              className="h-9 w-9 shrink-0 text-muted-foreground dark:text-muted-foreground"
             >
               <a href={fileUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open file for ${material.title}`}>
                 <Download className="h-4 w-4" />
@@ -97,7 +97,7 @@ export const MaterialCard: React.FC<MaterialCardProps> = React.memo(({
               onClick={() => onToggleCourseSharing?.(material)}
               title={isSharedWithCourse ? 'Stop sharing with class' : 'Share with class'}
               aria-label={isSharedWithCourse ? `Stop sharing ${material.title} with class` : `Share ${material.title} with class`}
-              className="h-9 w-9 shrink-0 text-slate-600 dark:text-slate-300"
+              className="h-9 w-9 shrink-0 text-muted-foreground dark:text-muted-foreground"
             >
               <Share2 className="h-4 w-4" />
             </Button>

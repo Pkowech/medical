@@ -166,14 +166,14 @@ export const ProgressDashboard = () => {
                   .map(chain => (
                     <div
                       key={chain.weakTopic.id}
-                      className="p-3 bg-white dark:bg-slate-800 rounded-lg border border-red-200 dark:border-red-800"
+                      className="p-3 bg-card dark:bg-card rounded-lg border border-red-200 dark:border-red-800"
                     >
                       <div className="flex items-start justify-between mb-2">
                         <div className="flex-1">
-                          <p className="font-semibold text-gray-900 dark:text-white">
+                          <p className="font-semibold text-foreground dark:text-foreground">
                             {chain.weakTopic.name}
                           </p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                          <p className="text-xs text-muted-foreground dark:text-muted-foreground">
                             Current Mastery: {(chain.weakTopic.pKnown * 100).toFixed(0)}%
                           </p>
                         </div>
@@ -189,8 +189,8 @@ export const ProgressDashboard = () => {
                       </div>
 
                       {chain.dependentTopics.length > 0 && (
-                        <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
-                          <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">
+                        <div className="mt-2 pt-2 border-t border-border dark:border-border">
+                          <p className="text-xs text-muted-foreground dark:text-muted-foreground mb-1">
                             <TrendingDown className="w-3 h-3 inline mr-1" />
                             May affect:
                           </p>
@@ -204,7 +204,7 @@ export const ProgressDashboard = () => {
                               </span>
                             ))}
                             {chain.dependentTopics.length > 3 && (
-                              <span className="text-xs text-gray-500">
+                              <span className="text-xs text-muted-foreground">
                                 +{chain.dependentTopics.length - 3} more
                               </span>
                             )}
@@ -214,7 +214,7 @@ export const ProgressDashboard = () => {
                     </div>
                   ))}
               </div>
-              <p className="text-xs text-gray-600 dark:text-gray-400 mt-3">
+              <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-3">
                 💡 Check the Study Dashboard for AI-generated practice quizzes to strengthen these areas.
               </p>
             </CardContent>

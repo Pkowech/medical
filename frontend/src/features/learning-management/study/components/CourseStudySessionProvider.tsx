@@ -479,19 +479,19 @@ export function CourseStudySessionProvider({ children }: { children: React.React
       {activeSession && (
         <aside
           aria-label="Active course study session"
-          className="fixed bottom-4 right-4 z-[70] w-[min(24rem,calc(100vw-2rem))] rounded-2xl border border-indigo-200 bg-white p-4 shadow-2xl dark:border-indigo-900 dark:bg-slate-900"
+          className="fixed bottom-4 right-4 z-[70] w-[min(24rem,calc(100vw-2rem))] rounded-2xl border border-indigo-200 bg-card p-4 shadow-2xl dark:border-indigo-900 dark:bg-card"
         >
           <p className="text-xs font-semibold uppercase tracking-wide text-indigo-600 dark:text-indigo-400">
             Course study session
           </p>
-          <p className="mt-1 truncate font-semibold text-slate-900 dark:text-white">{activeSession.topicTitle}</p>
-          <p className="mt-2 font-mono text-2xl tabular-nums text-slate-900 dark:text-white" aria-live="off">
+          <p className="mt-1 truncate font-semibold text-foreground dark:text-foreground">{activeSession.topicTitle}</p>
+          <p className="mt-2 font-mono text-2xl tabular-nums text-foreground dark:text-foreground" aria-live="off">
             {formatElapsedTime(activeSession.elapsedSeconds)}
           </p>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+          <p className="mt-1 text-xs text-muted-foreground dark:text-muted-foreground">
             {activeSession.activities.length} learning activities tracked
           </p>
-          <label htmlFor="course-session-notes" className="mt-3 block text-xs font-medium text-slate-600 dark:text-slate-300">
+          <label htmlFor="course-session-notes" className="mt-3 block text-xs font-medium text-muted-foreground dark:text-muted-foreground">
             Session notes · saved on this device
           </label>
           <Textarea
@@ -501,7 +501,7 @@ export function CourseStudySessionProvider({ children }: { children: React.React
             placeholder="Capture key ideas or questions—even offline."
             className="mt-1 min-h-20 resize-y text-sm"
           />
-          <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+          <p className="mt-1 text-[11px] text-muted-foreground dark:text-muted-foreground">
             Notes are stored locally as you type and included when the session syncs.
           </p>
           <div className="mt-3 flex gap-2">

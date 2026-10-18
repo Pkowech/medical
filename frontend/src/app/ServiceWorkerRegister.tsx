@@ -62,7 +62,7 @@ export function ServiceWorkerRegister() {
       <span>A new version is ready.</span>
       <button
         type="button"
-        className="rounded bg-white px-3 py-1 font-semibold text-slate-900 hover:bg-slate-100"
+        className="rounded bg-card px-3 py-1 font-semibold text-foreground hover:bg-muted"
         onClick={() => {
           if (!waitingWorker) return;
           activatingUpdate.current = true;

@@ -64,7 +64,7 @@ export const RegisterForm: React.FC = () => {
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label htmlFor="firstName" className="block text-sm font-medium text-gray-700">
+          <label htmlFor="firstName" className="block text-sm font-medium text-muted-foreground">
             First Name
           </label>
           <input
@@ -73,13 +73,13 @@ export const RegisterForm: React.FC = () => {
             name="firstName"
             value={formData.firstName}
             onChange={handleChange}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            className="mt-1 block w-full rounded-md border-border shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
             required
           />
         </div>
 
         <div>
-          <label htmlFor="lastName" className="block text-sm font-medium text-gray-700">
+          <label htmlFor="lastName" className="block text-sm font-medium text-muted-foreground">
             Last Name
           </label>
           <input
@@ -88,14 +88,14 @@ export const RegisterForm: React.FC = () => {
             name="lastName"
             value={formData.lastName}
             onChange={handleChange}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            className="mt-1 block w-full rounded-md border-border shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
             required
           />
         </div>
       </div>
 
       <div>
-        <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+        <label htmlFor="email" className="block text-sm font-medium text-muted-foreground">
           Email
         </label>
         <input
@@ -104,13 +104,13 @@ export const RegisterForm: React.FC = () => {
           name="email"
           value={formData.email}
           onChange={handleChange}
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+          className="mt-1 block w-full rounded-md border-border shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
           required
         />
       </div>
 
       <div>
-        <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+        <label htmlFor="password" className="block text-sm font-medium text-muted-foreground">
           Password
         </label>
         <input
@@ -119,13 +119,13 @@ export const RegisterForm: React.FC = () => {
           name="password"
           value={formData.password}
           onChange={handleChange}
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+          className="mt-1 block w-full rounded-md border-border shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
           required
         />
       </div>
 
       <div>
-        <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
+        <label htmlFor="confirmPassword" className="block text-sm font-medium text-muted-foreground">
           Confirm Password
         </label>
         <input
@@ -134,7 +134,7 @@ export const RegisterForm: React.FC = () => {
           name="confirmPassword"
           value={formData.confirmPassword}
           onChange={handleChange}
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+          className="mt-1 block w-full rounded-md border-border shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
           required
         />
       </div>
@@ -146,9 +146,9 @@ export const RegisterForm: React.FC = () => {
           type="checkbox"
           checked={formData.acceptTerms}
           onChange={handleChange}
-          className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+          className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-border rounded"
         />
-        <label htmlFor="acceptTerms" className="ml-2 block text-sm text-gray-900">
+        <label htmlFor="acceptTerms" className="ml-2 block text-sm text-foreground">
           I accept the{' '}
           <a href="/terms" className="text-indigo-600 hover:text-indigo-500">
             Terms and Conditions

@@ -24,14 +24,14 @@ export const CourseListItem: React.FC<CourseListItemProps> = React.memo(({ cours
       case 'expert':
         return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
       default:
-        return 'bg-gray-100 text-gray-800 dark:bg-slate-800 dark:text-slate-400';
+        return 'bg-muted text-muted-foreground dark:bg-card dark:text-muted-foreground';
     }
   };
 
   return (
     <div
       onClick={() => onView(course.id)}
-      className="group flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-slate-800/50 rounded-xl transition-all cursor-pointer border border-transparent hover:border-gray-200 dark:hover:border-slate-700 bg-white dark:bg-slate-900 shadow-sm hover:shadow-md mb-3"
+      className="group flex items-center justify-between p-4 hover:bg-background dark:hover:bg-card/50 rounded-xl transition-all cursor-pointer border border-transparent hover:border-border dark:hover:border-border bg-card dark:bg-card shadow-sm hover:shadow-md mb-3"
     >
       {/* Icon & Title */}
       <div className="flex items-center gap-4 flex-1 min-w-0">
@@ -40,14 +40,14 @@ export const CourseListItem: React.FC<CourseListItemProps> = React.memo(({ cours
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <h4 className="text-base font-bold text-gray-900 dark:text-white truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+            <h4 className="text-base font-bold text-foreground dark:text-foreground truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
               {course.title}
             </h4>
             {/* Active Slot removed as it is not part of Course interface */}
           </div>
           
-          <div className="flex items-center gap-2 mt-1 text-xs text-gray-500 dark:text-slate-400">
-             <span className="font-medium text-gray-700 dark:text-slate-300">{course.code || 'MED-CORE'}</span>
+          <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground dark:text-muted-foreground">
+             <span className="font-medium text-muted-foreground dark:text-muted-foreground">{course.code || 'MED-CORE'}</span>
              <span className="hidden sm:inline">•</span>
              <span className="hidden sm:inline">by {getInstructorDisplayName(course.instructor)}</span>
           </div>
@@ -68,7 +68,7 @@ export const CourseListItem: React.FC<CourseListItemProps> = React.memo(({ cours
       </div>
 
       {/* Desktop Columns */}
-      <div className="hidden sm:flex items-center gap-8 text-sm text-gray-500 dark:text-slate-400 flex-shrink-0 mx-6">
+      <div className="hidden sm:flex items-center gap-8 text-sm text-muted-foreground dark:text-muted-foreground flex-shrink-0 mx-6">
         {/* Category/Difficulty */}
         <div className="w-32 flex flex-col items-start gap-1">
             <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${getDifficultyColor(course.difficulty)}`}>
@@ -83,7 +83,7 @@ export const CourseListItem: React.FC<CourseListItemProps> = React.memo(({ cours
 
         {/* Stats */}
         <div className="w-24 text-right">
-           <div className="flex items-center justify-end gap-1.5 text-gray-700 dark:text-slate-300">
+           <div className="flex items-center justify-end gap-1.5 text-muted-foreground dark:text-muted-foreground">
              <Users className="w-3.5 h-3.5" />
              <span className="font-semibold">{course.enrollmentCount || 0}</span>
            </div>

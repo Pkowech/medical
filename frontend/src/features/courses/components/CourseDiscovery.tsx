@@ -81,7 +81,7 @@ export function CourseDiscovery({ userId }: CourseDiscoveryProps) {
       case 'advanced':
         return 'bg-red-100 text-red-800';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-muted text-muted-foreground';
     }
   };
 
@@ -112,7 +112,7 @@ export function CourseDiscovery({ userId }: CourseDiscoveryProps) {
             </div>
             <CardTitle className="text-lg line-clamp-2">{course.title}</CardTitle>
             {course.instructor && (
-              <p className="text-sm text-gray-600 mt-1">
+              <p className="text-sm text-muted-foreground mt-1">
                 by {getInstructorDisplayName(course.instructor)}
               </p>
             )}
@@ -121,9 +121,9 @@ export function CourseDiscovery({ userId }: CourseDiscoveryProps) {
         </div>
       </CardHeader>
       <CardContent>
-        <p className="text-sm text-gray-600 mb-4 line-clamp-3">{course.description}</p>
+        <p className="text-sm text-muted-foreground mb-4 line-clamp-3">{course.description}</p>
 
-        <div className="flex items-center gap-4 text-xs text-gray-500 mb-4">
+        <div className="flex items-center gap-4 text-xs text-muted-foreground mb-4">
           <div className="flex items-center gap-1">
             <Clock className="h-3 w-3" />
             {course.estimatedHours}h
@@ -159,18 +159,18 @@ export function CourseDiscovery({ userId }: CourseDiscoveryProps) {
     return (
       <div className="space-y-8">
         <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
+          <div className="h-8 bg-secondary rounded w-1/4 mb-4"></div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[...Array(3)].map((_, i) => (
               <Card key={i}>
                 <CardHeader>
-                  <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                  <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                  <div className="h-4 bg-secondary rounded w-3/4"></div>
+                  <div className="h-3 bg-secondary rounded w-1/2"></div>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2">
-                    <div className="h-3 bg-gray-200 rounded"></div>
-                    <div className="h-3 bg-gray-200 rounded w-5/6"></div>
+                    <div className="h-3 bg-secondary rounded"></div>
+                    <div className="h-3 bg-secondary rounded w-5/6"></div>
                   </div>
                 </CardContent>
               </Card>
@@ -189,7 +189,7 @@ export function CourseDiscovery({ userId }: CourseDiscoveryProps) {
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
               <Sparkles className="h-6 w-6 text-yellow-500" />
-              <h2 className="text-2xl font-bold text-gray-900">Featured Courses</h2>
+              <h2 className="text-2xl font-bold text-foreground">Featured Courses</h2>
             </div>
             <Button variant="ghost" asChild>
               <Link href="/courses?featured=true">
@@ -211,7 +211,7 @@ export function CourseDiscovery({ userId }: CourseDiscoveryProps) {
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
               <TrendingUp className="h-6 w-6 text-blue-500" />
-              <h2 className="text-2xl font-bold text-gray-900">Recommended for You</h2>
+              <h2 className="text-2xl font-bold text-foreground">Recommended for You</h2>
             </div>
             <Button variant="ghost" asChild>
               <Link href="/courses">
@@ -229,9 +229,9 @@ export function CourseDiscovery({ userId }: CourseDiscoveryProps) {
 
       {featuredCourses.length === 0 && recommendedCourses.length === 0 && (
         <div className="text-center py-12">
-          <BookOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No courses available</h3>
-          <p className="text-gray-600">Check back later for new course recommendations.</p>
+          <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-foreground mb-2">No courses available</h3>
+          <p className="text-muted-foreground">Check back later for new course recommendations.</p>
         </div>
       )}
     </div>

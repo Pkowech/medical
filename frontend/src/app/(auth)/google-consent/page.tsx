@@ -69,25 +69,25 @@ function GoogleConsentContent() {
   };
 
   if (status === 'loading' || status === 'authenticated') {
-    return <p className="text-center text-sm text-slate-600">Completing sign-in…</p>;
+    return <p className="text-center text-sm text-muted-foreground">Completing sign-in…</p>;
   }
 
   return (
-    <main className="mx-auto w-full max-w-md rounded-2xl bg-white p-8 shadow-lg dark:bg-slate-900">
-      <h1 className="text-2xl font-semibold text-slate-900 dark:text-white">
+    <main className="mx-auto w-full max-w-md rounded-2xl bg-card p-8 shadow-lg dark:bg-card">
+      <h1 className="text-2xl font-semibold text-foreground dark:text-foreground">
         One last step
       </h1>
-      <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+      <p className="mt-2 text-sm text-muted-foreground dark:text-muted-foreground">
         Your Google account is verified. Review and accept our terms to create your MedTrack account.
       </p>
 
       <form onSubmit={handleSubmit} className="mt-6 space-y-6">
-        <label className="flex items-start gap-3 text-sm text-slate-700 dark:text-slate-200">
+        <label className="flex items-start gap-3 text-sm text-muted-foreground dark:text-muted-foreground">
           <input
             type="checkbox"
             checked={accepted}
             onChange={event => setAccepted(event.target.checked)}
-            className="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+            className="mt-1 h-4 w-4 rounded border-border text-blue-600 focus:ring-blue-500"
           />
           <span>
             I agree to the{' '}
@@ -113,7 +113,7 @@ function GoogleConsentContent() {
         </button>
       </form>
 
-      <p className="mt-5 text-center text-sm text-slate-600 dark:text-slate-300">
+      <p className="mt-5 text-center text-sm text-muted-foreground dark:text-muted-foreground">
         Not now? <Link href="/login" className="font-medium text-blue-600 underline dark:text-blue-400">Return to sign in</Link>
       </p>
     </main>
@@ -122,7 +122,7 @@ function GoogleConsentContent() {
 
 export default function GoogleConsentPage() {
   return (
-    <Suspense fallback={<p className="text-center text-sm text-slate-600">Loading…</p>}>
+    <Suspense fallback={<p className="text-center text-sm text-muted-foreground">Loading…</p>}>
       <GoogleConsentContent />
     </Suspense>
   );

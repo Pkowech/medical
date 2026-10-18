@@ -49,7 +49,7 @@ export default function ResendVerificationPage() {
         isLoading={loading}
         submitText={loading ? 'Sending...' : 'Send Verification Link'}
         footer={
-          <p className="text-center text-sm text-gray-600 dark:text-gray-400">
+          <p className="text-center text-sm text-muted-foreground dark:text-muted-foreground">
             <Link href="/login" className="font-medium text-blue-600 hover:text-blue-700">
               Return to sign in
             </Link>

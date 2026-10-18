@@ -82,7 +82,7 @@ export function ConnectivityIndicator() {
           <WifiOff className="w-4 h-4" />
           <span className="text-sm font-medium">You are offline</span>
           {pendingChanges > 0 && (
-            <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">
+            <span className="text-xs bg-card/20 px-2 py-0.5 rounded-full">
               {pendingChanges} pending
             </span>
           )}
@@ -107,7 +107,7 @@ export function ConnectivityIndicator() {
           {retryableFailedChanges > 0 && (
             <button
               type="button"
-              className="rounded bg-white/20 px-2 py-1 text-xs font-semibold hover:bg-white/30"
+              className="rounded bg-card/20 px-2 py-1 text-xs font-semibold hover:bg-card/30"
               onClick={() => void retryFailed()}
               title={latestFailure || 'Retry failed changes'}
               aria-label={
@@ -121,7 +121,7 @@ export function ConnectivityIndicator() {
           )}
           <button
             type="button"
-            className="rounded bg-white/20 px-2 py-1 text-xs font-semibold hover:bg-white/30"
+            className="rounded bg-card/20 px-2 py-1 text-xs font-semibold hover:bg-card/30"
             onClick={() => {
               if (window.confirm('Discard all failed offline changes from this device?')) {
                 void discardFailed();
@@ -147,7 +147,7 @@ export function ConnectivityIndicator() {
           <span className="text-sm font-medium">
             {isFlushing ? 'Syncing...' : 'Changes pending'}
           </span>
-          <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">
+          <span className="text-xs bg-card/20 px-2 py-0.5 rounded-full">
             {pendingChanges}
           </span>
 

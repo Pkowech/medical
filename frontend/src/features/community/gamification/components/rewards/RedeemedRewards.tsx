@@ -73,7 +73,7 @@ export const RedeemedRewards: React.FC = () => {
             {redeemedRewards.map((rewardId, index) => (
               <div
                 key={`${rewardId}-${index}`}
-                className="border rounded-lg p-4 flex flex-col items-center text-center bg-gray-50"
+                className="border rounded-lg p-4 flex flex-col items-center text-center bg-background"
               >
                 <h3 className="font-semibold text-lg">Reward ID</h3>
                 <p className="mt-1 break-all text-sm text-muted-foreground">{rewardId}</p>

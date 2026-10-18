@@ -16,19 +16,19 @@ export default function Notifications({ userId: _userId }: { userId?: string }) 
   }, [refetch]);
 
   return (
-    <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow">
-      <h2 className="text-xl font-semibold mb-2 text-gray-900 dark:text-white">Notifications</h2>
+    <div className="p-4 bg-card dark:bg-card rounded-lg shadow">
+      <h2 className="text-xl font-semibold mb-2 text-foreground dark:text-foreground">Notifications</h2>
       {notifications.length ? (
         <ul>
           {notifications.map((notif: Notification) => (
             <li key={notif.id} className="py-2">
-              <div className="text-sm text-gray-800 dark:text-gray-200">{notif.message}</div>
-              <div className="text-xs text-gray-500">{notif.createdAt}</div>
+              <div className="text-sm text-muted-foreground dark:text-muted-foreground">{notif.message}</div>
+              <div className="text-xs text-muted-foreground">{notif.createdAt}</div>
             </li>
           ))}
         </ul>
       ) : (
-        <p className="text-gray-500 dark:text-gray-400">No notifications yet.</p>
+        <p className="text-muted-foreground dark:text-muted-foreground">No notifications yet.</p>
       )}
     </div>
   );

@@ -60,7 +60,7 @@ export const AdminCourseList: React.FC<AdminCourseListProps> = ({
     return (
       <Card>
         <CardContent className="text-center py-12">
-          <p className="text-gray-500">No courses yet. Create your first course to get started.</p>
+          <p className="text-muted-foreground">No courses yet. Create your first course to get started.</p>
         </CardContent>
       </Card>
     );
@@ -76,7 +76,7 @@ export const AdminCourseList: React.FC<AdminCourseListProps> = ({
               <div className="flex items-center gap-4 flex-1">
                 <button
                   onClick={() => toggleCourseExpanded(course.id)}
-                  className="p-0 hover:bg-gray-100 rounded transition"
+                  className="p-0 hover:bg-muted rounded transition"
                 >
                   {expanded.has(course.id) ? (
                     <ChevronDown className="h-5 w-5" />
@@ -86,7 +86,7 @@ export const AdminCourseList: React.FC<AdminCourseListProps> = ({
                 </button>
                 <div className="flex-1">
                   <h3 className="font-semibold text-lg">{course.title}</h3>
-                  <p className="text-sm text-gray-600 line-clamp-1">{course.description}</p>
+                  <p className="text-sm text-muted-foreground line-clamp-1">{course.description}</p>
                   <div className="flex gap-2 mt-2">
                     <Badge variant="secondary">{course.status || 'draft'}</Badge>
                     {course.difficulty && <Badge variant="outline">{course.difficulty}</Badge>}
@@ -119,7 +119,7 @@ export const AdminCourseList: React.FC<AdminCourseListProps> = ({
 
             {/* Course Details - Expanded */}
             {expanded.has(course.id) && (
-              <div className="mt-6 pl-12 border-l-2 border-gray-200 space-y-4">
+              <div className="mt-6 pl-12 border-l-2 border-border space-y-4">
                 <div className="flex justify-between items-center mb-4">
                   <h4 className="font-semibold">
                     Units ({loadingCourseIds.has(course.id) ? '...' : course.units?.length || 0})
@@ -136,17 +136,17 @@ export const AdminCourseList: React.FC<AdminCourseListProps> = ({
                 </div>
 
                 {loadingCourseIds.has(course.id) ? (
-                  <p className="text-sm text-gray-500">Loading units and topics...</p>
+                  <p className="text-sm text-muted-foreground">Loading units and topics...</p>
                 ) : course.units && course.units.length > 0 ? (
                   <div className="space-y-3">
                     {course.units.map((unit: Unit) => (
-                      <div key={unit.id} className="border rounded-lg p-4 bg-gray-50">
+                      <div key={unit.id} className="border rounded-lg p-4 bg-background">
                         {/* Unit Header */}
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3 flex-1">
                             <button
                               onClick={() => toggleUnitExpanded(unit.id)}
-                              className="p-0 hover:bg-gray-200 rounded transition"
+                              className="p-0 hover:bg-secondary rounded transition"
                             >
                               {expandedUnits.get(unit.id) ? (
                                 <ChevronDown className="h-4 w-4" />
@@ -156,7 +156,7 @@ export const AdminCourseList: React.FC<AdminCourseListProps> = ({
                             </button>
                             <div className="flex-1">
                               <p className="font-medium">{unit.title}</p>
-                              <p className="text-xs text-gray-500">{unit.description}</p>
+                              <p className="text-xs text-muted-foreground">{unit.description}</p>
                             </div>
                           </div>
                           <div className="flex gap-2">
@@ -181,7 +181,7 @@ export const AdminCourseList: React.FC<AdminCourseListProps> = ({
 
                         {/* Topics - Expanded Unit */}
                         {expandedUnits.get(unit.id) && (
-                          <div className="mt-4 pl-8 border-l-2 border-gray-300 space-y-3">
+                          <div className="mt-4 pl-8 border-l-2 border-border space-y-3">
                             <div className="flex justify-between items-center mb-3">
                               <span className="text-sm font-semibold">Topics ({unit.topics?.length || 0})</span>
                               <Button
@@ -206,7 +206,7 @@ export const AdminCourseList: React.FC<AdminCourseListProps> = ({
                                   return (
                                     <div
                                       key={topic.id}
-                                      className="flex items-center justify-between p-3 bg-white rounded border border-gray-200"
+                                      className="flex items-center justify-between p-3 bg-card rounded border border-border"
                                     >
                                       <div className="flex-1">
                                         <p className="text-sm font-medium">{normalizedTopic.title}</p>
@@ -241,7 +241,7 @@ export const AdminCourseList: React.FC<AdminCourseListProps> = ({
                                 })}
                               </div>
                             ) : (
-                              <p className="text-xs text-gray-500 italic">No topics yet</p>
+                              <p className="text-xs text-muted-foreground italic">No topics yet</p>
                             )}
                           </div>
                         )}
@@ -249,7 +249,7 @@ export const AdminCourseList: React.FC<AdminCourseListProps> = ({
                     ))}
                   </div>
                 ) : (
-                  <p className="text-sm text-gray-500 italic">No units yet</p>
+                  <p className="text-sm text-muted-foreground italic">No units yet</p>
                 )}
               </div>
             )}

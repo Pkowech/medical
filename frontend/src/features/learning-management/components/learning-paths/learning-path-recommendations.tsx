@@ -93,7 +93,7 @@ export const LearningPathRecommendations: React.FC<LearningPathRecommendationsPr
   };
 
   const getDifficultyColor = (difficulty?: string) => {
-    if (!difficulty) return 'bg-gray-100 text-gray-800';
+    if (!difficulty) return 'bg-muted text-muted-foreground';
     switch (difficulty.toLowerCase()) {
       case 'beginner':
         return 'bg-green-100 text-green-800';
@@ -104,7 +104,7 @@ export const LearningPathRecommendations: React.FC<LearningPathRecommendationsPr
       case 'expert':
         return 'bg-red-100 text-red-800';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-muted text-muted-foreground';
     }
   };
 
@@ -118,12 +118,12 @@ export const LearningPathRecommendations: React.FC<LearningPathRecommendationsPr
     return (
       <div
         key={rec.pathId}
-        className="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow p-6"
+        className="bg-card rounded-lg shadow-sm border border-border hover:shadow-md transition-shadow p-6"
       >
         <div className="flex items-start justify-between mb-4">
           <div className="flex-1">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">{path.title}</h3>
-            <p className="text-gray-600 text-sm mb-3 line-clamp-2">{path.description}</p>
+            <h3 className="text-lg font-semibold text-foreground mb-2">{path.title}</h3>
+            <p className="text-muted-foreground text-sm mb-3 line-clamp-2">{path.description}</p>
 
             <div className="flex flex-wrap gap-2 mb-3">
               <span
@@ -140,7 +140,7 @@ export const LearningPathRecommendations: React.FC<LearningPathRecommendationsPr
           <div className="flex flex-col items-end space-y-2">
             <div className="flex items-center space-x-1">
               <Star className="w-4 h-4 text-yellow-400 fill-current" />
-              <span className="text-sm text-gray-600">
+              <span className="text-sm text-muted-foreground">
                 {path.analytics.userRatings.average.toFixed(1)}
               </span>
             </div>
@@ -158,11 +158,11 @@ export const LearningPathRecommendations: React.FC<LearningPathRecommendationsPr
           <div className="mb-4">
             <div className="flex items-center space-x-2 mb-2">
               <Lightbulb className="w-4 h-4 text-blue-600" />
-              <span className="text-sm font-medium text-gray-700">Why this path?</span>
+              <span className="text-sm font-medium text-muted-foreground">Why this path?</span>
             </div>
             <ul className="space-y-1">
               {rec.reasons.slice(0, 2).map((reason, index) => (
-                <li key={index} className="text-sm text-gray-600 flex items-start space-x-2">
+                <li key={index} className="text-sm text-muted-foreground flex items-start space-x-2">
                   <span className="w-1 h-1 bg-blue-600 rounded-full mt-2 shrink-0"></span>
                   <span>{reason}</span>
                 </li>
@@ -172,7 +172,7 @@ export const LearningPathRecommendations: React.FC<LearningPathRecommendationsPr
         )}
 
         {/* Path stats */}
-        <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
+        <div className="flex items-center justify-between text-sm text-muted-foreground mb-4">
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-1">
               <Clock className="w-4 h-4" />
@@ -199,11 +199,11 @@ export const LearningPathRecommendations: React.FC<LearningPathRecommendationsPr
         {/* Confidence indicator */}
         {type === 'personalized' && rec.confidence > 0 && (
           <div className="mb-4">
-            <div className="flex items-center justify-between text-sm text-gray-600 mb-1">
+            <div className="flex items-center justify-between text-sm text-muted-foreground mb-1">
               <span>Recommendation confidence</span>
               <span>{Math.round(rec.confidence * 100)}%</span>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-2">
+            <div className="w-full bg-secondary rounded-full h-2">
               <div
                 className={`h-2 rounded-full transition-all duration-300 ${
                   rec.confidence >= 0.8
@@ -234,12 +234,12 @@ export const LearningPathRecommendations: React.FC<LearningPathRecommendationsPr
   const renderTrendingCard = (path: TrendingPath) => (
     <div
       key={path.id}
-      className="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow p-6"
+      className="bg-card rounded-lg shadow-sm border border-border hover:shadow-md transition-shadow p-6"
     >
       <div className="flex items-start justify-between mb-4">
         <div className="flex-1">
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">{path.title}</h3>
-          <p className="text-gray-600 text-sm mb-3 line-clamp-2">{path.description}</p>
+          <h3 className="text-lg font-semibold text-foreground mb-2">{path.title}</h3>
+          <p className="text-muted-foreground text-sm mb-3 line-clamp-2">{path.description}</p>
 
           <div className="flex flex-wrap gap-2 mb-3">
             <span
@@ -255,13 +255,13 @@ export const LearningPathRecommendations: React.FC<LearningPathRecommendationsPr
 
         <div className="flex items-center space-x-1 text-yellow-400">
           <Star className="w-4 h-4 fill-current" />
-          <span className="text-sm text-gray-600">
+          <span className="text-sm text-muted-foreground">
             {path.analytics?.userRatings?.average?.toFixed(1) || 'New'}
           </span>
         </div>
       </div>
 
-      <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
+      <div className="flex items-center justify-between text-sm text-muted-foreground mb-4">
         <div className="flex items-center space-x-4">
           <div className="flex items-center space-x-1">
             <Clock className="w-4 h-4" />
@@ -298,7 +298,7 @@ export const LearningPathRecommendations: React.FC<LearningPathRecommendationsPr
       <div className="space-y-6">
         <div className="flex items-center space-x-3">
           <Sparkles className="w-6 h-6 text-blue-600" />
-          <h2 className="text-2xl font-bold text-gray-900">Recommended for You</h2>
+          <h2 className="text-2xl font-bold text-foreground">Recommended for You</h2>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {loadError && (
@@ -307,12 +307,12 @@ export const LearningPathRecommendations: React.FC<LearningPathRecommendationsPr
             </div>
           )}
           {[...Array(6)].map((_, i) => (
-            <div key={i} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div key={i} className="bg-card rounded-lg shadow-sm border border-border p-6">
               <div className="animate-pulse space-y-4">
-                <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                <div className="h-3 bg-gray-200 rounded w-full"></div>
-                <div className="h-3 bg-gray-200 rounded w-2/3"></div>
-                <div className="h-8 bg-gray-200 rounded"></div>
+                <div className="h-4 bg-secondary rounded w-3/4"></div>
+                <div className="h-3 bg-secondary rounded w-full"></div>
+                <div className="h-3 bg-secondary rounded w-2/3"></div>
+                <div className="h-8 bg-secondary rounded"></div>
               </div>
             </div>
           ))}
@@ -326,17 +326,17 @@ export const LearningPathRecommendations: React.FC<LearningPathRecommendationsPr
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-3">
           <Sparkles className="w-6 h-6 text-blue-600" />
-          <h2 className="text-2xl font-bold text-gray-900">Recommended for You</h2>
+          <h2 className="text-2xl font-bold text-foreground">Recommended for You</h2>
         </div>
 
         {/* Tab navigation */}
-        <div className="flex space-x-1 bg-gray-100 rounded-lg p-1">
+        <div className="flex space-x-1 bg-muted rounded-lg p-1">
           <button
             onClick={() => setActiveTab('personalized')}
             className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
               activeTab === 'personalized'
-                ? 'bg-white text-blue-600 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900'
+                ? 'bg-card text-blue-600 shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             <div className="flex items-center space-x-1">
@@ -350,8 +350,8 @@ export const LearningPathRecommendations: React.FC<LearningPathRecommendationsPr
               onClick={() => setActiveTab('collaborative')}
               className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
                 activeTab === 'collaborative'
-                  ? 'bg-white text-blue-600 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
+                  ? 'bg-card text-blue-600 shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
               }`}
             >
               <div className="flex items-center space-x-1">
@@ -366,8 +366,8 @@ export const LearningPathRecommendations: React.FC<LearningPathRecommendationsPr
               onClick={() => setActiveTab('trending')}
               className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
                 activeTab === 'trending'
-                  ? 'bg-white text-blue-600 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
+                  ? 'bg-card text-blue-600 shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
               }`}
             >
               <div className="flex items-center space-x-1">
@@ -393,9 +393,9 @@ export const LearningPathRecommendations: React.FC<LearningPathRecommendationsPr
         (activeTab === 'collaborative' && collaborativeRecs.length === 0) ||
         (activeTab === 'trending' && trendingPaths.length === 0)) && (
         <div className="text-center py-12">
-          <Sparkles className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No recommendations available</h3>
-          <p className="text-gray-500">
+          <Sparkles className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-foreground mb-2">No recommendations available</h3>
+          <p className="text-muted-foreground">
             {activeTab === 'personalized'
               ? 'Complete some courses or assessments to get personalized recommendations'
               : activeTab === 'collaborative'

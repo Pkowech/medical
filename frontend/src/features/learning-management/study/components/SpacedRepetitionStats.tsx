@@ -36,7 +36,7 @@ export const SpacedRepetitionStats: React.FC = () => {
   if (!stats) {
     return (
       <div className="flex justify-center items-center min-h-[200px]">
-        <p className="text-gray-500 dark:text-gray-400">No statistics available</p>
+        <p className="text-muted-foreground dark:text-muted-foreground">No statistics available</p>
       </div>
     );
   }
@@ -52,25 +52,25 @@ export const SpacedRepetitionStats: React.FC = () => {
             <p className="text-3xl font-semibold text-blue-600 dark:text-blue-400">
               {stats.totalCards}
             </p>
-            <p className="text-sm text-gray-600 dark:text-gray-400">Total Cards</p>
+            <p className="text-sm text-muted-foreground dark:text-muted-foreground">Total Cards</p>
           </div>
           <div className="text-center">
             <p className="text-3xl font-semibold text-red-600 dark:text-red-400">
               {stats.dueToday}
             </p>
-            <p className="text-sm text-gray-600 dark:text-gray-400">Due Today</p>
+            <p className="text-sm text-muted-foreground dark:text-muted-foreground">Due Today</p>
           </div>
           <div className="text-center">
             <p className="text-3xl font-semibold text-yellow-600 dark:text-yellow-400">
               {stats.mastered}
             </p>
-            <p className="text-sm text-gray-600 dark:text-gray-400">Mastered</p>
+            <p className="text-sm text-muted-foreground dark:text-muted-foreground">Mastered</p>
           </div>
           <div className="text-center">
             <p className="text-3xl font-semibold text-green-600 dark:text-green-400">
               {stats.avgEaseFactor.toFixed(2)}
             </p>
-            <p className="text-sm text-gray-600 dark:text-gray-400">Avg. Ease Factor</p>
+            <p className="text-sm text-muted-foreground dark:text-muted-foreground">Avg. Ease Factor</p>
           </div>
         </div>
         <div className="mt-8 flex justify-center">

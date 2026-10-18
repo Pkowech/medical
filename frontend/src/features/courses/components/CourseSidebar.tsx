@@ -65,11 +65,11 @@ export const CourseSidebar = ({
   });
 
   return (
-    <div className="w-80 h-full min-h-0 transition-all duration-300 overflow-hidden bg-white dark:bg-slate-900 border-r border-gray-200 dark:border-slate-800 flex flex-col shadow-xl">
-      <div className="lg:hidden flex justify-end p-4 border-b border-gray-100 dark:border-slate-800">
+    <div className="w-80 h-full min-h-0 transition-all duration-300 overflow-hidden bg-card dark:bg-card border-r border-border dark:border-border flex flex-col shadow-xl">
+      <div className="lg:hidden flex justify-end p-4 border-b border-border dark:border-border">
         <button
           onClick={() => setSidebarOpen(false)}
-          className="p-2 text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-200 bg-gray-100 dark:bg-slate-800 rounded-full"
+          className="p-2 text-muted-foreground hover:text-muted-foreground dark:text-muted-foreground dark:hover:text-muted-foreground bg-muted dark:bg-card rounded-full"
           aria-label="Close sidebar"
         >
           <X className="w-5 h-5" />
@@ -80,12 +80,12 @@ export const CourseSidebar = ({
           {/* Course Navigation */}
           <div className="mb-8">
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Course Content</h3>
+              <h3 className="text-lg font-semibold text-foreground dark:text-foreground">Course Content</h3>
               {allowCollapse && (
                 <button
                   type="button"
                   onClick={() => setSidebarCollapsed(true)}
-                  className="hidden rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white lg:inline-flex"
+                  className="hidden rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground dark:text-muted-foreground dark:hover:bg-card dark:hover:text-foreground lg:inline-flex"
                   aria-label="Collapse course sidebar"
                   title="Collapse course sidebar"
                 >
@@ -107,12 +107,12 @@ export const CourseSidebar = ({
                   const isExpanded = expandedChapterId === chapter.id;
 
                   return (
-                  <div key={chapter.id} className="border border-gray-200 dark:border-slate-800 rounded-lg overflow-hidden">
+                  <div key={chapter.id} className="border border-border dark:border-border rounded-lg overflow-hidden">
                     <button
                       type="button"
                       disabled={chapterLocked}
                       aria-expanded={isExpanded}
-                      className="w-full flex items-center justify-between p-3 text-left hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+                      className="w-full flex items-center justify-between p-3 text-left hover:bg-background dark:hover:bg-card/50 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
                       onClick={() => {
                         if (chapterLocked) return;
                         setExpandedChapterId(isExpanded ? null : chapter.id);
@@ -125,13 +125,13 @@ export const CourseSidebar = ({
                       title={chapterLocked ? 'Pass the previous topic quiz to unlock this topic' : `Navigate to chapter ${chapter.title}`}
                     >
                       <div>
-                        <p className="font-semibold text-gray-900 dark:text-white">{chapter.title}</p>
-                        <p className="text-xs text-gray-500 dark:text-slate-500">{chapter.duration}</p>
+                        <p className="font-semibold text-foreground dark:text-foreground">{chapter.title}</p>
+                        <p className="text-xs text-muted-foreground dark:text-muted-foreground">{chapter.duration}</p>
                       </div>
-                      <ChevronRight className={`w-4 h-4 text-gray-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                      <ChevronRight className={`w-4 h-4 text-muted-foreground transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
                     </button>
                     {isExpanded && (
-                      <div className="border-t border-gray-200 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-900/50">
+                      <div className="border-t border-border dark:border-border bg-background/50 dark:bg-card/50">
                         {chapter.lessons.map((lesson, lessonIndex) => {
                           const previousLesson = chapter.lessons[lessonIndex - 1];
                           const previousLessonUnlocked = previousLesson?.nextTopicUnlocked || previousLesson?.masteryUnlocked;
@@ -143,7 +143,7 @@ export const CourseSidebar = ({
                           return (
                             <React.Fragment key={lesson.id}>
                               <div
-                                className={`w-full flex items-center justify-between p-3 text-left hover:bg-white dark:hover:bg-slate-800 transition-all ${
+                                className={`w-full flex items-center justify-between p-3 text-left hover:bg-card dark:hover:bg-card transition-all ${
                                   isActive
                                     ? 'bg-blue-50 dark:bg-blue-500/10 border-l-2 border-blue-500'
                                     : ''
@@ -152,7 +152,7 @@ export const CourseSidebar = ({
                               >
                                 <div className="flex items-center space-x-3">
                                   {isLocked ? (
-                                    <Lock className="w-4 h-4 text-gray-400" />
+                                    <Lock className="w-4 h-4 text-muted-foreground" />
                                   ) : (
                                     <button
                                       type="button"
@@ -162,7 +162,7 @@ export const CourseSidebar = ({
                                       className={`cursor-pointer hover:scale-125 transition-all p-0.5 rounded-full z-10 ${
                                         lessonResources.length > 0
                                           ? 'ring-2 ring-blue-400/30 bg-blue-50 dark:bg-blue-900/20 shadow-sm shadow-blue-500/20'
-                                          : 'hover:bg-gray-100 dark:hover:bg-slate-800'
+                                          : 'hover:bg-muted dark:hover:bg-card'
                                       }`}
                                       title="Click to view relevant materials (videos, links, etc.)"
                                     >
@@ -174,7 +174,7 @@ export const CourseSidebar = ({
                                             ? 'text-blue-600 fill-blue-500/20' 
                                             : lessonResources.length > 0
                                               ? 'text-blue-500'
-                                              : 'text-gray-400'
+                                              : 'text-muted-foreground'
                                         }`} />
                                       )}
                                     </button>
@@ -187,9 +187,9 @@ export const CourseSidebar = ({
                                     title={isLocked ? 'Lesson locked: complete the previous mastery quiz' : `Go to lesson ${lesson.title}`}
                                   >
                                   <div>
-                                    <p className="text-sm font-medium text-gray-900 dark:text-slate-200">{lesson.title}</p>
+                                    <p className="text-sm font-medium text-foreground dark:text-muted-foreground">{lesson.title}</p>
                                     <div className="flex items-center space-x-2">
-                                      <p className="text-xs text-gray-500 dark:text-slate-500">{lesson.duration}</p>
+                                      <p className="text-xs text-muted-foreground dark:text-muted-foreground">{lesson.duration}</p>
                                       {lesson.failedAttempts && lesson.failedAttempts > 0 && (
                                         <span className="text-[10px] bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 px-1 rounded">
                                           {lesson.failedAttempts} attempts
@@ -229,7 +229,7 @@ export const CourseSidebar = ({
                                         type="button"
                                         key={material.id}
                                         onClick={() => openMaterial(String(material.id))}
-                                        className="w-full flex items-center space-x-3 px-3 py-1.5 rounded-md text-left hover:bg-white dark:hover:bg-slate-800 transition-colors group cursor-pointer"
+                                        className="w-full flex items-center space-x-3 px-3 py-1.5 rounded-md text-left hover:bg-card dark:hover:bg-card transition-colors group cursor-pointer"
                                         title={`Open ${material.title} (Activity Tracked)`}
                                       >
                                         <div className="p-1 bg-blue-100/50 dark:bg-blue-900/20 rounded text-blue-600 dark:text-blue-400">
@@ -239,7 +239,7 @@ export const CourseSidebar = ({
                                             <FileText className="w-3 h-3" />
                                           )}
                                         </div>
-                                        <span className="text-[11px] font-medium text-gray-600 dark:text-slate-300 group-hover:text-blue-600 dark:group-hover:text-blue-400 truncate flex-1">
+                                        <span className="text-[11px] font-medium text-muted-foreground dark:text-muted-foreground group-hover:text-blue-600 dark:group-hover:text-blue-400 truncate flex-1">
                                           {material.title}
                                         </span>
                                         <ExternalLink className="w-2.5 h-2.5 text-gray-300 opacity-0 group-hover:opacity-100" />
@@ -247,7 +247,7 @@ export const CourseSidebar = ({
                                       ))
                                     }
                                     {lessonResources.length === 0 && (
-                                      <p className="text-[10px] text-gray-400 italic px-3 py-1">No additional materials for this unit.</p>
+                                      <p className="text-[10px] text-muted-foreground italic px-3 py-1">No additional materials for this unit.</p>
                                     )}
                                   </div>
                                 </div>
@@ -261,8 +261,8 @@ export const CourseSidebar = ({
                   );
                 })
               ) : (
-                <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-dashed border-slate-200 dark:border-slate-700 text-center">
-                  <p className="text-xs text-slate-500">No units available for this course yet.</p>
+                <div className="p-4 bg-background dark:bg-card/50 rounded-lg border border-dashed border-border dark:border-border text-center">
+                  <p className="text-xs text-muted-foreground">No units available for this course yet.</p>
                 </div>
               )}
             </div>
@@ -270,12 +270,12 @@ export const CourseSidebar = ({
 
           {/* Resources */}
           <div className="mb-8">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Resources</h3>
+            <h3 className="text-lg font-semibold text-foreground dark:text-foreground mb-4">Resources</h3>
             <div className="space-y-2">
               {resources.map(resource => (
                 <div
                   key={resource.id}
-                  className="flex items-center justify-between p-3 bg-gray-50 dark:bg-slate-800/30 rounded-lg border border-transparent dark:border-slate-800/50 group hover:border-blue-200 dark:hover:border-blue-500/30 transition-all"
+                  className="flex items-center justify-between p-3 bg-background dark:bg-card/30 rounded-lg border border-transparent dark:border-border/50 group hover:border-blue-200 dark:hover:border-blue-500/30 transition-all"
                 >
                   <div 
                     className="flex items-center space-x-3 flex-1 cursor-pointer"
@@ -285,13 +285,13 @@ export const CourseSidebar = ({
                       {resource.type.toLowerCase().includes('video') ? <PlayCircle className="w-4 h-4" /> : <FileText className="w-4 h-4" />}
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-gray-900 dark:text-slate-200 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{resource.title}</p>
-                      {resource.size && <p className="text-xs text-gray-500 dark:text-slate-500">{resource.size}</p>}
+                      <p className="text-sm font-medium text-foreground dark:text-muted-foreground group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{resource.title}</p>
+                      {resource.size && <p className="text-xs text-muted-foreground dark:text-muted-foreground">{resource.size}</p>}
                     </div>
                   </div>
                   <div className="flex items-center gap-1">
                     <button
-                      className="p-1.5 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                      className="p-1.5 text-muted-foreground hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                       title={`Open ${resource.title}`}
                       onClick={() => openMaterial(String(resource.id))}
                     >
@@ -300,7 +300,7 @@ export const CourseSidebar = ({
                     {(onDownloadMaterial || resource.url) && (
                       <button
                       type="button"
-                      className="p-1.5 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                      className="p-1.5 text-muted-foreground hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                       title={`Download ${resource.title}`}
                       aria-label={`Download ${resource.title}`}
                       onClick={() => {
@@ -324,27 +324,27 @@ export const CourseSidebar = ({
           <div className="space-y-2 pb-6">
             <button
               onClick={() => toggleCoursePanel('notes')}
-              className="w-full flex items-center space-x-3 p-3 text-left bg-gray-50 dark:bg-slate-800/30 hover:bg-gray-100 dark:hover:bg-slate-700/50 rounded-lg transition-colors border border-transparent dark:border-slate-800/50"
+              className="w-full flex items-center space-x-3 p-3 text-left bg-background dark:bg-card/30 hover:bg-muted dark:hover:bg-secondary/50 rounded-lg transition-colors border border-transparent dark:border-border/50"
               title="Open Notes Panel"
             >
-              <Edit3 className="w-4 h-4 text-gray-600 dark:text-slate-400" />
-              <span className="text-sm font-medium text-gray-900 dark:text-slate-200">Notes</span>
+              <Edit3 className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
+              <span className="text-sm font-medium text-foreground dark:text-muted-foreground">Notes</span>
             </button>
             <button
               onClick={() => toggleCoursePanel('discussion')}
-              className="w-full flex items-center space-x-3 p-3 text-left bg-gray-50 dark:bg-slate-800/30 hover:bg-gray-100 dark:hover:bg-slate-700/50 rounded-lg transition-colors border border-transparent dark:border-slate-800/50"
+              className="w-full flex items-center space-x-3 p-3 text-left bg-background dark:bg-card/30 hover:bg-muted dark:hover:bg-secondary/50 rounded-lg transition-colors border border-transparent dark:border-border/50"
               title="Open Discussion Panel"
             >
-              <MessageSquare className="w-4 h-4 text-gray-600 dark:text-slate-400" />
-              <span className="text-sm font-medium text-gray-900 dark:text-slate-200">Discussion</span>
+              <MessageSquare className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
+              <span className="text-sm font-medium text-foreground dark:text-muted-foreground">Discussion</span>
             </button>
             <button
               onClick={() => toggleCoursePanel('quiz')}
-              className="w-full flex items-center space-x-3 p-3 text-left bg-gray-50 dark:bg-slate-800/30 hover:bg-gray-100 dark:hover:bg-slate-700/50 rounded-lg transition-colors border border-transparent dark:border-slate-800/50"
+              className="w-full flex items-center space-x-3 p-3 text-left bg-background dark:bg-card/30 hover:bg-muted dark:hover:bg-secondary/50 rounded-lg transition-colors border border-transparent dark:border-border/50"
               title="Open Quiz Panel"
             >
-              <FileText className="w-4 h-4 text-gray-600 dark:text-slate-400" />
-              <span className="text-sm font-medium text-gray-900 dark:text-slate-200">Quiz</span>
+              <FileText className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
+              <span className="text-sm font-medium text-foreground dark:text-muted-foreground">Quiz</span>
             </button>
           </div>
         </div>

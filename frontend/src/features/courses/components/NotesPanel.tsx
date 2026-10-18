@@ -62,10 +62,10 @@ export const NotesPanel = ({
   };
 
   return (
-    <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200 mt-6">
+    <div className="bg-card rounded-lg p-6 shadow-sm border border-border mt-6">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-gray-900">Personal Knowledge & Notes</h3>
-        <span className="text-xs font-medium px-2 py-1 bg-gray-100 text-gray-600 rounded">
+        <h3 className="text-lg font-semibold text-foreground">Personal Knowledge & Notes</h3>
+        <span className="text-xs font-medium px-2 py-1 bg-muted text-muted-foreground rounded">
           {topicId ? 'Linked to Topic' : 'General'}
         </span>
       </div>
@@ -75,7 +75,7 @@ export const NotesPanel = ({
           value={noteInput}
           onChange={e => setNoteInput(e.target.value)}
           placeholder="Add active recall notes, reflections, or key points..."
-          className="w-full h-32 p-3 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+          className="w-full h-32 p-3 border border-border rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
         />
         <div className="flex justify-end mt-2">
           <button
@@ -92,7 +92,7 @@ export const NotesPanel = ({
 
       {noteList.length > 0 && (
         <div className="space-y-3">
-          <h4 className="font-medium text-gray-900 text-sm">Saved Notes ({noteList.length})</h4>
+          <h4 className="font-medium text-foreground text-sm">Saved Notes ({noteList.length})</h4>
           {noteList.map(note => {
             const dateStr = note.createdAt || note.timestamp;
             const textContent = note.content || note.text || '';
@@ -102,7 +102,7 @@ export const NotesPanel = ({
                 className={`p-3.5 rounded-lg border ${
                   note.isStale
                     ? 'bg-amber-50 border-amber-200'
-                    : 'bg-gray-50 border-gray-200'
+                    : 'bg-background border-border'
                 }`}
               >
                 {note.isStale && (
@@ -111,8 +111,8 @@ export const NotesPanel = ({
                     <span>Source material updated since this note was created. Please review.</span>
                   </div>
                 )}
-                <p className="text-gray-800 text-sm mb-2 whitespace-pre-wrap">{textContent}</p>
-                <div className="flex items-center justify-between text-xs text-gray-500">
+                <p className="text-muted-foreground text-sm mb-2 whitespace-pre-wrap">{textContent}</p>
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
                   <span className="flex items-center">
                     {getNoteIcon(note.type)}
                     <span className="capitalize">{note.type ? note.type.replace('_', ' ') : 'Student Note'}</span>

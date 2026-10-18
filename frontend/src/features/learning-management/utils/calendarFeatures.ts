@@ -7,7 +7,7 @@ export const PRIORITY_LEVELS = {
 };
 
 export const EVENT_STATUS = {
-  pending: { label: 'Pending', color: 'bg-gray-100 text-gray-700', icon: '⏳' },
+  pending: { label: 'Pending', color: 'bg-muted text-muted-foreground', icon: '⏳' },
   in_progress: { label: 'In Progress', color: 'bg-blue-100 text-blue-700', icon: '🔵' },
   completed: { label: 'Completed', color: 'bg-green-100 text-green-700', icon: '✅' },
   cancelled: { label: 'Cancelled', color: 'bg-red-100 text-red-700', icon: '❌' },
@@ -44,7 +44,7 @@ export const formatStatus = (status?: string): string => {
 };
 
 export const getStatusColor = (status?: string): string => {
-  return EVENT_STATUS[status as keyof typeof EVENT_STATUS]?.color || 'bg-gray-100 text-gray-700';
+  return EVENT_STATUS[status as keyof typeof EVENT_STATUS]?.color || 'bg-muted text-muted-foreground';
 };
 
 export const formatCategory = (category?: string): string => {

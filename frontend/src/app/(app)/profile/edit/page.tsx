@@ -302,16 +302,16 @@ export default function EditProfilePage() {
 
   if (isLoadingProfile) {
     return (
-      <div className="flex items-center justify-center min-h-[80vh] bg-gray-50/50 dark:bg-slate-900/50">
+      <div className="flex items-center justify-center min-h-[80vh] bg-background/50 dark:bg-card/50">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 bg-gray-50/50 dark:bg-slate-900/50 min-h-screen space-y-6">
+    <div className="container mx-auto px-4 py-8 bg-background/50 dark:bg-card/50 min-h-screen space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Edit Profile</h1>
+        <h1 className="text-3xl font-bold text-foreground dark:text-foreground">Edit Profile</h1>
         <div className="flex gap-2">
           {hasUnsavedChanges && (
             <button
@@ -319,7 +319,7 @@ export default function EditProfilePage() {
                 reset();
                 window.location.reload();
               }}
-              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700"
+              className="px-4 py-2 text-sm font-medium text-muted-foreground dark:text-muted-foreground hover:bg-muted dark:hover:bg-card rounded-lg border border-border dark:border-border"
             >
               Reset
             </button>
@@ -327,7 +327,7 @@ export default function EditProfilePage() {
           <Button 
             variant="outline" 
             onClick={() => router.push('/profile')} 
-            className="dark:border-slate-700 dark:text-slate-300"
+            className="dark:border-border dark:text-muted-foreground"
             disabled={hasUnsavedChanges}
           >
             Cancel
@@ -355,9 +355,9 @@ export default function EditProfilePage() {
         </div>
       )}
 
-      <Card className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm border-gray-100 dark:border-slate-700/50">
+      <Card className="bg-card/80 dark:bg-card/50 backdrop-blur-sm border-border dark:border-border/50">
         <CardHeader>
-          <CardTitle className="flex items-center text-gray-900 dark:text-white">
+          <CardTitle className="flex items-center text-foreground dark:text-foreground">
             <User className="h-5 w-5 mr-2 text-blue-500" />
             Personal Information
           </CardTitle>
@@ -367,7 +367,7 @@ export default function EditProfilePage() {
             {/* Profile Image */}
             <div className="md:col-span-2 flex flex-col items-center mb-4">
               <div className="relative">
-                <div className="h-32 w-32 rounded-full bg-gray-100 dark:bg-slate-800 border-2 border-dashed border-gray-200 dark:border-slate-700 flex items-center justify-center text-gray-400 dark:text-slate-600 text-4xl font-bold overflow-hidden transition-all hover:border-blue-500/50">
+                <div className="h-32 w-32 rounded-full bg-muted dark:bg-card border-2 border-dashed border-border dark:border-border flex items-center justify-center text-muted-foreground dark:text-muted-foreground text-4xl font-bold overflow-hidden transition-all hover:border-blue-500/50">
                   {previewImage ? (
                     <Image
                       src={previewImage}
@@ -406,13 +406,13 @@ export default function EditProfilePage() {
                   />
                 </label>
               </div>
-              <p className="text-sm text-gray-500 dark:text-slate-500 mt-3">
+              <p className="text-sm text-muted-foreground dark:text-muted-foreground mt-3">
                 {isUploadingImage ? 'Uploading…' : 'Click the camera icon to upload a profile picture'}
               </p>
               {imageError && (
                 <p className="text-xs text-red-600 dark:text-red-400 mt-2">{imageError}</p>
               )}
-              <p className="text-xs text-gray-400 dark:text-slate-600 mt-1">
+              <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-1">
                 Max 5 MB · JPEG, PNG, WebP, GIF · Stored optimised (400×400 WebP)
               </p>
             </div>
@@ -510,9 +510,9 @@ export default function EditProfilePage() {
       </Card>
 
       {/* Academic Information Section */}
-      <Card className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm border-gray-100 dark:border-slate-700/50">
+      <Card className="bg-card/80 dark:bg-card/50 backdrop-blur-sm border-border dark:border-border/50">
         <CardHeader>
-          <CardTitle className="text-gray-900 dark:text-white flex items-center gap-2">
+          <CardTitle className="text-foreground dark:text-foreground flex items-center gap-2">
             <Award className="h-5 w-5 text-purple-500" />
             Healthcare Learning & Professional Information
           </CardTitle>
@@ -520,7 +520,7 @@ export default function EditProfilePage() {
         <CardContent>
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             <div>
-              <label htmlFor="careerStage" className="mb-2 block text-sm font-medium text-gray-700 dark:text-slate-300">
+              <label htmlFor="careerStage" className="mb-2 block text-sm font-medium text-muted-foreground dark:text-muted-foreground">
                 Current stage
               </label>
               <select
@@ -528,7 +528,7 @@ export default function EditProfilePage() {
                 name="careerStage"
                 value={profile.careerStage}
                 onChange={handleChange}
-                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+                className="w-full rounded-lg border border-border bg-card px-3 py-2 text-foreground dark:border-border dark:bg-card dark:text-foreground"
               >
                 <option value="">Not set</option>
                 <option value="student">Student or trainee</option>
@@ -564,7 +564,7 @@ export default function EditProfilePage() {
 
             {profile.careerStage === 'student' && (
               <div>
-                <label htmlFor="studyYear" className="mb-2 block text-sm font-medium text-gray-700 dark:text-slate-300">
+                <label htmlFor="studyYear" className="mb-2 block text-sm font-medium text-muted-foreground dark:text-muted-foreground">
                   Current year of study
                 </label>
                 <select
@@ -577,7 +577,7 @@ export default function EditProfilePage() {
                       studyYear: event.target.value ? Number(event.target.value) : null,
                     }))
                   }
-                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+                  className="w-full rounded-lg border border-border bg-card px-3 py-2 text-foreground dark:border-border dark:bg-card dark:text-foreground"
                 >
                   <option value="">Not set</option>
                   {Array.from({ length: 12 }, (_, index) => index + 1).map(year => (
@@ -652,7 +652,7 @@ export default function EditProfilePage() {
             variant="outline"
             onClick={() => router.push('/profile')}
             disabled={isSaving}
-            className="dark:border-slate-700 dark:text-slate-300"
+            className="dark:border-border dark:text-muted-foreground"
           >
             Cancel
           </Button>

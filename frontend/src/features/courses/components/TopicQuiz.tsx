@@ -290,7 +290,7 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
           <div className="flex items-center justify-center py-12">
             <div className="text-center space-y-4">
               <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mx-auto" />
-              <p className="text-slate-600 dark:text-slate-400">Loading quiz...</p>
+              <p className="text-muted-foreground dark:text-muted-foreground">Loading quiz...</p>
             </div>
           </div>
         </DialogContent>
@@ -328,7 +328,7 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
                   <div className={`text-5xl font-bold ${score >= 70 ? 'text-green-600' : 'text-orange-600'}`}>
                     {score}%
                   </div>
-                  <p className="text-slate-600 dark:text-slate-400">
+                  <p className="text-muted-foreground dark:text-muted-foreground">
                     {score >= 90
                       ? '🎉 Excellent! You mastered this topic!'
                       : score >= 70
@@ -339,8 +339,8 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
 
                 {feedback && (
                   <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
-                    <h4 className="font-semibold text-slate-900 dark:text-white mb-2">Feedback</h4>
-                    <p className="text-slate-700 dark:text-slate-300 text-sm">{feedback}</p>
+                    <h4 className="font-semibold text-foreground dark:text-foreground mb-2">Feedback</h4>
+                    <p className="text-muted-foreground dark:text-muted-foreground text-sm">{feedback}</p>
                   </div>
                 )}
 
@@ -376,7 +376,7 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
             <DialogTitle>Quiz</DialogTitle>
             <DialogDescription>No quiz questions available</DialogDescription>
           </DialogHeader>
-          <p className="text-slate-600 dark:text-slate-400 py-8 text-center">
+          <p className="text-muted-foreground dark:text-muted-foreground py-8 text-center">
             Quiz questions will be added soon for this topic.
           </p>
           <Button onClick={onClose} className="w-full">
@@ -409,12 +409,12 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
           {/* Progress Bar */}
           <div className="space-y-2">
             <Progress value={progress} className="h-2" />
-            <p className="text-xs text-slate-500">{Math.round(progress)}% complete</p>
+            <p className="text-xs text-muted-foreground">{Math.round(progress)}% complete</p>
           </div>
 
           {/* Question */}
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
+            <h3 className="text-lg font-semibold text-foreground dark:text-foreground">
               {currentQuestion.text}
             </h3>
 
@@ -437,7 +437,7 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
                   className={`w-full text-left p-3 rounded-lg border-2 transition-all ${
                     selectedAnswers[currentQuestion.id]?.includes(option.id)
                       ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/20'
-                      : 'border-slate-200 dark:border-slate-700 hover:border-slate-300'
+                      : 'border-border dark:border-border hover:border-border'
                   }`}
                 >
                   <div className="flex items-start gap-3">
@@ -445,14 +445,14 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
                       className={`w-5 h-5 rounded border-2 mt-0.5 flex items-center justify-center ${
                         selectedAnswers[currentQuestion.id]?.includes(option.id)
                           ? 'border-blue-600 bg-blue-600'
-                          : 'border-slate-300'
+                          : 'border-border'
                       }`}
                     >
                       {selectedAnswers[currentQuestion.id]?.includes(option.id) && (
                         <CheckCircle className="w-4 h-4 text-white" />
                       )}
                     </div>
-                    <span className="text-slate-700 dark:text-slate-300">
+                    <span className="text-muted-foreground dark:text-muted-foreground">
                       {option.text}
                     </span>
                   </div>
