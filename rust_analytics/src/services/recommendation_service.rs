@@ -1,8 +1,9 @@
-use sqlx::{Pool, Postgres};
+use sqlx::{Pool, Postgres, Row};
 use tonic::{Request, Response, Status};
 use std::sync::Arc;
 use crate::analytics_proto::{
     GetRecommendationsRequest, GetRecommendationsResponse, RecommendationItem,
+    UnifiedRecommendationsRequest, UnifiedRecommendationsResponse, UnifiedRecommendationItem,
     CollaborativeRecommendationRequest, CollaborativeRecommendationResponse, CollaborativeRecommendationItem,
     TrendingPathsRequest, TrendingPathsResponse, TrendingPath,
     GetFilteredRecommendationsRequest, GetFilteredRecommendationsResponse,
@@ -24,10 +25,18 @@ impl RecommendationService {
     }
 
     fn validate_user_id(user_id: &str) -> Result<(), Status> {
-        if user_id.is_empty() {
+        if user_id.trim().is_empty() {
             return Err(Status::invalid_argument("user_id cannot be empty"));
         }
         Ok(())
+    }
+
+    fn effective_limit(requested: i32) -> usize {
+        if requested <= 0 {
+            10
+        } else {
+            requested.min(100) as usize
+        }
     }
 
     pub async fn get_recommendations(
@@ -68,6 +77,248 @@ impl RecommendationService {
             .collect();
 
         Ok(Response::new(GetRecommendationsResponse { items }))
+    }
+
+    pub async fn get_unified_recommendations(
+        &self,
+        request: Request<UnifiedRecommendationsRequest>,
+    ) -> Result<Response<UnifiedRecommendationsResponse>, Status> {
+        let req = request.into_inner();
+        Self::validate_user_id(&req.user_id)?;
+
+        let limit = Self::effective_limit(req.limit);
+        let candidate_limit = limit
+            .saturating_add(req.exclude_ids.len())
+            .min(100) as i32;
+
+        let mut items = match req.context.as_str() {
+            "learning_path" => {
+                let repo =
+                    PostgresRecommendationRepository::new(Arc::new(self.pool.clone()));
+                let use_case = GetRecommendationsUseCase::new(Arc::new(repo));
+                let result = use_case
+                    .execute(AppGetRecommendationsRequest {
+                        user_id: req.user_id.clone(),
+                        limit: Some(candidate_limit),
+                    })
+                    .await
+                    .map_err(|error| {
+                        Status::internal(format!("Recommendations failed: {error}"))
+                    })?;
+
+                result
+                    .recommendations
+                    .into_iter()
+                    .map(|recommendation| UnifiedRecommendationItem {
+                        id: recommendation.path_id,
+                        title: recommendation.title,
+                        description: recommendation.description,
+                        r#type: "learning_path".to_string(),
+                        score: Some(recommendation.score),
+                        reason: recommendation.reason,
+                        priority: String::new(),
+                        estimated_duration_minutes: 0,
+                        resource_id: None,
+                    })
+                    .collect()
+            }
+            "collaborative" => {
+                let recommendations =
+                    crate::modules::analytics::recommendations::collaborative::
+                        get_collaborative_recommendations(
+                            &req.user_id,
+                            candidate_limit,
+                            &self.pool,
+                        )
+                        .await
+                        .map_err(|error| {
+                            Status::internal(format!(
+                                "Collaborative recommendations failed: {error}"
+                            ))
+                        })?;
+
+                recommendations
+                    .into_iter()
+                    .map(|recommendation| UnifiedRecommendationItem {
+                        id: recommendation.item_id.clone(),
+                        title: recommendation.item_id,
+                        description: String::new(),
+                        r#type: "learning_path".to_string(),
+                        score: Some(recommendation.score as f32),
+                        reason: recommendation.reason,
+                        priority: String::new(),
+                        estimated_duration_minutes: 0,
+                        resource_id: None,
+                    })
+                    .collect()
+            }
+            "study_material" => {
+                let recommendations =
+                    crate::modules::analytics::recommendations::study_recommendations::
+                        generate_study_recommendations(
+                            &req.user_id,
+                            &req.knowledge_gaps,
+                            &self.pool,
+                        )
+                        .await
+                        .map_err(|error| {
+                            Status::internal(format!(
+                                "Study recommendations failed: {error}"
+                            ))
+                        })?;
+
+                recommendations
+                    .into_iter()
+                    .enumerate()
+                    .map(|(index, recommendation)| {
+                        let resource_id = recommendation.resource_id;
+                        UnifiedRecommendationItem {
+                            id: resource_id
+                                .clone()
+                                .unwrap_or_else(|| format!("knowledge-gap-{index}")),
+                            title: recommendation.recommendation,
+                            description: String::new(),
+                            r#type: "study_material".to_string(),
+                            score: Some(match recommendation.priority.as_str() {
+                                "high" => 0.9,
+                                "medium" => 0.6,
+                                _ => 0.3,
+                            }),
+                            reason: format!(
+                                "Prioritized to address a {}-priority knowledge gap",
+                                recommendation.priority
+                            ),
+                            priority: recommendation.priority,
+                            estimated_duration_minutes: recommendation
+                                .estimated_time_hours
+                                .saturating_mul(60),
+                            resource_id,
+                        }
+                    })
+                    .collect()
+            }
+            "next_step" => {
+                let steps = crate::modules::analytics::recommendations::next_steps::
+                    generate_next_steps(&req.user_id, &self.pool)
+                        .await
+                        .map_err(|error| {
+                            Status::internal(format!("Next steps failed: {error}"))
+                        })?;
+
+                steps
+                    .into_iter()
+                    .enumerate()
+                    .map(|(index, step)| UnifiedRecommendationItem {
+                        id: format!("next-step-{index}"),
+                        title: step.step,
+                        description: String::new(),
+                        r#type: "next_step".to_string(),
+                        score: None,
+                        reason: step.reason.unwrap_or_default(),
+                        priority: String::new(),
+                        estimated_duration_minutes: step
+                            .estimated_duration_minutes
+                            .unwrap_or_default(),
+                        resource_id: None,
+                    })
+                    .collect()
+            }
+            "assessment" => {
+                let recommendations = sqlx::query(
+                    r#"
+                    SELECT
+                        q.id,
+                        q.title,
+                        COALESCE(q.description, '') AS description,
+                        GREATEST(
+                            0.0,
+                            LEAST(
+                                1.0,
+                                1.0 - COALESCE(
+                                    uss.p_known::double precision,
+                                    AVG(qa.percentage)::double precision / 100.0,
+                                    0.5
+                                )
+                            )
+                        ) AS score
+                    FROM quizzes q
+                    LEFT JOIN quiz_attempts qa
+                        ON qa.quiz_id = q.id AND qa.user_id = $1
+                    LEFT JOIN user_skill_states uss
+                        ON uss.user_id = $1 AND uss.skill_id = q.topic_id
+                    WHERE q.is_published = TRUE
+                        AND (q.available_from IS NULL OR q.available_from <= NOW())
+                        AND (q.available_until IS NULL OR q.available_until >= NOW())
+                        AND NOT EXISTS (
+                            SELECT 1
+                            FROM quiz_attempts passed
+                            WHERE passed.user_id = $1
+                                AND passed.quiz_id = q.id
+                                AND passed.is_passed = TRUE
+                        )
+                    GROUP BY q.id, uss.p_known
+                    ORDER BY COALESCE(
+                        uss.p_known::double precision,
+                        AVG(qa.percentage)::double precision / 100.0,
+                        0.5
+                    ) ASC, q.title ASC
+                    LIMIT $2
+                    "#,
+                )
+                .bind(&req.user_id)
+                .bind(candidate_limit)
+                .fetch_all(&self.pool)
+                .await
+                .map_err(|error| {
+                    Status::internal(format!("Assessment recommendations failed: {error}"))
+                })?;
+
+                recommendations
+                    .into_iter()
+                    .map(|row| {
+                        Ok(UnifiedRecommendationItem {
+                            id: row.try_get("id").map_err(|error| {
+                                Status::internal(format!(
+                                    "Failed to read assessment recommendation id: {error}"
+                                ))
+                            })?,
+                            title: row.try_get("title").map_err(|error| {
+                                Status::internal(format!(
+                                    "Failed to read assessment recommendation title: {error}"
+                                ))
+                            })?,
+                            description: row.try_get("description").map_err(|error| {
+                                Status::internal(format!(
+                                    "Failed to read assessment recommendation description: {error}"
+                                ))
+                            })?,
+                            r#type: "assessment".to_string(),
+                            score: Some(
+                                row.try_get::<f64, _>("score").map_err(|error| {
+                                    Status::internal(format!(
+                                        "Failed to read assessment recommendation score: {error}"
+                                    ))
+                                })? as f32,
+                            ),
+                            reason: "Recommended based on your learning progress".to_string(),
+                            priority: String::new(),
+                            estimated_duration_minutes: 0,
+                            resource_id: None,
+                        })
+                    })
+                    .collect::<Result<Vec<_>, Status>>()?
+            }
+            _ => {
+                return Err(Status::invalid_argument(
+                    "context must be one of: learning_path, collaborative, study_material, next_step, assessment",
+                ));
+            }
+        };
+
+        items.retain(|item| !req.exclude_ids.contains(&item.id));
+        items.truncate(limit);
+
+        Ok(Response::new(UnifiedRecommendationsResponse { items }))
     }
 
     pub async fn get_collaborative_recommendations(
@@ -198,5 +449,18 @@ impl RecommendationService {
             }
             Err(e) => Err(Status::internal(format!("next steps failed: {}", e))),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::RecommendationService;
+
+    #[test]
+    fn recommendation_limit_defaults_and_is_bounded() {
+        assert_eq!(RecommendationService::effective_limit(0), 10);
+        assert_eq!(RecommendationService::effective_limit(-1), 10);
+        assert_eq!(RecommendationService::effective_limit(7), 7);
+        assert_eq!(RecommendationService::effective_limit(1000), 100);
     }
 }

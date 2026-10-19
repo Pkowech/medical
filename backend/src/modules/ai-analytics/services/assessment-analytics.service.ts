@@ -1382,12 +1382,14 @@ export class AssessmentAnalyticsService implements OnModuleInit {
    */
   async getMastery(userId: string): Promise<Record<string, number>> {
     try {
-      const cacheKey = ANALYTICS_CACHE_CONFIG.ASSESSMENT.PERFORMANCE(
+      const cacheKey = `${ANALYTICS_CACHE_CONFIG.ASSESSMENT.PERFORMANCE(
         `${userId}:mastery`,
+      )}:v2`;
+      const cached = await this.redisService.get<Record<string, number>>(
+        cacheKey,
       );
-      const cached = await this.redisService.get<string>(cacheKey);
-      if (typeof cached === 'string') {
-        return JSON.parse(cached);
+      if (cached !== null) {
+        return cached;
       }
 
       // Strictly gRPC
@@ -1408,17 +1410,9 @@ export class AssessmentAnalyticsService implements OnModuleInit {
         timestamp: new Date(),
       });
 
-      // Map p_known_by_skill (proto) -> mastery (frontend)
-      // Note: The proto interface definition wrapper might case-convert key names depending on config,
-      // but usually it's camelCase in the generated interface if we defined it that way.
-      // However, our interface manually types it as `pKnownBySkill`.
       const mastery = grpcResp.pKnownBySkill;
 
-      await this.redisService.set(
-        cacheKey,
-        JSON.stringify(mastery),
-        this.cacheTtl,
-      );
+      await this.redisService.set(cacheKey, mastery, this.cacheTtl);
       return mastery;
     } catch (error) {
       this.logger.error(
@@ -1564,22 +1558,19 @@ export class AssessmentAnalyticsService implements OnModuleInit {
     const cacheKey = `${ANALYTICS_CACHE_CONFIG.ASSESSMENT.PREDICTIONS(
       userId,
       assessmentId,
-    )}:v3`;
-    const _cachedAnalytics = await this.redisService.get<string>(cacheKey);
-    if (typeof _cachedAnalytics === 'string') {
+    )}:v4`;
+    const cachedAnalytics =
+      await this.redisService.get<PerformanceAnalyticsDto>(cacheKey);
+    if (cachedAnalytics !== null) {
       this.logger.log(`Retrieved cached analytics for user ${userId}`);
-      return JSON.parse(_cachedAnalytics);
+      return cachedAnalytics;
     }
 
     const analytics = await this.generatePerformanceAnalytics(
       userId,
       assessmentId,
     );
-    await this.redisService.set(
-      cacheKey,
-      JSON.stringify(analytics),
-      12 * 60 * 60,
-    );
+    await this.redisService.set(cacheKey, analytics, 12 * 60 * 60);
 
     return analytics;
   }

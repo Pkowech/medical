@@ -15,6 +15,7 @@ mod inner {
         GetStudyPatternsRequest, GetStudyPatternsResponse,
         GetFocusCorrelationResponse, GetFocusRecommendationsRequest,
         GetFocusRecommendationsResponse, GetGoalAnalyticsRequest, GetLearningPathStatisticsRequest,
+        UnifiedRecommendationsRequest, UnifiedRecommendationsResponse,
         GetSystemAnalyticsRequest, GetSystemAnalyticsResponse, ProgressRecord,
         ProgressRecordsRequest, ProgressRecordsResponse, ProcessAnalyticsForUsersRequest,
         ProcessAnalyticsForUsersResponse,
@@ -111,6 +112,14 @@ mod inner {
         ) -> Result<Response<GetRecommendationsResponse>, Status> {
             let service = RecommendationService::new(self.pool.clone());
             service.get_recommendations(request).await
+        }
+
+        async fn get_unified_recommendations(
+            &self,
+            request: Request<UnifiedRecommendationsRequest>,
+        ) -> Result<Response<UnifiedRecommendationsResponse>, Status> {
+            let service = RecommendationService::new(self.pool.clone());
+            service.get_unified_recommendations(request).await
         }
 
         async fn update_attempt_metrics(

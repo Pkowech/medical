@@ -297,7 +297,7 @@ impl LearningService {
         .unwrap_or(0.0);
 
         let completed_items: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM progress WHERE user_id = $1 AND is_completed = true",
+            "SELECT COUNT(*) FROM topic_progress WHERE user_id = $1 AND is_completed = true",
         )
         .bind(&user_id)
         .fetch_one(&self.pool)
@@ -698,7 +698,7 @@ impl LearningService {
             "SELECT TO_CHAR(updated_at, 'YYYY-MM-DD') AS date,
                     AVG(progress_percentage)::double precision AS value,
                     '' AS metadata
-             FROM progress
+             FROM topic_progress
              WHERE user_id = $1
              GROUP BY updated_at::date
              ORDER BY updated_at::date",

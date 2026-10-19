@@ -161,23 +161,29 @@ impl ActivityRepository for PostgresActivityRepository {
     }
 
     async fn get_topic_mastery_stats(&self, user_id: &str) -> Result<(i32, i32), AnalyticsError> {
-        let total: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM progress WHERE user_id = $1 AND topic_id IS NOT NULL",
+        let (total, mastered): (i64, i64) = sqlx::query_as(
+            "SELECT COUNT(*)::bigint,
+                    COUNT(*) FILTER (WHERE p_known >= 0.75)::bigint
+             FROM user_skill_states
+             WHERE user_id = $1",
         )
         .bind(user_id)
         .fetch_one(&*self.pool)
         .await
-        .unwrap_or(0);
+        .map_err(|error| {
+            AnalyticsError::DatabaseError(format!(
+                "Failed to fetch topic mastery statistics: {error}"
+            ))
+        })?;
 
-        let mastered: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM progress WHERE user_id = $1 AND topic_id IS NOT NULL AND mastery_unlocked = true"
-        )
-        .bind(user_id)
-        .fetch_one(&*self.pool)
-        .await
-        .unwrap_or(0);
+        let total = i32::try_from(total).map_err(|error| {
+            AnalyticsError::DatabaseError(format!("Topic count exceeds i32: {error}"))
+        })?;
+        let mastered = i32::try_from(mastered).map_err(|error| {
+            AnalyticsError::DatabaseError(format!("Mastered topic count exceeds i32: {error}"))
+        })?;
 
-        Ok((total as i32, mastered as i32))
+        Ok((total, mastered))
     }
 }
 

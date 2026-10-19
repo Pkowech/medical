@@ -205,6 +205,7 @@ service AnalyticsService {
   rpc GetEngagementMetrics(GetEngagementMetricsRequest) returns (GetEngagementMetricsResponse);
   rpc GetStudyPatterns(GetStudyPatternsRequest) returns (GetStudyPatternsResponse);
   rpc GetRecommendations(GetRecommendationsRequest) returns (GetRecommendationsResponse);
+  rpc GetUnifiedRecommendations(UnifiedRecommendationsRequest) returns (UnifiedRecommendationsResponse);
   rpc UpdateAttemptMetrics (AttemptMetricsRequest) returns (UpdateAttemptMetricsResponse);
   rpc GetUserAbility (GetUserAbilityRequest) returns (GetUserAbilityResponse);
   rpc GetNextAdaptiveQuestion (GetNextAdaptiveQuestionRequest) returns (GetNextAdaptiveQuestionResponse);
@@ -510,6 +511,30 @@ message RecommendationItem {
 
 message GetRecommendationsResponse {
   repeated RecommendationItem items = 1;
+}
+
+message UnifiedRecommendationsRequest {
+  string user_id = 1;
+  string context = 2;
+  int32 limit = 3;
+  repeated string knowledge_gaps = 4;
+  repeated string exclude_ids = 5;
+}
+
+message UnifiedRecommendationItem {
+  string id = 1;
+  string title = 2;
+  string description = 3;
+  string type = 4;
+  optional float score = 5;
+  string reason = 6;
+  string priority = 7;
+  int32 estimated_duration_minutes = 8;
+  optional string resource_id = 9;
+}
+
+message UnifiedRecommendationsResponse {
+  repeated UnifiedRecommendationItem items = 1;
 }
 
 // --- ADDED MESSAGES FOR NEW RPCS ---

@@ -84,6 +84,9 @@ if (enableGrpc) {
               url: grpcUrl,
               loader: {
                 keepCase: false,
+                defaults: true,
+                arrays: true,
+                objects: true,
               },
               channelOptions: {
                 interceptors: [apiKeyInterceptor],
