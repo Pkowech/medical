@@ -89,7 +89,10 @@ export class AiAnalyticsService implements OnModuleInit {
     return this.learningAnalyticsService.getPathRecommendations(userId);
   }
 
-  async getRecommendationsAI(userId: string): Promise<RecommendationItemDto[]> {
+  async getRecommendationsAI(
+    userId: string,
+    limit: number = 10,
+  ): Promise<RecommendationItemDto[]> {
     const startTime = Date.now();
     const traceContext = this.tracingService.createTraceContext(userId);
     const span = await this.tracingService.startSpan(
@@ -100,7 +103,10 @@ export class AiAnalyticsService implements OnModuleInit {
     );
 
     try {
-      const cacheKey = ANALYTICS_CACHE_CONFIG.RECOMMENDATIONS.AI(userId);
+      const cacheKey = ANALYTICS_CACHE_CONFIG.RECOMMENDATIONS.AI(
+        userId,
+        limit,
+      );
       const cachedRaw = await this.redisService.get<string>(cacheKey);
       if (typeof cachedRaw === 'string') {
         try {
@@ -134,6 +140,7 @@ export class AiAnalyticsService implements OnModuleInit {
             const grpcResponse = await this.callGrpc(
               this.analyticsServiceGrpc.getRecommendations({
                 userId: userId,
+                limit,
               }),
             );
 
@@ -309,9 +316,10 @@ export class AiAnalyticsService implements OnModuleInit {
             userId: userId,
             events: userEvents.map((e) => ({
               eventType: e.eventType,
+              data: e.data ?? {},
               timestamp: e.timestamp,
-              sessionId: null,
-              duration: e.data?.duration,
+              sessionId: e.sessionId ?? '',
+              duration: Number(e.data?.duration) || 0,
             })),
           }),
         );
@@ -551,17 +559,17 @@ export class AiAnalyticsService implements OnModuleInit {
 
   async generateNextSteps(userId: string): Promise<string[]> {
     try {
-      const grpcResp: any = await this.callGrpc(
-        this.analyticsServiceGrpc.generateNextSteps({ userId: userId }),
+      const grpcResp = await this.callGrpc(
+        this.analyticsServiceGrpc.generateNextSteps({ userId }),
       );
 
-      return grpcResp?.nextSteps || [];
+      return grpcResp.steps.map((step) => step.step);
     } catch (error) {
       this.logger.error(
         `Error generating next steps from Rust (gRPC): ${getErrorMessage(error)}`,
         getErrorStack(error),
       );
-      return [];
+      throw error;
     }
   }
 
@@ -596,30 +604,14 @@ export class AiAnalyticsService implements OnModuleInit {
 
   async extractQuizzesFromMaterial(
     materialId: string,
-    filePath: string,
+    _filePath: string,
   ): Promise<{ success: boolean; questionsCount: number }> {
-    try {
-      this.logger.log(`Triggering quiz extraction for material ${materialId}`);
-      const response = await this.callGrpc(
-        this.analyticsServiceGrpc.extractQuizzes({
-          materialId: materialId,
-          filePath: filePath,
-        }),
-      );
-
-      this.logger.log(
-        `Quiz extraction completed for ${materialId}: ${response.questions_count} questions found.`,
-      );
-
-      return {
-        success: response.success,
-        questionsCount: response.questions_count,
-      };
-    } catch (error) {
-      this.logger.error(
-        `Failed to extract quizzes for material ${materialId}: ${getErrorMessage(error)}`,
-      );
-      return { success: false, questionsCount: 0 };
-    }
+    const error = new Error(
+      'Quiz extraction is not supported by the Rust analytics gRPC contract',
+    );
+    this.logger.error(
+      `Cannot extract quizzes for material ${materialId}: ${getErrorMessage(error)}`,
+    );
+    throw error;
   }
 }

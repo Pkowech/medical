@@ -108,7 +108,7 @@ export class CourseAnalyticsService implements OnModuleInit {
             // Try gRPC first
             const startTime = Date.now();
             const grpcResponse = await this.callGrpc(
-              this.analyticsServiceGrpc.getRecommendations({ userId: userId }),
+              this.analyticsServiceGrpc.getRecommendations({ userId, limit: 10 }),
             );
             const responseTimeMs = Date.now() - startTime;
 
@@ -169,12 +169,15 @@ export class CourseAnalyticsService implements OnModuleInit {
           this.analyticsServiceGrpc.getCourseStatistics({ userId: userId }),
         );
 
-        const stats = response.course_stats;
+        const stats = response.courseStats;
+        if (!stats) {
+          throw new Error('Rust analytics returned no course statistics');
+        }
         const result = {
-          totalCourses: stats.total_courses,
-          completedCourses: stats.completed_courses,
-          totalStudyTimeMinutes: stats.total_study_time_minutes,
-          averageCourseProgress: stats.average_course_progress,
+          totalCourses: stats.totalCourses,
+          completedCourses: stats.completedCourses,
+          totalStudyTimeMinutes: stats.totalStudyTimeMinutes,
+          averageCourseProgress: stats.averageCourseProgress,
         };
 
         await this.redisService.set(
@@ -307,10 +310,13 @@ export class CourseAnalyticsService implements OnModuleInit {
         );
 
         const patterns = {
-          dailyActiveStreak: response.daily_active_streak,
-          sessionCount: response.session_count,
-          averageSessionDuration: response.average_session_duration,
-          weeklyActiveStreak: response.weekly_active_streak,
+          dailyActiveStreak: response.dailyStreak,
+          sessionCount: response.activityFrequency,
+          averageSessionDuration:
+            response.activityFrequency > 0
+              ? response.timeSpent / response.activityFrequency
+              : 0,
+          weeklyActiveStreak: response.weeklyStreak,
         };
 
         await this.redisService.set(

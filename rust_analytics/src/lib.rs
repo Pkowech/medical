@@ -617,7 +617,7 @@ async fn get_recommendations_ai_handler(
     req: web::Json<UserIdRequest>,
 ) -> impl Responder {
     // Authentication is handled by middleware (JWT or x-api-key)
-    match crate::domain::services::get_recommendations_ai(&req.user_id, pool.get_ref()).await {
+    match crate::domain::services::get_recommendations_ai(&req.user_id, pool.get_ref(), 10).await {
         Ok(recommendations) => HttpResponse::Ok().json(recommendations),
         Err(e) => {
             eprintln!("Error generating recommendations: {}", e);

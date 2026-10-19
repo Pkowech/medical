@@ -2,7 +2,6 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../../infrastructure/prisma/prisma.service';
 import { RedisService } from '../../../../infrastructure/redis/redis.service';
 import { AssessmentConfigService } from '../../../../config/assessment.config';
-import { AssessmentAnalyticsService } from '#modules/ai-analytics/services/assessment-analytics.service';
 import { QuizUtils } from '../../../../common/utils/quiz.utils';
 import {
   AdaptiveQuizConfig,
@@ -26,7 +25,6 @@ export class QuestionBankService {
     private readonly prisma: PrismaService,
     private readonly redisService: RedisService,
     private readonly config: AssessmentConfigService,
-    private readonly analyticsService: AssessmentAnalyticsService,
   ) {}
 
   private getCacheKey(filters: QuestionBankFilters): string {
@@ -312,13 +310,6 @@ export class QuestionBankService {
         this.redisService.del(`topic:${topicId}:questions:v2`),
       ),
     ]);
-
-    // Fire-and-forget gRPC call to Rust for async analytics
-    void this.analyticsService.updateQuestionStats(
-      questionId,
-      isCorrect,
-      responseTime,
-    );
 
     await this.redisService.del(`question:${questionId}:*`);
 

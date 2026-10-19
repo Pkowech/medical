@@ -12,6 +12,7 @@ mod inner {
         GetEngagementMetricsRequest, GetEngagementMetricsResponse, GetFocusCorrelationRequest,
         GetFocusCorrelationResponse, GetFocusRecommendationsRequest,
         GetFocusRecommendationsResponse, GetGoalAnalyticsRequest, GetLearningPathStatisticsRequest,
+        GetSystemAnalyticsRequest, GetSystemAnalyticsResponse,
         GetNextAdaptiveQuestionRequest, GetNextAdaptiveQuestionResponse, GetRecommendationsRequest,
         GetRecommendationsResponse, GetSpacedRepetitionStatsRequest,
         GetSpacedRepetitionStatsResponse, GetUserAbilityRequest, GetUserAbilityResponse,
@@ -261,6 +262,27 @@ mod inner {
         ) -> Result<Response<LearningPathStatsResultResponse>, Status> {
             let service = LearningService::new(self.pool.clone());
             service.get_learning_path_statistics(request).await
+        }
+
+        async fn get_system_analytics(
+            &self,
+            _request: Request<GetSystemAnalyticsRequest>,
+        ) -> Result<Response<GetSystemAnalyticsResponse>, Status> {
+            let analytics =
+                crate::modules::analytics::system::analytics::get_system_analytics(&self.pool)
+                    .await
+                    .map_err(|error| Status::internal(format!("System analytics failed: {error}")))?;
+
+            Ok(Response::new(GetSystemAnalyticsResponse {
+                total_users: analytics.total_users,
+                active_learners: analytics.active_learners,
+                total_courses: analytics.total_courses,
+                completed_courses: analytics.completed_courses,
+                average_completion_rate: analytics.average_completion_rate,
+                total_paths: analytics.total_paths,
+                total_enrollments: analytics.total_enrollments,
+                overall_completion_rate: analytics.overall_completion_rate,
+            }))
         }
 
         async fn get_detailed_learning_analytics(
@@ -638,6 +660,13 @@ impl crate::analytics_proto::analytics_service_server::AnalyticsService for MyAn
         &self,
         _req: Request<GetLearningPathStatisticsRequest>,
     ) -> Result<Response<LearningPathStatsResultResponse>, Status> {
+        Err(Status::unimplemented("ML feature disabled"))
+    }
+
+    async fn get_system_analytics(
+        &self,
+        _req: Request<crate::analytics_proto::GetSystemAnalyticsRequest>,
+    ) -> Result<Response<crate::analytics_proto::GetSystemAnalyticsResponse>, Status> {
         Err(Status::unimplemented("ML feature disabled"))
     }
 

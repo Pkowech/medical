@@ -11,7 +11,6 @@ import { AnalyticsService } from '#infrastructure/grpc/analytics.client';
 import { firstValueFrom, timeout, Observable } from 'rxjs';
 import { retry } from 'rxjs/operators';
 import {
-  PredictionResponseDto,
   StudyPatternsResponseDto,
   GoalAnalytics,
   SystemAnalytics,
@@ -21,7 +20,6 @@ import {
   LearningAnalyticsDto,
   PathAnalyticsResponseDto,
 } from '#common/dto';
-import { PredictionType } from '@prisma/client';
 import {
   ANALYTICS_CACHE_CONFIG,
   ANALYTICS_METRICS_CONFIG,
@@ -251,12 +249,15 @@ export class LearningAnalyticsService implements OnModuleInit {
           userId: userId,
         }),
       );
+      if (!response.courseStats) {
+        throw new Error('Rust analytics returned no course statistics');
+      }
 
       const result: CourseStats = {
-        totalCourses: response.course_stats.total_courses,
-        completedCourses: response.course_stats.completed_courses,
-        totalStudyTimeMinutes: response.course_stats.total_study_time_minutes,
-        averageCourseProgress: response.course_stats.average_course_progress,
+        totalCourses: response.courseStats.totalCourses,
+        completedCourses: response.courseStats.completedCourses,
+        totalStudyTimeMinutes: response.courseStats.totalStudyTimeMinutes,
+        averageCourseProgress: response.courseStats.averageCourseProgress,
       };
 
       await this.redisService.set(
@@ -293,12 +294,15 @@ export class LearningAnalyticsService implements OnModuleInit {
           userId: userId,
         }),
       );
+      if (!response.pathStats) {
+        throw new Error('Rust analytics returned no learning-path statistics');
+      }
 
       const result: LearningPathStats = {
-        totalLearningPaths: response.path_stats.total_learning_paths,
-        completedLearningPaths: response.path_stats.completed_learning_paths,
-        totalStudyTimeMinutes: response.path_stats.total_study_time_minutes,
-        averagePathProgress: response.path_stats.average_path_progress,
+        totalLearningPaths: response.pathStats.totalLearningPaths,
+        completedLearningPaths: response.pathStats.completedLearningPaths,
+        totalStudyTimeMinutes: response.pathStats.totalStudyTimeMinutes,
+        averagePathProgress: response.pathStats.averagePathProgress,
       };
 
       await this.redisService.set(
@@ -778,90 +782,6 @@ export class LearningAnalyticsService implements OnModuleInit {
 
   // ==================== PREDICTIONS ====================
 
-  /**
-   * Predict learning success rate using ML model (gRPC only)
-   * Consolidates implementations from:
-   * - learning-ai-predictions.service.ts (adapter with HTTP fallback)
-   * - learning-prediction-analytics.service.ts (HTTP with local fallback)
-   *
-   * Now strictly gRPC with graceful fallback to empty prediction.
-   */
-  async predictSuccessRate(
-    userId: string,
-    features: number[],
-  ): Promise<PredictionResponseDto> {
-    const startTime = Date.now();
-    const cacheKey = ANALYTICS_CACHE_CONFIG.RECOMMENDATIONS.PREDICTION(userId);
-    const dedupKey = ANALYTICS_CACHE_CONFIG.DEDUP(cacheKey);
-
-    try {
-      const cached = await this.redisService.get<string>(cacheKey);
-      if (typeof cached === 'string') {
-        return JSON.parse(cached) as PredictionResponseDto;
-      }
-
-      return await this.requestDeduplicationService.executeWithDedup(
-        dedupKey,
-        async () => {
-          const grpcResp: any = await this.callGrpc(
-            this.analyticsServiceGrpc.predictSuccessRate({
-              userId: userId,
-              features,
-            }),
-          );
-
-          const mapped: PredictionResponseDto = {
-            userId,
-            type: PredictionType.successProbability,
-            probability: grpcResp.probability,
-            confidence: grpcResp.confidence,
-            factors: grpcResp.factors ?? [],
-            predictedSuccessRate: grpcResp.predicted_success_rate,
-            recommendedStudyTime: grpcResp.recommended_study_time,
-            explanations: this.generateQualitativeExplanations(
-              features,
-              grpcResp.probability,
-            ),
-          };
-
-          await this.redisService.set(
-            cacheKey,
-            JSON.stringify(mapped),
-            this.cacheTtl,
-          );
-
-          await this.performanceMetrics.recordMetric({
-            endpoint: ANALYTICS_METRICS_CONFIG.ENDPOINTS.LEARNING,
-            method: 'predictSuccessRate',
-            provider: ANALYTICS_METRICS_CONFIG.PROVIDERS.GRPC,
-            userId,
-            responseTimeMs: Date.now() - startTime,
-            cacheHit: false,
-            success: true,
-            timestamp: new Date(),
-          });
-
-          return mapped;
-        },
-      );
-    } catch (error) {
-      this.logger.warn(
-        `gRPC predictSuccessRate failed: ${getErrorMessage(error)}`,
-      );
-      await this.performanceMetrics.recordMetric({
-        endpoint: ANALYTICS_METRICS_CONFIG.ENDPOINTS.LEARNING,
-        method: 'predictSuccessRate',
-        provider: ANALYTICS_METRICS_CONFIG.PROVIDERS.GRPC,
-        userId,
-        responseTimeMs: Date.now() - startTime,
-        cacheHit: false,
-        success: false,
-        timestamp: new Date(),
-      });
-      throw error;
-    }
-  }
-
   async getBktPredictions(userId: string) {
     const states = await this.prisma.userSkillState.findMany({
       where: { userId },
@@ -887,8 +807,8 @@ export class LearningAnalyticsService implements OnModuleInit {
         return {
           skillId: state.skillId,
           skillName: state.skill.name,
-          masteryProbability: result.p_known,
-          nextCorrectProbability: result.p_next_correct,
+          masteryProbability: result.pKnown,
+          nextCorrectProbability: result.pNextCorrect,
           observedAttempts: state.attempts,
         };
       }),
@@ -965,29 +885,23 @@ export class LearningAnalyticsService implements OnModuleInit {
       return await this.requestDeduplicationService.executeWithDedup(
         dedupKey,
         async () => {
-          const grpcResp: any = await this.callGrpc(
-            (this.analyticsServiceGrpc as any).getRecommendations({
+          const grpcResp = await this.callGrpc(
+            this.analyticsServiceGrpc.getRecommendations({
               userId: userId,
               limit,
             }),
           );
 
-          const mapped = (grpcResp.items || [])
+          const mapped = grpcResp.items
             .slice(0, limit)
-            .map((rec: any) => ({
-              pathId: rec.path_id || rec.id || rec.pathId,
-              score: typeof rec.score === 'number' ? rec.score : 0.7,
-              reasons: Array.isArray(rec.reasons)
-                ? rec.reasons
-                : rec.reason
-                  ? [rec.reason]
-                  : ['Recommended based on your profile'],
-              confidence:
-                typeof rec.confidence === 'number'
-                  ? rec.confidence
-                  : typeof rec.score === 'number'
-                    ? rec.score
-                    : 0.8,
+            .filter((rec) => Boolean(rec.id))
+            .map((rec) => ({
+              pathId: rec.id,
+              score: rec.score,
+              reasons: rec.reason
+                ? [rec.reason]
+                : ['Recommended based on your profile'],
+              confidence: rec.score,
             }));
 
           await this.redisService.set(

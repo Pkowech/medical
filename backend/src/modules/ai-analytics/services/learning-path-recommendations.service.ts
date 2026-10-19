@@ -4,6 +4,7 @@
 
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '#infrastructure/prisma/prisma.service';
+import { LearningAnalyticsService } from '#modules/ai-analytics/services/learning-analytics.service';
 import { AiAnalyticsService } from '#modules/ai-analytics/services/ai-analytics.service';
 import { RedisService } from '#infrastructure/redis/redis.service';
 import { getErrorMessage } from '#common/utils/error.utils';
@@ -25,6 +26,7 @@ export class LearningPathRecommendationsService {
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly learningAnalyticsService: LearningAnalyticsService,
     private readonly aiAnalyticsService: AiAnalyticsService,
     private readonly redisService: RedisService,
   ) {}
@@ -37,35 +39,17 @@ export class LearningPathRecommendationsService {
     userId: string,
     limit: number = 10,
   ): Promise<RecommendationScore[]> {
-    const cacheKey = ANALYTICS_CACHE_CONFIG.RECOMMENDATIONS.PATH(userId, limit);
-
     try {
-      const cached = await this.redisService.get(cacheKey);
-      if (cached) {
-        this.logger.debug(`Cache HIT for path recommendations ${userId}`);
-        return JSON.parse(cached as string);
-      }
-
-      this.logger.debug(`Cache MISS for path recommendations ${userId}`);
-
-      // Call Rust service via AI Analytics (gRPC)
       const rustRecommendations =
-        await this.aiAnalyticsService.getRecommendationsAI(userId);
+        await this.learningAnalyticsService.getPathRecommendations(
+          userId,
+          limit,
+        );
 
-      // Enrich with learning path metadata from database
       const recommendations = await this.enrichRustRecommendations(
         rustRecommendations,
         limit,
-        userId,
       );
-
-      // Cache the result
-      await this.redisService.set(
-        cacheKey,
-        JSON.stringify(recommendations),
-        this.CACHE_TTL,
-      );
-
       return recommendations;
     } catch (error) {
       this.logger.error(
@@ -76,84 +60,44 @@ export class LearningPathRecommendationsService {
   }
 
   /**
-   * Enrich Rust recommendations with database metadata.
-   * Includes healthcare-field and specialization matching logic.
+   * Enrich Rust-ranked paths with metadata, preserving the engine's order.
    */
   private async enrichRustRecommendations(
-    rustRecs: any[],
+    rustRecs: Array<{
+      pathId: string;
+      score: number;
+      reasons: string[];
+      confidence: number;
+    }>,
     limit: number,
-    userId?: string,
   ): Promise<RecommendationScore[]> {
-    const pathIds = rustRecs.map((r) => r.materialId || r.id).filter(Boolean);
-
-    // Fetch the learner's track and focus when available.
-    let userSpecialization: string | null = null;
-    let userHealthcareField: string | null = null;
-    if (userId) {
-      const user = await this.prisma.user.findUnique({
-        where: { id: userId },
-        select: { specialization: true, healthcareField: true },
-      });
-      userSpecialization = user?.specialization || null;
-      userHealthcareField = user?.healthcareField || null;
-    }
-    const fieldCategoryTerm = userHealthcareField?.replace(/[_-]/g, ' ') || '';
-    const fieldCategories = fieldCategoryTerm
-      ? await this.prisma.courseCategory.findMany({
-          where: {
-            name: { contains: fieldCategoryTerm, mode: 'insensitive' },
-          },
-          select: { id: true },
-        })
-      : [];
-    const fieldCategoryIds = fieldCategories.map(category => category.id);
+    const rankedRecommendations = rustRecs.slice(0, limit);
+    const pathIds = rankedRecommendations.map(
+      (recommendation) => recommendation.pathId,
+    );
+    if (!pathIds.length) return [];
 
     const paths = await this.prisma.learningPath.findMany({
       where: {
-        OR: [
-          { id: { in: pathIds } },
-          userSpecialization ? { specialization: userSpecialization } : {},
-          fieldCategoryIds.length ? { categoryId: { in: fieldCategoryIds } } : {},
-        ].filter((cond) => Object.keys(cond).length > 0),
+        id: { in: pathIds },
         status: 'published',
       },
-      include: {
-        milestones: true,
-      },
-      take: limit,
     });
 
-    return paths.map((path) => {
-      const rustRec =
-        rustRecs.find((r) => (r.materialId || r.id) === path.id) || {};
+    const pathsById = new Map(paths.map((path) => [path.id, path]));
+    return rankedRecommendations.flatMap((recommendation) => {
+      const path = pathsById.get(recommendation.pathId);
+      if (!path) return [];
 
-      const isSpecializationMatch =
-        Boolean(userSpecialization && path.specialization === userSpecialization);
-      const isHealthcareFieldMatch = Boolean(
-        path.categoryId && fieldCategoryIds.includes(path.categoryId),
-      );
-
-      return {
-        pathId: path.id,
-        score: isSpecializationMatch
-          ? Math.max(rustRec.score || 0.5, 0.9)
-          : isHealthcareFieldMatch
-            ? Math.max(rustRec.score || 0.5, 0.85)
-              : rustRec.score || 0.5,
-        reasons: [
-          isSpecializationMatch
-            ? `Matches your specialization: ${userSpecialization}`
-            : isHealthcareFieldMatch
-              ? `Matches your healthcare field: ${userHealthcareField}`
-              : rustRec.reason || 'AI recommended based on your profile',
-        ],
-        confidence: isSpecializationMatch
-          ? 0.95
-          : isHealthcareFieldMatch
-            ? 0.9
-            : rustRec.confidence || 0.7,
-        estimatedCompletionTime: path.estimatedDurationWeeks || 4,
-      };
+      return [
+        {
+          pathId: path.id,
+          score: recommendation.score,
+          reasons: recommendation.reasons,
+          confidence: recommendation.confidence,
+          estimatedCompletionTime: path.estimatedDurationWeeks || 4,
+        },
+      ];
     });
   }
 

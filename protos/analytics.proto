@@ -209,6 +209,7 @@ service AnalyticsService {
   rpc GetGoalAnalytics(GetGoalAnalyticsRequest) returns (LearningGoalAnalyticsResponse);
   rpc GetCourseStatistics(GetCourseStatisticsRequest) returns (CourseStatsResultResponse);
   rpc GetLearningPathStatistics(GetLearningPathStatisticsRequest) returns (LearningPathStatsResultResponse);
+  rpc GetSystemAnalytics(GetSystemAnalyticsRequest) returns (GetSystemAnalyticsResponse);
   rpc GetDetailedLearningAnalytics (GetDetailedLearningAnalyticsRequest) returns (GetDetailedLearningAnalyticsResponse);
   rpc CalculateCourseProgress (CalculateCourseProgressRequest) returns (CourseProgress);
   rpc GetUserDataForProfile(GetUserDataForProfileRequest) returns (GetUserDataForProfileResponse);
@@ -324,6 +325,19 @@ message GetLearningPathStatisticsRequest {
   string user_id = 1;
 }
 
+message GetSystemAnalyticsRequest {}
+
+message GetSystemAnalyticsResponse {
+  int64 total_users = 1;
+  int64 active_learners = 2;
+  int64 total_courses = 3;
+  int64 completed_courses = 4;
+  double average_completion_rate = 5;
+  int64 total_paths = 6;
+  int64 total_enrollments = 7;
+  double overall_completion_rate = 8;
+}
+
 message LearningPathProgress {
   string user_id = 1;
   string path_id = 2;
@@ -388,6 +402,7 @@ message GetEngagementMetricsResponse {
 
 message GetRecommendationsRequest {
   string user_id = 1;
+  int32 limit = 2;
 }
 
 message RecommendationItem {

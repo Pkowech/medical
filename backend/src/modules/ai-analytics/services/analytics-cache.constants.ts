@@ -40,7 +40,8 @@ export const ANALYTICS_CACHE_CONFIG = {
 
   // Recommendation-related cache keys
   RECOMMENDATIONS: {
-    AI: (userId: string) => `analytics:recommendations:ai:${userId}`,
+    AI: (userId: string, limit?: number) =>
+      `analytics:recommendations:ai:${userId}:${limit || 10}`,
     ASSESSMENT: (userId: string, assessmentId?: string) =>
       `analytics:recommendations:assessment:${userId}:${assessmentId || 'all'}`,
     PERSONALIZED: (userId: string) =>

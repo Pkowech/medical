@@ -142,7 +142,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
           unitId,
           questions: [],
           currentQuestionIndex: 0,
-          userAbility: userAbility.estimated_ability,
+          userAbility: userAbility.estimatedAbility,
           confidenceInterval: 2.0,
           targetPrecision: 0.3,
           responses: [],
@@ -154,13 +154,14 @@ export class AssessmentAnalyticsService implements OnModuleInit {
         const grpcResp = await this.callGrpcWithTimeout(
           this.analyticsServiceGrpc.getNextAdaptiveQuestion({
             userId,
+            topicId: '',
             courseId: session.courseId ?? '',
             unitId: session.unitId ?? '',
           }),
           this.grpcTimeoutMs,
         );
-        const initialQuestion = grpcResp.question_id
-          ? await this.findAdaptiveQuestion(grpcResp.question_id, session)
+        const initialQuestion = grpcResp.questionId
+          ? await this.findAdaptiveQuestion(grpcResp.questionId, session)
           : null;
         if (!initialQuestion) {
           throw new NotFoundException(
@@ -322,15 +323,16 @@ export class AssessmentAnalyticsService implements OnModuleInit {
         const grpcResp = await this.callGrpcWithTimeout(
           this.analyticsServiceGrpc.getNextAdaptiveQuestion({
             userId: session.userId,
+            topicId: '',
             courseId: session.courseId ?? '',
             unitId: session.unitId ?? '',
           }),
           this.grpcTimeoutMs,
         );
-        if (grpcResp.question_id) {
+        if (grpcResp.questionId) {
           nextQuestion =
             (await this.findAdaptiveQuestion(
-              grpcResp.question_id,
+              grpcResp.questionId,
               session,
             )) || undefined;
         }
@@ -454,10 +456,15 @@ export class AssessmentAnalyticsService implements OnModuleInit {
   }> {
     const startTime = Date.now();
     const grpcResp = await this.callGrpcWithTimeout(
-      this.analyticsServiceGrpc.getNextAdaptiveQuestion({ userId }),
+      this.analyticsServiceGrpc.getNextAdaptiveQuestion({
+        userId,
+        topicId: '',
+        courseId: '',
+        unitId: '',
+      }),
       this.grpcTimeoutMs,
     );
-    if (!grpcResp.question_id) {
+    if (!grpcResp.questionId) {
       throw new NotFoundException(
         'Rust analytics found no eligible adaptive question',
       );
@@ -475,8 +482,8 @@ export class AssessmentAnalyticsService implements OnModuleInit {
     });
 
     return {
-      questionId: grpcResp.question_id,
-      recommendedDifficulty: grpcResp.recommended_difficulty,
+      questionId: grpcResp.questionId,
+      recommendedDifficulty: grpcResp.recommendedDifficulty,
     };
   }
 
@@ -487,6 +494,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
       const grpcResp = await this.callGrpc(
         this.analyticsServiceGrpc.getRelatedResources({
           resourceId: assessmentId,
+          limit: 5,
         }),
       );
       return (grpcResp as any).resources || [];
@@ -789,7 +797,8 @@ export class AssessmentAnalyticsService implements OnModuleInit {
     }>
   > {
     try {
-      const cacheKey = ANALYTICS_CACHE_CONFIG.RECOMMENDATIONS.AI(userId);
+      const cacheKey =
+        ANALYTICS_CACHE_CONFIG.RECOMMENDATIONS.ASSESSMENT(userId);
       const dedupKey = ANALYTICS_CACHE_CONFIG.DEDUP(cacheKey);
 
       const cached = await this.redisService.get<string>(cacheKey);
@@ -802,7 +811,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
         async () => {
           // Strictly gRPC
           const response = await this.callGrpc(
-            this.analyticsServiceGrpc.getRecommendations({ userId: userId }),
+            this.analyticsServiceGrpc.getRecommendations({ userId, limit: 10 }),
           );
 
           // Filter for assessment-type recommendations
@@ -922,8 +931,8 @@ export class AssessmentAnalyticsService implements OnModuleInit {
       const recommendations =
         response.areas?.map((a) => ({
           topic: a.topic,
-          cardCount: a.card_count,
-          passRate: a.pass_rate,
+          cardCount: a.cardCount,
+          passRate: a.passRate,
         })) || [];
 
       await this.redisService.set(
@@ -975,8 +984,9 @@ export class AssessmentAnalyticsService implements OnModuleInit {
           events: [
             {
               eventType: 'assessment_submission',
+              data: {},
               timestamp: new Date().toISOString(),
-              sessionId: null,
+              sessionId: '',
               duration: 0,
             },
           ],
@@ -1158,8 +1168,8 @@ export class AssessmentAnalyticsService implements OnModuleInit {
 
         const result = {
           skillId,
-          probabilityKnown: grpcResp.p_known,
-          probabilityNextCorrect: grpcResp.p_next_correct,
+          probabilityKnown: grpcResp.pKnown,
+          probabilityNextCorrect: grpcResp.pNextCorrect,
           attempts: previousAttempts,
         };
 
@@ -1473,29 +1483,6 @@ export class AssessmentAnalyticsService implements OnModuleInit {
       this.logger.warn(
         `getSpacedRepetitionStats gRPC failure: ${getErrorMessage(error)}`,
       );
-      throw error;
-    }
-  }
-
-  /**
-   * Update question statistics after answer.
-   * Proxies to Rust for async difficulty recalculation.
-   */
-  async updateQuestionStats(
-    questionId: string,
-    isCorrect: boolean,
-    responseTimeMs: number,
-  ): Promise<void> {
-    try {
-      await this.callGrpc(
-        this.analyticsServiceGrpc.updateQuestionStatistics({
-          questionId: questionId,
-          isCorrect: isCorrect,
-          responseTimeMs: responseTimeMs,
-        }),
-      );
-    } catch (error) {
-      this.logger.error(`updateQuestionStats error: ${getErrorMessage(error)}`);
       throw error;
     }
   }

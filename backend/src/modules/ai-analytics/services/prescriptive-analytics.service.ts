@@ -87,7 +87,7 @@ export class PrescriptiveAnalyticsService implements OnModuleInit {
           ),
       );
 
-      const pKnown = response.p_known_by_skill?.[topicId] ?? 0;
+      const pKnown = response.pKnownBySkill[topicId] ?? 0;
 
       // Increment metrics
       this.metrics.recordAnalyticsEvaluation('success');

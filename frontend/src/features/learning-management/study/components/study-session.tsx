@@ -66,6 +66,7 @@ export const StudySession: React.FC<StudySessionProps> = ({
   const [showEndDialog, setShowEndDialog] = useState(false);
   const [notes, setNotes] = useState('');
   const [sessionError, setSessionError] = useState<string | null>(null);
+  const [isStarting, setIsStarting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const elapsedMillisecondsRef = useRef(0);
   const activeSegmentStartedAtRef = useRef<number | null>(null);
@@ -181,6 +182,9 @@ export const StudySession: React.FC<StudySessionProps> = ({
       return;
     }
 
+    if (isStarting) return;
+
+    setIsStarting(true);
     try {
       setSessionError(null);
       const session = await startSession(studyContext);
@@ -201,6 +205,8 @@ export const StudySession: React.FC<StudySessionProps> = ({
     } catch (error) {
       console.error('Error starting session:', error);
       setSessionError('Could not start this session. Please try again.');
+    } finally {
+      setIsStarting(false);
     }
   };
 
@@ -306,7 +312,7 @@ export const StudySession: React.FC<StudySessionProps> = ({
         },
         getSessionXapiContext(sessionId)
       );
-      const durationLabel = `${endedSession.duration ?? Math.floor(elapsedTime / 60)} min`;
+      const durationLabel = `${endedSession.duration ?? Math.floor(elapsedSeconds / 60)} min`;
       if (endedSession.isValid) {
         toast.success(
           `${durationLabel} study session saved${contextLabel ? ` for ${contextLabel}` : ''} and counted toward your learning progress.`
@@ -425,9 +431,13 @@ export const StudySession: React.FC<StudySessionProps> = ({
 
           <div className="flex justify-center gap-4">
             {!sessionId ? (
-              <Button onClick={handleStart} className="w-40">
+              <Button
+                onClick={handleStart}
+                className="w-40"
+                disabled={isStarting}
+              >
                 <Play className="h-4 w-4 mr-2" />
-                Start session
+                {isStarting ? 'Starting…' : 'Start session'}
               </Button>
             ) : (
               <>
@@ -460,8 +470,13 @@ export const StudySession: React.FC<StudySessionProps> = ({
         </CardContent>
       </Card>
 
-      <Dialog open={showEndDialog} onOpenChange={open => setShowEndDialog(open)}>
-        <DialogContent>
+      <Dialog
+        open={showEndDialog}
+        onOpenChange={open => {
+          if (!open && !isSaving) setShowEndDialog(false);
+        }}
+      >
+        <DialogContent showCloseButton={false}>
           <DialogHeader>
             <DialogTitle>End Study Session</DialogTitle>
           </DialogHeader>
@@ -484,7 +499,11 @@ export const StudySession: React.FC<StudySessionProps> = ({
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowEndDialog(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setShowEndDialog(false)}
+              disabled={isSaving}
+            >
               Cancel
             </Button>
             <Button onClick={handleEndSession} disabled={isSaving}>

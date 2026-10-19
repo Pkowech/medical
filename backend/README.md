@@ -45,6 +45,15 @@ For a comprehensive overview of the project's features, please refer to the [mai
 - **Authentication**: NextAuth handles the frontend session; the backend
   verifies Google ID tokens and issues the app's access and refresh tokens.
 
+### Recommendation boundary
+
+Rust ranks personalized learning-path recommendations and accepts the requested
+result limit through the `GetRecommendations` gRPC contract. NestJS remains
+responsible for authenticated user identity, filtering recommendations to
+published paths, enriching results with application metadata, and API response
+shaping. Recommendation endpoints should reuse this Rust-backed path rather
+than applying a second ranking in TypeScript.
+
 ## 🚀 Quick Start
 
 ### Prerequisites

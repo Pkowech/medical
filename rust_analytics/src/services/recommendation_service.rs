@@ -43,7 +43,11 @@ impl RecommendationService {
         let use_case = GetRecommendationsUseCase::new(Arc::new(repo));
         let app_req = AppGetRecommendationsRequest {
             user_id: user_id.clone(),
-            limit: None,
+            limit: if req.limit > 0 {
+                Some(req.limit)
+            } else {
+                None
+            },
         };
         let result = use_case
             .execute(app_req)

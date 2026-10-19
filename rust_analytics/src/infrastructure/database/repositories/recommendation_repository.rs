@@ -24,6 +24,7 @@ impl RecommendationRepository for PostgresRecommendationRepository {
             crate::modules::analytics::recommendations::service::get_recommendations_ai(
                 user_id,
                 &self.pool,
+                limit,
             )
             .await
             .map_err(AnalyticsError::DatabaseError)?;

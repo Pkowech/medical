@@ -59,6 +59,7 @@ struct LearningPathScore {
 pub async fn get_recommendations_ai(
     user_id: &str,
     pool: &Pool<Postgres>,
+    limit: usize,
 ) -> Result<Vec<Recommendation>, String> {
     // Step 1: Build comprehensive user profile
     let profile = build_user_profile(user_id, pool).await?;
@@ -84,7 +85,7 @@ pub async fn get_recommendations_ai(
     // Step 5: Return actual learning path IDs and metadata to the API.
     let recommendations: Vec<Recommendation> = scored_paths
         .into_iter()
-        .take(10)
+        .take(limit)
         .map(|path| {
             let final_score = calculate_final_score(&path);
             let reason = generate_recommendation_reason(&path, &profile);

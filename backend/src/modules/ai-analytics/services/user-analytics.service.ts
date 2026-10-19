@@ -109,13 +109,16 @@ export class UserAnalyticsService implements OnModuleInit {
       });
 
       const metrics = {
-        timeSpent: response.time_spent || 0,
-        completionRate: response.completion_rate || 0,
-        activityFrequency: response.activity_frequency || 0,
-        dailyActiveStreak: response.daily_active_streak || 0,
-        weeklyActiveStreak: response.weekly_active_streak || 0,
-        sessionCount: response.session_count || 0,
-        averageSessionDuration: response.average_session_duration || 0,
+        timeSpent: response.timeSpent,
+        completionRate: response.completionRate,
+        activityFrequency: response.activityFrequency,
+        dailyActiveStreak: response.dailyStreak,
+        weeklyActiveStreak: response.weeklyStreak,
+        sessionCount: response.activityFrequency,
+        averageSessionDuration:
+          response.activityFrequency > 0
+            ? response.timeSpent / response.activityFrequency
+            : 0,
       };
 
       await this.redisService.set(
@@ -167,7 +170,7 @@ export class UserAnalyticsService implements OnModuleInit {
         this.cacheTtl,
       );
       return {
-        userId: response.user_id,
+        userId: response.userId,
         features: response.features,
         featureMap: response.featureMap,
       };
@@ -302,19 +305,24 @@ export class UserAnalyticsService implements OnModuleInit {
   async getUserProfileStats(userId: string): Promise<any> {
     try {
       const resp = await this.callGrpc(
-        this.analyticsServiceGrpc.getUserLearningSummary({ userId: userId }),
+        this.analyticsServiceGrpc.getUserLearningSummary({
+          userId,
+          studySessions: [],
+          quizAttempts: [],
+        }),
       );
+      const summary = resp.summary;
 
       return {
         coursesEnrolled: 0, // Need to merge if needed, but keeping it gRPC proxy
         coursesCompleted: 0,
-        totalStudyTime: resp.total_study_time || 0,
+        totalStudyTime: summary?.totalStudyTime ?? 0,
         totalCourses: 0,
-        averageScore: resp.average_score || 0,
+        averageScore: summary?.averageScore ?? 0,
         badges: 0,
         points: 0,
         level: 1,
-        currentStreak: resp.current_streak || 0,
+        currentStreak: summary?.currentStreak ?? 0,
         recentActivity: [],
       };
     } catch (error) {
@@ -355,7 +363,7 @@ export class UserAnalyticsService implements OnModuleInit {
   async generateRecommendations(userId: string) {
     try {
       const response = await this.callGrpc(
-        this.analyticsServiceGrpc.getRecommendations({ userId: userId }),
+        this.analyticsServiceGrpc.getRecommendations({ userId, limit: 10 }),
       );
       return response.items || [];
     } catch (error) {
