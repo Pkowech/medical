@@ -15,18 +15,18 @@ RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
     pnpm install --frozen-lockfile --prefer-offline --ignore-scripts --shamefully-hoist
 
 FROM deps AS build
-COPY protos ./protos
+COPY protos /usr/src/protos
 COPY backend ./
-
-RUN pnpm run generate:proto
-RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
-    rm -rf node_modules && pnpm install --frozen-lockfile --ignore-scripts=false --shamefully-hoist
 
 RUN echo "DATABASE_URL=postgresql://dummy:[REDACTED]@localhost:5432/dummy" > .env && \
     echo "DIRECT_URL=postgresql://dummy:[REDACTED]@localhost:5432/dummy" >> .env && \
     echo "JWT_SECRET=build-time-dummy" >> .env && \
-    echo "JWT_REFRESH_SECRET=build-time-dummy-refresh" >> .env && \
-    pnpm prisma generate
+    echo "JWT_REFRESH_SECRET=build-time-dummy-refresh" >> .env
+
+RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
+    rm -rf node_modules && pnpm install --frozen-lockfile --ignore-scripts=false --shamefully-hoist
+
+RUN pnpm prisma generate && pnpm run generate:proto
 
 RUN find node_modules/@prisma/client -type f \
       \( -iname "query_compiler_*" -o -iname "*.wasm" \) \
@@ -58,7 +58,7 @@ COPY --chown=nestjs:nodejs --from=build /usr/src/app/dist ./dist
 COPY --chown=nestjs:nodejs --from=build /usr/src/app/node_modules ./node_modules
 COPY --chown=nestjs:nodejs --from=build /usr/src/app/prisma/schema.prisma ./prisma/
 COPY --chown=nestjs:nodejs --from=build /usr/src/app/package.json ./
-COPY --chown=nestjs:nodejs --from=build /usr/src/app/protos /usr/src/protos
+COPY --chown=nestjs:nodejs --from=build /usr/src/protos /usr/src/protos
 
 HEALTHCHECK --interval=10s --timeout=5s --start-period=10s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:3002/health || exit 1

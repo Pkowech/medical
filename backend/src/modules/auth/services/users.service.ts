@@ -521,10 +521,10 @@ export class UsersService {
         level: analytics.level,
         currentStreak: analytics.currentStreak,
       },
-      recentActivity: (analytics.recentActivity || []).map((a: any) => ({
+      recentActivity: analytics.recentActivity.map((a) => ({
         id: a.id,
-        type: a.type ?? '',
-        description: a.description ?? '',
+        type: a.type,
+        description: a.description,
         createdAt: a.createdAt,
       })),
     };

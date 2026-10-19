@@ -1,9 +1,7 @@
 import { Injectable, Logger, Inject, OnModuleInit } from '@nestjs/common';
 import { ClientGrpc } from '@nestjs/microservices';
-import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '#infrastructure/prisma/prisma.service';
 import { RedisService } from '#infrastructure/redis/redis.service';
-import { HttpService } from '@nestjs/axios';
 import { firstValueFrom, timeout, Observable } from 'rxjs';
 import { retry } from 'rxjs/operators';
 import { AnalyticsService } from '#infrastructure/grpc/analytics.client';
@@ -23,7 +21,7 @@ import { v4 as uuidv4 } from 'uuid';
  *
  * Domain-specific service for course-related analytics operations.
  * Provides course recommendations, learning patterns, progress tracking, and engagement metrics.
- * Uses gRPC-first approach with HTTP fallback for Rust analytics service integration.
+ * Delegates analytics computation to the Rust service over gRPC.
  *
  * Used by:
  * - progress.service.ts (progress tracking)
@@ -36,10 +34,6 @@ import { v4 as uuidv4 } from 'uuid';
 export class CourseAnalyticsService implements OnModuleInit {
   private readonly logger = new Logger(CourseAnalyticsService.name);
   private readonly cacheTtl = 3600;
-  private readonly rustAnalyticsUrl: string;
-  private readonly rustApiKey: string;
-  private readonly httpTimeoutMs: number;
-  private readonly httpRetries: number;
   private readonly grpcTimeoutMs: number;
   private readonly grpcRetries: number;
   private analyticsServiceGrpc!: AnalyticsService;
@@ -47,31 +41,13 @@ export class CourseAnalyticsService implements OnModuleInit {
   constructor(
     private readonly prisma: PrismaService,
     private readonly redisService: RedisService,
-    private readonly httpService: HttpService,
     @Inject('ANALYTICS_PACKAGE') private readonly client: ClientGrpc,
     private readonly requestDeduplicationService: RequestDeduplicationService,
     private readonly performanceMetrics: PerformanceMetricsService,
     private readonly tracingService: DistributedTracingService,
-    private readonly configService: ConfigService,
   ) {
-    this.rustAnalyticsUrl = this.configService.get<string>(
-      'RUST_ANALYTICS_URL',
-    )!;
-    this.rustApiKey = this.configService.get<string>(
-      'RUST_ANALYTICS_API_KEY',
-    )!;
-    this.httpTimeoutMs = this.configService.get<number>(
-      'RUST_HTTP_TIMEOUT_MS',
-    )!;
-    this.httpRetries = this.configService.get<number>(
-      'RUST_HTTP_RETRIES',
-    )!;
-    this.grpcTimeoutMs = this.configService.get<number>(
-      'RUST_GRPC_TIMEOUT_MS',
-    )!;
-    this.grpcRetries = this.configService.get<number>(
-      'RUST_GRPC_RETRIES',
-    )!;
+    this.grpcTimeoutMs = Number(process.env.RUST_GRPC_TIMEOUT_MS ?? 5000);
+    this.grpcRetries = Number(process.env.RUST_GRPC_RETRIES ?? 2);
   }
 
   onModuleInit() {
@@ -87,7 +63,7 @@ export class CourseAnalyticsService implements OnModuleInit {
 
   /**
    * Get personalized course recommendations for a user
-   * gRPC call with HTTP fallback
+   * Rust gRPC recommendation call
    */
   async getRecommendationsForCourse(
     userId: string,
@@ -133,7 +109,7 @@ export class CourseAnalyticsService implements OnModuleInit {
             this.logger.error(
               `gRPC failed for getRecommendationsForCourse: ${getErrorMessage(grpcError)}`,
             );
-            return [];
+            throw grpcError;
           }
         },
       );
@@ -141,7 +117,7 @@ export class CourseAnalyticsService implements OnModuleInit {
       this.logger.error(
         `Failed to get course recommendations: ${getErrorMessage(error)}`,
       );
-      return [];
+      throw error;
     }
   }
 
@@ -190,32 +166,19 @@ export class CourseAnalyticsService implements OnModuleInit {
         this.logger.error(
           `gRPC failed for getCourseStatistics: ${getErrorMessage(grpcError)}`,
         );
-
-        return {
-          totalCourses: 0,
-          completedCourses: 0,
-          totalStudyTimeMinutes: 0,
-          averageCourseProgress: 0,
-        };
+        throw grpcError;
       }
     } catch (error) {
       this.logger.error(
         `Failed to get course statistics: ${getErrorMessage(error)}`,
       );
-      return {
-        totalCourses: 0,
-        completedCourses: 0,
-        totalStudyTimeMinutes: 0,
-        averageCourseProgress: 0,
-      };
+      throw error;
     }
   }
 
   /**
    * Calculate course progress (read-only authoritative compute)
    * Delegates the computation to the Rust analytics engine over gRPC.
-   * When the Rust service is unavailable, callers may fall back to derived
-   * database progress so the app still serves progress data during outages.
    */
   async calculateCourseProgress(
     userId: string,
@@ -247,8 +210,7 @@ export class CourseAnalyticsService implements OnModuleInit {
       this.logger.warn(
         `gRPC calculateCourseProgress failed: ${getErrorMessage(error)}`,
       );
-      // Return null to indicate fallback neded
-      return null;
+      throw error;
     }
   }
 
@@ -329,13 +291,13 @@ export class CourseAnalyticsService implements OnModuleInit {
         this.logger.error(
           `gRPC failed for getLearningPatterns: ${getErrorMessage(grpcError)}`,
         );
-        return {};
+        throw grpcError;
       }
     } catch (error) {
       this.logger.error(
         `Failed to get learning patterns: ${getErrorMessage(error)}`,
       );
-      return {};
+      throw error;
     }
   }
 
@@ -353,77 +315,23 @@ export class CourseAnalyticsService implements OnModuleInit {
         return JSON.parse(cached as string);
       }
 
-      const enrollments = await this.prisma.courseEnrollment.findMany({
-        where: { courseId },
-      });
-
-      const enrollmentCount = enrollments.length;
-      const completedCount = enrollments.filter(
-        (e) => e.status === 'completed',
-      ).length;
-      const completionRate =
-        enrollmentCount > 0 ? (completedCount / enrollmentCount) * 100 : 0;
-
-      const unitAccesses = await this.prisma.unitAccess.findMany({
-        where: { unit: { courseId } },
-      });
-      const totalTime = unitAccesses.reduce(
-        (sum, access) => sum + (access.timeSpent || 0),
-        0,
+      const response = await this.callGrpc(
+        this.analyticsServiceGrpc.getCourseAnalytics({ courseId }),
       );
-      const averageTimeSpent =
-        enrollmentCount > 0 ? totalTime / enrollmentCount : 0;
-
-      const unitAccessCounts = await this.prisma.unitAccess.groupBy({
-        by: ['unitId'],
-        where: { unit: { courseId } },
-        _count: { id: true },
-      });
-
-      const unitsWithTitles = await this.prisma.unit.findMany({
-        where: {
-          courseId,
-          id: { in: unitAccessCounts.map((uac) => uac.unitId) },
-        },
-        select: { id: true, title: true },
-      });
-
-      const popularUnits = unitAccessCounts
-        .map((uac) => {
-          const unit = unitsWithTitles.find((u) => u.id === uac.unitId);
-          return {
-            unitId: uac.unitId,
-            title: unit?.title || 'Unknown Unit',
-            accessCount: uac._count.id,
-          };
-        })
-        .sort((a, b) => b.accessCount - a.accessCount)
-        .slice(0, 5);
-
-      const courseProgresses = await Promise.all(
-        enrollments.map(async (enrollment) => {
-          const progress = await this.calculateCourseProgress(
-            enrollment.userId,
-            courseId,
-          );
-          return {
-            userId: enrollment.userId,
-            progressPercentage: progress?.progressPercentage || 0,
-          };
-        }),
-      );
-
-      const strugglingStudents = courseProgresses
-        .filter((cp) => cp.progressPercentage < 30)
-        .sort((a, b) => a.progressPercentage - b.progressPercentage)
-        .slice(0, 10);
 
       const result = {
-        enrollmentCount,
-        completionRate: Math.round(completionRate * 100) / 100,
-        averageTimeSpent: Math.round(averageTimeSpent),
-        popularUnits,
-        strugglingStudents,
+        enrollmentCount: response.enrollmentCount,
+        completionRate: Math.round(response.completionRate * 100) / 100,
+        averageTimeSpent: Math.round(response.averageTimeSpent),
+        popularUnits: response.popularUnits.map((unit) => ({
+          unitId: unit.unitId,
+          title: unit.title,
+          accessCount: unit.accessCount,
+        })),
+        strugglingStudents: response.strugglingStudents.map((student) => ({
+          userId: student.userId,
+          progressPercentage: student.progressPercentage,
+        })),
       };
 
       await this.redisService.set(
@@ -437,37 +345,6 @@ export class CourseAnalyticsService implements OnModuleInit {
         courseId,
         error: getErrorMessage(error),
       });
-      return {
-        enrollmentCount: 0,
-        completionRate: 0,
-        averageTimeSpent: 0,
-        popularUnits: [],
-        strugglingStudents: [],
-      };
-    }
-  }
-
-  private async postWithTimeoutAndRetry(
-    url: string,
-    data: unknown,
-  ): Promise<any> {
-    const config = {
-      timeout: this.httpTimeoutMs,
-      headers: this.rustApiKey
-        ? { Authorization: `Bearer ${this.rustApiKey}` }
-        : {},
-    };
-
-    try {
-      const response = await this.httpService
-        .post(url, data, config)
-        .toPromise();
-      return response;
-    } catch (error) {
-      if (this.httpRetries > 0) {
-        await new Promise((resolve) => setTimeout(resolve, 100));
-        return this.postWithTimeoutAndRetry(url, data);
-      }
       throw error;
     }
   }

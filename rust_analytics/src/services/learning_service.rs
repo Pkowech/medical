@@ -7,6 +7,8 @@ use crate::analytics_proto::{
     GetUserLearningSummaryRequest, UserLearningSummaryResponse,
     GetGoalAnalyticsRequest, LearningGoalAnalyticsResponse,
     GetCourseStatisticsRequest, CourseStatsResultResponse, CourseStatsResult,
+    GetCourseAnalyticsRequest, CourseAnalyticsResponse, CourseUnitPopularity,
+    StrugglingStudent,
     GetLearningPathStatisticsRequest, LearningPathStatsResultResponse, LearningPathStatsResult,
     GetDetailedLearningAnalyticsRequest, GetDetailedLearningAnalyticsResponse,
     CalculateCourseProgressRequest, CourseProgress,
@@ -265,7 +267,7 @@ impl LearningService {
         .map_err(|e| Status::internal(format!("DB error: {}", e)))?;
 
         let completed: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM course_enrollments WHERE user_id = $1 AND status::text = 'completed'"
+            "SELECT COUNT(*) FROM course_enrollments WHERE user_id = $1 AND status::text IN ('completed', 'COMPLETED')"
         )
         .bind(&user_id)
         .fetch_one(&self.pool)
@@ -294,15 +296,144 @@ impl LearningService {
         .map_err(|e| Status::internal(format!("DB error: {}", e)))?
         .unwrap_or(0.0);
 
+        let completed_items: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM progress WHERE user_id = $1 AND is_completed = true",
+        )
+        .bind(&user_id)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| Status::internal(format!("Completed-items query failed: {e}")))?;
+
         let cs = CourseStatsResult {
             total_courses: total as i32,
             completed_courses: completed as i32,
             total_study_time_minutes: total_time.min(i32::MAX as i64) as i32,
             average_course_progress: avg_progress as f32,
+            completion_rate: if total > 0 {
+                completed as f32 / total as f32
+            } else {
+                0.0
+            },
+            completed_items: completed_items.min(i32::MAX as i64) as i32,
         };
 
         Ok(Response::new(CourseStatsResultResponse {
             course_stats: Some(cs),
+        }))
+    }
+
+    pub async fn get_course_analytics(
+        &self,
+        request: Request<GetCourseAnalyticsRequest>,
+    ) -> Result<Response<CourseAnalyticsResponse>, Status> {
+        let course_id = request.into_inner().course_id;
+        if course_id.is_empty() {
+            return Err(Status::invalid_argument("course_id required"));
+        }
+
+        let (enrollment_count, completed_count): (i64, i64) = sqlx::query_as(
+            "SELECT COUNT(*)::bigint,
+                    COUNT(*) FILTER (WHERE status::text IN ('completed', 'COMPLETED'))::bigint
+             FROM course_enrollments
+             WHERE course_id = $1",
+        )
+        .bind(&course_id)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|error| Status::internal(format!("Course enrollment query failed: {error}")))?;
+
+        let total_time_spent: i64 = sqlx::query_scalar(
+            "SELECT COALESCE(SUM(ua.time_spent), 0)::bigint
+             FROM unit_accesses ua
+             JOIN units u ON u.id = ua.unit_id
+             WHERE u.course_id = $1",
+        )
+        .bind(&course_id)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|error| Status::internal(format!("Course study-time query failed: {error}")))?;
+
+        #[derive(sqlx::FromRow)]
+        struct UnitPopularity {
+            unit_id: String,
+            title: String,
+            access_count: i64,
+        }
+        let popular_units = sqlx::query_as::<_, UnitPopularity>(
+            "SELECT u.id AS unit_id, u.title, COUNT(ua.id)::bigint AS access_count
+             FROM units u
+             JOIN unit_accesses ua ON ua.unit_id = u.id
+             WHERE u.course_id = $1
+             GROUP BY u.id, u.title
+             ORDER BY access_count DESC, u.id
+             LIMIT 5",
+        )
+        .bind(&course_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|error| Status::internal(format!("Popular unit query failed: {error}")))?;
+
+        let enrolled_users: Vec<String> = sqlx::query_scalar(
+            "SELECT user_id
+             FROM course_enrollments
+             WHERE course_id = $1
+             ORDER BY user_id",
+        )
+        .bind(&course_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|error| Status::internal(format!("Course enrollment query failed: {error}")))?;
+
+        let mut struggling_students = Vec::new();
+        for user_id in enrolled_users {
+            let progress =
+                crate::modules::analytics::progress_tracking::calculate_course_progress(
+                    &self.pool,
+                    &user_id,
+                    &course_id,
+                )
+                .await
+                .map_err(|error| {
+                    Status::internal(format!(
+                        "Course progress query failed for user {user_id}: {error}"
+                    ))
+                })?;
+            if progress.progress_percentage < 30 {
+                struggling_students.push(StrugglingStudent {
+                    user_id,
+                    progress_percentage: f64::from(progress.progress_percentage),
+                });
+            }
+        }
+        struggling_students.sort_by(|left, right| {
+            left.progress_percentage
+                .partial_cmp(&right.progress_percentage)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        struggling_students.truncate(10);
+
+        Ok(Response::new(CourseAnalyticsResponse {
+            course_id,
+            enrollment_count: enrollment_count.min(i32::MAX as i64) as i32,
+            completion_rate: if enrollment_count > 0 {
+                completed_count as f64 / enrollment_count as f64 * 100.0
+            } else {
+                0.0
+            },
+            average_time_spent: if enrollment_count > 0 {
+                total_time_spent as f64 / enrollment_count as f64
+            } else {
+                0.0
+            },
+            popular_units: popular_units
+                .into_iter()
+                .map(|unit| CourseUnitPopularity {
+                    unit_id: unit.unit_id,
+                    title: unit.title,
+                    access_count: unit.access_count.min(i32::MAX as i64) as i32,
+                })
+                .collect(),
+            struggling_students,
         }))
     }
 
@@ -413,7 +544,7 @@ impl LearningService {
         .bind(&user_id)
         .fetch_optional(&self.pool)
         .await
-        .unwrap_or(None)
+        .map_err(|error| Status::internal(format!("Last activity query failed: {error}")))?
         .flatten();
 
         // Get most active hour (0-23)
@@ -435,7 +566,7 @@ impl LearningService {
         .bind(&user_id)
         .fetch_optional(&self.pool)
         .await
-        .unwrap_or(None)
+        .map_err(|error| Status::internal(format!("Activity-hour query failed: {error}")))?
         .flatten();
 
         let most_active_time_of_day = match most_active_hour {
@@ -446,46 +577,257 @@ impl LearningService {
             None => "Unknown".to_string(),
         };
 
+        let most_active_day: Option<i32> = sqlx::query_scalar(
+            "SELECT EXTRACT(DOW FROM activity_at)::int
+             FROM (
+                 SELECT last_accessed AS activity_at
+                 FROM course_enrollments
+                 WHERE user_id = $1 AND last_accessed IS NOT NULL
+                 UNION ALL
+                 SELECT last_activity_date AS activity_at
+                 FROM learning_path_progress
+                 WHERE user_id = $1 AND last_activity_date IS NOT NULL
+             ) AS activities
+             GROUP BY EXTRACT(DOW FROM activity_at)
+             ORDER BY COUNT(*) DESC, EXTRACT(DOW FROM activity_at) ASC
+             LIMIT 1",
+        )
+        .bind(&user_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|error| Status::internal(format!("Activity-day query failed: {error}")))?
+        .flatten();
+        let most_active_day_of_week = match most_active_day {
+            Some(0) => "Sunday",
+            Some(1) => "Monday",
+            Some(2) => "Tuesday",
+            Some(3) => "Wednesday",
+            Some(4) => "Thursday",
+            Some(5) => "Friday",
+            Some(6) => "Saturday",
+            _ => "Unknown",
+        }
+        .to_string();
+
+        let total_study_time: i64 = sqlx::query_scalar(
+            "SELECT COALESCE(SUM(duration), 0)::bigint
+             FROM study_sessions
+             WHERE user_id = $1 AND is_valid = true AND end_time IS NOT NULL",
+        )
+        .bind(&user_id)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|error| Status::internal(format!("Study-time query failed: {error}")))?;
+        let average_session_length: Option<f64> = sqlx::query_scalar(
+            "SELECT AVG(duration)::double precision
+             FROM study_sessions
+             WHERE user_id = $1 AND is_valid = true AND end_time IS NOT NULL",
+        )
+        .bind(&user_id)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|error| Status::internal(format!("Session-length query failed: {error}")))?;
+
+        let (average_score, pass_rate): (Option<f64>, Option<f64>) = sqlx::query_as(
+            "SELECT AVG(percentage)::double precision,
+                    AVG(CASE WHEN is_passed THEN 100.0 ELSE 0.0 END)::double precision
+             FROM quiz_attempts
+             WHERE user_id = $1 AND completed_at IS NOT NULL",
+        )
+        .bind(&user_id)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|error| Status::internal(format!("Assessment metrics query failed: {error}")))?;
+        let average_score = average_score.unwrap_or_default() as f32;
+        let pass_rate = pass_rate.unwrap_or_default() as f32;
+
+        #[derive(sqlx::FromRow)]
+        struct TopicScore {
+            topic: String,
+            score: f64,
+        }
+        let topic_scores = sqlx::query_as::<_, TopicScore>(
+            "SELECT t.name AS topic, AVG(qa.percentage)::double precision AS score
+             FROM quiz_attempts qa
+             JOIN quizzes q ON q.id = qa.quiz_id
+             JOIN topics t ON t.id = q.topic_id
+             WHERE qa.user_id = $1 AND qa.completed_at IS NOT NULL
+             GROUP BY t.name
+             ORDER BY score DESC, t.name",
+        )
+        .bind(&user_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|error| Status::internal(format!("Topic metrics query failed: {error}")))?;
+        let strength_areas: Vec<String> = topic_scores
+            .iter()
+            .filter(|topic| topic.score >= 80.0)
+            .take(3)
+            .map(|topic| topic.topic.clone())
+            .collect();
+        let mut weakness_areas: Vec<String> = topic_scores
+            .iter()
+            .filter(|topic| topic.score < 70.0)
+            .map(|topic| topic.topic.clone())
+            .collect();
+        weakness_areas.reverse();
+        weakness_areas.truncate(3);
+
+        #[derive(sqlx::FromRow)]
+        struct ProgressMetric {
+            date: String,
+            value: f64,
+            metadata: String,
+        }
+        let progress_metrics = sqlx::query_as::<_, ProgressMetric>(
+            "SELECT TO_CHAR(qa.completed_at, 'YYYY-MM-DD') AS date,
+                    qa.percentage::double precision AS value,
+                    COALESCE(t.name, '') AS metadata
+             FROM quiz_attempts qa
+             JOIN quizzes q ON q.id = qa.quiz_id
+             LEFT JOIN topics t ON t.id = q.topic_id
+             WHERE qa.user_id = $1 AND qa.completed_at IS NOT NULL
+             ORDER BY qa.completed_at DESC
+             LIMIT 10",
+        )
+        .bind(&user_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|error| Status::internal(format!("Progress trend query failed: {error}")))?;
+        let course_progress_metrics = sqlx::query_as::<_, ProgressMetric>(
+            "SELECT TO_CHAR(updated_at, 'YYYY-MM-DD') AS date,
+                    AVG(progress_percentage)::double precision AS value,
+                    '' AS metadata
+             FROM progress
+             WHERE user_id = $1
+             GROUP BY updated_at::date
+             ORDER BY updated_at::date",
+        )
+        .bind(&user_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|error| {
+            Status::internal(format!("Course progress trend query failed: {error}"))
+        })?;
+        let recent_scores: Vec<f64> = progress_metrics
+            .iter()
+            .take(5)
+            .map(|metric| metric.value)
+            .collect();
+        let previous_scores: Vec<f64> = progress_metrics
+            .iter()
+            .skip(5)
+            .take(5)
+            .map(|metric| metric.value)
+            .collect();
+        let improvement_rate = if previous_scores.is_empty() {
+            0.0
+        } else {
+            recent_scores.iter().sum::<f64>() / recent_scores.len() as f64
+                - previous_scores.iter().sum::<f64>() / previous_scores.len() as f64
+        } as f32;
+
+        let activity_dates: Vec<NaiveDate> = sqlx::query_scalar(
+            "SELECT activity_date
+             FROM (
+                 SELECT DISTINCT start_time::date AS activity_date
+                 FROM study_sessions
+                 WHERE user_id = $1 AND is_valid = true AND end_time IS NOT NULL
+                 UNION
+                 SELECT DISTINCT accessed_at::date AS activity_date
+                 FROM unit_accesses
+                 WHERE user_id = $1
+             ) AS activity_days
+             ORDER BY activity_date",
+        )
+        .bind(&user_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|error| Status::internal(format!("Study streak query failed: {error}")))?;
+        let mut longest_streak = 0;
+        let mut current_run = 0;
+        let mut previous_day: Option<NaiveDate> = None;
+        for day in activity_dates {
+            current_run = if previous_day.and_then(|date| date.succ_opt()) == Some(day) {
+                current_run + 1
+            } else {
+                1
+            };
+            longest_streak = longest_streak.max(current_run);
+            previous_day = Some(day);
+        }
+
         let engagement_service = crate::services::engagement_service::EngagementService::new(self.pool.clone());
         let engagement_req = Request::new(crate::analytics_proto::GetEngagementMetricsRequest {
             user_id: user_id.clone(),
         });
         
-        let engagement_metrics = match engagement_service.get_engagement_metrics(engagement_req).await {
-            Ok(resp) => {
-                let r = resp.into_inner();
-                Some(crate::analytics_proto::EngagementMetrics {
-                    user_id: user_id.clone(),
-                    daily_active_streak: r.daily_streak,
-                    weekly_active_streak: r.weekly_streak,
-                    last_activity_date: last_activity_date.map(|d| d.to_string()).unwrap_or_default(), // logic for last_activity_date is below, need to reorder or use what we have
-                    session_count: r.activity_frequency,
-                    average_session_duration: r.time_spent as i32,
-                    most_active_time_of_day: most_active_time_of_day.clone(), // logic below
-                    most_active_day_of_week: "Monday".to_string(),
-                })
-            }
-            Err(_) => None,
-        };
+        let engagement = engagement_service
+            .get_engagement_metrics(engagement_req)
+            .await?
+            .into_inner();
+        let engagement_metrics = Some(crate::analytics_proto::EngagementMetrics {
+            user_id: user_id.clone(),
+            daily_active_streak: engagement.daily_streak,
+            weekly_active_streak: engagement.weekly_streak,
+            last_activity_date: last_activity_date
+                .map(|date| date.to_string())
+                .unwrap_or_default(),
+            session_count: engagement.activity_frequency,
+            average_session_duration: if engagement.activity_frequency > 0 {
+                (engagement.time_spent / engagement.activity_frequency as f32).round() as i32
+            } else {
+                0
+            },
+            most_active_time_of_day,
+            most_active_day_of_week,
+        });
 
-        // Note: moved last_activity usage into engagement_metrics construction or update it 
-        // Logic flow: calculate dates first, then use in engagement object construction.
-        
-        // Re-arranging for clarity:
-        // 1. Goals, Course, Path stats (done)
-        // 2. Local DB queries for activity dates and times (done below)
-        // 3. Engagement Service call (new)
-        // 4. Construct response
+        let user_learning_summary = Some(crate::analytics_proto::UserLearningSummary {
+            total_study_time: total_study_time.clamp(0, i32::MAX as i64) as i32,
+            average_session_length: average_session_length.unwrap_or_default() as f32,
+            average_score,
+            current_streak: engagement.daily_streak,
+            longest_streak,
+            strongest_subjects: strength_areas.clone(),
+            weakest_subjects: weakness_areas.clone(),
+        });
+        let performance_metrics = Some(crate::analytics_proto::PerformanceMetrics {
+            average_assessment_score: average_score,
+            pass_rate,
+            weakness_areas,
+            strength_areas,
+            improvement_rate,
+        });
+        let progress_trends = progress_metrics
+            .into_iter()
+            .map(|metric| crate::analytics_proto::ProgressTrend {
+                date: metric.date,
+                value: metric.value,
+                r#type: "assessment_score".to_string(),
+                metadata: metric.metadata,
+            })
+            .collect();
+        let course_progress_trends = course_progress_metrics
+            .into_iter()
+            .map(|metric| crate::analytics_proto::ProgressTrend {
+                date: metric.date,
+                value: metric.value,
+                r#type: "course_progress".to_string(),
+                metadata: metric.metadata,
+            })
+            .collect();
 
         Ok(Response::new(GetDetailedLearningAnalyticsResponse {
             user_id,
-            user_learning_summary: None,
+            user_learning_summary,
             goal_analytics,
             course_stats,
             path_stats,
-            engagement_metrics, 
-            performance_metrics: None,
-            progress_trends: vec![],
+            engagement_metrics,
+            performance_metrics,
+            progress_trends,
+            course_progress_trends,
         }))
     }
 
@@ -541,17 +883,17 @@ impl LearningService {
         request: Request<crate::analytics_proto::GetUserFeatureVectorRequest>,
     ) -> Result<Response<crate::analytics_proto::GetUserFeatureVectorResponse>, Status> {
         let req = request.into_inner();
-        let user_id = req.user_id.clone();
+        let user_id = req.user_id;
+        if user_id.is_empty() {
+            return Err(Status::invalid_argument("user_id cannot be empty"));
+        }
 
-        // Assuming crate::modules::analytics::core::feature_extraction exists and is accessible
-        // Simplification: We might need to copy extract_user_features logic if it's not public
-        // But for now assuming it is public as it was used in analytics_service
         let features = crate::modules::analytics::core::feature_extraction::extract_user_features(
             user_id.clone(),
             &self.pool,
         )
         .await
-        .map_err(|e| Status::internal(format!("Failed to extract features: {}", e)))?;
+        .map_err(|error| Status::internal(format!("Failed to extract features: {error}")))?;
 
         let feature_vector = vec![
             features.completed_materials as f64,

@@ -4,15 +4,20 @@ mod inner {
     use crate::analytics_proto::{
         analytics_service_server::AnalyticsService, AnalyzeQuestionDifficultyRequest,
         AnalyzeQuestionDifficultyResponse, AttemptMetricsRequest, BatchEventRequest,
+        AssessmentPerformanceAnalyticsRequest, AssessmentPerformanceAnalyticsResponse,
         BatchEventResponse, CalculateCourseProgressRequest, CohortAnalyticsResponse,
         CollaborativeRecommendationRequest, CollaborativeRecommendationResponse, CourseProgress,
         CourseStatsResultResponse, DueCard, FocusArea, GetCohortAnalyticsRequest,
-        GetCourseStatisticsRequest, GetDetailedLearningAnalyticsRequest,
+        GetCourseStatisticsRequest, GetCourseAnalyticsRequest, CourseAnalyticsResponse,
+        GetDetailedLearningAnalyticsRequest,
         GetDetailedLearningAnalyticsResponse, GetDueCardsRequest, GetDueCardsResponse,
         GetEngagementMetricsRequest, GetEngagementMetricsResponse, GetFocusCorrelationRequest,
+        GetStudyPatternsRequest, GetStudyPatternsResponse,
         GetFocusCorrelationResponse, GetFocusRecommendationsRequest,
         GetFocusRecommendationsResponse, GetGoalAnalyticsRequest, GetLearningPathStatisticsRequest,
-        GetSystemAnalyticsRequest, GetSystemAnalyticsResponse,
+        GetSystemAnalyticsRequest, GetSystemAnalyticsResponse, ProgressRecord,
+        ProgressRecordsRequest, ProgressRecordsResponse, ProcessAnalyticsForUsersRequest,
+        ProcessAnalyticsForUsersResponse,
         GetNextAdaptiveQuestionRequest, GetNextAdaptiveQuestionResponse, GetRecommendationsRequest,
         GetRecommendationsResponse, GetSpacedRepetitionStatsRequest,
         GetSpacedRepetitionStatsResponse, GetUserAbilityRequest, GetUserAbilityResponse,
@@ -90,6 +95,14 @@ mod inner {
         ) -> Result<Response<GetEngagementMetricsResponse>, Status> {
             let service = EngagementService::new(self.pool.clone());
             service.get_engagement_metrics(request).await
+        }
+
+        async fn get_study_patterns(
+            &self,
+            request: Request<GetStudyPatternsRequest>,
+        ) -> Result<Response<GetStudyPatternsResponse>, Status> {
+            let service = EngagementService::new(self.pool.clone());
+            service.get_study_patterns(request).await
         }
 
         async fn get_recommendations(
@@ -256,6 +269,14 @@ mod inner {
             service.get_course_statistics(request).await
         }
 
+        async fn get_course_analytics(
+            &self,
+            request: Request<GetCourseAnalyticsRequest>,
+        ) -> Result<Response<CourseAnalyticsResponse>, Status> {
+            let service = LearningService::new(self.pool.clone());
+            service.get_course_analytics(request).await
+        }
+
         async fn get_learning_path_statistics(
             &self,
             request: Request<GetLearningPathStatisticsRequest>,
@@ -282,6 +303,62 @@ mod inner {
                 total_paths: analytics.total_paths,
                 total_enrollments: analytics.total_enrollments,
                 overall_completion_rate: analytics.overall_completion_rate,
+                published_courses: analytics.published_courses,
+                active_today: analytics.active_today,
+                average_course_rating: analytics.average_course_rating,
+                average_assessment_score: analytics.average_assessment_score,
+                total_study_time_minutes: analytics.total_study_time_minutes,
+            }))
+        }
+
+        async fn get_progress_records_for_period(
+            &self,
+            request: Request<ProgressRecordsRequest>,
+        ) -> Result<Response<ProgressRecordsResponse>, Status> {
+            let request = request.into_inner();
+            let records = crate::modules::analytics::performance::records::get_progress_records(
+                &request.start,
+                &request.end,
+                &self.pool,
+            )
+            .await
+            .map_err(|error| Status::invalid_argument(error))?;
+
+            Ok(Response::new(ProgressRecordsResponse {
+                records: records
+                    .into_iter()
+                    .map(|record| ProgressRecord {
+                        user_id: record.user_id,
+                        course_id: record.course_id,
+                        progress: record.progress,
+                        date: record.date,
+                    })
+                    .collect(),
+            }))
+        }
+
+        async fn process_analytics_for_users(
+            &self,
+            request: Request<ProcessAnalyticsForUsersRequest>,
+        ) -> Result<Response<ProcessAnalyticsForUsersResponse>, Status> {
+            let request = request.into_inner();
+            let result = crate::modules::analytics::core::batch_processing::process_analytics_for_users(
+                &self.pool,
+                &request.user_ids,
+            )
+            .await
+            .map_err(|error| Status::internal(format!("Batch analytics failed: {error}")))?;
+
+            crate::modules::analytics::core::batch_processing::update_bkt_skill_avg_metrics(
+                &self.pool,
+            )
+            .await
+            .map_err(|error| Status::internal(format!("BKT metrics update failed: {error}")))?;
+
+            Ok(Response::new(ProcessAnalyticsForUsersResponse {
+                success: result.success,
+                message: result.message,
+                processed_users: result.processed_users as i32,
             }))
         }
 
@@ -401,6 +478,14 @@ mod inner {
         ) -> Result<Response<QuizAttemptHistoryResponse>, Status> {
             let service = EngagementService::new(self.pool.clone());
             service.get_quiz_attempt_history(request).await
+        }
+
+        async fn get_assessment_performance_analytics(
+            &self,
+            request: Request<AssessmentPerformanceAnalyticsRequest>,
+        ) -> Result<Response<AssessmentPerformanceAnalyticsResponse>, Status> {
+            let service = PerformanceService::new(self.pool.clone());
+            service.get_assessment_performance_analytics(request).await
         }
 
         async fn get_related_resources(
@@ -600,6 +685,13 @@ impl crate::analytics_proto::analytics_service_server::AnalyticsService for MyAn
         Err(Status::unimplemented("ML feature disabled"))
     }
 
+    async fn get_study_patterns(
+        &self,
+        _req: Request<GetStudyPatternsRequest>,
+    ) -> Result<Response<GetStudyPatternsResponse>, Status> {
+        Err(Status::unimplemented("ML feature disabled"))
+    }
+
     async fn get_recommendations(
         &self,
         _req: Request<GetRecommendationsRequest>,
@@ -656,6 +748,13 @@ impl crate::analytics_proto::analytics_service_server::AnalyticsService for MyAn
         Err(Status::unimplemented("ML feature disabled"))
     }
 
+    async fn get_course_analytics(
+        &self,
+        _req: Request<crate::analytics_proto::GetCourseAnalyticsRequest>,
+    ) -> Result<Response<crate::analytics_proto::CourseAnalyticsResponse>, Status> {
+        Err(Status::unimplemented("ML feature disabled"))
+    }
+
     async fn get_learning_path_statistics(
         &self,
         _req: Request<GetLearningPathStatisticsRequest>,
@@ -667,6 +766,20 @@ impl crate::analytics_proto::analytics_service_server::AnalyticsService for MyAn
         &self,
         _req: Request<crate::analytics_proto::GetSystemAnalyticsRequest>,
     ) -> Result<Response<crate::analytics_proto::GetSystemAnalyticsResponse>, Status> {
+        Err(Status::unimplemented("ML feature disabled"))
+    }
+
+    async fn get_progress_records_for_period(
+        &self,
+        _req: Request<crate::analytics_proto::ProgressRecordsRequest>,
+    ) -> Result<Response<crate::analytics_proto::ProgressRecordsResponse>, Status> {
+        Err(Status::unimplemented("ML feature disabled"))
+    }
+
+    async fn process_analytics_for_users(
+        &self,
+        _req: Request<crate::analytics_proto::ProcessAnalyticsForUsersRequest>,
+    ) -> Result<Response<crate::analytics_proto::ProcessAnalyticsForUsersResponse>, Status> {
         Err(Status::unimplemented("ML feature disabled"))
     }
 
@@ -749,6 +862,13 @@ impl crate::analytics_proto::analytics_service_server::AnalyticsService for MyAn
         &self,
         _req: Request<QuizAttemptHistoryRequest>,
     ) -> Result<Response<QuizAttemptHistoryResponse>, Status> {
+        Err(Status::unimplemented("ML feature disabled"))
+    }
+
+    async fn get_assessment_performance_analytics(
+        &self,
+        _req: Request<AssessmentPerformanceAnalyticsRequest>,
+    ) -> Result<Response<AssessmentPerformanceAnalyticsResponse>, Status> {
         Err(Status::unimplemented("ML feature disabled"))
     }
 

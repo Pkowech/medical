@@ -184,10 +184,11 @@ export class PerformanceAnalyticsDto {
   @IsObject()
   difficultyBreakdown?: Record<string, number>;
 
-  @ApiProperty({ type: Object, required: false })
-  @IsOptional()
-  @IsObject()
-  categoryBreakdown?: Record<string, CategoryBreakdownDto>;
+  @ApiProperty({ type: [CategoryBreakdownDto] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CategoryBreakdownDto)
+  categoryBreakdown!: CategoryBreakdownDto[];
 
   @ApiProperty({ type: [Object], required: false })
   @IsOptional()
@@ -338,9 +339,13 @@ export class CourseStats {
   @ApiProperty()
   completedCourses!: number;
   @ApiProperty()
+  completedItems!: number;
+  @ApiProperty()
   totalStudyTimeMinutes!: number;
   @ApiProperty()
   averageCourseProgress!: number;
+  @ApiProperty()
+  completionRate!: number;
 }
 
 export class LearningPathStats {
@@ -485,6 +490,11 @@ export class LearningAnalyticsDto {
   @IsArray()
   @Type(() => ProgressTrend)
   progressTrends!: ProgressTrend[];
+
+  @ApiProperty({ type: () => ProgressTrend, isArray: true })
+  @IsArray()
+  @Type(() => ProgressTrend)
+  courseProgressTrends!: ProgressTrend[];
 }
 
 export class UserInsightsDto {
@@ -503,8 +513,11 @@ export class UserInsightsDto {
   @ApiProperty()
   learningVelocity!: number;
 
-  @ApiProperty()
-  estimatedCompletionDate!: string;
+  @ApiPropertyOptional()
+  goalAchievementRate?: number;
+
+  @ApiProperty({ nullable: true })
+  estimatedCompletionDate!: string | null;
 }
 export type UserInsights = UserInsightsDto;
 
@@ -526,6 +539,13 @@ export class StudyActivityDto {
   metadata?: any;
 }
 export type StudyActivity = StudyActivityDto;
+
+export interface StudyRecommendationDto {
+  recommendation: string;
+  priority: string;
+  estimatedTimeHours: number;
+  resourceId?: string;
+}
 
 /**
  * Common Analytics Entities

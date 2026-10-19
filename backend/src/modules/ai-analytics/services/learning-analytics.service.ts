@@ -3,7 +3,6 @@ import {
   Logger,
   Inject,
   OnModuleInit,
-  NotFoundException,
 } from '@nestjs/common';
 import { ClientGrpc } from '@nestjs/microservices';
 import { RedisService } from '#infrastructure/redis/redis.service';
@@ -13,12 +12,12 @@ import { retry } from 'rxjs/operators';
 import {
   StudyPatternsResponseDto,
   GoalAnalytics,
-  SystemAnalytics,
   UserInsights,
   LearningPathStats,
   CourseStats,
   LearningAnalyticsDto,
   PathAnalyticsResponseDto,
+  StudyRecommendationDto,
 } from '#common/dto';
 import {
   ANALYTICS_CACHE_CONFIG,
@@ -27,7 +26,6 @@ import {
 import { RequestDeduplicationService } from './request-deduplication.service';
 import { PerformanceMetricsService } from '#infrastructure/monitoring/performance-metrics.service';
 import { getErrorMessage } from '#common/utils/error.utils';
-import { CourseAnalyticsService } from './course-analytics.service';
 
 import { PrismaService } from '#infrastructure/prisma/prisma.service';
 
@@ -45,7 +43,6 @@ export class LearningAnalyticsService implements OnModuleInit {
     private readonly requestDeduplicationService: RequestDeduplicationService,
     private readonly performanceMetrics: PerformanceMetricsService,
     private readonly prisma: PrismaService,
-    private readonly courseAnalyticsService: CourseAnalyticsService,
   ) {}
 
   onModuleInit() {
@@ -74,7 +71,7 @@ export class LearningAnalyticsService implements OnModuleInit {
    */
   async getPathAnalytics(pathId: string): Promise<PathAnalyticsResponseDto> {
     const startTime = Date.now();
-    const cacheKey = ANALYTICS_CACHE_CONFIG.LEARNING.PATH_ANALYTICS(pathId);
+    const cacheKey = `${ANALYTICS_CACHE_CONFIG.LEARNING.PATH_ANALYTICS(pathId)}:v2`;
 
     try {
       const cached = await this.redisService.get<string>(cacheKey);
@@ -82,50 +79,13 @@ export class LearningAnalyticsService implements OnModuleInit {
         return JSON.parse(cached) as PathAnalyticsResponseDto;
       }
 
-      const grpcResp: any = await this.callGrpc(
-        this.analyticsServiceGrpc.getPathAnalytics({ pathId: pathId }),
+      const grpcResp = await this.callGrpc(
+        this.analyticsServiceGrpc.getPathAnalytics({ pathId }),
       );
-
       const result: PathAnalyticsResponseDto = {
-        pathId,
-        title: grpcResp.title ?? '',
-        enrolledUsers:
-          grpcResp.total_enrollments ?? grpcResp.totalEnrollments ?? 0,
-        activeUsers:
-          grpcResp.active_enrollments ?? grpcResp.activeEnrollments ?? 0,
-        averageCompletionTime:
-          grpcResp.avg_completion_time ?? grpcResp.averageCompletionTime ?? 0,
-        completionRate:
-          grpcResp.completion_rate ?? grpcResp.completionRate ?? 0,
-        metrics: {
-          completedEnrollments:
-            grpcResp.completed_enrollments ??
-            grpcResp.completedEnrollments ??
-            0,
-          averageProgressPercentage:
-            grpcResp.average_progress ?? grpcResp.averageProgress ?? 0,
-          dropoutRate: grpcResp.dropout_rate ?? grpcResp.dropoutRate ?? 0,
-          userSatisfaction: {
-            averageRating: 0,
-            totalRatings: 0,
-            ratingDistribution: {},
-          },
-          engagementMetrics: {
-            averageSessionDuration:
-              grpcResp.engagement_metrics?.average_session_duration ?? 0,
-            sessionsPerWeek:
-              grpcResp.engagement_metrics?.sessions_per_week ?? 0,
-            streakData: {
-              averageStreak:
-                grpcResp.engagement_metrics?.streak_maintenance ?? 0,
-              maxStreak: 0,
-            },
-          },
-          milestoneAnalytics: [],
-          difficultyFeedback: { tooEasy: 0, justRight: 0, tooHard: 0 },
-          bottlenecks: [],
-        },
-        userProgress: [],
+        pathId: grpcResp.pathId,
+        averageCompletionRate: grpcResp.averageCompletionRate,
+        averageTimeToComplete: grpcResp.averageTimeToComplete,
       };
 
       await this.redisService.set(
@@ -152,17 +112,7 @@ export class LearningAnalyticsService implements OnModuleInit {
       this.logger.error(
         `Error getting path analytics: ${getErrorMessage(error)}`,
       );
-      // Return empty default
-      return {
-        pathId,
-        title: '',
-        enrolledUsers: 0,
-        activeUsers: 0,
-        averageCompletionTime: 0,
-        completionRate: 0,
-        metrics: {},
-        userProgress: [],
-      };
+      throw error;
     }
   }
 
@@ -226,9 +176,7 @@ export class LearningAnalyticsService implements OnModuleInit {
       this.logger.error(
         `Failed to get goal analytics from Rust via gRPC for user ${userId}: ${String(error)}`,
       );
-      throw new NotFoundException(
-        `Unable to compute goal analytics for user ${userId}`,
-      );
+      throw error;
     }
   }
 
@@ -256,8 +204,10 @@ export class LearningAnalyticsService implements OnModuleInit {
       const result: CourseStats = {
         totalCourses: response.courseStats.totalCourses,
         completedCourses: response.courseStats.completedCourses,
+        completedItems: response.courseStats.completedItems,
         totalStudyTimeMinutes: response.courseStats.totalStudyTimeMinutes,
         averageCourseProgress: response.courseStats.averageCourseProgress,
+        completionRate: response.courseStats.completionRate,
       };
 
       await this.redisService.set(
@@ -271,9 +221,7 @@ export class LearningAnalyticsService implements OnModuleInit {
       this.logger.error(
         `Failed to get course statistics from Rust via gRPC for user ${userId}: ${String(error)}`,
       );
-      throw new NotFoundException(
-        `Unable to compute course statistics for user ${userId}`,
-      );
+      throw error;
     }
   }
 
@@ -316,9 +264,7 @@ export class LearningAnalyticsService implements OnModuleInit {
       this.logger.error(
         `Failed to get learning path statistics from Rust via gRPC for user ${userId}: ${String(error)}`,
       );
-      throw new NotFoundException(
-        `Unable to compute learning path statistics for user ${userId}`,
-      );
+      throw error;
     }
   }
 
@@ -349,36 +295,45 @@ export class LearningAnalyticsService implements OnModuleInit {
       const pathStats = response.pathStats;
       const engagementMetrics = response.engagementMetrics;
       const performanceMetrics = response.performanceMetrics;
+      if (
+        !response.userId ||
+        !userSummary ||
+        !goalAnalytics ||
+        !courseStats ||
+        !pathStats ||
+        !engagementMetrics ||
+        !performanceMetrics
+      ) {
+        throw new Error('Rust analytics returned an incomplete learning summary');
+      }
+
       const result: LearningAnalyticsDto = {
-        userId: response.userId || userId,
+        userId: response.userId,
         userLearningSummary: {
-          totalStudyTime: userSummary?.totalStudyTime ?? 0,
-          averageSessionLength: userSummary?.averageSessionLength ?? 0,
-          averageScore: userSummary?.averageScore ?? 0,
-          currentStreak: userSummary?.currentStreak ?? 0,
-          longestStreak: userSummary?.longestStreak ?? 0,
-          strongestSubjects: userSummary?.strongestSubjects ?? [],
-          weakestSubjects: userSummary?.weakestSubjects ?? [],
+          totalStudyTime: userSummary.totalStudyTime,
+          averageSessionLength: userSummary.averageSessionLength,
+          averageScore: userSummary.averageScore,
+          currentStreak: userSummary.currentStreak,
+          longestStreak: userSummary.longestStreak,
+          strongestSubjects: userSummary.strongestSubjects,
+          weakestSubjects: userSummary.weakestSubjects,
         },
         goalAnalytics: {
-          userId: goalAnalytics?.userId || userId,
-          totalGoals: goalAnalytics?.totalGoals ?? 0,
-          activeGoals: goalAnalytics?.activeGoals ?? 0,
-          completedGoals: goalAnalytics?.completedGoals ?? 0,
-          overdueGoals: goalAnalytics?.overdueGoals ?? 0,
-          completionRate: goalAnalytics?.completionRate ?? 0,
-          averageCompletionTimeDays:
-            goalAnalytics?.averageCompletionTimeDays ?? 0,
-          goalsByCategory: goalAnalytics?.goalsByCategory ?? {},
-          goalsByPriority: goalAnalytics?.goalsByPriority ?? {},
+          userId: goalAnalytics.userId,
+          totalGoals: goalAnalytics.totalGoals,
+          activeGoals: goalAnalytics.activeGoals,
+          completedGoals: goalAnalytics.completedGoals,
+          overdueGoals: goalAnalytics.overdueGoals,
+          completionRate: goalAnalytics.completionRate,
+          averageCompletionTimeDays: goalAnalytics.averageCompletionTimeDays,
+          goalsByCategory: goalAnalytics.goalsByCategory,
+          goalsByPriority: goalAnalytics.goalsByPriority,
           streakData: {
-            currentStreak: goalAnalytics?.currentStreak ?? 0,
-            longestStreak: goalAnalytics?.longestStreak ?? 0,
+            currentStreak: goalAnalytics.currentStreak,
+            longestStreak: goalAnalytics.longestStreak,
           },
-          streakGoalIds: goalAnalytics?.streakGoalIds ?? [],
-          upcomingDeadlines: (
-            goalAnalytics?.upcomingDeadlines ?? []
-          ).map((deadline: {
+          streakGoalIds: goalAnalytics.streakGoalIds,
+          upcomingDeadlines: goalAnalytics.upcomingDeadlines.map((deadline: {
             goalId: string;
             title: string;
             targetDate: string;
@@ -391,41 +346,42 @@ export class LearningAnalyticsService implements OnModuleInit {
           })),
         },
         courseStats: {
-          totalCourses: courseStats?.totalCourses ?? 0,
-          completedCourses: courseStats?.completedCourses ?? 0,
-          totalStudyTimeMinutes: courseStats?.totalStudyTimeMinutes ?? 0,
-          averageCourseProgress: courseStats?.averageCourseProgress ?? 0,
+          totalCourses: courseStats.totalCourses,
+          completedCourses: courseStats.completedCourses,
+          completedItems: courseStats.completedItems,
+          totalStudyTimeMinutes: courseStats.totalStudyTimeMinutes,
+          averageCourseProgress: courseStats.averageCourseProgress,
+          completionRate: courseStats.completionRate,
         },
         pathStats: {
-          totalLearningPaths: pathStats?.totalLearningPaths ?? 0,
-          completedLearningPaths: pathStats?.completedLearningPaths ?? 0,
-          totalStudyTimeMinutes: pathStats?.totalStudyTimeMinutes ?? 0,
-          averagePathProgress: pathStats?.averagePathProgress ?? 0,
+          totalLearningPaths: pathStats.totalLearningPaths,
+          completedLearningPaths: pathStats.completedLearningPaths,
+          totalStudyTimeMinutes: pathStats.totalStudyTimeMinutes,
+          averagePathProgress: pathStats.averagePathProgress,
         },
         engagementMetrics: {
-          userId: engagementMetrics?.userId || userId,
-          dailyActiveStreak: engagementMetrics?.dailyActiveStreak ?? 0,
-          weeklyActiveStreak: engagementMetrics?.weeklyActiveStreak ?? 0,
-          lastActivityDate: engagementMetrics?.lastActivityDate ?? '',
-          sessionCount: engagementMetrics?.sessionCount ?? 0,
-          averageSessionDuration:
-            engagementMetrics?.averageSessionDuration ?? 0,
-          mostActiveTimeOfDay: engagementMetrics?.mostActiveTimeOfDay ?? '',
-          mostActiveDayOfWeek: engagementMetrics?.mostActiveDayOfWeek ?? '',
+          userId: engagementMetrics.userId,
+          dailyActiveStreak: engagementMetrics.dailyActiveStreak,
+          weeklyActiveStreak: engagementMetrics.weeklyActiveStreak,
+          lastActivityDate: engagementMetrics.lastActivityDate || null,
+          sessionCount: engagementMetrics.sessionCount,
+          averageSessionDuration: engagementMetrics.averageSessionDuration,
+          mostActiveTimeOfDay: engagementMetrics.mostActiveTimeOfDay,
+          mostActiveDayOfWeek: engagementMetrics.mostActiveDayOfWeek,
         },
         performanceMetrics: {
-          averageAssessmentScore:
-            performanceMetrics?.averageAssessmentScore ?? 0,
-          passRate: performanceMetrics?.passRate ?? 0,
-          weaknessAreas: performanceMetrics?.weaknessAreas ?? [],
-          strengthAreas: performanceMetrics?.strengthAreas ?? [],
-          improvementRate: performanceMetrics?.improvementRate ?? 0,
+          averageAssessmentScore: performanceMetrics.averageAssessmentScore,
+          passRate: performanceMetrics.passRate,
+          weaknessAreas: performanceMetrics.weaknessAreas,
+          strengthAreas: performanceMetrics.strengthAreas,
+          improvementRate: performanceMetrics.improvementRate,
         },
-        progressTrends: (response.progressTrends ?? []).map((trend: {
-          date?: string;
-          value: any;
-          type: any;
-        }) => ({
+        progressTrends: response.progressTrends.map((trend) => ({
+          date: trend.date ? new Date(trend.date) : undefined,
+          value: trend.value,
+          type: trend.type,
+        })),
+        courseProgressTrends: response.courseProgressTrends.map((trend) => ({
           date: trend.date ? new Date(trend.date) : undefined,
           value: trend.value,
           type: trend.type,
@@ -443,9 +399,7 @@ export class LearningAnalyticsService implements OnModuleInit {
       this.logger.error(
         `Failed to get detailed analytics from Rust via gRPC for user ${userId}: ${String(error)}`,
       );
-      throw new NotFoundException(
-        `Unable to compute detailed analytics for user ${userId}`,
-      );
+      throw error;
     }
   }
 
@@ -466,40 +420,11 @@ export class LearningAnalyticsService implements OnModuleInit {
       this.logger.warn(
         `calculatePerformanceMetrics failed for ${userId}: ${getErrorMessage(err)}`,
       );
-      return {};
+      throw err;
     }
   }
 
-  /**
-   * Get system-wide learning analytics via gRPC (stubbed for now to bypass local)
-   */
-  async getSystemAnalytics(): Promise<SystemAnalytics> {
-    try {
-      const cacheKey = 'system_analytics';
-      const cached = await this.redisService.get<string>(cacheKey);
-      if (cached) {
-        return JSON.parse(cached) as SystemAnalytics;
-      }
-
-      // This would ideally call a gRPC method like getSystemAnalytics
-      return {
-        totalUsers: 0,
-        activeUsers: 0,
-        averageEngagementScore: 0,
-        averageCompletionRate: 0,
-        totalStudyTime: 0,
-        topCourses: [],
-        topLearningPaths: [],
-      };
-    } catch (error) {
-      this.logger.error('Failed to get system analytics:', String(error));
-      throw new NotFoundException('Unable to compute system analytics');
-    }
-  }
-
-  /**
-   * Get user-specific learning insights via gRPC (stubbed for now to bypass local)
-   */
+  /** Get user-specific learning insights from Rust. */
   async getUserInsights(userId: string): Promise<UserInsights> {
     const startTime = Date.now();
     const cacheKey = ANALYTICS_CACHE_CONFIG.LEARNING.USER_INSIGHTS(userId);
@@ -517,22 +442,25 @@ export class LearningAnalyticsService implements OnModuleInit {
         }),
       );
 
-      const userLearning = resp.user_learning_summary || {};
-      const goalAnalytics = resp.goal_analytics || {};
+      const userLearning = resp.userLearningSummary;
+      const goalAnalytics = resp.goalAnalytics;
+      if (!userLearning || !goalAnalytics) {
+        throw new Error('Rust analytics returned an incomplete user insight response');
+      }
 
       const insights: UserInsights = {
         userId,
-        recommendedNextSteps: (resp.progress_trends || [])
+        recommendedNextSteps: resp.progressTrends
           .slice(0, 3)
-          .map((t: any) => t.metadata || t.type || ''),
-        strengths: userLearning.strongest_subjects || [],
-        areasForImprovement: userLearning.weakest_subjects || [],
-        learningVelocity: userLearning.average_session_length || 0,
+          .map((trend: { metadata: string; type: string }) =>
+            trend.metadata || trend.type,
+          ),
+        strengths: userLearning.strongestSubjects,
+        areasForImprovement: userLearning.weakestSubjects,
+        learningVelocity: userLearning.averageSessionLength,
+        goalAchievementRate: goalAnalytics.completionRate,
         estimatedCompletionDate:
-          (goalAnalytics.upcoming_deadlines &&
-            goalAnalytics.upcoming_deadlines[0] &&
-            goalAnalytics.upcoming_deadlines[0].target_date) ||
-          new Date().toISOString(),
+          goalAnalytics?.upcomingDeadlines[0]?.targetDate ?? null,
       };
 
       await this.redisService.set(
@@ -565,9 +493,7 @@ export class LearningAnalyticsService implements OnModuleInit {
         success: false,
         timestamp: new Date(),
       });
-      throw new NotFoundException(
-        `Unable to compute insights for user ${userId}`,
-      );
+      throw error;
     }
   }
 
@@ -579,13 +505,13 @@ export class LearningAnalyticsService implements OnModuleInit {
    * - ai-analytics.service.ts (original gRPC approach)
    * - learning-path-recommendations.service.ts (local analysis)
    *
-   * Returns empty DTO on failure instead of throwing.
+   * Propagates Rust gRPC failures to callers.
    */
   async analyzeStudyPatterns(
     userId: string,
   ): Promise<StudyPatternsResponseDto> {
     const startTime = Date.now();
-    const cacheKey = ANALYTICS_CACHE_CONFIG.LEARNING.PATTERNS(userId);
+    const cacheKey = `${ANALYTICS_CACHE_CONFIG.LEARNING.PATTERNS(userId)}:v2`;
     const dedupKey = ANALYTICS_CACHE_CONFIG.DEDUP(cacheKey);
 
     try {
@@ -607,45 +533,28 @@ export class LearningAnalyticsService implements OnModuleInit {
       return await this.requestDeduplicationService.executeWithDedup(
         dedupKey,
         async () => {
-          const grpcResp: any = await this.callGrpc(
-            this.analyticsServiceGrpc.getDetailedLearningAnalytics({
-              userId: userId,
-            }),
+          const grpcResp = await this.callGrpc(
+            this.analyticsServiceGrpc.getStudyPatterns({ userId }),
           );
+          if (!grpcResp.studyDuration || !grpcResp.preferredStudyTimes) {
+            throw new Error(
+              'Rust analytics omitted study duration or preferred study times',
+            );
+          }
 
           const mapped: StudyPatternsResponseDto = {
-            userId,
-            patterns:
-              (grpcResp.progress_trends || []).map((t: any) =>
-                (t.type || '').toUpperCase(),
-              ) || [],
-            consistency:
-              (grpcResp.user_learning_summary?.average_session_length as
-                | number
-                | undefined) ?? 0,
-            timeDistribution: {},
+            userId: grpcResp.userId,
+            patterns: grpcResp.patterns,
+            consistency: grpcResp.consistency,
+            timeDistribution: grpcResp.timeDistribution,
             studyDuration: {
-              averageDuration:
-                grpcResp.user_learning_summary?.average_session_length || 0,
-              longestSession: 0,
-              shortestSession: 0,
+              averageDuration: grpcResp.studyDuration.averageDuration,
+              longestSession: grpcResp.studyDuration.longestSession,
+              shortestSession: grpcResp.studyDuration.shortestSession,
             },
-            consistencyScore: grpcResp.user_learning_summary
-              ? Math.min(
-                  1,
-                  (grpcResp.user_learning_summary.average_session_length || 0) /
-                    60,
-                )
-              : 0,
-            preferredStudyTimes: { morning: 0, afternoon: 0, evening: 0 },
-            performanceByTopic:
-              grpcResp.performance_metrics?.weakness_areas?.reduce(
-                (acc: any, cur: string) => {
-                  acc[cur] = 0;
-                  return acc;
-                },
-                {},
-              ) || {},
+            consistencyScore: grpcResp.consistencyScore,
+            preferredStudyTimes: grpcResp.preferredStudyTimes,
+            performanceByTopic: grpcResp.performanceByTopic,
           };
 
           await this.redisService.set(
@@ -682,21 +591,7 @@ export class LearningAnalyticsService implements OnModuleInit {
         success: false,
         timestamp: new Date(),
       });
-      // Return empty DTO on failure
-      return {
-        userId,
-        patterns: [],
-        consistency: 0,
-        timeDistribution: {},
-        studyDuration: {
-          averageDuration: 0,
-          longestSession: 0,
-          shortestSession: 0,
-        },
-        preferredStudyTimes: { morning: 0, afternoon: 0, evening: 0 },
-        performanceByTopic: {},
-        consistencyScore: 0,
-      };
+      throw error;
     }
   }
 
@@ -769,14 +664,7 @@ export class LearningAnalyticsService implements OnModuleInit {
         success: false,
         timestamp: new Date(),
       });
-      return {
-        userId,
-        totalStudyTimeMinutes: 0,
-        sessions: 0,
-        streakDays: 0,
-        weeklyActiveStreak: 0,
-        lastActivityDate: null,
-      };
+      throw error;
     }
   }
 
@@ -846,7 +734,7 @@ export class LearningAnalyticsService implements OnModuleInit {
       this.logger.error(
         `Failed to extract features for user ${userId}: ${String(error)}`,
       );
-      return Promise.resolve([0, 0, 0, 0, 0]);
+      throw error;
     }
   }
 
@@ -938,7 +826,7 @@ export class LearningAnalyticsService implements OnModuleInit {
         success: false,
         timestamp: new Date(),
       });
-      return [];
+      throw error;
     }
   }
 
@@ -951,10 +839,10 @@ export class LearningAnalyticsService implements OnModuleInit {
     limit: number = 5,
   ): Promise<Array<{ item_id: string; score: number }>> {
     const startTime = Date.now();
-    const cacheKey = ANALYTICS_CACHE_CONFIG.RECOMMENDATIONS.COLLABORATIVE(
+    const cacheKey = `${ANALYTICS_CACHE_CONFIG.RECOMMENDATIONS.COLLABORATIVE(
       userId,
       limit,
-    );
+    )}:v2`;
 
     try {
       const cached = await this.redisService.get<string>(cacheKey);
@@ -962,16 +850,16 @@ export class LearningAnalyticsService implements OnModuleInit {
         return JSON.parse(cached);
       }
 
-      const grpcResp: any = await this.callGrpc(
+      const grpcResp = await this.callGrpc(
         this.analyticsServiceGrpc.getCollaborativeRecommendations({
-          userId: userId,
+          userId,
           limit,
         }),
       );
 
-      const mapped = (grpcResp.items || []).slice(0, limit).map((rec: any) => ({
-        item_id: rec.item_id || rec.id,
-        score: rec.score || 0.7,
+      const mapped = grpcResp.items.slice(0, limit).map((recommendation) => ({
+        item_id: recommendation.itemId,
+        score: recommendation.score,
       }));
 
       await this.redisService.set(
@@ -1006,7 +894,7 @@ export class LearningAnalyticsService implements OnModuleInit {
         success: false,
         timestamp: new Date(),
       });
-      return [];
+      throw error;
     }
   }
 
@@ -1016,34 +904,25 @@ export class LearningAnalyticsService implements OnModuleInit {
   async generateStudyRecommendations(
     userId: string,
     knowledgeGaps: string[],
-  ): Promise<
-    Array<{ id: string; type: string; title: string; priority: string }>
-  > {
-    const cacheKey = ANALYTICS_CACHE_CONFIG.RECOMMENDATIONS.STUDY_WITH_GAPS(
+  ): Promise<StudyRecommendationDto[]> {
+    const cacheKey = `${ANALYTICS_CACHE_CONFIG.RECOMMENDATIONS.STUDY_WITH_GAPS(
       userId,
       knowledgeGaps,
-    );
+    )}:v2`;
 
     try {
       const cached = await this.redisService.get<string>(cacheKey);
       if (typeof cached === 'string') {
-        return JSON.parse(cached);
+        return JSON.parse(cached) as StudyRecommendationDto[];
       }
 
-      const grpcResp: any = await this.callGrpc(
+      const grpcResp = await this.callGrpc(
         this.analyticsServiceGrpc.generateStudyRecommendations({
-          userId: userId,
-          knowledgeGaps: knowledgeGaps,
+          userId,
+          knowledgeGaps,
         }),
       );
-
-      const mapped = ((grpcResp?.items || grpcResp?.recommendations || []) as any[])
-        .map((rec: any) => ({
-          id: rec.material_id || rec.materialId || rec.id,
-          type: rec.type || 'MATERIAL',
-          title: rec.title || rec.recommendation || 'Study Material',
-          priority: rec.priority || 'MEDIUM',
-        }));
+      const mapped: StudyRecommendationDto[] = grpcResp.recommendations;
 
       await this.redisService.set(
         cacheKey,
@@ -1056,7 +935,7 @@ export class LearningAnalyticsService implements OnModuleInit {
       this.logger.warn(
         `gRPC generateStudyRecommendations failed: ${getErrorMessage(error)}`,
       );
-      return [];
+      throw error;
     }
   }
 
@@ -1066,7 +945,7 @@ export class LearningAnalyticsService implements OnModuleInit {
   async getTrendingPaths(
     limit: number = 5,
   ): Promise<Array<{ path_id: string; enrollments: number }>> {
-    const cacheKey = `trending_paths:${limit}`;
+    const cacheKey = `trending_paths:${limit}:v2`;
 
     try {
       const cached = await this.redisService.get<string>(cacheKey);
@@ -1074,15 +953,15 @@ export class LearningAnalyticsService implements OnModuleInit {
         return JSON.parse(cached);
       }
 
-      const grpcResp: any = await this.callGrpc(
+      const grpcResp = await this.callGrpc(
         this.analyticsServiceGrpc.getTrendingPaths({ limit }),
       );
 
-      const mapped = (grpcResp.paths || [])
+      const mapped = grpcResp.paths
         .slice(0, limit)
-        .map((path: any) => ({
-          path_id: path.path_id || path.id,
-          enrollments: path.popularity || 0,
+        .map((path) => ({
+          path_id: path.pathId,
+          enrollments: path.popularity,
         }));
 
       await this.redisService.set(cacheKey, JSON.stringify(mapped), 3600);
@@ -1092,7 +971,7 @@ export class LearningAnalyticsService implements OnModuleInit {
       this.logger.warn(
         `gRPC getTrendingPaths failed: ${getErrorMessage(error)}`,
       );
-      return [];
+      throw error;
     }
   }
 
@@ -1114,7 +993,9 @@ export class LearningAnalyticsService implements OnModuleInit {
         this.redisService.del(
           ANALYTICS_CACHE_CONFIG.LEARNING.ANALYTICS(userId),
         ),
-        this.redisService.del(ANALYTICS_CACHE_CONFIG.LEARNING.PATTERNS(userId)),
+        this.redisService.del(
+          `${ANALYTICS_CACHE_CONFIG.LEARNING.PATTERNS(userId)}:v2`,
+        ),
         this.redisService.del(
           ANALYTICS_CACHE_CONFIG.LEARNING.ENGAGEMENT(userId),
         ),
@@ -1220,316 +1101,34 @@ export class LearningAnalyticsService implements OnModuleInit {
   }
 
   /**
-   * Get comprehensive learning analytics combining all metrics
+   * Get comprehensive learning analytics from Rust.
    */
   async getLearningAnalytics(userId: string): Promise<LearningAnalyticsDto> {
-    const cacheKey = ANALYTICS_CACHE_CONFIG.LEARNING.ANALYTICS(userId);
-    const cached = await this.redisService.get(cacheKey);
-
-    if (cached) {
-      return JSON.parse(cached as string) as LearningAnalyticsDto;
+    const detailed = await this.getDetailedLearningAnalytics(userId);
+    const courseStats = detailed.courseStats;
+    const pathStats = detailed.pathStats;
+    const summary = detailed.userLearningSummary;
+    if (!courseStats || !pathStats || !summary) {
+      throw new Error('Rust analytics returned an incomplete learning summary');
     }
 
-    try {
-      const enrollments = await this.prisma.courseEnrollment.findMany({
-        where: { userId },
-        include: {
-          course: {
-            include: {
-              category: { select: { name: true } },
-              units: { select: { id: true } },
-            },
-          },
-        },
-      });
-
-      const totalCoursesEnrolled = enrollments.length;
-      const completedEnrollments = enrollments.filter(
-        (e) => e.status === 'completed',
-      );
-      const totalCoursesCompleted = completedEnrollments.length;
-
-      const unitAccesses = await this.prisma.unitAccess.findMany({
-        where: { userId },
-      });
-      const totalTimeSpent = unitAccesses.reduce(
-        (sum, access) => sum + (access.timeSpent || 0),
-        0,
-      );
-
-      const courseProgresses = await Promise.all(
-        enrollments.map((e) =>
-          this.courseAnalyticsService.calculateCourseProgress(
-            userId,
-            e.courseId,
-          ),
-        ),
-      );
-      const validProgresses = courseProgresses.filter(
-        (cp) => cp !== null && cp !== undefined,
-      );
-      const averageCompletionRate =
-        validProgresses.length > 0
-          ? validProgresses.reduce(
-              (sum, cp) => sum + (cp?.percentage || 0),
-              0,
-            ) / validProgresses.length
-          : 0;
-
-      const subjectPerformance = new Map<
-        string,
-        { total: number; completed: number }
-      >();
-      enrollments.forEach((enrollment) => {
-        const categoryName =
-          enrollment.course.category?.name || 'Uncategorized';
-        const current = subjectPerformance.get(categoryName) || {
-          total: 0,
-          completed: 0,
-        };
-        current.total++;
-        if (enrollment.status === 'completed') {
-          current.completed++;
-        }
-        subjectPerformance.set(categoryName, current);
-      });
-
-      const subjectRates = Array.from(subjectPerformance.entries())
-        .map(([subject, performance]) => ({
-          subject,
-          rate:
-            performance.total > 0
-              ? performance.completed / performance.total
-              : 0,
-        }))
-        .sort((a, b) => b.rate - a.rate);
-
-      const strongestSubjects = subjectRates.slice(0, 3).map((s) => s.subject);
-      const weakestSubjects = subjectRates
-        .slice(-3)
-        .reverse()
-        .map((s) => s.subject);
-
-      const learningStreak = await this.calculateLearningStreak(userId);
-
-      const lastActivity = await this.prisma.unitAccess.findFirst({
-        where: { userId },
-        orderBy: { accessedAt: 'desc' },
-      });
-
-      const learningGoals = await this.prisma.learningGoal.findMany({
-        where: { userId },
-        include: { LearningGoalProgress: true },
-      });
-
-      const totalGoals = learningGoals.length;
-      const activeGoals = learningGoals.filter(
-        (g) => g.status === 'inProgress',
-      ).length;
-      const completedGoals = learningGoals.filter(
-        (g) => g.status === 'completed',
-      ).length;
-      const overdueGoals = learningGoals.filter(
-        (g) =>
-          g.targetDate && g.targetDate < new Date() && g.status !== 'completed',
-      ).length;
-      const completionRate =
-        totalGoals > 0 ? (completedGoals / totalGoals) * 100 : 0;
-
-      const goalsByCategory = learningGoals.reduce(
-        (acc, goal) => {
-          const category = goal.category ?? 'Uncategorized';
-          acc[category] = (acc[category] || 0) + 1;
-          return acc;
-        },
-        {} as Record<string, number>,
-      );
-
-      const goalsByPriority = learningGoals.reduce(
-        (acc, goal) => {
-          const priority = String(goal.priority ?? 'normal');
-          acc[priority] = (acc[priority] || 0) + 1;
-          return acc;
-        },
-        {} as Record<string, number>,
-      );
-
-      const upcomingDeadlines = learningGoals
-        .filter(
-          (g) =>
-            g.targetDate &&
-            g.targetDate > new Date() &&
-            g.status !== 'completed',
-        )
-        .map((g) => {
-          const td = g.targetDate!;
-          return {
-            goalId: g.id,
-            title: g.title,
-            targetDate: td.toISOString(),
-            daysRemaining: Math.ceil(
-              (td.getTime() - Date.now()) / (1000 * 3600 * 24),
-            ),
-          };
-        });
-
-      const goalAnalytics: GoalAnalytics = {
-        userId,
-        totalGoals,
-        activeGoals,
-        completedGoals,
-        overdueGoals,
-        completionRate,
-        averageCompletionTimeDays: 0, // Placeholder
-        goalsByCategory,
-        goalsByPriority,
-        streakData: {
-          currentStreak: 0, // Placeholder
-          longestStreak: 0, // Placeholder
-        },
-        streakGoalIds: [], // Placeholder
-        upcomingDeadlines,
-      };
-
-      const result: LearningAnalyticsDto = {
-        userId,
-        totalCourses: totalCoursesEnrolled,
-        completedCourses: totalCoursesCompleted,
-        totalLearningPaths: 0,
-        completedLearningPaths: 0,
-        totalStudyTimeMinutes: Math.round(totalTimeSpent / 60),
-        averageCourseProgress: Math.round(averageCompletionRate * 100) / 100,
-        averagePathProgress: 0,
-        totalCoursesEnrolled,
-        totalCoursesCompleted,
-        totalTimeSpent,
-        averageCompletionRate: Math.round(averageCompletionRate * 100) / 100,
-        strongestSubjects,
-        weakestSubjects,
-        learningStreak,
-        lastActivityDate: lastActivity?.accessedAt || null,
-        engagementMetrics: {
-          userId,
-          assessmentId: '',
-          timeSpent: totalTimeSpent,
-          interactions: [],
-          dailyActiveStreak: learningStreak,
-          weeklyActiveStreak: Math.floor(learningStreak / 7),
-          lastActivityDate: lastActivity?.accessedAt || null,
-          sessionCount: unitAccesses.length,
-          averageSessionDuration:
-            unitAccesses.length > 0 ? totalTimeSpent / unitAccesses.length : 0,
-          mostActiveTimeOfDay: '',
-          mostActiveDayOfWeek: '',
-        },
-        performanceMetrics: {
-          averageAssessmentScore: 0,
-          passRate: 0,
-          skillMasteryProgress: {},
-          weaknessAreas: weakestSubjects,
-          strengthAreas: strongestSubjects,
-          improvementRate: 0,
-        },
-        progressTrends: [],
-        goalAnalytics,
-      };
-
-      await this.redisService.set(
-        cacheKey,
-        JSON.stringify(result),
-        this.cacheTtl,
-      );
-      return result;
-    } catch (error) {
-      this.logger.error('Error getting learning analytics', {
-        userId,
-        error: getErrorMessage(error),
-      });
-      return this.getDefaultLearningAnalytics(userId);
-    }
-  }
-
-  private getDefaultLearningAnalytics(userId: string): LearningAnalyticsDto {
     return {
-      userId,
-      totalCourses: 0,
-      completedCourses: 0,
-      totalLearningPaths: 0,
-      completedLearningPaths: 0,
-      totalStudyTimeMinutes: 0,
-      averageCourseProgress: 0,
-      averagePathProgress: 0,
-      totalCoursesEnrolled: 0,
-      totalCoursesCompleted: 0,
-      totalTimeSpent: 0,
-      averageCompletionRate: 0,
-      strongestSubjects: [],
-      weakestSubjects: [],
-      learningStreak: 0,
-      lastActivityDate: null,
-      engagementMetrics: {
-        userId,
-        assessmentId: '',
-        timeSpent: 0,
-        interactions: [],
-        dailyActiveStreak: 0,
-        weeklyActiveStreak: 0,
-        lastActivityDate: null,
-        sessionCount: 0,
-        averageSessionDuration: 0,
-        mostActiveTimeOfDay: '',
-        mostActiveDayOfWeek: '',
-      },
-      performanceMetrics: {
-        averageAssessmentScore: 0,
-        passRate: 0,
-        skillMasteryProgress: {},
-        weaknessAreas: [],
-        strengthAreas: [],
-        improvementRate: 0,
-      },
-      progressTrends: [],
-      goalAnalytics: {} as GoalAnalytics,
+      ...detailed,
+      totalCourses: courseStats.totalCourses,
+      completedCourses: courseStats.completedCourses,
+      totalLearningPaths: pathStats.totalLearningPaths,
+      completedLearningPaths: pathStats.completedLearningPaths,
+      totalStudyTimeMinutes: summary.totalStudyTime,
+      averageCourseProgress: courseStats.averageCourseProgress,
+      averagePathProgress: pathStats.averagePathProgress,
+      totalCoursesEnrolled: courseStats.totalCourses,
+      totalCoursesCompleted: courseStats.completedCourses,
+      totalTimeSpent: summary.totalStudyTime,
+      averageCompletionRate: courseStats.averageCourseProgress,
+      strongestSubjects: summary.strongestSubjects,
+      weakestSubjects: summary.weakestSubjects,
+      learningStreak: summary.currentStreak,
+      lastActivityDate: detailed.engagementMetrics?.lastActivityDate ?? null,
     };
-  }
-
-  private async calculateLearningStreak(userId: string): Promise<number> {
-    try {
-      const accesses = await this.prisma.unitAccess.findMany({
-        where: { userId },
-        select: { accessedAt: true },
-        orderBy: { accessedAt: 'desc' },
-      });
-
-      if (accesses.length === 0) {
-        return 0;
-      }
-
-      let streak = 1;
-      let currentDate = new Date(accesses[0].accessedAt);
-
-      for (let i = 1; i < accesses.length; i++) {
-        const accessDate = new Date(accesses[i].accessedAt);
-        const daysDifference = Math.floor(
-          (currentDate.getTime() - accessDate.getTime()) /
-            (1000 * 60 * 60 * 24),
-        );
-
-        if (daysDifference === 1) {
-          streak++;
-          currentDate = accessDate;
-        } else if (daysDifference > 1) {
-          break;
-        }
-      }
-
-      return streak;
-    } catch (error) {
-      this.logger.error('Error calculating learning streak', {
-        userId,
-        error: getErrorMessage(error),
-      });
-      return 0;
-    }
   }
 }

@@ -1,7 +1,15 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  Logger,
+  OnModuleInit,
+} from '@nestjs/common';
+import { ClientGrpc } from '@nestjs/microservices';
 import { RedisService } from '#infrastructure/redis/redis.service';
+import { AnalyticsService } from '#infrastructure/grpc/analytics.client';
+import { firstValueFrom } from 'rxjs';
 
 export interface UserActivity {
   userId: string;
@@ -52,13 +60,38 @@ export interface UserFeatureProfile {
 }
 
 @Injectable()
-export class UserFeaturesService {
+export class UserFeaturesService implements OnModuleInit {
   private readonly logger = new Logger(UserFeaturesService.name);
   private readonly CACHE_TTL = 3600; // 1 hour
   private readonly FEATURE_CACHE_PREFIX = 'user_features:';
   private readonly ACTIVITY_CACHE_PREFIX = 'user_activities:';
 
-  constructor(private readonly redisService: RedisService) {}
+  private analyticsServiceGrpc!: AnalyticsService;
+
+  constructor(
+    private readonly redisService: RedisService,
+    @Inject('ANALYTICS_PACKAGE') private readonly grpcClient: ClientGrpc,
+  ) {}
+
+  onModuleInit(): void {
+    this.analyticsServiceGrpc =
+      this.grpcClient.getService<AnalyticsService>('AnalyticsService');
+  }
+
+  async getRustUserFeatureVector(userId: string): Promise<{
+    userId: string;
+    features: number[];
+    featureMap: Record<string, number>;
+  }> {
+    const response = await firstValueFrom(
+      this.analyticsServiceGrpc.getUserFeatureVector({ userId }),
+    );
+    return {
+      userId: response.userId,
+      features: response.features,
+      featureMap: response.featureMap,
+    };
+  }
 
   /**
    * Get user features (simplified view of feature profile)
@@ -239,6 +272,7 @@ export class UserFeaturesService {
 
   /**
    * Generate AI-ready feature vector for user
+   * @deprecated Use getRustUserFeatureVector instead.
    */
   async getUserFeatureVector(userId: string): Promise<number[] | null> {
     try {

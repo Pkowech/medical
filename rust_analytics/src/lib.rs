@@ -1355,11 +1355,25 @@ async fn get_quiz_attempt_history_handler(
         &req.user_id,
         req.options.as_ref().and_then(|o| o.limit),
         req.options.as_ref().and_then(|o| o.offset),
+        false,
         pool.get_ref(),
     )
     .await
     {
-        Ok(history) => HttpResponse::Ok().json(history),
+        Ok((history, _, _)) => {
+            let attempts: Vec<crate::domain::models::quiz::QuizAttempt> = history
+                .into_iter()
+                .map(|attempt| crate::domain::models::quiz::QuizAttempt {
+                    quiz_id: attempt.quiz_id,
+                    score: attempt.score,
+                    date: attempt
+                        .date
+                        .map(|date| date.and_utc().to_rfc3339())
+                        .unwrap_or_default(),
+                })
+                .collect();
+            HttpResponse::Ok().json(attempts)
+        }
         Err(e) => HttpResponse::InternalServerError().body(format!("Error: {}", e)),
     }
 }

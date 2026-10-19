@@ -21,22 +21,28 @@ pub async fn get_progress_records(
     let end_date = NaiveDate::parse_from_str(end, "%Y-%m-%d")
         .map_err(|e| format!("Invalid end date: {}", e))?;
 
+    if start_date > end_date {
+        return Err("Invalid date range: start must not be after end".to_string());
+    }
+
     #[derive(sqlx::FromRow)]
     struct DbRecord {
         user_id: String,
-        course_id: Option<String>,
+        course_id: String,
         progress: f64,
-        updated_at: DateTime<Utc>,
+        activity_at: DateTime<Utc>,
     }
 
     let records = sqlx::query_as::<_, DbRecord>(
-        "SELECT user_id, course_id, progress, updated_at 
-         FROM enrollments 
-         WHERE updated_at >= $1 AND updated_at <= $2
-         ORDER BY updated_at DESC",
+        "SELECT user_id, course_id,
+                COALESCE(progress_percentage, 0)::double precision AS progress,
+                COALESCE(last_accessed, completed_at, enrolled_at) AS activity_at
+         FROM course_enrollments
+         WHERE COALESCE(last_accessed, completed_at, enrolled_at)::date BETWEEN $1 AND $2
+         ORDER BY activity_at DESC",
     )
-    .bind(start_date.and_hms_opt(0, 0, 0).unwrap())
-    .bind(end_date.and_hms_opt(23, 59, 59).unwrap())
+    .bind(start_date)
+    .bind(end_date)
     .fetch_all(pool)
     .await
     .map_err(|e| format!("Database error: {}", e))?;
@@ -45,9 +51,9 @@ pub async fn get_progress_records(
         .into_iter()
         .map(|r| ProgressRecord {
             user_id: r.user_id,
-            course_id: r.course_id.unwrap_or_default(),
+            course_id: r.course_id,
             progress: r.progress,
-            date: r.updated_at.format("%Y-%m-%d").to_string(),
+            date: r.activity_at.format("%Y-%m-%d").to_string(),
         })
         .collect())
 }

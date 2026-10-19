@@ -124,7 +124,7 @@ allowBuilds:
   '@swc/core': false
   argon2: true
   esbuild: false
-  grpc-tools: false
+  grpc-tools: true
   msgpackr-extract: false
   prisma: false
   protobufjs: false

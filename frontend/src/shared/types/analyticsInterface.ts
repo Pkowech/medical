@@ -63,6 +63,13 @@ export interface LearningRecommendation {
   estimatedTime?: string | number;
 }
 
+export interface StudyRecommendation {
+  recommendation: string;
+  priority: string;
+  estimatedTimeHours: number;
+  resourceId?: string;
+}
+
 export interface LearningPathAnalytics extends BaseAnalytics {
   pathId: string;
   enrollments: number;
@@ -116,22 +123,22 @@ export interface ConsolidatedAnalytics {
   coursesCompleted: number;
   averageScore: number;
   totalStudyHours: number;
-  achievementsUnlocked: number;
-  peerRanking: string;
-  learningEfficiency: number;
+  achievementsUnlocked?: number;
+  peerRanking?: string;
+  learningEfficiency?: number;
   overview: {
     totalUsers: number;
     activeUsers: number;
     completionRate: number;
-    averageScore: number;
+    averageScore?: number;
   };
-  trends: {
+  trends?: {
     date: string;
     users: number;
     completions: number;
     averageScore: number;
   }[];
-  topPerformers: {
+  topPerformers?: {
     userId: string;
     name: string;
     score: number;
@@ -158,7 +165,7 @@ export interface UserInsights {
   recommendedNextSteps?: string[];
   strengths?: string[];
   areasForImprovement?: string[];
-  estimatedCompletionDate?: string;
+  estimatedCompletionDate?: string | null;
 }
 
 /**

@@ -497,27 +497,21 @@ pub fn calculate_user_learning_summary(
     let user_sessions: Vec<&StudySession> =
         sessions.iter().filter(|s| s.user_id == user_id).collect();
 
-    if user_sessions.is_empty() && attempts.is_empty() {
-        return Err(AnalyticsError::EmptyDataset);
-    }
-
     // Calculate total and average study time
     let total_study_time: i32 = user_sessions.iter().map(|s| s.duration).sum();
     let average_session_length = compute_average_session_length(&user_sessions);
 
-    // Calculate average score from sessions and quiz attempts
-    let average_score = compute_average_score(&user_sessions, &attempts, user_id);
+    let average_score = compute_average_score(&attempts, user_id);
 
-    // Identify strengths and weaknesses
     let (strongest_subjects, weakest_subjects) =
-        identify_subject_strengths_weaknesses(&user_sessions);
+        identify_subject_strengths_weaknesses(&attempts, user_id);
 
     UserLearningSummary::new(
         total_study_time,
         average_session_length,
         average_score,
-        3, // Placeholder: fetch from database in production
-        5, // Placeholder: fetch from database in production
+        0,
+        0,
         strongest_subjects,
         weakest_subjects,
     )
@@ -530,29 +524,29 @@ pub fn calculate_user_learning_summary(
 ///
 /// # Returns
 /// * A tuple of (strongest_subjects, weakest_subjects)
-fn identify_subject_strengths_weaknesses(sessions: &[&StudySession]) -> (Vec<String>, Vec<String>) {
-    let mut subject_performance: HashMap<&str, (i32, i32)> = HashMap::new();
-
-    for session in sessions {
+fn identify_subject_strengths_weaknesses(
+    attempts: &[QuizAttempt],
+    user_id: &str,
+) -> (Vec<String>, Vec<String>) {
+    let mut subject_performance: HashMap<&str, (f32, usize)> = HashMap::new();
+    for attempt in attempts.iter().filter(|attempt| attempt.user_id == user_id) {
         let entry = subject_performance
-            .entry(session.topic.as_str())
-            .or_insert((0, 0));
-        entry.1 += 1; // Increment total
-
-        // Count as correct if score >= 70%
-        if session.score >= 70.0 {
-            entry.0 += 1;
-        }
+            .entry(attempt.category.as_str())
+            .or_insert((0.0, 0));
+        entry.0 += attempt.percentage;
+        entry.1 += 1;
     }
 
     let mut subject_scores: Vec<(&str, f32)> = subject_performance
         .into_iter()
-        .filter(|(_, (_, total))| *total > 0)
-        .map(|(subject, (correct, total))| (subject, (correct as f32 / total as f32) * 100.0))
+        .filter(|(subject, (_, count))| !subject.is_empty() && *count > 0)
+        .map(|(subject, (score_total, count))| (subject, score_total / count as f32))
         .collect();
 
-    // Sort by score descending
-    subject_scores.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    subject_scores.sort_by(|a, b| {
+        b.1.partial_cmp(&a.1)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
 
     let strongest = subject_scores
         .iter()
@@ -1399,25 +1393,17 @@ fn compute_average_session_length(sessions: &[&StudySession]) -> f32 {
 /// # Returns
 /// * Average score across all activities
 #[inline]
-fn compute_average_score(
-    sessions: &[&StudySession],
-    attempts: &[QuizAttempt],
-    user_id: &str,
-) -> f32 {
-    let session_scores: Vec<f32> = sessions.iter().map(|s| s.score).collect();
-
+fn compute_average_score(attempts: &[QuizAttempt], user_id: &str) -> f32 {
     let quiz_scores: Vec<f32> = attempts
         .iter()
         .filter(|q| q.user_id == user_id)
         .map(|q| q.percentage)
         .collect();
 
-    let all_scores = [session_scores, quiz_scores].concat();
-
-    if all_scores.is_empty() {
+    if quiz_scores.is_empty() {
         0.0
     } else {
-        all_scores.iter().sum::<f32>() / all_scores.len() as f32
+        quiz_scores.iter().sum::<f32>() / quiz_scores.len() as f32
     }
 }
 
@@ -1925,11 +1911,16 @@ mod tests {
     }
 
     #[test]
-    fn test_empty_dataset_error() {
+    fn test_empty_dataset_returns_empty_summary() {
         let sessions = vec![];
         let attempts = vec![];
         let result = calculate_user_learning_summary("user1", sessions, attempts);
-        assert_eq!(result, Err(AnalyticsError::EmptyDataset));
+        let summary = result.expect("empty learning data is a valid analytics result");
+        assert_eq!(summary.total_study_time, 0);
+        assert_eq!(summary.average_session_length, 0.0);
+        assert_eq!(summary.average_score, 0.0);
+        assert!(summary.strongest_subjects.is_empty());
+        assert!(summary.weakest_subjects.is_empty());
     }
 
     #[test]

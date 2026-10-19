@@ -87,17 +87,18 @@ export class UserStatsDto {
   @ApiProperty({ description: 'Total points earned' })
   points!: number;
 
-  @ApiProperty({ description: 'Current user level' })
-  level!: number;
+  @ApiProperty({ description: 'Current user level', nullable: true })
+  level!: number | null;
 
   @ApiProperty({ description: 'Current learning streak' })
   currentStreak!: number;
 }
 
 export class UserAnalyticsResponseDto extends UserStatsDto {
-  @ApiProperty()
+  @ApiProperty({ nullable: true })
+  @IsOptional()
   @IsString()
-  lastActiveDate!: string;
+  lastActiveDate!: string | null;
 
   @ApiProperty()
   @IsNumber()

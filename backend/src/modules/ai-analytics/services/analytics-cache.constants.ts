@@ -10,16 +10,16 @@ export const ANALYTICS_CACHE_CONFIG = {
   // Learning-related cache keys
   LEARNING: {
     PATTERNS: (userId: string) => `analytics:learning:patterns:${userId}`,
-    ENGAGEMENT: (userId: string) => `analytics:learning:engagement:${userId}`,
-    ANALYTICS: (userId: string) => `analytics:learning:detailed:${userId}`,
+    ENGAGEMENT: (userId: string) => `analytics:learning:engagement:v2:${userId}`,
+    ANALYTICS: (userId: string) => `analytics:learning:detailed:v2:${userId}`,
     FEATURE_VECTOR: (userId: string) =>
       `analytics:learning:feature_vector:${userId}`,
     PERFORMANCE_PROFILE: (userId: string) =>
       `analytics:learning:profile:${userId}`,
     PATH_ANALYTICS: (pathId: string) => `analytics:learning:path:${pathId}`,
     GOALS: (userId: string) => `analytics:learning:goals:${userId}`,
-    USER_INSIGHTS: (userId: string) => `analytics:learning:insights:${userId}`,
-    COURSE_STATS: (userId: string) => `analytics:learning:courses:${userId}`,
+    USER_INSIGHTS: (userId: string) => `analytics:learning:insights:v2:${userId}`,
+    COURSE_STATS: (userId: string) => `analytics:learning:courses:v2:${userId}`,
     PATH_STATS: (userId: string) => `analytics:learning:path_stats:${userId}`,
   },
 
@@ -65,11 +65,6 @@ export const ANALYTICS_CACHE_CONFIG = {
       `analytics:recommendations:study:${userId}:${encodeURIComponent(JSON.stringify(gaps))}`,
   },
 
-  // Content and model related caches
-  CONTENT: {
-    FEATURES: (contentId: string) => `analytics:content:features:${contentId}`,
-  },
-
   // Unit & course related caches
   UNIT: {
     PROGRESS: (userId: string, unitId: string) =>
@@ -80,11 +75,6 @@ export const ANALYTICS_CACHE_CONFIG = {
     PROGRESS: (userId: string, courseId: string) =>
       `analytics:course:progress:${userId}:${courseId}`,
     ANALYTICS: (courseId: string) => `analytics:course:${courseId}`,
-  },
-
-  MODEL: {
-    PREDICTIONS: (userId: string, fingerprint?: string) =>
-      `analytics:model:predictions:${userId}:${fingerprint || 'default'}`,
   },
 
   // Deduplication keys (use shorter TTL for request dedup)

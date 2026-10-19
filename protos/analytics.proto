@@ -175,6 +175,8 @@ message CourseStatsResult {
   int32 completed_courses = 2;
   int32 total_study_time_minutes = 3;
   float average_course_progress = 4;
+  float completion_rate = 5; // Ratio from 0.0 to 1.0.
+  int32 completed_items = 6;
 }
 
 message LearningPathStatsResult {
@@ -193,6 +195,7 @@ message GetDetailedLearningAnalyticsResponse {
   EngagementMetrics engagement_metrics = 6;
   PerformanceMetrics performance_metrics = 7;
   repeated ProgressTrend progress_trends = 8;
+  repeated ProgressTrend course_progress_trends = 9;
 }
 
 service AnalyticsService {
@@ -200,6 +203,7 @@ service AnalyticsService {
   rpc PredictPerformance(PredictPerformanceRequest) returns (PredictPerformanceResponse);
   rpc AnalyzeQuestionDifficulty(AnalyzeQuestionDifficultyRequest) returns (AnalyzeQuestionDifficultyResponse);
   rpc GetEngagementMetrics(GetEngagementMetricsRequest) returns (GetEngagementMetricsResponse);
+  rpc GetStudyPatterns(GetStudyPatternsRequest) returns (GetStudyPatternsResponse);
   rpc GetRecommendations(GetRecommendationsRequest) returns (GetRecommendationsResponse);
   rpc UpdateAttemptMetrics (AttemptMetricsRequest) returns (UpdateAttemptMetricsResponse);
   rpc GetUserAbility (GetUserAbilityRequest) returns (GetUserAbilityResponse);
@@ -208,8 +212,11 @@ service AnalyticsService {
   rpc GetUserLearningSummary(GetUserLearningSummaryRequest) returns (UserLearningSummaryResponse);
   rpc GetGoalAnalytics(GetGoalAnalyticsRequest) returns (LearningGoalAnalyticsResponse);
   rpc GetCourseStatistics(GetCourseStatisticsRequest) returns (CourseStatsResultResponse);
+  rpc GetCourseAnalytics(GetCourseAnalyticsRequest) returns (CourseAnalyticsResponse);
   rpc GetLearningPathStatistics(GetLearningPathStatisticsRequest) returns (LearningPathStatsResultResponse);
   rpc GetSystemAnalytics(GetSystemAnalyticsRequest) returns (GetSystemAnalyticsResponse);
+  rpc GetProgressRecordsForPeriod(ProgressRecordsRequest) returns (ProgressRecordsResponse);
+  rpc ProcessAnalyticsForUsers(ProcessAnalyticsForUsersRequest) returns (ProcessAnalyticsForUsersResponse);
   rpc GetDetailedLearningAnalytics (GetDetailedLearningAnalyticsRequest) returns (GetDetailedLearningAnalyticsResponse);
   rpc CalculateCourseProgress (CalculateCourseProgressRequest) returns (CourseProgress);
   rpc GetUserDataForProfile(GetUserDataForProfileRequest) returns (GetUserDataForProfileResponse);
@@ -222,6 +229,7 @@ service AnalyticsService {
   rpc GetPathAnalytics (PathAnalyticsRequest) returns (PathAnalyticsResponse);
   rpc GetCohortAnalytics (GetCohortAnalyticsRequest) returns (CohortAnalyticsResponse);
   rpc GetQuizAttemptHistory (QuizAttemptHistoryRequest) returns (QuizAttemptHistoryResponse);
+  rpc GetAssessmentPerformanceAnalytics (AssessmentPerformanceAnalyticsRequest) returns (AssessmentPerformanceAnalyticsResponse);
   rpc GetRelatedResources (RelatedResourcesRequest) returns (RelatedResourcesResponse);
   rpc GenerateStudyRecommendations (StudyRecommendationsRequest) returns (StudyRecommendationsResponse);
   rpc GenerateNextSteps (NextStepsRequest) returns (NextStepsResponse);
@@ -321,6 +329,30 @@ message CourseStatsResultResponse {
   CourseStatsResult course_stats = 1;
 }
 
+message GetCourseAnalyticsRequest {
+  string course_id = 1;
+}
+
+message CourseUnitPopularity {
+  string unit_id = 1;
+  string title = 2;
+  int32 access_count = 3;
+}
+
+message StrugglingStudent {
+  string user_id = 1;
+  double progress_percentage = 2;
+}
+
+message CourseAnalyticsResponse {
+  string course_id = 1;
+  int32 enrollment_count = 2;
+  double completion_rate = 3;
+  double average_time_spent = 4;
+  repeated CourseUnitPopularity popular_units = 5;
+  repeated StrugglingStudent struggling_students = 6;
+}
+
 message GetLearningPathStatisticsRequest {
   string user_id = 1;
 }
@@ -336,6 +368,37 @@ message GetSystemAnalyticsResponse {
   int64 total_paths = 6;
   int64 total_enrollments = 7;
   double overall_completion_rate = 8;
+  int64 published_courses = 9;
+  int64 active_today = 10;
+  double average_course_rating = 11;
+  double average_assessment_score = 12;
+  int64 total_study_time_minutes = 13;
+}
+
+message ProgressRecordsRequest {
+  string start = 1;
+  string end = 2;
+}
+
+message ProgressRecord {
+  string user_id = 1;
+  string course_id = 2;
+  double progress = 3;
+  string date = 4;
+}
+
+message ProgressRecordsResponse {
+  repeated ProgressRecord records = 1;
+}
+
+message ProcessAnalyticsForUsersRequest {
+  repeated string user_ids = 1;
+}
+
+message ProcessAnalyticsForUsersResponse {
+  bool success = 1;
+  string message = 2;
+  int32 processed_users = 3;
 }
 
 message LearningPathProgress {
@@ -398,6 +461,37 @@ message GetEngagementMetricsResponse {
   int32 activity_frequency = 3;
   int32 daily_streak = 4;
   int32 weekly_streak = 5;
+  int32 total_study_time_minutes = 6;
+  int32 weekly_study_minutes = 7;
+  int32 active_study_days_this_week = 8;
+}
+
+message GetStudyPatternsRequest {
+  string user_id = 1;
+}
+
+message StudyDurationMetrics {
+  double average_duration = 1;
+  double longest_session = 2;
+  double shortest_session = 3;
+}
+
+message PreferredStudyTimes {
+  int32 morning = 1;
+  int32 afternoon = 2;
+  int32 evening = 3;
+  int32 night = 4;
+}
+
+message GetStudyPatternsResponse {
+  string user_id = 1;
+  repeated string patterns = 2;
+  int32 consistency = 3;
+  map<string, double> time_distribution = 4;
+  StudyDurationMetrics study_duration = 5;
+  PreferredStudyTimes preferred_study_times = 6;
+  map<string, double> performance_by_topic = 7;
+  double consistency_score = 8;
 }
 
 message GetRecommendationsRequest {
@@ -487,10 +581,69 @@ message QuizAttemptHistoryItem {
   string quiz_id = 1;
   double score = 2;
   string date = 3;
+  string attempt_id = 4;
+  int32 total_questions = 5;
+  int32 correct_answers = 6;
+  int32 time_taken_seconds = 7;
+  string quiz_title = 8;
+  string unit_id = 9;
+  string unit_title = 10;
 }
 
 message QuizAttemptHistoryResponse {
   repeated QuizAttemptHistoryItem attempts = 1;
+  int32 total_attempts = 2;
+  double average_score = 3;
+  double best_score = 4;
+  int64 total_time_spent_seconds = 5;
+  double recent_improvement = 6;
+}
+
+message AssessmentPerformanceAnalyticsRequest {
+  string user_id = 1;
+  string quiz_id = 2;
+}
+
+message AssessmentCategoryBreakdown {
+  string category = 1;
+  double score = 2;
+  int32 questions_answered = 3;
+  double average_time = 4;
+  bool is_strength = 5;
+  bool is_weakness = 6;
+  int32 correct = 7;
+  int32 total = 8;
+}
+
+message AssessmentDifficultyBreakdown {
+  string difficulty = 1;
+  int32 correct_answers = 2;
+}
+
+message AssessmentLearningTrend {
+  string date = 1;
+  double score = 2;
+}
+
+message AssessmentPerformanceAnalyticsResponse {
+  string user_id = 1;
+  string quiz_id = 2;
+  double overall_score = 3;
+  double average_score = 4;
+  repeated double recent_scores = 5;
+  int32 questions_attempted = 6;
+  int32 correct_answers = 7;
+  int64 time_taken = 8;
+  int32 time_spent = 9;
+  double time_per_question = 10;
+  int32 total_attempts = 11;
+  repeated AssessmentCategoryBreakdown category_breakdown = 12;
+  repeated AssessmentLearningTrend learning_trends = 13;
+  repeated string strengths = 14;
+  repeated string weaknesses = 15;
+  repeated AssessmentDifficultyBreakdown difficulty_breakdown = 16;
+  map<string, double> progress_trend = 17;
+  double average_time_per_question = 18;
 }
 
 message RelatedResourcesRequest {
@@ -518,7 +671,7 @@ message StudyRecommendationItem {
   string recommendation = 1;
   string priority = 2;
   int32 estimated_time_hours = 3;
-  string resource_id = 4;
+  optional string resource_id = 4;
 }
 
 message StudyRecommendationsResponse {

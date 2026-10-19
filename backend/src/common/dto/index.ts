@@ -49,6 +49,7 @@ export {
   CourseStats,
   SystemAnalytics,
   UserInsights,
+  StudyRecommendationDto,
   LearningPathStats,
   QuizScore,
   LearningActivityDetails,

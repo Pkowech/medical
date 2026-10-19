@@ -172,6 +172,10 @@ export default function OfflineDownloadsPage() {
           Topic PDFs and practice quizzes saved on this device. Downloads expire after 30 days and
           are rechecked when you reconnect.
         </p>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Saved files are stored in MedTrack Hub’s local browser storage (IndexedDB), not in your
+          device’s Downloads or Files folder. Clearing this browser’s site data can remove them.
+        </p>
       </header>
 
       {!isOnline && (

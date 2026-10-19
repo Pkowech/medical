@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Body, Query, UseGuards, Logger, Request } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Query,
+  UseGuards,
+  Logger,
+  DefaultValuePipe,
+  ParseIntPipe,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { AdminAnalyticsService } from '../services/admin-analytics.service';
 import { JwtAuthGuard } from '#modules/auth/guards/jwt-auth.guard';
@@ -52,8 +62,10 @@ export class AdminAnalyticsController {
   }
 
   @Get('trending')
-  getTrendingPaths(@Query('limit') limit: string) {
-    return this.adminAnalyticsService.getTrendingPaths(parseInt(limit, 10));
+  getTrendingPaths(
+    @Query('limit', new DefaultValuePipe(5), ParseIntPipe) limit: number,
+  ) {
+    return this.adminAnalyticsService.getTrendingPaths(limit);
   }
 
   @Get('consolidated-data')
@@ -61,5 +73,4 @@ export class AdminAnalyticsController {
     return this.assessmentAnalyticsService.getConsolidatedAnalytics();
   }
 }
-
 

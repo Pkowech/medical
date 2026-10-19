@@ -144,6 +144,14 @@ export class CategoryBreakdownDto {
   totalQuestions?: number;
   @ApiProperty({ required: false })
   correctAnswers?: number;
+  @ApiProperty({ required: false })
+  questionsAnswered?: number;
+  @ApiProperty({ required: false })
+  averageTime?: number;
+  @ApiProperty({ type: [String], required: false })
+  strengths?: string[];
+  @ApiProperty({ type: [String], required: false })
+  weaknesses?: string[];
 }
 
 /**

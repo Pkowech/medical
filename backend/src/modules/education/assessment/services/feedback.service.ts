@@ -123,7 +123,7 @@ export class FeedbackService {
       // Optional fields
       topicScores: dto.topicScores || {},
       difficultyBreakdown: dto.difficultyBreakdown || {},
-      categoryBreakdown: dto.categoryBreakdown || {},
+      categoryBreakdown: dto.categoryBreakdown,
       learningTrends: dto.learningTrends || [],
       strengths: dto.strengths || [],
       weaknesses: dto.weaknesses || [],

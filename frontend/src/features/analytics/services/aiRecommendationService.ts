@@ -1,6 +1,7 @@
 import { apiService } from '@/features/auth/services/apiClient';
 import type {
   LearningRecommendation,
+  StudyRecommendation,
   StudyPattern,
   AdaptiveLearningConfig,
   ApiResponse,
@@ -91,10 +92,10 @@ class AiRecommendationService {
 
   async getWeakAreasRecommendations(
     _userId: string
-  ): Promise<Array<{ topic: string; recommendations: LearningRecommendation[] }>> {
+  ): Promise<StudyRecommendation[]> {
     try {
       const response = await apiService.get<
-        ApiResponse<Array<{ topic: string; recommendations: LearningRecommendation[] }>>
+        ApiResponse<StudyRecommendation[]>
       >(`/assessment-progress/study-materials`);
       return response.data.data;
     } catch (error) {

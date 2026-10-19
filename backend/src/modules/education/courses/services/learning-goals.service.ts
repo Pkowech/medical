@@ -1099,9 +1099,7 @@ export class LearningGoalsService {
       const examMappings = await this.prisma.examMapping.findMany({
         where: {
           topicId: {
-            in: studyRecs
-              .map((r) => r.id)
-              .concat(peerRecs.map((p) => p.item_id)),
+            in: peerRecs.map((recommendation) => recommendation.item_id),
           },
         },
         include: { topic: true },
@@ -1111,23 +1109,16 @@ export class LearningGoalsService {
 
       const recommendations: RecommendedGoalDto[] = [];
 
-      // Add study recommendations with weight boost
+      // Add recommendations returned by Rust analytics
       studyRecs.forEach((rec) => {
-        const mapping = mappingMap.get(rec.id);
-        const stakeInfo = mapping
-          ? ` - 🔥 High Stakes: ${mapping.examType}`
-          : '';
-
         recommendations.push({
-          title: `Study: ${rec.title || 'Recommended Material'}`,
-          description: `Complete study materials: ${rec.title || 'Recommended learning material'}`,
+          title: rec.recommendation,
+          description: `Estimated study time: ${rec.estimatedTimeHours} hours`,
           category: GoalCategory.course_completion,
           type: GoalType.shortTerm,
-          recommendationReason: `Priority: ${rec.priority || 'Medium'} - Type: ${rec.type}${stakeInfo}`,
+          recommendationReason: `Priority: ${rec.priority}`,
           recommendationSource: GoalRecommendationSource.PERFORMANCE_ANALYTICS,
-          relatedId: rec.id,
-          examStake: mapping?.correlation,
-          examType: mapping?.examType,
+          relatedId: rec.resourceId,
         });
       });
 
@@ -1167,50 +1158,13 @@ export class LearningGoalsService {
       // Order by exam stake (highest first)
       recommendations.sort((a, b) => (b.examStake || 0) - (a.examStake || 0));
 
-      // Fallback
-      if (recommendations.length === 0) {
-        recommendations.push({
-          title: 'Maintain a 5-day Study Streak',
-          description:
-            'Log in and complete at least one learning activity every day for 5 days.',
-          category: GoalCategory.streak_maintenance,
-          type: GoalType.shortTerm,
-          recommendationReason: 'Consistent study habits improve outcomes.',
-          recommendationSource: GoalRecommendationSource.PERFORMANCE_ANALYTICS,
-        });
-      }
-
       return { recommendations: recommendations.slice(0, limit) };
     } catch (error) {
-      this.logger.warn(
-        `Error fetching gRPC recommendations for user ${userId}, returning defaults:`,
+      this.logger.error(
+        `Failed to fetch recommendations for user ${userId}`,
         error,
       );
-
-      // Graceful fallback with default recommendations
-      const defaultRecommendations: RecommendedGoalDto[] = [
-        {
-          title: 'Master Cardiovascular System',
-          description:
-            'Complete all modules and assessments related to the cardiovascular system.',
-          category: GoalCategory.course_completion,
-          type: GoalType.longTerm,
-          recommendationReason: 'Popular area of focus among learners',
-          recommendationSource: GoalRecommendationSource.PEER_TRENDS,
-        },
-        {
-          title: 'Maintain Consistent Study Streak',
-          description:
-            'Log in and complete at least one learning activity every day.',
-          category: GoalCategory.streak_maintenance,
-          type: GoalType.shortTerm,
-          recommendationReason:
-            'Consistency is key to long-term retention and mastery',
-          recommendationSource: GoalRecommendationSource.PERFORMANCE_ANALYTICS,
-        },
-      ];
-
-      return { recommendations: defaultRecommendations.slice(0, limit) };
+      throw error;
     }
   }
 

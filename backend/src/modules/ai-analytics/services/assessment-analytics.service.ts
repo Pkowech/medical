@@ -18,7 +18,9 @@ import {
   PerformanceAnalyticsDto,
   SubmitAnswerDto,
   AdaptiveQuizSession,
+  UserPerformanceProfileDto,
 } from '#common/dto';
+import type { AssessmentPerformanceAnalyticsResponse } from '../../../generated/grpc/analytics';
 import { getErrorMessage } from '#common/utils/error.utils';
 import {
   ANALYTICS_CACHE_CONFIG,
@@ -28,7 +30,13 @@ import { PrismaService } from '#infrastructure/prisma/prisma.service';
 import { PredictionValidatorService } from './prediction-validator.service';
 import { QuizUtils } from '#common/utils/quiz.utils';
 import { v4 as uuidv4 } from 'uuid';
-import { Option, Question, Prisma, QuestionType } from '@prisma/client';
+import {
+  Option,
+  Question,
+  Prisma,
+  QuestionCategory,
+  QuestionType,
+} from '@prisma/client';
 
 type AdaptiveQuestionWithOptions = Question & { options: Option[] };
 
@@ -55,12 +63,6 @@ export class AssessmentAnalyticsService implements OnModuleInit {
   private readonly grpcRetries = Number(process.env.RUST_GRPC_RETRIES || 2);
 
   private analyticsServiceGrpc!: AnalyticsService;
-
-  // Helper to access the gRPC client as `any` to allow calling RPCs
-  // that may not be declared in the generated TypeScript interface.
-  private grpc(): any {
-    return this.analyticsServiceGrpc as any;
-  }
 
   constructor(
     private readonly redisService: RedisService,
@@ -497,7 +499,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
           limit: 5,
         }),
       );
-      return (grpcResp as any).resources || [];
+      return grpcResp.resources;
     } catch (error) {
       this.logger.error(
         `getRelatedResources gRPC failure: ${getErrorMessage(error)}`,
@@ -512,12 +514,12 @@ export class AssessmentAnalyticsService implements OnModuleInit {
   ): Promise<any[]> {
     try {
       const grpcResp = await this.callGrpc(
-        (this.analyticsServiceGrpc as any).generateStudyRecommendations({
-          userId: userId,
-          knowledgeGaps: knowledgeGaps,
+        this.analyticsServiceGrpc.generateStudyRecommendations({
+          userId,
+          knowledgeGaps,
         }),
       );
-      return (grpcResp as any).recommendations || [];
+      return grpcResp.recommendations;
     } catch (error) {
       this.logger.error(
         `generateStudyRecommendations gRPC failure: ${getErrorMessage(error)}`,
@@ -531,7 +533,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
       const grpcResp = await this.callGrpc(
         this.analyticsServiceGrpc.generateNextSteps({ userId: userId }),
       );
-      return (grpcResp as any).steps?.map((s: any) => s.step) || [];
+      return grpcResp.steps.map((step) => step.step);
     } catch (error) {
       this.logger.error(
         `generateNextSteps gRPC failure: ${getErrorMessage(error)}`,
@@ -691,12 +693,11 @@ export class AssessmentAnalyticsService implements OnModuleInit {
       },
       select: {
         quizId: true,
-        score: true,
-        percentage: true,
         quiz: {
           select: {
             title: true,
             passingScore: true,
+            topicId: true,
             topic: { select: { name: true } },
           },
         },
@@ -709,50 +710,51 @@ export class AssessmentAnalyticsService implements OnModuleInit {
       string,
       {
         title: string;
+        topicId: string | null;
         topicName: string | null;
         passingScore: number;
-        scores: number[];
       }
     >();
 
     for (const attempt of attempts) {
       const entry = attemptsByQuiz.get(attempt.quizId) ?? {
         title: attempt.quiz.title,
+        topicId: attempt.quiz.topicId,
         topicName: attempt.quiz.topic?.name ?? null,
         passingScore: attempt.quiz.passingScore ?? 70,
-        scores: [],
       };
-      if (entry.scores.length < 5) {
-        const score =
-          attempt.percentage > 0 || attempt.score === 0
-            ? attempt.percentage
-            : attempt.score;
-        entry.scores.push(Math.min(100, Math.max(0, score)));
-      }
       attemptsByQuiz.set(attempt.quizId, entry);
     }
 
-    return [...attemptsByQuiz.entries()].map(([assessmentId, entry]) => {
-      const predictedScore =
-        entry.scores.reduce((sum, score) => sum + score, 0) /
-        entry.scores.length;
-      const belowPassingScore = predictedScore < entry.passingScore;
-      const studyTarget = entry.topicName ?? entry.title;
+    return Promise.all(
+      [...attemptsByQuiz.entries()].map(async ([assessmentId, entry]) => {
+        if (!entry.topicId) {
+          throw new Error(
+            `Cannot predict assessment ${assessmentId}: no topic is linked`,
+          );
+        }
+        const prediction = await this.predictAssessmentPerformance(
+          userId,
+          entry.topicId,
+        );
+        const predictedScore = prediction.score * 100;
+        const belowPassingScore = predictedScore < entry.passingScore;
+        const studyTarget = entry.topicName ?? entry.title;
 
-      return {
-        assessmentId,
-        assessmentName: entry.title,
-        predictedScore,
-        sampleSize: entry.scores.length,
-        recommendation: belowPassingScore
-          ? `Review ${studyTarget}; your recent average is below the ${entry.passingScore}% passing score.`
-          : `Your recent average is above the passing score. Continue practicing ${studyTarget}.`,
-        recommendedPreparation: belowPassingScore
-          ? [`Review the course materials for ${studyTarget}.`]
-          : [],
-        difficultyAreas: belowPassingScore ? [studyTarget] : [],
-      };
-    });
+        return {
+          assessmentId,
+          assessmentName: entry.title,
+          predictedScore,
+          recommendation: belowPassingScore
+            ? `Review ${studyTarget}; your predicted score is below the ${entry.passingScore}% passing score.`
+            : `Your predicted score is above the passing score. Continue practicing ${studyTarget}.`,
+          recommendedPreparation: belowPassingScore
+            ? [`Review the course materials for ${studyTarget}.`]
+            : [],
+          difficultyAreas: belowPassingScore ? [studyTarget] : [],
+        };
+      }),
+    );
   }
 
   async getUserAssessmentPrediction(userId: string, assessmentId: string) {
@@ -815,7 +817,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
           );
 
           // Filter for assessment-type recommendations
-          const assessmentRecs = (response.items || [])
+          const assessmentRecs = response.items
             .filter((item) => item.type === 'assessment')
             .map((item) => ({
               assessmentId: item.id,
@@ -849,7 +851,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
     userId: string,
   ): Promise<Record<string, unknown>> {
     try {
-      const cacheKey = ANALYTICS_CACHE_CONFIG.ASSESSMENT.PERFORMANCE(userId);
+      const cacheKey = `${ANALYTICS_CACHE_CONFIG.ASSESSMENT.PERFORMANCE(userId)}:assessment-summary:v2`;
 
       const cached = await this.redisService.get<string>(cacheKey);
       if (typeof cached === 'string') {
@@ -860,7 +862,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
       const startTime = Date.now();
       const grpcResp = await this.callGrpc(
         this.analyticsServiceGrpc.getDetailedLearningAnalytics({
-          userId: userId,
+          userId,
         }),
       );
       const responseTimeMs = Date.now() - startTime;
@@ -876,13 +878,16 @@ export class AssessmentAnalyticsService implements OnModuleInit {
         timestamp: new Date(),
       });
 
+      const metrics = grpcResp.performanceMetrics;
+      if (!metrics) {
+        throw new Error('Rust analytics omitted assessment performance metrics');
+      }
       const analytics = {
         userId,
-        averageScore:
-          grpcResp.performanceMetrics?.averageAssessmentScore || 0,
-        passRate: grpcResp.performanceMetrics?.passRate || 0,
-        weaknessAreas: grpcResp.performanceMetrics?.weaknessAreas || [],
-        strengthAreas: grpcResp.performanceMetrics?.strengthAreas || [],
+        averageScore: metrics.averageAssessmentScore,
+        passRate: metrics.passRate,
+        weaknessAreas: metrics.weaknessAreas,
+        strengthAreas: metrics.strengthAreas,
       };
 
       await this.redisService.set(
@@ -928,12 +933,11 @@ export class AssessmentAnalyticsService implements OnModuleInit {
         }),
       );
 
-      const recommendations =
-        response.areas?.map((a) => ({
+      const recommendations = response.areas.map((a) => ({
           topic: a.topic,
           cardCount: a.cardCount,
           passRate: a.passRate,
-        })) || [];
+        }));
 
       await this.redisService.set(
         cacheKey,
@@ -953,12 +957,12 @@ export class AssessmentAnalyticsService implements OnModuleInit {
   /**
    * Get due flashcards/reviews for spaced repetition via Rust analytics gRPC
    */
-  async getDueCards(userId: string): Promise<any[]> {
+  async getDueCards(userId: string) {
     try {
       const grpcResp = await this.callGrpc(
-        this.analyticsServiceGrpc.getDueCards({ userId: userId }),
+        this.analyticsServiceGrpc.getDueCards({ userId }),
       );
-      return (grpcResp as any).cards || [];
+      return grpcResp.cards;
     } catch (error) {
       this.logger.error(
         `Failed to get due cards via gRPC: ${getErrorMessage(error)}`,
@@ -1045,10 +1049,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
         timestamp: new Date(),
       });
 
-      const result = {
-        score: grpcResp.score,
-        confidence: (grpcResp as any).confidence,
-      };
+      const result = { score: grpcResp.score };
       await this.redisService.set(
         cacheKey,
         JSON.stringify(result),
@@ -1066,59 +1067,54 @@ export class AssessmentAnalyticsService implements OnModuleInit {
   /**
    * Get performance analytics for a user
    */
-  async getPerformanceAnalytics(userId: string): Promise<any> {
+  async getPerformanceAnalytics(userId: string): Promise<{
+    userId: string;
+    totalAssessments: number;
+    averageScore: number;
+    performanceBySkill: Record<string, number>;
+    strengthAreas: string[];
+    weaknessAreas: string[];
+  }> {
     try {
-      const cacheKey = ANALYTICS_CACHE_CONFIG.ASSESSMENT.PERFORMANCE(userId);
+      const cacheKey = `${ANALYTICS_CACHE_CONFIG.ASSESSMENT.PERFORMANCE(userId)}:v2`;
       const cached = await this.redisService.get<string>(cacheKey);
       if (typeof cached === 'string') {
         return JSON.parse(cached);
       }
 
-      try {
-        const startTime = Date.now();
-        const grpcResp = await this.callGrpc(
-          this.analyticsServiceGrpc.getDetailedLearningAnalytics({
-            userId: userId,
-          }),
-        );
-        const responseTimeMs = Date.now() - startTime;
+      const startTime = Date.now();
+      const response = await this.requestAssessmentPerformanceAnalytics(userId);
+      const responseTimeMs = Date.now() - startTime;
+      const analytics = {
+        userId,
+        totalAssessments: response.totalAttempts,
+        averageScore: response.averageScore,
+        performanceBySkill: Object.fromEntries(
+          response.categoryBreakdown.map(({ category, score }) => [
+            category,
+            score,
+          ]),
+        ),
+        strengthAreas: response.strengths,
+        weaknessAreas: response.weaknesses,
+      };
 
-        void this.performanceMetrics.recordMetric({
-          endpoint: ANALYTICS_METRICS_CONFIG.ENDPOINTS.ASSESSMENT,
-          method: 'GET',
-          provider: ANALYTICS_METRICS_CONFIG.PROVIDERS.GRPC,
-          userId,
-          responseTimeMs,
-          cacheHit: false,
-          success: true,
-          timestamp: new Date(),
-        });
-
-        const analytics = {
-          userId,
-          totalAssessments: (grpcResp.performanceMetrics?.weaknessAreas || [])
-            .length,
-          averageScore:
-            grpcResp.userLearningSummary?.averageSessionLength || 0,
-          performanceBySkill:
-            grpcResp.performanceMetrics?.weaknessAreas?.reduce(
-              (acc: any, skill: string) => ({ ...acc, [skill]: 0 }),
-              {},
-            ) || {},
-        };
-
-        await this.redisService.set(
-          cacheKey,
-          JSON.stringify(analytics),
-          this.cacheTtl,
-        );
-        return analytics;
-      } catch (grpcErr) {
-        this.logger.warn(
-          `gRPC getPerformanceAnalytics failed: ${getErrorMessage(grpcErr)}`,
-        );
-        throw grpcErr;
-      }
+      void this.performanceMetrics.recordMetric({
+        endpoint: ANALYTICS_METRICS_CONFIG.ENDPOINTS.ASSESSMENT,
+        method: 'GET',
+        provider: ANALYTICS_METRICS_CONFIG.PROVIDERS.GRPC,
+        userId,
+        responseTimeMs,
+        cacheHit: false,
+        success: true,
+        timestamp: new Date(),
+      });
+      await this.redisService.set(
+        cacheKey,
+        JSON.stringify(analytics),
+        this.cacheTtl,
+      );
+      return analytics;
     } catch (error) {
       this.logger.error(
         `Error in getPerformanceAnalytics: ${getErrorMessage(error)}`,
@@ -1245,61 +1241,26 @@ export class AssessmentAnalyticsService implements OnModuleInit {
     }
   }
 
-  /**
-   * Backwards-compatible wrapper used by education callers — generates a
-   * PerformanceAnalyticsDto for the given user (optionally scoped to an assessment
-   * and/or timeframe). This method is gRPC-first but will supplement results
-   * from local DB if needed for fields not provided by the Rust service.
-   */
+  /** Generates assessment analytics through the Rust analytics service. */
   async generateAnalytics(
     userId: string,
     assessmentId?: string,
   ): Promise<PerformanceAnalyticsDto> {
-    try {
-      // Strictly gRPC
-      const analytics = await this.getPerformanceAnalytics(userId);
-
-      // We no longer gather recent attempts locally in the proxy service.
-      // Callers (domain services) should do this if they need to merge.
-      // However, to keep DTO compatibility, we return what gRPC gives us.
-
-      const dto: PerformanceAnalyticsDto = {
-        userId,
-        overallScore: Math.round(analytics.averageScore || 0),
-        totalAttempts: analytics.totalAttempts || 0,
-        correctAnswers: analytics.correctAnswers || 0,
-        quizId: assessmentId,
-        averageScore: analytics.averageScore || undefined,
-        recentScores: analytics.recentScores || [],
-        questionsAttempted: analytics.questionsAttempted || 0,
-        timeTaken: analytics.timeTaken || 0,
-        timeSpent: analytics.timeSpent || 0,
-        weakAreas: analytics.weaknessAreas || [],
-        progressTrend: {},
-        averageTimePerQuestion: 0,
-        timePerQuestion: 0,
-        topicScores: {},
-        strengths: analytics.strengthAreas || [],
-        weaknesses: analytics.weaknessAreas || [],
-      };
-
-      return dto;
-    } catch (error) {
-      this.logger.warn(
-        `generateAnalytics gRPC failure: ${getErrorMessage(error)}`,
-      );
-      throw error;
-    }
+    const response = await this.requestAssessmentPerformanceAnalytics(
+      userId,
+      assessmentId,
+    );
+    return this.mapAssessmentPerformanceAnalytics(response);
   }
 
   async identifyStrengths(userId: string): Promise<string[]> {
     const analytics = await this.getPerformanceAnalytics(userId);
-    return analytics.strengthAreas || [];
+    return analytics.strengthAreas;
   }
 
   async identifyWeaknesses(userId: string): Promise<string[]> {
     const analytics = await this.getPerformanceAnalytics(userId);
-    return analytics.weaknessAreas || [];
+    return analytics.weaknessAreas;
   }
 
   async analyzeDifficulty(
@@ -1318,17 +1279,70 @@ export class AssessmentAnalyticsService implements OnModuleInit {
    * Backwards-compatible wrapper used by education callers to fetch
    * a user performance profile from Rust analytics.
    */
-  async getUserPerformanceProfile(userId: string): Promise<any> {
+  async getUserPerformanceProfile(
+    userId: string,
+  ): Promise<UserPerformanceProfileDto> {
     try {
-      // Strictly gRPC
-      const resp: any = await this.callGrpc(
-        this.grpc().getDetailedLearningAnalytics({ userId: userId }),
-      );
+      const [learningAnalytics, assessmentAnalytics, userAbility] =
+        await Promise.all([
+          this.callGrpc(
+            this.analyticsServiceGrpc.getDetailedLearningAnalytics({
+              userId,
+            }),
+          ),
+          this.requestAssessmentPerformanceAnalytics(userId),
+          this.callGrpc(
+            this.analyticsServiceGrpc.getUserAbility({ userId }),
+          ),
+        ]);
+      const { courseStats, pathStats } = learningAnalytics;
+        const performanceMetrics = learningAnalytics.performanceMetrics;
+        if (!courseStats || !pathStats || !performanceMetrics) {
+          throw new Error(
+            'Rust analytics omitted required course, path, or performance statistics',
+          );
+      }
+      const categoryValues = Object.values(QuestionCategory);
+      const knowledgeGaps = assessmentAnalytics.weaknesses.map((category) => {
+        const normalized = category.toLowerCase().replaceAll(' ', '_');
+        const questionCategory = categoryValues.find(
+          (value) => value === normalized,
+        );
+        if (!questionCategory) {
+          throw new Error(
+            `Rust analytics returned unsupported question category: ${category}`,
+          );
+        }
+        return questionCategory;
+      });
       return {
-        userId: resp?.userId,
-        overallScore: resp?.performanceMetrics?.averageAssessmentScore ?? 0,
-        strengths: resp?.userLearningSummary?.strongestSubjects || [],
-        weaknesses: resp?.userLearningSummary?.weakestSubjects || [],
+        userId,
+        recentPerformance: {
+          correct: assessmentAnalytics.correctAnswers,
+          total: assessmentAnalytics.questionsAttempted,
+          averageTime: assessmentAnalytics.timePerQuestion,
+        },
+        knowledgeGaps,
+        totalCourses: courseStats.totalCourses,
+        completedCourses: courseStats.completedCourses,
+        totalLearningPaths: pathStats.totalLearningPaths,
+        completedLearningPaths: pathStats.completedLearningPaths,
+        categoryAbilities: Object.fromEntries(
+          assessmentAnalytics.categoryBreakdown.map(({ category, score }) => [
+            category,
+            score,
+          ]),
+        ),
+        overallAbility: userAbility.estimatedAbility,
+        overallScore: assessmentAnalytics.averageScore,
+        performanceMetrics: {
+          averageAssessmentScore: performanceMetrics.averageAssessmentScore,
+          passRate: performanceMetrics.passRate,
+          improvementRate: performanceMetrics.improvementRate,
+        },
+        strengths: assessmentAnalytics.strengths,
+        weaknesses: assessmentAnalytics.weaknesses,
+        skill_prob_by_skill: userAbility.pKnownBySkill,
       };
     } catch (error) {
       this.logger.warn(
@@ -1347,14 +1361,14 @@ export class AssessmentAnalyticsService implements OnModuleInit {
   ): Promise<any[]> {
     try {
       // Strictly gRPC
-      const resp: any = await this.callGrpc(
-        this.grpc().getQuizAttemptHistory({
+      const resp = await this.callGrpc(
+        this.analyticsServiceGrpc.getQuizAttemptHistory({
           userId,
-          limit: options?.limit,
-          offset: options?.offset,
+          limit: options?.limit ?? 0,
+          offset: options?.offset ?? 0,
         }),
       );
-      return (resp?.attempts || []) as any[];
+      return resp.attempts;
     } catch (error) {
       this.logger.warn(
         `getQuizAttemptHistory gRPC failure: ${getErrorMessage(error)}`,
@@ -1398,10 +1412,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
       // Note: The proto interface definition wrapper might case-convert key names depending on config,
       // but usually it's camelCase in the generated interface if we defined it that way.
       // However, our interface manually types it as `pKnownBySkill`.
-      const mastery =
-        (grpcResp as any).pKnownBySkill ||
-        (grpcResp as any).p_known_by_skill ||
-        {};
+      const mastery = grpcResp.pKnownBySkill;
 
       await this.redisService.set(
         cacheKey,
@@ -1442,7 +1453,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
 
       // Strictly gRPC
       const startTime = Date.now();
-      const grpcResp: any = await this.callGrpc(
+      const grpcResp = await this.callGrpc(
         this.analyticsServiceGrpc.getSpacedRepetitionStats({ userId: userId }),
       );
       const responseTimeMs = Date.now() - startTime;
@@ -1458,20 +1469,10 @@ export class AssessmentAnalyticsService implements OnModuleInit {
         timestamp: new Date(),
       });
 
-      const stats = {
-        totalCards: grpcResp?.totalCards ?? grpcResp?.total_cards ?? 0,
-        dueToday: grpcResp?.dueToday ?? grpcResp?.due_today ?? 0,
-        masteredCards: grpcResp?.masteredCards ?? grpcResp?.mastered_cards ?? 0,
-        learningCards: grpcResp?.learningCards ?? grpcResp?.learning_cards ?? 0,
-        relearningCards:
-          grpcResp?.relearningCards ?? grpcResp?.relearning_cards ?? 0,
-        avgEaseFactor:
-          grpcResp?.avgEaseFactor ?? grpcResp?.avg_ease_factor ?? 2.5,
-        avgIntervalDays:
-          grpcResp?.avgIntervalDays ?? grpcResp?.avg_interval_days ?? 0,
-        recentPassRate:
-          grpcResp?.recentPassRate ?? grpcResp?.recent_pass_rate ?? 0,
-      };
+      if (!grpcResp.stats) {
+        throw new Error('Rust analytics omitted spaced repetition statistics');
+      }
+      const stats = grpcResp.stats;
 
       await this.redisService.set(
         cacheKey,
@@ -1489,152 +1490,68 @@ export class AssessmentAnalyticsService implements OnModuleInit {
 
   // ==================== CONSOLIDATED RECOMMENDATIONS METHODS ====================
 
-  /**
-   * Generate performance analytics from DB (category breakdown, trends, strengths/weaknesses)
-   * This is merged from assessment-recommendations.service.ts
-   */
+  private async requestAssessmentPerformanceAnalytics(
+    userId: string,
+    assessmentId?: string,
+  ) {
+    return this.callGrpc(
+      this.analyticsServiceGrpc.getAssessmentPerformanceAnalytics({
+        userId,
+        quizId: assessmentId ?? '',
+      }),
+    );
+  }
+
+  private mapAssessmentPerformanceAnalytics(
+    response: AssessmentPerformanceAnalyticsResponse,
+  ): PerformanceAnalyticsDto {
+    return {
+      userId: response.userId,
+      quizId: response.quizId || undefined,
+      overallScore: response.overallScore,
+      averageScore: response.averageScore,
+      totalAttempts: response.totalAttempts,
+      recentScores: response.recentScores,
+      questionsAttempted: response.questionsAttempted,
+      correctAnswers: response.correctAnswers,
+      timeTaken: response.timeTaken,
+      timeSpent: response.timeSpent,
+      timePerQuestion: response.timePerQuestion,
+      averageTimePerQuestion: response.averageTimePerQuestion,
+      weakAreas: response.weaknesses,
+      progressTrend: response.progressTrend,
+      difficultyBreakdown: Object.fromEntries(
+        response.difficultyBreakdown.map(({ difficulty, correctAnswers }) => [
+          difficulty,
+          correctAnswers,
+        ]),
+      ),
+      categoryBreakdown: response.categoryBreakdown.map((category) => ({
+        category: category.category,
+        correct: category.correct,
+        total: category.total,
+        percentage: category.score,
+        score: category.score,
+        questionsAnswered: category.questionsAnswered,
+        averageTime: category.averageTime,
+        strengths: category.isStrength ? [category.category] : [],
+        weaknesses: category.isWeakness ? [category.category] : [],
+      })),
+      learningTrends: response.learningTrends,
+      strengths: response.strengths,
+      weaknesses: response.weaknesses,
+    };
+  }
+
   private async generatePerformanceAnalytics(
     userId: string,
     assessmentId?: string,
-  ): Promise<any> {
-    return await this.prisma.$transaction(async (tx) => {
-      const where: { userId: string; quizId?: string } = { userId };
-      if (assessmentId) {
-        where.quizId = assessmentId;
-      }
-      const attempts = await tx.quizAttempt.findMany({
-        where: { ...where, completedAt: { not: null } },
-        include: {
-          quiz: { include: { questions: { include: { question: true } } } },
-        },
-        orderBy: { startedAt: 'desc' },
-      });
-
-      const responses = await tx.userResponse.findMany({
-        where: {
-          userId,
-          attemptId: { in: attempts.map((attempt) => attempt.id) },
-          ...(assessmentId && {
-            question: { quizQuestions: { some: { quizId: assessmentId } } },
-          }),
-        },
-        include: { question: true },
-        orderBy: { createdAt: 'desc' },
-      });
-
-      const categories = [
-        'Anatomy',
-        'Pharmacology',
-        'Physiology',
-        'Clinical Pharmacy',
-        'Pathology',
-        'Biochemistry',
-      ];
-      const categoryBreakdown = categories
-        .map((category) => {
-          const categoryResponses = responses.filter(
-            (r) =>
-              r.question.category?.toLowerCase() ===
-              category.toLowerCase().replace(' ', '_'),
-          );
-          const correct = categoryResponses.filter((r) => r.isCorrect).length;
-          const total = categoryResponses.length;
-          const score = total > 0 ? (correct / total) * 100 : 0;
-
-          return {
-            category,
-            score,
-            questionsAnswered: total,
-            averageTime:
-              total > 0
-                ? categoryResponses.reduce(
-                  (sum, r) => sum + (r.responseTime || 0),
-                    0,
-                  ) / total
-                : 0,
-            strengths: score >= 80 ? [category] : [],
-            weaknesses: score < 60 && total > 0 ? [category] : [],
-          };
-        })
-        .filter((b) => b.questionsAnswered > 0);
-
-      const allScores = attempts.map((attempt) => attempt.score);
-      const recentScores = allScores.slice(0, 5);
-      const overallScore =
-        allScores.length > 0
-          ? allScores.reduce((sum, score) => sum + score, 0) / allScores.length
-          : 0;
-      const averageScore = overallScore;
-
-      const learningTrends = attempts.map((attempt) => ({
-        date: attempt.startedAt.toISOString(),
-        score: attempt.score,
-        category: 'Overall',
-      }));
-
-      const strengths = categoryBreakdown
-        .filter((b) => b.score >= 80)
-        .map((b) => b.category);
-      const weaknesses = categoryBreakdown
-        .filter((b) => b.score < 60)
-        .map((b) => b.category);
-
-      const difficultyBreakdown = {
-        easy: 0,
-        medium: 0,
-        hard: 0,
-      };
-
-      responses.forEach((response) => {
-        const difficulty =
-          response.question.difficulty?.toLowerCase() || 'medium';
-        if (difficulty in difficultyBreakdown) {
-          difficultyBreakdown[difficulty as keyof typeof difficultyBreakdown] +=
-            response.isCorrect ? 1 : 0;
-        }
-      });
-
-      const questionsAttempted = attempts.reduce(
-        (total, attempt) => total + attempt.totalQuestions,
-        0,
-      ) || responses.length;
-      const correctAnswers = attempts.reduce(
-        (total, attempt) => total + attempt.correctAnswers,
-        0,
-      ) || responses.filter((response) => response.isCorrect).length;
-      const responseTime = responses.reduce(
-        (sum, response) => sum + (response.responseTime || 0),
-        0,
-      );
-      const timeTaken = responseTime || attempts.reduce(
-        (sum, attempt) => sum + (attempt.timeTaken || 0),
-        0,
-      );
-
-      return {
-        userId,
-        quizId: assessmentId || '',
-        overallScore,
-        averageScore,
-        recentScores,
-        questionsAttempted,
-        correctAnswers,
-        timeTaken,
-        timeSpent: Math.round(timeTaken / 60),
-        timePerQuestion:
-          questionsAttempted > 0
-            ? Math.round((timeTaken / questionsAttempted) * 100) / 100
-            : 0,
-        totalAttempts: attempts.length,
-        categoryBreakdown, // Now an array of category objects
-        learningTrends,
-        strengths,
-        weaknesses,
-        knowledgeGaps: [], // Added for compatibility
-        studyRecommendations: [], // Added for compatibility
-        nextSteps: [], // Added for compatibility
-      };
-    });
+  ): Promise<PerformanceAnalyticsDto> {
+    const response = await this.requestAssessmentPerformanceAnalytics(
+      userId,
+      assessmentId,
+    );
+    return this.mapAssessmentPerformanceAnalytics(response);
   }
 
   /**
@@ -1647,7 +1564,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
     const cacheKey = `${ANALYTICS_CACHE_CONFIG.ASSESSMENT.PREDICTIONS(
       userId,
       assessmentId,
-    )}:v2`;
+    )}:v3`;
     const _cachedAnalytics = await this.redisService.get<string>(cacheKey);
     if (typeof _cachedAnalytics === 'string') {
       this.logger.log(`Retrieved cached analytics for user ${userId}`);
@@ -1668,48 +1585,32 @@ export class AssessmentAnalyticsService implements OnModuleInit {
   }
 
   async getQuizHistory(userId: string) {
-    const attempts = await this.prisma.quizAttempt.findMany({
-      where: { userId, completedAt: { not: null } },
-      include: {
-        quiz: {
-          select: {
-            title: true,
-            unit: { select: { id: true, title: true, name: true } },
-          },
-        },
-      },
-      orderBy: { completedAt: 'desc' },
-    });
-
-    const scores = attempts.map(attempt => attempt.percentage ?? attempt.score);
-    const totalTimeSpentSeconds = attempts.reduce(
-      (total, attempt) => total + (attempt.timeTaken ?? 0),
-      0,
+    const response = await this.callGrpc(
+      this.analyticsServiceGrpc.getQuizAttemptHistory({
+        userId,
+        limit: 0,
+        offset: 0,
+      }),
     );
-
     return {
-      attempts: attempts.map(attempt => ({
-        id: attempt.id,
+      attempts: response.attempts.map((attempt) => ({
+        id: attempt.attemptId,
         quizId: attempt.quizId,
-        quizTitle: attempt.quiz.title,
-        score: attempt.percentage ?? attempt.score,
+        quizTitle: attempt.quizTitle,
+        score: attempt.score,
         totalQuestions: attempt.totalQuestions,
         correctAnswers: attempt.correctAnswers,
-        timeSpent: Math.round((attempt.timeTaken ?? 0) / 60),
-        completedAt: attempt.completedAt,
-        unitId: attempt.quiz.unit?.id ?? '',
-        unitTitle: attempt.quiz.unit?.title ?? attempt.quiz.unit?.name ?? '',
+        timeSpent: Math.round(attempt.timeTakenSeconds / 60),
+        completedAt: attempt.date,
+        unitId: attempt.unitId,
+        unitTitle: attempt.unitTitle,
       })),
       stats: {
-        totalAttempts: attempts.length,
-        averageScore:
-          scores.length > 0
-            ? scores.reduce((total, score) => total + score, 0) / scores.length
-            : 0,
-        bestScore: scores.length > 0 ? Math.max(...scores) : 0,
-        totalTimeSpent: Math.round(totalTimeSpentSeconds / 60),
-        recentImprovement:
-          scores.length > 1 ? scores[0] - scores[1] : 0,
+        totalAttempts: response.totalAttempts,
+        averageScore: response.averageScore,
+        bestScore: response.bestScore,
+        totalTimeSpent: Math.round(response.totalTimeSpentSeconds / 60),
+        recentImprovement: response.recentImprovement,
       },
     };
   }
@@ -1777,98 +1678,34 @@ export class AssessmentAnalyticsService implements OnModuleInit {
    * (merged from consolidated-analytics.service.ts)
    */
   async getConsolidatedAnalytics(): Promise<any> {
-    const cacheKey = 'consolidated-analytics:all';
+    const cacheKey = 'consolidated-analytics:all:v2';
     try {
       const cached = await this.redisService.get<any>(cacheKey);
       if (cached) {
         return typeof cached === 'string' ? JSON.parse(cached) : cached;
       }
-    } catch {
-      // cache retrieval failed, continue to compute
-    }
 
-    try {
-      const [
-        totalUsers,
-        activeUsers,
-        completedCourses,
-        totalEnrollments,
-        avgScoreResult,
-        totalStudyTimeResult,
-      ] = await Promise.all([
-        this.prisma.user.count(),
-        this.prisma.user.count({
-          where: {
-            lastLogin: {
-              gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
-            },
-          },
-        }),
-        this.prisma.courseEnrollment.count({
-          where: { status: 'completed' },
-        }),
-        this.prisma.courseEnrollment.count(),
-        this.prisma.quizAttempt.aggregate({
-          _avg: { score: true },
-        }),
-        this.prisma.progress.aggregate({
-          _sum: { timeSpent: true },
-        }),
-      ]);
-
-      const completionRate =
-        totalEnrollments > 0
-          ? Math.round((completedCourses / totalEnrollments) * 100)
-          : 0;
-      const avgScore = avgScoreResult._avg.score
-        ? Math.round(avgScoreResult._avg.score)
-        : 78;
-      const totalStudyHours = Math.round(
-        (totalStudyTimeResult._sum.timeSpent || 0) / 60,
+      const analytics = await this.callGrpc(
+        this.analyticsServiceGrpc.getSystemAnalytics({}),
       );
-
       const result = {
-        coursesCompleted: completedCourses,
-        averageScore: avgScore,
-        totalStudyHours: totalStudyHours,
-        achievementsUnlocked: 0,
-        peerRanking: 'Top 15%',
-        learningEfficiency: 85,
+        coursesCompleted: analytics.completedCourses,
+        averageScore: Math.round(analytics.averageAssessmentScore),
+        totalStudyHours: Math.round(analytics.totalStudyTimeMinutes / 60),
         overview: {
-          totalUsers,
-          activeUsers,
-          completionRate,
-          averageDailyStudyHours: 2.5,
-          topPerformingCourse: 'Clinical Medicine',
+          totalUsers: analytics.totalUsers,
+          activeUsers: analytics.activeLearners,
+          completionRate: Math.round(analytics.averageCompletionRate),
         },
       };
 
-      try {
-        await this.redisService.set(cacheKey, result, this.cacheTtl);
-      } catch {
-        // ignore cache write error
-      }
-
+      await this.redisService.set(cacheKey, result, this.cacheTtl);
       return result;
     } catch (error) {
       this.logger.error(
-        `Error computing consolidated analytics: ${getErrorMessage(error)}`,
+        `Failed to get consolidated analytics from Rust: ${getErrorMessage(error)}`,
       );
-      return {
-        coursesCompleted: 0,
-        averageScore: 75,
-        totalStudyHours: 0,
-        achievementsUnlocked: 0,
-        peerRanking: 'N/A',
-        learningEfficiency: 80,
-        overview: {
-          totalUsers: 0,
-          activeUsers: 0,
-          completionRate: 0,
-          averageDailyStudyHours: 0,
-          topPerformingCourse: 'N/A',
-        },
-      };
+      throw error;
     }
   }
 

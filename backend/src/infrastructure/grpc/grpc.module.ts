@@ -3,7 +3,7 @@ import { ClientsModule, Transport } from '@nestjs/microservices';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { join } from 'path';
 import { existsSync } from 'fs';
-import { of } from 'rxjs';
+import { throwError } from 'rxjs';
 import { InterceptingCall } from '@grpc/grpc-js';
 
 // Resolve proto path in a runtime-safe way:
@@ -98,9 +98,7 @@ if (enableGrpc) {
 
 // Provide a lightweight stub for the ClientGrpc package token when GRPC is
 // disabled so modules that inject the token do not fail during DI resolution.
-// The stub returns a proxy whose methods return an rxjs Observable (of({})),
-// which keeps downstream call sites that expect Observables working without
-// requiring the external analytics gRPC service to be available.
+// The stub rejects calls explicitly when the Rust analytics service is disabled.
 const stubAnalyticsPackageProvider = {
   provide: 'ANALYTICS_PACKAGE',
   useValue: {
@@ -109,7 +107,13 @@ const stubAnalyticsPackageProvider = {
         {},
         {
           get: () => {
-            return (..._args: any[]) => of({});
+            return (..._args: any[]) =>
+              throwError(
+                () =>
+                  new Error(
+                    'Rust analytics gRPC is disabled; set ENABLE_GRPC=true',
+                  ),
+              );
           },
         },
       );

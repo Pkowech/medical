@@ -64,21 +64,26 @@ export class AdminAnalyticsService implements OnModuleInit {
 
   getProgressRecordsForPeriod(start: string, end: string) {
     this.logger.log(`getProgressRecordsForPeriod: ${start} to ${end}`);
-    return Promise.resolve([]);
+    return this.callGrpc(
+      this.analyticsServiceGrpc.getProgressRecordsForPeriod({ start, end }),
+    );
   }
 
   processAnalyticsForUsers(userIds: string[]) {
     this.logger.log(`processAnalyticsForUsers: ${userIds.length} users`);
-    return Promise.resolve({ success: true, processed: 0 });
+    return this.callGrpc(
+      this.analyticsServiceGrpc.processAnalyticsForUsers({ userIds }),
+    );
   }
 
   getTrendingPaths(limit: number) {
     this.logger.log(`getTrendingPaths: limit ${limit}`);
-    return Promise.resolve([]);
+    return this.callGrpc(
+      this.analyticsServiceGrpc.getTrendingPaths({ limit }),
+    );
   }
 
-  // Placeholder methods for other analytics functionality
   getSystemAnalyticsFromAI() {
-    return Promise.resolve({ message: 'AI Analytics not yet fully integrated' });
+    return this.getSystemAnalytics();
   }
 }

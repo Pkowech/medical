@@ -11,7 +11,10 @@ import {
 } from './analytics-cache.constants';
 import { getErrorMessage } from '#common/utils/error.utils';
 import { PerformanceMetricsService } from '#infrastructure/monitoring/performance-metrics.service';
-import { StudyPatternsResponseDto } from '#common/dto';
+import {
+  StudyPatternsResponseDto,
+  StudyRecommendationDto,
+} from '#common/dto';
 
 import { PrismaService } from '#infrastructure/prisma/prisma.service';
 
@@ -50,7 +53,7 @@ export class StudyAnalyticsService implements OnModuleInit {
    * Analyze study patterns for a user
    * Consolidates implementations from:
    * - ai-analytics.service.ts (gRPC-first approach with caching)
-   * - learning-analytics.service.ts (gRPC with local fallback)
+   * - learning-analytics.service.ts (gRPC implementation)
    * - learning-path-recommendations.service.ts (local analysis)
    *
    * This is the primary implementation using gRPC with proper error handling and caching.
@@ -59,7 +62,7 @@ export class StudyAnalyticsService implements OnModuleInit {
     userId: string,
   ): Promise<StudyPatternsResponseDto> {
     const startTime = Date.now();
-    const cacheKey = ANALYTICS_CACHE_CONFIG.LEARNING.PATTERNS(userId);
+    const cacheKey = `${ANALYTICS_CACHE_CONFIG.LEARNING.PATTERNS(userId)}:v2`;
     const dedupKey = ANALYTICS_CACHE_CONFIG.DEDUP(cacheKey);
 
     try {
@@ -81,39 +84,28 @@ export class StudyAnalyticsService implements OnModuleInit {
       return await this.requestDeduplicationService.executeWithDedup(
         dedupKey,
         async () => {
-          // Try gRPC first
           try {
             const grpcResp = await this.callGrpc(
-              this.analyticsServiceGrpc.getDetailedLearningAnalytics({
-                userId: userId,
-              }),
+              this.analyticsServiceGrpc.getStudyPatterns({ userId }),
             );
-
+            if (!grpcResp.studyDuration || !grpcResp.preferredStudyTimes) {
+              throw new Error(
+                'Rust analytics omitted study duration or preferred study times',
+              );
+            }
             const mapped: StudyPatternsResponseDto = {
-              userId,
-              patterns: (grpcResp.progressTrends ?? []).map((trend: { type: string }) =>
-                trend.type.toUpperCase(),
-              ),
-              consistency: grpcResp.userLearningSummary?.averageSessionLength ?? 0,
-              timeDistribution: {},
+              userId: grpcResp.userId,
+              patterns: grpcResp.patterns,
+              consistency: grpcResp.consistency,
+              timeDistribution: grpcResp.timeDistribution,
               studyDuration: {
-                averageDuration: grpcResp.userLearningSummary?.averageSessionLength ?? 0,
-                longestSession: 0,
-                shortestSession: 0,
+                averageDuration: grpcResp.studyDuration.averageDuration,
+                longestSession: grpcResp.studyDuration.longestSession,
+                shortestSession: grpcResp.studyDuration.shortestSession,
               },
-              consistencyScore: grpcResp.userLearningSummary
-                ? Math.min(
-                    1,
-                    (grpcResp.userLearningSummary.averageSessionLength || 0) / 60,
-                  )
-                : 0,
-              preferredStudyTimes: { morning: 0, afternoon: 0, evening: 0 },
-              performanceByTopic:
-                Object.fromEntries(
-                  (grpcResp.performanceMetrics?.weaknessAreas ?? []).map(
-                    (topic: string) => [topic, 0],
-                  ),
-                ),
+              consistencyScore: grpcResp.consistencyScore,
+              preferredStudyTimes: grpcResp.preferredStudyTimes,
+              performanceByTopic: grpcResp.performanceByTopic,
             };
 
             await this.redisService.set(
@@ -138,21 +130,7 @@ export class StudyAnalyticsService implements OnModuleInit {
             this.logger.warn(
               `gRPC analyzeStudyPatterns (detailed analytics) failed: ${getErrorMessage(grpcErr)}`,
             );
-            // Return empty DTO on gRPC failure
-            return {
-              userId,
-              patterns: [],
-              consistency: 0,
-              timeDistribution: {},
-              studyDuration: {
-                averageDuration: 0,
-                longestSession: 0,
-                shortestSession: 0,
-              },
-              preferredStudyTimes: { morning: 0, afternoon: 0, evening: 0 },
-              performanceByTopic: {},
-              consistencyScore: 0,
-            };
+            throw grpcErr;
           }
         },
       );
@@ -160,20 +138,7 @@ export class StudyAnalyticsService implements OnModuleInit {
       this.logger.error(
         `Error in analyzeStudyPatterns: ${getErrorMessage(error)}`,
       );
-      return {
-        userId,
-        patterns: [],
-        consistency: 0,
-        timeDistribution: {},
-        studyDuration: {
-          averageDuration: 0,
-          longestSession: 0,
-          shortestSession: 0,
-        },
-        preferredStudyTimes: { morning: 0, afternoon: 0, evening: 0 },
-        performanceByTopic: {},
-        consistencyScore: 0,
-      };
+      throw error;
     }
   }
 
@@ -183,47 +148,30 @@ export class StudyAnalyticsService implements OnModuleInit {
    * - ai-analytics.service.ts (gRPC approach)
    * - assessment-recommendations.service.ts (Prisma local approach with caching)
    *
-   * Uses hybrid approach: gRPC for AI recommendations, Prisma fallback for local materials.
+   * Rust generates recommendations; NestJS applies domain authorization filters.
    */
   async generateStudyRecommendations(
     userId: string,
     knowledgeGaps: string[],
-  ): Promise<
-    Array<{
-      id: string;
-      type: string;
-      title: string;
-      url?: string;
-      priority: string;
-    }>
-  > {
+  ): Promise<StudyRecommendationDto[]> {
     try {
-      const cacheKey = ANALYTICS_CACHE_CONFIG.RECOMMENDATIONS.STUDY_WITH_GAPS(
+      const cacheKey = `${ANALYTICS_CACHE_CONFIG.RECOMMENDATIONS.STUDY_WITH_GAPS(
         userId,
         knowledgeGaps,
-      );
+      )}:v2`;
       const cached = await this.redisService.get<string>(cacheKey);
       if (typeof cached === 'string') {
-        return JSON.parse(cached);
+        return JSON.parse(cached) as StudyRecommendationDto[];
       }
 
-      // Strictly gRPC
-      const grpcResp: any = await this.callGrpc(
+      const grpcResp = await this.callGrpc(
         this.analyticsServiceGrpc.generateStudyRecommendations({
-          userId: userId,
-          knowledgeGaps: knowledgeGaps,
+          userId,
+          knowledgeGaps,
         }),
       );
-
-      const recommendations = (grpcResp?.recommendations || []).map(
-        (rec: any) => ({
-          id: rec.materialId || rec.id,
-          type: rec.type || 'MATERIAL',
-          title: rec.title || 'Study Material',
-          url: rec.url,
-          priority: rec.priority || 'MEDIUM',
-        }),
-      );
+      const recommendations: StudyRecommendationDto[] =
+        grpcResp.recommendations;
 
       await this.redisService.set(
         cacheKey,
@@ -236,7 +184,7 @@ export class StudyAnalyticsService implements OnModuleInit {
       this.logger.error(
         `Error generating study recommendations via gRPC: ${getErrorMessage(error)}`,
       );
-      return [];
+      throw error;
     }
   }
 
@@ -247,12 +195,12 @@ export class StudyAnalyticsService implements OnModuleInit {
   async getDueCards(userId: string): Promise<any[]> {
     try {
       const grpcResp = await this.callGrpc(
-        this.analyticsServiceGrpc.getDueCards({ userId: userId }),
+        this.analyticsServiceGrpc.getDueCards({ userId }),
       );
-      return grpcResp.cards || [];
+      return grpcResp.cards;
     } catch (error) {
       this.logger.error(`Error getting due cards: ${getErrorMessage(error)}`);
-      return [];
+      throw error;
     }
   }
 
@@ -267,14 +215,14 @@ export class StudyAnalyticsService implements OnModuleInit {
     try {
       const grpcResp = await this.callGrpc(
         this.analyticsServiceGrpc.getFocusRecommendations({
-          userId: userId,
+          userId,
           limit,
         }),
       );
-      const areas = grpcResp.areas || [];
+      const areas = grpcResp.areas;
 
       if (areas.length > 0) {
-        const areaTopicIds = areas.map((a: any) => a.topic);
+        const areaTopicIds = areas.map((area) => area.topic);
         // PERS-001: Filter out topics marked as mandatory in course structure
         const topics = await this.prisma.topic.findMany({
           where: { id: { in: areaTopicIds } },
@@ -282,10 +230,10 @@ export class StudyAnalyticsService implements OnModuleInit {
         });
 
         const mandatoryTopicIds = new Set(
-          topics.filter((t: any) => t.isMandatory).map((t: any) => t.id),
+          topics.filter((topic) => topic.isMandatory).map((topic) => topic.id),
         );
 
-        return areas.filter((area: any) => !mandatoryTopicIds.has(area.topic));
+        return areas.filter((area) => !mandatoryTopicIds.has(area.topic));
       }
 
       return areas;
@@ -293,7 +241,7 @@ export class StudyAnalyticsService implements OnModuleInit {
       this.logger.error(
         `Error getting focus recommendations: ${getErrorMessage(error)}`,
       );
-      return [];
+      throw error;
     }
   }
 }

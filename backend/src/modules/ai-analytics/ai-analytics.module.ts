@@ -16,7 +16,6 @@ import { AnalyticsController } from './controllers/analytics.controller';
 // AI Services
 import { AiAnalyticsService } from './services/ai-analytics.service';
 import { RequestDeduplicationService } from './services/request-deduplication.service';
-import { AIFeaturesService } from './services/ai-features.service';
 // Domain-Specific gRPC Analytics Services
 import { CourseAnalyticsService } from './services/course-analytics.service';
 import { AssessmentAnalyticsService } from './services/assessment-analytics.service';
@@ -72,7 +71,6 @@ export const bullModuleForAnalytics = BullModule.registerQueueAsync({
       useExisting: AiAnalyticsService,
     },
     RequestDeduplicationService,
-    AIFeaturesService,
     // Domain-Specific gRPC Analytics Services
     CourseAnalyticsService,
     AssessmentAnalyticsService,
@@ -114,7 +112,6 @@ export const bullModuleForAnalytics = BullModule.registerQueueAsync({
     // AI Services
     AiAnalyticsService,
     RequestDeduplicationService,
-    AIFeaturesService,
     // Domain-Specific gRPC Analytics Services
     CourseAnalyticsService,
     AssessmentAnalyticsService,

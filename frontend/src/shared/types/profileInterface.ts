@@ -80,7 +80,7 @@ export interface UserProfileStats {
   averageScore: number; // 0-100
   badges: number;
   points: number;
-  level: number;
+  level: number | null;
   currentStreak: number; // in days
 }
 

@@ -35,13 +35,13 @@ export const features = [
   },
   {
     icon: WifiOff,
-    title: 'Offline progress syncing',
+    title: 'Offline study and progress syncing',
     description:
-      'Supported quiz and progress updates can queue in this browser and sync when connectivity returns. Course content and PDFs are not available for offline download yet.',
+      'Download complete topics while online to read saved PDFs and practice quizzes offline. Supported quiz and progress updates queue on this device and sync when connectivity returns.',
     details: [
-      'Supported updates queue in this browser',
-      'Queued updates sync when online',
-      'Courses and PDFs are not downloadable offline',
+      'Download complete topics for offline study',
+      'Saved PDFs and practice quizzes stay available offline',
+      'Supported updates sync when you reconnect',
     ],
   },
 ];

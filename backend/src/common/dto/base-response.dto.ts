@@ -26,6 +26,9 @@ export class PreferredStudyTimesDto {
 
   @ApiProperty({ description: 'Evening study sessions count' })
   evening!: number;
+
+  @ApiProperty({ description: 'Night study sessions count' })
+  night!: number;
 }
 
 export class FlashcardStatsResponseDto {
@@ -66,10 +69,12 @@ export class StudyPatternsResponseDto {
   @ApiProperty({ type: [String] })
   patterns!: string[];
 
-  @ApiProperty()
+  @ApiProperty({ description: 'Distinct active study days in the last 30 days' })
   consistency!: number;
 
-  @ApiProperty()
+  @ApiProperty({
+    description: 'Study duration in minutes for each time-of-day bucket',
+  })
   timeDistribution!: Record<string, number>;
 
   @ApiProperty({
@@ -79,7 +84,7 @@ export class StudyPatternsResponseDto {
   studyDuration!: StudyDurationMetricsDto;
 
   @ApiProperty({
-    description: 'Preferred study times',
+    description: 'Completed study session counts by time of day',
     type: () => PreferredStudyTimesDto,
   })
   preferredStudyTimes!: PreferredStudyTimesDto;
@@ -87,7 +92,7 @@ export class StudyPatternsResponseDto {
   @ApiProperty()
   performanceByTopic!: Record<string, number>;
 
-  @ApiProperty()
+  @ApiProperty({ description: 'Share of active study days in the last 30 days (0-1)' })
   consistencyScore!: number;
 }
 
@@ -185,27 +190,12 @@ export class SystemAnalyticsResponseDto {
 }
 
 export class PathAnalyticsResponseDto {
-  @ApiProperty()
+  @ApiProperty({ description: 'Learning path identifier' })
   pathId!: string;
 
-  @ApiProperty()
-  title!: string;
+  @ApiProperty({ description: 'Mean completion percentage across progress records' })
+  averageCompletionRate!: number;
 
-  @ApiProperty()
-  enrolledUsers!: number;
-
-  @ApiProperty()
-  activeUsers!: number;
-
-  @ApiProperty()
-  averageCompletionTime!: number;
-
-  @ApiProperty()
-  completionRate!: number;
-
-  @ApiProperty()
-  metrics!: any;
-
-  @ApiProperty({ type: [Object] })
-  userProgress!: any[];
+  @ApiProperty({ description: 'Mean completion time in seconds' })
+  averageTimeToComplete!: number;
 }

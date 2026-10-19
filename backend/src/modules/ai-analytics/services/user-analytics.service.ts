@@ -1,4 +1,9 @@
-import { Injectable, Logger, Inject, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  Inject,
+  OnModuleInit,
+} from '@nestjs/common';
 import { ClientGrpc } from '@nestjs/microservices';
 import { RedisService } from '#infrastructure/redis/redis.service';
 import { firstValueFrom, timeout, Observable } from 'rxjs';
@@ -27,7 +32,7 @@ import {
  * Domain-specific service for user-centric analytics operations.
  * Provides user engagement metrics, feature vectors, learning summaries,
  * and individual user performance tracking.
- * Uses gRPC-first approach with HTTP fallback for Rust analytics service integration.
+ * Analytics calculations are delegated to the Rust service over gRPC.
  *
  * Used by:
  * - User profile pages
@@ -81,6 +86,9 @@ export class UserAnalyticsService implements OnModuleInit {
     weeklyActiveStreak: number;
     sessionCount: number;
     averageSessionDuration: number;
+    totalStudyTimeMinutes: number;
+    weeklyStudyMinutes: number;
+    activeStudyDaysThisWeek: number;
   }> {
     try {
       const cacheKey = ANALYTICS_CACHE_CONFIG.LEARNING.ENGAGEMENT(userId);
@@ -119,6 +127,9 @@ export class UserAnalyticsService implements OnModuleInit {
           response.activityFrequency > 0
             ? response.timeSpent / response.activityFrequency
             : 0,
+        totalStudyTimeMinutes: response.totalStudyTimeMinutes,
+        weeklyStudyMinutes: response.weeklyStudyMinutes,
+        activeStudyDaysThisWeek: response.activeStudyDaysThisWeek,
       };
 
       await this.redisService.set(
@@ -131,15 +142,7 @@ export class UserAnalyticsService implements OnModuleInit {
       this.logger.error(
         `Failed to get user engagement metrics via gRPC: ${getErrorMessage(error)}`,
       );
-      return {
-        timeSpent: 0,
-        completionRate: 0,
-        activityFrequency: 0,
-        dailyActiveStreak: 0,
-        weeklyActiveStreak: 0,
-        sessionCount: 0,
-        averageSessionDuration: 0,
-      };
+      throw error;
     }
   }
 
@@ -178,11 +181,7 @@ export class UserAnalyticsService implements OnModuleInit {
       this.logger.error(
         `Failed to get user feature vector via gRPC: ${getErrorMessage(error)}`,
       );
-      return {
-        userId,
-        features: [],
-        featureMap: {},
-      };
+      throw error;
     }
   }
 
@@ -200,48 +199,20 @@ export class UserAnalyticsService implements OnModuleInit {
       this.logger.error(
         `Failed to fetch detailed learning analytics via gRPC: ${getErrorMessage(error)}`,
       );
-      return {} as LearningAnalyticsDto;
+      throw error;
     }
   }
 
-  /**
-   * Get user engagement derived directly from DB (Prisma) for cases where gRPC
-   * is unavailable or callers require an immediate DB-backed view.
-   */
-  async getUserEngagementFromPrisma(
-    userId: string,
-  ): Promise<Record<string, unknown>> {
-    try {
-      const [totalStudyTimeResult, pathProgress] = await Promise.all([
-        this.prisma.progress.aggregate({
-          where: { userId },
-          _sum: { timeSpent: true },
-        }),
-        this.prisma.learningPathProgress.findMany({ where: { userId } }),
-      ]);
+  async getUserInsights(userId: string) {
+    return this.learningAnalyticsService.getUserInsights(userId);
+  }
 
-      const totalStudyTime =
-        (totalStudyTimeResult._sum.timeSpent || 0) +
-        pathProgress.reduce(
-          (s: number, p: any) => s + (p.totalTimeSpentMinutes || 0),
-          0,
-        );
+  async getSystemAnalytics() {
+    return this.callGrpc(this.analyticsServiceGrpc.getSystemAnalytics({}));
+  }
 
-      const streakDays = 0;
-      const sessions = 0;
-
-      return {
-        userId,
-        totalStudyTimeMinutes: totalStudyTime,
-        sessions,
-        streakDays,
-      };
-    } catch (error) {
-      this.logger.error(
-        `Error computing engagement for ${userId} from DB: ${getErrorMessage(error)}`,
-      );
-      throw error;
-    }
+  async getCourseStatistics(userId: string) {
+    return this.learningAnalyticsService.getCourseStatistics(userId);
   }
 
   /**
@@ -269,27 +240,27 @@ export class UserAnalyticsService implements OnModuleInit {
    */
   async getUserAnalytics(userId: string): Promise<UserAnalyticsResponseDto> {
     try {
-      const analytics = await this.getDetailedUserAnalytics(userId);
+      const [stats, nextSteps] = await Promise.all([
+        this.getUserProfileStats(userId),
+        this.callGrpc(
+          this.analyticsServiceGrpc.generateNextSteps({ userId }),
+        ),
+      ]);
 
       return {
-        lastActiveDate: analytics.engagementMetrics?.lastActivityDate
-          ? typeof analytics.engagementMetrics.lastActivityDate === 'string'
-            ? analytics.engagementMetrics.lastActivityDate
-            : analytics.engagementMetrics.lastActivityDate.toISOString()
-          : new Date().toISOString(),
-        streakDays: analytics.engagementMetrics?.dailyActiveStreak || 0,
-        strongestCategories:
-          analytics.userLearningSummary?.strongestSubjects || [],
-        improvementAreas: analytics.userLearningSummary?.weakestSubjects || [],
-        recommendedNextSteps: [],
-        coursesEnrolled: analytics.courseStats?.totalCourses || 0,
-        coursesCompleted: analytics.courseStats?.completedCourses || 0,
-        averageScore: analytics.userLearningSummary?.averageScore || 0,
-        totalStudyTime: analytics.userLearningSummary?.totalStudyTime || 0,
-        badges: 0,
-        points: 0,
-        level: 1,
-        currentStreak: analytics.engagementMetrics?.dailyActiveStreak || 0,
+        lastActiveDate: stats.lastActiveDate,
+        streakDays: stats.currentStreak,
+        strongestCategories: stats.strongestSubjects,
+        improvementAreas: stats.weakestSubjects,
+        recommendedNextSteps: nextSteps.steps.map((nextStep) => nextStep.step),
+        coursesEnrolled: stats.coursesEnrolled,
+        coursesCompleted: stats.coursesCompleted,
+        averageScore: stats.averageScore,
+        totalStudyTime: stats.totalStudyTime,
+        badges: stats.badges,
+        points: stats.points,
+        level: null,
+        currentStreak: stats.currentStreak,
       };
     } catch (error) {
       this.logger.error(
@@ -302,61 +273,145 @@ export class UserAnalyticsService implements OnModuleInit {
   /**
    * Get profile stats via gRPC
    */
-  async getUserProfileStats(userId: string): Promise<any> {
+  async getUserProfileStats(userId: string): Promise<{
+    coursesEnrolled: number;
+    coursesCompleted: number;
+    completionRate: number;
+    totalStudyTime: number;
+    averageScore: number;
+    assessmentsTaken: number;
+    completedItems: number;
+    badges: number;
+    points: number;
+    level: null;
+    currentStreak: number;
+    lastActiveDate: string | null;
+    strongestSubjects: string[];
+    weakestSubjects: string[];
+    enrollments: Array<{
+      title: string | null;
+      status: string;
+      progressPercentage: number | null;
+    }>;
+    recentActivity: Array<{
+      id: string;
+      type: string;
+      description: string;
+      createdAt: string;
+    }>;
+  }> {
     try {
-      const resp = await this.callGrpc(
-        this.analyticsServiceGrpc.getUserLearningSummary({
-          userId,
-          studySessions: [],
-          quizAttempts: [],
+      const [
+        studySessions,
+        quizAttempts,
+        enrollments,
+        user,
+        badges,
+        recentEvents,
+      ] = await Promise.all([
+        this.prisma.studySession.findMany({
+          where: { userId, isValid: true, endTime: { not: null } },
+          select: {
+            duration: true,
+            topic: { select: { name: true } },
+          },
         }),
-      );
-      const summary = resp.summary;
+        this.prisma.quizAttempt.findMany({
+          where: { userId, completedAt: { not: null } },
+          select: {
+            percentage: true,
+            quiz: { select: { topic: { select: { name: true } } } },
+          },
+        }),
+        this.prisma.courseEnrollment.findMany({
+          where: { userId },
+          orderBy: { lastAccessed: 'desc' },
+          select: {
+            status: true,
+            progressPercentage: true,
+            course: { select: { title: true } },
+          },
+        }),
+        this.prisma.user.findUnique({
+          where: { id: userId },
+          select: { points: true, lastLogin: true },
+        }),
+        this.prisma.userBadge.count({ where: { userId } }),
+        this.prisma.analyticsEvent.findMany({
+          where: { userId },
+          orderBy: { timestamp: 'desc' },
+          take: 10,
+          select: { id: true, eventType: true, timestamp: true },
+        }),
+      ]);
+
+      if (!user) {
+        throw new Error(`User ${userId} does not exist`);
+      }
+
+      const [courseStatsResponse, summaryResponse, engagement] =
+        await Promise.all([
+          this.callGrpc(
+            this.analyticsServiceGrpc.getCourseStatistics({ userId }),
+          ),
+          this.callGrpc(
+            this.analyticsServiceGrpc.getUserLearningSummary({
+              userId,
+              studySessions: studySessions.map((session) => ({
+                userId,
+                duration: session.duration ?? 0,
+                topic: session.topic?.name ?? '',
+                score: 0,
+              })),
+              quizAttempts: quizAttempts.map((attempt) => ({
+                userId,
+                percentage: attempt.percentage,
+                category: attempt.quiz.topic?.name ?? '',
+              })),
+            }),
+          ),
+          this.callGrpc(
+            this.analyticsServiceGrpc.getEngagementMetrics({ userId }),
+          ),
+        ]);
+      const courseStats = courseStatsResponse.courseStats;
+      const summary = summaryResponse.summary;
+      if (!courseStats || !summary) {
+        throw new Error('Rust analytics returned an incomplete user summary');
+      }
 
       return {
-        coursesEnrolled: 0, // Need to merge if needed, but keeping it gRPC proxy
-        coursesCompleted: 0,
-        totalStudyTime: summary?.totalStudyTime ?? 0,
-        totalCourses: 0,
-        averageScore: summary?.averageScore ?? 0,
-        badges: 0,
-        points: 0,
-        level: 1,
-        currentStreak: summary?.currentStreak ?? 0,
-        recentActivity: [],
+        coursesEnrolled: courseStats.totalCourses,
+        coursesCompleted: courseStats.completedCourses,
+        completionRate: courseStats.completionRate,
+        totalStudyTime: summary.totalStudyTime,
+        averageScore: summary.averageScore,
+        assessmentsTaken: quizAttempts.length,
+        completedItems: courseStats.completedItems,
+        badges,
+        points: user.points,
+        level: null,
+        currentStreak: engagement.dailyStreak,
+        lastActiveDate: user.lastLogin?.toISOString() ?? null,
+        strongestSubjects: summary.strongestSubjects,
+        weakestSubjects: summary.weakestSubjects,
+        enrollments: enrollments.map((enrollment) => ({
+          title: enrollment.course.title,
+          status: enrollment.status,
+          progressPercentage: enrollment.progressPercentage,
+        })),
+        recentActivity: recentEvents.map((event) => ({
+          id: event.id,
+          type: event.eventType,
+          description: event.eventType,
+          createdAt: event.timestamp.toISOString(),
+        })),
       };
     } catch (error) {
       this.logger.error(
         `Failed to get user profile stats via gRPC: ${getErrorMessage(error)}`,
       );
-      return {
-        coursesEnrolled: 0,
-        coursesCompleted: 0,
-        totalStudyTime: 0,
-        totalCourses: 0,
-        averageScore: 0,
-        badges: 0,
-        points: 0,
-        level: 1,
-        currentStreak: 0,
-        recentActivity: [],
-      };
-    }
-  }
-
-  async generatePredictions(userId: string) {
-    try {
-      return await this.callGrpc(
-        this.analyticsServiceGrpc.predictPerformance({
-          userId: userId,
-          skillId: '',
-        }),
-      );
-    } catch (error) {
-      this.logger.error(
-        `Error generating predictions via gRPC: ${getErrorMessage(error)}`,
-      );
-      return {};
+      throw error;
     }
   }
 
@@ -370,7 +425,7 @@ export class UserAnalyticsService implements OnModuleInit {
       this.logger.error(
         `Error generating recommendations via gRPC: ${getErrorMessage(error)}`,
       );
-      return [];
+      throw error;
     }
   }
 

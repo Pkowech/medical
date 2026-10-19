@@ -33,7 +33,7 @@ export class LearningPathRecommendationsService {
 
   /**
    * Get personalized learning path recommendations for a user.
-   * Delegates to Rust gRPC service; returns empty array on failure.
+   * Delegates ranking to Rust and enriches the results with path metadata.
    */
   async getRecommendations(
     userId: string,
@@ -55,7 +55,7 @@ export class LearningPathRecommendationsService {
       this.logger.error(
         `Error generating recommendations for user ${userId}: ${getErrorMessage(error)}`,
       );
-      return [];
+      throw error;
     }
   }
 
@@ -163,7 +163,7 @@ export class LearningPathRecommendationsService {
       this.logger.error(
         `Error in collaborative recommendations: ${getErrorMessage(error)}`,
       );
-      return [];
+      throw error;
     }
   }
 
@@ -233,7 +233,7 @@ export class LearningPathRecommendationsService {
       this.logger.error(
         `Error getting trending paths: ${getErrorMessage(error)}`,
       );
-      return [];
+      throw error;
     }
   }
 }

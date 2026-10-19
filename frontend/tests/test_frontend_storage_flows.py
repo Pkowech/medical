@@ -277,6 +277,19 @@ def test_pwa_caches_only_static_assets_and_public_resources():
     assert "maxEntries: 150" in strategies
 
 
+def test_offline_pwa_copy_matches_supported_downloads_and_storage():
+    offline_page = read_frontend("public/offline.html")
+    features = read_frontend("src/core/marketing/data/features.ts")
+
+    assert '<img src="/favicon.svg"' in offline_page
+    assert "<span>MedTrack Hub</span>" in offline_page
+    assert "IndexedDB" in offline_page
+    assert "Downloads or Files app" in offline_page
+    assert "Download complete topics for offline study" in features
+    assert "Saved PDFs and practice quizzes stay available offline" in features
+    assert "not available for offline download yet" not in features
+
+
 def test_user_progress_requests_require_the_stored_user_id():
     store = read_frontend(
         "src/features/learning-management/hooks/useProgressStore.ts"

@@ -28,6 +28,7 @@ import {
 import {
   StudyPatternsResponseDto,
   PathAnalyticsResponseDto,
+  StudyRecommendationDto,
 } from '#common/dto';
 import {
   LearningAnalyticsDto,
@@ -46,8 +47,6 @@ export class AiAnalyticsService implements OnModuleInit {
     process.env.RUST_GRPC_TIMEOUT_MS || 5000,
   );
   private readonly grpcRetries = Number(process.env.RUST_GRPC_RETRIES || 2);
-  private readonly USE_RUST_RECOMMENDATIONS =
-    process.env.USE_RUST_RECOMMENDATIONS !== 'false';
 
   private analyticsServiceGrpc!: AnalyticsService;
 
@@ -406,13 +405,6 @@ export class AiAnalyticsService implements OnModuleInit {
     this.logger.debug(`Caches invalidated for user ${userId}`);
   }
 
-  async getUserEngagementFromPrisma(userId: string): Promise<JsonObject> {
-    // Delegate DB-backed engagement computation to UserAnalyticsService
-    return this.userAnalyticsService.getUserEngagementFromPrisma(
-      userId,
-    );
-  }
-
   /**
    * Get collaborative filtering recommendations from Rust service
    * Uses similarity-based filtering to recommend items liked by similar users
@@ -458,13 +450,6 @@ export class AiAnalyticsService implements OnModuleInit {
     userId: string,
   ): Promise<StudyPatternsResponseDto> {
     return this.studyAnalyticsService.analyzeStudyPatterns(userId);
-  }
-
-  async generatePredictions(userId: string): Promise<JsonObject> {
-    // Delegate to UserAnalyticsService which provides a gRPC-backed prediction
-    return this.userAnalyticsService.generatePredictions(
-      userId,
-    );
   }
 
   async getUserEngagement(userId: string): Promise<JsonObject> {
@@ -533,7 +518,7 @@ export class AiAnalyticsService implements OnModuleInit {
   async generateStudyRecommendations(
     userId: string,
     knowledgeGaps: string[],
-  ): Promise<JsonArray> {
+  ): Promise<StudyRecommendationDto[]> {
     // Delegate to consolidated learning analytics service
     const results =
       await this.learningAnalyticsService.generateStudyRecommendations(
@@ -543,18 +528,9 @@ export class AiAnalyticsService implements OnModuleInit {
     return results;
   }
 
-  // Backwards-compatible alias used by some callers/controllers
-  // Older code expects `generateRecommendations(userId)` — delegate
-  // to the gRPC-first recommendation pipeline.
+  // Backwards-compatible alias used by some callers/controllers.
   async generateRecommendations(userId: string): Promise<any[]> {
-    try {
-      return await this.getRecommendationsAI(userId);
-    } catch (err) {
-      this.logger.warn(
-        `generateRecommendations fallback to empty for ${userId}: ${String(err)}`,
-      );
-      return [];
-    }
+    return this.getRecommendationsAI(userId);
   }
 
   async generateNextSteps(userId: string): Promise<string[]> {

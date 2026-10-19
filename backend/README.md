@@ -2,7 +2,7 @@
 
 > Secure, scalable backend for medical education platform built with NestJS
 
-[![Node.js](https://img.shields.io/badge/Node.js-20+-green.svg)](https://nodejs.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-22.23.1-green.svg)](https://nodejs.org/)
 [![NestJS](https://img.shields.io/badge/NestJS-11+-red.svg)](https://nestjs.com/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5+-blue.svg)](https://typescriptlang.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-blue.svg)](https://postgresql.org/)
@@ -57,7 +57,7 @@ than applying a second ranking in TypeScript.
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Node.js 20+
+- Node.js 22.23.1
 - PostgreSQL 15+
 - Redis 7+
 - pnpm (recommended) or npm
@@ -72,6 +72,13 @@ pnpm install
 cp .env.example .env
 # Edit .env with your configuration
 ```
+
+gRPC TypeScript sources are generated from `../protos/*.proto` by
+`pnpm run generate:proto` (also run automatically by `pnpm run build`). The
+generated files under `src/generated` are build output; edit the `.proto`
+definitions instead. The local `grpc-tools` compiler and its Google protobuf
+includes are used, so no system-wide `protoc` or Unix-specific include path is
+required.
 
 ### Development
 

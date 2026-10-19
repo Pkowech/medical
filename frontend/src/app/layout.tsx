@@ -18,19 +18,23 @@ const configuredSiteUrl =
   process.env.VERCEL_URL;
 const siteUrl = configuredSiteUrl
   ? new URL(
-      /^https?:\/\//i.test(configuredSiteUrl)
-        ? configuredSiteUrl
-        : `https://${configuredSiteUrl}`,
+      /^https?:\/\//i.test(configuredSiteUrl) ? configuredSiteUrl : `https://${configuredSiteUrl}`
     )
   : undefined;
 
 export const metadata: Metadata = {
+  applicationName: 'MedTrack Hub',
   title: {
     default: 'MedTrack Hub',
     template: '%s | MedTrack Hub',
   },
   ...(siteUrl ? { metadataBase: siteUrl } : {}),
   manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'MedTrack Hub',
+  },
   description:
     'Medical courses, quizzes, flashcards, study planning, and progress tracking in one learning platform.',
   icons: {

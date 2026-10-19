@@ -31,7 +31,6 @@ import { Role } from '#modules/auth/constants/role.constants';
 import { UsersService } from '../../../auth/services/users.service';
 import { FtsUtils } from '#common/utils/fts.utils';
 import { WorkloadService } from './workload.service';
-import { BridgingMaterialService } from './bridging-material.service';
 
 import { GlobalSearchSyncService } from '../../../../infrastructure/search/services/global-search-sync.service';
 
@@ -49,7 +48,6 @@ export class CoursesService {
     @Inject(forwardRef(() => AiAnalyticsService))
     private readonly aiAnalyticsService: AiAnalyticsService,
     private readonly workloadService: WorkloadService,
-    private readonly bridgingMaterialService: BridgingMaterialService,
     private readonly searchSync: GlobalSearchSyncService,
   ) {}
 
@@ -1724,73 +1722,6 @@ export class CoursesService {
         error: getErrorMessage(error),
       });
       throw error;
-    }
-  }
-
-  async predictCourseSuccessForUser(
-    userId: string,
-    courseId: string,
-  ): Promise<any> {
-    try {
-      const predictions =
-        await this.aiAnalyticsService.generatePredictions(userId);
-      const suggestions = await this.bridgingMaterialService.suggestMaterials(
-        userId,
-        courseId,
-      );
-
-      if (!predictions || typeof predictions !== 'object') {
-        return {
-          successProbability: 0.5,
-          estimatedCompletionDays: 30,
-          readyToEnroll: true,
-          confidence: 0,
-          bridgingMaterials: suggestions,
-        };
-      }
-
-      const predictionsArray = Array.isArray(predictions)
-        ? predictions
-        : (predictions.predictions as any[]) || [];
-      const coursePrediction = predictionsArray.find(
-        (p: any) => p.assessmentId === courseId || p.courseId === courseId,
-      );
-
-      if (!coursePrediction) {
-        return {
-          successProbability: 0.5,
-          estimatedCompletionDays: 30,
-          readyToEnroll: true,
-          confidence: 0,
-          bridgingMaterials: suggestions,
-        };
-      }
-
-      const probability = coursePrediction.probability || 0.5;
-
-      return {
-        successProbability: probability,
-        estimatedCompletionDays: coursePrediction.estimatedTime || 30,
-        readyToEnroll: probability > 0.6,
-        confidence: coursePrediction.confidence || 0,
-        bridgingMaterials: suggestions,
-        recommendation:
-          probability > 0.7
-            ? 'You should be ready for this course'
-            : suggestions.length > 0
-              ? 'We recommend reviewing bridging materials to fill prerequisite gaps'
-              : 'Consider completing prerequisites first',
-      };
-    } catch (error: any) {
-      this.logger.error(`Error predicting success for course ${courseId}:`, {
-        error: getErrorMessage(error),
-      });
-      return {
-        successProbability: 0.5,
-        estimatedCompletionDays: 30,
-        readyToEnroll: true,
-        confidence: 0,
-      };
     }
   }
 

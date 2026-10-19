@@ -1,6 +1,8 @@
 use crate::analytics_proto::{
-    AnalyzeQuestionDifficultyRequest, AnalyzeQuestionDifficultyResponse, PredictPerformanceRequest,
-    PredictPerformanceResponse, UpdateBktRequest, UpdateBktResponse,
+    AnalyzeQuestionDifficultyRequest, AnalyzeQuestionDifficultyResponse,
+    AssessmentCategoryBreakdown, AssessmentDifficultyBreakdown, AssessmentLearningTrend,
+    AssessmentPerformanceAnalyticsRequest, AssessmentPerformanceAnalyticsResponse,
+    PredictPerformanceRequest, PredictPerformanceResponse, UpdateBktRequest, UpdateBktResponse,
 };
 use crate::application::use_cases::performance::{
     PredictPerformanceRequest as AppPredictPerformanceRequest, PredictPerformanceUseCase,
@@ -8,6 +10,7 @@ use crate::application::use_cases::performance::{
 };
 use crate::infrastructure::database::repositories::PostgresSkillStateRepository;
 use sqlx::{Pool, Postgres, Row};
+use std::collections::HashMap;
 use std::sync::Arc;
 use tonic::{Request, Response, Status};
 
@@ -28,6 +31,248 @@ impl PerformanceService {
             return Err(Status::invalid_argument("skill_id cannot be empty"));
         }
         Ok(())
+    }
+
+    pub async fn get_assessment_performance_analytics(
+        &self,
+        request: Request<AssessmentPerformanceAnalyticsRequest>,
+    ) -> Result<Response<AssessmentPerformanceAnalyticsResponse>, Status> {
+        let request = request.into_inner();
+        if request.user_id.is_empty() {
+            return Err(Status::invalid_argument("user_id cannot be empty"));
+        }
+
+        let quiz_id = if request.quiz_id.is_empty() {
+            None
+        } else {
+            Some(request.quiz_id.as_str())
+        };
+        let aggregate = sqlx::query(
+            "SELECT COUNT(*)::bigint AS total_attempts,
+                    COALESCE(AVG(COALESCE(percentage, score)), 0)::double precision AS average_score,
+                    COALESCE(SUM(total_questions), 0)::bigint AS questions_attempted,
+                    COALESCE(SUM(correct_answers), 0)::bigint AS correct_answers,
+                    COALESCE(SUM(time_taken), 0)::bigint AS time_taken
+             FROM quiz_attempts
+             WHERE user_id = $1
+               AND completed_at IS NOT NULL
+               AND ($2::text IS NULL OR quiz_id = $2)",
+        )
+        .bind(&request.user_id)
+        .bind(quiz_id)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|error| {
+            Status::internal(format!("Failed to aggregate assessment performance: {error}"))
+        })?;
+
+        let total_attempts: i64 = aggregate
+            .try_get("total_attempts")
+            .map_err(|error| Status::internal(format!("Invalid attempt count: {error}")))?;
+        let average_score: f64 = aggregate
+            .try_get("average_score")
+            .map_err(|error| Status::internal(format!("Invalid average score: {error}")))?;
+        let questions_attempted: i64 = aggregate
+            .try_get("questions_attempted")
+            .map_err(|error| Status::internal(format!("Invalid question count: {error}")))?;
+        let correct_answers: i64 = aggregate
+            .try_get("correct_answers")
+            .map_err(|error| Status::internal(format!("Invalid correct answer count: {error}")))?;
+        let time_taken: i64 = aggregate
+            .try_get("time_taken")
+            .map_err(|error| Status::internal(format!("Invalid time taken: {error}")))?;
+
+        let attempts_filter =
+            "user_id = $1 AND completed_at IS NOT NULL AND ($2::text IS NULL OR quiz_id = $2)";
+        let recent_scores: Vec<f64> = sqlx::query_scalar(&format!(
+            "SELECT COALESCE(percentage, score)::double precision
+             FROM quiz_attempts WHERE {attempts_filter}
+             ORDER BY started_at DESC LIMIT 5"
+        ))
+        .bind(&request.user_id)
+        .bind(quiz_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|error| Status::internal(format!("Failed to load recent scores: {error}")))?;
+
+        let trend_rows = sqlx::query(&format!(
+            "SELECT to_char(started_at, 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"') AS date,
+                    COALESCE(percentage, score)::double precision AS score
+             FROM quiz_attempts WHERE {attempts_filter}
+             ORDER BY started_at DESC"
+        ))
+        .bind(&request.user_id)
+        .bind(quiz_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|error| Status::internal(format!("Failed to load learning trends: {error}")))?;
+        let mut learning_trends = Vec::with_capacity(trend_rows.len());
+        let mut progress_trend = HashMap::new();
+        for row in trend_rows {
+            let date: String = row
+                .try_get("date")
+                .map_err(|error| Status::internal(format!("Invalid trend date: {error}")))?;
+            let score: f64 = row
+                .try_get("score")
+                .map_err(|error| Status::internal(format!("Invalid trend score: {error}")))?;
+            progress_trend.entry(date.clone()).or_insert(score);
+            learning_trends.push(AssessmentLearningTrend { date, score });
+        }
+
+        let category_rows = sqlx::query(
+            "SELECT q.category::text AS category,
+                    COUNT(*)::bigint AS total,
+                    COUNT(*) FILTER (WHERE ur.is_correct)::bigint AS correct,
+                    AVG(COALESCE(ur.response_time, 0))::double precision AS average_time
+             FROM user_responses ur
+             JOIN quiz_attempts qa ON qa.id = ur.attempt_id
+             JOIN questions q ON q.id = ur.question_id
+             WHERE qa.user_id = $1
+               AND ur.user_id = $1
+               AND qa.completed_at IS NOT NULL
+               AND ($2::text IS NULL OR qa.quiz_id = $2)
+             GROUP BY q.category
+             ORDER BY q.category::text",
+        )
+        .bind(&request.user_id)
+        .bind(quiz_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|error| {
+            Status::internal(format!("Failed to aggregate category performance: {error}"))
+        })?;
+        let mut category_breakdown = Vec::with_capacity(category_rows.len());
+        let mut strengths = Vec::new();
+        let mut weaknesses = Vec::new();
+        for row in category_rows {
+            let raw_category: String = row
+                .try_get("category")
+                .map_err(|error| Status::internal(format!("Invalid category: {error}")))?;
+            let total: i64 = row
+                .try_get("total")
+                .map_err(|error| Status::internal(format!("Invalid category count: {error}")))?;
+            let correct: i64 = row
+                .try_get("correct")
+                .map_err(|error| Status::internal(format!("Invalid category score: {error}")))?;
+            let average_time: f64 = row
+                .try_get("average_time")
+                .map_err(|error| Status::internal(format!("Invalid category time: {error}")))?;
+            let category = raw_category
+                .split('_')
+                .map(|part| {
+                    let mut chars = part.chars();
+                    match chars.next() {
+                        Some(first) => first.to_uppercase().chain(chars).collect::<String>(),
+                        None => String::new(),
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join(" ");
+            let score = if total > 0 {
+                correct as f64 / total as f64 * 100.0
+            } else {
+                0.0
+            };
+            let is_strength = score >= 80.0;
+            let is_weakness = score < 60.0;
+            if is_strength {
+                strengths.push(category.clone());
+            }
+            if is_weakness {
+                weaknesses.push(category.clone());
+            }
+            category_breakdown.push(AssessmentCategoryBreakdown {
+                category,
+                score,
+                questions_answered: i32::try_from(total).map_err(|error| {
+                    Status::internal(format!("Category question count overflow: {error}"))
+                })?,
+                average_time,
+                is_strength,
+                is_weakness,
+                correct: i32::try_from(correct).map_err(|error| {
+                    Status::internal(format!("Category correct count overflow: {error}"))
+                })?,
+                total: i32::try_from(total).map_err(|error| {
+                    Status::internal(format!("Category total count overflow: {error}"))
+                })?,
+            });
+        }
+
+        let difficulty_rows = sqlx::query(
+            "SELECT q.difficulty::text AS difficulty,
+                    COUNT(*) FILTER (WHERE ur.is_correct)::bigint AS correct_answers
+             FROM user_responses ur
+             JOIN quiz_attempts qa ON qa.id = ur.attempt_id
+             JOIN questions q ON q.id = ur.question_id
+             WHERE qa.user_id = $1
+               AND ur.user_id = $1
+               AND qa.completed_at IS NOT NULL
+               AND ($2::text IS NULL OR qa.quiz_id = $2)
+             GROUP BY q.difficulty
+             ORDER BY q.difficulty::text",
+        )
+        .bind(&request.user_id)
+        .bind(quiz_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|error| {
+            Status::internal(format!(
+                "Failed to aggregate difficulty performance: {error}"
+            ))
+        })?;
+        let mut difficulty_breakdown = Vec::with_capacity(difficulty_rows.len());
+        for row in difficulty_rows {
+            let difficulty: String = row
+                .try_get("difficulty")
+                .map_err(|error| Status::internal(format!("Invalid difficulty: {error}")))?;
+            let correct: i64 = row.try_get("correct_answers").map_err(|error| {
+                Status::internal(format!("Invalid difficulty answer count: {error}"))
+            })?;
+            let correct = i32::try_from(correct).map_err(|error| {
+                Status::internal(format!("Difficulty answer count overflow: {error}"))
+            })?;
+            difficulty_breakdown.push(AssessmentDifficultyBreakdown {
+                difficulty,
+                correct_answers: correct,
+            });
+        }
+
+        let total_attempts = i32::try_from(total_attempts)
+            .map_err(|error| Status::internal(format!("Attempt count overflow: {error}")))?;
+        let questions_attempted = i32::try_from(questions_attempted)
+            .map_err(|error| Status::internal(format!("Question count overflow: {error}")))?;
+        let correct_answers = i32::try_from(correct_answers)
+            .map_err(|error| Status::internal(format!("Correct answer count overflow: {error}")))?;
+        let time_spent_minutes = time_taken / 60 + i64::from(time_taken % 60 >= 30);
+        let time_spent = i32::try_from(time_spent_minutes)
+            .map_err(|error| Status::internal(format!("Time spent overflow: {error}")))?;
+        let time_per_question = if questions_attempted > 0 {
+            (time_taken as f64 / questions_attempted as f64 * 100.0).round() / 100.0
+        } else {
+            0.0
+        };
+
+        Ok(Response::new(AssessmentPerformanceAnalyticsResponse {
+            user_id: request.user_id,
+            quiz_id: quiz_id.unwrap_or_default().to_string(),
+            overall_score: average_score,
+            average_score,
+            recent_scores,
+            questions_attempted,
+            correct_answers,
+            time_taken,
+            time_spent,
+            time_per_question,
+            total_attempts,
+            category_breakdown,
+            learning_trends,
+            strengths,
+            weaknesses,
+            difficulty_breakdown,
+            progress_trend,
+            average_time_per_question: time_per_question,
+        }))
     }
 
     pub async fn analyze_question_difficulty(

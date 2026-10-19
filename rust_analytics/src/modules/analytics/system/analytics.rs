@@ -11,6 +11,11 @@ pub struct SystemAnalytics {
     pub total_paths: i64,
     pub total_enrollments: i64,
     pub overall_completion_rate: f64,
+    pub published_courses: i64,
+    pub active_today: i64,
+    pub average_course_rating: f64,
+    pub average_assessment_score: f64,
+    pub total_study_time_minutes: i64,
 }
 
 pub async fn get_system_analytics(pool: &Pool<Postgres>) -> Result<SystemAnalytics, String> {
@@ -33,6 +38,47 @@ pub async fn get_system_analytics(pool: &Pool<Postgres>) -> Result<SystemAnalyti
         .await
         .map_err(|e| e.to_string())?
         .unwrap_or(0);
+
+    let published_courses: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM courses WHERE status::text = 'published'",
+    )
+    .fetch_one(pool)
+    .await
+    .map_err(|error| error.to_string())?;
+
+    let active_today: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM users WHERE last_login >= CURRENT_DATE",
+    )
+    .fetch_one(pool)
+    .await
+    .map_err(|error| error.to_string())?;
+
+    let average_course_rating: Option<f64> = sqlx::query_scalar(
+        "SELECT AVG(rating)::double precision
+         FROM courses
+         WHERE status::text = 'published' AND rating > 0",
+    )
+    .fetch_one(pool)
+    .await
+    .map_err(|error| error.to_string())?;
+
+    let average_assessment_score: Option<f64> = sqlx::query_scalar(
+        "SELECT AVG(percentage)::double precision
+         FROM quiz_attempts
+         WHERE completed_at IS NOT NULL",
+    )
+    .fetch_one(pool)
+    .await
+    .map_err(|error| error.to_string())?;
+
+    let total_study_time_minutes: i64 = sqlx::query_scalar(
+        "SELECT COALESCE(SUM(duration), 0)::bigint
+         FROM study_sessions
+         WHERE is_valid = true AND end_time IS NOT NULL",
+    )
+    .fetch_one(pool)
+    .await
+    .map_err(|error| error.to_string())?;
 
     let completed_courses: i64 = sqlx::query_scalar::<_, i64>(
         "SELECT COUNT(*) FROM course_enrollments WHERE status::text = 'completed' OR status::text = 'COMPLETED'"
@@ -68,5 +114,10 @@ pub async fn get_system_analytics(pool: &Pool<Postgres>) -> Result<SystemAnalyti
         total_paths,
         total_enrollments,
         overall_completion_rate: average_completion_rate,
+        published_courses,
+        active_today,
+        average_course_rating: average_course_rating.unwrap_or(0.0),
+        average_assessment_score: average_assessment_score.unwrap_or(0.0),
+        total_study_time_minutes,
     })
 }

@@ -167,9 +167,9 @@ impl RecommendationService {
                     .into_iter()
                     .map(|it| crate::analytics_proto::StudyRecommendationItem { 
                         recommendation: it.recommendation, 
-                        priority: it.priority.unwrap_or_default(), 
-                        estimated_time_hours: it.estimated_time_hours.unwrap_or_default(), 
-                        resource_id: it.resource_id.unwrap_or_default() 
+                        priority: it.priority, 
+                        estimated_time_hours: it.estimated_time_hours, 
+                        resource_id: it.resource_id,
                     })
                     .collect();
                 Ok(Response::new(crate::analytics_proto::StudyRecommendationsResponse { recommendations: proto_items }))

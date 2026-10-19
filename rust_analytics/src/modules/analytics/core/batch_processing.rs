@@ -14,38 +14,21 @@ pub async fn process_analytics_for_users(
     pool: &Pool<Postgres>,
     user_ids: &[String],
 ) -> Result<BatchProcessingResult, String> {
-    println!("Processing analytics for users: {:?}", user_ids);
     let mut processed_count = 0;
 
     for user_id in user_ids {
-        match data_processor::get_user_data(pool, user_id).await {
-            Ok((progress_df, quizzes_df, study_time_df)) => {
-                match data_processor::process_user_data(&progress_df, &quizzes_df, &study_time_df) {
-                    Ok(processed_data) => {
-                        println!(
-                            "Successfully processed data for user {}: {:?}",
-                            user_id, processed_data
-                        );
-                        processed_count += 1;
-                    }
-                    Err(e) => {
-                        eprintln!("Error processing data for user {}: {}", user_id, e);
-                    }
-                }
-            }
-            Err(e) => {
-                eprintln!("Error fetching data for user {}: {}", user_id, e);
-            }
-        }
+        let (progress_df, quizzes_df, study_time_df) =
+            data_processor::get_user_data(pool, user_id)
+                .await
+                .map_err(|error| format!("Failed to load analytics for user {user_id}: {error}"))?;
+        data_processor::process_user_data(&progress_df, &quizzes_df, &study_time_df)
+            .map_err(|error| format!("Failed to process analytics for user {user_id}: {error}"))?;
+        processed_count += 1;
     }
 
     Ok(BatchProcessingResult {
         success: true,
-        message: format!(
-            "Processed {} out of {} users.",
-            processed_count,
-            user_ids.len()
-        ),
+        message: format!("Processed {processed_count} users."),
         processed_users: processed_count,
     })
 }
