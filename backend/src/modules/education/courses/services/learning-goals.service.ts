@@ -1134,7 +1134,7 @@ export class LearningGoalsService {
           description: `Join peers learning similar content based on your profile`,
           category: GoalCategory.learning_path,
           type: GoalType.longTerm,
-          recommendationReason: `Collaborative score: ${(rec.score * 100).toFixed(0)}% match${stakeInfo}`,
+          recommendationReason: `${rec.reason} (${(rec.score * 100).toFixed(0)}% match)${stakeInfo}`,
           recommendationSource: GoalRecommendationSource.PEER_TRENDS,
           relatedId: rec.item_id,
           examStake: mapping?.correlation,

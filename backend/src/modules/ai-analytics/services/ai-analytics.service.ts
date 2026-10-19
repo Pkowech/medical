@@ -413,7 +413,7 @@ export class AiAnalyticsService implements OnModuleInit {
   async getCollaborativeRecommendations(
     userId: string,
     limit: number = 5,
-  ): Promise<Array<{ item_id: string; score: number }>> {
+  ): Promise<Array<{ item_id: string; score: number; reason: string }>> {
     return this.learningAnalyticsService.getCollaborativeRecommendations(
       userId,
       limit,

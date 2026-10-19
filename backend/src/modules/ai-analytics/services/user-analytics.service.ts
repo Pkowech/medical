@@ -155,7 +155,7 @@ export class UserAnalyticsService implements OnModuleInit {
     featureMap: Record<string, number>;
   }> {
     try {
-      const cacheKey = ANALYTICS_CACHE_CONFIG.LEARNING.FEATURE_VECTOR(userId);
+      const cacheKey = `${ANALYTICS_CACHE_CONFIG.LEARNING.FEATURE_VECTOR(userId)}:v2`;
 
       const cached = await this.redisService.get<string>(cacheKey);
       if (typeof cached === 'string') {
@@ -221,7 +221,7 @@ export class UserAnalyticsService implements OnModuleInit {
   async invalidateUserCache(userId: string): Promise<void> {
     const cacheKeys = [
       ANALYTICS_CACHE_CONFIG.LEARNING.ENGAGEMENT(userId),
-      ANALYTICS_CACHE_CONFIG.LEARNING.FEATURE_VECTOR(userId),
+      `${ANALYTICS_CACHE_CONFIG.LEARNING.FEATURE_VECTOR(userId)}:v2`,
       ANALYTICS_CACHE_CONFIG.LEARNING.ANALYTICS(userId),
     ];
 

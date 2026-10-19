@@ -527,43 +527,17 @@ export class LearningService {
       throw new BadRequestException('User ID is required');
     }
 
-    try {
-      // Get user engagement metrics from analytics service
-      const engagement =
-        await this.learningAnalyticsService.getUserEngagement(userId);
+    const [engagement, studyPatterns] = await Promise.all([
+      this.learningAnalyticsService.getUserEngagement(userId),
+      this.learningAnalyticsService.analyzeStudyPatterns(userId),
+    ]);
 
-      // Get study pattern analysis
-      const studyPatterns =
-        await this.learningAnalyticsService.analyzeStudyPatterns(userId);
-
-      return {
-        userId,
-        engagement,
-        studyPatterns,
-        generatedAt: new Date(),
-      };
-    } catch (error) {
-      this.logger.warn(`Error fetching analytics for user ${userId}:`, error);
-      // Return graceful empty engagement data
-      return {
-        userId,
-        engagement: {
-          userId,
-          totalStudyTime: 0,
-          totalSessions: 0,
-          lastActive: null,
-          engagementScore: 0,
-          averageSessionDuration: 0,
-        },
-        studyPatterns: {
-          userId,
-          peakStudyHours: [],
-          averageSessionDuration: 0,
-          consistencyScore: 0,
-        },
-        generatedAt: new Date(),
-      };
-    }
+    return {
+      userId,
+      engagement,
+      studyPatterns,
+      generatedAt: new Date(),
+    };
   }
 
   /**

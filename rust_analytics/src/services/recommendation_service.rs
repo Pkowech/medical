@@ -84,7 +84,7 @@ impl RecommendationService {
                     .map(|it| CollaborativeRecommendationItem { 
                         item_id: it.item_id, 
                         score: it.score, 
-                        reason: it.reason.unwrap_or_default() 
+                        reason: it.reason 
                     })
                     .collect();
                 Ok(Response::new(CollaborativeRecommendationResponse { items: proto_items }))

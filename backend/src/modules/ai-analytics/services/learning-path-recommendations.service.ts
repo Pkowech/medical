@@ -1,6 +1,6 @@
 // src/modules/ai-analytics/services/learning-path-recommendations.service.ts
 // Refactored to gRPC-only pattern following study-analytics.service.ts best practices.
-// All ML-based recommendations delegated to Rust; returns empty arrays on gRPC failure.
+// All ML-based recommendations are delegated to Rust.
 
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '#infrastructure/prisma/prisma.service';
@@ -15,8 +15,8 @@ export interface RecommendationScore {
   pathId: string;
   score: number;
   reasons: string[];
-  confidence: number;
-  estimatedCompletionTime: number;
+  confidence?: number;
+  estimatedCompletionTime?: number;
 }
 
 @Injectable()
@@ -95,7 +95,7 @@ export class LearningPathRecommendationsService {
           score: recommendation.score,
           reasons: recommendation.reasons,
           confidence: recommendation.confidence,
-          estimatedCompletionTime: path.estimatedDurationWeeks || 4,
+          estimatedCompletionTime: path.estimatedDurationWeeks ?? undefined,
         },
       ];
     });
@@ -114,16 +114,16 @@ export class LearningPathRecommendationsService {
 
   /**
    * Get collaborative filtering recommendations.
-   * Delegates to Rust gRPC service; returns empty array on failure.
+   * Delegates ranking to Rust and returns only published paths with metadata.
    */
   async getCollaborativeRecommendations(
     userId: string,
     limit: number = 5,
   ): Promise<RecommendationScore[]> {
-    const cacheKey = ANALYTICS_CACHE_CONFIG.RECOMMENDATIONS.COLLABORATIVE(
+    const cacheKey = `${ANALYTICS_CACHE_CONFIG.RECOMMENDATIONS.COLLABORATIVE(
       userId,
       limit,
-    );
+    )}:enriched:v2`;
 
     try {
       const cached = await this.redisService.get(cacheKey);
@@ -171,10 +171,10 @@ export class LearningPathRecommendationsService {
    * Enrich collaborative recommendations with path details.
    */
   private async enrichCollaborativeRecommendations(
-    rustRecs: any[],
+    rustRecs: Array<{ item_id: string; score: number; reason: string }>,
     limit: number,
   ): Promise<RecommendationScore[]> {
-    const pathIds = rustRecs.map((r) => r.item_id).filter(Boolean);
+    const pathIds = rustRecs.map((recommendation) => recommendation.item_id);
 
     if (pathIds.length === 0) {
       return [];
@@ -191,15 +191,22 @@ export class LearningPathRecommendationsService {
       take: limit,
     });
 
-    return paths.map((path) => {
-      const rustRec = rustRecs.find((r) => r.item_id === path.id) || {};
-      return {
-        pathId: path.id,
-        score: rustRec.score || 0.7,
-        reasons: ['Recommended based on similar learners'],
-        confidence: 0.8,
-        estimatedCompletionTime: path.estimatedDurationWeeks || 4,
-      };
+    const pathsById = new Map(paths.map((path) => [path.id, path]));
+    return rustRecs.flatMap((recommendation) => {
+      const path = pathsById.get(recommendation.item_id);
+      if (!path) {
+        return [];
+      }
+
+      return [
+        {
+          pathId: path.id,
+          score: recommendation.score,
+          reasons: [recommendation.reason],
+          estimatedCompletionTime:
+            path.estimatedDurationWeeks ?? undefined,
+        },
+      ];
     });
   }
 

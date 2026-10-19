@@ -5,8 +5,7 @@ use sqlx::{Pool, Postgres};
 pub struct CollaborativeRecommendation {
     pub item_id: String,
     pub score: f64,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub reason: Option<String>,
+    pub reason: String,
 }
 
 #[derive(Debug, Clone)]
@@ -56,21 +55,17 @@ pub async fn get_collaborative_recommendations(
             CollaborativeRecommendation {
                 item_id: item.item_id,
                 score,
-                reason: Some(format!(
+                reason: format!(
                     "Recommended by {} similar learners with avg completion time of {:.1} hours",
                     item.completion_count,
                     item.avg_time_to_complete / 60.0
-                )),
+                ),
             }
         })
         .collect();
 
     // Step 5: Sort by score and limit results
-    recommendations.sort_by(|a, b| {
-        b.score
-            .partial_cmp(&a.score)
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
+    recommendations.sort_by(|a, b| b.score.total_cmp(&a.score));
     recommendations.truncate(limit as usize);
 
     Ok(recommendations)
@@ -139,7 +134,12 @@ async fn find_similar_users_from_db(
         )
         .fetch_one(pool)
         .await
-        .unwrap_or(0) as f64;
+        .map_err(|error| {
+            format!(
+                "Failed to count completed paths for similar user {}: {error}",
+                record.user_id
+            )
+        })? as f64;
 
         // Jaccard similarity: intersection / union
         let union = user_path_count + similar_user_total - common_count;
@@ -160,11 +160,7 @@ async fn find_similar_users_from_db(
     }
 
     // Sort by similarity score
-    similarities.sort_by(|a, b| {
-        b.similarity_score
-            .partial_cmp(&a.similarity_score)
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
+    similarities.sort_by(|a, b| b.similarity_score.total_cmp(&a.similarity_score));
 
     Ok(similarities)
 }
@@ -301,10 +297,10 @@ async fn get_popular_recommendations(
             CollaborativeRecommendation {
                 item_id: item.id,
                 score: score.max(0.5),
-                reason: Some(format!(
+                reason: format!(
                     "Popular choice - completed by {} learners with {:.0}% avg progress",
                     item.completion_count, item.avg_progress
-                )),
+                ),
             }
         })
         .collect();

@@ -100,7 +100,8 @@ pub async fn extract_user_features(
     let engagement_level: f64 = sqlx::query_scalar(
         "SELECT LEAST(COUNT(*)::double precision / 200.0, 1.0)
          FROM user_activities
-         WHERE user_id = $1",
+        WHERE user_id = $1
+          AND created_at >= NOW() - INTERVAL '30 days'",
     )
     .bind(&user_id)
     .fetch_one(pool)
@@ -112,7 +113,8 @@ pub async fn extract_user_features(
              0
          )::double precision
          FROM material_events
-         WHERE user_id = $1",
+         WHERE user_id = $1
+           AND last_occurred_at >= NOW() - INTERVAL '30 days'",
     )
     .bind(&user_id)
     .fetch_one(pool)

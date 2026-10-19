@@ -156,7 +156,7 @@ export class LearningAnalyticsService implements OnModuleInit {
           longestStreak: goalAnalytics.longestStreak,
         },
         streakGoalIds: goalAnalytics.streakGoalIds,
-        upcomingDeadlines: (goalAnalytics.upcomingDeadlines || []).map(deadline => ({
+        upcomingDeadlines: goalAnalytics.upcomingDeadlines.map((deadline) => ({
           goalId: deadline.goalId,
           title: deadline.title,
           targetDate: deadline.targetDate,
@@ -607,7 +607,7 @@ export class LearningAnalyticsService implements OnModuleInit {
     lastActivityDate: string | null;
   }> {
     const startTime = Date.now();
-    const cacheKey = ANALYTICS_CACHE_CONFIG.LEARNING.ENGAGEMENT(userId);
+    const cacheKey = `${ANALYTICS_CACHE_CONFIG.LEARNING.ENGAGEMENT(userId)}:v2`;
 
     try {
       const cached = await this.redisService.get<string>(cacheKey);
@@ -616,16 +616,21 @@ export class LearningAnalyticsService implements OnModuleInit {
       }
 
       const detailed = await this.getDetailedLearningAnalytics(userId);
+      const summary = detailed.userLearningSummary;
       const metrics = detailed.engagementMetrics;
+      if (!summary || !metrics) {
+        throw new Error(
+          'Rust analytics omitted user learning summary or engagement metrics',
+        );
+      }
 
       const mapped = {
         userId,
-        totalStudyTimeMinutes:
-          detailed.userLearningSummary?.totalStudyTime || 0,
-        sessions: metrics?.sessionCount || 0,
-        streakDays: metrics?.dailyActiveStreak || 0,
-        weeklyActiveStreak: metrics?.weeklyActiveStreak || 0,
-        lastActivityDate: metrics?.lastActivityDate
+        totalStudyTimeMinutes: summary.totalStudyTime,
+        sessions: metrics.sessionCount,
+        streakDays: metrics.dailyActiveStreak,
+        weeklyActiveStreak: metrics.weeklyActiveStreak,
+        lastActivityDate: metrics.lastActivityDate
           ? typeof metrics.lastActivityDate === 'string'
             ? metrics.lastActivityDate
             : metrics.lastActivityDate.toISOString()
@@ -837,7 +842,7 @@ export class LearningAnalyticsService implements OnModuleInit {
   async getCollaborativeRecommendations(
     userId: string,
     limit: number = 5,
-  ): Promise<Array<{ item_id: string; score: number }>> {
+  ): Promise<Array<{ item_id: string; score: number; reason: string }>> {
     const startTime = Date.now();
     const cacheKey = `${ANALYTICS_CACHE_CONFIG.RECOMMENDATIONS.COLLABORATIVE(
       userId,
@@ -847,7 +852,11 @@ export class LearningAnalyticsService implements OnModuleInit {
     try {
       const cached = await this.redisService.get<string>(cacheKey);
       if (typeof cached === 'string') {
-        return JSON.parse(cached);
+        return JSON.parse(cached) as Array<{
+          item_id: string;
+          score: number;
+          reason: string;
+        }>;
       }
 
       const grpcResp = await this.callGrpc(
@@ -860,6 +869,7 @@ export class LearningAnalyticsService implements OnModuleInit {
       const mapped = grpcResp.items.slice(0, limit).map((recommendation) => ({
         item_id: recommendation.itemId,
         score: recommendation.score,
+        reason: recommendation.reason,
       }));
 
       await this.redisService.set(
@@ -997,7 +1007,7 @@ export class LearningAnalyticsService implements OnModuleInit {
           `${ANALYTICS_CACHE_CONFIG.LEARNING.PATTERNS(userId)}:v2`,
         ),
         this.redisService.del(
-          ANALYTICS_CACHE_CONFIG.LEARNING.ENGAGEMENT(userId),
+          `${ANALYTICS_CACHE_CONFIG.LEARNING.ENGAGEMENT(userId)}:v2`,
         ),
         this.redisService.del(
           ANALYTICS_CACHE_CONFIG.RECOMMENDATIONS.PATH(userId, 10),
