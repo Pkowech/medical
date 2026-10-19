@@ -75,15 +75,118 @@ impl GetGoalsUseCase {
 
 #[cfg(test)]
 mod tests {
-    #[tokio::test]
-    #[ignore]
-    async fn test_get_goals_success() {
-        // Mock repository tests
+    use super::GetGoalsUseCase;
+    use crate::{
+        application::dtos::goals::GoalsRequest,
+        domain::{
+            models::{Goal, UpcomingDeadline},
+            repositories::GoalRepository,
+            value_objects::ProgressStatus,
+        },
+        shared::error::AnalyticsError,
+    };
+    use async_trait::async_trait;
+    use chrono::{Duration, Local};
+    use std::sync::Arc;
+
+    struct MockGoalRepository {
+        goals: Vec<Goal>,
+        deadlines: Vec<UpcomingDeadline>,
+    }
+
+    #[async_trait]
+    impl GoalRepository for MockGoalRepository {
+        async fn get_user_goals(&self, _user_id: &str) -> Result<Vec<Goal>, AnalyticsError> {
+            Ok(self.goals.clone())
+        }
+
+        async fn get_goals_by_status(
+            &self,
+            user_id: &str,
+            status: &str,
+        ) -> Result<Vec<Goal>, AnalyticsError> {
+            Ok(self
+                .goals
+                .iter()
+                .filter(|goal| goal.user_id == user_id && goal.status.to_string() == status)
+                .cloned()
+                .collect())
+        }
+
+        async fn get_upcoming_deadlines(
+            &self,
+            _user_id: &str,
+        ) -> Result<Vec<UpcomingDeadline>, AnalyticsError> {
+            Ok(self.deadlines.clone())
+        }
+
+        async fn update_goal(&self, _goal: Goal) -> Result<(), AnalyticsError> {
+            Ok(())
+        }
+    }
+
+    fn goal(id: &str, status: ProgressStatus) -> Goal {
+        Goal {
+            id: id.to_string(),
+            user_id: "user-1".to_string(),
+            title: format!("Goal {id}"),
+            status,
+            category: "study".to_string(),
+            priority: "normal".to_string(),
+            target_date: None,
+            completed_at: None,
+            created_at: Local::now().naive_local(),
+            start_date: None,
+            streak_count: 0,
+        }
     }
 
     #[tokio::test]
-    #[ignore]
+    async fn test_get_goals_success() {
+        let target_date = Local::now().date_naive() + Duration::days(3);
+        let repository = Arc::new(MockGoalRepository {
+            goals: vec![
+                goal("active", ProgressStatus::Active),
+                goal("completed", ProgressStatus::Completed),
+            ],
+            deadlines: vec![UpcomingDeadline {
+                goal_id: "active".to_string(),
+                title: "Goal active".to_string(),
+                target_date,
+                days_remaining: 0,
+            }],
+        });
+        let use_case = GetGoalsUseCase::new(repository);
+
+        let response = use_case
+            .execute(GoalsRequest {
+                user_id: "user-1".to_string(),
+                status: Some("active".to_string()),
+            })
+            .await
+            .expect("valid request should return goals");
+
+        assert_eq!(response.total_goals, 1);
+        assert_eq!(response.goals[0].id, "active");
+        assert_eq!(response.upcoming_deadlines.len(), 1);
+        assert_eq!(response.upcoming_deadlines[0].target_date, target_date);
+        assert_eq!(response.upcoming_deadlines[0].days_remaining, 3);
+    }
+
+    #[tokio::test]
     async fn test_get_goals_validation() {
-        // Validate empty user_id rejection
+        let use_case = GetGoalsUseCase::new(Arc::new(MockGoalRepository {
+            goals: Vec::new(),
+            deadlines: Vec::new(),
+        }));
+
+        let result = use_case
+            .execute(GoalsRequest {
+                user_id: String::new(),
+                status: None,
+            })
+            .await;
+
+        assert!(matches!(result, Err(AnalyticsError::ValidationError(_))));
     }
 }

@@ -85,21 +85,156 @@ impl UpdateGoalUseCase {
 
 #[cfg(test)]
 mod tests {
+    use super::UpdateGoalUseCase;
+    use crate::{
+        application::dtos::goals::UpdateGoalRequest,
+        domain::{
+            models::{Goal, UpcomingDeadline},
+            repositories::GoalRepository,
+            value_objects::ProgressStatus,
+        },
+        shared::error::AnalyticsError,
+    };
+    use async_trait::async_trait;
+    use chrono::{Local, NaiveDate};
+    use std::sync::{Arc, Mutex};
+
+    struct MockGoalRepository {
+        goals: Vec<Goal>,
+        updated_goal: Mutex<Option<Goal>>,
+    }
+
+    #[async_trait]
+    impl GoalRepository for MockGoalRepository {
+        async fn get_user_goals(&self, _user_id: &str) -> Result<Vec<Goal>, AnalyticsError> {
+            Ok(self.goals.clone())
+        }
+
+        async fn get_goals_by_status(
+            &self,
+            user_id: &str,
+            status: &str,
+        ) -> Result<Vec<Goal>, AnalyticsError> {
+            Ok(self
+                .goals
+                .iter()
+                .filter(|goal| goal.user_id == user_id && goal.status.to_string() == status)
+                .cloned()
+                .collect())
+        }
+
+        async fn get_upcoming_deadlines(
+            &self,
+            _user_id: &str,
+        ) -> Result<Vec<UpcomingDeadline>, AnalyticsError> {
+            Ok(Vec::new())
+        }
+
+        async fn update_goal(&self, goal: Goal) -> Result<(), AnalyticsError> {
+            *self.updated_goal.lock().expect("mock mutex should not be poisoned") = Some(goal);
+            Ok(())
+        }
+    }
+
+    fn goal() -> Goal {
+        Goal {
+            id: "goal-1".to_string(),
+            user_id: "user-1".to_string(),
+            title: "Study anatomy".to_string(),
+            status: ProgressStatus::InProgress,
+            category: "study".to_string(),
+            priority: "normal".to_string(),
+            target_date: None,
+            completed_at: None,
+            created_at: Local::now().naive_local(),
+            start_date: None,
+            streak_count: 0,
+        }
+    }
+
     #[tokio::test]
-    #[ignore]
     async fn test_update_goal_status() {
-        // Test status update with completion timestamp
+        let repository = Arc::new(MockGoalRepository {
+            goals: vec![goal()],
+            updated_goal: Mutex::new(None),
+        });
+        let use_case = UpdateGoalUseCase::new(repository.clone());
+
+        let response = use_case
+            .execute(UpdateGoalRequest {
+                user_id: "user-1".to_string(),
+                goal_id: "goal-1".to_string(),
+                status: Some(ProgressStatus::Completed),
+                priority: None,
+                target_date: None,
+                streak_count: None,
+            })
+            .await
+            .expect("existing goal should be updated");
+
+        assert_eq!(response.status, ProgressStatus::Completed);
+        assert!(response.completed_at.is_some());
+        let updated = repository
+            .updated_goal
+            .lock()
+            .expect("mock mutex should not be poisoned")
+            .clone()
+            .expect("repository should receive the update");
+        assert_eq!(updated.status, ProgressStatus::Completed);
+        assert!(updated.completed_at.is_some());
     }
 
     #[tokio::test]
-    #[ignore]
     async fn test_update_goal_priority() {
-        // Test priority update
+        let repository = Arc::new(MockGoalRepository {
+            goals: vec![goal()],
+            updated_goal: Mutex::new(None),
+        });
+        let use_case = UpdateGoalUseCase::new(repository.clone());
+
+        let response = use_case
+            .execute(UpdateGoalRequest {
+                user_id: "user-1".to_string(),
+                goal_id: "goal-1".to_string(),
+                status: None,
+                priority: Some("high".to_string()),
+                target_date: Some(NaiveDate::from_ymd_opt(2026, 12, 31).unwrap()),
+                streak_count: Some(4),
+            })
+            .await
+            .expect("existing goal should be updated");
+
+        assert_eq!(response.priority, "high");
+        assert_eq!(response.target_date, NaiveDate::from_ymd_opt(2026, 12, 31));
+        assert_eq!(response.streak_count, 4);
+        let updated = repository
+            .updated_goal
+            .lock()
+            .expect("mock mutex should not be poisoned")
+            .clone()
+            .expect("repository should receive the update");
+        assert_eq!(updated.priority, "high");
+        assert_eq!(updated.streak_count, 4);
     }
 
     #[tokio::test]
-    #[ignore]
     async fn test_update_nonexistent_goal() {
-        // Test error handling for missing goal
+        let use_case = UpdateGoalUseCase::new(Arc::new(MockGoalRepository {
+            goals: Vec::new(),
+            updated_goal: Mutex::new(None),
+        }));
+
+        let result = use_case
+            .execute(UpdateGoalRequest {
+                user_id: "user-1".to_string(),
+                goal_id: "missing".to_string(),
+                status: None,
+                priority: None,
+                target_date: None,
+                streak_count: None,
+            })
+            .await;
+
+        assert!(matches!(result, Err(AnalyticsError::ValidationError(_))));
     }
 }
