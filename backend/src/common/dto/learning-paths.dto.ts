@@ -269,11 +269,21 @@ export class LearningPathFiltersDto {
 
   @ApiPropertyOptional({
     enum: LearningPathType,
-    description: 'Filter by type',
+    description: 'Filter by path type (STANDARD_STUDY, EXAM_BLUEPRINT, CLINICAL_COMPETENCY)',
   })
   @IsOptional()
   @IsEnum(LearningPathType)
   type?: LearningPathType;
+
+  @ApiPropertyOptional({ description: 'Filter by specialization (e.g. pharmacy, nursing, pediatrics)' })
+  @IsOptional()
+  @IsString()
+  specialization?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by healthcare field' })
+  @IsOptional()
+  @IsString()
+  healthcareField?: string;
 
   @ApiPropertyOptional({ description: 'Filter by tags' })
   @IsOptional()
@@ -290,6 +300,11 @@ export class LearningPathFiltersDto {
   @IsOptional()
   @IsString()
   createdById?: string;
+
+  @ApiPropertyOptional({ description: 'Filter learning paths containing this course ID' })
+  @IsOptional()
+  @IsString()
+  courseId?: string;
 }
 
 export class GenerateLearningPathDto {

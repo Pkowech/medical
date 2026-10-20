@@ -1,4 +1,4 @@
-import { Controller, Get, Param } from '@nestjs/common';
+import { Controller, Get, Param, Query } from '@nestjs/common';
 import { PeerBenchmarkingService } from '../services/peer-benchmarking.service';
 import { AiAnalyticsService } from '#modules/ai-analytics/services/ai-analytics.service';
 
@@ -18,8 +18,11 @@ export class EngagementController {
   }
 
   @Get('leaderboard/:topicId')
-  async getLeaderboard(@Param('topicId') topicId: string) {
-    return this.peerBenchmarkingService.getLeaderboard(topicId);
+  async getLeaderboard(
+    @Param('topicId') topicId: string,
+    @Query('userId') userId?: string,
+  ) {
+    return this.peerBenchmarkingService.getLeaderboard(topicId, 10, userId);
   }
 
   @Get('study-group/:groupId')

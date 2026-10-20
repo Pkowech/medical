@@ -95,6 +95,28 @@ class PeerBenchmarkingService {
       throw new Error('Failed to fetch performance insights');
     }
   }
+
+  /** Fetches a cohort-scoped leaderboard for a topic, scoped to the requesting user's discipline. */
+  async getLeaderboard(
+    topicId: string,
+    userId?: string,
+  ): Promise<Array<{ id: string; username: string; completionPercentage?: number; streakDays?: number }>> {
+    try {
+      const params = userId ? `?userId=${encodeURIComponent(userId)}` : '';
+      const response = await apiService.get<ApiResponse<unknown[]>>(
+        `/engagement/leaderboard/${topicId}${params}`,
+      );
+      return (response.data.data ?? []) as Array<{
+        id: string;
+        username: string;
+        completionPercentage?: number;
+        streakDays?: number;
+      }>;
+    } catch (error) {
+      console.error('Error fetching leaderboard:', error);
+      return [];
+    }
+  }
 }
 
 export const peerBenchmarkingService = new PeerBenchmarkingService();

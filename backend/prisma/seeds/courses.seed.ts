@@ -41,6 +41,7 @@ import {
 import { createSeedPrisma } from './seed-db';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { seedLearningPaths } from './learning-paths.seed';
 
 // ─── Prisma setup ─────────────────────────────────────────────────────────────
 
@@ -3118,6 +3119,9 @@ async function seedCourses() {
       `${courseDef.units.reduce((s, u) => s + u.topics.length, 0)} topic(s) seeded`,
     );
   }
+
+  // ── Learning Paths ────────────────────────────────────────────────────────
+  await seedLearningPaths();
 
   // ── Summary ───────────────────────────────────────────────────────────────
   console.log('\n🎉  Seeding complete!');

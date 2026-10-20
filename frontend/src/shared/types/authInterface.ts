@@ -111,6 +111,11 @@ export interface UserPreferences {
   };
   learningPreference?: string;
   onboardingCompleted?: boolean;
+  institution?: string;
+  targetExam?: string;
+  dailyGoalMinutes?: number;
+  focusTopics?: string[];
+  [key: string]: any;
 }
 
 export interface NotificationPreferences {

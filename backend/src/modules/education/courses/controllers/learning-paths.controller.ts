@@ -69,6 +69,16 @@ export class LearningPathsController {
     return await this.learningPathsService.getByCategory(category);
   }
 
+  @Get('by-course/:courseId')
+  @ApiOperation({ summary: 'Get learning paths that include a specific course' })
+  @ApiResponse({
+    status: 200,
+    description: 'Learning paths referencing this course',
+  })
+  async getByCourse(@Param('courseId') courseId: string) {
+    return await this.learningPathsService.findByCourseId(courseId);
+  }
+
   // ==================== ANALYTICS - gRPC-based Recommendations ====================
   @Get('discovery/trending')
   @ApiOperation({
@@ -288,6 +298,16 @@ export class LearningPathsController {
   })
   async findAll(@Query() filters: LearningPathFiltersDto) {
     return await this.learningPathsService.findAll(filters);
+  }
+
+  @Get(':id/integrity')
+  @ApiOperation({ summary: 'Validate learning path catalog and resource integrity' })
+  @ApiResponse({
+    status: 200,
+    description: 'Path integrity verification details',
+  })
+  async checkIntegrity(@Param('id') id: string) {
+    return await this.learningPathsService.checkPathIntegrity(id);
   }
 
   @Get(':id')

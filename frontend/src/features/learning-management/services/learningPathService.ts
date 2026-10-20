@@ -42,6 +42,10 @@ class LearningPathService {
     return response.data?.data || (Array.isArray(response.data) ? response.data : []);
   }
 
+  async enroll(pathId: string): Promise<void> {
+    await apiService.post(`${LEARNING_PATH_BASE_URL}/${pathId}/enroll`, {});
+  }
+
   async deleteLearningPath(learningPathId: string): Promise<void> {
     await apiService.delete(`${LEARNING_PATH_BASE_URL}/${learningPathId}`);
   }

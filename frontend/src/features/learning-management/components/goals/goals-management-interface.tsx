@@ -14,6 +14,7 @@ import {
   Trash2,
   Flame,
   BarChart3,
+  Sparkles,
 } from 'lucide-react';
 import { apiService } from '@/features/auth/services/apiClient';
 import { LearningGoal, GoalAnalytics } from '@/shared/types/learningGoalsInterface';
@@ -273,6 +274,16 @@ export const GoalsManagementInterface: React.FC = () => {
                 <span className="px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-950/50 dark:text-purple-300">
                   {goal.category.replace('_', ' ')}
                 </span>
+                {goal.metadata && typeof goal.metadata === 'object' && (goal.metadata as any).createdFromOnboarding && (
+                  <span className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300">
+                    <Sparkles className="w-3 h-3" /> Starter Goal
+                  </span>
+                )}
+                {goal.metadata && typeof goal.metadata === 'object' && (goal.metadata as any).targetExam && (
+                  <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-950/50 dark:text-blue-300">
+                    {(goal.metadata as any).targetExam}
+                  </span>
+                )}
               </div>
             </div>
 
@@ -296,7 +307,8 @@ export const GoalsManagementInterface: React.FC = () => {
               <div
                 className={`h-full rounded-full transition-all duration-500 ease-out ${
                   goal.status === 'completed' ? 'bg-emerald-500' : 'bg-indigo-600'
-                } ${getProgressBarWidth(goal.progressPercentage)}`}
+                }`}
+                style={{ width: `${Math.min(100, Math.max(0, goal.progressPercentage))}%` }}
               />
             </div>
           </div>

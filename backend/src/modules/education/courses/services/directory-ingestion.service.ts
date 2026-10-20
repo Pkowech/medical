@@ -81,7 +81,6 @@ export class DirectoryIngestionService implements OnModuleInit {
         difficulty: CourseDifficulty.intermediate,
         status: LearningPathStatus.published,
         specialization: specializationName,
-        pathStructure: { phases: [] } as any,
       },
     });
 

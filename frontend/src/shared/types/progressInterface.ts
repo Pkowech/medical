@@ -401,6 +401,9 @@ export interface PeerComparison {
   topPerformer: number;
   rank: number;
   totalStudents: number;
+  cohortLabel?: string;
+  cohortTier?: string;
+  percentile?: number;
 }
 
 /**

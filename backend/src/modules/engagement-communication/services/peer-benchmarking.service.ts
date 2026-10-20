@@ -8,6 +8,11 @@ export class PeerBenchmarkingService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getPeerStats(userId: string, topicId: string): Promise<PeerStats> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { healthcareField: true },
+    });
+
     const userProgress = await this.prisma.progress.findFirst({
       where: { userId, topicId },
     });
@@ -28,9 +33,27 @@ export class PeerBenchmarkingService {
       };
     }
 
-    const peerProgress = await this.prisma.progress.findMany({
-      where: { topicId, NOT: { userId } },
-    });
+    let peerProgress: Progress[] = [];
+    if (user?.healthcareField) {
+      peerProgress = await this.prisma.progress.findMany({
+        where: {
+          topicId,
+          NOT: { userId },
+          user: {
+            healthcareField: {
+              equals: user.healthcareField,
+              mode: 'insensitive',
+            },
+          },
+        },
+      });
+    }
+
+    if (peerProgress.length === 0) {
+      peerProgress = await this.prisma.progress.findMany({
+        where: { topicId, NOT: { userId } },
+      });
+    }
 
     return {
       userProgress: {
@@ -50,13 +73,51 @@ export class PeerBenchmarkingService {
     };
   }
 
-  async getLeaderboard(topicId: string, limit = 10) {
-    return this.prisma.progress.findMany({
-      where: { topicId },
+  async getLeaderboard(topicId: string, limit = 10, requestingUserId?: string) {
+    // Scope leaderboard to same healthcare field when possible
+    let healthcareField: string | null = null;
+    if (requestingUserId) {
+      const reqUser = await this.prisma.user.findUnique({
+        where: { id: requestingUserId },
+        select: { healthcareField: true },
+      });
+      healthcareField = reqUser?.healthcareField ?? null;
+    }
+
+    const where: any = { topicId };
+    if (healthcareField) {
+      where.user = {
+        healthcareField: { equals: healthcareField, mode: 'insensitive' },
+      };
+    }
+
+    const cohortLeaderboard = await this.prisma.progress.findMany({
+      where,
       orderBy: [{ completionPercentage: 'desc' }, { streakDays: 'desc' }],
       take: limit,
-      include: { user: { select: { id: true, username: true } } },
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            healthcareField: true,
+            studyYear: true,
+          },
+        },
+      },
     });
+
+    // If cohort-scoped is empty, fall back to global
+    if (cohortLeaderboard.length === 0) {
+      return this.prisma.progress.findMany({
+        where: { topicId },
+        orderBy: [{ completionPercentage: 'desc' }, { streakDays: 'desc' }],
+        take: limit,
+        include: { user: { select: { id: true, username: true } } },
+      });
+    }
+
+    return cohortLeaderboard;
   }
 
   async getStudyGroupStats(groupId: string): Promise<StudyGroupStats> {

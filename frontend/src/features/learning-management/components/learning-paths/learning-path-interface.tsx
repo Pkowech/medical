@@ -487,6 +487,13 @@ export const LearningPathInterface: React.FC = () => {
   const inProgress = userProgress.filter(p => p.status === 'inProgress').length;
   const completed  = userProgress.filter(p => p.status === 'completed').length;
 
+  const scoredModules = userProgress.flatMap(p => p.moduleProgress || []).filter(m => typeof m.bestScore === 'number' && m.bestScore > 0);
+  const avgScore = scoredModules.length > 0
+    ? `${Math.round(scoredModules.reduce((acc, m) => acc + (m.bestScore || 0), 0) / scoredModules.length)}%`
+    : userProgress.length > 0
+    ? `${Math.round(userProgress.reduce((acc, p) => acc + (p.overallProgressPercentage || 0), 0) / userProgress.length)}%`
+    : 'N/A';
+
   const cardProps = (path: PathCardData) => ({
     path,
     isEnrolled: path.isEnrolled,
@@ -505,7 +512,7 @@ export const LearningPathInterface: React.FC = () => {
           <StatCard icon={BookOpen}     title="Active Paths" value={inProgress}    subtitle="Currently enrolled"   accent="text-indigo-500" />
           <StatCard icon={CheckCircle}  title="Completed"    value={completed}     subtitle="Paths finished"        accent="text-emerald-500" />
           <StatCard icon={TrendingUp}   title="In Progress"  value={inProgress}    subtitle="Keep going"            accent="text-violet-500" />
-          <StatCard icon={Sparkles}     title="Avg Score"    value="88%"           subtitle="Across all paths"      accent="text-amber-500" />
+          <StatCard icon={Sparkles}     title="Avg Score"    value={avgScore}      subtitle={scoredModules.length > 0 ? 'Across assessments' : 'Overall progress avg'} accent="text-amber-500" />
         </div>
 
         {/* ── Active Pathways ── */}
@@ -562,8 +569,34 @@ export const LearningPathInterface: React.FC = () => {
             </form>
           </SectionHeader>
 
+          {/* Discipline / Specialization filter */}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-semibold text-muted-foreground mr-1 uppercase tracking-wider">Discipline:</span>
+            {[
+              { id: '', label: 'All Fields' },
+              { id: 'pharmacy', label: 'Pharmacy' },
+              { id: 'nursing', label: 'Nursing' },
+              { id: 'medicine', label: 'Medicine' },
+              { id: 'alliedHealth', label: 'Allied Health' },
+            ].map(f => (
+              <button
+                key={`field-${f.id}`}
+                onClick={() => setFilters({ ...filters, category: f.id, specialization: '' })}
+                className={cn(
+                  'px-3.5 h-8 rounded-full text-xs font-semibold uppercase tracking-wider transition-colors',
+                  filters.category === f.id && !filters.specialization
+                    ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/20'
+                    : 'bg-card border border-border text-muted-foreground hover:border-primary/30'
+                )}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
           {/* Difficulty filter */}
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-semibold text-muted-foreground mr-1 uppercase tracking-wider">Level:</span>
             {['', 'beginner', 'intermediate', 'advanced', 'expert'].map(d => (
               <button
                 key={d}

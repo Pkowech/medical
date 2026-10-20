@@ -39,6 +39,7 @@
     "prisma:db:push": "prisma db push",
     "prisma:db:pull": "prisma db pull",
     "seed": "tsx prisma/seeds/seed_roles.ts && tsx prisma/seeds/seed.ts && tsx prisma/seeds/courses.seed.ts",
+    "seed:paths": "tsx prisma/seeds/learning-paths.seed.ts",
     "docker:dev": "docker-compose up server-dev --build",
     "docker:dev:clean": "docker-compose down -v && docker-compose up server-dev --build",
     "docker:logs": "docker-compose logs -f server-dev",

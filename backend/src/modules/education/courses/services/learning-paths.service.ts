@@ -21,6 +21,7 @@ import {
   LearningPathStatus,
   LearningPathCategory,
   ProgressStatus,
+  PathModuleType,
 } from '@prisma/client';
 import { PathStructure } from '../../../../common/dto/learning.dto';
 import { LearningAnalyticsService } from '../../../ai-analytics/services/learning-analytics.service';
@@ -45,22 +46,27 @@ export class LearningPathsService {
     this.validatePathStructure(createDto.pathStructure);
 
     try {
-      const learningPath = await this.prisma.learningPath.create({
-        data: {
-          title: createDto.title,
-          description: createDto.description,
-          categoryId: createDto.category,
-          difficulty: createDto.difficulty as CourseDifficulty,
-          estimatedDurationWeeks: createDto.estimatedDurationWeeks,
-          estimatedHoursPerWeek: createDto.estimatedHoursPerWeek,
-          pathStructure:
-            createDto.pathStructure as unknown as Prisma.JsonObject,
-          createdBy: userId,
-          status: LearningPathStatus.draft,
-        },
-        include: {
-          milestones: true,
-        },
+      const learningPath = await this.prisma.$transaction(async (tx) => {
+        const path = await tx.learningPath.create({
+          data: {
+            title: createDto.title,
+            description: createDto.description,
+            categoryId: createDto.category,
+            difficulty: createDto.difficulty as CourseDifficulty,
+            estimatedDurationWeeks: createDto.estimatedDurationWeeks,
+            estimatedHoursPerWeek: createDto.estimatedHoursPerWeek,
+            pathStructure:
+              createDto.pathStructure as unknown as Prisma.JsonObject,
+            createdBy: userId,
+            status: LearningPathStatus.draft,
+          },
+          include: {
+            milestones: true,
+          },
+        });
+
+        await this.syncRelationalPhases(tx, path.id, createDto.pathStructure);
+        return path;
       });
 
       this.eventEmitter.emit('learning-path.created', {
@@ -84,6 +90,23 @@ export class LearningPathsService {
       return await this.prisma.learningPath.findMany({
         where: whereClause,
         include: {
+          phases: {
+            orderBy: { order: 'asc' },
+            include: {
+              modules: {
+                orderBy: { order: 'asc' },
+                include: {
+                  course: {
+                    select: {
+                      id: true,
+                      title: true,
+                      code: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
           _count: {
             select: {
               progress: true,
@@ -99,11 +122,39 @@ export class LearningPathsService {
     }
   }
 
+  async findByCourseId(courseId: string): Promise<LearningPath[]> {
+    return this.findAll({ courseId, status: LearningPathStatus.published });
+  }
+
   async findOne(id: string, userId?: string): Promise<LearningPath> {
     try {
       const learningPath = await this.prisma.learningPath.findUnique({
         where: { id },
         include: {
+          phases: {
+            orderBy: { order: 'asc' },
+            include: {
+              modules: {
+                orderBy: { order: 'asc' },
+                include: {
+                  course: {
+                    select: {
+                      id: true,
+                      title: true,
+                      code: true,
+                      difficulty: true,
+                    },
+                  },
+                  quiz: {
+                    select: {
+                      id: true,
+                      title: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
           progress: userId ? { where: { userId } } : false,
           milestones: {
             orderBy: { order: 'asc' },
@@ -118,6 +169,28 @@ export class LearningPathsService {
 
       if (!learningPath) {
         throw new NotFoundException('Learning path not found');
+      }
+
+      if (learningPath.phases?.length > 0 && !learningPath.pathStructure) {
+        (learningPath as any).pathStructure = {
+          phases: learningPath.phases.map((p) => ({
+            id: p.id,
+            title: p.title,
+            description: p.description,
+            order: p.order,
+            estimatedWeeks: p.estimatedWeeks,
+            modules: p.modules.map((m) => ({
+              id: m.id,
+              title: m.title,
+              description: m.description,
+              type: m.type,
+              resourceId: m.resourceId || m.courseId || m.quizId,
+              order: m.order,
+              isRequired: m.isRequired,
+              unlockConditions: m.unlockConditions,
+            })),
+          })),
+        };
       }
 
       return learningPath;
@@ -149,18 +222,26 @@ export class LearningPathsService {
     }
 
     try {
-      const updatedPath = await this.prisma.learningPath.update({
-        where: { id },
-        data: {
-          title: updateDto.title,
-          description: updateDto.description,
-          pathStructure:
-            updateDto.pathStructure as unknown as Prisma.JsonObject,
-          updatedAt: new Date(),
-        },
-        include: {
-          milestones: true,
-        },
+      const updatedPath = await this.prisma.$transaction(async (tx) => {
+        const path = await tx.learningPath.update({
+          where: { id },
+          data: {
+            title: updateDto.title,
+            description: updateDto.description,
+            pathStructure:
+              updateDto.pathStructure as unknown as Prisma.JsonObject,
+            updatedAt: new Date(),
+          },
+          include: {
+            milestones: true,
+          },
+        });
+
+        if (updateDto.pathStructure) {
+          await this.syncRelationalPhases(tx, path.id, updateDto.pathStructure);
+        }
+
+        return path;
       });
 
       this.eventEmitter.emit('learning-path.updated', {
@@ -172,9 +253,92 @@ export class LearningPathsService {
 
       return updatedPath;
     } catch (error) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException
+      ) {
+        throw error;
+      }
       throw new BadRequestException(
         `Failed to update learning path: ${getErrorMessage(error)}`,
       );
+    }
+  }
+
+  private async syncRelationalPhases(
+    tx: Prisma.TransactionClient,
+    pathId: string,
+    pathStructure: PathStructure,
+  ): Promise<void> {
+    if (!pathStructure?.phases || !Array.isArray(pathStructure.phases)) return;
+
+    await tx.learningPathPhase.deleteMany({
+      where: { learningPathId: pathId },
+    });
+
+    for (let pIdx = 0; pIdx < pathStructure.phases.length; pIdx++) {
+      const phase = pathStructure.phases[pIdx];
+      const phaseAny = phase as any;
+      const createdPhase = await tx.learningPathPhase.create({
+        data: {
+          learningPathId: pathId,
+          title: phase.title,
+          description: phase.description,
+          order: phase.order ?? pIdx + 1,
+          estimatedWeeks: phaseAny.estimatedWeeks ?? phaseAny.estimatedDurationWeeks,
+        },
+      });
+
+      for (let mIdx = 0; mIdx < (phase.modules || []).length; mIdx++) {
+        const mod = phase.modules[mIdx];
+        const modAny = mod as any;
+        let courseId: string | null = null;
+        let quizId: string | null = null;
+        const targetResourceId = mod.resourceId || mod.id;
+
+        if (mod.type === 'course' && targetResourceId) {
+          const course = await tx.course.findUnique({
+            where: { id: targetResourceId },
+            select: { id: true },
+          });
+          if (course) courseId = course.id;
+        } else if (mod.type === 'assessment' && targetResourceId) {
+          const quiz = await tx.quiz.findUnique({
+            where: { id: targetResourceId },
+            select: { id: true },
+          });
+          if (quiz) quizId = quiz.id;
+        }
+
+        const validTypes = [
+          'course',
+          'assessment',
+          'clinical_case',
+          'milestone',
+          'resource',
+        ];
+        const modType: PathModuleType = validTypes.includes(mod.type)
+          ? (mod.type as PathModuleType)
+          : PathModuleType.course;
+
+        await tx.learningPathModule.create({
+          data: {
+            phaseId: createdPhase.id,
+            title: mod.title,
+            description: mod.description,
+            type: modType,
+            resourceId: targetResourceId,
+            courseId,
+            quizId,
+            order: mod.order ?? mIdx + 1,
+            estimatedMinutes:
+              mod.estimatedMinutes ??
+              (modAny.estimatedHours ? modAny.estimatedHours * 60 : 60),
+            isRequired: mod.required ?? modAny.isRequired ?? true,
+            unlockConditions: modAny.unlockConditions || [],
+          },
+        });
+      }
     }
   }
 
@@ -320,7 +484,7 @@ export class LearningPathsService {
       );
     }
 
-    this.validatePathForPublishing(learningPath);
+    await this.validatePathForPublishing(learningPath);
 
     try {
       const publishedPath = await this.prisma.learningPath.update({
@@ -425,7 +589,9 @@ export class LearningPathsService {
     }
   }
 
-  private validatePathForPublishing(learningPath: LearningPath): void {
+  private async validatePathForPublishing(
+    learningPath: LearningPath,
+  ): Promise<void> {
     const errors: string[] = [];
 
     if (!learningPath.title?.trim()) {
@@ -441,6 +607,31 @@ export class LearningPathsService {
 
     if (!pathStructure?.phases?.length) {
       errors.push('At least one phase is required');
+    } else {
+      const courseIds: string[] = [];
+      for (const phase of pathStructure.phases) {
+        for (const module of phase.modules || []) {
+          if (module.type === 'course' && module.resourceId) {
+            courseIds.push(module.resourceId);
+          }
+        }
+      }
+
+      if (courseIds.length > 0) {
+        const existingCourses = await this.prisma.course.findMany({
+          where: { id: { in: courseIds } },
+          select: { id: true },
+        });
+        const existingIds = new Set(existingCourses.map((c) => c.id));
+        const missingCourseIds = courseIds.filter(
+          (cid) => !existingIds.has(cid),
+        );
+        if (missingCourseIds.length > 0) {
+          errors.push(
+            `Referenced course(s) not found in catalog: ${missingCourseIds.join(', ')}`,
+          );
+        }
+      }
     }
 
     if (errors.length > 0) {
@@ -459,6 +650,60 @@ export class LearningPathsService {
     }
   }
 
+  async checkPathIntegrity(id: string): Promise<{
+    pathId: string;
+    title: string;
+    isValid: boolean;
+    totalPhases: number;
+    totalModules: number;
+    courseModules: number;
+    missingCourses: string[];
+  }> {
+    const learningPath = await this.prisma.learningPath.findUnique({
+      where: { id },
+      include: {
+        phases: {
+          include: {
+            modules: {
+              include: { course: true },
+            },
+          },
+        },
+      },
+    });
+
+    if (!learningPath) {
+      throw new NotFoundException('Learning path not found');
+    }
+
+    const totalPhases = learningPath.phases?.length || 0;
+    let totalModules = 0;
+    let courseModules = 0;
+    const missingCourses: string[] = [];
+
+    for (const phase of learningPath.phases || []) {
+      for (const mod of phase.modules || []) {
+        totalModules += 1;
+        if (mod.type === 'course') {
+          courseModules += 1;
+          if (!mod.courseId || !mod.course) {
+            missingCourses.push(mod.resourceId || mod.id);
+          }
+        }
+      }
+    }
+
+    return {
+      pathId: id,
+      title: learningPath.title,
+      isValid: missingCourses.length === 0,
+      totalPhases,
+      totalModules,
+      courseModules,
+      missingCourses,
+    };
+  }
+
   private buildWhereClause(
     filters: LearningPathFiltersDto,
   ): Prisma.LearningPathWhereInput {
@@ -469,18 +714,51 @@ export class LearningPathsService {
     }
 
     if (filters.type) {
-      // where.type = filters.type; // type is not in the model
+      where.pathType = filters.type;
+    }
+
+    if (filters.difficulty) {
+      where.difficulty = filters.difficulty as CourseDifficulty;
+    }
+
+    if (filters.specialization) {
+      where.specialization = {
+        contains: filters.specialization,
+        mode: 'insensitive',
+      };
     }
 
     if (filters.category) {
       where.categoryId = filters.category;
     }
 
-    if (filters.search) {
+    if (filters.courseId) {
+      where.phases = {
+        some: {
+          modules: {
+            some: {
+              courseId: filters.courseId,
+            },
+          },
+        },
+      };
+    }
+
+    if (filters.healthcareField) {
       where.OR = [
+        ...(where.OR || []),
+        { categoryId: { contains: filters.healthcareField, mode: 'insensitive' } },
+        { specialization: { contains: filters.healthcareField, mode: 'insensitive' } },
+      ];
+    }
+
+    if (filters.search) {
+      const searchConditions: Prisma.LearningPathWhereInput[] = [
         { title: { contains: filters.search, mode: 'insensitive' } },
         { description: { contains: filters.search, mode: 'insensitive' } },
+        { specialization: { contains: filters.search, mode: 'insensitive' } },
       ];
+      where.OR = where.OR ? [...(where.OR as Prisma.LearningPathWhereInput[]), ...searchConditions] : searchConditions;
     }
 
     if (filters.createdById) {
@@ -492,13 +770,20 @@ export class LearningPathsService {
 
   /**
    * Get personalized learning path recommendations for a user
-   * Uses learning-analytics service for gRPC-based recommendations
+   * Uses learning-analytics service for gRPC-based recommendations,
+   * with cohort-aware fallback based on user's healthcare profile
    */
   async getRecommendedPaths(
     userId: string,
     limit: number = 5,
   ): Promise<LearningPath[]> {
+    let userProfile: { healthcareField: string | null; specialization: string | null } | null = null;
     try {
+      userProfile = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { healthcareField: true, specialization: true },
+      });
+
       // Get path recommendations from analytics service
       const recommendations =
         await this.learningAnalyticsService.getPathRecommendations(
@@ -510,11 +795,11 @@ export class LearningPathsService {
       const pathIds = recommendations.map((rec) => rec.pathId);
 
       if (pathIds.length === 0) {
-        // Fallback to trending paths
-        return this.getTrendingPaths(limit);
+        // Fallback to cohort-prioritized trending paths
+        return this.getCohortOrTrendingPaths(userProfile, limit);
       }
 
-      return await this.prisma.learningPath.findMany({
+      const paths = await this.prisma.learningPath.findMany({
         where: {
           id: { in: pathIds },
           status: 'published',
@@ -524,14 +809,67 @@ export class LearningPathsService {
         },
         take: limit,
       });
+
+      if (paths.length === 0) {
+        return this.getCohortOrTrendingPaths(userProfile, limit);
+      }
+
+      return paths;
     } catch (error) {
       this.logger.warn(
         `Error getting recommended paths for user ${userId}:`,
         error,
       );
-      // Graceful fallback to trending published paths
-      return this.getTrendingPaths(limit);
+      return this.getCohortOrTrendingPaths(userProfile, limit);
     }
+  }
+
+  /**
+   * Fallback for recommendations: prioritize published paths matching the user's
+   * healthcare field or specialization before defaulting to global trending paths.
+   */
+  async getCohortOrTrendingPaths(
+    user: { healthcareField?: string | null; specialization?: string | null } | null,
+    limit: number = 5,
+  ): Promise<LearningPath[]> {
+    try {
+      const cohortConditions: Prisma.LearningPathWhereInput[] = [];
+
+      if (user?.specialization) {
+        cohortConditions.push({
+          specialization: { contains: user.specialization, mode: 'insensitive' },
+        });
+      }
+
+      if (user?.healthcareField) {
+        cohortConditions.push({
+          categoryId: { contains: user.healthcareField, mode: 'insensitive' },
+        });
+        cohortConditions.push({
+          specialization: { contains: user.healthcareField, mode: 'insensitive' },
+        });
+      }
+
+      if (cohortConditions.length > 0) {
+        const cohortPaths = await this.prisma.learningPath.findMany({
+          where: {
+            status: 'published',
+            OR: cohortConditions,
+          },
+          include: { _count: { select: { progress: true } } },
+          orderBy: { createdAt: 'desc' },
+          take: limit,
+        });
+
+        if (cohortPaths.length > 0) {
+          return cohortPaths;
+        }
+      }
+    } catch (err) {
+      this.logger.warn('Error fetching cohort-specific paths fallback:', err);
+    }
+
+    return this.getTrendingPaths(limit);
   }
 
   /**

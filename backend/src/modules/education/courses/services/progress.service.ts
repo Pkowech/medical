@@ -1479,10 +1479,20 @@ export class ProgressService {
 
   async getPeerComparison(userId: string): Promise<any> {
     try {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          healthcareField: true,
+          studyYear: true,
+          preferences: true,
+        },
+      });
+
       // Get user's average score from enrollments
       const userProgress = await this.prisma.courseEnrollment.findMany({
         where: { userId },
-        select: { progressPercentage: true },
+        select: { progressPercentage: true, courseId: true },
       });
 
       const userAverage =
@@ -1495,40 +1505,172 @@ export class ProgressService {
             )
           : 0;
 
-      // Get cohort statistics from all users
-      const allEnrollments = await this.prisma.courseEnrollment.findMany({
-        select: { progressPercentage: true, userId: true },
-      });
+      const userCourseIds = userProgress.map((p) => p.courseId);
 
-      const uniqueUsers = new Set(allEnrollments.map((e) => e.userId));
-      const totalStudents = uniqueUsers.size;
+      const prefs =
+        user?.preferences &&
+        typeof user.preferences === 'object' &&
+        !Array.isArray(user.preferences)
+          ? (user.preferences as Record<string, any>)
+          : null;
+      const institution =
+        typeof prefs?.institution === 'string' && prefs.institution.trim()
+          ? prefs.institution.trim()
+          : null;
+      const field = user?.healthcareField?.trim() || null;
+      const year = user?.studyYear || null;
+
+      let cohortEnrollments: Array<{
+        progressPercentage: number | null;
+        userId: string;
+      }> = [];
+      let cohortLabel = 'Platform-Wide Medical Learners';
+      let cohortTier = 'GLOBAL';
+
+      // Tier 1 & 2: Discipline + Study Year (+ optional Institution)
+      if (field && year) {
+        const disciplineYearEnrollments =
+          await this.prisma.courseEnrollment.findMany({
+            where: {
+              user: {
+                healthcareField: { equals: field, mode: 'insensitive' },
+                studyYear: year,
+              },
+            },
+            select: {
+              progressPercentage: true,
+              userId: true,
+              user: { select: { preferences: true } },
+            },
+          });
+
+        const distinctUsers = new Set(
+          disciplineYearEnrollments.map((e) => e.userId),
+        );
+
+        if (institution && distinctUsers.size >= 2) {
+          const instEnrollments = disciplineYearEnrollments.filter((e) => {
+            const uPrefs = e.user?.preferences as Record<string, any> | null;
+            return (
+              uPrefs?.institution &&
+              typeof uPrefs.institution === 'string' &&
+              uPrefs.institution
+                .toLowerCase()
+                .includes(institution.toLowerCase())
+            );
+          });
+          const instUsers = new Set(instEnrollments.map((e) => e.userId));
+          if (instUsers.size >= 2) {
+            cohortEnrollments = instEnrollments;
+            cohortLabel = `${institution} - ${field.charAt(0).toUpperCase() + field.slice(1)} Year ${year}`;
+            cohortTier = 'INSTITUTION';
+          }
+        }
+
+        if (cohortEnrollments.length === 0 && distinctUsers.size >= 2) {
+          cohortEnrollments = disciplineYearEnrollments;
+          cohortLabel = `${field.charAt(0).toUpperCase() + field.slice(1)} Year ${year} Cohort`;
+          cohortTier = 'DISCIPLINE_YEAR';
+        }
+      }
+
+      // Tier 3: Discipline wide
+      if (cohortEnrollments.length === 0 && field) {
+        const disciplineEnrollments =
+          await this.prisma.courseEnrollment.findMany({
+            where: {
+              user: {
+                healthcareField: { equals: field, mode: 'insensitive' },
+              },
+            },
+            select: { progressPercentage: true, userId: true },
+          });
+        const distinctUsers = new Set(
+          disciplineEnrollments.map((e) => e.userId),
+        );
+        if (distinctUsers.size >= 2) {
+          cohortEnrollments = disciplineEnrollments;
+          cohortLabel = `${field.charAt(0).toUpperCase() + field.slice(1)} Students`;
+          cohortTier = 'DISCIPLINE';
+        }
+      }
+
+      // Tier 4: Enrolled Course Peers
+      if (cohortEnrollments.length === 0 && userCourseIds.length > 0) {
+        const coursePeerEnrollments =
+          await this.prisma.courseEnrollment.findMany({
+            where: {
+              courseId: { in: userCourseIds },
+            },
+            select: { progressPercentage: true, userId: true },
+          });
+        const distinctUsers = new Set(
+          coursePeerEnrollments.map((e) => e.userId),
+        );
+        if (distinctUsers.size >= 2) {
+          cohortEnrollments = coursePeerEnrollments;
+          cohortLabel = 'Classmates in Your Enrolled Courses';
+          cohortTier = 'COURSE';
+        }
+      }
+
+      // Tier 5: Global Platform Fallback
+      if (cohortEnrollments.length === 0) {
+        cohortEnrollments = await this.prisma.courseEnrollment.findMany({
+          select: { progressPercentage: true, userId: true },
+        });
+        cohortLabel = 'Platform-Wide Medical Learners';
+        cohortTier = 'GLOBAL';
+      }
+
+      const cohortUserIds = new Set(cohortEnrollments.map((e) => e.userId));
+      const totalStudents = Math.max(cohortUserIds.size, userProgress.length > 0 ? 1 : 0);
 
       const cohortAverage =
-        allEnrollments.length > 0
+        cohortEnrollments.length > 0
           ? Math.round(
-              allEnrollments.reduce(
+              cohortEnrollments.reduce(
                 (sum, e) => sum + (e.progressPercentage || 0),
                 0,
-              ) / allEnrollments.length,
+              ) / cohortEnrollments.length,
             )
           : 0;
 
-      // Get top performer
-      const topPerformer = Math.max(
-        0,
-        ...allEnrollments.map((e) => e.progressPercentage || 0),
+      // Aggregate per-user average for cohort ranking
+      const userAveragesMap = new Map<string, { sum: number; count: number }>();
+      for (const e of cohortEnrollments) {
+        const cur = userAveragesMap.get(e.userId) || { sum: 0, count: 0 };
+        cur.sum += e.progressPercentage || 0;
+        cur.count += 1;
+        userAveragesMap.set(e.userId, cur);
+      }
+
+      if (userProgress.length > 0 && !userAveragesMap.has(userId)) {
+        userAveragesMap.set(userId, { sum: userAverage, count: 1 });
+      }
+
+      const allUserAverages = Array.from(userAveragesMap.values()).map((v) =>
+        Math.round(v.sum / v.count),
       );
 
-      // Calculate rank (percentile rank)
-      const userScores = allEnrollments
-        .filter((e) => e.userId === userId)
-        .map((e) => e.progressPercentage || 0);
+      const topPerformer =
+        allUserAverages.length > 0 ? Math.max(...allUserAverages) : 0;
 
-      const userRank =
-        userScores.length > 0
-          ? allEnrollments.filter(
-              (e) => (e.progressPercentage || 0) > userAverage,
-            ).length + 1
+      const usersAhead = allUserAverages.filter((avg) => avg > userAverage).length;
+      const userRank = userProgress.length > 0 ? usersAhead + 1 : 0;
+      const percentile =
+        allUserAverages.length > 0 && userProgress.length > 0
+          ? Math.max(
+              1,
+              Math.min(
+                100,
+                Math.round(
+                  ((allUserAverages.length - usersAhead) /
+                    allUserAverages.length) *
+                    100,
+                ),
+              ),
+            )
           : 0;
 
       return {
@@ -1537,6 +1679,9 @@ export class ProgressService {
         topPerformer,
         rank: userRank,
         totalStudents,
+        percentile,
+        cohortLabel,
+        cohortTier,
       };
     } catch (error) {
       this.logger.error(
@@ -1548,7 +1693,10 @@ export class ProgressService {
         cohortAverage: 0,
         topPerformer: 0,
         rank: 0,
+        percentile: 0,
         totalStudents: 0,
+        cohortLabel: 'Platform-Wide Medical Learners',
+        cohortTier: 'GLOBAL',
       };
     }
   }

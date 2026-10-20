@@ -40,6 +40,7 @@ export interface LearningPath {
   category: string;
   difficulty: string;
   status: string;
+  pathType?: string;
   estimatedDurationWeeks: number;
   estimatedHoursPerWeek: number;
   tags: string[];

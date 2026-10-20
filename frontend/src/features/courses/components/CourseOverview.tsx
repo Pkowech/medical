@@ -4,7 +4,8 @@ import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { BookOpen, CheckCircle, ChevronRight, CircleCheck, Clock, Plus } from 'lucide-react';
+import { BookOpen, CheckCircle, ChevronRight, CircleCheck, Clock, Plus, Sparkles } from 'lucide-react';
+import { apiService } from '@/features/auth/services/apiClient';
 import { toast } from 'sonner';
 import { courseService } from '@/features/courses/services/courseService';
 import type { Course } from '@/shared/types/courseInterface';
@@ -40,6 +41,20 @@ export function CourseOverview() {
     queryFn: () => courseService.getDetailedCourseProgress(courseId),
     enabled: Boolean(courseId && user?.id),
   });
+  const { data: connectedPaths = [] } = useQuery<Array<{ id: string; title: string; specialization?: string; pathType?: string }>>({
+    queryKey: ['course-connected-paths', courseId],
+    queryFn: async () => {
+      try {
+        const response = await apiService.get<any>(`/learning-paths/by-course/${courseId}`);
+        const d = response.data?.data || response.data || [];
+        return Array.isArray(d) ? d : [];
+      } catch {
+        return [];
+      }
+    },
+    enabled: Boolean(courseId),
+  });
+
   const { data: activeUnits = [] } = useQuery<Array<Record<string, unknown>>>({
     queryKey: ['course-overview-active-units', courseId, user?.id],
     queryFn: () => courseService.getEnrolledUnits(),
@@ -97,6 +112,24 @@ export function CourseOverview() {
             </p>
             <h1 className="mt-2 text-3xl font-semibold text-foreground dark:text-foreground">{course.title || course.name}</h1>
             {course.description && <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground dark:text-muted-foreground">{course.description}</p>}
+            {connectedPaths.length > 0 && (
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                  <Sparkles className="h-3.5 w-3.5 text-blue-500" /> Part of Curricula:
+                </span>
+                {connectedPaths.map((p) => (
+                  <Link
+                    key={p.id}
+                    href={`/learning-paths/${p.id}`}
+                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/60 transition-colors"
+                  >
+                    <BookOpen className="h-3 w-3" />
+                    <span>{p.title}</span>
+                    <ChevronRight className="h-3 w-3 opacity-60" />
+                  </Link>
+                ))}
+              </div>
+            )}
           </div>
           {user ? (
             <button

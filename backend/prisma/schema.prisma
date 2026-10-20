@@ -165,6 +165,7 @@ model Quiz {
   topicPracticeFor     Topic?                   @relation("TopicPracticeQuiz", fields: [topicPracticeForId], references: [id], onDelete: SetNull)
   unit                 Unit?                    @relation(fields: [unitId], references: [id])
   rubric               Rubric?
+  learningPathModules  LearningPathModule[]
 
   @@index([unitId])
   @@index([topicId])
@@ -358,6 +359,8 @@ model User {
   learningGoals                  LearningGoal[]
   learningHistory                LearningHistory[]
   learningPathProgress           LearningPathProgress[]
+  learningPathPhaseProgress      LearningPathPhaseProgress[]
+  learningPathModuleProgress     LearningPathModuleProgress[]
   learningSuggestions            LearningSuggestion[]
   materialEngagements            MaterialEngagement[]
   materialEvents                 MaterialEvent[]
@@ -689,6 +692,7 @@ model Course {
   scheduleEvents    ScheduleEvent[]
   progress          Progress[]
   units             Unit[]
+  learningPathModules LearningPathModule[]
 
   @@index([code])
   @@index([categoryId])
@@ -1085,7 +1089,6 @@ model LearningPath {
   estimatedHours         Int?                    @map("estimated_hours")
   estimatedDurationWeeks Int?                    @map("estimated_duration_weeks")
   estimatedHoursPerWeek  Int?                    @map("estimated_hours_per_week")
-  pathStructure          Json?                   @map("path_structure")
   analytics              Json?
   milestonesAchieved     Json?                   @map("milestones_achieved")
   status                 CourseStatus            @default(draft)
@@ -1099,6 +1102,7 @@ model LearningPath {
   blueprintMappings      BlueprintMapping[]
   learningGoals          LearningGoal[]
   milestones             LearningPathMilestone[]
+  phases                 LearningPathPhase[]
   progress               LearningPathProgress[]
   category               CourseCategory?         @relation(fields: [categoryId], references: [id])
 
@@ -1168,6 +1172,99 @@ model LearningPathMilestone {
   @@unique([learningPathId, order])
   @@index([learningPathId])
   @@map("learning_path_milestones")
+}
+
+enum PathModuleType {
+  course
+  assessment
+  clinical_case
+  milestone
+  resource
+}
+
+model LearningPathPhase {
+  id             String                      @id @default(uuid())
+  learningPathId String                      @map("learning_path_id")
+  title          String                      @db.VarChar(255)
+  description    String?
+  order          Int                         @default(1)
+  estimatedWeeks Int?                        @map("estimated_weeks")
+  createdAt      DateTime                    @default(now()) @map("created_at")
+  updatedAt      DateTime                    @updatedAt @map("updated_at")
+
+  learningPath   LearningPath                @relation(fields: [learningPathId], references: [id], onDelete: Cascade)
+  modules        LearningPathModule[]
+  phaseProgress  LearningPathPhaseProgress[]
+
+  @@unique([learningPathId, order])
+  @@index([learningPathId])
+  @@map("learning_path_phases")
+}
+
+model LearningPathModule {
+  id               String                       @id @default(uuid())
+  phaseId          String                       @map("phase_id")
+  title            String                       @db.VarChar(255)
+  description      String?
+  type             PathModuleType               @default(course)
+  resourceId       String                       @map("resource_id")
+  courseId         String?                      @map("course_id")
+  quizId           String?                      @map("quiz_id")
+  order            Int                          @default(1)
+  estimatedMinutes Int?                         @map("estimated_minutes")
+  isRequired       Boolean                      @default(true) @map("is_required")
+  unlockConditions Json?                        @map("unlock_conditions")
+  createdAt        DateTime                     @default(now()) @map("created_at")
+  updatedAt        DateTime                     @updatedAt @map("updated_at")
+
+  phase            LearningPathPhase            @relation(fields: [phaseId], references: [id], onDelete: Cascade)
+  course           Course?                      @relation(fields: [courseId], references: [id], onDelete: Restrict)
+  quiz             Quiz?                        @relation(fields: [quizId], references: [id], onDelete: Restrict)
+  moduleProgress   LearningPathModuleProgress[]
+
+  @@unique([phaseId, order])
+  @@index([phaseId])
+  @@index([courseId])
+  @@index([quizId])
+  @@map("learning_path_modules")
+}
+
+model LearningPathPhaseProgress {
+  id                 String            @id @default(uuid())
+  userId             String            @map("user_id")
+  phaseId            String            @map("phase_id")
+  status             ProgressStatus    @default(notStarted)
+  progressPercentage Float             @default(0) @map("progress_percentage")
+  completedAt        DateTime?         @map("completed_at")
+  lastAccessedAt     DateTime?         @map("last_accessed_at")
+
+  user               User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  phase              LearningPathPhase @relation(fields: [phaseId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, phaseId])
+  @@index([userId])
+  @@index([phaseId])
+  @@map("learning_path_phase_progress")
+}
+
+model LearningPathModuleProgress {
+  id                 String             @id @default(uuid())
+  userId             String             @map("user_id")
+  moduleId           String             @map("module_id")
+  status             ProgressStatus     @default(notStarted)
+  progressPercentage Float              @default(0) @map("progress_percentage")
+  timeSpentMinutes   Int                @default(0) @map("time_spent_minutes")
+  bestScore          Float?             @map("best_score")
+  completedAt        DateTime?          @map("completed_at")
+  lastAccessedAt     DateTime?          @map("last_accessed_at")
+
+  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  module             LearningPathModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, moduleId])
+  @@index([userId])
+  @@index([moduleId])
+  @@map("learning_path_module_progress")
 }
 
 model LearningGoal {

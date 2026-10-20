@@ -36,6 +36,7 @@ export interface LearningGoal {
   blockedReason?: string;
   dependsOn?: Partial<LearningGoal>;
   dependencies?: Partial<LearningGoal>[];
+  metadata?: Record<string, unknown>;
 }
 
 export interface GoalAnalytics {

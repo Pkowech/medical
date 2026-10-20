@@ -523,6 +523,26 @@ export class LearningPathIntegrationService {
           status: {
             in: [ProgressStatus.inProgress, ProgressStatus.notStarted],
           },
+          OR: [
+            {
+              learningPath: {
+                phases: {
+                  some: {
+                    modules: {
+                      some: {
+                        OR: [{ courseId }, { resourceId: courseId }],
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            {
+              learningPath: {
+                phases: { none: {} },
+              },
+            },
+          ],
         },
         include: {
           learningPath: {
@@ -530,18 +550,30 @@ export class LearningPathIntegrationService {
               id: true,
               title: true,
               pathStructure: true,
+              phases: {
+                include: {
+                  modules: true,
+                },
+              },
             },
           },
         },
       });
 
-      return pathProgresses.filter((p) =>
-        this.pathContainsResource(
+      return pathProgresses.filter((p) => {
+        if (p.learningPath.phases && p.learningPath.phases.length > 0) {
+          return p.learningPath.phases.some((phase) =>
+            phase.modules.some(
+              (m) => m.courseId === courseId || m.resourceId === courseId,
+            ),
+          );
+        }
+        return this.pathContainsResource(
           p.learningPath.pathStructure as any,
           'course',
           courseId,
-        ),
-      );
+        );
+      });
     } catch (error) {
       this.logger.error(
         `Error fetching path progresses for course ${courseId}:`,
@@ -758,7 +790,10 @@ export class LearningPathIntegrationService {
       }
 
       for (const module of phase.modules) {
-        if (module.type === moduleType && module.resourceId === resourceId) {
+        if (
+          module.type === moduleType &&
+          (module.resourceId === resourceId || module.id === resourceId)
+        ) {
           return { phase, module };
         }
       }
@@ -976,17 +1011,51 @@ export class LearningPathIntegrationService {
     try {
       const course = await this.prisma.course.findUnique({
         where: { id: courseId },
-        select: { tags: true, category: true, title: true },
+        select: { categoryId: true, name: true, title: true, tags: true },
       });
 
       if (!course) {
         return [];
       }
 
+      // Priority 1: Published paths that directly contain this course
+      const containingPaths = await this.prisma.learningPath.findMany({
+        where: {
+          status: 'published',
+          phases: {
+            some: {
+              modules: {
+                some: {
+                  OR: [{ courseId }, { resourceId: courseId }],
+                },
+              },
+            },
+          },
+        },
+        take: 5,
+      });
+
+      if (containingPaths.length > 0) {
+        return containingPaths;
+      }
+
+      // Priority 2: Paths in the same category or matching specialization
+      const filterConditions: Prisma.LearningPathWhereInput[] = [];
+      if (course.categoryId) {
+        filterConditions.push({ categoryId: course.categoryId });
+      }
+      if (course.tags && course.tags.length > 0) {
+        filterConditions.push({
+          OR: course.tags.map((tag) => ({
+            specialization: { contains: tag, mode: 'insensitive' as const },
+          })),
+        });
+      }
+
       return await this.prisma.learningPath.findMany({
         where: {
           status: 'published',
-          OR: [{}],
+          ...(filterConditions.length > 0 ? { OR: filterConditions } : {}),
         },
         take: 5,
       });

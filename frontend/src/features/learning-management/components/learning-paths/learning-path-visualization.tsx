@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { toast } from 'sonner';
 import { apiService } from '@/features/auth/services/apiClient';
 import {
@@ -15,6 +16,8 @@ import {
   Clock,
   Users,
   ChevronLeft,
+  ChevronRight,
+  Plus,
   Target,
   Sparkles,
 } from 'lucide-react';
@@ -80,8 +83,29 @@ export const LearningPathVisualization: React.FC<LearningPathVisualizationProps>
   const [progress, setProgress] = useState<LearningPathProgress | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedPhase, setSelectedPhase] = useState<string | null>(null);
+  const [enrolling, setEnrolling] = useState(false);
 
   const router = useRouter();
+
+  const handleEnroll = async () => {
+    try {
+      setEnrolling(true);
+      await apiService.post(`/learning-paths/${pathId}/enroll`, {});
+      toast.success('Successfully enrolled in curriculum!');
+      if (learningPath) {
+        await fetchProgress(learningPath);
+      }
+    } catch (err: unknown) {
+      const errorMsg =
+        err && typeof err === 'object' && 'response' in err
+          ? ((err as { response?: { data?: { message?: string } } }).response?.data?.message ??
+            'Failed to enroll in curriculum')
+          : 'Failed to enroll in curriculum';
+      toast.error(errorMsg);
+    } finally {
+      setEnrolling(false);
+    }
+  };
 
   useEffect(() => {
     const loadPath = async () => {
@@ -113,6 +137,8 @@ export const LearningPathVisualization: React.FC<LearningPathVisualizationProps>
         category: toDisplayString(rawObj.category),
         difficulty: toDisplayString(rawObj.difficulty),
         status: toDisplayString(rawObj.status),
+        specialization: rawObj.specialization ? toDisplayString(rawObj.specialization) : undefined,
+        pathType: (rawObj.pathType ?? rawObj.path_type) ? toDisplayString(rawObj.pathType ?? rawObj.path_type) : undefined,
         estimatedDurationWeeks: Number(rawObj.estimatedDurationWeeks ?? rawObj.estimated_duration_weeks ?? 0),
         estimatedHoursPerWeek: Number(rawObj.estimatedHoursPerWeek ?? rawObj.estimated_hours_per_week ?? 0),
         tags: Array.isArray(rawObj.tags) ? (rawObj.tags as string[]) : [],
@@ -379,35 +405,88 @@ export const LearningPathVisualization: React.FC<LearningPathVisualizationProps>
         animate={{ opacity: 1, y: 0 }}
         className="mb-10"
       >
-        <button
-          onClick={() => router.back()}
-          className="flex items-center gap-2 text-muted-foreground hover:text-foreground dark:hover:text-muted-foreground font-medium text-sm mb-6 transition-colors group"
-        >
-          <ChevronLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" /> 
-          Back to Specializations
-        </button>
+        <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground dark:text-muted-foreground mb-4">
+          <Link href="/learning-paths" className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
+            Learning Paths
+          </Link>
+          <span className="text-muted-foreground/60">/</span>
+          {learningPath.specialization && (
+            <>
+              <span className="hover:text-foreground">{learningPath.specialization}</span>
+              <span className="text-muted-foreground/60">/</span>
+            </>
+          )}
+          <span className="text-foreground dark:text-foreground font-semibold line-clamp-1">{learningPath.title}</span>
+        </div>
         
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-          <div className="space-y-2">
-            <h1 className="text-4xl font-extrabold text-foreground dark:text-foreground tracking-tight leading-tight">
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300">
+                {learningPath.pathType === 'CLINICAL_COMPETENCY'
+                  ? 'Clinical Clerkship'
+                  : learningPath.pathType === 'EXAM_BLUEPRINT'
+                  ? 'Exam Blueprint'
+                  : 'Study Curriculum'}
+              </span>
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-muted text-muted-foreground">
+                {learningPath.difficulty || 'All Levels'}
+              </span>
+              {learningPath.estimatedDurationWeeks > 0 && (
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-muted text-muted-foreground flex items-center gap-1">
+                  <Clock className="w-3 h-3" /> {learningPath.estimatedDurationWeeks} Weeks
+                </span>
+              )}
+            </div>
+            <h1 className="text-3xl md:text-4xl font-extrabold text-foreground dark:text-foreground tracking-tight leading-tight">
               {learningPath.title}
             </h1>
-            <p className="text-lg text-muted-foreground dark:text-muted-foreground max-w-2xl leading-relaxed">
+            <p className="text-base text-muted-foreground dark:text-muted-foreground max-w-2xl leading-relaxed">
               {learningPath.description}
             </p>
           </div>
           
-          <div className="flex items-center gap-4">
-            <div className="flex -space-x-2">
-              {[1,2,3].map(i => (
-                <div key={i} className="w-8 h-8 rounded-full border-2 border-white dark:border-border bg-secondary dark:bg-card flex items-center justify-center overflow-hidden">
-                  <Users className="w-4 h-4 text-muted-foreground" />
-                </div>
-              ))}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+            <div className="flex items-center gap-3">
+              <div className="flex -space-x-2">
+                {[1,2,3].map(i => (
+                  <div key={i} className="w-8 h-8 rounded-full border-2 border-white dark:border-border bg-secondary dark:bg-card flex items-center justify-center overflow-hidden">
+                    <Users className="w-4 h-4 text-muted-foreground" />
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
+                {learningPath.analytics.totalEnrollments}+ Learners
+              </p>
             </div>
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
-              Join {learningPath.analytics.totalEnrollments}+ Learners
-            </p>
+
+            {progress && progress.status !== 'notStarted' ? (
+              <button
+                type="button"
+                onClick={() => {
+                  const firstIncompletePhase = (learningPath.pathStructure?.phases || []).find(
+                    (p) => getPhaseProgress(p.id)?.status !== 'completed'
+                  );
+                  if (firstIncompletePhase) {
+                    setSelectedPhase(firstIncompletePhase.id);
+                  }
+                }}
+                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-5 py-3 text-sm shadow-lg shadow-indigo-500/20 transition-all cursor-pointer"
+              >
+                <Play className="w-4 h-4" />
+                Continue Curriculum
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled={enrolling}
+                onClick={handleEnroll}
+                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-5 py-3 text-sm shadow-lg shadow-indigo-500/20 transition-all cursor-pointer disabled:opacity-50"
+              >
+                <Plus className="w-4 h-4" />
+                {enrolling ? 'Enrolling...' : 'Enroll in Curriculum'}
+              </button>
+            )}
           </div>
         </div>
       </motion.div>
