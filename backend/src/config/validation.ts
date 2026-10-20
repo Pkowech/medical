@@ -33,13 +33,21 @@ export const validationSchema = Joi.object({
   // Redis
   // Support either a direct Redis URL (e.g. Upstash / managed Redis) or
   // a host-based configuration for Docker/local development.
-  REDIS_URL: Joi.string().uri().optional(),
+  REDIS_URL: Joi.string()
+    .uri({ scheme: ['redis', 'rediss'] })
+    .optional(),
   REDIS_HOST: Joi.string().default('redis'),
   REDIS_PORT: Joi.number().port().default(6379),
+  REDIS_USERNAME: Joi.string().optional(),
   REDIS_PASSWORD: Joi.string().optional(),
   REDIS_DB: Joi.number().min(0).max(15).default(0),
   REDIS_KEY_PREFIX: Joi.string().default('medtrack:'),
   REDIS_TTL: Joi.number().min(60).default(3600),
+  REDIS_MEMORY_MAX_ENTRIES: Joi.number().integer().min(1).default(10000),
+  REDIS_MEMORY_MAX_BYTES: Joi.number()
+    .integer()
+    .min(1024)
+    .default(64 * 1024 * 1024),
 
   // JWT (Required)
   JWT_SECRET: Joi.string().min(32).required(),
@@ -87,7 +95,9 @@ export const validationSchema = Joi.object({
   CLOUDINARY_API_SECRET: Joi.string().optional(),
   CLOUDINARY_URL: Joi.string().uri().optional(),
   CLOUDINARY_FOLDER: Joi.string().default('medtrack'),
-  MATERIAL_FILE_STORAGE_PROVIDER: Joi.string().valid('r2', 'local').default('r2'),
+  MATERIAL_FILE_STORAGE_PROVIDER: Joi.string()
+    .valid('r2', 'local')
+    .default('r2'),
   R2_ENDPOINT: Joi.when('MATERIAL_FILE_STORAGE_PROVIDER', {
     is: 'r2',
     then: Joi.string().uri().required(),

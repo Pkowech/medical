@@ -57,6 +57,12 @@ export class UserPrivacySettingsDto {
   allowMessages?: boolean;
 }
 
+export class UserSecurityPreferenceDto {
+  @IsOptional()
+  @IsBoolean()
+  loginNotifications?: boolean;
+}
+
 export class UpdateUserSettingsDto {
   @IsOptional()
   @IsIn(['light', 'dark', 'system'])
@@ -85,10 +91,4 @@ export class UpdateUserSettingsDto {
   @ValidateNested()
   @Type(() => UserSecurityPreferenceDto)
   security?: UserSecurityPreferenceDto;
-}
-
-export class UserSecurityPreferenceDto {
-  @IsOptional()
-  @IsBoolean()
-  loginNotifications?: boolean;
 }

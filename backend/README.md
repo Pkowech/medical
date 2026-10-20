@@ -47,12 +47,14 @@ For a comprehensive overview of the project's features, please refer to the [mai
 
 ### Recommendation boundary
 
-Rust ranks personalized learning-path recommendations and accepts the requested
-result limit through the `GetRecommendations` gRPC contract. NestJS remains
-responsible for authenticated user identity, filtering recommendations to
-published paths, enriching results with application metadata, and API response
-shaping. Recommendation endpoints should reuse this Rust-backed path rather
-than applying a second ranking in TypeScript.
+The `GetUnifiedRecommendations` gRPC contract normalizes personalized learning
+paths, collaborative paths, study materials, next steps, and assessments. It
+accepts a context, result limit, knowledge gaps, and excluded item IDs. Rust
+owns ranking and recommendation logic; NestJS owns authenticated user identity,
+cache/deduplication policy, published-path filtering, metadata enrichment, and
+API response shaping. NestJS recommendation endpoints should use this contract
+rather than duplicate ranking logic in TypeScript. The older context-specific
+RPCs remain available for compatibility with external clients.
 
 ## 🚀 Quick Start
 
@@ -124,6 +126,8 @@ The [backend Dockerfile](./Dockerfile) builds both services into one image. Conf
 Keep `ENABLE_GRPC=true`. The image starts Rust analytics first and configures the backend to call it at `127.0.0.1:50051`; do not expose port `50051` publicly. Render should route HTTP to the backend on its `PORT`. The frontend can remain on Vercel, and managed database, Redis, and file-storage services can remain external. Configure the same `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in the frontend and backend environments for Google sign-in and personal Drive links.
 
 The Node backend uses up to 3 PostgreSQL connections by default, and Rust analytics uses up to 2. Set `DATABASE_POOL_MAX` and `RUST_ANALYTICS_DB_MAX_CONNECTIONS` to lower or raise these per-process limits according to the database plan's connection cap and the number of running instances. The maximum across this combined service is 5 connections per instance, so account for every running instance and any other app using the same database.
+
+Configure Redis with a single `redis://` or `rediss://` endpoint in `REDIS_URL`, or use `REDIS_HOST`, `REDIS_PORT`, `REDIS_USERNAME`, `REDIS_PASSWORD`, and `REDIS_DB`. Sentinel endpoints are not accepted as comma-separated `REDIS_URL` values. The local fallback cache is limited to 10,000 least-recently-used entries and 64 MiB by default; set `REDIS_MEMORY_MAX_ENTRIES` or `REDIS_MEMORY_MAX_BYTES` to adjust those per-process limits. This fallback is process-local and best-effort, not a replacement for shared Redis state.
 
 ### Production smoke checklist
 

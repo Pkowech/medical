@@ -2,7 +2,6 @@ import { Global, Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { buildRedisOptions } from '#infrastructure/redis/redis.helper';
 import { Queue } from 'bullmq';
-import { RedisOptions } from 'ioredis';
 
 // Provide a single, explicit provider token for the analytics queue.
 // This ensures `BullQueue_analytics` is always present in DI (real queue
@@ -11,7 +10,7 @@ const analyticsQueueProvider = {
   provide: 'BullQueue_analytics',
   useFactory: (configService: ConfigService) => {
     if (process.env.ENABLE_REDIS === 'true') {
-      const connection = buildRedisOptions(configService) as RedisOptions;
+      const connection = buildRedisOptions(configService);
       return new Queue('analytics', { connection });
     }
 

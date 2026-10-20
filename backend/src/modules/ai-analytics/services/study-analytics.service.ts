@@ -17,6 +17,7 @@ import {
 } from '#common/dto';
 
 import { PrismaService } from '#infrastructure/prisma/prisma.service';
+import { LearningAnalyticsService } from './learning-analytics.service';
 
 @Injectable()
 export class StudyAnalyticsService implements OnModuleInit {
@@ -30,6 +31,7 @@ export class StudyAnalyticsService implements OnModuleInit {
     private readonly performanceMetrics: PerformanceMetricsService,
     private readonly requestDeduplicationService: RequestDeduplicationService,
     private readonly prisma: PrismaService,
+    private readonly learningAnalyticsService: LearningAnalyticsService,
   ) {}
 
   onModuleInit() {
@@ -154,38 +156,10 @@ export class StudyAnalyticsService implements OnModuleInit {
     userId: string,
     knowledgeGaps: string[],
   ): Promise<StudyRecommendationDto[]> {
-    try {
-      const cacheKey = `${ANALYTICS_CACHE_CONFIG.RECOMMENDATIONS.STUDY_WITH_GAPS(
-        userId,
-        knowledgeGaps,
-      )}:v2`;
-      const cached = await this.redisService.get<string>(cacheKey);
-      if (typeof cached === 'string') {
-        return JSON.parse(cached) as StudyRecommendationDto[];
-      }
-
-      const grpcResp = await this.callGrpc(
-        this.analyticsServiceGrpc.generateStudyRecommendations({
-          userId,
-          knowledgeGaps,
-        }),
-      );
-      const recommendations: StudyRecommendationDto[] =
-        grpcResp.recommendations;
-
-      await this.redisService.set(
-        cacheKey,
-        JSON.stringify(recommendations),
-        24 * 60 * 60, // 1 day TTL
-      );
-
-      return recommendations;
-    } catch (error) {
-      this.logger.error(
-        `Error generating study recommendations via gRPC: ${getErrorMessage(error)}`,
-      );
-      throw error;
-    }
+    return this.learningAnalyticsService.generateStudyRecommendations(
+      userId,
+      knowledgeGaps,
+    );
   }
 
   /**

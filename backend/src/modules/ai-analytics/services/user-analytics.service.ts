@@ -242,9 +242,7 @@ export class UserAnalyticsService implements OnModuleInit {
     try {
       const [stats, nextSteps] = await Promise.all([
         this.getUserProfileStats(userId),
-        this.callGrpc(
-          this.analyticsServiceGrpc.generateNextSteps({ userId }),
-        ),
+        this.learningAnalyticsService.generateNextSteps(userId),
       ]);
 
       return {
@@ -252,7 +250,7 @@ export class UserAnalyticsService implements OnModuleInit {
         streakDays: stats.currentStreak,
         strongestCategories: stats.strongestSubjects,
         improvementAreas: stats.weakestSubjects,
-        recommendedNextSteps: nextSteps.steps.map((nextStep) => nextStep.step),
+        recommendedNextSteps: nextSteps,
         coursesEnrolled: stats.coursesEnrolled,
         coursesCompleted: stats.coursesCompleted,
         averageScore: stats.averageScore,
@@ -417,10 +415,10 @@ export class UserAnalyticsService implements OnModuleInit {
 
   async generateRecommendations(userId: string) {
     try {
-      const response = await this.callGrpc(
-        this.analyticsServiceGrpc.getRecommendations({ userId, limit: 10 }),
+      return this.learningAnalyticsService.getUnifiedRecommendations(
+        userId,
+        'learning_path',
       );
-      return response.items || [];
     } catch (error) {
       this.logger.error(
         `Error generating recommendations via gRPC: ${getErrorMessage(error)}`,

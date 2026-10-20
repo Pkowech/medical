@@ -29,6 +29,25 @@ import { getErrorMessage } from '#common/utils/error.utils';
 
 import { PrismaService } from '#infrastructure/prisma/prisma.service';
 
+export type RecommendationContext =
+  | 'learning_path'
+  | 'collaborative'
+  | 'study_material'
+  | 'next_step'
+  | 'assessment';
+
+export interface UnifiedRecommendation {
+  id: string;
+  title: string;
+  description: string;
+  type: string;
+  score?: number;
+  reason: string;
+  priority: string;
+  estimatedDurationMinutes: number;
+  resourceId?: string;
+}
+
 @Injectable()
 export class LearningAnalyticsService implements OnModuleInit {
   private readonly logger = new Logger(LearningAnalyticsService.name);
@@ -745,6 +764,94 @@ export class LearningAnalyticsService implements OnModuleInit {
 
   // ==================== RECOMMENDATIONS ====================
 
+  async getUnifiedRecommendations(
+    userId: string,
+    context: RecommendationContext,
+    options: {
+      limit?: number;
+      knowledgeGaps?: string[];
+      excludeIds?: string[];
+    } = {},
+  ): Promise<UnifiedRecommendation[]> {
+    const limit = Math.min(100, Math.max(1, Math.floor(options.limit ?? 10)));
+    const knowledgeGaps = options.knowledgeGaps ?? [];
+    const excludeIds = options.excludeIds ?? [];
+    const fingerprint = encodeURIComponent(
+      JSON.stringify({ limit, knowledgeGaps, excludeIds }),
+    );
+    const cacheKey = `analytics:recommendations:unified:${context}:${userId}:${fingerprint}:v1`;
+    const dedupKey = ANALYTICS_CACHE_CONFIG.DEDUP(cacheKey);
+    const startedAt = Date.now();
+
+    try {
+      const cached = await this.redisService.get<string>(cacheKey);
+      if (typeof cached === 'string') {
+        return JSON.parse(cached) as UnifiedRecommendation[];
+      }
+
+      return await this.requestDeduplicationService.executeWithDedup(
+        dedupKey,
+        async () => {
+          const response = await this.callGrpc(
+            this.analyticsServiceGrpc.getUnifiedRecommendations({
+              userId,
+              context,
+              limit,
+              knowledgeGaps,
+              excludeIds,
+            }),
+          );
+          const recommendations: UnifiedRecommendation[] = response.items
+            .slice(0, limit)
+            .map((item) => ({
+              id: item.id,
+              title: item.title,
+              description: item.description,
+              type: item.type,
+              score: item.score,
+              reason: item.reason,
+              priority: item.priority,
+              estimatedDurationMinutes: item.estimatedDurationMinutes,
+              resourceId: item.resourceId,
+            }));
+
+          await this.redisService.set(
+            cacheKey,
+            JSON.stringify(recommendations),
+            this.cacheTtl,
+          );
+          await this.performanceMetrics.recordMetric({
+            endpoint: ANALYTICS_METRICS_CONFIG.ENDPOINTS.RECOMMENDATIONS,
+            method: 'getUnifiedRecommendations',
+            provider: ANALYTICS_METRICS_CONFIG.PROVIDERS.GRPC,
+            userId,
+            responseTimeMs: Date.now() - startedAt,
+            cacheHit: false,
+            success: true,
+            timestamp: new Date(),
+          });
+          return recommendations;
+        },
+      );
+    } catch (error) {
+      this.logger.error(
+        `gRPC getUnifiedRecommendations (${context}) failed: ${getErrorMessage(error)}`,
+      );
+      await this.performanceMetrics.recordMetric({
+        endpoint: ANALYTICS_METRICS_CONFIG.ENDPOINTS.RECOMMENDATIONS,
+        method: 'getUnifiedRecommendations',
+        provider: ANALYTICS_METRICS_CONFIG.PROVIDERS.GRPC,
+        userId,
+        responseTimeMs: Date.now() - startedAt,
+        cacheHit: false,
+        success: false,
+        errorMessage: getErrorMessage(error),
+        timestamp: new Date(),
+      });
+      throw error;
+    }
+  }
+
   /**
    * Get personalized learning path recommendations (gRPC only)
    * Consolidates implementations from:
@@ -765,72 +872,25 @@ export class LearningAnalyticsService implements OnModuleInit {
       confidence: number;
     }>
   > {
-    const startTime = Date.now();
-    const cacheKey = ANALYTICS_CACHE_CONFIG.RECOMMENDATIONS.PATH(userId, limit);
-    const dedupKey = ANALYTICS_CACHE_CONFIG.DEDUP(cacheKey);
-
+    const safeLimit = Math.min(100, Math.max(1, Math.floor(limit)));
     try {
-      const cached = await this.redisService.get<string>(cacheKey);
-      if (typeof cached === 'string') {
-        return JSON.parse(cached);
-      }
-
-      return await this.requestDeduplicationService.executeWithDedup(
-        dedupKey,
-        async () => {
-          const grpcResp = await this.callGrpc(
-            this.analyticsServiceGrpc.getRecommendations({
-              userId: userId,
-              limit,
-            }),
-          );
-
-          const mapped = grpcResp.items
-            .slice(0, limit)
-            .filter((rec) => Boolean(rec.id))
-            .map((rec) => ({
-              pathId: rec.id,
-              score: rec.score,
-              reasons: rec.reason
-                ? [rec.reason]
-                : ['Recommended based on your profile'],
-              confidence: rec.score,
-            }));
-
-          await this.redisService.set(
-            cacheKey,
-            JSON.stringify(mapped),
-            this.cacheTtl,
-          );
-
-          await this.performanceMetrics.recordMetric({
-            endpoint: ANALYTICS_METRICS_CONFIG.ENDPOINTS.LEARNING,
-            method: 'getPathRecommendations',
-            provider: ANALYTICS_METRICS_CONFIG.PROVIDERS.GRPC,
-            userId,
-            responseTimeMs: Date.now() - startTime,
-            cacheHit: false,
-            success: true,
-            timestamp: new Date(),
-          });
-
-          return mapped;
-        },
+      const recommendations = await this.getUnifiedRecommendations(
+        userId,
+        'learning_path',
+        { limit: safeLimit },
       );
+      return recommendations.map((recommendation) => ({
+        pathId: recommendation.id,
+        score: recommendation.score ?? 0,
+        reasons: recommendation.reason
+          ? [recommendation.reason]
+          : ['Recommended based on your profile'],
+        confidence: recommendation.score ?? 0,
+      }));
     } catch (error) {
       this.logger.warn(
         `gRPC getPathRecommendations failed: ${getErrorMessage(error)}`,
       );
-      await this.performanceMetrics.recordMetric({
-        endpoint: ANALYTICS_METRICS_CONFIG.ENDPOINTS.LEARNING,
-        method: 'getPathRecommendations',
-        provider: ANALYTICS_METRICS_CONFIG.PROVIDERS.GRPC,
-        userId,
-        responseTimeMs: Date.now() - startTime,
-        cacheHit: false,
-        success: false,
-        timestamp: new Date(),
-      });
       throw error;
     }
   }
@@ -843,67 +903,22 @@ export class LearningAnalyticsService implements OnModuleInit {
     userId: string,
     limit: number = 5,
   ): Promise<Array<{ item_id: string; score: number; reason: string }>> {
-    const startTime = Date.now();
-    const cacheKey = `${ANALYTICS_CACHE_CONFIG.RECOMMENDATIONS.COLLABORATIVE(
-      userId,
-      limit,
-    )}:v2`;
-
+    const safeLimit = Math.min(100, Math.max(1, Math.floor(limit)));
     try {
-      const cached = await this.redisService.get<string>(cacheKey);
-      if (typeof cached === 'string') {
-        return JSON.parse(cached) as Array<{
-          item_id: string;
-          score: number;
-          reason: string;
-        }>;
-      }
-
-      const grpcResp = await this.callGrpc(
-        this.analyticsServiceGrpc.getCollaborativeRecommendations({
-          userId,
-          limit,
-        }),
+      const recommendations = await this.getUnifiedRecommendations(
+        userId,
+        'collaborative',
+        { limit: safeLimit },
       );
-
-      const mapped = grpcResp.items.slice(0, limit).map((recommendation) => ({
-        item_id: recommendation.itemId,
-        score: recommendation.score,
+      return recommendations.map((recommendation) => ({
+        item_id: recommendation.id,
+        score: recommendation.score ?? 0,
         reason: recommendation.reason,
       }));
-
-      await this.redisService.set(
-        cacheKey,
-        JSON.stringify(mapped),
-        this.cacheTtl,
-      );
-
-      await this.performanceMetrics.recordMetric({
-        endpoint: ANALYTICS_METRICS_CONFIG.ENDPOINTS.LEARNING,
-        method: 'getCollaborativeRecommendations',
-        provider: ANALYTICS_METRICS_CONFIG.PROVIDERS.GRPC,
-        userId,
-        responseTimeMs: Date.now() - startTime,
-        cacheHit: false,
-        success: true,
-        timestamp: new Date(),
-      });
-
-      return mapped;
     } catch (error) {
       this.logger.warn(
         `gRPC getCollaborativeRecommendations failed: ${getErrorMessage(error)}`,
       );
-      await this.performanceMetrics.recordMetric({
-        endpoint: ANALYTICS_METRICS_CONFIG.ENDPOINTS.LEARNING,
-        method: 'getCollaborativeRecommendations',
-        provider: ANALYTICS_METRICS_CONFIG.PROVIDERS.GRPC,
-        userId,
-        responseTimeMs: Date.now() - startTime,
-        cacheHit: false,
-        success: false,
-        timestamp: new Date(),
-      });
       throw error;
     }
   }
@@ -915,38 +930,32 @@ export class LearningAnalyticsService implements OnModuleInit {
     userId: string,
     knowledgeGaps: string[],
   ): Promise<StudyRecommendationDto[]> {
-    const cacheKey = `${ANALYTICS_CACHE_CONFIG.RECOMMENDATIONS.STUDY_WITH_GAPS(
-      userId,
-      knowledgeGaps,
-    )}:v2`;
-
     try {
-      const cached = await this.redisService.get<string>(cacheKey);
-      if (typeof cached === 'string') {
-        return JSON.parse(cached) as StudyRecommendationDto[];
-      }
-
-      const grpcResp = await this.callGrpc(
-        this.analyticsServiceGrpc.generateStudyRecommendations({
-          userId,
-          knowledgeGaps,
-        }),
+      const recommendations = await this.getUnifiedRecommendations(
+        userId,
+        'study_material',
+        { knowledgeGaps },
       );
-      const mapped: StudyRecommendationDto[] = grpcResp.recommendations;
-
-      await this.redisService.set(
-        cacheKey,
-        JSON.stringify(mapped),
-        24 * 60 * 60, // 1 day TTL
-      );
-
-      return mapped;
+      return recommendations.map((recommendation) => ({
+        recommendation: recommendation.title,
+        priority: recommendation.priority,
+        estimatedTimeHours: recommendation.estimatedDurationMinutes / 60,
+        resourceId: recommendation.resourceId,
+      }));
     } catch (error) {
       this.logger.warn(
         `gRPC generateStudyRecommendations failed: ${getErrorMessage(error)}`,
       );
       throw error;
     }
+  }
+
+  async generateNextSteps(userId: string): Promise<string[]> {
+    const recommendations = await this.getUnifiedRecommendations(
+      userId,
+      'next_step',
+    );
+    return recommendations.map((recommendation) => recommendation.title);
   }
 
   /**
@@ -1012,11 +1021,22 @@ export class LearningAnalyticsService implements OnModuleInit {
         this.redisService.del(
           ANALYTICS_CACHE_CONFIG.RECOMMENDATIONS.PATH(userId, 10),
         ),
+        this.redisService.delPattern(
+          `analytics:recommendations:unified:*:${userId}:*`,
+        ),
+        this.redisService.delPattern(
+          `analytics:recommendations:ai:${userId}:*`,
+        ),
+        this.redisService.delPattern(
+          `analytics:recommendations:collab:${userId}:*`,
+        ),
         this.redisService.del(
           ANALYTICS_CACHE_CONFIG.RECOMMENDATIONS.PREDICTION(userId),
         ),
       ]);
-      this.requestDeduplicationService.invalidatePattern(`dedup:*:${userId}`);
+      this.requestDeduplicationService.invalidatePattern(
+        'dedup:analytics:recommendations:unified:',
+      );
       this.logger.debug(`Caches invalidated for user ${userId}`);
     } catch (error) {
       this.logger.warn(

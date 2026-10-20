@@ -28,6 +28,7 @@ import {
 } from './analytics-cache.constants';
 import { PrismaService } from '#infrastructure/prisma/prisma.service';
 import { PredictionValidatorService } from './prediction-validator.service';
+import { LearningAnalyticsService } from './learning-analytics.service';
 import { QuizUtils } from '#common/utils/quiz.utils';
 import { v4 as uuidv4 } from 'uuid';
 import {
@@ -72,6 +73,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
     private readonly tracingService: DistributedTracingService,
     private readonly prisma: PrismaService,
     private readonly predictionValidator: PredictionValidatorService,
+    private readonly learningAnalyticsService: LearningAnalyticsService,
   ) {}
 
   /**
@@ -512,34 +514,14 @@ export class AssessmentAnalyticsService implements OnModuleInit {
     userId: string,
     knowledgeGaps: string[] = [],
   ): Promise<any[]> {
-    try {
-      const grpcResp = await this.callGrpc(
-        this.analyticsServiceGrpc.generateStudyRecommendations({
-          userId,
-          knowledgeGaps,
-        }),
-      );
-      return grpcResp.recommendations;
-    } catch (error) {
-      this.logger.error(
-        `generateStudyRecommendations gRPC failure: ${getErrorMessage(error)}`,
-      );
-      throw error;
-    }
+    return this.learningAnalyticsService.generateStudyRecommendations(
+      userId,
+      knowledgeGaps,
+    );
   }
 
   async generateNextSteps(userId: string): Promise<string[]> {
-    try {
-      const grpcResp = await this.callGrpc(
-        this.analyticsServiceGrpc.generateNextSteps({ userId: userId }),
-      );
-      return grpcResp.steps.map((step) => step.step);
-    } catch (error) {
-      this.logger.error(
-        `generateNextSteps gRPC failure: ${getErrorMessage(error)}`,
-      );
-      throw error;
-    }
+    return this.learningAnalyticsService.generateNextSteps(userId);
   }
 
   async getFullRecommendations(
@@ -799,41 +781,18 @@ export class AssessmentAnalyticsService implements OnModuleInit {
     }>
   > {
     try {
-      const cacheKey =
-        ANALYTICS_CACHE_CONFIG.RECOMMENDATIONS.ASSESSMENT(userId);
-      const dedupKey = ANALYTICS_CACHE_CONFIG.DEDUP(cacheKey);
-
-      const cached = await this.redisService.get<string>(cacheKey);
-      if (typeof cached === 'string') {
-        return JSON.parse(cached);
-      }
-
-      return await this.requestDeduplicationService.executeWithDedup(
-        dedupKey,
-        async () => {
-          // Strictly gRPC
-          const response = await this.callGrpc(
-            this.analyticsServiceGrpc.getRecommendations({ userId, limit: 10 }),
-          );
-
-          // Filter for assessment-type recommendations
-          const assessmentRecs = response.items
-            .filter((item) => item.type === 'assessment')
-            .map((item) => ({
-              assessmentId: item.id,
-              title: item.title,
-              recommendedDifficulty: item.score,
-              reason: item.reason,
-            }));
-
-          await this.redisService.set(
-            cacheKey,
-            JSON.stringify(assessmentRecs),
-            this.cacheTtl,
-          );
-          return assessmentRecs;
-        },
-      );
+      const recommendations =
+        await this.learningAnalyticsService.getUnifiedRecommendations(
+          userId,
+          'assessment',
+          { limit: 10 },
+        );
+      return recommendations.map((recommendation) => ({
+        assessmentId: recommendation.id,
+        title: recommendation.title,
+        recommendedDifficulty: recommendation.score ?? 0,
+        reason: recommendation.reason,
+      }));
     } catch (error) {
       this.logger.error(
         `Failed to get assessment recommendations via gRPC: ${getErrorMessage(

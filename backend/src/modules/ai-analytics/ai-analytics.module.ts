@@ -8,7 +8,6 @@ import { GrpcModule } from '#infrastructure/grpc/grpc.module';
 import { MonitoringModule } from '#infrastructure/monitoring/monitoring.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { buildRedisOptions } from '../../infrastructure/redis/redis.helper';
-import { RedisOptions } from 'ioredis';
 import { MetricsModule } from '#infrastructure/metrics/metrics.module';
 import { AnalyticsAlertService } from './services/analytics-alert.service';
 // AI Controllers
@@ -44,7 +43,7 @@ export const bullModuleForAnalytics = BullModule.registerQueueAsync({
   name: 'analytics',
   imports: [ConfigModule],
   useFactory: (configService: ConfigService) => ({
-    connection: buildRedisOptions(configService) as RedisOptions,
+    connection: buildRedisOptions(configService),
   }),
   inject: [ConfigService],
 });

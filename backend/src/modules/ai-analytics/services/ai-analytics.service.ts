@@ -136,20 +136,23 @@ export class AiAnalyticsService implements OnModuleInit {
         await this.requestDeduplicationService.executeWithDedup(
           dedupKey,
           async () => {
-            const grpcResponse = await this.callGrpc(
-              this.analyticsServiceGrpc.getRecommendations({
-                userId: userId,
-                limit,
-              }),
+            const unifiedRecommendations =
+              await this.learningAnalyticsService.getUnifiedRecommendations(
+                userId,
+                'study_material',
+                { limit },
+              );
+            const items = unifiedRecommendations.flatMap((recommendation) =>
+              recommendation.resourceId
+                ? [
+                    {
+                      materialId: recommendation.resourceId,
+                      score: recommendation.score ?? 0,
+                      reason: recommendation.reason,
+                    },
+                  ]
+                : [],
             );
-
-            const items = (grpcResponse.items || []).map((i: any) => ({
-                materialId: i.id ?? i.materialId ?? i.material_id ?? '',
-                material_id: i.id ?? i.materialId ?? i.material_id ?? '',
-                score: typeof i.score === 'number' ? i.score : 0,
-                reason:
-                  typeof i.reason === 'string' ? i.reason : (i.reason ?? ''),
-              })) as RecommendationItemDto[];
 
             await this.performanceMetrics.recordMetric({
               endpoint: ANALYTICS_METRICS_CONFIG.ENDPOINTS.RECOMMENDATIONS,
@@ -165,14 +168,12 @@ export class AiAnalyticsService implements OnModuleInit {
             return items;
           },
         );
-      const suggestionData = recommendations
-        .filter((rec) => rec.materialId)
-        .map((rec) => ({
-          userId,
-          materialId: rec.materialId!,
-          score: rec.score,
-          reason: rec.reason ?? '',
-        }));
+      const suggestionData = recommendations.map((rec) => ({
+        userId,
+        materialId: rec.materialId,
+        score: rec.score,
+        reason: rec.reason ?? '',
+      }));
       await this.prisma.$transaction(async (tx) => {
         await tx.learningSuggestion.deleteMany({ where: { userId } });
         if (suggestionData.length > 0) {
@@ -535,11 +536,7 @@ export class AiAnalyticsService implements OnModuleInit {
 
   async generateNextSteps(userId: string): Promise<string[]> {
     try {
-      const grpcResp = await this.callGrpc(
-        this.analyticsServiceGrpc.generateNextSteps({ userId }),
-      );
-
-      return grpcResp.steps.map((step) => step.step);
+      return await this.learningAnalyticsService.generateNextSteps(userId);
     } catch (error) {
       this.logger.error(
         `Error generating next steps from Rust (gRPC): ${getErrorMessage(error)}`,

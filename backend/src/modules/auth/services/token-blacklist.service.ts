@@ -4,6 +4,7 @@ import { RedisService } from '#infrastructure/redis/redis.service';
 import { securityEventTypes } from '#common/dto/security.dto';
 import { getErrorMessage } from '#common/utils/error.utils';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { createHash } from 'crypto';
 
 @Injectable()
 export class TokenBlacklistService {
@@ -17,18 +18,14 @@ export class TokenBlacklistService {
   ) {}
 
   async addToBlacklist(token: string, expires: number): Promise<void> {
-    await this.redisService.set(
-      `${this.blacklistPrefix}${token}`,
-      '1', // Use '1' instead of 'true' for consistency
-      expires,
-    );
+    await this.redisService.set(this.getBlacklistKey(token), '1', expires);
 
     this.eventEmitter.emit('security.audit', {
       eventType: securityEventTypes.tokenRevoked,
       userId: 'unknown',
       ipAddress: 'unknown',
       userAgent: 'unknown',
-      eventData: { success: true, token, expires },
+      eventData: { success: true, expires },
     });
   }
 
@@ -43,11 +40,7 @@ export class TokenBlacklistService {
       const now = Math.floor(Date.now() / 1000);
       const ttl = exp ? Math.max(exp - now, 60) : this.defaultTtl; // Ensure at least 60s TTL
 
-      await this.redisService.set(
-        `${this.blacklistPrefix}${token}`,
-        '1', // Use '1' instead of 'true'
-        ttl,
-      );
+      await this.redisService.set(this.getBlacklistKey(token), '1', ttl);
 
       this.eventEmitter.emit('security.audit', {
         eventType: securityEventTypes.tokenRevoked,
@@ -56,13 +49,12 @@ export class TokenBlacklistService {
         userAgent: 'unknown',
         eventData: {
           success: true,
-          token: `${token.substring(0, 20)}...`,
           expires: ttl,
         },
       });
     } catch (error) {
       await this.redisService.set(
-        `${this.blacklistPrefix}${token}`,
+        this.getBlacklistKey(token),
         '1',
         this.defaultTtl,
       );
@@ -74,7 +66,6 @@ export class TokenBlacklistService {
         userAgent: 'unknown',
         eventData: {
           success: true,
-          token: `${token.substring(0, 20)}...`,
           expires: this.defaultTtl,
           error: getErrorMessage(error),
         },
@@ -83,18 +74,37 @@ export class TokenBlacklistService {
   }
 
   async isBlacklisted(token: string): Promise<boolean> {
-    const result = await this.redisService.get<string>(
-      `${this.blacklistPrefix}${token}`,
+    const hashedKey = this.getBlacklistKey(token);
+    if (this.isBlacklistedValue(await this.redisService.get(hashedKey))) {
+      return true;
+    }
+
+    // Read and migrate entries created before blacklist keys were hashed.
+    const legacyKey = `${this.blacklistPrefix}${token}`;
+    if (!this.isBlacklistedValue(await this.redisService.get(legacyKey))) {
+      return false;
+    }
+    const legacyTtl = await this.redisService.ttl(legacyKey);
+    await this.redisService.set(
+      hashedKey,
+      '1',
+      legacyTtl > 0
+        ? legacyTtl
+        : legacyTtl === -1
+          ? undefined
+          : this.defaultTtl,
     );
+    await this.redisService.del(legacyKey);
+    return true;
+  }
 
-    // Check for truthy values: '1', 'true', true, or 1
-    const isBlacklisted =
-      result === '1' ||
-      result === 'true' ||
-      String(result) === 'true' ||
-      String(result) === '1';
+  private getBlacklistKey(token: string): string {
+    const digest = createHash('sha256').update(token, 'utf8').digest('hex');
+    return `${this.blacklistPrefix}${digest}`;
+  }
 
-    return isBlacklisted;
+  private isBlacklistedValue(value: unknown): boolean {
+    return value === '1' || value === 'true' || value === true || value === 1;
   }
 
   async clearExpiredTokens(): Promise<void> {

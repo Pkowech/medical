@@ -133,10 +133,10 @@ export class RoleLimitingService {
       return false;
     }
 
-    const current = await this.redisService.increment(key);
-    if (current === 1) {
-      await this.redisService.expire(key, config.duration);
-    }
+    const current = await this.redisService.incrementWithExpiry(
+      key,
+      config.duration,
+    );
 
     if (current > config.points) {
       await this.redisService.set(blockKey, 'blocked', config.blockDuration);

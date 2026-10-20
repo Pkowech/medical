@@ -14,7 +14,9 @@ pub async fn generate_next_steps(
     user_id: &str,
     pool: &Pool<Postgres>,
 ) -> Result<Vec<NextStep>, String> {
-    println!("Generating next steps for user: {}", user_id);
+    if user_id.trim().is_empty() {
+        return Err("user_id cannot be empty".to_string());
+    }
 
     let incomplete_courses = sqlx::query_scalar::<_, i64>(
         "SELECT COUNT(*) FROM enrollments WHERE user_id = $1 AND status != 'completed'",
@@ -22,15 +24,15 @@ pub async fn generate_next_steps(
     .bind(user_id)
     .fetch_one(pool)
     .await
-    .unwrap_or(0);
+    .map_err(|error| format!("Failed to load incomplete courses: {error}"))?;
 
     let recent_quiz_score = sqlx::query_scalar::<_, Option<f64>>(
         "SELECT score FROM quiz_attempts WHERE user_id = $1 ORDER BY completed_at DESC LIMIT 1",
     )
     .bind(user_id)
-    .fetch_one(pool)
+    .fetch_optional(pool)
     .await
-    .ok()
+    .map_err(|error| format!("Failed to load recent quiz score: {error}"))?
     .flatten();
 
     let mut next_steps = Vec::new();
@@ -59,17 +61,17 @@ pub async fn generate_next_steps(
         }
     }
 
-    next_steps.push(NextStep {
-        step: "Practice with clinical cases".to_string(),
-        reason: Some("Apply knowledge in realistic scenarios".to_string()),
-        estimated_duration_minutes: Some(60),
-    });
-
     if next_steps.is_empty() {
         next_steps.push(NextStep {
             step: "Start a new learning path".to_string(),
             reason: Some("Begin your medical education journey".to_string()),
             estimated_duration_minutes: Some(30),
+        });
+    } else {
+        next_steps.push(NextStep {
+            step: "Practice with clinical cases".to_string(),
+            reason: Some("Apply knowledge in realistic scenarios".to_string()),
+            estimated_duration_minutes: Some(60),
         });
     }
 

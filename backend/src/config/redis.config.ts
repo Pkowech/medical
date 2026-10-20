@@ -9,6 +9,7 @@ export default registerAs('redis', () => {
     ? parseInt(process.env.REDIS_PORT, 10)
     : undefined;
   const password = process.env.REDIS_PASSWORD;
+  const username = process.env.REDIS_USERNAME;
   const db = process.env.REDIS_DB
     ? parseInt(process.env.REDIS_DB, 10)
     : undefined;
@@ -17,6 +18,7 @@ export default registerAs('redis', () => {
     host,
     port,
     password,
+    username,
     db,
     keyPrefix: process.env.REDIS_KEY_PREFIX || 'medtrack:',
     retryStrategy: (times: number) => {

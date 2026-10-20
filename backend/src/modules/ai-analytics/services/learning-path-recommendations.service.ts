@@ -140,7 +140,7 @@ export class LearningPathRecommendationsService {
 
       // Call Rust service (gRPC)
       const rustRecs =
-        await this.aiAnalyticsService.getCollaborativeRecommendations(
+        await this.learningAnalyticsService.getCollaborativeRecommendations(
           userId,
           limit,
         );

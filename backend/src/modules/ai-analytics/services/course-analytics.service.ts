@@ -69,7 +69,7 @@ export class CourseAnalyticsService implements OnModuleInit {
     userId: string,
   ): Promise<RecommendationItemDto[]> {
     try {
-      const cacheKey = ANALYTICS_CACHE_CONFIG.RECOMMENDATIONS.COURSE(userId);
+      const cacheKey = `${ANALYTICS_CACHE_CONFIG.RECOMMENDATIONS.COURSE(userId)}:unified:v1`;
       const dedupKey = ANALYTICS_CACHE_CONFIG.DEDUP(cacheKey);
 
       const cached = await this.redisService.get<string>(cacheKey);
@@ -84,7 +84,13 @@ export class CourseAnalyticsService implements OnModuleInit {
             // Try gRPC first
             const startTime = Date.now();
             const grpcResponse = await this.callGrpc(
-              this.analyticsServiceGrpc.getRecommendations({ userId, limit: 10 }),
+              this.analyticsServiceGrpc.getUnifiedRecommendations({
+                userId,
+                context: 'learning_path',
+                limit: 10,
+                knowledgeGaps: [],
+                excludeIds: [],
+              }),
             );
             const responseTimeMs = Date.now() - startTime;
 
@@ -99,12 +105,17 @@ export class CourseAnalyticsService implements OnModuleInit {
               timestamp: new Date(),
             });
 
+            const recommendations = grpcResponse.items.map((item) => ({
+              materialId: item.id,
+              score: item.score ?? 0,
+              reason: item.reason,
+            }));
             await this.redisService.set(
               cacheKey,
-              JSON.stringify(grpcResponse.items),
+              JSON.stringify(recommendations),
               this.cacheTtl,
             );
-            return grpcResponse.items;
+            return recommendations;
           } catch (grpcError) {
             this.logger.error(
               `gRPC failed for getRecommendationsForCourse: ${getErrorMessage(grpcError)}`,

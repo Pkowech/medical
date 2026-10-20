@@ -4,24 +4,23 @@ import {
   HealthIndicatorResult,
   HealthCheckError,
 } from '@nestjs/terminus';
-
+import { RedisService } from '#infrastructure/redis/redis.service';
 import { getErrorMessage } from '#common/utils/error.utils';
 
 @Injectable()
 export class RedisHealthIndicator extends HealthIndicator {
-  constructor() {
+  constructor(private readonly redisService: RedisService) {
     super();
   }
 
-  isHealthy(key: string): Promise<HealthIndicatorResult> {
+  async isHealthy(key: string): Promise<HealthIndicatorResult> {
+    if (!this.redisService.isEnabled) {
+      return this.getStatus(key, true, { message: 'Redis is disabled' });
+    }
+
     try {
-      // Temporarily disable Redis health check
-      // await this.redis.ping();
-      return Promise.resolve(
-        this.getStatus(key, true, {
-          message: 'Redis check temporarily disabled',
-        }),
-      );
+      await this.redisService.ping();
+      return this.getStatus(key, true);
     } catch (error) {
       throw new HealthCheckError(
         'Redis check failed',

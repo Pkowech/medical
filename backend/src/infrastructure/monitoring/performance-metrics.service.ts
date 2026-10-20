@@ -53,17 +53,14 @@ export class PerformanceMetricsService {
         3600, // Keep for 1 hour
       );
 
-      // Add to aggregation list using setList
-      const existingMetrics = await this.redisService.getList(
-        `${key}:list`,
-        0,
-        -1,
-      );
-      const updated = [metricsJson, ...existingMetrics].slice(0, 1000); // Keep last 1000
-      await this.redisService.setList(`${key}:list`, updated);
+      await this.redisService.prependList(`${key}:list`, metricsJson, 1000);
 
-      // Trigger stats aggregation if batch size reached
-      if (updated.length % this.batchSize === 0) {
+      const batchKey = `${key}:batch_count`;
+      const batchCount = await this.redisService.increment(batchKey);
+      if (batchCount === 1) {
+        await this.redisService.expire(batchKey, 3600);
+      }
+      if (batchCount % this.batchSize === 0) {
         await this.aggregateStats(
           metric.endpoint,
           metric.method,
@@ -75,7 +72,10 @@ export class PerformanceMetricsService {
         `Recorded metric: ${metric.endpoint}.${metric.method} (${metric.provider}) - ${metric.responseTimeMs}ms`,
       );
     } catch (error) {
-      this.logger.error(`Failed to record metric:`, error);
+      this.logger.error(
+        'Failed to record metric',
+        error instanceof Error ? error.stack : String(error),
+      );
     }
   }
 
