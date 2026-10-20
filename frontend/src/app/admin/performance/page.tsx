@@ -1,4 +1,4 @@
-import { PerformanceDashboard } from '@/features/assessment/components/performance/performance-dashboard';
+import { PerformanceDashboard } from '@/features/analytics/components/performance-dashboard';
 
 export default function PerformancePage() {
   return (

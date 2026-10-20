@@ -35,11 +35,17 @@ export function CourseOverview() {
     queryKey: ['course-overview', courseId],
     queryFn: () => courseService.getCourseById(courseId),
     enabled: Boolean(courseId),
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    meta: { persist: Boolean(user?.id) },
   });
   const { data: progress } = useQuery<CourseProgress>({
     queryKey: ['course-overview-progress', courseId, user?.id],
     queryFn: () => courseService.getDetailedCourseProgress(courseId),
     enabled: Boolean(courseId && user?.id),
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    meta: { persist: Boolean(user?.id) },
   });
   const { data: connectedPaths = [] } = useQuery<Array<{ id: string; title: string; specialization?: string; pathType?: string }>>({
     queryKey: ['course-connected-paths', courseId],
@@ -53,12 +59,18 @@ export function CourseOverview() {
       }
     },
     enabled: Boolean(courseId),
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    meta: { persist: Boolean(user?.id) },
   });
 
   const { data: activeUnits = [] } = useQuery<Array<Record<string, unknown>>>({
     queryKey: ['course-overview-active-units', courseId, user?.id],
     queryFn: () => courseService.getEnrolledUnits(),
     enabled: Boolean(courseId && user?.id),
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    meta: { persist: Boolean(user?.id) },
   });
 
   if (courseLoading) {

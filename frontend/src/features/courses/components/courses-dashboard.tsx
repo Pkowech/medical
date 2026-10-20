@@ -104,8 +104,8 @@ export const CoursesDashboard = () => {
     queryKey: ['course-progress-dashboard', user?.id],
     queryFn: () => courseService.getProgressDashboard(user!.id),
     enabled: Boolean(user?.id),
-    staleTime: 2 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
     meta: { persist: Boolean(user?.id) },
   });
   const {
@@ -117,7 +117,9 @@ export const CoursesDashboard = () => {
     queryKey: ['course-categories'],
     queryFn: () => courseService.getCategories(),
     enabled: activeTab === 'discover',
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30 * 60 * 1000,
+    gcTime: 60 * 60 * 1000,
+    meta: { persist: true },
   });
   const activeUnits = progressDashboard?.enrolledUnits ?? [];
   const courseProgressById = new Map(
@@ -290,8 +292,8 @@ export const CoursesDashboard = () => {
       avgScore: 0,
     })),
     enabled: Boolean(user?.id),
-    staleTime: 2 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
     meta: { persist: Boolean(user?.id) },
   });
 

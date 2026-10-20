@@ -273,7 +273,9 @@ export default function MaterialsDashboard() {
     queryKey: ['course', selectedCourseId],
     queryFn: () => courseService.getCourseById(selectedCourseId!),
     enabled: courseFilterInitialized && Boolean(selectedCourseId),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    meta: { persist: Boolean(user?.id) },
   });
   const {
     data: activeGoals = [],
@@ -298,7 +300,9 @@ export default function MaterialsDashboard() {
       return payload as RoadmapGoal[];
     },
     enabled: Boolean(user?.id && selectedCourseId),
-    staleTime: 60 * 1000,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    meta: { persist: Boolean(user?.id) },
   });
   const {
     data: learningPathProgress = [],
@@ -309,7 +313,9 @@ export default function MaterialsDashboard() {
     queryKey: ['course-roadmap-learning-paths', user?.id],
     queryFn: () => learningPathService.getMyProgress(),
     enabled: Boolean(user?.id && selectedCourseId),
-    staleTime: 2 * 60 * 1000,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    meta: { persist: Boolean(user?.id) },
   });
   const {
     data: courseDeadlines = [],
@@ -332,7 +338,9 @@ export default function MaterialsDashboard() {
       return payload as RoadmapDeadline[];
     },
     enabled: Boolean(user?.id && selectedCourseId),
-    staleTime: 60 * 1000,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    meta: { persist: Boolean(user?.id) },
   });
   const {
     data: upcomingStudySessions = [],
@@ -348,7 +356,9 @@ export default function MaterialsDashboard() {
       return getCourseRoadmapEvents(selectedCourseId);
     },
     enabled: Boolean(user?.id && selectedCourseId),
-    staleTime: 60 * 1000,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    meta: { persist: Boolean(user?.id) },
   });
 
   useEffect(() => {
@@ -428,7 +438,9 @@ export default function MaterialsDashboard() {
     queryKey: ['material-recommendations'],
     queryFn: () => materialService.getRecommendedMaterials(),
     enabled: filterContext === 'for_you',
-    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    meta: { persist: Boolean(user?.id) },
     refetchOnWindowFocus: false,
   });
 

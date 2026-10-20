@@ -18,8 +18,8 @@ export function useLearningStreak() {
       return progressService.getUserStreaks(user.id);
     },
     enabled: !!user?.id,
-    staleTime: 60 * 1000,
-    gcTime: 10 * 60 * 1000,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
     meta: { persist: Boolean(user?.id) },
   });
 
@@ -47,8 +47,8 @@ export function useProgress() {
       return await progressService.getEnrichedProgressData(user.id);
     },
     enabled: !!user?.id,
-    staleTime: 60 * 1000,
-    gcTime: 10 * 60 * 1000,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
     meta: { persist: Boolean(user?.id) },
   });
   const {

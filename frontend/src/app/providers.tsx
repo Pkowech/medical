@@ -225,13 +225,15 @@ export function Providers({ children }: { children: ReactNode }) {
         defaultOptions: {
           queries: {
             staleTime: 5 * 60 * 1000,
-            gcTime: 10 * 60 * 1000,
+            gcTime: 30 * 60 * 1000,
             retry: (failureCount: number, error: unknown) => {
               const status = (error as { status?: number })?.status;
               if (status === 404) return false;
               return failureCount < 3;
             },
             refetchOnWindowFocus: false,
+            refetchOnReconnect: true,
+            refetchOnMount: true,
           },
           mutations: {
             retry: 0,
@@ -291,6 +293,32 @@ export function Providers({ children }: { children: ReactNode }) {
               triggerNotificationsRefresh();
             } catch {
               // swallow errors from the trigger helper
+            }
+          }
+
+          // Strategy A: Thin Invalidation Event pushed by backend
+          // Never reloads the browser page. React Query updates only the specific mounted component
+          // in the background without layout shifts or skeleton flashes.
+          if (
+            type === 'cache:invalidate' ||
+            type === 'CACHE_INVALIDATE' ||
+            type === 'progress:update' ||
+            type === 'course:update'
+          ) {
+            let queryKey: unknown = payload?.queryKey;
+            if (!queryKey) {
+              if (type === 'progress:update' || payload?.scope === 'progress') {
+                queryKey = ['userProgress'];
+              } else if (type === 'course:update' || payload?.scope === 'course') {
+                queryKey = payload?.id ? ['course', String(payload.id)] : ['courses'];
+              }
+            }
+
+            if (queryKey) {
+              void client.invalidateQueries({
+                queryKey: Array.isArray(queryKey) ? queryKey : [queryKey],
+                refetchType: 'active',
+              });
             }
           }
         } catch {

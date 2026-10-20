@@ -1,7 +1,7 @@
 'use client';
 
-import { PerformanceDashboard } from '@/features/assessment/components/performance/performance-dashboard';
+import { AssessmentDashboard } from '@/features/assessment/components/assessment-dashboard';
 
 export default function AssessmentPage() {
-  return <PerformanceDashboard />;
+  return <AssessmentDashboard />;
 }

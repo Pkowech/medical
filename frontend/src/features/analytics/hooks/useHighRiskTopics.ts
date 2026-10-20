@@ -15,6 +15,8 @@ export const useHighRiskTopics = (userId: string) => {
       return response.data;
     },
     enabled: !!userId,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    meta: { persist: Boolean(userId) },
   });
 };

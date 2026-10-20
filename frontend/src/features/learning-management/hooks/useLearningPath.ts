@@ -9,9 +9,11 @@ import {
   Milestone,
 } from '@/shared/types/learningInterface';
 import { toast } from 'sonner';
+import { useAuthStore } from '@/features/auth/store/useAuthStore';
 
 export function useLearningPath(pathId: string) {
   const queryClient = useQueryClient();
+  const userId = useAuthStore(state => state.user?.id);
 
   const pathQuery = useQuery({
     queryKey: ['learning-path', pathId],
@@ -138,17 +140,21 @@ export function useLearningPath(pathId: string) {
       };
     },
     enabled: Boolean(pathId),
-    staleTime: 60 * 1000,
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    meta: { persist: Boolean(userId) },
   });
 
   const progressQuery = useQuery({
-    queryKey: ['learning-path-progress', pathId],
+    queryKey: ['learning-path-progress', pathId, userId],
     queryFn: async () => {
       const response = await apiService.get<unknown>(`/learning-paths/${pathId}/progress`);
       return unwrapApiPayload<Record<string, unknown>>(response);
     },
     enabled: Boolean(pathId),
-    staleTime: 30 * 1000,
+    staleTime: 3 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    meta: { persist: Boolean(userId) },
   });
 
   const enrollMutation = useMutation({
