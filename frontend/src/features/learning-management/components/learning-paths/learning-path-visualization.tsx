@@ -33,33 +33,15 @@ import {
 } from '@/shared/types/learningInterface';
 import { cn } from '@/lib/utils/cn';
 
+import { useLearningPath } from '../../hooks/useLearningPath';
+import {
+  unwrapApiPayload,
+  toDisplayString,
+  normalizeJsonArray,
+} from '@/shared/utils/apiHelpers';
+
 const getProgressBarWidth = (percentage: number): string => {
   return `${Math.min(100, Math.max(0, percentage))}%`;
-};
-
-// Safely coerce an unknown value (from API responses) into a display string.
-// Avoids @typescript-eslint/no-base-to-string, which flags String(unknown)
-// because objects would stringify to "[object Object]".
-const toDisplayString = (value: unknown, fallback = ''): string => {
-  if (typeof value === 'string') return value;
-  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
-  return fallback;
-};
-
-const unwrapApiPayload = (value: unknown): unknown => {
-  if (typeof value !== 'object' || value === null) return value;
-  const outerData = (value as Record<string, unknown>).data;
-  if (typeof outerData !== 'object' || outerData === null) return outerData ?? value;
-  const innerData = (outerData as Record<string, unknown>).data;
-  return innerData ?? outerData;
-};
-
-const normalizeJsonArray = (value: unknown): unknown[] => {
-  if (Array.isArray(value)) return value;
-  if (typeof value === 'object' && value !== null) {
-    return Object.values(value);
-  }
-  return [];
 };
 
 type PhaseStatus = 'completed' | 'inProgress' | 'notStarted';
@@ -79,260 +61,96 @@ interface LearningPathVisualizationProps {
 }
 
 export const LearningPathVisualization: React.FC<LearningPathVisualizationProps> = ({ pathId }) => {
-  const [learningPath, setLearningPath] = useState<LearningPath | null>(null);
+  const {
+    learningPath,
+    progressData,
+    isLoading: loading,
+    enroll,
+    isEnrolling: enrolling,
+    refetch,
+  } = useLearningPath(pathId);
+
   const [progress, setProgress] = useState<LearningPathProgress | null>(null);
-  const [loading, setLoading] = useState(true);
   const [selectedPhase, setSelectedPhase] = useState<string | null>(null);
-  const [enrolling, setEnrolling] = useState(false);
 
   const router = useRouter();
 
   const handleEnroll = async () => {
     try {
-      setEnrolling(true);
-      await apiService.post(`/learning-paths/${pathId}/enroll`, {});
-      toast.success('Successfully enrolled in curriculum!');
-      if (learningPath) {
-        await fetchProgress(learningPath);
-      }
-    } catch (err: unknown) {
-      const errorMsg =
-        err && typeof err === 'object' && 'response' in err
-          ? ((err as { response?: { data?: { message?: string } } }).response?.data?.message ??
-            'Failed to enroll in curriculum')
-          : 'Failed to enroll in curriculum';
-      toast.error(errorMsg);
-    } finally {
-      setEnrolling(false);
+      await enroll();
+    } catch {
+      // Toast notification is managed by useLearningPath mutation
     }
   };
 
   useEffect(() => {
-    const loadPath = async () => {
-      setLoading(true);
-      const path = await fetchLearningPath();
-      if (path) {
-        await fetchProgress(path);
-      } else {
-        setLoading(false);
-      }
+    if (!progressData || !learningPath) return;
+    const rawObj = progressData;
+    const phaseProgressRaw = normalizeJsonArray(
+      rawObj.phaseProgress ?? rawObj.phase_progress,
+    );
+    const moduleProgressRaw = normalizeJsonArray(
+      rawObj.moduleProgress ?? rawObj.module_progress,
+    );
+    const milestonesAchievedRaw = normalizeJsonArray(
+      rawObj.milestonesAchieved ?? rawObj.milestones_achieved,
+    );
+
+    const normalized: LearningPathProgress = {
+      id: toDisplayString(rawObj.id),
+      status: toDisplayString(rawObj.status, 'notStarted'),
+      startedAt: toDisplayString(rawObj.startedAt ?? rawObj.started_at, new Date().toISOString()),
+      lastAccessedAt: toDisplayString(rawObj.lastAccessedAt ?? rawObj.last_accessed_at, new Date().toISOString()),
+      totalTimeSpentMinutes: Number(rawObj.totalTimeSpentMinutes ?? rawObj.total_time_spent_minutes ?? 0),
+      streakDays: Number(rawObj.streakDays ?? rawObj.streak_days ?? 0),
+      learningPath,
+      overallProgressPercentage: Number(rawObj.overallProgressPercentage ?? rawObj.overall_progress_percentage ?? 0),
+      currentPhaseIndex: Number(rawObj.currentPhaseIndex ?? rawObj.current_phase_index ?? 0),
+      currentModuleIndex: Number(rawObj.currentModuleIndex ?? rawObj.current_module_index ?? 0),
+      phaseProgress: phaseProgressRaw.map((p: unknown) => {
+        const phase = p as Record<string, unknown>;
+        return {
+          phaseId: toDisplayString(phase.phaseId ?? phase.phase_id),
+          status: toPhaseStatus(phase.status),
+          progressPercentage: Number(phase.progressPercentage ?? phase.progress_percentage ?? 0),
+          modulesCompleted: Array.isArray(phase.modulesCompleted)
+            ? phase.modulesCompleted.map(String)
+            : Array.isArray(phase.modules_completed)
+            ? phase.modules_completed.map(String)
+            : [],
+          currentModuleId: toDisplayString(phase.currentModuleId ?? phase.current_module_id),
+        };
+      }),
+      moduleProgress: moduleProgressRaw.map((m: unknown) => {
+        const moduleItem = m as Record<string, unknown>;
+        const bestScoreRaw = moduleItem.bestScore ?? moduleItem.best_score;
+        return {
+          moduleId: toDisplayString(moduleItem.moduleId ?? moduleItem.module_id),
+          phaseId: toDisplayString(moduleItem.phaseId ?? moduleItem.phase_id),
+          status: toModuleStatus(moduleItem.status),
+          progressPercentage: Number(moduleItem.progressPercentage ?? moduleItem.progress_percentage ?? 0),
+          timeSpentMinutes: Number(moduleItem.timeSpentMinutes ?? moduleItem.time_spent_minutes ?? 0),
+          bestScore: typeof bestScoreRaw === 'number' ? bestScoreRaw : undefined,
+        };
+      }),
+      milestonesAchieved: milestonesAchievedRaw.map((m: unknown) => {
+        const milestone = m as Record<string, unknown>;
+        return {
+          milestoneId: toDisplayString(milestone.milestoneId ?? milestone.milestone_id),
+          achievedAt: toDisplayString(milestone.achievedAt ?? milestone.achieved_at, new Date().toISOString()),
+        };
+      }),
     };
-    void loadPath();
-  }, [pathId]);
 
-  const fetchLearningPath = async (): Promise<LearningPath | null> => {
-    try {
-      const response = await apiService.get<unknown>(`/learning-paths/${pathId}`);
-      const raw = unwrapApiPayload(response);
-      const rawObj = raw as Record<string, unknown>;
-      const analyticsObj = (rawObj.analytics as Record<string, unknown> | undefined) ?? {};
-      const createdByObj = (rawObj.createdBy as Record<string, unknown> | undefined) ?? (rawObj.created_by as Record<string, unknown> | undefined) ?? {};
-      const pathStructureObj = (rawObj.pathStructure as Record<string, unknown> | undefined) ?? (rawObj.path_structure as Record<string, unknown> | undefined) ?? {};
-      const phasesRaw = Array.isArray(rawObj.phases)
-        ? (rawObj.phases as unknown[])
-        : Array.isArray(pathStructureObj.phases)
-        ? (pathStructureObj.phases as unknown[])
-        : [];
-
-      const normalized: LearningPath = {
-        id: toDisplayString(rawObj.id ?? rawObj.path_id),
-        title: toDisplayString(rawObj.title),
-        description: toDisplayString(rawObj.description),
-        category: toDisplayString(rawObj.category),
-        difficulty: toDisplayString(rawObj.difficulty),
-        status: toDisplayString(rawObj.status),
-        specialization: rawObj.specialization ? toDisplayString(rawObj.specialization) : undefined,
-        pathType: (rawObj.pathType ?? rawObj.path_type) ? toDisplayString(rawObj.pathType ?? rawObj.path_type) : undefined,
-        estimatedDurationWeeks: Number(rawObj.estimatedDurationWeeks ?? rawObj.estimated_duration_weeks ?? 0),
-        estimatedHoursPerWeek: Number(rawObj.estimatedHoursPerWeek ?? rawObj.estimated_hours_per_week ?? 0),
-        tags: Array.isArray(rawObj.tags) ? (rawObj.tags as string[]) : [],
-        learningObjectives: Array.isArray(rawObj.learningObjectives)
-          ? (rawObj.learningObjectives as string[])
-          : Array.isArray(rawObj.learning_objectives)
-          ? (rawObj.learning_objectives as string[])
-          : [],
-        analytics: {
-          totalEnrollments: Number(analyticsObj.totalEnrollments ?? analyticsObj.total_enrollments ?? 0),
-          completionRate: Number(analyticsObj.completionRate ?? analyticsObj.completion_rate ?? 0),
-          userRatings: {
-            average: Number((analyticsObj.userRatings as Record<string, unknown> | undefined)?.average ?? (analyticsObj.user_ratings as Record<string, unknown> | undefined)?.average ?? 0),
-            count: Number((analyticsObj.userRatings as Record<string, unknown> | undefined)?.count ?? (analyticsObj.user_ratings as Record<string, unknown> | undefined)?.count ?? 0),
-          }
-        },
-        createdBy: {
-          id: toDisplayString(createdByObj.id ?? createdByObj.user_id ?? createdByObj.userId),
-          firstName: toDisplayString(createdByObj.firstName ?? createdByObj.first_name),
-          lastName: toDisplayString(createdByObj.lastName ?? createdByObj.last_name),
-        },
-        courses: Array.isArray(rawObj.courses) ? (rawObj.courses as LearningPath['courses']) : [],
-        milestones: Array.isArray(rawObj.milestones)
-          ? (rawObj.milestones as unknown[]).map(m => {
-              const milestone = m as Record<string, unknown>;
-              const rewards = milestone.rewards as Record<string, unknown> | undefined;
-              return {
-                id: toDisplayString(milestone.id),
-                title: toDisplayString(milestone.title),
-                description: toDisplayString(milestone.description ?? milestone.desc),
-                type: toDisplayString(milestone.type),
-                order: Number(milestone.order ?? 0),
-                isRequired: Boolean(milestone.isRequired ?? milestone.is_required ?? false),
-                rewards: rewards ? {
-                  points: Number(rewards.points ?? 0),
-                  badgeId: toDisplayString(rewards.badgeId ?? rewards.badge_id),
-                  certificate: rewards.certificate as Record<string, unknown> | undefined,
-                } : undefined,
-              } as Milestone;
-            })
-          : [],
-        phases: phasesRaw.map(p => {
-          const phase = p as Record<string, unknown>;
-          const modules = Array.isArray(phase.modules) ? phase.modules as unknown[] : [];
-          return {
-            id: toDisplayString(phase.id),
-            title: toDisplayString(phase.title),
-            description: toDisplayString(phase.description),
-            order: Number(phase.order ?? 0),
-            estimatedWeeks: Number(phase.estimatedWeeks ?? phase.estimated_weeks ?? 0),
-            modules: modules.map(m => {
-              const moduleItem = m as Record<string, unknown>;
-              return {
-                id: toDisplayString(moduleItem.id),
-                title: toDisplayString(moduleItem.title),
-                description: toDisplayString(moduleItem.description),
-                type: toDisplayString(moduleItem.type, 'course'),
-                resourceId: toDisplayString(moduleItem.resourceId ?? moduleItem.resource_id),
-                estimatedHours: Number(moduleItem.estimatedHours ?? moduleItem.estimated_hours ?? 0),
-                isRequired: Boolean(moduleItem.isRequired ?? moduleItem.is_required ?? false),
-                unlockConditions: Array.isArray(moduleItem.unlockConditions)
-                  ? moduleItem.unlockConditions.map(String)
-                  : Array.isArray(moduleItem.unlock_conditions)
-                  ? moduleItem.unlock_conditions.map(String)
-                  : [],
-                order: Number(moduleItem.order ?? 0),
-              } as PathModule;
-            }),
-          } as PathPhase;
-        }),
-        pathStructure: {
-          phases: phasesRaw.map(p => {
-            const phase = p as Record<string, unknown>;
-            const modules = Array.isArray(phase.modules) ? phase.modules as unknown[] : [];
-            return {
-              id: toDisplayString(phase.id),
-              title: toDisplayString(phase.title),
-              description: toDisplayString(phase.description),
-              order: Number(phase.order ?? 0),
-              estimatedWeeks: Number(phase.estimatedWeeks ?? phase.estimated_weeks ?? 0),
-              modules: modules.map(m => {
-                const moduleItem = m as Record<string, unknown>;
-                return {
-                  id: toDisplayString(moduleItem.id),
-                  title: toDisplayString(moduleItem.title),
-                  description: toDisplayString(moduleItem.description),
-                  type: toDisplayString(moduleItem.type, 'course'),
-                  resourceId: toDisplayString(moduleItem.resourceId ?? moduleItem.resource_id),
-                  estimatedHours: Number(moduleItem.estimatedHours ?? moduleItem.estimated_hours ?? 0),
-                  isRequired: Boolean(moduleItem.isRequired ?? moduleItem.is_required ?? false),
-                  unlockConditions: Array.isArray(moduleItem.unlockConditions)
-                    ? moduleItem.unlockConditions.map(String)
-                    : Array.isArray(moduleItem.unlock_conditions)
-                    ? moduleItem.unlock_conditions.map(String)
-                    : [],
-                  order: Number(moduleItem.order ?? 0),
-                } as PathModule;
-              }),
-            } as PathPhase;
-          }),
-        }
-      };
-      
-      setLearningPath(normalized);
-      return normalized;
-    } catch (error) {
-      console.error('Error fetching learning path:', error);
-      toast.error('Failed to load learning path details');
-      return null;
-    }
-  };
-
-  const fetchProgress = async (path: LearningPath) => {
-    try {
-      const response = await apiService.get<unknown>(`/learning-paths/${pathId}/progress`);
-      const raw = unwrapApiPayload(response);
-      const rawObj = raw as Record<string, unknown>;
-
-      if (!rawObj) return;
-
-      const phaseProgressRaw = normalizeJsonArray(
-        rawObj.phaseProgress ?? rawObj.phase_progress,
-      );
-      const moduleProgressRaw = normalizeJsonArray(
-        rawObj.moduleProgress ?? rawObj.module_progress,
-      );
-      const milestonesAchievedRaw = normalizeJsonArray(
-        rawObj.milestonesAchieved ?? rawObj.milestones_achieved,
-      );
-
-      const normalized: LearningPathProgress = {
-        id: toDisplayString(rawObj.id),
-        status: toDisplayString(rawObj.status, 'notStarted'),
-        startedAt: toDisplayString(rawObj.startedAt ?? rawObj.started_at, new Date().toISOString()),
-        lastAccessedAt: toDisplayString(rawObj.lastAccessedAt ?? rawObj.last_accessed_at, new Date().toISOString()),
-        totalTimeSpentMinutes: Number(rawObj.totalTimeSpentMinutes ?? rawObj.total_time_spent_minutes ?? 0),
-        streakDays: Number(rawObj.streakDays ?? rawObj.streak_days ?? 0),
-        learningPath: path,
-        overallProgressPercentage: Number(rawObj.overallProgressPercentage ?? rawObj.overall_progress_percentage ?? 0),
-        currentPhaseIndex: Number(rawObj.currentPhaseIndex ?? rawObj.current_phase_index ?? 0),
-        currentModuleIndex: Number(rawObj.currentModuleIndex ?? rawObj.current_module_index ?? 0),
-        phaseProgress: phaseProgressRaw.map((p: unknown) => {
-          const phase = p as Record<string, unknown>;
-          return {
-            phaseId: toDisplayString(phase.phaseId ?? phase.phase_id),
-            status: toPhaseStatus(phase.status),
-            progressPercentage: Number(phase.progressPercentage ?? phase.progress_percentage ?? 0),
-            modulesCompleted: Array.isArray(phase.modulesCompleted)
-              ? phase.modulesCompleted.map(String)
-              : Array.isArray(phase.modules_completed)
-              ? phase.modules_completed.map(String)
-              : [],
-            currentModuleId: toDisplayString(phase.currentModuleId ?? phase.current_module_id),
-          };
-        }),
-        moduleProgress: moduleProgressRaw.map((m: unknown) => {
-          const moduleItem = m as Record<string, unknown>;
-          const bestScoreRaw = moduleItem.bestScore ?? moduleItem.best_score;
-          return {
-            moduleId: toDisplayString(moduleItem.moduleId ?? moduleItem.module_id),
-            phaseId: toDisplayString(moduleItem.phaseId ?? moduleItem.phase_id),
-            status: toModuleStatus(moduleItem.status),
-            progressPercentage: Number(moduleItem.progressPercentage ?? moduleItem.progress_percentage ?? 0),
-            timeSpentMinutes: Number(moduleItem.timeSpentMinutes ?? moduleItem.time_spent_minutes ?? 0),
-            bestScore: typeof bestScoreRaw === 'number' ? bestScoreRaw : undefined,
-          };
-        }),
-        milestonesAchieved: milestonesAchievedRaw.map((m: unknown) => {
-          const milestone = m as Record<string, unknown>;
-          return {
-            milestoneId: toDisplayString(milestone.milestoneId ?? milestone.milestone_id),
-            achievedAt: toDisplayString(milestone.achievedAt ?? milestone.achieved_at, new Date().toISOString()),
-          };
-        }),
-      };
-      
-      setProgress(normalized);
-    } catch (error) {
-      console.error('Error fetching progress:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    setProgress(normalized);
+  }, [progressData, learningPath]);
 
   useEffect(() => {
     if (!learningPath) return;
 
     const refreshProgress = () => {
       if (document.visibilityState === 'visible') {
-        void fetchProgress(learningPath);
+        void refetch();
       }
     };
 

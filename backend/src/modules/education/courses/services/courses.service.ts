@@ -873,6 +873,37 @@ export class CoursesService {
         );
       }
 
+      // Integrity Guard: Check if this course is referenced in any learning paths
+      const referencingModules = await this.prisma.learningPathModule.findMany({
+        where: { courseId: id },
+        include: {
+          phase: {
+            include: {
+              learningPath: {
+                select: { id: true, title: true },
+              },
+            },
+          },
+        },
+      });
+
+      if (referencingModules.length > 0) {
+        const pathTitles = Array.from(
+          new Set(
+            referencingModules
+              .map((m) => m.phase?.learningPath?.title)
+              .filter(Boolean),
+          ),
+        );
+        this.logger.warn('Course deletion blocked by learning path constraint', {
+          courseId: id,
+          pathTitles,
+        });
+        throw new BadRequestException(
+          `Cannot delete course: it is currently required in curriculum: ${pathTitles.join(', ')}. Please remove it from the learning path(s) first.`,
+        );
+      }
+
       await this.prisma.course.delete({ where: { id } });
       await this.clearCache(existingCourse);
       this.logger.log('Course deleted successfully', { courseId: id, userId });

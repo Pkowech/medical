@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import {
   Target,
   Plus,
@@ -15,6 +16,7 @@ import {
   Flame,
   BarChart3,
   Sparkles,
+  BookOpen,
 } from 'lucide-react';
 import { apiService } from '@/features/auth/services/apiClient';
 import { LearningGoal, GoalAnalytics } from '@/shared/types/learningGoalsInterface';
@@ -283,6 +285,24 @@ export const GoalsManagementInterface: React.FC = () => {
                   <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-950/50 dark:text-blue-300">
                     {(goal.metadata as any).targetExam}
                   </span>
+                )}
+                {goal.metadata && typeof goal.metadata === 'object' && (goal.metadata as any).learningPathId && (
+                  <Link
+                    href={`/learning-paths/${(goal.metadata as any).learningPathId}`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 hover:bg-indigo-200 dark:bg-indigo-950/50 dark:text-indigo-300 dark:hover:bg-indigo-900/50 transition-colors"
+                  >
+                    <BookOpen className="w-3 h-3" /> View Curriculum &rarr;
+                  </Link>
+                )}
+                {goal.metadata && typeof goal.metadata === 'object' && (goal.metadata as any).courseId && (
+                  <Link
+                    href={`/courses/${(goal.metadata as any).courseId}`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-sky-100 text-sky-800 hover:bg-sky-200 dark:bg-sky-950/50 dark:text-sky-300 dark:hover:bg-sky-900/50 transition-colors"
+                  >
+                    <BookOpen className="w-3 h-3" /> View Course &rarr;
+                  </Link>
                 )}
               </div>
             </div>

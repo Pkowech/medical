@@ -107,17 +107,45 @@ export class PeerBenchmarkingService {
       },
     });
 
-    // If cohort-scoped is empty, fall back to global
-    if (cohortLeaderboard.length === 0) {
-      return this.prisma.progress.findMany({
-        where: { topicId },
-        orderBy: [{ completionPercentage: 'desc' }, { streakDays: 'desc' }],
-        take: limit,
-        include: { user: { select: { id: true, username: true } } },
-      });
-    }
+    const rows =
+      cohortLeaderboard.length > 0
+        ? cohortLeaderboard
+        : await this.prisma.progress.findMany({
+            where: { topicId },
+            orderBy: [{ completionPercentage: 'desc' }, { streakDays: 'desc' }],
+            take: limit,
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  username: true,
+                  healthcareField: true,
+                  studyYear: true,
+                },
+              },
+            },
+          });
 
-    return cohortLeaderboard;
+    return rows.map((entry, index) => {
+      const isSelf = Boolean(requestingUserId && entry.userId === requestingUserId);
+      const maskedUsername = isSelf
+        ? entry.user?.username || 'You'
+        : entry.user?.username
+          ? `${entry.user.username.slice(0, 2)}***${entry.user.username.slice(-1)}`
+          : `Peer #${index + 1}`;
+
+      return {
+        id: isSelf ? entry.userId : `peer-${index + 1}`,
+        username: maskedUsername,
+        isCurrentUser: isSelf,
+        cohort: entry.user?.healthcareField
+          ? `${entry.user.healthcareField}${entry.user.studyYear ? ` Year ${entry.user.studyYear}` : ''}`
+          : 'Healthcare Student',
+        completionPercentage: entry.completionPercentage,
+        streakDays: entry.streakDays,
+        timeSpentMinutes: entry.timeSpentMinutes,
+      };
+    });
   }
 
   async getStudyGroupStats(groupId: string): Promise<StudyGroupStats> {
