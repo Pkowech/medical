@@ -155,7 +155,7 @@ export const LearningPathProgressWidget: React.FC = () => {
               ? progress.moduleProgress
               : [];
             const totalModules =
-              progress.learningPath.pathStructure?.phases?.reduce(
+              (progress.learningPath.phases ?? progress.learningPath.pathStructure?.phases)?.reduce(
                 (total, phase) => total + phase.modules.length,
                 0,
               ) ?? moduleProgress.length;

@@ -549,7 +549,6 @@ export class LearningPathIntegrationService {
             select: {
               id: true,
               title: true,
-              pathStructure: true,
               phases: {
                 include: {
                   modules: true,
@@ -568,11 +567,7 @@ export class LearningPathIntegrationService {
             ),
           );
         }
-        return this.pathContainsResource(
-          p.learningPath.pathStructure as any,
-          'course',
-          courseId,
-        );
+        return false;
       });
     } catch (error) {
       this.logger.error(
@@ -600,7 +595,11 @@ export class LearningPathIntegrationService {
             select: {
               id: true,
               title: true,
-              pathStructure: true,
+              phases: {
+                include: {
+                  modules: true,
+                },
+              },
             },
           },
         },
@@ -608,7 +607,7 @@ export class LearningPathIntegrationService {
 
       return pathProgresses.filter((p) =>
         this.pathContainsResource(
-          p.learningPath.pathStructure as any,
+          p.learningPath.phases,
           'assessment',
           assessmentId,
         ),
@@ -639,7 +638,11 @@ export class LearningPathIntegrationService {
             select: {
               id: true,
               title: true,
-              pathStructure: true,
+              phases: {
+                include: {
+                  modules: true,
+                },
+              },
             },
           },
         },
@@ -647,7 +650,7 @@ export class LearningPathIntegrationService {
 
       return pathProgresses.filter((p) =>
         this.pathContainsResource(
-          p.learningPath.pathStructure as any,
+          p.learningPath.phases,
           'clinical_case',
           caseId,
         ),
@@ -667,7 +670,8 @@ export class LearningPathIntegrationService {
     progressData: ProgressData,
   ): Promise<void> {
     const moduleInfo = this.findModuleInPathStructure(
-      pathProgress.learningPath.pathStructure,
+      (pathProgress.learningPath as any).phases ||
+        (pathProgress.learningPath as any).pathStructure?.phases,
       'course',
       courseId,
     );
@@ -701,7 +705,8 @@ export class LearningPathIntegrationService {
     attemptData: ProgressData,
   ): Promise<void> {
     const moduleInfo = this.findModuleInPathStructure(
-      pathProgress.learningPath.pathStructure,
+      (pathProgress.learningPath as any).phases ||
+        (pathProgress.learningPath as any).pathStructure?.phases,
       'assessment',
       assessmentId,
     );
@@ -745,7 +750,8 @@ export class LearningPathIntegrationService {
     attemptData: ProgressData,
   ): Promise<void> {
     const moduleInfo = this.findModuleInPathStructure(
-      pathProgress.learningPath.pathStructure,
+      (pathProgress.learningPath as any).phases ||
+        (pathProgress.learningPath as any).pathStructure?.phases,
       'clinical_case',
       caseId,
     );
@@ -776,15 +782,18 @@ export class LearningPathIntegrationService {
   }
 
   private findModuleInPathStructure(
-    pathStructure: PathStructure,
+    structureOrPhases: any,
     moduleType: string,
     resourceId: string,
-  ): { phase: Phase; module: Module } | null {
-    if (!pathStructure?.phases) {
+  ): { phase: any; module: any } | null {
+    const phases = Array.isArray(structureOrPhases)
+      ? structureOrPhases
+      : structureOrPhases?.phases;
+    if (!phases || !Array.isArray(phases)) {
       return null;
     }
 
-    for (const phase of pathStructure.phases) {
+    for (const phase of phases) {
       if (!phase.modules) {
         continue;
       }
@@ -792,7 +801,10 @@ export class LearningPathIntegrationService {
       for (const module of phase.modules) {
         if (
           module.type === moduleType &&
-          (module.resourceId === resourceId || module.id === resourceId)
+          (module.resourceId === resourceId ||
+            module.courseId === resourceId ||
+            module.quizId === resourceId ||
+            module.id === resourceId)
         ) {
           return { phase, module };
         }
@@ -1251,18 +1263,25 @@ export class LearningPathIntegrationService {
   }
 
   private pathContainsResource(
-    pathStructure: PathStructure,
+    structureOrPhases: any,
     resourceType: string,
     resourceId: string,
   ): boolean {
-    if (!pathStructure?.phases) {
+    const phases = Array.isArray(structureOrPhases)
+      ? structureOrPhases
+      : structureOrPhases?.phases;
+    if (!phases || !Array.isArray(phases)) {
       return false;
     }
 
-    return pathStructure.phases.some((phase) =>
+    return phases.some((phase: any) =>
       phase.modules?.some(
-        (module) =>
-          module.type === resourceType && module.resourceId === resourceId,
+        (module: any) =>
+          module.type === resourceType &&
+          (module.resourceId === resourceId ||
+            module.courseId === resourceId ||
+            module.quizId === resourceId ||
+            module.id === resourceId),
       ),
     );
   }
@@ -1305,7 +1324,8 @@ export class LearningPathIntegrationService {
           const completedModules =
             this.getCompletedModulesCount(fullPathProgress);
           const totalModules = this.getTotalModulesCount(
-            fullPathProgress.learningPath.pathStructure,
+            (fullPathProgress.learningPath as any).phases ||
+              (fullPathProgress.learningPath as any).pathStructure,
           );
           const completionPercentage =
             totalModules > 0 ? (completedModules / totalModules) * 100 : 0;
@@ -1363,15 +1383,17 @@ export class LearningPathIntegrationService {
   ): Promise<void> {
     for (const pathProgress of pathProgresses) {
       try {
-        const pathStructure = pathProgress.learningPath.pathStructure;
-        if (!pathStructure?.phases) {
+        const phases =
+          (pathProgress.learningPath as any).phases ||
+          (pathProgress.learningPath as any).pathStructure?.phases;
+        if (!phases || !Array.isArray(phases)) {
           continue;
         }
 
         const phaseProgresses = this.toPhaseProgressMap(pathProgress.phaseProgress);
         const moduleProgresses = this.toModuleProgressMap(pathProgress.moduleProgress);
 
-        for (const phase of pathStructure.phases) {
+        for (const phase of phases) {
           const phaseProgress = phaseProgresses[phase.id];
           if (!phaseProgress?.completed) {
             const isPhaseCompleted = this.checkIfPhaseCompleted(
@@ -1415,12 +1437,15 @@ export class LearningPathIntegrationService {
     ).length;
   }
 
-  private getTotalModulesCount(pathStructure: PathStructure): number {
-    if (!pathStructure?.phases) {
+  private getTotalModulesCount(structureOrPhases: any): number {
+    const phases = Array.isArray(structureOrPhases)
+      ? structureOrPhases
+      : structureOrPhases?.phases;
+    if (!phases || !Array.isArray(phases)) {
       return 0;
     }
 
-    return pathStructure.phases.reduce(
+    return phases.reduce(
       (total: number, phase: Phase) => total + (phase.modules?.length || 0),
       0,
     );

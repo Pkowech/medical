@@ -128,7 +128,11 @@ export const LearningPathVisualization: React.FC<LearningPathVisualizationProps>
       const analyticsObj = (rawObj.analytics as Record<string, unknown> | undefined) ?? {};
       const createdByObj = (rawObj.createdBy as Record<string, unknown> | undefined) ?? (rawObj.created_by as Record<string, unknown> | undefined) ?? {};
       const pathStructureObj = (rawObj.pathStructure as Record<string, unknown> | undefined) ?? (rawObj.path_structure as Record<string, unknown> | undefined) ?? {};
-      const phasesRaw = Array.isArray(pathStructureObj.phases) ? (pathStructureObj.phases as unknown[]) : [];
+      const phasesRaw = Array.isArray(rawObj.phases)
+        ? (rawObj.phases as unknown[])
+        : Array.isArray(pathStructureObj.phases)
+        ? (pathStructureObj.phases as unknown[])
+        : [];
 
       const normalized: LearningPath = {
         id: toDisplayString(rawObj.id ?? rawObj.path_id),
@@ -180,6 +184,35 @@ export const LearningPathVisualization: React.FC<LearningPathVisualizationProps>
               } as Milestone;
             })
           : [],
+        phases: phasesRaw.map(p => {
+          const phase = p as Record<string, unknown>;
+          const modules = Array.isArray(phase.modules) ? phase.modules as unknown[] : [];
+          return {
+            id: toDisplayString(phase.id),
+            title: toDisplayString(phase.title),
+            description: toDisplayString(phase.description),
+            order: Number(phase.order ?? 0),
+            estimatedWeeks: Number(phase.estimatedWeeks ?? phase.estimated_weeks ?? 0),
+            modules: modules.map(m => {
+              const moduleItem = m as Record<string, unknown>;
+              return {
+                id: toDisplayString(moduleItem.id),
+                title: toDisplayString(moduleItem.title),
+                description: toDisplayString(moduleItem.description),
+                type: toDisplayString(moduleItem.type, 'course'),
+                resourceId: toDisplayString(moduleItem.resourceId ?? moduleItem.resource_id),
+                estimatedHours: Number(moduleItem.estimatedHours ?? moduleItem.estimated_hours ?? 0),
+                isRequired: Boolean(moduleItem.isRequired ?? moduleItem.is_required ?? false),
+                unlockConditions: Array.isArray(moduleItem.unlockConditions)
+                  ? moduleItem.unlockConditions.map(String)
+                  : Array.isArray(moduleItem.unlock_conditions)
+                  ? moduleItem.unlock_conditions.map(String)
+                  : [],
+                order: Number(moduleItem.order ?? 0),
+              } as PathModule;
+            }),
+          } as PathPhase;
+        }),
         pathStructure: {
           phases: phasesRaw.map(p => {
             const phase = p as Record<string, unknown>;

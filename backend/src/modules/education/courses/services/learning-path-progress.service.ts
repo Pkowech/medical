@@ -47,7 +47,13 @@ export class LearningPathProgressService {
 
     const learningPath = await this.prisma.learningPath.findUnique({
       where: { id: startDto.learningPathId },
-      include: { milestones: true },
+      include: {
+        milestones: true,
+        phases: {
+          include: { modules: { orderBy: { order: 'asc' } } },
+          orderBy: { order: 'asc' },
+        },
+      },
     });
     if (!learningPath) {
       throw new NotFoundException('Learning path not found');
@@ -63,7 +69,7 @@ export class LearningPathProgressService {
     }
 
     const { phaseProgress, moduleProgress } = this.createProgressStructure(
-      learningPath.pathStructure,
+      learningPath.phases,
     );
 
     const progress = await this.prisma.learningPathProgress.create({
@@ -107,14 +113,23 @@ export class LearningPathProgressService {
   ): Promise<LearningPathProgress> {
     const progress = await this.prisma.learningPathProgress.findFirst({
       where: { userId, learningPathId },
-      include: { learningPath: true },
+      include: {
+        learningPath: {
+          include: {
+            phases: {
+              include: { modules: { orderBy: { order: 'asc' } } },
+              orderBy: { order: 'asc' },
+            },
+          },
+        },
+      },
     });
     if (!progress) {
       throw new NotFoundException('Learning path progress not found');
     }
 
     const initialStructure = this.createProgressStructure(
-      progress.learningPath.pathStructure,
+      progress.learningPath.phases,
     );
     const existingModules = mapProgressByKey<ModuleProgress>(
       progress.moduleProgress,
@@ -274,14 +289,15 @@ export class LearningPathProgressService {
     return progress;
   }
 
-  private createProgressStructure(pathStructure: unknown): {
+  private createProgressStructure(phasesInput: unknown): {
     phaseProgress: PhaseProgress[];
     moduleProgress: ModuleProgress[];
   } {
-    const phases =
-      (pathStructure as PathStructure | null)?.phases ?? [];
+    const phases = Array.isArray(phasesInput)
+      ? phasesInput
+      : ((phasesInput as PathStructure | null)?.phases ?? []);
     return {
-      phaseProgress: phases.map((phase: Phase) => ({
+      phaseProgress: phases.map((phase: any) => ({
         phaseId: phase.id,
         title: phase.title,
         status: 'notStarted',
@@ -289,10 +305,10 @@ export class LearningPathProgressService {
         modulesCompleted: [],
         modules: [],
         completed: false,
-        currentModuleId: phase.modules[0]?.id,
+        currentModuleId: phase.modules?.[0]?.id,
       })),
-      moduleProgress: phases.flatMap((phase: Phase) =>
-        phase.modules.map((module: Module) => ({
+      moduleProgress: phases.flatMap((phase: any) =>
+        (phase.modules || []).map((module: any) => ({
           moduleId: module.id,
           phaseId: phase.id,
           status: 'notStarted',

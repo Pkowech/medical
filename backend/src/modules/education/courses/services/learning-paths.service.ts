@@ -55,8 +55,6 @@ export class LearningPathsService {
             difficulty: createDto.difficulty as CourseDifficulty,
             estimatedDurationWeeks: createDto.estimatedDurationWeeks,
             estimatedHoursPerWeek: createDto.estimatedHoursPerWeek,
-            pathStructure:
-              createDto.pathStructure as unknown as Prisma.JsonObject,
             createdBy: userId,
             status: LearningPathStatus.draft,
           },
@@ -171,27 +169,26 @@ export class LearningPathsService {
         throw new NotFoundException('Learning path not found');
       }
 
-      if (learningPath.phases?.length > 0 && !learningPath.pathStructure) {
-        (learningPath as any).pathStructure = {
-          phases: learningPath.phases.map((p) => ({
-            id: p.id,
-            title: p.title,
-            description: p.description,
-            order: p.order,
-            estimatedWeeks: p.estimatedWeeks,
-            modules: p.modules.map((m) => ({
-              id: m.id,
-              title: m.title,
-              description: m.description,
-              type: m.type,
-              resourceId: m.resourceId || m.courseId || m.quizId,
-              order: m.order,
-              isRequired: m.isRequired,
-              unlockConditions: m.unlockConditions,
-            })),
-          })),
-        };
-      }
+      const formattedPhases = (learningPath.phases || []).map((p) => ({
+        id: p.id,
+        title: p.title,
+        description: p.description,
+        order: p.order,
+        estimatedWeeks: p.estimatedWeeks,
+        modules: p.modules.map((m) => ({
+          id: m.id,
+          title: m.title,
+          description: m.description,
+          type: m.type,
+          resourceId: m.resourceId || m.courseId || m.quizId,
+          order: m.order,
+          isRequired: m.isRequired,
+          unlockConditions: m.unlockConditions,
+        })),
+      }));
+
+      (learningPath as any).phases = formattedPhases;
+      (learningPath as any).pathStructure = { phases: formattedPhases };
 
       return learningPath;
     } catch (error) {
@@ -228,8 +225,6 @@ export class LearningPathsService {
           data: {
             title: updateDto.title,
             description: updateDto.description,
-            pathStructure:
-              updateDto.pathStructure as unknown as Prisma.JsonObject,
             updatedAt: new Date(),
           },
           include: {
@@ -402,8 +397,9 @@ export class LearningPathsService {
         customizations?.estimatedHoursPerWeek ??
         originalPath.estimatedHoursPerWeek ??
         0,
-      pathStructure: (customizations?.pathStructure ||
-        originalPath.pathStructure) as any,
+      pathStructure: (customizations?.pathStructure || (originalPath as any).pathStructure || {
+        phases: (originalPath as any).phases || [],
+      }) as any,
     };
 
     return this.create(duplicateData, userId);
@@ -602,17 +598,19 @@ export class LearningPathsService {
       errors.push('Description is required');
     }
 
-    const pathStructure =
-      learningPath.pathStructure as unknown as PathStructure;
+    const phases =
+      (learningPath as any).phases ||
+      (learningPath as any).pathStructure?.phases ||
+      [];
 
-    if (!pathStructure?.phases?.length) {
+    if (!phases.length) {
       errors.push('At least one phase is required');
     } else {
       const courseIds: string[] = [];
-      for (const phase of pathStructure.phases) {
+      for (const phase of phases) {
         for (const module of phase.modules || []) {
-          if (module.type === 'course' && module.resourceId) {
-            courseIds.push(module.resourceId);
+          if (module.type === 'course' && (module.resourceId || module.courseId)) {
+            courseIds.push(module.resourceId || module.courseId);
           }
         }
       }
@@ -641,9 +639,9 @@ export class LearningPathsService {
     }
 
     const hasModules =
-      pathStructure.phases?.some(
-        (phase) => phase.modules && phase.modules.length > 0,
-      ) ?? false;
+      phases.some(
+        (phase: any) => phase.modules && phase.modules.length > 0,
+      );
 
     if (!hasModules) {
       throw new BadRequestException('At least one phase must contain modules');

@@ -61,6 +61,7 @@ export interface LearningPath {
   courses: any[];
   milestones: Milestone[];
   specialization?: string;
+  phases?: PathPhase[];
   pathStructure?: {
     phases: PathPhase[];
   };
