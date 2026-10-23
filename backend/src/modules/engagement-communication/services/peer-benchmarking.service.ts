@@ -143,7 +143,7 @@ export class PeerBenchmarkingService {
           : 'Healthcare Student',
         completionPercentage: entry.completionPercentage,
         streakDays: entry.streakDays,
-        timeSpentMinutes: entry.timeSpentMinutes,
+        timeSpentMinutes: entry.timeSpent,
       };
     });
   }
