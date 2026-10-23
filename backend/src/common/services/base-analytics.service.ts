@@ -19,8 +19,16 @@ export abstract class BaseAnalyticsService {
   }
 
   protected async getCachedAnalytics<T>(key: string): Promise<T | null> {
-    const cached = await this.redis.get(key);
-    return cached ? JSON.parse(cached) : null;
+    const cached = await this.redis.get<T>(key);
+    if (!cached) return null;
+    if (typeof cached === 'string') {
+      try {
+        return JSON.parse(cached) as T;
+      } catch {
+        return null;
+      }
+    }
+    return cached as T;
   }
 
   protected generateCacheKey(

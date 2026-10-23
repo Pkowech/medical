@@ -50,7 +50,7 @@ const AppLayoutContent: React.FC<AppLayoutProps> = ({ children }) => {
 
   // Fetch deadlines
   useEffect(() => {
-    if (!session?.user) return;
+    if (!session?.user?.id) return;
     const fetchDeadlines = async () => {
       try {
         await getDeadlines(session.user!.id);
@@ -59,7 +59,7 @@ const AppLayoutContent: React.FC<AppLayoutProps> = ({ children }) => {
       }
     };
     fetchDeadlines();
-  }, [session?.user]);
+  }, [session?.user?.id]);
 
   if (!mounted || isLoading) {
     return (

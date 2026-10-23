@@ -274,6 +274,9 @@ const progressService = {
   },
 
   async getAllProgressData(userId: string): Promise<ProgressData> {
+    if (!userId || userId === 'undefined') {
+      throw new Error('getAllProgressData: userId is required');
+    }
     try {
       // Fetch aggregated data + mastery data in parallel (2 requests instead of 8)
       // Use allSettled to ensure that even if one endpoint (e.g. gRPC-backed mastery) fails,
@@ -699,6 +702,9 @@ const progressService = {
    * Get unit progress
    */
   async getUnitProgress(userId: string, courseId?: string): Promise<UnitProgressSummary[]> {
+    if (!userId || userId === 'undefined') {
+      return [];
+    }
     try {
       const response = await api.get<{ enrolledUnits?: UnitProgressSummary[] }>(
         `/progress/dashboard/${userId}`
@@ -770,6 +776,9 @@ const progressService = {
    * Get user streak information
    */
   async getUserStreaks(userId: string): Promise<LearningStreakSummary> {
+    if (!userId || userId === 'undefined') {
+      throw new Error('getUserStreaks: userId is required');
+    }
     try {
       const response = await api.get<LearningStreakSummary>(
         `/progress/streaks/${userId}`,

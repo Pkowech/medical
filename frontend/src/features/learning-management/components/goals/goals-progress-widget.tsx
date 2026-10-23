@@ -24,6 +24,7 @@ export const GoalsProgressWidget: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!user?.id) return;
     fetchGoals();
     fetchAnalytics();
   }, [user?.id]);

@@ -7,11 +7,17 @@ interface DashboardApiResponse {
 
 // Lightweight service wrapper for dashboard-related API endpoints
 export async function getUserProgress(userId: string) {
+  if (!userId || userId === 'undefined') {
+    throw new Error('getUserProgress: userId is required');
+  }
   const response = await apiService.get<{ data: unknown }>(`/progress/dashboard/${userId}`);
   return response.data;
 }
 
 export async function getDeadlines(userId: string) {
+  if (!userId || userId === 'undefined') {
+    return [];
+  }
   const response = await apiService.get<DashboardApiResponse>(`/progress/dashboard/${userId}`);
   return response.data.deadlines ?? [];
 }

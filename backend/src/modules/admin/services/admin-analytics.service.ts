@@ -34,10 +34,18 @@ export class AdminAnalyticsService implements OnModuleInit {
 
     try {
       // 1. Try cache first
-      const cached = await this.redisService.get<string>(cacheKey);
-      if (typeof cached === 'string') {
+      const cached = await this.redisService.get<SystemAnalyticsResponseDto | string>(cacheKey);
+      if (cached) {
         this.logger.log('getSystemAnalytics: Returning cached data');
-        return JSON.parse(cached);
+        if (typeof cached === 'string') {
+          try {
+            return JSON.parse(cached) as SystemAnalyticsResponseDto;
+          } catch {
+            // ignore JSON error and refetch
+          }
+        } else {
+          return cached;
+        }
       }
 
       const grpcResp = await this.callGrpc(

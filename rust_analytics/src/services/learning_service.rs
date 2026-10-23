@@ -695,7 +695,7 @@ impl LearningService {
         .await
         .map_err(|error| Status::internal(format!("Progress trend query failed: {error}")))?;
         let course_progress_metrics = sqlx::query_as::<_, ProgressMetric>(
-            "SELECT TO_CHAR(updated_at, 'YYYY-MM-DD') AS date,
+            "SELECT TO_CHAR(updated_at::date, 'YYYY-MM-DD') AS date,
                     AVG(progress_percentage)::double precision AS value,
                     '' AS metadata
              FROM topic_progress

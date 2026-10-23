@@ -75,6 +75,17 @@ async function refreshAccessToken(token: JWT): Promise<JWT> {
         message: data.message || 'Unknown error',
         data,
       });
+      // On 401 the refresh token is invalid/expired in Redis — wipe it immediately
+      // so the jwt() callback stops retrying with a dead token.
+      if (response.status === 401) {
+        return {
+          ...token,
+          accessToken: '',
+          refreshToken: '',
+          accessTokenExpires: 0,
+          error: 'RefreshAccessTokenError',
+        };
+      }
       throw new Error(data.message || 'Failed to refresh token');
     }
 
@@ -603,6 +614,15 @@ export const authOptions: NextAuthOptions = {
         return token;
       }
 
+      // If the token already has a terminal error AND no refresh token left,
+      // do NOT attempt another refresh — just propagate the error.
+      if (
+        token.error === 'RefreshAccessTokenError' &&
+        !token.refreshToken
+      ) {
+        return token;
+      }
+
       // Return previous token if the access token has not expired yet
       // Refresh 5 minutes before expiry to avoid edge cases
       const refreshBuffer = 5 * 60 * 1000; // 5 minutes
@@ -640,6 +660,9 @@ export const authOptions: NextAuthOptions = {
       // If we get here, both refresh and current token are invalid
       return {
         ...token,
+        accessToken: '',
+        refreshToken: '',
+        accessTokenExpires: 0,
         error: 'TokenExpiredError',
       } as unknown as JWT;
     },

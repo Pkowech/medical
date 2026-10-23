@@ -233,6 +233,9 @@ class CourseService {
     }>;
     enrolledUnits: Array<Record<string, unknown>>;
   }> {
+    if (!userId || userId === 'undefined') {
+      return { courses: [], enrolledUnits: [] };
+    }
     const response = await apiService.get<unknown>(`/progress/dashboard/${userId}`);
     return parseResponse(response.data);
   }

@@ -67,9 +67,10 @@ export const GoalsManagementInterface: React.FC = () => {
   const [recommendationToAccept, setRecommendationToAccept] = useState<Partial<LearningGoal> | null>(null);
 
   useEffect(() => {
+    if (!user?.id) return;
     fetchGoals();
     fetchAnalytics();
-  }, [filters, activeTab]);
+  }, [filters, activeTab, user?.id]);
 
   const fetchGoals = async () => {
     try {

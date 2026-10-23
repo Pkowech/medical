@@ -85,6 +85,18 @@ export class LearningAnalyticsService implements OnModuleInit {
     );
   }
 
+  private parseCached<T>(cached: unknown): T | null {
+    if (!cached) return null;
+    if (typeof cached === 'string') {
+      try {
+        return JSON.parse(cached) as T;
+      } catch {
+        return null;
+      }
+    }
+    return cached as T;
+  }
+
   /**
    * Get learning path analytics for a specific path
    */
@@ -93,9 +105,10 @@ export class LearningAnalyticsService implements OnModuleInit {
     const cacheKey = `${ANALYTICS_CACHE_CONFIG.LEARNING.PATH_ANALYTICS(pathId)}:v2`;
 
     try {
-      const cached = await this.redisService.get<string>(cacheKey);
-      if (cached) {
-        return JSON.parse(cached) as PathAnalyticsResponseDto;
+      const cached = await this.redisService.get(cacheKey);
+      const parsed = this.parseCached<PathAnalyticsResponseDto>(cached);
+      if (parsed) {
+        return parsed;
       }
 
       const grpcResp = await this.callGrpc(
@@ -141,9 +154,10 @@ export class LearningAnalyticsService implements OnModuleInit {
   async getGoalAnalytics(userId: string): Promise<GoalAnalytics> {
     try {
       const cacheKey = ANALYTICS_CACHE_CONFIG.LEARNING.GOALS(userId);
-      const cached = await this.redisService.get<string>(cacheKey);
-      if (cached) {
-        return JSON.parse(cached) as GoalAnalytics;
+      const cached = await this.redisService.get(cacheKey);
+      const parsed = this.parseCached<GoalAnalytics>(cached);
+      if (parsed) {
+        return parsed;
       }
 
       // Call Rust service via gRPC
@@ -205,9 +219,10 @@ export class LearningAnalyticsService implements OnModuleInit {
   async getCourseStatistics(userId: string): Promise<CourseStats> {
     try {
       const cacheKey = ANALYTICS_CACHE_CONFIG.LEARNING.COURSE_STATS(userId);
-      const cached = await this.redisService.get<string>(cacheKey);
-      if (cached) {
-        return JSON.parse(cached) as CourseStats;
+      const cached = await this.redisService.get(cacheKey);
+      const parsed = this.parseCached<CourseStats>(cached);
+      if (parsed) {
+        return parsed;
       }
 
       // Call Rust service via gRPC
@@ -250,9 +265,10 @@ export class LearningAnalyticsService implements OnModuleInit {
   async getLearningPathStatistics(userId: string): Promise<LearningPathStats> {
     try {
       const cacheKey = ANALYTICS_CACHE_CONFIG.LEARNING.PATH_STATS(userId);
-      const cached = await this.redisService.get<string>(cacheKey);
-      if (cached) {
-        return JSON.parse(cached) as LearningPathStats;
+      const cached = await this.redisService.get(cacheKey);
+      const parsed = this.parseCached<LearningPathStats>(cached);
+      if (parsed) {
+        return parsed;
       }
 
       // Call Rust service via gRPC
@@ -295,9 +311,10 @@ export class LearningAnalyticsService implements OnModuleInit {
   ): Promise<LearningAnalyticsDto> {
     try {
       const cacheKey = ANALYTICS_CACHE_CONFIG.LEARNING.ANALYTICS(userId);
-      const cached = await this.redisService.get<string>(cacheKey);
-      if (cached) {
-        return JSON.parse(cached) as LearningAnalyticsDto;
+      const cached = await this.redisService.get(cacheKey);
+      const parsed = this.parseCached<LearningAnalyticsDto>(cached);
+      if (parsed) {
+        return parsed;
       }
 
       // Call Rust service via gRPC
@@ -449,9 +466,10 @@ export class LearningAnalyticsService implements OnModuleInit {
     const cacheKey = ANALYTICS_CACHE_CONFIG.LEARNING.USER_INSIGHTS(userId);
 
     try {
-      const cached = await this.redisService.get<string>(cacheKey);
-      if (cached) {
-        return JSON.parse(cached) as UserInsights;
+      const cached = await this.redisService.get(cacheKey);
+      const parsed = this.parseCached<UserInsights>(cached);
+      if (parsed) {
+        return parsed;
       }
 
       // Delegate to Rust detailed analytics for robust insights
@@ -534,8 +552,9 @@ export class LearningAnalyticsService implements OnModuleInit {
     const dedupKey = ANALYTICS_CACHE_CONFIG.DEDUP(cacheKey);
 
     try {
-      const cached = await this.redisService.get<string>(cacheKey);
-      if (typeof cached === 'string') {
+      const cached = await this.redisService.get(cacheKey);
+      const parsed = this.parseCached<StudyPatternsResponseDto>(cached);
+      if (parsed) {
         await this.performanceMetrics.recordMetric({
           endpoint: ANALYTICS_METRICS_CONFIG.ENDPOINTS.LEARNING,
           method: 'analyzeStudyPatterns',
@@ -546,7 +565,7 @@ export class LearningAnalyticsService implements OnModuleInit {
           success: true,
           timestamp: new Date(),
         });
-        return JSON.parse(cached) as StudyPatternsResponseDto;
+        return parsed;
       }
 
       return await this.requestDeduplicationService.executeWithDedup(
@@ -629,9 +648,10 @@ export class LearningAnalyticsService implements OnModuleInit {
     const cacheKey = `${ANALYTICS_CACHE_CONFIG.LEARNING.ENGAGEMENT(userId)}:v2`;
 
     try {
-      const cached = await this.redisService.get<string>(cacheKey);
-      if (typeof cached === 'string') {
-        return JSON.parse(cached);
+      const cached = await this.redisService.get(cacheKey);
+      const parsed = this.parseCached<any>(cached);
+      if (parsed) {
+        return parsed;
       }
 
       const detailed = await this.getDetailedLearningAnalytics(userId);
@@ -784,9 +804,10 @@ export class LearningAnalyticsService implements OnModuleInit {
     const startedAt = Date.now();
 
     try {
-      const cached = await this.redisService.get<string>(cacheKey);
-      if (typeof cached === 'string') {
-        return JSON.parse(cached) as UnifiedRecommendation[];
+      const cached = await this.redisService.get(cacheKey);
+      const parsed = this.parseCached<UnifiedRecommendation[]>(cached);
+      if (parsed) {
+        return parsed;
       }
 
       return await this.requestDeduplicationService.executeWithDedup(
@@ -967,9 +988,10 @@ export class LearningAnalyticsService implements OnModuleInit {
     const cacheKey = `trending_paths:${limit}:v2`;
 
     try {
-      const cached = await this.redisService.get<string>(cacheKey);
-      if (typeof cached === 'string') {
-        return JSON.parse(cached);
+      const cached = await this.redisService.get(cacheKey);
+      const parsed = this.parseCached<any>(cached);
+      if (parsed) {
+        return parsed;
       }
 
       const grpcResp = await this.callGrpc(
