@@ -31,13 +31,8 @@ const BACKEND_URL = configuredBackendUrl.replace(/\/v1\/?$/, '');
  */
 const getPWACacheStrategies = () => [
   {
-    // Never cache potentially private page HTML; serve the document fallback offline.
-    urlPattern: ({ request }) => request.mode === 'navigate',
-    handler: 'NetworkOnly',
-    options: {},
-  },
-  {
-    // API responses can contain private user data; never persist them in Cache Storage.
+    // API responses can contain private user data; never persist them in ServiceWorker Cache Storage.
+    // Client-side IndexedDB handles authenticated offline query storage securely.
     urlPattern: /^https?:\/\/[^/]+\/api(?:\/|$)/i,
     handler: 'NetworkOnly',
     options: {},
@@ -64,6 +59,39 @@ const getPWACacheStrategies = () => [
       },
     },
   },
+  {
+    // Next.js App Router RSC payloads and page route data (_next/data or ?_rsc=)
+    urlPattern: ({ url }) => {
+      const isSameOrigin = self.origin === url.origin;
+      if (!isSameOrigin) return false;
+      return url.pathname.includes('/_next/data/') || url.searchParams.has('_rsc');
+    },
+    handler: 'NetworkFirst',
+    options: {
+      cacheName: 'medtrack-rsc-v1',
+      expiration: {
+        maxEntries: 200,
+        maxAgeSeconds: 7 * 24 * 60 * 60,
+      },
+      networkTimeoutSeconds: 3,
+    },
+  },
+  {
+    // Enable offline page navigation: NetworkFirst falls back to cached page when offline
+    urlPattern: ({ request, url }) => {
+      const isSameOrigin = self.origin === url.origin;
+      return isSameOrigin && request.mode === 'navigate';
+    },
+    handler: 'NetworkFirst',
+    options: {
+      cacheName: 'medtrack-pages-v1',
+      expiration: {
+        maxEntries: 100,
+        maxAgeSeconds: 7 * 24 * 60 * 60,
+      },
+      networkTimeoutSeconds: 3,
+    },
+  },
 ];
 
 /**
@@ -81,7 +109,13 @@ const initializePWA = () => {
       register: false,
       skipWaiting: false,
       clientsClaim: true,
-      cacheOnFrontEndNav: false,
+      cacheOnFrontEndNav: true,
+      publicExcludes: [
+        '!noprecache/**/*',
+        '!pdfjs/**/*',
+        '!pdfjs/cmaps/**/*',
+        '!pdfjs/standard_fonts/**/*',
+      ],
       disable: false,
       customWorkerDir: 'worker',
       fallbacks: {

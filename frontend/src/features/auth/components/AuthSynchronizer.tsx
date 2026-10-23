@@ -33,6 +33,10 @@ export default function AuthSynchronizer({ children }: { children: React.ReactNo
         });
       }
     } else if (status === 'unauthenticated') {
+      // Don't wipe authenticated session when offline
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        return;
+      }
       const currentUser = useAuthStore.getState().user;
       if (currentUser !== null) {
         useAuthStore.setState({ 

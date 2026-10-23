@@ -2,6 +2,8 @@
 
 import { ReactNode, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
+import { useAuthStore } from '@/features/auth/store/useAuthStore';
+import { offlineService } from '@/lib/core/offline/offlineService';
 import { usePathname, useRouter } from 'next/navigation';
 import { Permission, hasPermission, Role } from '@/lib/auth/roles';
 
@@ -19,9 +21,13 @@ export function ProtectedRoute({
   const { data: session, status } = useSession();
   const router = useRouter();
   const pathname = usePathname();
-  const isLoading = status === 'loading';
-  const isAuthenticated = status === 'authenticated';
-  const user = session?.user;
+  const isOffline = typeof window !== 'undefined' && !navigator.onLine;
+  const storeUser = useAuthStore(state => state.user);
+  const activeOfflineUserId = typeof window !== 'undefined' ? offlineService.getActiveOfflineUserId() : undefined;
+  const hasOfflineIdentity = isOffline && Boolean(storeUser || activeOfflineUserId);
+  const isLoading = status === 'loading' && !hasOfflineIdentity;
+  const isAuthenticated = status === 'authenticated' || hasOfflineIdentity;
+  const user = session?.user || (isOffline ? (storeUser as typeof session extends { user?: infer U } ? U : undefined) : undefined);
   const hasRequiredPermission = !requiredPermission || Boolean(
     user?.permissions?.includes(requiredPermission) ||
     (user?.role && hasPermission(user.role as Role, requiredPermission as Permission))

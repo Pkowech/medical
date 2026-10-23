@@ -49,15 +49,23 @@ async function refreshAccessToken(token: JWT): Promise<JWT> {
     
     console.warn('[Token Refresh] Attempting to refresh token from:', normalizedBase);
     
-    const response = await fetch(`${normalizedBase}/auth/refresh`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        refreshToken: token.refreshToken,
-      }),
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    let response: Response;
+    try {
+      response = await fetch(`${normalizedBase}/auth/refresh`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          refreshToken: token.refreshToken,
+        }),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
 
     const data = await response.json();
 
@@ -254,13 +262,13 @@ export const authOptions: NextAuthOptions = {
         };
 
         const configuredTimeout = Number.parseInt(
-          process.env.AUTH_BACKEND_TIMEOUT_MS || '90000',
+          process.env.AUTH_BACKEND_TIMEOUT_MS || '8000',
           10
         );
         const timeoutMs =
           Number.isFinite(configuredTimeout) && configuredTimeout > 0
             ? configuredTimeout
-            : 90000;
+            : 8000;
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), timeoutMs);
 

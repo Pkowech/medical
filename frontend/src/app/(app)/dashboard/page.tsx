@@ -6,6 +6,8 @@ import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { Session } from 'next-auth';
+import { useAuthStore } from '@/features/auth/store/useAuthStore';
+import { offlineService } from '@/lib/core/offline/offlineService';
 
 // Define a custom session type that includes the 'error' property
 interface CustomSession extends Session {
@@ -15,19 +17,24 @@ interface CustomSession extends Session {
 export default function DashboardPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const storeUser = useAuthStore(state => state.user);
+  const isOffline = typeof window !== 'undefined' && !navigator.onLine;
+  const activeOfflineUserId = typeof window !== 'undefined' ? offlineService.getActiveOfflineUserId() : undefined;
+  const hasIdentity = Boolean(session?.user || storeUser || activeOfflineUserId);
 
   useEffect(() => {
+    if (status === 'loading') return;
     const customSession = session as CustomSession;
     if (customSession?.error === 'TokenExpiredError') {
       console.warn('Dashboard: Token expired, redirecting to sign-in');
       router.replace('/login?callbackUrl=%2Fdashboard');
-    } else if (status === 'unauthenticated') {
+    } else if (status === 'unauthenticated' && !isOffline && !storeUser) {
       console.warn('Dashboard: User unauthenticated, redirecting to sign-in');
       router.replace('/login?callbackUrl=%2Fdashboard');
     }
-  }, [session, status, router]);
+  }, [session, status, router, isOffline, storeUser]);
 
-  if (status === 'loading' || !session) {
+  if ((status === 'loading' && !hasIdentity) || (!session && !hasIdentity)) {
     return <LoadingSpinner fullScreen />;
   }
 
