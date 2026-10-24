@@ -88,22 +88,22 @@ export default function NotificationsPage() {
   };
 
   if (isLoading) {
-    return <div className="text-center py-8">Loading Notifications...</div>;
+    return <div className="py-8 text-center">Loading Notifications...</div>;
   }
 
   if (error) {
-    return <div className="text-center py-8 text-red-500">Error: {error}</div>;
+    return <div className="break-words py-8 text-center text-red-500">Error: {error}</div>;
   }
 
   const unreadNotifications = notifications.filter(n => !n.read);
   const readNotifications = notifications.filter(n => n.read);
 
   return (
-    <div className="space-y-8">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Notifications</h1>
+    <div className="min-w-0 space-y-6 sm:space-y-8">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="text-2xl font-bold sm:text-3xl">Notifications</h1>
         {unreadNotifications.length > 0 && (
-          <Button onClick={handleMarkAllAsRead} variant="outline">
+          <Button onClick={handleMarkAllAsRead} variant="outline" className="w-full sm:w-auto">
             <CheckCircle className="mr-2 h-4 w-4" /> Mark All as Read
           </Button>
         )}
@@ -127,22 +127,29 @@ export default function NotificationsPage() {
                 {unreadNotifications.map(notification => (
                   <div
                     key={notification.id}
-                    className="flex items-start p-4 border rounded-md bg-blue-50 dark:bg-blue-900/20"
+                    className="flex min-w-0 items-start gap-3 rounded-md border bg-blue-50 p-3 dark:bg-blue-900/20 sm:p-4"
                   >
-                    <Bell className="h-5 w-5 text-blue-600 mr-3 shrink-0" />
-                    <div className="flex-1">
-                      <p className="font-medium">{notification.title}</p>
-                      <p className="text-sm text-muted-foreground">{notification.message}</p>
+                    <Bell className="mt-0.5 h-5 w-5 shrink-0 text-blue-600" />
+                    <div className="min-w-0 flex-1">
+                      <p className="break-words font-medium">{notification.title}</p>
+                      <p className="break-words text-sm text-muted-foreground">
+                        {notification.message}
+                      </p>
                       <p className="text-xs text-muted-foreground mt-1">
                         {getTimeAgo(notification.createdAt)}
                       </p>
-                      <div className="mt-2 space-x-2">
-                        <Button size="sm" onClick={() => handleMarkAsRead(notification.id)}>
+                      <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                        <Button
+                          size="sm"
+                          className="min-h-10 w-full sm:w-auto"
+                          onClick={() => handleMarkAsRead(notification.id)}
+                        >
                           Mark as Read
                         </Button>
                         <Button
                           size="sm"
                           variant="destructive"
+                          className="min-h-10 w-full sm:w-auto"
                           onClick={() => handleDeleteNotification(notification.id)}
                         >
                           Delete
@@ -162,18 +169,24 @@ export default function NotificationsPage() {
               </CardHeader>
               <CardContent className="grid gap-4">
                 {readNotifications.map(notification => (
-                  <div key={notification.id} className="flex items-start p-4 border rounded-md">
-                    <CheckCircle className="h-5 w-5 text-green-600 mr-3 shrink-0" />
-                    <div className="flex-1">
-                      <p className="font-medium">{notification.title}</p>
-                      <p className="text-sm text-muted-foreground">{notification.message}</p>
+                  <div
+                    key={notification.id}
+                    className="flex min-w-0 items-start gap-3 rounded-md border p-3 sm:p-4"
+                  >
+                    <CheckCircle className="mt-0.5 h-5 w-5 shrink-0 text-green-600" />
+                    <div className="min-w-0 flex-1">
+                      <p className="break-words font-medium">{notification.title}</p>
+                      <p className="break-words text-sm text-muted-foreground">
+                        {notification.message}
+                      </p>
                       <p className="text-xs text-muted-foreground mt-1">
                         {getTimeAgo(notification.createdAt)}
                       </p>
-                      <div className="mt-2">
+                      <div className="mt-3">
                         <Button
                           size="sm"
                           variant="destructive"
+                          className="min-h-10 w-full sm:w-auto"
                           onClick={() => handleDeleteNotification(notification.id)}
                         >
                           Delete

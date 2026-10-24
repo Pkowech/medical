@@ -145,19 +145,21 @@ export function PushNotificationSettings({
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between gap-4">
-        <div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+        <div className="min-w-0">
           <h3 className="font-medium">Push Notifications</h3>
           <p className="text-sm text-muted-foreground dark:text-muted-foreground">
             Receive reminders on this device, even when MedTrack is closed.
           </p>
         </div>
-        <Switch
-          checked={isEnabledOnThisDevice}
-          onCheckedChange={checked => void handleChange(checked)}
-          disabled={isBusy || !supported || isIOSInstallRequired}
-          aria-label="Enable push notifications on this device"
-        />
+        <div className="flex justify-end sm:shrink-0">
+          <Switch
+            checked={isEnabledOnThisDevice}
+            onCheckedChange={checked => void handleChange(checked)}
+            disabled={isBusy || !supported || isIOSInstallRequired}
+            aria-label="Enable push notifications on this device"
+          />
+        </div>
       </div>
       {isIOSInstallRequired && (
         <p className="text-xs text-muted-foreground dark:text-muted-foreground">
@@ -175,7 +177,7 @@ export function PushNotificationSettings({
         </p>
       )}
       {error && (
-        <p className="text-sm text-red-600" role="alert">
+        <p className="break-words text-sm text-red-600" role="alert">
           {error}
         </p>
       )}

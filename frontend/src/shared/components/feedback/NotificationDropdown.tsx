@@ -122,12 +122,15 @@ export default function NotificationDropdown() {
           )}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-96 p-0 shadow-xl border-border dark:border-border">
-        <div className="flex items-center justify-between p-4 border-b border-border dark:border-border bg-card dark:bg-background rounded-t-lg">
+      <DropdownMenuContent
+        align="end"
+        className="w-[calc(100vw-2rem)] max-w-96 border-border p-0 shadow-xl dark:border-border"
+      >
+        <div className="flex items-center justify-between gap-2 rounded-t-lg border-b border-border bg-card p-3 dark:border-border dark:bg-background sm:p-4">
           <div className="flex items-center gap-2">
-            <h3 className="font-semibold text-sm">Notifications</h3>
+            <h3 className="text-sm font-semibold">Notifications</h3>
             {unreadCount > 0 && (
-              <Badge variant="secondary" className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 hover:bg-blue-100">
+              <Badge variant="secondary" className="bg-blue-100 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400">
                 {unreadCount} new
               </Badge>
             )}
@@ -137,7 +140,7 @@ export default function NotificationDropdown() {
               <Button 
                 variant="ghost" 
                 size="sm" 
-                className="h-7 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 px-2"
+                className="h-8 px-2 text-xs text-blue-600 hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-blue-900/20"
                 onClick={handleMarkAllAsRead}
               >
                 Mark all read
@@ -151,7 +154,7 @@ export default function NotificationDropdown() {
           </div>
         </div>
 
-        <ScrollArea className="h-[400px]">
+        <ScrollArea className="h-[60vh] max-h-[400px]">
           {sortedNotifications.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-[300px] text-muted-foreground">
               <Bell className="h-12 w-12 text-gray-200 dark:text-muted-foreground mb-3" />
@@ -166,7 +169,7 @@ export default function NotificationDropdown() {
                   <div
                     key={notification.id}
                     className={cn(
-                      "group relative flex gap-3 p-4 transition-all hover:bg-background dark:hover:bg-card/50 cursor-pointer border-l-2",
+                      "group relative flex min-w-0 gap-3 border-l-2 p-3 pr-10 transition-all hover:bg-background dark:hover:bg-card/50 sm:p-4 sm:pr-10",
                       !notification.read 
                         ? "border-l-blue-500 bg-blue-50/30 dark:bg-blue-900/10" 
                         : "border-l-transparent opacity-80 hover:opacity-100"
@@ -183,8 +186,8 @@ export default function NotificationDropdown() {
                     </div>
                     
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2">
-                        <p className={cn("text-sm font-medium leading-none", !notification.read ? "text-foreground dark:text-muted-foreground" : "text-muted-foreground dark:text-muted-foreground")}>
+                      <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-1">
+                        <p className={cn("min-w-0 break-words text-sm font-medium leading-snug [overflow-wrap:anywhere]", !notification.read ? "text-foreground dark:text-muted-foreground" : "text-muted-foreground dark:text-muted-foreground")}>
                           {notification.title || notification.metadata?.title || 'System Notification'}
                         </p>
                         <span className="text-[10px] text-muted-foreground tabular-nums shrink-0">
@@ -192,7 +195,7 @@ export default function NotificationDropdown() {
                         </span>
                       </div>
                       
-                      <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-1 line-clamp-2 leading-relaxed">
+                      <p className="mt-1 line-clamp-2 break-words text-xs leading-relaxed text-muted-foreground [overflow-wrap:anywhere] dark:text-muted-foreground">
                         {notification.message}
                       </p>
 
@@ -201,13 +204,13 @@ export default function NotificationDropdown() {
                           <Button 
                             size="sm" 
                             variant="outline" 
-                            className="h-7 text-xs px-3 bg-card dark:bg-card border-blue-200 dark:border-blue-900 text-blue-600 dark:text-blue-400 hover:bg-blue-50 hover:text-blue-700"
+                            className="h-auto min-h-9 max-w-full whitespace-normal break-words bg-card px-3 text-xs text-blue-600 hover:bg-blue-50 hover:text-blue-700 dark:border-blue-900 dark:bg-card dark:text-blue-400"
                             onClick={(e) => {
                               e.stopPropagation();
                               handleNotificationClick(notification.id, action);
                             }}
                           >
-                            <span className="mr-1.5">{action.label}</span>
+                            <span className="mr-1.5 break-words">{action.label}</span>
                             <ExternalLink className="h-3 w-3" />
                           </Button>
                         )}
@@ -219,7 +222,7 @@ export default function NotificationDropdown() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="absolute top-2 right-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="absolute right-2 top-2 h-8 w-8 opacity-100 transition-opacity focus-visible:opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
                           onClick={(e) => e.stopPropagation()}
                         >
                           <MoreHorizontal className="h-3 w-3" />

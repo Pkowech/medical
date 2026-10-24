@@ -103,18 +103,24 @@ export class PushNotificationsService {
 
       const preferences = this.jsonObject(user.preferences);
       const notifications = this.jsonObject(preferences.notifications);
+      await tx.pushSubscription.deleteMany({
+        where: endpoint ? { userId, endpoint } : { userId },
+      });
+      const remainingSubscriptions = endpoint
+        ? await tx.pushSubscription.count({ where: { userId } })
+        : 0;
       await tx.user.update({
         where: { id: userId },
         data: {
           preferences: {
             ...preferences,
-            notifications: { ...notifications, push: false },
+            notifications: {
+              ...notifications,
+              push: remainingSubscriptions > 0,
+            },
           },
         },
       });
-      if (endpoint) {
-        await tx.pushSubscription.deleteMany({ where: { userId, endpoint } });
-      }
     });
   }
 
