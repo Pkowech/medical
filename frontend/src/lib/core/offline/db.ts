@@ -199,10 +199,17 @@ interface MedicalEducationDB extends DBSchema {
     value: OfflineStudySession;
     indexes: { 'by-user': string };
   };
+  syncMeta: {
+    key: string;
+    value: {
+      key: string;
+      lastSyncTimestamp: number;
+    };
+  };
 }
 
 const DB_NAME = 'medical-education-db';
-const DB_VERSION = 8;
+const DB_VERSION = 9;
 let databasePromise: Promise<IDBPDatabase<MedicalEducationDB>> | undefined;
 
 export function initDB(): Promise<IDBPDatabase<MedicalEducationDB>> {
@@ -278,6 +285,10 @@ export function initDB(): Promise<IDBPDatabase<MedicalEducationDB>> {
       if (!db.objectStoreNames.contains('offlineStudySessions')) {
         const studySessions = db.createObjectStore('offlineStudySessions', { keyPath: 'id' });
         studySessions.createIndex('by-user', 'userId');
+      }
+
+      if (!db.objectStoreNames.contains('syncMeta')) {
+        db.createObjectStore('syncMeta', { keyPath: 'key' });
       }
     },
     blocked() {

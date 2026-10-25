@@ -60,37 +60,23 @@ const getPWACacheStrategies = () => [
     },
   },
   {
-    // Next.js App Router RSC payloads and page route data (_next/data or ?_rsc=)
+    // Authenticated App Router documents and RSC payloads must not land in Cache Storage.
     urlPattern: ({ url }) => {
       const isSameOrigin = self.origin === url.origin;
       if (!isSameOrigin) return false;
       return url.pathname.includes('/_next/data/') || url.searchParams.has('_rsc');
     },
-    handler: 'NetworkFirst',
-    options: {
-      cacheName: 'medtrack-rsc-v1',
-      expiration: {
-        maxEntries: 200,
-        maxAgeSeconds: 7 * 24 * 60 * 60,
-      },
-      networkTimeoutSeconds: 3,
-    },
+    handler: 'NetworkOnly',
+    options: {},
   },
   {
-    // Enable offline page navigation: NetworkFirst falls back to cached page when offline
+    // Uncached navigations fall back to public/offline.html via next-pwa fallbacks.
     urlPattern: ({ request, url }) => {
       const isSameOrigin = self.origin === url.origin;
       return isSameOrigin && request.mode === 'navigate';
     },
-    handler: 'NetworkFirst',
-    options: {
-      cacheName: 'medtrack-pages-v1',
-      expiration: {
-        maxEntries: 100,
-        maxAgeSeconds: 7 * 24 * 60 * 60,
-      },
-      networkTimeoutSeconds: 3,
-    },
+    handler: 'NetworkOnly',
+    options: {},
   },
 ];
 
@@ -109,7 +95,7 @@ const initializePWA = () => {
       register: false,
       skipWaiting: false,
       clientsClaim: true,
-      cacheOnFrontEndNav: true,
+      cacheOnFrontEndNav: false,
       publicExcludes: [
         '!noprecache/**/*',
         '!pdfjs/**/*',

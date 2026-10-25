@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { requestPersistentStorage } from '@/lib/core/offline/requestPersistentStorage';
 
 const showUpdateBanner = process.env.NEXT_PUBLIC_ENABLE_APP_UPDATE_BANNER === 'true';
 
@@ -41,14 +42,10 @@ export function ServiceWorkerRegister() {
         // Check for updates in the background without blocking PWA startup
         void registration.update().catch(() => {});
 
-        // Request persistent storage from the OS to prevent eviction of offline materials
-        if (navigator.storage && navigator.storage.persist) {
-          void navigator.storage.persist().then(persisted => {
-            if (persisted) {
-              console.log('[PWA] Storage persistence granted by OS.');
-            }
-          }).catch(() => {});
-        }
+        // Best-effort persist without a gesture; InstallAppButton also requests on click.
+        void requestPersistentStorage().then(persisted => {
+          if (persisted) console.log('[PWA] Storage persistence granted by OS.');
+        });
       } catch (error) {
         console.error('[PWA] Service worker registration/update failed:', error);
       }

@@ -9,15 +9,6 @@ class SyncManager {
     await syncService.syncOutbox();
   }
 
-  async queueQuizSubmission(quizData: unknown): Promise<void> {
-    await syncService.addToOutbox(
-      '/quizzes/submit?type=full',
-      'POST',
-      { ...(quizData as Record<string, unknown>), syncedAt: new Date().toISOString() },
-      { 'Content-Type': 'application/json' },
-    );
-  }
-
   async queueProgressLog(progressData: unknown): Promise<void> {
     await syncService.addToOutbox(
       '/progress/sync',

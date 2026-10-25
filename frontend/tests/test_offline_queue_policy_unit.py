@@ -15,7 +15,17 @@ for (const url of [
 ]) assert.equal(isOfflineQueueableRequest('POST', url), true);
 
 assert.equal(isOfflineQueueableRequest('POST', '/quizzes/topic/topic-1/submit'), false);
+assert.equal(isOfflineQueueableRequest('POST', '/quizzes/submit'), false);
+assert.equal(isOfflineQueueableRequest('POST', '/quizzes/submit?type=full'), false);
 assert.equal(isOfflineQueueableRequest('GET', '/quizzes/topic/topic-1/offline-attempts'), false);
+
+for (const url of [
+  '/progress/sync',
+  '/progress/log',
+  '/progress/statements',
+  '/learning/progress',
+  '/progress/materials/mat-1/read',
+]) assert.equal(isOfflineQueueableRequest('POST', url), true);
 
 for (const url of [
   '/study/session/session-1/end',
@@ -43,5 +53,34 @@ assert.equal(getSyncRetryDelay(1, '30'), 30000);
 const pastRetry = Date.parse('Sun, 06 Nov 1994 08:49:37 GMT');
 assert.equal(getSyncRetryDelay(1, 'Sun, 06 Nov 1994 08:49:37 GMT', pastRetry + 1000), 1000);
 assert.equal(getSyncRetryDelay(1, 'not a retry delay'), 5000);
+"""
+    )
+
+
+def test_connectivity_probe_and_shared_policy_reject_high_stakes_quiz_submit():
+    run_typescript(
+        r"""
+const assert = require('node:assert/strict');
+const {
+  canReachBackend,
+  isOfflineQueueableRequest,
+  resolveQueueRequest,
+} = require('./src/lib/core/offline/offlineQueueShared.js');
+
+assert.equal(isOfflineQueueableRequest('POST', '/quizzes/submit?type=full'), false);
+assert.throws(
+  () => resolveQueueRequest({ method: 'POST', url: '/quizzes/submit?type=full' }, 'http://localhost'),
+  /not safe to replay/
+);
+
+(async () => {
+  let probed = '';
+  const ok = await canReachBackend(async (url) => {
+    probed = String(url);
+    return { ok: true, status: 204 };
+  }, 'http://localhost:3000');
+  assert.equal(ok, true);
+  assert.match(probed, /\/api\/connectivity$/);
+})();
 """
     )

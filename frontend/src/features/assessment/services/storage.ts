@@ -123,6 +123,16 @@ class QuizStorage {
     }
     await tx.done;
   }
+
+  async clearUserData(userId: string): Promise<void> {
+    if (!this.db) await this.init();
+    const tx = this.db!.transaction(['quizState', 'quizResponses'], 'readwrite');
+    const states = await tx.objectStore('quizState').index('by-user').getAllKeys(userId);
+    for (const id of states) await tx.objectStore('quizState').delete(id);
+    const responses = await tx.objectStore('quizResponses').index('by-user').getAllKeys(userId);
+    for (const id of responses) await tx.objectStore('quizResponses').delete(id);
+    await tx.done;
+  }
 }
 
 export const quizStorage = new QuizStorage();

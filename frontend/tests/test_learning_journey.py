@@ -131,15 +131,16 @@ def test_quiz_submission_accepts_quiz_ids_and_resolves_published_unit_quizzes():
     assert "this.eventEmitter.emit('auto-quiz.completed'" in submit
 
 
-def test_quiz_submission_is_single_online_request_and_offline_queue_uses_real_route():
+def test_quiz_submission_is_online_only_and_does_not_queue_high_stakes_attempts():
     quiz_hook = read_frontend("src/shared/hooks/useQuiz.ts")
+    policy = read_frontend("src/lib/core/offline/offlineQueueShared.js")
 
     assert "'/quizzes/submit/${currentState.id}'" not in quiz_hook
-    assert quiz_hook.count("addToOutbox(") == 1
-    offline_branch = quiz_hook.split("if (isOffline) {", 1)[1].split("try {", 1)[0]
-    assert "addToOutbox" in offline_branch
-    assert "apiService.post" not in offline_branch
+    assert "addToOutbox" not in quiz_hook
+    assert "High-stakes assessments cannot be queued offline" in quiz_hook
     assert "'/quizzes/submit?type=full'" in quiz_hook
+    assert "'/quizzes/submit'" not in policy
+    assert "offline-attempts" in policy
 
 
 def test_quiz_completion_records_activity_and_calls_analytics():

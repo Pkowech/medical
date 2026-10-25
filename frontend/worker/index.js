@@ -1,5 +1,13 @@
+import {
+  LAST_SYNC_META_KEY,
+  canReachBackend,
+  getSyncRetryDelay,
+  resolveQueueRequest,
+} from '../src/lib/core/offline/offlineQueueShared.js';
+
 const OFFLINE_DB_NAME = 'medical-education-db';
 const SYNC_QUEUE_STORE = 'syncQueue';
+const PRIVATE_RUNTIME_CACHES = ['medtrack-rsc-v1', 'medtrack-pages-v1'];
 
 function requestResult(request) {
   return new Promise((resolve, reject) => {
@@ -28,51 +36,8 @@ function openOfflineDatabase() {
   });
 }
 
-function safeQueuePath(item) {
-  const url = new URL(item.url || '/progress/sync', self.location.origin);
-  let path = url.pathname.replace(/^\/api\/backend(?=\/|$)/, '').replace(/^\/v1(?=\/|$)/, '');
-  if (path === '/progress/log') path = '/progress/sync';
-
-  const method = String(item.method || 'POST').toUpperCase();
-  const allowedPostPaths = new Set([
-    '/progress/sync',
-    '/progress/log',
-    '/progress/statements',
-    '/learning/progress',
-    '/quizzes/submit',
-  ]);
-  const allowed =
-    (method === 'POST' &&
-      (allowedPostPaths.has(path) ||
-        /^\/quizzes\/topic\/[^/]+\/offline-attempts$/.test(path) ||
-        /^\/progress\/materials\/[^/]+\/read$/.test(path))) ||
-    (method === 'PUT' && /^\/study\/session\/[^/]+\/end$/.test(path));
-  if (!allowed) {
-    throw new Error(
-      'This action is not safe to replay automatically. Please perform it again while online.'
-    );
-  }
-
-  return {
-    method,
-    target: `/api/backend${path}${url.search}`,
-  };
-}
-
 function retryDelay(attempts, retryAfter) {
-  if (retryAfter) {
-    const seconds = Number(retryAfter);
-    const parsedDate = Date.parse(retryAfter);
-    const serverDelay = Number.isFinite(seconds)
-      ? seconds * 1000
-      : Number.isFinite(parsedDate)
-        ? parsedDate - Date.now()
-        : Number.NaN;
-    if (Number.isFinite(serverDelay)) {
-      return Math.min(60 * 60 * 1000, Math.max(1000, serverDelay));
-    }
-  }
-  return Math.min(5 * 60 * 1000, 5000 * 2 ** Math.min(Math.max(attempts - 1, 0), 10));
+  return getSyncRetryDelay(attempts, retryAfter);
 }
 
 async function acquireSyncLease(db) {
@@ -117,6 +82,17 @@ async function writeQueueItem(db, item) {
   const transaction = db.transaction(SYNC_QUEUE_STORE, 'readwrite');
   const complete = transactionComplete(transaction);
   transaction.objectStore(SYNC_QUEUE_STORE).put(item);
+  await complete;
+}
+
+async function recordLastSync(db) {
+  if (!db.objectStoreNames.contains('syncMeta')) return;
+  const transaction = db.transaction('syncMeta', 'readwrite');
+  const complete = transactionComplete(transaction);
+  transaction.objectStore('syncMeta').put({
+    key: LAST_SYNC_META_KEY,
+    lastSyncTimestamp: Date.now(),
+  });
   await complete;
 }
 
@@ -166,11 +142,11 @@ async function flushOutboxFromWorker(db, owner, onSynced) {
     let method;
     try {
       if (!item.url) {
-        item.url = item.type === 'quiz_submission' ? '/quizzes/submit?type=full' : '/progress/sync';
+        item.url = '/progress/sync';
         item.method = 'POST';
         item.body = item.data;
       }
-      ({ target, method } = safeQueuePath(item));
+      ({ target, method } = resolveQueueRequest(item, self.location.origin));
     } catch (error) {
       item.status = 'failed';
       item.lastError = error instanceof Error ? error.message : String(error);
@@ -242,6 +218,15 @@ async function flushOutboxFromWorker(db, owner, onSynced) {
         }
       }
       await removeQueueItem(db, item.id);
+      await recordLastSync(db);
+      syncedActivity = true;
+      onSynced();
+      continue;
+    }
+
+    if (response.status === 409) {
+      await removeQueueItem(db, item.id);
+      await recordLastSync(db);
       syncedActivity = true;
       onSynced();
       continue;
@@ -289,10 +274,25 @@ async function flushOutboxFromWorker(db, owner, onSynced) {
   return syncedActivity;
 }
 
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys().then(names =>
+      Promise.all(
+        names
+          .filter(name => PRIVATE_RUNTIME_CACHES.includes(name))
+          .map(name => caches.delete(name))
+      )
+    )
+  );
+});
+
 self.addEventListener('sync', event => {
   if (event.tag !== 'sync-outbox') return;
   event.waitUntil(
     (async () => {
+      const reachable = await canReachBackend(fetch, self.location.origin);
+      if (!reachable) return;
+
       const db = await openOfflineDatabase();
       if (!db.objectStoreNames.contains(SYNC_QUEUE_STORE)) {
         db.close();

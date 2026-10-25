@@ -117,11 +117,11 @@ student and does not share the file with classmates. Only course instructors
 and admins can share materials with an enrolled class.
 
 The production service worker caches versioned Next.js static assets and selected
-same-origin public image, icon, and font files. API routes, including `/api/auth`
-and `/api/backend`, are network-only so authenticated responses and mutations are
-not persisted in Cache Storage. On activation, the worker removes legacy runtime
-caches that may have stored API responses. If a navigation cannot be loaded while offline,
-the service worker serves `public/offline.html`.
+same-origin public image, icon, and font files. API routes, App Router documents,
+RSC payloads, and navigations are network-only so authenticated HTML and mutations
+are not persisted in Cache Storage. On activation, the worker deletes legacy
+`medtrack-rsc-v1` / `medtrack-pages-v1` caches if they still exist. If a navigation
+cannot be loaded while offline, the service worker serves `public/offline.html`.
 
 Students can explicitly download a topic's authorized PDF previews and practice
 quiz content from its topic page. These downloads are stored per user in the
@@ -146,20 +146,31 @@ returns. The server validates the submitted questions and options against the
 current topic, calculates the score, and stores the attempt idempotently.
 Validated offline attempts do not count toward mastery or unlocks. Temporary
 failures are retried, and failed attempts can be retried from Offline downloads.
-High-stakes assessments should be completed online.
+High-stakes unit quiz submissions (`/quizzes/submit`) are never queued offline.
 
-Signing out clears that user's local offline study cache, including unsynced
-practice attempts, to avoid leaving personal study data on a shared device.
-Browser storage is not a secure vault against someone with access to the device.
-Existing progress records in `medtrackhub-offline-progress` are copied to the
-unified queue during app startup, then removed from the legacy queue only after
-the copy succeeds.
+When a queueable mutation fails due to network or a transient server error, the
+API client stores it in the outbox and rejects with `OfflineQueuedError` so the
+UI does not treat the write as committed. Use `isOfflineQueuedError()` for
+queued toasts. Queue allowlist and retry backoff live in
+`src/lib/core/offline/offlineQueueShared.js` and are shared with the service
+worker.
+
+Signing out clears that user's local offline study cache
+(`medical-education-db`) and unit-quiz drafts (`medical-quiz-db`), including
+unsynced practice attempts, to avoid leaving personal study data on a shared
+device. Browser storage is not a secure vault against someone with access to the
+device. Existing progress records in `medtrackhub-offline-progress` are copied to
+the unified queue during app startup, then removed from the legacy queue only
+after the copy succeeds.
 
 The service worker is registered by the root application component. When a new
 worker is waiting, the app shows an update prompt when
 `NEXT_PUBLIC_ENABLE_APP_UPDATE_BANNER=true`; otherwise it activates automatically
 and reloads the open app. Browser Background Sync flushes the IndexedDB queue
-when available, with foreground online/visibility sync as the fallback.
+when available, with foreground online/visibility sync as the fallback. Flush
+probes `/api/connectivity` instead of trusting `navigator.onLine` alone, and
+persists the last successful sync time in IndexedDB. Install also requests
+persistent storage from the OS on the user gesture.
 
 Transient outbox failures remain queued and retry with exponential backoff (up
 to one hour when the server supplies `Retry-After`); permanent client errors

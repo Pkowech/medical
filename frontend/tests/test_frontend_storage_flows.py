@@ -138,30 +138,34 @@ def test_material_progress_does_not_queue_permanent_api_errors():
 
 
 def test_offline_replay_only_queues_allowlisted_learning_posts_not_admin_deletes():
-    policy = read_frontend("src/lib/core/offline/offlineQueuePolicy.ts")
+    policy = read_frontend("src/lib/core/offline/offlineQueueShared.js")
     api_client = read_frontend("src/features/auth/services/apiClient.ts")
     sync_service = read_frontend("src/lib/core/offline/syncService.ts")
-    worker_files = sorted((FRONTEND_ROOT / "public").glob("worker-*.js"))
-    assert worker_files
-    worker = worker_files[0].read_text(encoding="utf-8")
+    worker = read_frontend("worker/index.js")
+    quiz_storage = read_frontend("src/features/assessment/services/storage.ts")
+    offline_service = read_frontend("src/lib/core/offline/offlineService.ts")
 
-    assert "const normalizedMethod = method?.toUpperCase();" in policy
-    assert "if (normalizedMethod !== 'POST') return false;" in policy
+    assert "normalizedMethod !== 'POST'" in policy
     for route in (
         "'/progress/sync'",
         "'/progress/log'",
         "'/progress/statements'",
         "'/learning/progress'",
-        "'/quizzes/submit'",
     ):
         assert route in policy
+    assert "'/quizzes/submit'" not in policy
+    assert "offline-attempts" in policy
     assert "isOfflineQueueableRequest(" in api_client
-    assert "if (isQueueableRequest && isNetworkOrServerTemp)" in api_client
+    assert "OfflineQueuedError" in api_client
+    assert "status: 200" not in api_client.split("OFFLINE SYNC INTEGRATION START", 1)[1].split(
+        "OFFLINE SYNC INTEGRATION END", 1
+    )[0]
     assert "if (!isOfflineQueueableRequest(item.method, item.url))" in sync_service
     assert "if (item.status === 'failed' && isRetryableFailedItem(item))" in sync_service
-    assert "Please perform it again while online." in worker
-    assert '"/progress/sync"' in worker
-    assert '"/quizzes/submit"' in worker
+    assert "offlineQueueShared.js" in worker
+    assert "Please perform it again while online." in policy
+    assert "clearUserData" in quiz_storage
+    assert "quizStorage.clearUserData" in offline_service
 
 
 def test_admin_user_management_search_pagination_and_inline_delete_are_wired():
@@ -267,6 +271,8 @@ def test_pwa_caches_only_static_assets_and_public_resources():
     strategies = config.split("const getPWACacheStrategies = () => [", 1)[1].split(
         "\n];", 1
     )[0]
+    worker = read_frontend("worker/index.js")
+    manifest = read_frontend("public/manifest.json")
 
     assert "urlPattern: /^https?:\\/\\/[^/]+\\/api(?:\\/|$)/i" in strategies
     assert "handler: 'NetworkOnly'" in strategies
@@ -275,6 +281,17 @@ def test_pwa_caches_only_static_assets_and_public_resources():
     assert "handler: 'CacheFirst'" in strategies
     assert "maxEntries: 300" in strategies
     assert "maxEntries: 150" in strategies
+    assert "medtrack-rsc-v1" not in strategies or "NetworkOnly" in strategies
+    assert "request.mode === 'navigate'" in strategies
+    assert strategies.count("NetworkOnly") >= 3
+    assert "cacheOnFrontEndNav: false" in config
+    assert "medtrack-rsc-v1" in worker
+    assert "medtrack-pages-v1" in worker
+    assert '"orientation"' not in manifest
+    assert '"purpose": "maskable"' in manifest
+    assert "requestPersistentStorage" in read_frontend(
+        "src/core/app/components/layout/InstallAppButton.tsx"
+    )
 
 
 def test_offline_pwa_copy_matches_supported_downloads_and_storage():

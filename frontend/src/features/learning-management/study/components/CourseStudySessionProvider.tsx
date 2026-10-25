@@ -8,6 +8,7 @@ import { Textarea } from '@/shared/components/ui/textarea';
 import { useStudy } from '../hooks/useStudy';
 import { useAuthStore } from '@/features/auth/store/useAuthStore';
 import { offlineService } from '@/lib/core/offline/offlineService';
+import { isOfflineQueuedError } from '@/lib/core/offline/offlineQueuedError';
 import { syncService } from '@/lib/core/offline/syncService';
 import type { OfflineStudySession } from '@/lib/core/offline/db';
 import type {
@@ -381,6 +382,12 @@ export function CourseStudySessionProvider({ children }: { children: React.React
       await clearLocalSession();
       return ended;
     } catch (error) {
+      // apiClient may have already queued the end mutation; do not enqueue again.
+      if (isOfflineQueuedError(error)) {
+        await clearLocalSession();
+        toast.success('Session and notes saved on this device. They will sync when you are back online.');
+        return null;
+      }
       if (isNetworkUnavailable(error) && userId) {
         try {
           const finalSegmentSeconds = Math.max(

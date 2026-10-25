@@ -73,27 +73,6 @@ class OfflineService {
     return tx.store.get(hash);
   }
 
-  // Sync queue methods
-  async addToSyncQueue(item: Omit<SyncQueueItem, 'id' | 'attempts'>) {
-    const db = await this.initialize();
-    const tx = db.transaction('syncQueue', 'readwrite');
-    const syncItem: SyncQueueItem = {
-      ...item,
-      id: crypto.randomUUID(),
-      url:
-        item.type === 'quiz_submission'
-          ? '/api/backend/quizzes/submit?type=full'
-          : '/api/backend/progress/sync',
-      method: 'POST',
-      body: item.data,
-      createdAt: item.timestamp,
-      status: 'pending',
-      attempts: 0,
-    };
-    await tx.store.add(syncItem);
-    await tx.done;
-  }
-
   async getSyncQueueItems(): Promise<SyncQueueItem[]> {
     const db = await this.initialize();
     const tx = db.transaction('syncQueue', 'readonly');
@@ -105,17 +84,6 @@ class OfflineService {
     const db = await this.initialize();
     const tx = db.transaction('syncQueue', 'readwrite');
     await tx.store.delete(id);
-    await tx.done;
-  }
-
-  async incrementSyncAttempt(id: string) {
-    const db = await this.initialize();
-    const tx = db.transaction('syncQueue', 'readwrite');
-    const item = await tx.store.get(id);
-    if (item) {
-      item.attempts += 1;
-      await tx.store.put(item);
-    }
     await tx.done;
   }
 
@@ -394,6 +362,7 @@ class OfflineService {
       'offlineTopicMaterials',
       'offlineTopicQuizzes',
       'offlinePracticeAttempts',
+      'offlineStudySessions',
     ] as const;
     const tx = db.transaction([...userStores, 'syncQueue'], 'readwrite');
     for (const storeName of userStores) {
@@ -407,6 +376,12 @@ class OfflineService {
       if (item.userId === userId) await queue.delete(item.id);
     }
     await tx.done;
+    try {
+      const { quizStorage } = await import('@/features/assessment/services/storage');
+      await quizStorage.clearUserData(userId);
+    } catch (error) {
+      console.error('[OfflineCache] Could not clear local quiz drafts for this user:', error);
+    }
     if (this.getActiveOfflineUserId() === userId) {
       localStorage.removeItem(OFFLINE_USER_KEY);
     }

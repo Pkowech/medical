@@ -39,25 +39,28 @@ export function useConnectivity() {
         }
       });
 
-    // 1. Online/Offline Listeners
+    // 1. Online/Offline Listeners — probe via syncService (not navigator.onLine alone).
     const handleOnline = () => {
-      setIsOnline(true);
-      // Trigger sync when coming back online
-      void syncService.syncOutbox().catch(error => {
-        if (!disposed) {
-          setStatusError(error instanceof Error ? error.message : String(error));
-        }
-      });
+      void syncService
+        .syncOutbox()
+        .then(() => refreshStatus())
+        .catch(error => {
+          if (!disposed) {
+            setStatusError(error instanceof Error ? error.message : String(error));
+          }
+        });
     };
     const handleOffline = () => setIsOnline(false);
     const handleVisibilityChange = () => {
       if (document.visibilityState !== 'visible' || !navigator.onLine) return;
-      setIsOnline(true);
-      void syncService.syncOutbox().catch(error => {
-        if (!disposed) {
-          setStatusError(error instanceof Error ? error.message : String(error));
-        }
-      });
+      void syncService
+        .syncOutbox()
+        .then(() => refreshStatus())
+        .catch(error => {
+          if (!disposed) {
+            setStatusError(error instanceof Error ? error.message : String(error));
+          }
+        });
     };
 
     window.addEventListener('online', handleOnline);

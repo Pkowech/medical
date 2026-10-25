@@ -2,12 +2,17 @@ import { useAuthStore } from '@/features/auth/store/useAuthStore';
 import { getSession } from 'next-auth/react';
 import { initDB, SyncQueueItem } from './db';
 import { normalizeApiUrl } from './normalizeApiUrl';
-import { isOfflineQueueableRequest } from './offlineQueuePolicy';
-import { getSyncRetryDelay } from './syncRetryPolicy';
+import {
+  LAST_SYNC_META_KEY,
+  canReachBackend,
+  isOfflineQueueableRequest,
+  getSyncRetryDelay,
+} from './offlineQueueShared.js';
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 const SYNC_STORE_NAME = 'syncQueue' as const;
+const SYNC_META_STORE = 'syncMeta' as const;
 
 function isRetryableFailedItem(item: SyncQueueItem): boolean {
   if (!isOfflineQueueableRequest(item.method, item.url)) return false;
@@ -55,13 +60,21 @@ class SyncService {
     userId?: string,
     type?: SyncQueueItem['type']
   ): Promise<void> {
+    const normalizedUrl = this.normalizeUrl(url);
+    if (!isOfflineQueueableRequest(method, normalizedUrl)) {
+      throw new Error(
+        'This action is not safe to replay automatically. Please perform it again while online.'
+      );
+    }
+
     const now = Date.now();
     const db = await this.getDb();
+    const studySessionMatch = normalizedUrl.match(/\/study\/session\/([^/]+)\/end(?:\?|$)/);
     const item: SyncQueueItem = {
-      id: id || crypto.randomUUID(),
-      type,
+      id: id || studySessionMatch?.[1] || crypto.randomUUID(),
+      type: type || (studySessionMatch ? 'study_session_end' : undefined),
       userId,
-      url: this.normalizeUrl(url),
+      url: normalizedUrl,
       method,
       headers,
       body,
@@ -84,11 +97,22 @@ class SyncService {
         .catch(error => console.error('Background sync registration failed', error));
     }
 
-    // Auto-trigger sync if online (Seamless Sync)
+    // Auto-trigger sync when the browser reports online; syncOutbox probes reachability.
     if (typeof navigator !== 'undefined' && navigator.onLine) {
-      // We don't await this so the UI returns immediately
       this.syncOutbox().catch(err => console.error('Auto-sync failed:', err));
     }
+  }
+
+  private async recordLastSync(db: Awaited<ReturnType<typeof initDB>>): Promise<void> {
+    await db.put(SYNC_META_STORE, {
+      key: LAST_SYNC_META_KEY,
+      lastSyncTimestamp: Date.now(),
+    });
+  }
+
+  private async readLastSyncTimestamp(db: Awaited<ReturnType<typeof initDB>>): Promise<number> {
+    const meta = await db.get(SYNC_META_STORE, LAST_SYNC_META_KEY);
+    return meta?.lastSyncTimestamp ?? 0;
   }
 
   async getSyncStatus(): Promise<{
@@ -103,20 +127,26 @@ class SyncService {
     statusError?: string;
   }> {
     try {
-      const items = await this.getQueueItems();
+      const db = await this.getDb();
+      const items = await db.getAll(SYNC_STORE_NAME);
       const pendingItems = items.filter(item => item.status !== 'failed');
       const failedItems = items.filter(item => item.status === 'failed');
       const failedChanges = failedItems.length;
       const retryableFailedChanges = failedItems.filter(isRetryableFailedItem).length;
       const count = pendingItems.length;
+      const browserOnline = typeof navigator !== 'undefined' ? navigator.onLine : false;
+      const reachable =
+        typeof window !== 'undefined' && browserOnline
+          ? await canReachBackend(fetch, window.location.origin)
+          : false;
       return {
-        lastSyncTimestamp: Date.now(), // This should ideally come from actual last sync, but for now, current time
-        isOnline: typeof navigator !== 'undefined' ? navigator.onLine : false,
+        lastSyncTimestamp: await this.readLastSyncTimestamp(db),
+        isOnline: reachable,
         pendingChanges: count,
         failedChanges,
         retryableFailedChanges,
-        isFlushing: this.isFlushing, // Expose flush lock status
-        readyToSync: pendingItems.some(item => (item.nextAttemptAt ?? 0) <= Date.now()),
+        isFlushing: this.isFlushing,
+        readyToSync: reachable && pendingItems.some(item => (item.nextAttemptAt ?? 0) <= Date.now()),
         latestFailure: items
           .filter(item => item.lastError)
           .sort((a, b) => b.createdAt - a.createdAt)[0]?.lastError,
@@ -124,7 +154,7 @@ class SyncService {
     } catch (error) {
       console.warn('Failed to get sync status from IndexedDB. Connection may be closing.', error);
       return {
-        lastSyncTimestamp: Date.now(),
+        lastSyncTimestamp: 0,
         isOnline: typeof navigator !== 'undefined' ? navigator.onLine : false,
         pendingChanges: 0,
         failedChanges: 0,
@@ -149,6 +179,10 @@ class SyncService {
    */
   async syncOutbox(forceRetry = false): Promise<void> {
     if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+    if (typeof window !== 'undefined') {
+      const reachable = await canReachBackend(fetch, window.location.origin);
+      if (!reachable) return;
+    }
 
     // Prevent parallel flush executions (concurrency lock)
     if (this.isFlushing) {
@@ -220,10 +254,17 @@ class SyncService {
           await this.renewLease(db, lockOwner);
 
           if (!item.url) {
-            item.url =
-              item.type === 'quiz_submission'
-                ? '/api/backend/quizzes/submit?type=full'
-                : '/api/backend/progress/sync';
+            if (item.type === 'quiz_submission') {
+              await db.put(SYNC_STORE_NAME, {
+                ...item,
+                status: 'failed',
+                lastError:
+                  'High-stakes quiz submissions cannot be replayed offline. Please submit again while online.',
+                nextAttemptAt: undefined,
+              });
+              continue;
+            }
+            item.url = '/api/backend/progress/sync';
             item.method = 'POST';
             item.body = item.data;
           }
@@ -276,8 +317,8 @@ class SyncService {
             clearTimeout(timeout);
           }
 
-          if (response.ok) {
-            if (item.type === 'offline_practice_submission') {
+          if (response.ok || response.status === 409) {
+            if (response.ok && item.type === 'offline_practice_submission') {
               const receipt = (await response.clone().json()) as {
                 attemptId?: unknown;
                 score?: unknown;
@@ -301,9 +342,9 @@ class SyncService {
                 });
               }
             }
-            // Success: mark as synced and delete
-            // Using atomic operations to avoid transaction timeouts
+            // Success or server-newer conflict: dequeue and record last success.
             await db.delete(SYNC_STORE_NAME, item.id);
+            await this.recordLastSync(db);
             syncedActivity = true;
             console.warn(`✅ Synced item ${item.id} to ${item.url}`);
           } else if (response.status === 401) {

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Download, Share } from 'lucide-react';
+import { requestPersistentStorage } from '@/lib/core/offline/requestPersistentStorage';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -58,6 +59,11 @@ export function InstallAppButton({ compact = false }: { compact?: boolean }) {
   if (!installPrompt && !isIOSDevice) return null;
 
   const handleInstall = async () => {
+    // User gesture: best chance for the OS to grant persistent storage for offline materials.
+    void requestPersistentStorage().then(persisted => {
+      if (persisted) console.log('[PWA] Storage persistence granted by OS.');
+    });
+
     if (!installPrompt) {
       setShowIOSInstructions(true);
       return;

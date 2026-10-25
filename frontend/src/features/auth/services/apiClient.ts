@@ -4,6 +4,7 @@ import { ApiError, ApiResponse, RequestOptions } from '@/shared/types';
 import { errorService } from '@/app/services/error.service';
 import { useAuthStore } from '@/features/auth/store/useAuthStore';
 import { isOfflineQueueableRequest } from '@/lib/core/offline/offlineQueuePolicy';
+import { OfflineQueuedError } from '@/lib/core/offline/offlineQueuedError';
 
 // Enhanced error classification
 type ErrorType = 'network' | 'timeout' | 'auth' | 'validation' | 'server' | 'unknown';
@@ -164,7 +165,6 @@ class ApiService {
 
         if (isQueueableRequest && isNetworkOrServerTemp) {
           try {
-            // Lazy load syncService to separate imports slightly (optional but safe)
             const { syncService } = await import('@/lib/core/offline/syncService');
             const method = originalRequest.method?.toUpperCase();
             if (method !== 'POST' && method !== 'PUT') {
@@ -174,7 +174,6 @@ class ApiService {
               `[Offline] Queuing mutation: ${originalRequest.method} ${originalRequest.url}`
             );
 
-            // Queue request
             await syncService.addToOutbox(
               originalRequest.url || '',
               method,
@@ -183,25 +182,21 @@ class ApiService {
                   ? JSON.parse(originalRequest.data)
                   : originalRequest.data
                 : undefined,
-              originalRequest.headers as Record<string, string> // Includes Auth headers
+              originalRequest.headers as Record<string, string>
             );
 
-            // Return "Optimistic Success"
-            // The UI should handle this gracefully by checking for an 'offline' flag if needed
-            // or we just return a standard success structure.
-            return {
-              data: {
-                success: true,
-                message: 'Operation queued for offline sync',
-                offline: true, // Marker for UI
-                queuedAt: new Date().toISOString(),
-              },
-              status: 200,
-              statusText: 'OK (Offline Queued)',
-              headers: {},
-              config: originalRequest,
-            } as AxiosResponse;
+            // Reject so callers do not treat the mutation as committed. Use
+            // isOfflineQueuedError() when the UI should show a queued toast.
+            return Promise.reject(
+              new OfflineQueuedError(undefined, {
+                url: originalRequest.url,
+                method,
+              })
+            );
           } catch (queueError) {
+            if (queueError instanceof OfflineQueuedError) {
+              return Promise.reject(queueError);
+            }
             console.error('[Offline] Failed to queue request', queueError);
             // Fall through to normal error handling
           }

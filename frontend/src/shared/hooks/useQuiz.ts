@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { quizStorage } from '../../features/assessment/services/storage';
 import { v4 as uuidv4 } from 'uuid';
-import { syncService } from '@/lib/core/offline/syncService';
 import { apiService } from '@/features/auth/services/apiClient';
 
 interface QuizQuestion {
@@ -188,30 +187,27 @@ export function useQuiz(unitId: string, userId: string) {
       selectedOption,
     }));
 
-    // Keep the attempt locally until the server accepts it or it is queued offline.
+    // High-stakes unit quizzes must complete online; drafts stay local until then.
     const updatedState = {
       ...currentState,
       lastModified: new Date(),
       synced: false,
     };
     setCurrentState(updatedState);
+    await quizStorage.saveQuizState(updatedState);
+
+    if (isOffline) {
+      const offlineError = new Error(
+        'Connect to the internet to submit this quiz. High-stakes assessments cannot be queued offline.'
+      );
+      setError(offlineError);
+      throw offlineError;
+    }
 
     const submission = {
       unitId,
       answers: formattedAnswers,
     };
-
-    if (isOffline) {
-      await syncService.addToOutbox(
-        '/quizzes/submit?type=full',
-        'POST',
-        submission,
-        { 'X-Client-Timestamp': String(lastUpdated) },
-        lastUpdated,
-      );
-      await quizStorage.saveQuizState({ ...updatedState, synced: true });
-      return { queued: true, offline: true };
-    }
 
     try {
       const response = await apiService.post(
