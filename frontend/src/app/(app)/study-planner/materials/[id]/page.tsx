@@ -10,6 +10,7 @@ import materialService from '@/features/courses/services/materialService';
 import useMaterialProgressTracker from '@/features/learning-management/hooks/useMaterialProgressTracker';
 import PDFViewer from '@/shared/components/pdf/PDFViewer';
 import offlineSync from '@/features/learning-management/services/offlineProgressSync';
+import { isOfflineQueuedError } from '@/lib/core/offline/offlineQueuedError';
 import { apiService as api } from '@/features/auth/services/apiClient';
 import { Material } from '@/shared/types/materialInterface';
 import { useXapi } from '@/lib/xapi/useXapi';
@@ -189,6 +190,7 @@ export default function MaterialViewPage() {
           try {
             await api.post(`/materials/${material.id}/track/view`, { page: current });
           } catch (trackingError) {
+            if (isOfflineQueuedError(trackingError)) return;
             console.warn('[MaterialView] Page tracking failed; queueing offline update.', trackingError);
             await offlineSync.addToQueue({
               materialId: material.id,

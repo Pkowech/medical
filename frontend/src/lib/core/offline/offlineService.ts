@@ -1,15 +1,12 @@
 import {
   initDB,
   LocalFileMetadata,
-  QuizQuestion,
-  ReadingMaterial,
   OfflinePracticeAttempt,
   OfflineStudySession,
   OfflineQuizQuestion,
   OfflineTopicBundle,
   OfflineTopicMaterial,
   OfflineTopicQuiz,
-  SyncQueueItem,
 } from './db';
 import { syncService } from './syncService';
 
@@ -26,40 +23,6 @@ class OfflineService {
     return this.db;
   }
 
-  // Quiz caching methods
-  async cacheQuizQuestions(questions: QuizQuestion[]) {
-    const db = await this.initialize();
-    const tx = db.transaction('quizQuestions', 'readwrite');
-    const store = tx.objectStore('quizQuestions');
-
-    for (const question of questions) {
-      await store.put(question);
-    }
-
-    await tx.done;
-  }
-
-  async getQuizQuestionsByTopic(topic: string): Promise<QuizQuestion[]> {
-    const db = await this.initialize();
-    const tx = db.transaction('quizQuestions', 'readonly');
-    const index = tx.store.index('by-topic');
-    return index.getAll(topic);
-  }
-
-  // Reading material caching methods
-  async cacheReadingMaterial(material: ReadingMaterial) {
-    const db = await this.initialize();
-    const tx = db.transaction('readingMaterials', 'readwrite');
-    await tx.store.put(material);
-    await tx.done;
-  }
-
-  async getReadingMaterial(id: string): Promise<ReadingMaterial | undefined> {
-    const db = await this.initialize();
-    const tx = db.transaction('readingMaterials', 'readonly');
-    return tx.store.get(id);
-  }
-
   async saveLocalFileMetadata(metadata: LocalFileMetadata): Promise<void> {
     const db = await this.initialize();
     const tx = db.transaction('localFileMetadata', 'readwrite');
@@ -71,20 +34,6 @@ class OfflineService {
     const db = await this.initialize();
     const tx = db.transaction('localFileMetadata', 'readonly');
     return tx.store.get(hash);
-  }
-
-  async getSyncQueueItems(): Promise<SyncQueueItem[]> {
-    const db = await this.initialize();
-    const tx = db.transaction('syncQueue', 'readonly');
-    const index = tx.store.index('by-timestamp');
-    return index.getAll();
-  }
-
-  async removeFromSyncQueue(id: string) {
-    const db = await this.initialize();
-    const tx = db.transaction('syncQueue', 'readwrite');
-    await tx.store.delete(id);
-    await tx.done;
   }
 
   async saveOfflineStudySession(session: OfflineStudySession): Promise<void> {

@@ -1,12 +1,12 @@
 import { useAuthStore } from '@/features/auth/store/useAuthStore';
 import { getSession } from 'next-auth/react';
 import { initDB, SyncQueueItem } from './db';
-import { normalizeApiUrl } from './normalizeApiUrl';
 import {
   LAST_SYNC_META_KEY,
   canReachBackend,
-  isOfflineQueueableRequest,
   getSyncRetryDelay,
+  isOfflineQueueableRequest,
+  normalizeApiUrl,
 } from './offlineQueueShared.js';
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
@@ -485,92 +485,6 @@ class SyncService {
     }
     await tx.store.put({ ...lock, expiresAt: Date.now() + 90_000 });
     await tx.done;
-  }
-
-  // Lightweight progress helpers to support the frontend sync API used by the stores.
-  // These are intentionally permissive and return simple shapes so the frontend
-  // can call them even when an actual backend sync endpoint is not available.
-  async getProgress(userId: string): Promise<Record<string, unknown>[]> {
-    try {
-      // If there's a backend sync endpoint, prefer calling it when online.
-      if (typeof window !== 'undefined' && navigator.onLine) {
-        try {
-          const storeToken = useAuthStore.getState().user?.accessToken;
-          const session = !storeToken ? await getSession() : null;
-          const token = storeToken || session?.user?.accessToken;
-
-          const res = await fetch(
-            this.normalizeUrl(`/progress/sync?userId=${encodeURIComponent(userId)}`),
-            {
-              headers: {
-                ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                'Content-Type': 'application/json',
-              },
-            }
-          );
-          if (res.ok) return (await res.json()) || [];
-        } catch {
-          // ignore and fall through to local store fallback
-        }
-      }
-
-      // Fallback: return empty progress list (frontend will initialize local state)
-      return [];
-    } catch (error) {
-      console.error('syncService.getProgress error', error);
-      return [];
-    }
-  }
-
-  async saveProgress(progress: unknown, lastUpdated?: number): Promise<void> {
-    try {
-      // Queue the save operation in the outbox so it can be synced when online.
-      await this.addToOutbox(
-        '/progress/sync',
-        'POST',
-        progress,
-        {
-          'Content-Type': 'application/json',
-        },
-        lastUpdated
-      );
-    } catch (error) {
-      console.error('syncService.saveProgress error', error);
-    }
-  }
-
-  /**
-   * Get pending items with errors for UI debugging
-   */
-  async getFailedItems(): Promise<SyncQueueItem[]> {
-    const allItems = await this.getQueueItems();
-    return allItems.filter(item => item.status === 'failed');
-  }
-
-  /**
-   * Manually retry a failed item
-   */
-  async retryFailedItem(id: string): Promise<void> {
-    const db = await this.getDb();
-    const item = await db.get(SYNC_STORE_NAME, id);
-
-    if (item) {
-      if (!isRetryableFailedItem(item)) {
-        throw new Error(
-          'This failed action cannot be retried automatically. Please resolve the error or perform it again while online.'
-        );
-      }
-      await db.put(SYNC_STORE_NAME, {
-        ...item,
-        status: 'pending',
-        attempts: 0,
-        lastError: undefined,
-        nextAttemptAt: undefined,
-      });
-    }
-
-    // Trigger a new flush
-    await this.syncOutbox();
   }
 
   async retryAllFailedItems(): Promise<void> {

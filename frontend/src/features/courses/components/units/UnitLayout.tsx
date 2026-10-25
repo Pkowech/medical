@@ -37,6 +37,7 @@ import { Button } from '@/shared/components/ui/button';
 import { Dialog, DialogContent } from '@/shared/components/ui/dialog';
 import progressService from '@/features/learning-management/services/progressService';
 import offlineProgressSync from '@/features/learning-management/services/offlineProgressSync';
+import { isOfflineQueuedError } from '@/lib/core/offline/offlineQueuedError';
 import { toast } from 'sonner';
 import {
   StartCourseStudySessionButton,
@@ -272,6 +273,11 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
     try {
       await progressService.updateContentProgress(update);
     } catch (error) {
+      if (isOfflineQueuedError(error)) {
+        toggleLessonComplete(key);
+        toast.info('Topic progress saved offline and will sync when connected.');
+        return;
+      }
       console.error('Failed to update topic progress:', error);
       try {
         await offlineProgressSync.addToQueue({

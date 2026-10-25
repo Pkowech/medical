@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import progressService from '@/features/learning-management/services/progressService';
+import { isOfflineQueuedError } from '@/lib/core/offline/offlineQueuedError';
 import { useXapi } from '@/lib/xapi/useXapi';
 import { URLS } from '@/lib/urls';
 
@@ -92,8 +93,12 @@ export default function useMaterialProgressTracker(options: Options) {
             });
             progressSaved = true;
           } catch (err) {
-            console.error('Failed to send material progress', err);
-            toast.error('Material progress could not be saved.');
+            if (isOfflineQueuedError(err)) {
+              progressSaved = true;
+            } else {
+              console.error('Failed to send material progress', err);
+              toast.error('Material progress could not be saved.');
+            }
           }
           if (progressSaved) {
             lastReportedMinutesRef.current = elapsedMinutes;

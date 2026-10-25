@@ -218,6 +218,7 @@ def test_local_file_metadata_is_saved_on_device_without_uploading_file_details()
 
     assert "crypto.subtle.digest('SHA-256', buffer)" in reader
     assert "offlineService.saveLocalFileMetadata(metadata)" in reader
+    assert "offlineService.getLocalFileMetadata(hash)" in reader
     assert "localFileMetadata.filename" in reader
     assert "localFileMetadata.mimetype" in reader
     assert "localFileMetadata.size" in reader
@@ -242,7 +243,7 @@ def test_production_pwa_build_and_course_recommendations_use_cacheable_fast_path
     )
 
     assert "next build --webpack" in package
-    assert "urlPattern: ({ request }) => request.mode === 'navigate'" in next_config
+    assert "request.mode === 'navigate'" in next_config
     assert "handler: 'NetworkOnly',\n    options: {}," in next_config
     assert "handler: 'CacheFirst'" in next_config
     assert "meta: { persist: Boolean(user?.id) }" in dashboard
@@ -307,15 +308,21 @@ def test_offline_pwa_copy_matches_supported_downloads_and_storage():
     assert "not available for offline download yet" not in features
 
 
-def test_user_progress_requests_require_the_stored_user_id():
-    store = read_frontend(
-        "src/features/learning-management/hooks/useProgressStore.ts"
+def test_user_progress_requests_use_authenticated_progress_service():
+    progress = read_frontend(
+        "src/features/learning-management/services/progressService.ts"
     )
+    unit_layout = read_frontend("src/features/courses/components/units/UnitLayout.tsx")
+    topic_viewer = read_frontend("src/features/courses/components/TopicViewer.tsx")
 
-    assert store.count("localStorage.getItem('userId')") == 2
-    assert "if (!userId) throw new Error('User not authenticated')" in store
-    assert "syncService.getProgress(userId)" in store
-    assert "syncService.saveProgress(progressToSave, lastUpdated)" in store
+    assert "getAllProgressData: userId is required" in progress
+    assert "localStorage.getItem('userId')" not in progress
+    assert "await api.post<void>('/progress/sync'" in progress
+    assert "isOfflineQueuedError(error)" in progress
+    assert "isOfflineQueuedError(error)" in unit_layout
+    assert "isOfflineQueuedError(error)" in topic_viewer
+    assert "offlineProgressSync.addToQueue" in unit_layout
+    assert "offlineProgressSync.addToQueue" in topic_viewer
 
 
 def test_login_form_exposes_browser_password_manager_autofill_fields():

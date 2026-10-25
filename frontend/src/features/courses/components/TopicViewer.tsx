@@ -35,6 +35,7 @@ import { Badge } from '@/shared/components/ui/badge';
 import { toast } from 'sonner';
 import { Brain } from 'lucide-react';
 import { offlineService } from '@/lib/core/offline/offlineService';
+import { isOfflineQueuedError } from '@/lib/core/offline/offlineQueuedError';
 import type { OfflineQuizQuestion, OfflineTopicBundle } from '@/lib/core/offline/db';
 import {
   StartCourseStudySessionButton,
@@ -514,8 +515,12 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
           console.error('Could not refresh learning data after saving material progress:', error);
         }
       } catch (error) {
-        console.error('Error tracking material progress:', error);
-        toast.error('Material progress could not be saved.');
+        if (isOfflineQueuedError(error)) {
+          toast.info('Material progress saved offline and will sync when connected.');
+        } else {
+          console.error('Error tracking material progress:', error);
+          toast.error('Material progress could not be saved.');
+        }
       }
     }
     
@@ -541,6 +546,11 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
       markLessonComplete(topicId);
       toast.success('Topic marked as complete!');
     } catch (error) {
+      if (isOfflineQueuedError(error)) {
+        markLessonComplete(topicId);
+        toast.info('Topic completion saved offline and will sync when connected.');
+        return;
+      }
       console.error('Error saving topic completion:', error);
       try {
         await offlineProgressSync.addToQueue({

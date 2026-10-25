@@ -1,4 +1,5 @@
 import api from '../../auth/services/apiClient';
+import { isOfflineQueuedError } from '@/lib/core/offline/offlineQueuedError';
 import type {
   ProgressData,
   ProgressStats,
@@ -639,6 +640,7 @@ const progressService = {
         },
       });
     } catch (error) {
+      if (isOfflineQueuedError(error)) return;
       if (((error as { response?: { status?: number } })?.response?.status) === 409) {
         console.warn('Progress sync conflict: server has newer data.');
       }
@@ -762,6 +764,7 @@ const progressService = {
         },
       });
     } catch (error) {
+      if (isOfflineQueuedError(error)) return;
       // Handle 409 Conflict - server has newer data
       if (((error as { response?: { status?: number } })?.response?.status) === 409) {
         console.warn('Conflict detected in course sync: server has newer data');

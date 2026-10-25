@@ -1,5 +1,6 @@
 import { apiService } from '@/features/auth/services/apiClient';
 import { authService } from '@/features/auth/services/authService';
+import { isOfflineQueuedError } from '@/lib/core/offline/offlineQueuedError';
 import { XApiVerb } from './verbs';
 import { XApiObject, XApiResult, XApiContext, XApiStatement } from './types';
 
@@ -81,6 +82,8 @@ class XApiService {
         
         await apiService.post('/progress/statements', statement);
       } catch (error) {
+        if (isOfflineQueuedError(error)) continue;
+
         let errorMessage = 'Unknown error';
         if (error instanceof Error) {
           errorMessage = error.message;

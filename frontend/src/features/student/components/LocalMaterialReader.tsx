@@ -65,9 +65,11 @@ export function LocalMaterialReader() {
         size: file.size,
         hash,
       };
-      await offlineService.saveLocalFileMetadata(metadata);
+      const saved =
+        (await offlineService.getLocalFileMetadata(hash)) ??
+        (await offlineService.saveLocalFileMetadata(metadata).then(() => metadata));
       if (fileSelectionIdRef.current === fileSelectionId) {
-        setLocalFileMetadata(metadata);
+        setLocalFileMetadata(saved);
       }
     } catch (metadataSaveError) {
       console.error('Failed to save local file metadata on this device.', metadataSaveError);

@@ -6,6 +6,7 @@
 import { toast } from 'sonner';
 import progressService from '@/features/learning-management/services/progressService';
 import { learningPathService } from '@/features/learning-management/services/learningPathService';
+import { isOfflineQueuedError } from '@/lib/core/offline/offlineQueuedError';
 import type { QuizCompletionEvent } from '@/shared/types/assessmentInterface';
 
 class QuizProgressIntegrationService {
@@ -112,6 +113,7 @@ class QuizProgressIntegrationService {
         quizScores: { [event.topicId]: event.score },
       });
     } catch (error) {
+      if (isOfflineQueuedError(error)) return;
       console.error('Error syncing quiz to progress:', error);
       throw error;
     }
