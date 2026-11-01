@@ -12,6 +12,7 @@ import {
 import { Button } from '@/shared/components/ui/button';
 import {
   AlertCircle,
+  CheckCircle,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -41,6 +42,8 @@ interface MaterialPreviewModalProps {
   onNavigate?: (id: string) => void;
   inline?: boolean;
   topicId?: string;
+  unitId?: string;
+  courseId?: string;
   userId?: string;
   studySessionId?: string;
   fallbackMaterial?: Material;
@@ -54,6 +57,8 @@ export const MaterialPreviewModal = ({
   onNavigate,
   inline = false,
   topicId,
+  unitId,
+  courseId,
   userId,
   studySessionId,
   fallbackMaterial,
@@ -62,11 +67,14 @@ export const MaterialPreviewModal = ({
   const [isLoading, setIsLoading] = useState(false);
   const [pdfCurrentPage, setPdfCurrentPage] = useState<number>(1);
   const [pdfNumPages, setPdfNumPages] = useState<number | null>(null);
+  const [pdfPagesViewed, setPdfPagesViewed] = useState(0);
+  const [videoProgressPercent, setVideoProgressPercent] = useState(0);
   const [pdfContent, setPdfContent] = useState<Uint8Array | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [retryAttempt, setRetryAttempt] = useState(0);
   const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
   const trackedViewKeyRef = useRef<string | null>(null);
+  const viewedPdfPagesRef = useRef(new Set<number>());
   const hadInlineOpenRef = useRef(false);
   const previousHeaderRef = useRef<PageHeader | null>(null);
   const immersiveOwner = useId();
@@ -148,6 +156,9 @@ export const MaterialPreviewModal = ({
         setPreviewError(null);
         setPdfCurrentPage(1);
         setPdfNumPages(null);
+        viewedPdfPagesRef.current = new Set();
+        setPdfPagesViewed(0);
+        setVideoProgressPercent(0);
         const loadCachedPdf = async () => {
           if (!userId || !topicId) return false;
           const cached = await offlineService.getOfflineMaterial(userId, topicId, materialId);
@@ -233,24 +244,49 @@ export const MaterialPreviewModal = ({
     }, undefined, xapiContext);
   }, [isOpen, material, materialId, studySessionId, trackAction, XAPI_VERBS, xapiContext]);
 
+  const isVideo = material?.type?.toLowerCase().includes('video') ||
+    material?.contentType?.toLowerCase().includes('video') ||
+    material?.url?.includes('youtube.com') ||
+    material?.url?.includes('youtu.be');
   const computePercent = useCallback(() => {
-    if (material?.type === 'pdf' && pdfNumPages && pdfNumPages > 0) {
-      return Math.round((pdfCurrentPage / pdfNumPages) * 100);
+    const isPdf = material?.type?.toLowerCase() === 'pdf' ||
+      material?.contentType?.toLowerCase() === 'application/pdf' ||
+      material?.metadata?.driveMimeType?.toLowerCase() === 'application/pdf' ||
+      material?.file?.mimetype?.toLowerCase() === 'application/pdf' ||
+      material?.previewFile?.mimetype?.toLowerCase() === 'application/pdf';
+    if (isPdf && pdfNumPages && pdfNumPages > 0) {
+      return Math.min(99, Math.round((pdfPagesViewed / pdfNumPages) * 100));
     }
-    // For others, tracking might be simpler or handled by the component
+    if (isVideo) return Math.min(99, videoProgressPercent);
     return 0;
-  }, [material?.type, pdfNumPages, pdfCurrentPage]);
+  }, [
+    isVideo,
+    material?.contentType,
+    material?.file?.mimetype,
+    material?.metadata?.driveMimeType,
+    material?.previewFile?.mimetype,
+    material?.type,
+    pdfNumPages,
+    pdfPagesViewed,
+    topicId,
+    unitId,
+    videoProgressPercent,
+  ]);
 
-  const { startTracking, stopTracking } = useMaterialProgressTracker({
+  const { startTracking, stopTracking, markComplete, currentPercent } = useMaterialProgressTracker({
     materialId: material?.id,
-    topicId: material?.topicId,
-    unitId: material?.unitId ? String(material.unitId) : undefined,
-    courseId: material?.courseId,
+    topicId: material?.topicId ?? topicId,
+    unitId: material?.unitId ? String(material.unitId) : unitId,
+    courseId: material?.courseId ?? courseId,
     studySessionId,
     materialTitle: material?.title,
     computePercent,
     intervalMs: 120000,
   });
+  const closeMaterial = async () => {
+    await stopTracking();
+    onClose();
+  };
 
   useEffect(() => {
     if (material) {
@@ -261,7 +297,6 @@ export const MaterialPreviewModal = ({
     };
   }, [material, startTracking, stopTracking]);
 
-  const isVideo = material?.type?.toLowerCase().includes('video') || material?.contentType?.toLowerCase().includes('video') || material?.url?.includes('youtube.com') || material?.url?.includes('youtu.be');
   const materialIndex = materials.findIndex(item => String(item.id) === String(materialId));
   const navigateMaterial = (offset: number) => {
     const nextMaterial = materials[materialIndex + offset];
@@ -301,7 +336,7 @@ export const MaterialPreviewModal = ({
         </p>
         <div className="mt-5 flex flex-col justify-center gap-2 sm:flex-row">
           <Button type="button" onClick={retryPreview}>Try again</Button>
-          <Button type="button" variant="outline" onClick={onClose}>Back to topic</Button>
+          <Button type="button" variant="outline" onClick={() => void closeMaterial()}>Back to topic</Button>
         </div>
       </div>
     </div>
@@ -333,7 +368,13 @@ export const MaterialPreviewModal = ({
             className="aspect-video w-full max-w-full overflow-hidden rounded-md shadow-2xl"
             style={{ maxWidth: 'min(100%, calc((100dvh - 14rem) * 16 / 9))' }}
           >
-            <VideoPlayer url={resolvedEffectiveUrl} title={material.title} lessonId={material.id} theaterMode />
+            <VideoPlayer
+              url={resolvedEffectiveUrl}
+              title={material.title}
+              lessonId={material.id}
+              theaterMode
+              onProgress={setVideoProgressPercent}
+            />
           </div>
         </div>
       );
@@ -358,6 +399,10 @@ export const MaterialPreviewModal = ({
             onPageChange={(current, total) => {
               setPdfCurrentPage(current);
               setPdfNumPages(total);
+              if (!viewedPdfPagesRef.current.has(current)) {
+                viewedPdfPagesRef.current.add(current);
+                setPdfPagesViewed(viewedPdfPagesRef.current.size);
+              }
             }}
           />
         </div>
@@ -419,7 +464,7 @@ export const MaterialPreviewModal = ({
               type="button"
               variant="outline"
               size="sm"
-              onClick={onClose}
+              onClick={() => void closeMaterial()}
               title="Back to topic"
               aria-label="Back to topic"
               className="gap-2 border-border bg-card text-muted-foreground shadow-sm hover:bg-background dark:border-border dark:bg-card dark:text-muted-foreground dark:hover:bg-card"
@@ -451,9 +496,18 @@ export const MaterialPreviewModal = ({
           {renderContent()}
         </div>
         {!isLoading && material && (
-          <footer className="flex items-center justify-between gap-3 border-t bg-background p-3 text-xs text-muted-foreground dark:border-border dark:bg-card/30">
-            <span>{material.type?.toLowerCase() === 'pdf' && pdfNumPages ? `Page ${pdfCurrentPage} of ${pdfNumPages}` : material.description || 'Study activity is being tracked'}</span>
-            <span className="shrink-0 font-medium text-blue-600 dark:text-blue-400">Activity is being tracked</span>
+          <footer className="flex flex-wrap items-center justify-between gap-3 border-t bg-background p-3 text-xs text-muted-foreground dark:border-border dark:bg-card/30">
+            <span>{material.type?.toLowerCase() === 'pdf' && pdfNumPages ? `Page ${pdfCurrentPage} of ${pdfNumPages}` : 'Progress saves while you study. Closing does not mark this complete.'}</span>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => void markComplete()}
+              disabled={currentPercent >= 100}
+            >
+              <CheckCircle className="mr-1.5 h-4 w-4" />
+              {currentPercent >= 100 ? 'Completed' : 'Mark complete'}
+            </Button>
           </footer>
         )}
       </section>
@@ -461,7 +515,7 @@ export const MaterialPreviewModal = ({
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && void closeMaterial()}>
       <DialogContent
         showCloseButton={false}
         className={`fixed inset-0 left-0 top-0 right-0 bottom-0 z-[70] grid h-dvh max-h-dvh w-screen max-w-none translate-x-0 translate-y-0 ${
@@ -483,7 +537,7 @@ export const MaterialPreviewModal = ({
                 type="button"
                 variant="ghost"
                 size="icon"
-                onClick={onClose}
+                onClick={() => void closeMaterial()}
                 title="Back to topic"
                 aria-label="Back to topic"
               >
@@ -536,7 +590,7 @@ export const MaterialPreviewModal = ({
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={onClose}
+                onClick={() => void closeMaterial()}
                 title="Back to topic"
                 aria-label="Back to topic"
                 className="gap-2 border-border bg-card text-muted-foreground shadow-sm hover:bg-background dark:border-border dark:bg-card dark:text-muted-foreground dark:hover:bg-card"
@@ -607,7 +661,7 @@ export const MaterialPreviewModal = ({
         
         {/* Footer with basic info */}
         {!isHeaderCollapsed && !isLoading && material && (
-          <div className="flex items-center justify-between border-t bg-background p-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] text-[10px] text-muted-foreground dark:border-border dark:bg-card/30 sm:p-4 sm:text-xs">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t bg-background p-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] text-[10px] text-muted-foreground dark:border-border dark:bg-card/30 sm:p-4 sm:text-xs">
             <div className="flex items-center gap-4">
               <span>Added on {new Date(material.createdAt).toLocaleDateString()}</span>
               {material.difficulty && (
@@ -616,9 +670,16 @@ export const MaterialPreviewModal = ({
                 </span>
               )}
             </div>
-            <div className="font-medium text-blue-600 dark:text-blue-400">
-               Activity is being tracked
-            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => void markComplete()}
+              disabled={currentPercent >= 100}
+            >
+              <CheckCircle className="mr-1.5 h-4 w-4" />
+              {currentPercent >= 100 ? 'Completed' : 'Mark complete'}
+            </Button>
           </div>
         )}
       </DialogContent>

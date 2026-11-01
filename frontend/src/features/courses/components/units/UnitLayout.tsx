@@ -129,9 +129,11 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
   const openMaterial = (id: string) => {
     if (typedCurrentTopic?.id != null) {
       recordCourseActivity(
-        'reading',
+        'material_opened',
         courseId,
         activeSession?.topicId ?? String(typedCurrentTopic.id),
+        undefined,
+        id,
       );
     }
     setSidebarCollapsed(false);
@@ -219,9 +221,9 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
       setHeader({
         title: unitData.title,
         description: unitData.description || 'Unit content and materials',
+        canResumeStudySession: isTopicReading,
         presentation: isTopicReading ? 'compact' : 'metadata',
         actions: isTopicReading ? (
-          <>
             <Button
               type="button"
               size="icon"
@@ -242,16 +244,20 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
                 {activeCoursePanel === 'unit-quiz' ? 'Back to Unit' : 'Unit Quiz'}
               </span>
             </Button>
-          </>
         ) : undefined,
       });
     }
     return () => setHeader(null);
   }, [
     activeCoursePanel,
+    courseId,
+    hasSelectedTopic,
     recordCourseActivity,
+    selectedMaterialId,
     setHeader,
     toggleCoursePanel,
+    typedCurrentTopic?.id,
+    typedCurrentTopic?.title,
     unitData?.description,
     unitData?.title,
   ]);
@@ -262,7 +268,7 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
       String(typedCurrentTopic.id),
       typedCurrentTopic.title,
     );
-    return () => pauseCourseSession();
+    return () => pauseCourseSession('navigation');
   }, [
     courseId,
     ensureCourseSession,
@@ -600,6 +606,14 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
                 onClose={closeMaterial}
                 materials={allResources}
                 onNavigate={id => updateRouteQuery('materialId', id)}
+                unitId={unitId}
+                courseId={courseId}
+                topicId={
+                  typedCurrentTopic?.id == null
+                    ? undefined
+                    : String(typedCurrentTopic.id)
+                }
+                studySessionId={activeSession?.id}
                 inline
               />
             ) : activeCoursePanel === 'unit-quiz' ? (

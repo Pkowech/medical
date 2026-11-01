@@ -190,6 +190,7 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
   const { toggleBookmark, bookmarks, markLessonComplete, progress, notes, saveNote } =
     useCourseProgressStore();
   const {
+    activeSession,
     ensureCourseSession,
     pauseCourseSession,
     recordCourseActivity,
@@ -226,7 +227,7 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
   useEffect(() => {
     if (!topic || String(topic.id) !== topicId) return;
     void ensureCourseSession(courseId, topicId, topic.title);
-    return () => pauseCourseSession();
+    return () => pauseCourseSession('navigation');
   }, [courseId, ensureCourseSession, pauseCourseSession, topic, topicId]);
   const [materialsLoaded, setMaterialsLoaded] = useState(false);
   const [materialsMetadataComplete, setMaterialsMetadataComplete] = useState(true);
@@ -276,6 +277,7 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
           title: topicData.title || 'Topic',
           description: topicData.description || 'Learning material',
           icon: '📖',
+          canResumeStudySession: true,
           presentation: 'metadata',
         });
 
@@ -355,6 +357,7 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
                 title: bundle.title,
                 description: bundle.description || 'Learning material',
                 icon: '📖',
+                canResumeStudySession: true,
                 presentation: 'metadata',
               });
               return;
@@ -388,6 +391,7 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
     return () => {
       window.removeEventListener('online', updateOfflineStatus);
       window.removeEventListener('offline', updateOfflineStatus);
+      setHeader(null);
     };
   }, [courseId, unitId, topicId, setHeader, session?.user?.id]);
 
@@ -508,7 +512,7 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
   const offlinePdfCount = materials.filter(isPdfMaterial).length;
 
   const handleOpenMaterial = (materialId: string) => {
-    recordCourseActivity('reading', courseId, topicId);
+    recordCourseActivity('material_opened', courseId, topicId, undefined, materialId);
     setSelectedMaterialId(materialId);
     setShowMaterialModal(true);
   };
@@ -522,33 +526,12 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
         console.error('[OfflineCache] Could not refresh the saved-topic status:', error);
       }
     }
-    
-    // Track material as viewed
-    if (selectedMaterialId) {
-      try {
-        await progressService.updateContentProgress({
-          courseId,
-          unitId,
-          topicId,
-          materialId: selectedMaterialId,
-          status: 'completed',
-          progressPercentage: 100,
-        });
-        try {
-          await refreshLearningCaches();
-        } catch (error) {
-          console.error('Could not refresh learning data after saving material progress:', error);
-        }
-      } catch (error) {
-        if (isOfflineQueuedError(error)) {
-          toast.info('Material progress saved offline and will sync when connected.');
-        } else {
-          console.error('Error tracking material progress:', error);
-          toast.error('Material progress could not be saved.');
-        }
-      }
+    try {
+      await refreshLearningCaches();
+    } catch (error) {
+      console.error('Could not refresh learning data after material progress changed:', error);
     }
-    
+
     setSelectedMaterialId(null);
   };
 
@@ -943,7 +926,10 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
       <MaterialPreviewModal
         materialId={selectedMaterialId}
         topicId={topicId}
+        unitId={unitId}
+        courseId={courseId}
         userId={offlineUserId}
+        studySessionId={activeSession?.id}
         fallbackMaterial={materials.find(material => material.id === selectedMaterialId)}
         isOpen={showMaterialModal}
         onClose={handleCloseMaterial}

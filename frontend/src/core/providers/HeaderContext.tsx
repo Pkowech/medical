@@ -14,6 +14,7 @@ export interface PageHeader {
   description?: string;
   icon?: React.ReactNode;
   actions?: React.ReactNode;
+  canResumeStudySession?: boolean;
   presentation?: 'header' | 'metadata' | 'compact';
 }
 

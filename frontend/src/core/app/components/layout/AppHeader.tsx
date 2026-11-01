@@ -83,7 +83,7 @@ export const AppHeader: React.FC<{ showDesktopSidebarToggle?: boolean }> = ({
             </div>
           )}
           <div className="ml-auto flex shrink-0 items-center gap-1">
-            <CourseStudySessionIndicator />
+            <CourseStudySessionIndicator canResume={header?.canResumeStudySession} />
             {header?.actions}
           </div>
         </div>

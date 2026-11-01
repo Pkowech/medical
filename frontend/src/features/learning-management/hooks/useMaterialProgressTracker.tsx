@@ -28,32 +28,36 @@ export default function useMaterialProgressTracker(options: Options) {
     intervalMs = 60000,
   } = options;
   const [isTracking, setIsTracking] = useState(false);
-  const timeStartedRef = useRef<number | null>(null);
   const intervalRef = useRef<number | null>(null);
   const isTrackingRef = useRef(false);
   const computePercentRef = useRef(computePercent);
   computePercentRef.current = computePercent;
   const lastPercentRef = useRef<number>(0);
   const lastSyncTimeRef = useRef<number>(0);
+  const activeElapsedMsRef = useRef(0);
+  const lastTickAtRef = useRef<number | null>(null);
   const lastReportedMinutesRef = useRef(0);
   const sendInFlightRef = useRef<Promise<void> | null>(null);
+  const isCompletedRef = useRef(false);
+  const isCompletingRef = useRef(false);
   const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
   const [currentPercent, setCurrentPercent] = useState<number>(0);
 
   const { trackAction, XAPI_VERBS } = useXapi();
-  const materialTitleFetched = useRef<string | null>(null);
 
-  // Fetch material title for xAPI if not provided
   useEffect(() => {
-    if (materialId && !materialTitleFetched.current) {
-      // We don't have the title here easily, but we can assume the caller might provide it
-      // or we can fetch it once. For now, we'll rely on the caller or use a generic title.
-    }
-  }, [materialId]);
+    const resetActiveClock = () => {
+      lastTickAtRef.current = document.visibilityState === 'visible'
+        ? Date.now()
+        : null;
+    };
+    document.addEventListener('visibilitychange', resetActiveClock);
+    return () => document.removeEventListener('visibilitychange', resetActiveClock);
+  }, []);
 
   // Internal helper to send progress
   const sendProgress = useCallback(
-    async (percent: number, elapsedMinutes: number, force = false) => {
+    async (percent: number, elapsedMinutes: number, force = false): Promise<boolean> => {
       while (sendInFlightRef.current) {
         await sendInFlightRef.current;
       }
@@ -65,10 +69,10 @@ export default function useMaterialProgressTracker(options: Options) {
         lastPercentRef.current >= 100 &&
         elapsedMinutes <= lastReportedMinutesRef.current
       ) {
-        return;
+        return true;
       }
       if (!force && now - lastSyncTimeRef.current < 15000 && percent < 100) {
-        return;
+        return true;
       }
       let finishSend!: () => void;
       const sendPromise = new Promise<void>(resolve => {
@@ -77,7 +81,9 @@ export default function useMaterialProgressTracker(options: Options) {
       sendInFlightRef.current = sendPromise;
       try {
         lastSyncTimeRef.current = now;
-        const unreportedMinutes = Math.max(0, elapsedMinutes - lastReportedMinutesRef.current);
+        const unreportedMinutes = studySessionId
+          ? 0
+          : Math.max(0, elapsedMinutes - lastReportedMinutesRef.current);
         let progressSaved = !(materialId || topicId);
 
         if (materialId || topicId) {
@@ -122,8 +128,10 @@ export default function useMaterialProgressTracker(options: Options) {
               },
               {
                 completion: percent >= 100,
-                score: { scaled: percent / 100 },
                 duration: `PT${unreportedMinutes}M`,
+                extensions: {
+                  'http://id.tincanapi.com/extension/progress': percent,
+                },
               },
               {
                 extensions: {
@@ -138,6 +146,7 @@ export default function useMaterialProgressTracker(options: Options) {
             console.error('Failed to track material progress in xAPI', err);
           }
         }
+        return progressSaved;
       } finally {
         sendInFlightRef.current = null;
         finishSend();
@@ -156,17 +165,18 @@ export default function useMaterialProgressTracker(options: Options) {
         console.warn('computePercent callback failed', err);
       }
     }
-    // fallback: increment gently based on time elapsed
-    const start = timeStartedRef.current || Date.now();
-    const minutes = Math.max(0, (Date.now() - start) / 60000);
-    const estimate = Math.min(100, Math.round((minutes / 10) * 100));
-    return estimate; // assumes 10 minutes ~ 100% heuristic
+    return 0;
   }, []);
 
   const startTracking = useCallback(() => {
     if (isTrackingRef.current) return;
     isTrackingRef.current = true;
-    timeStartedRef.current = Date.now();
+    isCompletedRef.current = false;
+    isCompletingRef.current = false;
+    activeElapsedMsRef.current = 0;
+    lastTickAtRef.current = document.visibilityState === 'visible'
+      ? Date.now()
+      : null;
     setIsTracking(true);
 
     // Initial state
@@ -179,15 +189,21 @@ export default function useMaterialProgressTracker(options: Options) {
 
     // Repeating updates (every 1s for UI smoothness, but sync happens less frequently)
     intervalRef.current = window.setInterval(async () => {
+      const tickAt = Date.now();
+      const previousTickAt = lastTickAtRef.current;
+      lastTickAtRef.current = tickAt;
+      if (previousTickAt !== null && document.visibilityState === 'visible') {
+        activeElapsedMsRef.current += Math.min(tickAt - previousTickAt, 5000);
+      }
+
       const p = computeCurrentPercent();
-      const now = Date.now();
-      const elapsedMilli = now - (timeStartedRef.current || now);
-      const elapsedMin = Math.max(0, Math.floor(elapsedMilli / 60000));
+      const elapsedMin = Math.floor(activeElapsedMsRef.current / 60000);
 
       setCurrentPercent(p);
-      setElapsedSeconds(Math.max(0, Math.floor(elapsedMilli / 1000)));
+      setElapsedSeconds(Math.floor(activeElapsedMsRef.current / 1000));
+      if (isCompletedRef.current || isCompletingRef.current) return;
 
-      // Trigger server sync if 100% reached or significant delta (10%) OR interval elapsed
+      const now = Date.now();
       const isNewlyCompleted = p === 100 && lastPercentRef.current < 100;
       const isSignificantDelta = Math.abs(p - lastPercentRef.current) >= 10;
       const isTimeForSync = now - lastSyncTimeRef.current >= intervalMs;
@@ -212,16 +228,31 @@ export default function useMaterialProgressTracker(options: Options) {
       window.clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
-    const elapsedMin = Math.max(
-      0,
-      Math.round((Date.now() - (timeStartedRef.current || Date.now())) / 60000)
-    );
-    const p = computeCurrentPercent();
-    await sendProgress(p >= 100 ? 100 : p, elapsedMin, true);
+    if (lastTickAtRef.current !== null && document.visibilityState === 'visible') {
+      activeElapsedMsRef.current += Math.min(Date.now() - lastTickAtRef.current, 5000);
+    }
+    lastTickAtRef.current = null;
+    const elapsedMin = Math.floor(activeElapsedMsRef.current / 60000);
+    const p = isCompletedRef.current ? 100 : computeCurrentPercent();
+    await sendProgress(p, elapsedMin, true);
     setIsTracking(false);
-    timeStartedRef.current = null;
     setElapsedSeconds(0);
   }, [computeCurrentPercent, sendProgress]);
+
+  const markComplete = useCallback(async () => {
+    if (!materialId) return;
+    if (isCompletedRef.current || isCompletingRef.current) return;
+    isCompletingRef.current = true;
+    const elapsedMin = Math.floor(activeElapsedMsRef.current / 60000);
+    try {
+      if (await sendProgress(100, elapsedMin, true)) {
+        isCompletedRef.current = true;
+        setCurrentPercent(100);
+      }
+    } finally {
+      isCompletingRef.current = false;
+    }
+  }, [materialId, sendProgress]);
 
   // Flush the final unreported duration when the reader unmounts.
   useEffect(() => {
@@ -234,6 +265,7 @@ export default function useMaterialProgressTracker(options: Options) {
     isTracking,
     startTracking,
     stopTracking,
+    markComplete,
     computeCurrentPercent,
     elapsedSeconds,
     currentPercent,

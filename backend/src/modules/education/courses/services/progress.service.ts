@@ -200,6 +200,12 @@ export class ProgressService {
         timeSpent,
         clientTimestamp,
       } = updateDto;
+      const progressValue = Number.isFinite(progressPercentage)
+        ? Math.max(0, Math.min(100, Math.floor(progressPercentage ?? 0)))
+        : 0;
+      const timeSpentDelta = Number.isFinite(timeSpent)
+        ? Math.max(0, Math.min(1440, Math.floor(timeSpent ?? 0)))
+        : 0;
 
       if (materialId) {
         await this.authorizeMaterialProgress(userId, materialId, {
@@ -254,11 +260,27 @@ export class ProgressService {
             const currentTimestamp = clientTimestamp ?? BigInt(now.getTime());
 
             if (existing) {
+              const preserveCompletion =
+                existing.isCompleted && status !== ProgressStatus.notStarted;
+              const materialCompleted = isCompleted || preserveCompletion;
+              const materialProgressPercentage = materialCompleted
+                ? 100
+                : status === ProgressStatus.notStarted
+                  ? 0
+                  : Math.max(existing.progressPercentage, progressValue);
               await tx.progress.update({
                 where: { id: existing.id },
                 data: {
-                  isCompleted,
-                  completedAt: isCompleted ? now : null,
+                  isCompleted: materialCompleted,
+                  completedAt: materialCompleted
+                    ? existing.completedAt ?? now
+                    : null,
+                  status: materialCompleted
+                    ? ProgressStatus.completed
+                    : status ?? ProgressStatus.inProgress,
+                  progressPercentage: materialProgressPercentage,
+                  completionPercentage: materialProgressPercentage,
+                  lastAccessedAt: now,
                   lastUpdated: currentTimestamp,
                 },
               });
@@ -268,7 +290,11 @@ export class ProgressService {
                   userId,
                   materialId,
                   isCompleted,
-                  completedAt: isCompleted ? new Date() : undefined,
+                  completedAt: isCompleted ? now : undefined,
+                  status: status ?? ProgressStatus.inProgress,
+                  progressPercentage: isCompleted ? 100 : progressValue,
+                  completionPercentage: isCompleted ? 100 : progressValue,
+                  lastAccessedAt: now,
                   lastUpdated: currentTimestamp,
                 },
               });
@@ -345,15 +371,29 @@ export class ProgressService {
           // update()/upsert().update — passing it to create() throws a
           // PrismaClientValidationError ("Expected Int, provided Object"),
           // since create() has no existing row to increment from.
+          const preserveCompletion =
+            Boolean(existingProgress?.isCompleted) &&
+            status !== ProgressStatus.notStarted;
+          const isCompleted =
+            status === ProgressStatus.completed || preserveCompletion;
+          const effectiveStatus = isCompleted
+            ? ProgressStatus.completed
+            : status ?? ProgressStatus.inProgress;
+          const effectiveProgressPercentage = isCompleted
+            ? 100
+            : status === ProgressStatus.notStarted
+              ? 0
+              : Math.max(existingProgress?.progressPercentage ?? 0, progressValue);
           const baseData = {
-            progressPercentage: progressPercentage ?? 0,
+            progressPercentage: effectiveProgressPercentage,
+            completionPercentage: effectiveProgressPercentage,
+            isCompleted,
             lastAccessedAt: now,
             lastUpdated: currentTimestamp,
-            status:
-              status === ProgressStatus.completed
-                ? ProgressStatus.completed
-                : ProgressStatus.inProgress,
-            completedAt: status === ProgressStatus.completed ? now : null,
+            status: effectiveStatus,
+            completedAt: isCompleted
+              ? existingProgress?.completedAt ?? now
+              : null,
           };
 
           if (existingProgress) {
@@ -361,7 +401,7 @@ export class ProgressService {
               where: { id: existingProgress.id },
               data: {
                 ...baseData,
-                timeSpent: { increment: timeSpent ?? 0 },
+                timeSpent: { increment: timeSpentDelta },
               },
             });
           } else {
@@ -373,7 +413,7 @@ export class ProgressService {
                 unitId: unitId ?? null,
                 courseId: courseId ?? null,
                 ...baseData,
-                timeSpent: timeSpent ?? 0,
+                timeSpent: timeSpentDelta,
               },
             });
           }
@@ -409,15 +449,15 @@ export class ProgressService {
           data: {
             userId,
             type: UserActivityType.LEARNING,
-            description: `Studied ${materialId ? 'material' : unitId ? 'unit' : topicId ? 'topic' : 'course'}: ${timeSpent ?? 0} minutes`,
+            description: `Studied ${materialId ? 'material' : unitId ? 'unit' : topicId ? 'topic' : 'course'}: ${timeSpentDelta} minutes`,
             details: {
               courseId,
               unitId,
               materialId,
               topicId,
-              timeSpent,
-              studyTimeDeltaMinutes: timeSpent ?? 0,
-              progressPercentage,
+              timeSpent: timeSpentDelta,
+              studyTimeDeltaMinutes: timeSpentDelta,
+              progressPercentage: progressValue,
             },
           },
         });
@@ -437,7 +477,7 @@ export class ProgressService {
           updatedCourseProgress.progressPercentage;
         const progressData = {
           progressPercentage: courseProgressPercentage,
-          timeSpentMinutes: timeSpent ?? 0,
+          timeSpentMinutes: timeSpentDelta,
           status: updatedCourseProgress.status,
           completed: updatedCourseProgress.status === ProgressStatus.completed,
           timestamp: new Date(),

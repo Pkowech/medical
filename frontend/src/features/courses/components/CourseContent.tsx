@@ -6,8 +6,8 @@ import {
   Bookmark,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   EyeOff,
-  AlertCircle,
   PlayCircle,
   XCircle,
 } from 'lucide-react';
@@ -38,6 +38,7 @@ export const CourseContent = ({
 }: CourseContentProps) => {
   const { trackAction, XAPI_VERBS } = useXapi();
   const lastLessonId = useRef<string | number | null>(null);
+  const durationLabel = formatStudyDuration(lesson?.duration);
 
   // Track Unit Initialization
   useEffect(() => {
@@ -81,57 +82,54 @@ export const CourseContent = ({
   }
 
   return (
-    <div className="bg-card/80 dark:bg-card/50 backdrop-blur-sm rounded-lg p-6 shadow-sm border border-border dark:border-border/50">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-2xl font-bold text-foreground dark:text-foreground">{lesson.title}</h2>
-        <div className="flex shrink-0 items-center gap-2">
-          <button
-            type="button"
-            onClick={() => toggleBookmark(lessonKey)}
-            aria-label={bookmarks.has(lessonKey) ? `Remove bookmark for ${lesson.title}` : `Bookmark ${lesson.title} for later`}
-            aria-pressed={bookmarks.has(lessonKey)}
-            className={`p-2 rounded-lg transition-colors ${
-              bookmarks.has(lessonKey)
-                ? 'bg-yellow-100 dark:bg-yellow-500/20 text-yellow-600 dark:text-yellow-400'
-                : 'bg-muted dark:bg-secondary text-muted-foreground dark:text-muted-foreground hover:bg-secondary dark:hover:bg-secondary'
-            }`}
-            title={bookmarks.has(lessonKey) ? 'Remove bookmark' : 'Bookmark for later'}
-          >
-            <Bookmark className={`w-5 h-5 ${bookmarks.has(lessonKey) ? 'fill-current' : ''}`} />
-          </button>
-          <button
-            type="button"
-            onClick={() => toggleLessonComplete(lessonKey)}
-            aria-label={progress[lessonKey] ? `Clear studied status for ${lesson.title}` : `Mark ${lesson.title} as studied`}
-            aria-pressed={Boolean(progress[lessonKey])}
-            className={`p-2 rounded-lg transition-colors ${
-              progress[lessonKey]
-                ? 'bg-green-100 dark:bg-green-500/20 text-green-600 dark:text-green-400'
-                : 'bg-muted dark:bg-secondary text-muted-foreground dark:text-muted-foreground hover:bg-secondary dark:hover:bg-secondary'
-            }`}
-            title={progress[lessonKey] ? 'Clear studied status' : 'Mark as studied'}
-          >
-            <CheckCircle className="w-5 h-5" />
-          </button>
-        </div>
+    <div className="bg-card/80 dark:bg-card/50 backdrop-blur-sm rounded-lg p-5 shadow-sm border border-border dark:border-border/50 sm:p-6">
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <h2 className="min-w-0 text-2xl font-bold leading-tight text-foreground dark:text-foreground">
+          {lesson.title}
+        </h2>
+        <details className="group relative shrink-0">
+          <summary className="flex h-9 cursor-pointer list-none items-center rounded-md border border-border px-3 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground marker:hidden">
+            Topic actions
+          </summary>
+          <div className="absolute right-0 top-full z-30 mt-2 grid min-w-48 gap-1 rounded-lg border border-border bg-card p-1.5 shadow-lg">
+            <button
+              type="button"
+              onClick={() => toggleBookmark(lessonKey)}
+              aria-pressed={bookmarks.has(lessonKey)}
+              className="flex items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-foreground hover:bg-muted"
+            >
+              <Bookmark className={`h-4 w-4 ${bookmarks.has(lessonKey) ? 'fill-current text-yellow-600' : ''}`} />
+              {bookmarks.has(lessonKey) ? 'Remove bookmark' : 'Bookmark for later'}
+            </button>
+            <button
+              type="button"
+              onClick={() => toggleLessonComplete(lessonKey)}
+              aria-pressed={Boolean(progress[lessonKey])}
+              className="flex items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-foreground hover:bg-muted"
+            >
+              <CheckCircle className={`h-4 w-4 ${progress[lessonKey] ? 'text-green-600' : ''}`} />
+              {progress[lessonKey] ? 'Clear studied status' : 'Mark as studied'}
+            </button>
+          </div>
+        </details>
       </div>
 
-      <div className="flex items-center space-x-4 mb-6 text-sm text-muted-foreground dark:text-muted-foreground">
-        <span className="flex items-center space-x-1">
-          <Clock className="w-4 h-4" />
-          <span>{lesson.duration}</span>
-        </span>
-        <span className="flex items-center space-x-1">
-          <FileText className="w-4 h-4" />
-          <span>{lesson.type}</span>
-        </span>
-        {offlineMode && (
-          <span className="flex items-center space-x-1 text-orange-600">
-            <EyeOff className="w-4 h-4" />
-            <span>Offline Mode</span>
-          </span>
-        )}
-      </div>
+      {(durationLabel || offlineMode) && (
+        <div className="mb-5 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+          {durationLabel && (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 dark:bg-secondary">
+              <Clock aria-hidden="true" className="h-3.5 w-3.5" />
+              {durationLabel}
+            </span>
+          )}
+          {offlineMode && (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-orange-700 dark:bg-secondary dark:text-orange-300">
+              <EyeOff aria-hidden="true" className="h-3.5 w-3.5" />
+              Available offline
+            </span>
+          )}
+        </div>
+      )}
 
       {lesson.type === 'video' && lesson.content?.video && (
         <div className="mb-6">
@@ -149,68 +147,90 @@ export const CourseContent = ({
         </div>
       )}
 
-      {/* Materials for this lesson/unit - Moved above Mastery Gate for visibility */}
+      {/* Keep one clear starting point; the rest stays available on demand. */}
       {materials.length > 0 && (
-        <div className="mt-8 pt-8 border-t border-border dark:border-border">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-bold text-foreground dark:text-foreground flex items-center gap-2">
-              <Bookmark className="w-5 h-5 text-blue-500" />
-              Relevant Study Materials
-            </h3>
-            <span className="text-xs text-muted-foreground dark:text-muted-foreground font-medium bg-muted dark:bg-card px-2 py-1 rounded-full">
-              {materials.length} {materials.length === 1 ? 'Resource' : 'Resources'}
+        <section className="mt-8 space-y-3 border-t border-border pt-6 dark:border-border">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-primary">Your next step</p>
+              <h3 className="mt-1 font-bold text-foreground dark:text-foreground">Start with a study material</h3>
+            </div>
+            <span className="shrink-0 rounded-full bg-muted px-2 py-1 text-xs font-medium text-muted-foreground dark:bg-card">
+              {materials.length} {materials.length === 1 ? 'resource' : 'resources'}
             </span>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {materials.map(m => {
-              const isVideo = m.type?.toLowerCase().includes('video') || m.contentType?.toLowerCase().includes('video');
-              return (
-                <div
-                  key={m.id} 
-                  className="relative p-4 border border-border dark:border-border/50 rounded-xl bg-card dark:bg-card/50 hover:shadow-md hover:border-blue-200 dark:hover:border-blue-500/30 transition-all group overflow-hidden"
-                >
-                  <div className="flex items-start gap-4">
-                    <div className={`p-3 rounded-lg shrink-0 ${
-                      isVideo 
-                        ? 'bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400' 
-                        : 'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400'
-                    }`}>
-                      {isVideo ? <PlayCircle className="w-5 h-5" /> : <FileText className="w-5 h-5" />}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-bold text-foreground dark:text-foreground text-sm truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                        {m.title}
+
+          {(() => {
+            const firstMaterial = materials[0];
+            const isVideo = firstMaterial.type?.toLowerCase().includes('video') ||
+              firstMaterial.contentType?.toLowerCase().includes('video');
+            return (
+              <div className="flex flex-col gap-4 rounded-xl border border-primary/20 bg-primary/[0.03] p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className={`shrink-0 rounded-lg p-3 ${
+                    isVideo
+                      ? 'bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400'
+                      : 'bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400'
+                  }`}>
+                    {isVideo ? <PlayCircle className="h-5 w-5" /> : <FileText className="h-5 w-5" />}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium text-muted-foreground">
+                      {isVideo ? 'Video' : 'Reading'}{firstMaterial.duration ? ` · ${firstMaterial.duration}` : ''}
+                    </p>
+                    <p className="mt-1 line-clamp-2 font-semibold text-foreground">
+                      {firstMaterial.title}
+                    </p>
+                    {firstMaterial.description && (
+                      <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+                        {firstMaterial.description}
                       </p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
-                           isVideo 
-                            ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300' 
-                            : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
-                        }`}>
-                          {isVideo ? 'Video' : 'Document'}
-                        </span>
-                        {m.size && <span className="text-[10px] text-muted-foreground dark:text-muted-foreground">{m.size}</span>}
-                      </div>
-                    </div>
+                    )}
                   </div>
-                  <div className="mt-4 flex items-center justify-between">
-                    <div className="flex -space-x-1">
-                       <div className="w-5 h-5 rounded-full border-2 border-white dark:border-border bg-secondary dark:bg-secondary" />
-                       <div className="w-5 h-5 rounded-full border-2 border-white dark:border-border bg-secondary dark:bg-secondary" />
-                    </div>
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); openMaterial(String(m.id)); }}
-                      className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition-colors shadow-sm shadow-blue-500/20"
-                    >
-                      Study Now <ChevronRight className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                  <div className="absolute bottom-0 left-0 h-1 bg-blue-500/20 w-full" />
                 </div>
-              );
-            })}
-          </div>
-        </div>
+                <button
+                  type="button"
+                  onClick={() => openMaterial(String(firstMaterial.id))}
+                  className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+                  aria-label={`${isVideo ? 'Watch' : 'Read'} ${firstMaterial.title}`}
+                >
+                  {isVideo ? 'Watch now' : 'Start reading'}
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            );
+          })()}
+
+          {materials.length > 1 && (
+            <details className="group rounded-lg border border-border dark:border-border/50">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium text-foreground marker:hidden">
+                <span>More study materials ({materials.length - 1})</span>
+                <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+              </summary>
+              <div className="space-y-2 border-t border-border p-3 dark:border-border/50">
+                {materials.slice(1).map(material => (
+                  <button
+                    key={material.id}
+                    type="button"
+                    onClick={() => openMaterial(String(material.id))}
+                    className="flex w-full items-center justify-between gap-3 rounded-md px-3 py-2 text-left transition-colors hover:bg-muted"
+                  >
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-medium text-foreground">
+                        {material.title}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {material.type || material.contentType || 'Study material'}
+                        {material.duration ? ` · ${material.duration}` : ''}
+                      </span>
+                    </span>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  </button>
+                ))}
+              </div>
+            </details>
+          )}
+        </section>
       )}
 
       {/* Mastery Gate Section - Now feels like a natural "Next Step" */}
@@ -232,15 +252,6 @@ export const CourseContent = ({
                 : `Verify your understanding of this topic to unlock the next part of your learning path. ${masteryPassingScore}% passing score required.`}
             </p>
             
-            {/* Read-Before-Quiz Warning */}
-            {!lesson.masteryUnlocked && materials.length > 0 && (
-              <div className="mt-4 p-4 bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-300 text-sm rounded-xl border border-amber-100 dark:border-amber-800/30 flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 mt-0.5 shrink-0" />
-                <span>
-                  <strong>Wait!</strong> We recommend finishing all the study materials above before attempting the quiz. It significantly increases your chance of passing.
-                </span>
-              </div>
-            )}
           </div>
           
           <div className="flex flex-col items-center gap-3 min-w-60">
@@ -294,3 +305,12 @@ export const CourseContent = ({
     </div>
   );
 };
+
+function formatStudyDuration(value?: string): string | null {
+  const match = value?.trim().match(
+    /^(\d+(?:\s*[-–]\s*\d+)?)\s*(m|min|mins|minute|minutes|h|hr|hrs|hour|hours)$/i,
+  );
+  if (!match) return null;
+  const unit = /^h/i.test(match[2]) ? 'hr' : 'min';
+  return `${match[1].replace(/\s+/g, '')} ${unit}`;
+}

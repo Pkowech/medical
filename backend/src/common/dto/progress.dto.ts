@@ -3,6 +3,7 @@ import {
   IsString,
   IsNotEmpty,
   IsNumber,
+  IsInt,
   IsOptional,
   IsIn,
   Min,
@@ -61,15 +62,16 @@ export class CreateProgressDto {
 
   @ApiPropertyOptional({ description: 'Progress percentage (0-100)' })
   @IsOptional()
-  @IsNumber()
+  @IsInt()
   @Min(0)
   @Max(100)
   progressPercentage?: number;
 
   @ApiPropertyOptional({ description: 'Time spent in minutes' })
   @IsOptional()
-  @IsNumber()
+  @IsInt()
   @Min(0)
+  @Max(1440)
   timeSpent?: number;
 }
 
@@ -98,15 +100,16 @@ export class UpdateProgressDto {
 
   @ApiPropertyOptional({ description: 'Progress percentage (0-100)' })
   @IsOptional()
-  @IsNumber()
+  @IsInt()
   @Min(0)
   @Max(100)
   progressPercentage?: number;
 
   @ApiPropertyOptional({ description: 'Time spent in minutes' })
   @IsOptional()
-  @IsNumber()
+  @IsInt()
   @Min(0)
+  @Max(1440)
   timeSpent?: number;
 
   @ApiPropertyOptional({

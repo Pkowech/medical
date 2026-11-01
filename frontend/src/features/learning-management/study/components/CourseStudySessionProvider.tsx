@@ -25,6 +25,7 @@ interface ActiveCourseSession {
   lastActivitySeconds: number;
   pausedDurationSeconds: number;
   pauseStartedAtMs: number | null;
+  pauseReason: 'manual' | 'navigation' | 'visibility' | null;
   isActive: boolean;
   activities: StudySessionActivity[];
   notes: string;
@@ -37,6 +38,7 @@ interface ActiveCourseSessionSummary {
   topicTitle: string;
   elapsedSeconds: number;
   isActive: boolean;
+  pauseReason: ActiveCourseSession['pauseReason'];
   notes: string;
 }
 
@@ -50,9 +52,10 @@ interface CourseStudySessionContextValue {
     courseId: string | undefined,
     topicId: string,
     score?: number,
+    materialId?: string,
   ) => void;
   switchCourseTopic: (courseId: string, topicId: string, topicTitle: string) => void;
-  pauseCourseSession: (byVisibility?: boolean) => void;
+  pauseCourseSession: (reason?: NonNullable<ActiveCourseSession['pauseReason']>) => void;
   resumeCourseSession: () => void;
   endCourseSession: () => Promise<StudySession | null>;
 }
@@ -114,6 +117,7 @@ export function CourseStudySessionProvider({ children }: { children: React.React
       lastActivitySeconds: session.lastActivitySeconds,
       pausedDurationSeconds: session.pausedDurationSeconds,
       pauseStartedAtMs: session.pauseStartedAtMs,
+      pauseReason: session.pauseReason,
       isActive: session.isActive,
       activities: session.activities,
       notes: session.notes,
@@ -137,6 +141,7 @@ export function CourseStudySessionProvider({ children }: { children: React.React
         isActive: false,
         pausedDurationSeconds: saved.pausedDurationSeconds ?? 0,
         pauseStartedAtMs: saved.pauseStartedAtMs ?? saved.updatedAt,
+        pauseReason: saved.pauseReason ?? 'navigation',
         activities: saved.activities,
       };
       activeSessionRef.current = restored;
@@ -210,26 +215,37 @@ export function CourseStudySessionProvider({ children }: { children: React.React
     courseId: string | undefined,
     topicId: string,
     score?: number,
+    materialId?: string,
   ) => {
-    setActiveSession(current => {
-      if (!current || (courseId && current.courseId !== courseId)) return current;
-      const segmentSeconds = Math.max(0, current.elapsedSeconds - current.lastActivitySeconds);
-      return {
-        ...current,
-        topicId,
-        lastActivitySeconds: current.elapsedSeconds,
-        activities: [
-          ...current.activities,
-          {
-            type,
-            duration: segmentSeconds / 60,
-            timestamp: new Date().toISOString(),
-            ...(score === undefined ? {} : { score }),
-            metadata: { topicId, durationSeconds: segmentSeconds },
+    const current = activeSessionRef.current;
+    if (!current || (courseId && current.courseId !== courseId)) return;
+    const isMaterialOpen = type === 'material_opened';
+    const segmentSeconds = isMaterialOpen
+      ? 0
+      : Math.max(0, current.elapsedSeconds - current.lastActivitySeconds);
+    const updated = {
+      ...current,
+      topicId,
+      lastActivitySeconds: isMaterialOpen
+        ? current.lastActivitySeconds
+        : current.elapsedSeconds,
+      activities: [
+        ...current.activities,
+        {
+          type,
+          duration: segmentSeconds / 60,
+          timestamp: new Date().toISOString(),
+          ...(score === undefined ? {} : { score }),
+          metadata: {
+            topicId,
+            durationSeconds: segmentSeconds,
+            ...(materialId ? { materialId } : {}),
           },
-        ],
-      };
-    });
+        },
+      ],
+    };
+    activeSessionRef.current = updated;
+    setActiveSession(updated);
   }, []);
 
   const switchCourseTopic = useCallback((
@@ -262,13 +278,25 @@ export function CourseStudySessionProvider({ children }: { children: React.React
     setActiveSession(updated);
   }, []);
 
-  const pauseCourseSession = useCallback((byVisibility = false) => {
+  const pauseCourseSession = useCallback((
+    reason: NonNullable<ActiveCourseSession['pauseReason']> = 'manual',
+  ) => {
     const current = activeSessionRef.current;
-    if (!current || !current.isActive) return;
-    if (!byVisibility) isPausedByVisibilityRef.current = false;
+    if (!current) return;
+    if (!current.isActive) {
+      if (reason === 'navigation' && current.pauseReason === 'visibility') {
+        const pausedForNavigation = { ...current, pauseReason: 'navigation' as const };
+        isPausedByVisibilityRef.current = false;
+        activeSessionRef.current = pausedForNavigation;
+        setActiveSession(pausedForNavigation);
+      }
+      return;
+    }
+    isPausedByVisibilityRef.current = reason === 'visibility';
     const paused = {
       ...current,
       isActive: false,
+      pauseReason: reason,
       pauseStartedAtMs: current.pauseStartedAtMs ?? Date.now(),
     };
     activeSessionRef.current = paused;
@@ -287,6 +315,7 @@ export function CourseStudySessionProvider({ children }: { children: React.React
       isActive: true,
       pausedDurationSeconds: current.pausedDurationSeconds + pausedSeconds,
       pauseStartedAtMs: null,
+      pauseReason: null,
     };
     activeSessionRef.current = resumed;
     setActiveSession(resumed);
@@ -297,9 +326,12 @@ export function CourseStudySessionProvider({ children }: { children: React.React
       if (document.visibilityState === 'hidden') {
         if (activeSessionRef.current?.isActive) {
           isPausedByVisibilityRef.current = true;
-          pauseCourseSession(true);
+          pauseCourseSession('visibility');
         }
-      } else if (isPausedByVisibilityRef.current) {
+      } else if (
+        isPausedByVisibilityRef.current &&
+        activeSessionRef.current?.pauseReason === 'visibility'
+      ) {
         isPausedByVisibilityRef.current = false;
         resumeCourseSession();
       }
@@ -436,7 +468,13 @@ export function CourseStudySessionProvider({ children }: { children: React.React
       if (currentSession.topicId !== topicId) {
         switchCourseTopic(courseId, topicId, topicTitle);
       }
-      if (!currentSession.isActive) resumeCourseSession();
+      if (
+        !currentSession.isActive &&
+        currentSession.pauseReason !== 'manual' &&
+        document.visibilityState === 'visible'
+      ) {
+        resumeCourseSession();
+      }
       return;
     }
     if (isStartingRef.current) return;
@@ -463,6 +501,7 @@ export function CourseStudySessionProvider({ children }: { children: React.React
         lastActivitySeconds: 0,
         pausedDurationSeconds: 0,
         pauseStartedAtMs: null,
+        pauseReason: null,
         isActive: true,
         activities: [{
           type: 'reading',
@@ -502,6 +541,7 @@ export function CourseStudySessionProvider({ children }: { children: React.React
         topicTitle: activeSession.topicTitle,
         elapsedSeconds: sessionElapsedBase,
         isActive: activeSession.isActive,
+        pauseReason: activeSession.pauseReason,
         notes: activeSession.notes,
       }
     : null, [
@@ -510,6 +550,7 @@ export function CourseStudySessionProvider({ children }: { children: React.React
     activeSession?.topicId,
     activeSession?.topicTitle,
     activeSession?.isActive,
+    activeSession?.pauseReason,
     activeSession?.notes,
     sessionElapsedBase,
   ]);
@@ -551,7 +592,11 @@ export function useCourseStudySession(): CourseStudySessionContextValue {
   return context;
 }
 
-export function CourseStudySessionIndicator() {
+export function CourseStudySessionIndicator({
+  canResume = false,
+}: {
+  canResume?: boolean;
+}) {
   const {
     activeSession,
     isEnding,
@@ -596,6 +641,11 @@ export function CourseStudySessionIndicator() {
           {activeSession.isActive ? 'Study session' : 'Session paused'}
         </p>
         <p className="mt-1 truncate font-semibold text-foreground">{activeSession.topicTitle}</p>
+        {!activeSession.isActive && !canResume && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            Open a topic to resume tracking.
+          </p>
+        )}
         <label htmlFor="course-session-notes" className="mt-3 block text-xs font-medium text-muted-foreground">
           Session notes
         </label>
@@ -614,11 +664,11 @@ export function CourseStudySessionIndicator() {
             <Button type="button" variant="outline" size="sm" onClick={() => pauseCourseSession()}>
               <Pause className="mr-1.5 h-4 w-4" /> Pause
             </Button>
-          ) : (
+          ) : canResume ? (
             <Button type="button" variant="outline" size="sm" onClick={resumeCourseSession}>
               <Play className="mr-1.5 h-4 w-4" /> Resume
             </Button>
-          )}
+          ) : null}
           <Button
             type="button"
             variant="destructive"

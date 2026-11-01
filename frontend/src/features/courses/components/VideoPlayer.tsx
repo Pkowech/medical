@@ -11,6 +11,7 @@ interface VideoPlayerProps {
   title: string;
   lessonId: string | number;
   theaterMode?: boolean;
+  onProgress?: (percent: number) => void;
 }
 
 const getYouTubeEmbedUrl = (value: string): string | null => {
@@ -35,7 +36,13 @@ const getYouTubeEmbedUrl = (value: string): string | null => {
   }
 };
 
-export const VideoPlayer = ({ url, title, lessonId, theaterMode = false }: VideoPlayerProps) => {
+export const VideoPlayer = ({
+  url,
+  title,
+  lessonId,
+  theaterMode = false,
+  onProgress,
+}: VideoPlayerProps) => {
   const { trackAction, XAPI_VERBS } = useXapi();
   const [playing, setPlaying] = useState(false);
   const [played, setPlayed] = useState(0);
@@ -78,6 +85,7 @@ export const VideoPlayer = ({ url, title, lessonId, theaterMode = false }: Video
     if (!Number.isFinite(currentPlayed)) return;
 
     setPlayed(currentPlayed);
+    onProgress?.(Math.round(currentPlayed * 100));
     const milestones = [0.25, 0.5, 0.75, 0.9];
     const prevPlayed = played;
     milestones.forEach(m => {
@@ -93,6 +101,7 @@ export const VideoPlayer = ({ url, title, lessonId, theaterMode = false }: Video
 
   const handleEnded = () => {
     setPlaying(false);
+    onProgress?.(100);
     trackAction(XAPI_VERBS.COMPLETED, object, {
       extensions: {
         'https://w3id.org/xapi/video/extensions/time': duration,

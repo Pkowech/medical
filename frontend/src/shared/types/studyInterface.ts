@@ -48,7 +48,7 @@ export interface StudySession {
  * Backend API response type for course progress
  */
 export interface StudySessionActivity {
-  type: 'reading' | 'quiz' | 'notes';
+  type: 'reading' | 'material_opened' | 'quiz' | 'notes';
   duration: number;
   timestamp: string;
   score?: number;
