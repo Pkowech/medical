@@ -268,10 +268,10 @@ function LoginContent() {
   return (
     <div className="w-full space-y-8">
       <div className="space-y-3">
-        <h2 className="text-center text-4xl font-black tracking-[-0.04em] text-foreground dark:text-foreground">
+        <h2 className="text-center text-4xl font-black tracking-[-0.04em] text-white dark:text-white">
           Sign in to your account
         </h2>
-        <p className="text-center text-[1.05rem] font-medium text-muted-foreground dark:text-muted-foreground">
+        <p className="text-center text-[1.05rem] font-medium text-[#aebbd0] dark:text-[#aebbd0] sm:text-xl">
           Enter your username or email to continue
         </p>
       </div>
@@ -299,30 +299,30 @@ function LoginContent() {
         <div
           role="alert"
           aria-live="assertive"
-          className="rounded-md bg-red-50 p-4 dark:bg-red-950/30"
+          className="rounded-lg border border-[#351f2b] bg-[#2b1d29] p-5"
         >
-          <div className="flex">
-            <div className="shrink-0">
-              <FaExclamationCircle className="h-5 w-5 text-red-400" />
+          <div className="flex items-start gap-4">
+            <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#ff5864] text-[#2b1d29]">
+              <FaExclamationCircle className="h-4 w-4" />
             </div>
-            <div className="ml-3">
-              <p className="text-sm font-medium text-red-800 dark:text-red-200">
+            <div className="flex-1">
+              <p className="text-base font-semibold text-[#f4dce0]">
                 {error}
                 {showResendVerification && (
                   <Link
                     href="/resend-verification"
-                    className="ml-2 text-indigo-600 hover:text-indigo-500 underline dark:text-indigo-300 dark:hover:text-indigo-200"
+                    className="ml-2 text-indigo-300 underline hover:text-indigo-200"
                   >
                     Resend verification email
                   </Link>
                 )}
               </p>
               {/(username not found|no account found)/i.test(error) && (
-                <p className="mt-2 text-sm text-red-800 dark:text-red-200">
+                <p className="mt-2 text-sm text-[#f4dce0]">
                   Don't have an account?{' '}
                   <Link
                     href="/register"
-                    className="font-semibold underline hover:text-red-600 dark:hover:text-red-100"
+                    className="font-semibold underline hover:text-white"
                   >
                     Sign up
                   </Link>
@@ -333,7 +333,7 @@ function LoginContent() {
                   type="button"
                   onClick={() => void handleSubmit()}
                   disabled={loading}
-                  className="mt-3 rounded-md border border-red-300 bg-card px-3 py-1.5 text-sm font-medium text-red-800 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-red-700 dark:bg-card dark:text-red-200 dark:hover:bg-secondary"
+                  className="mt-4 rounded-lg border border-[#d81e36] bg-transparent px-4 py-2 text-base font-semibold text-[#f4dce0] transition-colors hover:bg-[#d81e36]/10 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   Try again
                 </button>
@@ -343,7 +343,7 @@ function LoginContent() {
         </div>
       )}
       {loading && showSlowRequestHint && (
-        <p role="status" className="text-center text-sm text-muted-foreground dark:text-muted-foreground">
+        <p role="status" className="text-center text-sm text-[#aebbd0] dark:text-[#aebbd0]">
           Sign-in is taking longer than usual. Please keep this page open; you can retry if it
           fails.
         </p>
@@ -368,23 +368,23 @@ function LoginContent() {
           <div>
             <label
               htmlFor="identifier"
-              className="mb-2 block text-[1.05rem] font-medium text-muted-foreground dark:text-muted-foreground"
+              className="mb-2 block text-[1.05rem] font-medium text-[#aebbd0] dark:text-[#aebbd0] sm:text-xl"
             >
               Username or Email
             </label>
             <div className="relative">
               <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5">
                 {isEmail ? (
-                  <FaEnvelope className="h-5 w-5 text-muted-foreground dark:text-muted-foreground" />
+                  <FaEnvelope className="h-5 w-5 text-[#91a2ba] dark:text-[#91a2ba]" />
                 ) : (
-                  <FaUser className="h-5 w-5 text-muted-foreground dark:text-muted-foreground" />
+                  <FaUser className="h-5 w-5 text-[#91a2ba] dark:text-[#91a2ba]" />
                 )}
               </div>
               {requiresMfa && (
                 <div>
                   <label
                     htmlFor="two-factor-token"
-                    className="mb-2 block text-[1.05rem] font-medium text-muted-foreground dark:text-muted-foreground"
+                    className="mb-2 block text-[1.05rem] font-medium text-[#aebbd0] dark:text-[#aebbd0]"
                   >
                     Authenticator code
                   </label>
@@ -399,7 +399,7 @@ function LoginContent() {
                     required
                     value={twoFactorToken}
                     onChange={event => setTwoFactorToken(event.target.value.replace(/\D/g, ''))}
-                    className="block w-full rounded-xl border border-border bg-card px-3 py-3.5 text-[1.05rem] text-foreground focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-border dark:bg-card dark:text-foreground"
+                    className="block w-full rounded-2xl border border-[#d9e2ef] bg-[#e8f0fd] px-3 py-3.5 text-[1.05rem] text-[#111827] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-[#d9e2ef] dark:bg-[#e8f0fd] dark:text-[#111827]"
                     placeholder="Six-digit code"
                   />
                 </div>
@@ -423,10 +423,10 @@ function LoginContent() {
                     });
                   }
                 }}
-                className={`block w-full rounded-xl border bg-card py-3.5 pl-11 pr-3 text-[1.05rem] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${
+                className={`block w-full rounded-2xl border bg-[#e8f0fd] py-3.5 pl-11 pr-3 text-[1.05rem] text-[#111827] placeholder:text-[#69778c] focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${
                   formErrors.identifier
                     ? 'border-red-300 focus:border-red-500'
-                    : 'border-border focus:border-blue-500 dark:border-border dark:bg-card dark:text-foreground dark:placeholder:text-muted-foreground'
+                    : 'border-[#d9e2ef] focus:border-blue-500 dark:border-[#d9e2ef] dark:bg-[#e8f0fd] dark:text-[#111827] dark:placeholder:text-[#69778c]'
                 }`}
                 placeholder="Enter your username or email"
               />
@@ -440,13 +440,13 @@ function LoginContent() {
           <div>
             <label
               htmlFor="password"
-              className="mb-2 block text-[1.05rem] font-medium text-muted-foreground dark:text-muted-foreground"
+              className="mb-2 block text-[1.05rem] font-medium text-[#aebbd0] dark:text-[#aebbd0] sm:text-xl"
             >
               Password
             </label>
             <div className="relative">
               <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5">
-                <FaLock className="h-5 w-5 text-muted-foreground dark:text-muted-foreground" />
+                <FaLock className="h-5 w-5 text-[#91a2ba] dark:text-[#91a2ba]" />
               </div>
               <input
                 id="password"
@@ -467,16 +467,16 @@ function LoginContent() {
                     });
                   }
                 }}
-                className={`block w-full rounded-xl border bg-card py-3.5 pl-11 pr-11 text-[1.05rem] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${
+                className={`block w-full rounded-2xl border bg-[#e8f0fd] py-3.5 pl-11 pr-11 text-[1.05rem] text-[#111827] placeholder:text-[#69778c] focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${
                   formErrors.password
                     ? 'border-red-300 focus:border-red-500'
-                    : 'border-border focus:border-blue-500 dark:border-border dark:bg-card dark:text-foreground dark:placeholder:text-muted-foreground'
+                    : 'border-[#d9e2ef] focus:border-blue-500 dark:border-[#d9e2ef] dark:bg-[#e8f0fd] dark:text-[#111827] dark:placeholder:text-[#69778c]'
                 }`}
                 placeholder="Enter your password"
               />
               <button
                 type="button"
-                className="absolute inset-y-0 right-0 flex items-center pr-3.5 text-muted-foreground transition-colors hover:text-muted-foreground dark:text-muted-foreground"
+                className="absolute inset-y-0 right-0 flex items-center pr-4 text-[#91a2ba] transition-colors hover:text-[#5c6e86] dark:text-[#91a2ba]"
                 onClick={() => setShowPassword(!showPassword)}
                 aria-label={showPassword ? 'Hide password' : 'Show password'}
               >
@@ -499,7 +499,7 @@ function LoginContent() {
           <div className="text-sm font-medium">
             <Link
               href="/forgot-password"
-              className="text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
+              className="text-[#419bff] hover:text-[#75b6ff] dark:text-[#419bff] dark:hover:text-[#75b6ff]"
             >
               Forgot your password?
             </Link>
@@ -510,7 +510,7 @@ function LoginContent() {
           <button
             type="submit"
             disabled={loading}
-            className={`group relative flex w-full justify-center rounded-xl border border-transparent bg-[#0d6efd] px-4 py-4 text-[1.15rem] font-bold text-white shadow-[0_10px_18px_rgba(13,110,253,0.25)] transition-colors hover:bg-[#0b5ed7] focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:ring-offset-2 dark:focus:ring-offset-slate-900 ${
+            className={`group relative flex w-full justify-center rounded-xl border border-transparent bg-[#0b79e5] px-4 py-4 text-[1.15rem] font-bold text-white shadow-[0_10px_18px_rgba(11,121,229,0.25)] transition-colors hover:bg-[#0b6fd1] focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:ring-offset-2 dark:focus:ring-offset-slate-900 ${
               loading ? 'cursor-not-allowed opacity-70' : ''
             }`}
           >
@@ -522,11 +522,11 @@ function LoginContent() {
         </div>
 
         <div className="my-5 flex items-center gap-4">
-          <div className="h-px flex-1 bg-secondary" aria-hidden="true" />
-          <span className="text-[0.78rem] font-semibold uppercase tracking-[0.28em] text-muted-foreground dark:text-muted-foreground">
+          <div className="h-px flex-1 bg-[#3a4759]" aria-hidden="true" />
+          <span className="text-[0.78rem] font-semibold uppercase tracking-[0.28em] text-[#aebbd0] dark:text-[#aebbd0]">
             Or continue with
           </span>
-          <div className="h-px flex-1 bg-secondary" aria-hidden="true" />
+          <div className="h-px flex-1 bg-[#3a4759]" aria-hidden="true" />
         </div>
 
         <div>
@@ -534,22 +534,22 @@ function LoginContent() {
             type="button"
             onClick={() => void handleProviderSignIn()}
             disabled={loading || socialLoading !== null}
-            className="flex w-full items-center justify-center gap-3 rounded-xl border border-border bg-card px-4 py-3.5 text-[1.1rem] font-medium text-muted-foreground shadow-sm transition-colors hover:bg-background focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 dark:border-border dark:bg-card dark:text-muted-foreground dark:hover:bg-secondary"
+            className="flex w-full items-center justify-center gap-3 rounded-xl border border-[#3a4759] bg-[#263548] px-4 py-3.5 text-[1.1rem] font-medium text-white shadow-sm transition-colors hover:bg-[#304258] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 dark:border-[#3a4759] dark:bg-[#263548] dark:text-white dark:hover:bg-[#304258]"
           >
             <FaGoogle className="text-[1.7rem]" />
             <span>{socialLoading === 'google' ? 'Connecting...' : 'Continue with Google'}</span>
           </button>
-          <p className="mt-3 text-center text-xs text-muted-foreground dark:text-muted-foreground">
+          <p className="mt-3 text-center text-xs text-[#aebbd0] dark:text-[#aebbd0]">
             New Google accounts will be asked to accept the Terms of Service and Privacy Policy after sign-in.
           </p>
         </div>
 
         <div className="mt-6 text-center">
-          <p className="text-[1.05rem] text-muted-foreground dark:text-muted-foreground">
+          <p className="text-[1.05rem] text-[#aebbd0] dark:text-[#aebbd0]">
             Don't have an account?{' '}
             <Link
               href="/register"
-              className="font-bold text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
+              className="font-bold text-[#419bff] hover:text-[#75b6ff] dark:text-[#419bff] dark:hover:text-[#75b6ff]"
             >
               Sign up
             </Link>

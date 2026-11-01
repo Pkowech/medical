@@ -23,7 +23,7 @@
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/src/main",
     "debug:swagger": "nest build && node dist/src/main",
-    "format": "prettier --write \"{src,apps,libs,test}/**/*.ts\"",
+    "format": "prettier --write \"{src,apps,libs,test}/**/*.ts\"Y",
     "lint": "node -e \"require('fs').accessSync('node_modules/eslint/bin/eslint.js');\" && eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "python -m pytest tests",
     "test:cov": "python -m pytest --cov=src tests",

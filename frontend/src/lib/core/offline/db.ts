@@ -85,6 +85,8 @@ export interface OfflineTopicBundle {
   downloadedAt: number;
   expiresAt: number;
   totalBytes: number;
+  contentRevision?: string;
+  stale?: boolean;
 }
 
 export interface OfflineTopicMaterial {

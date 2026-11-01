@@ -2,6 +2,9 @@
 CREATE EXTENSION IF NOT EXISTS "pg_trgm";
 
 -- CreateEnum
+CREATE TYPE "PathModuleType" AS ENUM ('course', 'assessment', 'clinical_case', 'milestone', 'resource');
+
+-- CreateEnum
 CREATE TYPE "RoleName" AS ENUM ('admin', 'instructor', 'moderator', 'student');
 
 -- CreateEnum
@@ -158,6 +161,9 @@ CREATE TYPE "ProgressEntryType" AS ENUM ('automatic', 'manual', 'milestone');
 CREATE TYPE "ProgressUpdateSource" AS ENUM ('user', 'system');
 
 -- CreateEnum
+CREATE TYPE "NoteType" AS ENUM ('student', 'ai_generated', 'peer_shared');
+
+-- CreateEnum
 CREATE TYPE "GoalPriority" AS ENUM ('low', 'medium', 'high', 'critical');
 
 -- CreateEnum
@@ -178,14 +184,11 @@ CREATE TABLE "questions" (
     "tags" TEXT[],
     "points" INTEGER NOT NULL DEFAULT 1,
     "metadata" JSONB,
-    "is_multiple_choice" BOOLEAN NOT NULL DEFAULT true,
     "choices" JSONB,
     "usage_count" INTEGER NOT NULL DEFAULT 0,
     "success_rate" DOUBLE PRECISION NOT NULL DEFAULT 0,
     "average_time" INTEGER NOT NULL DEFAULT 0,
-    "discrimination_index" DOUBLE PRECISION,
     "difficulty_index" DOUBLE PRECISION,
-    "guessing_parameter" DOUBLE PRECISION,
     "discrimination" DOUBLE PRECISION NOT NULL DEFAULT 0,
     "guessing" DOUBLE PRECISION NOT NULL DEFAULT 0,
     "average_score" DOUBLE PRECISION DEFAULT 0,
@@ -227,6 +230,33 @@ CREATE TABLE "user_activities" (
 );
 
 -- CreateTable
+CREATE TABLE "offline_practice_attempts" (
+    "id" TEXT NOT NULL,
+    "user_id" TEXT NOT NULL,
+    "topic_id" TEXT NOT NULL,
+    "responses" JSONB NOT NULL,
+    "score" INTEGER NOT NULL,
+    "validated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "offline_practice_attempts_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "analytics_events" (
+    "id" TEXT NOT NULL,
+    "user_id" TEXT NOT NULL,
+    "event_type" TEXT NOT NULL,
+    "data" JSONB NOT NULL DEFAULT '{}',
+    "timestamp" TIMESTAMPTZ(6) NOT NULL,
+    "session_id" TEXT,
+    "duration" INTEGER,
+    "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "analytics_events_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "unit_accesses" (
     "id" TEXT NOT NULL,
     "user_id" TEXT NOT NULL,
@@ -260,6 +290,7 @@ CREATE TABLE "quizzes" (
     "category_id" TEXT,
     "unit_id" TEXT,
     "topic_id" TEXT,
+    "topic_practice_for_id" TEXT,
     "created_by" TEXT NOT NULL,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
@@ -305,7 +336,6 @@ CREATE TABLE "quiz_attempts" (
     "score" DOUBLE PRECISION NOT NULL DEFAULT 0,
     "max_score" DOUBLE PRECISION NOT NULL DEFAULT 0,
     "percentage" DOUBLE PRECISION NOT NULL DEFAULT 0,
-    "time_spent" INTEGER NOT NULL DEFAULT 0,
     "time_taken" INTEGER,
     "is_passed" BOOLEAN NOT NULL DEFAULT false,
     "correct_answers" INTEGER NOT NULL DEFAULT 0,
@@ -326,7 +356,6 @@ CREATE TABLE "user_responses" (
     "answer" JSONB NOT NULL,
     "is_correct" BOOLEAN NOT NULL DEFAULT false,
     "score" DOUBLE PRECISION DEFAULT 0,
-    "time_spent" INTEGER NOT NULL DEFAULT 0,
     "response_time" INTEGER,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
@@ -378,6 +407,9 @@ CREATE TABLE "users" (
     "profile_image" VARCHAR(2048),
     "bio" TEXT,
     "location" VARCHAR(255),
+    "career_stage" VARCHAR(32),
+    "healthcare_field" VARCHAR(80),
+    "study_year" INTEGER,
     "year_of_experience" INTEGER,
     "streak_days" INTEGER NOT NULL DEFAULT 0,
     "preferences" JSONB,
@@ -397,6 +429,27 @@ CREATE TABLE "users" (
     "fts" tsvector,
 
     CONSTRAINT "users_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "app_system_settings" (
+    "id" TEXT NOT NULL DEFAULT 'global',
+    "settings" JSONB NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "app_system_settings_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "google_drive_connections" (
+    "id" TEXT NOT NULL,
+    "user_id" TEXT NOT NULL,
+    "encrypted_refresh_token" TEXT NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "google_drive_connections_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -509,6 +562,17 @@ CREATE TABLE "email_verification_tokens" (
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "email_verification_tokens_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "password_reset_tokens" (
+    "id" TEXT NOT NULL,
+    "user_id" TEXT NOT NULL,
+    "token_hash" TEXT NOT NULL,
+    "expires_at" TIMESTAMP(3) NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "password_reset_tokens_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -677,6 +741,15 @@ CREATE TABLE "materials" (
 );
 
 -- CreateTable
+CREATE TABLE "recommendation_scores" (
+    "item_id" TEXT NOT NULL,
+    "score" DOUBLE PRECISION NOT NULL,
+    "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "recommendation_scores_pkey" PRIMARY KEY ("item_id")
+);
+
+-- CreateTable
 CREATE TABLE "material_shares" (
     "id" TEXT NOT NULL,
     "material_id" TEXT NOT NULL,
@@ -738,22 +811,6 @@ CREATE TABLE "material_engagements" (
 );
 
 -- CreateTable
-CREATE TABLE "material_notes" (
-    "id" TEXT NOT NULL,
-    "user_id" TEXT NOT NULL,
-    "material_id" TEXT NOT NULL,
-    "content" TEXT NOT NULL,
-    "page_number" INTEGER,
-    "position" JSONB,
-    "color" TEXT DEFAULT '#FFFF00',
-    "is_private" BOOLEAN NOT NULL DEFAULT true,
-    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "material_notes_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
 CREATE TABLE "topic_progress" (
     "id" TEXT NOT NULL,
     "user_id" TEXT NOT NULL,
@@ -774,10 +831,6 @@ CREATE TABLE "topic_progress" (
     "material_version" INTEGER,
     "is_stale" BOOLEAN NOT NULL DEFAULT false,
     "last_studied_at" TIMESTAMP(3),
-    "ease_factor" DOUBLE PRECISION NOT NULL DEFAULT 2.5,
-    "interval" INTEGER NOT NULL DEFAULT 0,
-    "next_review_date" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "last_reviewed_at" TIMESTAMP(3),
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
     "last_updated" BIGINT NOT NULL DEFAULT 0,
@@ -868,7 +921,6 @@ CREATE TABLE "learning_paths" (
     "estimated_hours" INTEGER,
     "estimated_duration_weeks" INTEGER,
     "estimated_hours_per_week" INTEGER,
-    "path_structure" JSONB,
     "analytics" JSONB,
     "milestones_achieved" JSONB,
     "status" "CourseStatus" NOT NULL DEFAULT 'draft',
@@ -929,6 +981,68 @@ CREATE TABLE "learning_path_milestones" (
     "status" "ProgressStatus" NOT NULL DEFAULT 'not_started',
 
     CONSTRAINT "learning_path_milestones_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "learning_path_phases" (
+    "id" TEXT NOT NULL,
+    "learning_path_id" TEXT NOT NULL,
+    "title" VARCHAR(255) NOT NULL,
+    "description" TEXT,
+    "order" INTEGER NOT NULL DEFAULT 1,
+    "estimated_weeks" INTEGER,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "learning_path_phases_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "learning_path_modules" (
+    "id" TEXT NOT NULL,
+    "phase_id" TEXT NOT NULL,
+    "title" VARCHAR(255) NOT NULL,
+    "description" TEXT,
+    "type" "PathModuleType" NOT NULL DEFAULT 'course',
+    "resource_id" TEXT NOT NULL,
+    "course_id" TEXT,
+    "quiz_id" TEXT,
+    "order" INTEGER NOT NULL DEFAULT 1,
+    "estimated_minutes" INTEGER,
+    "is_required" BOOLEAN NOT NULL DEFAULT true,
+    "unlock_conditions" JSONB,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "learning_path_modules_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "learning_path_phase_progress" (
+    "id" TEXT NOT NULL,
+    "user_id" TEXT NOT NULL,
+    "phase_id" TEXT NOT NULL,
+    "status" "ProgressStatus" NOT NULL DEFAULT 'not_started',
+    "progress_percentage" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "completed_at" TIMESTAMP(3),
+    "last_accessed_at" TIMESTAMP(3),
+
+    CONSTRAINT "learning_path_phase_progress_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "learning_path_module_progress" (
+    "id" TEXT NOT NULL,
+    "user_id" TEXT NOT NULL,
+    "module_id" TEXT NOT NULL,
+    "status" "ProgressStatus" NOT NULL DEFAULT 'not_started',
+    "progress_percentage" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "time_spent_minutes" INTEGER NOT NULL DEFAULT 0,
+    "best_score" DOUBLE PRECISION,
+    "completed_at" TIMESTAMP(3),
+    "last_accessed_at" TIMESTAMP(3),
+
+    CONSTRAINT "learning_path_module_progress_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -1166,6 +1280,36 @@ CREATE TABLE "chat_messages" (
 );
 
 -- CreateTable
+CREATE TABLE "direct_conversations" (
+    "id" TEXT NOT NULL,
+    "pair_key" VARCHAR(73) NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "direct_conversations_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "direct_conversation_participants" (
+    "conversation_id" TEXT NOT NULL,
+    "user_id" TEXT NOT NULL,
+    "last_read_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "direct_conversation_participants_pkey" PRIMARY KEY ("conversation_id","user_id")
+);
+
+-- CreateTable
+CREATE TABLE "direct_messages" (
+    "id" TEXT NOT NULL,
+    "conversation_id" TEXT NOT NULL,
+    "sender_id" TEXT NOT NULL,
+    "content" TEXT NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "direct_messages_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "notifications" (
     "id" TEXT NOT NULL,
     "user_id" TEXT NOT NULL,
@@ -1175,11 +1319,23 @@ CREATE TABLE "notifications" (
     "priority" "NotificationPriority" NOT NULL DEFAULT 'low',
     "metadata" JSONB,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "severity" VARCHAR(20),
     "throttled" BOOLEAN NOT NULL DEFAULT false,
     "sent_via_push" BOOLEAN NOT NULL DEFAULT false,
 
     CONSTRAINT "notifications_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "push_subscriptions" (
+    "id" TEXT NOT NULL,
+    "user_id" TEXT NOT NULL,
+    "endpoint" VARCHAR(2048) NOT NULL,
+    "p256dh" VARCHAR(256) NOT NULL,
+    "auth" VARCHAR(256) NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "push_subscriptions_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -1257,20 +1413,6 @@ CREATE TABLE "student_interactions" (
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "student_interactions_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "flashcard_results" (
-    "id" TEXT NOT NULL,
-    "user_id" TEXT NOT NULL,
-    "unit_id" TEXT NOT NULL,
-    "quiz_id" TEXT,
-    "score" DOUBLE PRECISION NOT NULL,
-    "passed" BOOLEAN NOT NULL,
-    "attempted_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "metadata" JSONB,
-
-    CONSTRAINT "flashcard_results_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -1401,83 +1543,6 @@ CREATE TABLE "system_analytics" (
 );
 
 -- CreateTable
-CREATE TABLE "course_progress" (
-    "id" TEXT NOT NULL,
-    "user_id" TEXT NOT NULL,
-    "course_id" TEXT NOT NULL,
-    "status" "ProgressStatus" NOT NULL DEFAULT 'not_started',
-    "progress_percentage" INTEGER NOT NULL DEFAULT 0,
-    "completed_units" INTEGER NOT NULL DEFAULT 0,
-    "time_spent" INTEGER NOT NULL DEFAULT 0,
-    "started_at" TIMESTAMP(3),
-    "completed_at" TIMESTAMP(3),
-    "last_accessed_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMP(3) NOT NULL,
-    "last_updated" BIGINT NOT NULL DEFAULT 0,
-
-    CONSTRAINT "course_progress_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "question_stats" (
-    "id" TEXT NOT NULL,
-    "question_id" TEXT NOT NULL,
-    "total_attempts" INTEGER NOT NULL DEFAULT 0,
-    "correct_attempts" INTEGER NOT NULL DEFAULT 0,
-    "average_time" INTEGER NOT NULL DEFAULT 0,
-    "difficulty_score" DOUBLE PRECISION NOT NULL DEFAULT 0,
-    "last_calculated" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT "question_stats_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "rapid_review_answers" (
-    "id" TEXT NOT NULL,
-    "sessionId" TEXT NOT NULL,
-    "questionId" TEXT NOT NULL,
-    "isCorrect" BOOLEAN NOT NULL,
-    "timeSpent" DOUBLE PRECISION,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT "rapid_review_answers_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "rapid_review_sessions" (
-    "id" TEXT NOT NULL,
-    "userId" TEXT NOT NULL,
-    "startTime" TIMESTAMP(3) NOT NULL,
-    "endTime" TIMESTAMP(3) NOT NULL,
-    "topics" TEXT[],
-    "score" DOUBLE PRECISION NOT NULL,
-    "totalQuestions" INTEGER NOT NULL,
-    "correctAnswers" INTEGER NOT NULL,
-    "averageTimePerQuestion" DOUBLE PRECISION NOT NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT "rapid_review_sessions_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "spaced_repetition_cards" (
-    "id" TEXT NOT NULL,
-    "userId" TEXT NOT NULL,
-    "questionId" TEXT NOT NULL,
-    "easinessFactor" DOUBLE PRECISION NOT NULL DEFAULT 2.5,
-    "interval" INTEGER NOT NULL DEFAULT 0,
-    "repetitions" INTEGER NOT NULL DEFAULT 0,
-    "correctStreak" INTEGER NOT NULL DEFAULT 0,
-    "lastReviewedAt" TIMESTAMP(3) NOT NULL,
-    "nextReviewAt" TIMESTAMP(3) NOT NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "spaced_repetition_cards_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
 CREATE TABLE "unit_completions" (
     "id" TEXT NOT NULL,
     "user_id" TEXT NOT NULL,
@@ -1487,38 +1552,6 @@ CREATE TABLE "unit_completions" (
     "feedback" TEXT,
 
     CONSTRAINT "unit_completions_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "unit_progress" (
-    "id" TEXT NOT NULL,
-    "user_id" TEXT NOT NULL,
-    "unit_id" TEXT NOT NULL,
-    "status" "ProgressStatus" NOT NULL DEFAULT 'not_started',
-    "progress_percentage" INTEGER NOT NULL DEFAULT 0,
-    "time_spent" INTEGER NOT NULL DEFAULT 0,
-    "started_at" TIMESTAMP(3),
-    "completed_at" TIMESTAMP(3),
-    "last_accessed_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMP(3) NOT NULL,
-    "last_updated" BIGINT NOT NULL DEFAULT 0,
-
-    CONSTRAINT "unit_progress_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "user_quiz_progress" (
-    "id" TEXT NOT NULL,
-    "user_id" TEXT NOT NULL,
-    "quiz_id" TEXT NOT NULL,
-    "last_attempted" TIMESTAMP(3),
-    "best_score" DOUBLE PRECISION NOT NULL DEFAULT 0,
-    "attempts_count" INTEGER NOT NULL DEFAULT 0,
-    "time_spent" INTEGER NOT NULL DEFAULT 0,
-    "status" "ProgressStatus" NOT NULL DEFAULT 'not_started',
-
-    CONSTRAINT "user_quiz_progress_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -1626,6 +1659,19 @@ CREATE TABLE "instructor_overrides" (
 );
 
 -- CreateTable
+CREATE TABLE "analytics_overrides" (
+    "id" TEXT NOT NULL,
+    "instructor_id" TEXT NOT NULL,
+    "student_id" TEXT NOT NULL,
+    "topic_id" TEXT NOT NULL,
+    "action" VARCHAR(50) NOT NULL,
+    "reason" TEXT,
+    "applied_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "analytics_overrides_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "sync_logs" (
     "id" TEXT NOT NULL,
     "user_id" TEXT NOT NULL,
@@ -1668,6 +1714,34 @@ CREATE TABLE "medical_synonyms" (
     CONSTRAINT "medical_synonyms_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "notes" (
+    "id" TEXT NOT NULL,
+    "user_id" TEXT NOT NULL,
+    "topic_id" TEXT NOT NULL,
+    "material_id" TEXT,
+    "type" "NoteType" NOT NULL DEFAULT 'student',
+    "content" TEXT NOT NULL,
+    "linked_quiz_ids" TEXT[],
+    "linked_concept_ids" TEXT[],
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "last_updated_at" TIMESTAMP(3) NOT NULL,
+    "is_stale" BOOLEAN NOT NULL DEFAULT false,
+    "staled_at" TIMESTAMP(3),
+
+    CONSTRAINT "notes_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "note_versions" (
+    "id" TEXT NOT NULL,
+    "note_id" TEXT NOT NULL,
+    "content" TEXT NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "note_versions_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE INDEX "questions_course_id_idx" ON "questions"("course_id");
 
@@ -1696,10 +1770,25 @@ CREATE INDEX "user_activities_type_idx" ON "user_activities"("type");
 CREATE INDEX "user_activities_user_id_created_at_idx" ON "user_activities"("user_id", "created_at");
 
 -- CreateIndex
+CREATE INDEX "offline_practice_attempts_user_id_created_at_idx" ON "offline_practice_attempts"("user_id", "created_at");
+
+-- CreateIndex
+CREATE INDEX "offline_practice_attempts_topic_id_idx" ON "offline_practice_attempts"("topic_id");
+
+-- CreateIndex
+CREATE INDEX "analytics_events_user_id_timestamp_idx" ON "analytics_events"("user_id", "timestamp");
+
+-- CreateIndex
+CREATE INDEX "analytics_events_event_type_idx" ON "analytics_events"("event_type");
+
+-- CreateIndex
 CREATE INDEX "unit_accesses_user_id_idx" ON "unit_accesses"("user_id");
 
 -- CreateIndex
 CREATE INDEX "unit_accesses_unit_id_idx" ON "unit_accesses"("unit_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "quizzes_topic_practice_for_id_key" ON "quizzes"("topic_practice_for_id");
 
 -- CreateIndex
 CREATE INDEX "quizzes_unit_id_idx" ON "quizzes"("unit_id");
@@ -1762,10 +1851,10 @@ CREATE INDEX "user_responses_user_id_idx" ON "user_responses"("user_id");
 CREATE INDEX "user_responses_question_id_idx" ON "user_responses"("question_id");
 
 -- CreateIndex
-CREATE INDEX "user_responses_attempt_id_idx" ON "user_responses"("attempt_id");
+CREATE INDEX "user_responses_user_id_question_id_created_at_idx" ON "user_responses"("user_id", "question_id", "created_at");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "user_responses_user_id_question_id_key" ON "user_responses"("user_id", "question_id");
+CREATE INDEX "user_responses_attempt_id_idx" ON "user_responses"("attempt_id");
 
 -- CreateIndex
 CREATE INDEX "flashcards_question_id_idx" ON "flashcards"("question_id");
@@ -1799,6 +1888,9 @@ CREATE INDEX "users_created_at_idx" ON "users"("created_at");
 
 -- CreateIndex
 CREATE INDEX "users_fts_idx" ON "users" USING GIN ("fts");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "google_drive_connections_user_id_key" ON "google_drive_connections"("user_id");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "roles_name_key" ON "roles"("name");
@@ -1856,6 +1948,15 @@ CREATE INDEX "email_verification_tokens_token_idx" ON "email_verification_tokens
 
 -- CreateIndex
 CREATE INDEX "email_verification_tokens_user_id_idx" ON "email_verification_tokens"("user_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "password_reset_tokens_user_id_key" ON "password_reset_tokens"("user_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "password_reset_tokens_token_hash_key" ON "password_reset_tokens"("token_hash");
+
+-- CreateIndex
+CREATE INDEX "password_reset_tokens_expires_at_idx" ON "password_reset_tokens"("expires_at");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "user_sessions_token_key" ON "user_sessions"("token");
@@ -2020,12 +2121,6 @@ CREATE INDEX "xapi_statements_occurred_at_idx" ON "xapi_statements"("occurred_at
 CREATE UNIQUE INDEX "material_engagements_user_id_material_id_key" ON "material_engagements"("user_id", "material_id");
 
 -- CreateIndex
-CREATE INDEX "material_notes_user_id_idx" ON "material_notes"("user_id");
-
--- CreateIndex
-CREATE INDEX "material_notes_material_id_idx" ON "material_notes"("material_id");
-
--- CreateIndex
 CREATE INDEX "topic_progress_user_id_idx" ON "topic_progress"("user_id");
 
 -- CreateIndex
@@ -2051,9 +2146,6 @@ CREATE INDEX "topic_progress_user_id_status_idx" ON "topic_progress"("user_id", 
 
 -- CreateIndex
 CREATE INDEX "topic_progress_user_id_last_updated_idx" ON "topic_progress"("user_id", "last_updated");
-
--- CreateIndex
-CREATE INDEX "topic_progress_next_review_date_idx" ON "topic_progress"("next_review_date");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "topic_progress_user_id_topic_id_material_id_unit_id_course__key" ON "topic_progress"("user_id", "topic_id", "material_id", "unit_id", "course_id");
@@ -2150,6 +2242,42 @@ CREATE INDEX "learning_path_milestones_learning_path_id_idx" ON "learning_path_m
 
 -- CreateIndex
 CREATE UNIQUE INDEX "learning_path_milestones_learning_path_id_order_key" ON "learning_path_milestones"("learning_path_id", "order");
+
+-- CreateIndex
+CREATE INDEX "learning_path_phases_learning_path_id_idx" ON "learning_path_phases"("learning_path_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "learning_path_phases_learning_path_id_order_key" ON "learning_path_phases"("learning_path_id", "order");
+
+-- CreateIndex
+CREATE INDEX "learning_path_modules_phase_id_idx" ON "learning_path_modules"("phase_id");
+
+-- CreateIndex
+CREATE INDEX "learning_path_modules_course_id_idx" ON "learning_path_modules"("course_id");
+
+-- CreateIndex
+CREATE INDEX "learning_path_modules_quiz_id_idx" ON "learning_path_modules"("quiz_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "learning_path_modules_phase_id_order_key" ON "learning_path_modules"("phase_id", "order");
+
+-- CreateIndex
+CREATE INDEX "learning_path_phase_progress_user_id_idx" ON "learning_path_phase_progress"("user_id");
+
+-- CreateIndex
+CREATE INDEX "learning_path_phase_progress_phase_id_idx" ON "learning_path_phase_progress"("phase_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "learning_path_phase_progress_user_id_phase_id_key" ON "learning_path_phase_progress"("user_id", "phase_id");
+
+-- CreateIndex
+CREATE INDEX "learning_path_module_progress_user_id_idx" ON "learning_path_module_progress"("user_id");
+
+-- CreateIndex
+CREATE INDEX "learning_path_module_progress_module_id_idx" ON "learning_path_module_progress"("module_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "learning_path_module_progress_user_id_module_id_key" ON "learning_path_module_progress"("user_id", "module_id");
 
 -- CreateIndex
 CREATE INDEX "learning_goals_user_id_idx" ON "learning_goals"("user_id");
@@ -2290,6 +2418,21 @@ CREATE INDEX "chat_messages_user_id_idx" ON "chat_messages"("user_id");
 CREATE INDEX "chat_messages_created_at_idx" ON "chat_messages"("created_at");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "direct_conversations_pair_key_key" ON "direct_conversations"("pair_key");
+
+-- CreateIndex
+CREATE INDEX "direct_conversations_updated_at_idx" ON "direct_conversations"("updated_at");
+
+-- CreateIndex
+CREATE INDEX "direct_conversation_participants_user_id_idx" ON "direct_conversation_participants"("user_id");
+
+-- CreateIndex
+CREATE INDEX "direct_messages_conversation_id_created_at_idx" ON "direct_messages"("conversation_id", "created_at");
+
+-- CreateIndex
+CREATE INDEX "direct_messages_sender_id_idx" ON "direct_messages"("sender_id");
+
+-- CreateIndex
 CREATE INDEX "notifications_user_id_idx" ON "notifications"("user_id");
 
 -- CreateIndex
@@ -2302,7 +2445,10 @@ CREATE INDEX "notifications_priority_idx" ON "notifications"("priority");
 CREATE INDEX "notifications_user_id_created_at_idx" ON "notifications"("user_id", "created_at" DESC);
 
 -- CreateIndex
-CREATE INDEX "notifications_severity_idx" ON "notifications"("severity");
+CREATE INDEX "push_subscriptions_user_id_idx" ON "push_subscriptions"("user_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "push_subscriptions_user_id_endpoint_key" ON "push_subscriptions"("user_id", "endpoint");
 
 -- CreateIndex
 CREATE INDEX "weekly_digests_user_id_idx" ON "weekly_digests"("user_id");
@@ -2362,15 +2508,6 @@ CREATE INDEX "student_interactions_unit_id_idx" ON "student_interactions"("unit_
 CREATE INDEX "student_interactions_interaction_type_idx" ON "student_interactions"("interaction_type");
 
 -- CreateIndex
-CREATE INDEX "flashcard_results_user_id_idx" ON "flashcard_results"("user_id");
-
--- CreateIndex
-CREATE INDEX "flashcard_results_unit_id_idx" ON "flashcard_results"("unit_id");
-
--- CreateIndex
-CREATE INDEX "flashcard_results_quiz_id_idx" ON "flashcard_results"("quiz_id");
-
--- CreateIndex
 CREATE INDEX "recommendations_user_id_idx" ON "recommendations"("user_id");
 
 -- CreateIndex
@@ -2422,42 +2559,6 @@ CREATE INDEX "user_badges_badge_id_idx" ON "user_badges"("badge_id");
 CREATE UNIQUE INDEX "user_badges_user_id_badge_id_key" ON "user_badges"("user_id", "badge_id");
 
 -- CreateIndex
-CREATE INDEX "course_progress_course_id_idx" ON "course_progress"("course_id");
-
--- CreateIndex
-CREATE INDEX "course_progress_status_idx" ON "course_progress"("status");
-
--- CreateIndex
-CREATE INDEX "course_progress_user_id_idx" ON "course_progress"("user_id");
-
--- CreateIndex
-CREATE INDEX "course_progress_user_id_last_accessed_at_idx" ON "course_progress"("user_id", "last_accessed_at");
-
--- CreateIndex
-CREATE INDEX "course_progress_user_id_last_updated_idx" ON "course_progress"("user_id", "last_updated");
-
--- CreateIndex
-CREATE UNIQUE INDEX "course_progress_user_id_course_id_key" ON "course_progress"("user_id", "course_id");
-
--- CreateIndex
-CREATE UNIQUE INDEX "question_stats_question_id_key" ON "question_stats"("question_id");
-
--- CreateIndex
-CREATE INDEX "rapid_review_answers_sessionId_idx" ON "rapid_review_answers"("sessionId");
-
--- CreateIndex
-CREATE INDEX "rapid_review_sessions_userId_idx" ON "rapid_review_sessions"("userId");
-
--- CreateIndex
-CREATE INDEX "spaced_repetition_cards_nextReviewAt_idx" ON "spaced_repetition_cards"("nextReviewAt");
-
--- CreateIndex
-CREATE INDEX "spaced_repetition_cards_userId_idx" ON "spaced_repetition_cards"("userId");
-
--- CreateIndex
-CREATE UNIQUE INDEX "spaced_repetition_cards_userId_questionId_key" ON "spaced_repetition_cards"("userId", "questionId");
-
--- CreateIndex
 CREATE INDEX "unit_completions_unit_id_idx" ON "unit_completions"("unit_id");
 
 -- CreateIndex
@@ -2465,33 +2566,6 @@ CREATE INDEX "unit_completions_user_id_idx" ON "unit_completions"("user_id");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "unit_completions_user_id_unit_id_key" ON "unit_completions"("user_id", "unit_id");
-
--- CreateIndex
-CREATE INDEX "unit_progress_status_idx" ON "unit_progress"("status");
-
--- CreateIndex
-CREATE INDEX "unit_progress_unit_id_idx" ON "unit_progress"("unit_id");
-
--- CreateIndex
-CREATE INDEX "unit_progress_user_id_idx" ON "unit_progress"("user_id");
-
--- CreateIndex
-CREATE INDEX "unit_progress_user_id_last_accessed_at_idx" ON "unit_progress"("user_id", "last_accessed_at");
-
--- CreateIndex
-CREATE INDEX "unit_progress_user_id_last_updated_idx" ON "unit_progress"("user_id", "last_updated");
-
--- CreateIndex
-CREATE UNIQUE INDEX "unit_progress_user_id_unit_id_key" ON "unit_progress"("user_id", "unit_id");
-
--- CreateIndex
-CREATE INDEX "user_quiz_progress_quiz_id_idx" ON "user_quiz_progress"("quiz_id");
-
--- CreateIndex
-CREATE INDEX "user_quiz_progress_user_id_idx" ON "user_quiz_progress"("user_id");
-
--- CreateIndex
-CREATE UNIQUE INDEX "user_quiz_progress_user_id_quiz_id_key" ON "user_quiz_progress"("user_id", "quiz_id");
 
 -- CreateIndex
 CREATE INDEX "exam_mappings_topic_id_idx" ON "exam_mappings"("topic_id");
@@ -2554,6 +2628,15 @@ CREATE INDEX "instructor_overrides_question_id_idx" ON "instructor_overrides"("q
 CREATE INDEX "instructor_overrides_instructor_id_idx" ON "instructor_overrides"("instructor_id");
 
 -- CreateIndex
+CREATE INDEX "analytics_overrides_student_id_idx" ON "analytics_overrides"("student_id");
+
+-- CreateIndex
+CREATE INDEX "analytics_overrides_topic_id_idx" ON "analytics_overrides"("topic_id");
+
+-- CreateIndex
+CREATE INDEX "analytics_overrides_instructor_id_idx" ON "analytics_overrides"("instructor_id");
+
+-- CreateIndex
 CREATE INDEX "sync_logs_user_id_idx" ON "sync_logs"("user_id");
 
 -- CreateIndex
@@ -2574,6 +2657,18 @@ CREATE UNIQUE INDEX "medical_synonyms_term_key" ON "medical_synonyms"("term");
 -- CreateIndex
 CREATE INDEX "medical_synonyms_term_idx" ON "medical_synonyms"("term");
 
+-- CreateIndex
+CREATE INDEX "notes_user_id_idx" ON "notes"("user_id");
+
+-- CreateIndex
+CREATE INDEX "notes_topic_id_idx" ON "notes"("topic_id");
+
+-- CreateIndex
+CREATE INDEX "notes_material_id_idx" ON "notes"("material_id");
+
+-- CreateIndex
+CREATE INDEX "note_versions_note_id_idx" ON "note_versions"("note_id");
+
 -- AddForeignKey
 ALTER TABLE "questions" ADD CONSTRAINT "questions_course_id_fkey" FOREIGN KEY ("course_id") REFERENCES "courses"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
@@ -2587,6 +2682,12 @@ ALTER TABLE "question_options" ADD CONSTRAINT "question_options_question_id_fkey
 ALTER TABLE "user_activities" ADD CONSTRAINT "user_activities_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "offline_practice_attempts" ADD CONSTRAINT "offline_practice_attempts_topic_id_fkey" FOREIGN KEY ("topic_id") REFERENCES "topics"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "offline_practice_attempts" ADD CONSTRAINT "offline_practice_attempts_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "unit_accesses" ADD CONSTRAINT "unit_accesses_unit_id_fkey" FOREIGN KEY ("unit_id") REFERENCES "units"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -2597,6 +2698,9 @@ ALTER TABLE "quizzes" ADD CONSTRAINT "quizzes_category_id_fkey" FOREIGN KEY ("ca
 
 -- AddForeignKey
 ALTER TABLE "quizzes" ADD CONSTRAINT "quizzes_topic_id_fkey" FOREIGN KEY ("topic_id") REFERENCES "topics"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "quizzes" ADD CONSTRAINT "quizzes_topic_practice_for_id_fkey" FOREIGN KEY ("topic_practice_for_id") REFERENCES "topics"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "quizzes" ADD CONSTRAINT "quizzes_unit_id_fkey" FOREIGN KEY ("unit_id") REFERENCES "units"("id") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -2641,6 +2745,9 @@ ALTER TABLE "user_flashcard_progress" ADD CONSTRAINT "user_flashcard_progress_fl
 ALTER TABLE "user_flashcard_progress" ADD CONSTRAINT "user_flashcard_progress_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "google_drive_connections" ADD CONSTRAINT "google_drive_connections_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "user_skill_states" ADD CONSTRAINT "user_skill_states_skill_id_fkey" FOREIGN KEY ("skill_id") REFERENCES "topics"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -2666,6 +2773,9 @@ ALTER TABLE "user_security_settings" ADD CONSTRAINT "user_security_settings_user
 
 -- AddForeignKey
 ALTER TABLE "email_verification_tokens" ADD CONSTRAINT "email_verification_tokens_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "password_reset_tokens" ADD CONSTRAINT "password_reset_tokens_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "user_sessions" ADD CONSTRAINT "user_sessions_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -2716,6 +2826,9 @@ ALTER TABLE "materials" ADD CONSTRAINT "materials_unit_id_fkey" FOREIGN KEY ("un
 ALTER TABLE "materials" ADD CONSTRAINT "materials_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "recommendation_scores" ADD CONSTRAINT "recommendation_scores_item_id_fkey" FOREIGN KEY ("item_id") REFERENCES "materials"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "material_shares" ADD CONSTRAINT "material_shares_material_id_fkey" FOREIGN KEY ("material_id") REFERENCES "materials"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -2738,12 +2851,6 @@ ALTER TABLE "material_engagements" ADD CONSTRAINT "material_engagements_material
 
 -- AddForeignKey
 ALTER TABLE "material_engagements" ADD CONSTRAINT "material_engagements_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "material_notes" ADD CONSTRAINT "material_notes_material_id_fkey" FOREIGN KEY ("material_id") REFERENCES "materials"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "material_notes" ADD CONSTRAINT "material_notes_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "topic_progress" ADD CONSTRAINT "topic_progress_course_id_fkey" FOREIGN KEY ("course_id") REFERENCES "courses"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -2801,6 +2908,30 @@ ALTER TABLE "learning_path_progress" ADD CONSTRAINT "learning_path_progress_user
 
 -- AddForeignKey
 ALTER TABLE "learning_path_milestones" ADD CONSTRAINT "learning_path_milestones_learning_path_id_fkey" FOREIGN KEY ("learning_path_id") REFERENCES "learning_paths"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "learning_path_phases" ADD CONSTRAINT "learning_path_phases_learning_path_id_fkey" FOREIGN KEY ("learning_path_id") REFERENCES "learning_paths"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "learning_path_modules" ADD CONSTRAINT "learning_path_modules_phase_id_fkey" FOREIGN KEY ("phase_id") REFERENCES "learning_path_phases"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "learning_path_modules" ADD CONSTRAINT "learning_path_modules_course_id_fkey" FOREIGN KEY ("course_id") REFERENCES "courses"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "learning_path_modules" ADD CONSTRAINT "learning_path_modules_quiz_id_fkey" FOREIGN KEY ("quiz_id") REFERENCES "quizzes"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "learning_path_phase_progress" ADD CONSTRAINT "learning_path_phase_progress_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "learning_path_phase_progress" ADD CONSTRAINT "learning_path_phase_progress_phase_id_fkey" FOREIGN KEY ("phase_id") REFERENCES "learning_path_phases"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "learning_path_module_progress" ADD CONSTRAINT "learning_path_module_progress_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "learning_path_module_progress" ADD CONSTRAINT "learning_path_module_progress_module_id_fkey" FOREIGN KEY ("module_id") REFERENCES "learning_path_modules"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "learning_goals" ADD CONSTRAINT "learning_goals_courseId_fkey" FOREIGN KEY ("courseId") REFERENCES "courses"("id") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -2884,7 +3015,22 @@ ALTER TABLE "chat_messages" ADD CONSTRAINT "chat_messages_session_id_fkey" FOREI
 ALTER TABLE "chat_messages" ADD CONSTRAINT "chat_messages_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "direct_conversation_participants" ADD CONSTRAINT "direct_conversation_participants_conversation_id_fkey" FOREIGN KEY ("conversation_id") REFERENCES "direct_conversations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "direct_conversation_participants" ADD CONSTRAINT "direct_conversation_participants_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "direct_messages" ADD CONSTRAINT "direct_messages_conversation_id_fkey" FOREIGN KEY ("conversation_id") REFERENCES "direct_conversations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "direct_messages" ADD CONSTRAINT "direct_messages_sender_id_fkey" FOREIGN KEY ("sender_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "notifications" ADD CONSTRAINT "notifications_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "push_subscriptions" ADD CONSTRAINT "push_subscriptions_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "weekly_digests" ADD CONSTRAINT "weekly_digests_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -2912,15 +3058,6 @@ ALTER TABLE "student_interactions" ADD CONSTRAINT "student_interactions_unit_id_
 
 -- AddForeignKey
 ALTER TABLE "student_interactions" ADD CONSTRAINT "student_interactions_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "flashcard_results" ADD CONSTRAINT "flashcard_results_quiz_id_fkey" FOREIGN KEY ("quiz_id") REFERENCES "quizzes"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "flashcard_results" ADD CONSTRAINT "flashcard_results_unit_id_fkey" FOREIGN KEY ("unit_id") REFERENCES "units"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "flashcard_results" ADD CONSTRAINT "flashcard_results_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "recommendations" ADD CONSTRAINT "recommendations_recommended_unit_id_fkey" FOREIGN KEY ("recommended_unit_id") REFERENCES "units"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -2953,46 +3090,10 @@ ALTER TABLE "user_badges" ADD CONSTRAINT "user_badges_badge_id_fkey" FOREIGN KEY
 ALTER TABLE "user_badges" ADD CONSTRAINT "user_badges_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "course_progress" ADD CONSTRAINT "course_progress_course_id_fkey" FOREIGN KEY ("course_id") REFERENCES "courses"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "course_progress" ADD CONSTRAINT "course_progress_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "question_stats" ADD CONSTRAINT "question_stats_question_id_fkey" FOREIGN KEY ("question_id") REFERENCES "questions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "rapid_review_answers" ADD CONSTRAINT "rapid_review_answers_questionId_fkey" FOREIGN KEY ("questionId") REFERENCES "questions"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "rapid_review_answers" ADD CONSTRAINT "rapid_review_answers_sessionId_fkey" FOREIGN KEY ("sessionId") REFERENCES "rapid_review_sessions"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "rapid_review_sessions" ADD CONSTRAINT "rapid_review_sessions_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "spaced_repetition_cards" ADD CONSTRAINT "spaced_repetition_cards_questionId_fkey" FOREIGN KEY ("questionId") REFERENCES "questions"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "spaced_repetition_cards" ADD CONSTRAINT "spaced_repetition_cards_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "unit_completions" ADD CONSTRAINT "unit_completions_unit_id_fkey" FOREIGN KEY ("unit_id") REFERENCES "units"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "unit_completions" ADD CONSTRAINT "unit_completions_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "unit_progress" ADD CONSTRAINT "unit_progress_unit_id_fkey" FOREIGN KEY ("unit_id") REFERENCES "units"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "unit_progress" ADD CONSTRAINT "unit_progress_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "user_quiz_progress" ADD CONSTRAINT "user_quiz_progress_quiz_id_fkey" FOREIGN KEY ("quiz_id") REFERENCES "quizzes"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "user_quiz_progress" ADD CONSTRAINT "user_quiz_progress_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "exam_mappings" ADD CONSTRAINT "exam_mappings_topic_id_fkey" FOREIGN KEY ("topic_id") REFERENCES "topics"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -3028,4 +3129,25 @@ ALTER TABLE "instructor_overrides" ADD CONSTRAINT "instructor_overrides_instruct
 ALTER TABLE "instructor_overrides" ADD CONSTRAINT "instructor_overrides_question_id_fkey" FOREIGN KEY ("question_id") REFERENCES "questions"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "analytics_overrides" ADD CONSTRAINT "analytics_overrides_instructor_id_fkey" FOREIGN KEY ("instructor_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "analytics_overrides" ADD CONSTRAINT "analytics_overrides_student_id_fkey" FOREIGN KEY ("student_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "analytics_overrides" ADD CONSTRAINT "analytics_overrides_topic_id_fkey" FOREIGN KEY ("topic_id") REFERENCES "topics"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "sync_logs" ADD CONSTRAINT "sync_logs_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "notes" ADD CONSTRAINT "notes_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "notes" ADD CONSTRAINT "notes_topic_id_fkey" FOREIGN KEY ("topic_id") REFERENCES "topics"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "notes" ADD CONSTRAINT "notes_material_id_fkey" FOREIGN KEY ("material_id") REFERENCES "materials"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "note_versions" ADD CONSTRAINT "note_versions_note_id_fkey" FOREIGN KEY ("note_id") REFERENCES "notes"("id") ON DELETE CASCADE ON UPDATE CASCADE;

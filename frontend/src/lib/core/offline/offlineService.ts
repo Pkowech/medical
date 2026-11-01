@@ -70,6 +70,7 @@ class OfflineService {
       content: Blob;
     }>;
     questions: OfflineQuizQuestion[];
+    contentRevision?: string;
   }): Promise<OfflineTopicBundle> {
     const db = await this.initialize();
     const bundleId = this.topicBundleId(input.userId, input.topicId);
@@ -123,6 +124,8 @@ class OfflineService {
       totalBytes:
         [...materialRecords.values()].reduce((total, material) => total + material.size, 0) +
         new Blob([JSON.stringify(questions)]).size,
+      contentRevision: input.contentRevision,
+      stale: false,
     };
     const tx = db.transaction(
       ['offlineTopics', 'offlineTopicMaterials', 'offlineTopicQuizzes'],
@@ -230,6 +233,13 @@ class OfflineService {
         .delete(this.materialId(userId, topicId, materialId));
     }
     await tx.done;
+  }
+
+  async markOfflineTopicStale(userId: string, topicId: string): Promise<void> {
+    const db = await this.initialize();
+    const bundle = await db.get('offlineTopics', this.topicBundleId(userId, topicId));
+    if (!bundle || bundle.stale) return;
+    await db.put('offlineTopics', { ...bundle, stale: true });
   }
 
   async removeSessionOfflineTopic(

@@ -36,6 +36,11 @@ import { toast } from 'sonner';
 import { Brain } from 'lucide-react';
 import { offlineService } from '@/lib/core/offline/offlineService';
 import { isOfflineQueuedError } from '@/lib/core/offline/offlineQueuedError';
+import {
+  markBundleStaleIfOutdated,
+  revisionFromTopicContent,
+} from '@/lib/core/offline/reconcileOfflineRevision';
+import { StoragePersistenceNotice } from '@/lib/core/offline/StoragePersistenceNotice';
 import type { OfflineQuizQuestion, OfflineTopicBundle } from '@/lib/core/offline/db';
 import {
   StartCourseStudySessionButton,
@@ -143,6 +148,11 @@ async function prepareTopicOfflineContent(
     preserveCachedQuiz: quizResult.status === 'rejected',
     materials: downloadedMaterials,
     questions,
+    contentRevision: revisionFromTopicContent(
+      topic.id,
+      pdfMaterials,
+      questions.map(question => ({ id: question.id })),
+    ),
   });
   return { bundle, complete };
 }
@@ -278,7 +288,15 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
 
         if (userId) {
           const bundle = await offlineService.getOfflineTopicBundle(userId, topicId);
-          setOfflineBundle(bundle);
+          if (bundle && navigator.onLine) {
+            const currentMaterials =
+              topicData.materials && Array.isArray(topicData.materials)
+                ? topicData.materials
+                : materials;
+            setOfflineBundle(await markBundleStaleIfOutdated(userId, bundle, currentMaterials));
+          } else {
+            setOfflineBundle(bundle);
+          }
         }
       } catch (error) {
         console.error('Error fetching topic:', error);
