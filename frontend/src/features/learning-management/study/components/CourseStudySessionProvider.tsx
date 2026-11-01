@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { Clock, Pause, Play, Square } from 'lucide-react';
+import { Pause, Play, Square } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/shared/components/ui/button';
 import { Textarea } from '@/shared/components/ui/textarea';
@@ -721,14 +721,11 @@ export function CourseStudySessionIndicator({
   return (
     <details className="relative">
       <summary
-        className="flex min-h-11 list-none cursor-pointer items-center gap-1.5 rounded-md border border-border px-2 text-xs font-medium text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-        aria-label="Study session controls"
-        title={`Study time ${activeSession.isActive ? 'tracking' : 'paused'}: ${activeSession.topicTitle}`}
+        className="flex min-h-11 list-none cursor-pointer items-center gap-2 rounded-md border border-border px-2 text-xs font-medium text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        aria-label={`Study session ${activeSession.isActive ? 'running' : 'paused'}, ${formatElapsedTime(elapsedSeconds)} elapsed. Open session controls.`}
+        title={`${activeSession.isActive ? 'Running' : 'Paused'}: ${activeSession.topicTitle}. Open session controls.`}
       >
         <span className={`h-2 w-2 rounded-full ${activeSession.isActive ? 'bg-emerald-500' : 'bg-muted-foreground'}`} />
-        <Clock aria-hidden="true" className="h-4 w-4" />
-        <span className="text-[11px] sm:hidden">Study</span>
-        <span className="hidden sm:inline">Study time</span>
         <span className="font-mono tabular-nums" aria-live="off">
           {formatElapsedTime(elapsedSeconds)}
         </span>

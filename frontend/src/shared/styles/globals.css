@@ -109,6 +109,22 @@
   }
 }
 
+@media (hover: none) and (pointer: coarse) {
+  * {
+    scrollbar-width: none;
+  }
+
+  *::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@media (max-width: 1023px) {
+  .tsqd-open-btn-container {
+    display: none !important;
+  }
+}
+
 .install-instructions-dialog::backdrop {
   background: rgb(2 6 23 / 50%);
 }

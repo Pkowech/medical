@@ -142,6 +142,25 @@ class CourseService {
    * Fetches a single course by its ID.
    */
   async getCourseById(courseId: string): Promise<Course> {
+    if (courseId === 'course-preview' || courseId === 'preview') {
+      return {
+        id: courseId,
+        name: 'Preview Course',
+        title: 'Preview Course',
+        code: 'PREVIEW',
+        description: 'Preview course details before enrolling in the full learning experience.',
+        difficulty: 'beginner',
+        status: 'published',
+        price: 0,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        estimatedHours: 0,
+        enrollmentCount: 0,
+        rating: 0,
+        units: [],
+      } as Course;
+    }
+
     const response = await apiService.get<unknown>(`${this.baseUrl}/${courseId}`, {
       params: {
         include: 'units,topics,materials',

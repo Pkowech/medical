@@ -67,6 +67,10 @@ function getMobileTopicTitle(title?: string): string {
   return words.length > 2 ? words.slice(0, 2).join(' ') : title || 'Topic';
 }
 
+function getTopicBreadcrumbTitle(title: string): string {
+  return /\boverview$/i.test(title.trim()) ? 'Overview' : title;
+}
+
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
@@ -536,15 +540,15 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
                     { label: 'Courses', href: '/courses' },
                     ...(courseId
                       ? [{
-                          label: unitData.courseName || 'Course overview',
+                          label: unitData.courseName || unitData.title,
                           href: `/courses/${courseId}`,
                         }]
                       : []),
-                    {
-                      label: hasSelectedTopic
-                        ? typedCurrentTopic?.title || unitData.title
-                        : unitData.title,
-                    },
+                    ...(hasSelectedTopic
+                      ? [{ label: getTopicBreadcrumbTitle(typedCurrentTopic?.title || unitData.title) }]
+                      : !courseId || Boolean(unitData.courseName && unitData.courseName !== unitData.title)
+                        ? [{ label: unitData.title }]
+                        : []),
                   ]}
                 />
                 <details className="group relative shrink-0">

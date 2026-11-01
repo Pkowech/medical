@@ -299,6 +299,7 @@ const nextConfig = {
 
   // ========== DEVELOPER EXPERIENCE ==========
   allowedDevOrigins: ALLOWED_DEV_ORIGINS,
+  devIndicators: false,
   turbopack: {
     root: projectRoot,
   },

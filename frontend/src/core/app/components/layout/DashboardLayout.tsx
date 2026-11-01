@@ -115,7 +115,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                             isFullHeightPage
                                 ? 'overflow-x-hidden overflow-y-auto lg:overflow-hidden'
                                 : 'overflow-auto',
-                            !isQuizSessionPage && !isImmersive && 'pb-[calc(4.0625rem+env(safe-area-inset-bottom))] lg:pb-0',
+                            !isQuizSessionPage && !isImmersive && 'pb-[calc(6rem+env(safe-area-inset-bottom))] lg:pb-0',
                         )}
                     >
                         <div

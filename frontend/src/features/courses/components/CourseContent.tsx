@@ -185,7 +185,9 @@ export const CourseContent = ({
             <p className="text-[13px] font-semibold uppercase tracking-wide text-primary">Your next step</p>
             <h3 className="mt-1 font-bold text-foreground">
               {nextStep === 'material'
-                ? `Next: ${nextMaterial?.material.title}`
+                ? nextMaterial?.material.title.toLowerCase().includes('notes')
+                  ? 'Next: Read the notes'
+                  : 'Next: Continue studying'
                 : nextStep === 'assessment'
                   ? lesson.failedAttempts
                     ? 'Review and retry your assessment'
@@ -208,7 +210,7 @@ export const CourseContent = ({
 
         <p className="text-sm text-foreground/75">
           {nextStep === 'material'
-            ? nextMaterial?.material.title
+            ? nextMaterial?.material.description || 'Open this material to continue your study.'
             : nextStep === 'assessment'
               ? allMaterialsComplete
                 ? `Your study materials are complete. A passing assessment (${masteryPassingScore}%) confirms mastery and unlocks progression.`
@@ -288,7 +290,7 @@ export const CourseContent = ({
               title: 'Progress',
               detail: isLastLesson
                 ? lesson.masteryUnlocked
-                  ? 'Course complete'
+                  ? 'Unit complete'
                   : 'Final topic'
                 : lesson.nextTopicUnlocked
                   ? 'Next topic unlocked'
@@ -325,7 +327,7 @@ export const CourseContent = ({
         </ol>
 
         {materials.length > 1 && (
-          <div aria-label="Study materials" className="flex flex-wrap gap-2">
+          <div role="group" aria-label="Study materials" className="flex flex-wrap gap-2">
             {materialStatuses
               .filter(({ material }) => String(material.id) !== String(nextMaterial?.material.id))
               .map(({ material, progress: materialProgress }) => (

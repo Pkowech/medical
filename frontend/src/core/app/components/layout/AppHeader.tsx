@@ -82,8 +82,8 @@ export const AppHeader: React.FC<{ showDesktopSidebarToggle?: boolean }> = ({
                   title
                 )}
               </h1>
-              {!isCompactHeader && description && (
-                <p className="hidden max-w-2xl truncate text-xs text-muted-foreground md:block sm:text-sm">
+              {description && (
+                <p className="line-clamp-2 max-w-2xl text-xs text-muted-foreground sm:text-sm md:truncate md:line-clamp-none">
                   {description}
                 </p>
               )}

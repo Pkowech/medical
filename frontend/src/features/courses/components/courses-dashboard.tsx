@@ -6,15 +6,17 @@ import {
   BookOpen,
   Star,
   CheckCircle,
-  AlertCircle,
   Search,
   type LucideIcon,
   Layers,
   ChevronRight,
-  UserRound,
   MoreVertical,
   LogOut,
   FolderOpen,
+  Clock3,
+  Users,
+  X,
+  SlidersHorizontal,
 } from 'lucide-react';
 import {
   useInfiniteQuery,
@@ -75,6 +77,7 @@ export const CoursesDashboard = () => {
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [courseToUnenroll, setCourseToUnenroll] = useState<Course | null>(null);
   const [isUnenrolling, setIsUnenrolling] = useState(false);
+  const [isCategoryFilterOpen, setIsCategoryFilterOpen] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -271,6 +274,14 @@ export const CoursesDashboard = () => {
 
   const loadedCourses = infiniteData?.pages.flatMap(page => page.courses) ?? [];
   const totalCourseCount = infiniteData?.pages[0]?.stats.total ?? loadedCourses.length;
+  const suggestedCoursesQuery = useQuery({
+    queryKey: ['course-suggestions', user?.id],
+    queryFn: () => courseService.getCourses({ page: 1, limit: 3 }),
+    enabled: Boolean(user?.id) && activeTab === 'enrolled' && !coursesLoading &&
+      !coursesError && loadedCourses.length === 0,
+    staleTime: 5 * 60 * 1000,
+  });
+  const suggestedCourses = suggestedCoursesQuery.data?.items.slice(0, 3) ?? [];
 
   const requestCourseUnenrollment = (course: Course) => {
     setCourseToUnenroll(course);
@@ -300,14 +311,15 @@ export const CoursesDashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#f8f9fa] p-4 dark:bg-background md:p-8">
-      <div className="mx-auto flex max-w-7xl flex-col space-y-6">
-        
+    <div className="min-h-full bg-[#f8f9fa] p-4 dark:bg-background md:p-6">
+      <div className="mx-auto flex max-w-7xl flex-col space-y-5">
         {/* Search & Tabs Header */}
-        <div className="flex flex-col justify-between gap-4 rounded-2xl border border-border bg-card p-4 shadow-sm dark:border-border dark:bg-card sm:flex-row sm:items-center">
-          <div className="flex min-w-0 flex-col gap-3">
-            <h1 className="text-xl font-semibold tracking-tight text-foreground dark:text-foreground">Classes</h1>
-            <div className="flex w-fit max-w-full items-center gap-1 overflow-x-auto rounded-full bg-muted p-1 dark:bg-card">
+        <div className="flex flex-col justify-between gap-3 rounded-2xl border border-border bg-card p-3 dark:border-border dark:bg-card sm:flex-row sm:items-center sm:p-4">
+          <div className="flex min-w-0 flex-col gap-2">
+            <div
+              className="grid w-full items-center gap-1 rounded-full bg-muted p-1 dark:bg-card sm:w-fit"
+              style={{ gridTemplateColumns: `repeat(${user ? 3 : 1}, minmax(0, 1fr))` }}
+            >
               {user && <TabButton
                 active={activeTab === 'enrolled'} 
                 onClick={() => {
@@ -315,7 +327,8 @@ export const CoursesDashboard = () => {
                   setFilters(prev => ({ ...prev, searchTerm: '' }));
                   setDebouncedSearchTerm('');
                 }}
-                label="My Classes"
+                label="Mine"
+                accessibleLabel="My Classes"
                 icon={BookOpen}
               />}
               <TabButton 
@@ -342,44 +355,44 @@ export const CoursesDashboard = () => {
             )}
           </div>
 
-          <div className="flex w-full flex-col gap-2 sm:max-w-xl sm:flex-row">
+          <div className="flex w-full items-center gap-2 sm:max-w-xl">
             <form onSubmit={handleSearch} className="relative min-w-0 flex-1">
               <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <input
                 type="text"
                 placeholder="Search classes"
                 value={filters.searchTerm}
-                onChange={e => setFilters({ ...filters, searchTerm: e.target.value })}
-                className="w-full rounded-full border border-border bg-card py-2.5 pl-10 pr-4 text-sm text-foreground outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-border dark:bg-background dark:text-foreground dark:focus:ring-blue-950"
+                onChange={e => setFilters(current => ({ ...current, searchTerm: e.target.value }))}
+                aria-label="Search classes"
+                className="h-11 w-full rounded-full border border-border bg-card py-2.5 pl-10 pr-10 text-sm text-foreground outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-border dark:bg-background dark:text-foreground dark:focus:ring-blue-950"
               />
+              {filters.searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFilters(current => ({ ...current, searchTerm: '' }));
+                    setDebouncedSearchTerm('');
+                  }}
+                  aria-label="Clear search"
+                  className="absolute right-1 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  <X aria-hidden="true" className="h-4 w-4" />
+                </button>
+              )}
             </form>
             {activeTab === 'discover' && (
-              <div className="min-w-0 sm:w-52">
-                <label className="sr-only" htmlFor="course-category-filter">Filter courses by category</label>
-                <select
-                  id="course-category-filter"
-                  value={filters.category}
-                  onChange={event => setFilters(current => ({ ...current, category: event.target.value }))}
-                  disabled={categoriesLoading || categoriesError}
-                  className="w-full rounded-full border border-border bg-card px-4 py-2.5 text-sm text-foreground outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-border dark:bg-background dark:text-foreground dark:focus:ring-blue-950"
-                >
-                  <option value="">
-                    {categoriesLoading ? 'Loading categories...' : 'All categories'}
-                  </option>
-                  {courseCategories.map(category => (
-                    <option key={category.id} value={category.id}>{category.name}</option>
-                  ))}
-                </select>
-                {categoriesError && (
-                  <p className="mt-1 flex items-center gap-1 px-3 text-xs text-destructive" role="alert">
-                    <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                    Categories could not be loaded.{' '}
-                    <button type="button" className="underline" onClick={() => void refetchCategories()}>
-                      Retry
-                    </button>
-                  </p>
+              <button
+                type="button"
+                onClick={() => setIsCategoryFilterOpen(true)}
+                aria-label={`Filter by category${filters.category ? `: ${courseCategories.find(category => category.id === filters.category)?.name ?? 'selected'}` : ''}`}
+                aria-haspopup="dialog"
+                className="relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border bg-card text-muted-foreground transition hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:bg-background"
+              >
+                <SlidersHorizontal aria-hidden="true" className="h-4 w-4" />
+                {filters.category && (
+                  <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-blue-600" />
                 )}
-              </div>
+              </button>
             )}
           </div>
         </div>
@@ -399,18 +412,31 @@ export const CoursesDashboard = () => {
             </button>
           </div>
         ) : coursesLoading ? (
-          <div className="flex flex-col items-center justify-center py-20">
-            <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent" />
-            <p className="mt-4 text-muted-foreground font-medium">Curating your courses...</p>
+          <div
+            className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3"
+            role="status"
+            aria-label="Loading courses"
+          >
+            {Array.from({ length: 3 }, (_, index) => (
+              <div key={index} className="overflow-hidden rounded-xl border border-border bg-card p-3">
+                <div className="h-24 animate-pulse rounded-lg bg-muted" />
+                <div className="mt-4 space-y-3">
+                  <div className="h-3 w-1/3 animate-pulse rounded bg-muted" />
+                  <div className="h-4 w-4/5 animate-pulse rounded bg-muted" />
+                  <div className="h-4 w-full animate-pulse rounded bg-muted" />
+                  <div className="h-10 animate-pulse rounded-lg bg-muted" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-muted-foreground dark:text-muted-foreground">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-lg font-semibold text-foreground dark:text-foreground">
                 {activeTab === 'enrolled' ? 'Enrolled classes' : activeTab === 'recommended' ? 'Recommended classes' : 'Explore classes'}
               </h2>
-              <span className="text-sm text-muted-foreground dark:text-muted-foreground">
-                {totalCourseCount}
+              <span className="shrink-0 text-sm font-medium text-muted-foreground dark:text-muted-foreground" aria-live="polite">
+                {totalCourseCount} {activeTab === 'enrolled' ? 'enrolled' : 'classes'}
               </span>
             </div>
             {!user && (
@@ -423,7 +449,7 @@ export const CoursesDashboard = () => {
                 {loadedCourses.map(course => (
                   <CourseCard 
                     key={course.id}
-                    course={activeTab === 'enrolled'
+                    course={courseProgressById.has(course.id)
                       ? {
                           ...course,
                           progressPercentage: courseProgressById.get(course.id)?.progressPercentage
@@ -431,32 +457,105 @@ export const CoursesDashboard = () => {
                             ?? 0,
                         }
                       : course}
-                    enrolledView={activeTab === 'enrolled'}
                     onUnenrollCourse={requestCourseUnenrollment}
                     router={router}
                   />
                 ))}
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center py-20 bg-card dark:bg-card rounded-3xl border-2 border-dashed border-border dark:border-border">
-                <div className="p-4 bg-background dark:bg-card rounded-full mb-4">
-                  <AlertCircle className="w-10 h-10 text-muted-foreground" />
+              <div className="flex flex-col items-center justify-center rounded-3xl border-2 border-dashed border-border bg-card px-5 py-10 dark:bg-card">
+                <div className="mb-4 rounded-full bg-blue-50 p-4 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">
+                  {activeTab === 'enrolled'
+                    ? <BookOpen aria-hidden="true" className="h-9 w-9" />
+                    : <Search aria-hidden="true" className="h-9 w-9" />}
                 </div>
-                <h3 className="text-xl font-bold text-foreground dark:text-foreground">No courses found</h3>
+                <h3 className="text-center text-xl font-bold text-foreground dark:text-foreground">
+                  {activeTab === 'enrolled'
+                    ? "You're not enrolled in any classes yet"
+                    : filters.searchTerm || filters.category
+                      ? 'No classes match your filters'
+                      : 'No classes available yet'}
+                </h3>
                 <p className="text-muted-foreground max-w-xs text-center mt-2">
                   {activeTab === 'enrolled' 
-                    ? "You haven't enrolled in any courses yet. Start exploring the catalog!"
-                    : "We couldn't find any courses matching your search. Try different keywords."}
+                    ? 'Explore the catalog to find a class that fits your goals.'
+                    : filters.searchTerm || filters.category
+                      ? 'Try another search or clear your filters to see more classes.'
+                      : 'Check back soon for new classes in the catalog.'}
                 </p>
                 {activeTab === 'enrolled' && (
                   <button 
-                    onClick={() => setActiveTab('discover')}
-                    className="mt-6 px-6 py-2 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-colors"
+                    type="button"
+                    onClick={() => {
+                      setFilters(current => ({ ...current, searchTerm: '', category: '' }));
+                      setDebouncedSearchTerm('');
+                      setActiveTab('discover');
+                    }}
+                    className="mt-5 inline-flex h-11 items-center gap-2 rounded-xl bg-blue-700 px-5 font-semibold text-white transition-colors hover:bg-blue-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
                   >
                     Explore Catalog
+                    <ChevronRight aria-hidden="true" className="h-4 w-4" />
+                  </button>
+                )}
+                {activeTab === 'discover' && (filters.searchTerm || filters.category) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFilters(current => ({ ...current, searchTerm: '', category: '' }));
+                      setDebouncedSearchTerm('');
+                    }}
+                    className="mt-4 text-sm font-semibold text-blue-700 underline-offset-4 hover:underline dark:text-blue-300"
+                  >
+                    Clear filters
                   </button>
                 )}
               </div>
+            )}
+
+            {activeTab === 'enrolled' && loadedCourses.length === 0 && (
+              <section aria-labelledby="suggested-courses-title" className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <h3 id="suggested-courses-title" className="text-base font-semibold text-foreground">
+                    Suggested classes
+                  </h3>
+                  {suggestedCourses.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('discover')}
+                      className="text-sm font-semibold text-blue-700 hover:underline dark:text-blue-300"
+                    >
+                      View all
+                    </button>
+                  )}
+                </div>
+                {suggestedCoursesQuery.isLoading ? (
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3" role="status" aria-label="Loading suggested classes">
+                    {Array.from({ length: 3 }, (_, index) => (
+                      <div key={index} className="h-48 animate-pulse rounded-xl border border-border bg-card" />
+                    ))}
+                  </div>
+                ) : suggestedCoursesQuery.isError ? (
+                  <p role="alert" className="text-sm text-destructive">
+                    Suggested classes could not be loaded.{' '}
+                    <button type="button" className="font-semibold underline" onClick={() => void suggestedCoursesQuery.refetch()}>
+                      Retry
+                    </button>
+                  </p>
+                ) : suggestedCourses.length > 0 ? (
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                    {suggestedCourses.map(course => (
+                      <CourseCard
+                        key={course.id}
+                        course={course}
+                        onUnenrollCourse={requestCourseUnenrollment}
+                        router={router}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">New classes will appear here as they become available.</p>
+                )}
+              </section>
             )}
 
             {hasNextPage && (
@@ -509,6 +608,45 @@ export const CoursesDashboard = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <Dialog open={isCategoryFilterOpen} onOpenChange={setIsCategoryFilterOpen}>
+        <DialogContent className="bottom-0 left-0 top-auto w-full max-w-none translate-x-0 translate-y-0 rounded-t-2xl border-border bg-card p-5 dark:border-border dark:bg-card sm:bottom-auto sm:left-[50%] sm:top-[50%] sm:max-w-md sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-2xl">
+          <DialogHeader className="text-left">
+            <DialogTitle className="text-foreground">Filter by category</DialogTitle>
+            <DialogDescription>Choose a category to narrow the catalog.</DialogDescription>
+          </DialogHeader>
+          {categoriesError ? (
+            <p role="alert" className="text-sm text-destructive">
+              Categories could not be loaded.{' '}
+              <button type="button" className="font-semibold underline" onClick={() => void refetchCategories()}>
+                Retry
+              </button>
+            </p>
+          ) : categoriesLoading ? (
+            <p role="status" className="text-sm text-muted-foreground">Loading categories…</p>
+          ) : (
+            <div className="grid max-h-[55vh] gap-2 overflow-y-auto">
+              {[{ id: '', name: 'All categories' }, ...courseCategories].map(category => (
+                <button
+                  key={category.id || 'all'}
+                  type="button"
+                  aria-pressed={filters.category === category.id}
+                  onClick={() => {
+                    setFilters(current => ({ ...current, category: category.id }));
+                    setIsCategoryFilterOpen(false);
+                  }}
+                  className={`min-h-11 rounded-xl border px-4 text-left text-sm font-medium transition-colors ${
+                    filters.category === category.id
+                      ? 'border-blue-600 bg-blue-50 text-blue-800 dark:bg-blue-950/40 dark:text-blue-200'
+                      : 'border-border text-foreground hover:bg-muted'
+                  }`}
+                >
+                  {category.name}
+                </button>
+              ))}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
@@ -517,35 +655,35 @@ interface TabButtonProps {
   active: boolean;
   onClick: () => void;
   label: string;
+  accessibleLabel?: string;
   icon: LucideIcon;
 }
 
-const TabButton = ({ active, onClick, label, icon: Icon }: TabButtonProps) => (
+const TabButton = ({ active, onClick, label, accessibleLabel, icon: Icon }: TabButtonProps) => (
   <button
     type="button"
     onClick={onClick}
     aria-pressed={active}
-    className={`flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+    aria-label={accessibleLabel ?? label}
+    className={`flex min-h-11 min-w-0 items-center justify-center gap-1.5 rounded-full px-2 py-2 text-xs font-medium transition-colors sm:gap-2 sm:px-4 sm:text-sm ${
       active
         ? 'bg-card text-blue-700 shadow-sm dark:bg-secondary dark:text-blue-300'
         : 'text-muted-foreground hover:bg-card/70 hover:text-foreground dark:text-muted-foreground dark:hover:bg-secondary/70 dark:hover:text-foreground'
     }`}
   >
-    <Icon className={`h-4 w-4 ${active ? 'text-blue-600 dark:text-blue-300' : 'text-muted-foreground'}`} />
-    {label}
+    <Icon aria-hidden="true" className={`h-4 w-4 shrink-0 ${active ? 'text-blue-600 dark:text-blue-300' : 'text-muted-foreground'}`} />
+    <span className="truncate">{label}</span>
   </button>
 );
 
 interface CourseCardProps {
   course: Course;
-  enrolledView?: boolean;
   onUnenrollCourse: (course: Course) => void;
   router: ReturnType<typeof useRouter>;
 }
 
 const CourseCard = ({
   course,
-  enrolledView = false,
   onUnenrollCourse,
   router,
 }: CourseCardProps) => {
@@ -564,16 +702,16 @@ const CourseCard = ({
   const openCourse = () => router.push(`/courses/${encodeURIComponent(course.id)}`);
 
   return (
-    <article className="group flex min-h-[21rem] flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm transition-shadow hover:shadow-md dark:border-border dark:bg-card">
-      <div className={`relative flex h-36 flex-col justify-between overflow-hidden bg-linear-to-br ${bannerPalettes[paletteIndex]} px-5 py-4 text-white`}>
-        <BookOpen className="absolute -bottom-8 -right-4 h-36 w-36 rotate-[-12deg] text-white/10" aria-hidden="true" />
+    <article className="group flex flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm transition-shadow hover:shadow-md dark:border-border dark:bg-card">
+      <div className={`relative flex h-24 flex-col justify-between overflow-hidden bg-linear-to-br ${bannerPalettes[paletteIndex]} px-4 py-3 text-white`}>
+        <BookOpen className="absolute -bottom-6 -right-3 h-24 w-24 rotate-[-12deg] text-white/10" aria-hidden="true" />
         <div className="relative flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-start gap-2">
-            <span className="shrink-0 rounded bg-black/15 px-2 py-1 text-xs font-medium tracking-wide text-white/90">
+            <span className="shrink-0 rounded-md bg-slate-950/70 px-2 py-1 text-xs font-semibold tracking-wide text-white">
               {course.code || 'Course'}
             </span>
             {course.category?.name && (
-              <span className="max-w-40 truncate rounded bg-black/15 px-2 py-1 text-xs font-medium text-white/90">
+              <span className="max-w-40 truncate rounded-md bg-slate-950/70 px-2 py-1 text-xs font-semibold text-white">
                 {course.category.name}
               </span>
             )}
@@ -616,7 +754,7 @@ const CourseCard = ({
             onClick={openCourse}
             className="block max-w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
           >
-            <h3 className="line-clamp-2 text-xl font-semibold leading-tight">{courseName}</h3>
+            <h3 className="line-clamp-2 text-lg font-semibold leading-tight">{courseName}</h3>
           </button>
           {Math.round(progress) >= 100 && isEnrolled && (
             <span className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-emerald-100">
@@ -627,21 +765,15 @@ const CourseCard = ({
         </div>
       </div>
 
-      <div className="flex flex-1 flex-col gap-4 p-4">
-        <div className="flex min-w-0 items-center gap-3">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground dark:bg-card dark:text-muted-foreground">
-            <UserRound className="h-4 w-4" />
-          </span>
-          <div className="min-w-0">
-            <p className="truncate text-sm font-medium text-muted-foreground dark:text-muted-foreground">{owner}</p>
-            <p className="text-xs text-muted-foreground dark:text-muted-foreground">Instructor</p>
-          </div>
-        </div>
+      <div className="flex flex-1 flex-col gap-2.5 p-3">
+        <p className="truncate text-xs text-muted-foreground dark:text-muted-foreground">
+          Instructor: <span className="font-medium text-foreground dark:text-foreground">{owner}</span>
+        </p>
 
-        {enrolledView && isEnrolled ? (
+        {isEnrolled ? (
           <>
             {course.description && (
-              <p className="line-clamp-2 min-h-10 text-sm leading-relaxed text-muted-foreground dark:text-muted-foreground">
+              <p className="line-clamp-2 text-sm leading-relaxed text-muted-foreground dark:text-muted-foreground">
                 {course.description}
               </p>
             )}
@@ -666,13 +798,26 @@ const CourseCard = ({
           </>
         )}
 
-        <div className="mt-auto flex items-center justify-between border-t border-border pt-3 text-xs text-muted-foreground dark:border-border dark:text-muted-foreground">
-          <span>{course.estimatedHours ?? 0} study hours</span>
-          <span>{course.enrollmentCount ?? 0} learners</span>
-          <span className="inline-flex items-center gap-1">
-            {course.rating?.toFixed(1) ?? '—'}
-            <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+        <div className="mt-auto flex items-center justify-between gap-2 border-t border-border pt-2.5 text-xs font-medium text-muted-foreground dark:border-border dark:text-muted-foreground">
+          <span className="inline-flex min-w-0 items-center gap-1.5" title={`${course.estimatedHours ?? 0} study hours`}>
+            <Clock3 aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
+            <span className="truncate">{course.estimatedHours ?? 0} hrs</span>
           </span>
+          <span className="inline-flex min-w-0 items-center gap-1.5" title={`${course.enrollmentCount ?? 0} learners`}>
+            <Users aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
+            <span className="truncate">{course.enrollmentCount ?? 0} learners</span>
+          </span>
+          {typeof course.rating === 'number' && course.rating > 0 ? (
+            <span className="inline-flex min-w-0 items-center gap-1.5" aria-label={`Rating ${course.rating.toFixed(1)} out of 5`}>
+              <Star aria-hidden="true" className="h-3.5 w-3.5 shrink-0 fill-amber-400 text-amber-400" />
+              <span>{course.rating.toFixed(1)}</span>
+            </span>
+          ) : (
+            <span className="inline-flex min-w-0 items-center gap-1.5">
+              <Star aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate text-[11px]">No ratings yet</span>
+            </span>
+          )}
         </div>
       </div>
 
@@ -680,9 +825,9 @@ const CourseCard = ({
         <button
           type="button"
           onClick={openCourse}
-          className="inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+          className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-lg bg-blue-700 px-3 text-sm font-semibold text-white transition-colors hover:bg-blue-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
         >
-          {isEnrolled ? 'Open class' : 'View class'}
+          {isEnrolled ? 'Continue' : 'View class'}
           <ChevronRight className="h-4 w-4" />
         </button>
         {isEnrolled && (
