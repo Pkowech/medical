@@ -356,13 +356,15 @@ export function CourseStudySessionProvider({ children }: { children: React.React
         toast.warning('Session ended, but its saved offline copy could not be removed.');
       }
     };
+    const currentPauseSeconds = currentSession.pauseStartedAtMs === null
+      ? 0
+      : Math.max(
+          0,
+          Math.floor((Date.now() - currentSession.pauseStartedAtMs) / 1000),
+        );
+    const pausedDurationSeconds =
+      currentSession.pausedDurationSeconds + currentPauseSeconds;
     try {
-      const currentPauseSeconds = currentSession.pauseStartedAtMs === null
-        ? 0
-        : Math.max(
-            0,
-            Math.floor((Date.now() - currentSession.pauseStartedAtMs) / 1000),
-          );
       const finalSegmentSeconds = Math.max(
         0,
         currentSession.elapsedSeconds - currentSession.lastActivitySeconds,
@@ -384,7 +386,7 @@ export function CourseStudySessionProvider({ children }: { children: React.React
         currentSession.notes,
         activities,
         currentSession.elapsedSeconds,
-        currentSession.pausedDurationSeconds + currentPauseSeconds,
+        pausedDurationSeconds,
       );
       if (ended.isValid) {
         toast.success(`Course study session saved (${ended.duration ?? 0} minutes).`);
@@ -425,6 +427,7 @@ export function CourseStudySessionProvider({ children }: { children: React.React
               notes: currentSession.notes,
               activities,
               durationSeconds: currentSession.elapsedSeconds,
+              pausedDurationSeconds,
             },
             { 'Content-Type': 'application/json' },
             Date.now(),
