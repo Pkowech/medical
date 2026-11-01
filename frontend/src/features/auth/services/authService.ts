@@ -79,11 +79,8 @@ class AuthService {
 
   async register(registerData: RegisterDTO): Promise<RegisterResponse> {
     // Use apiService for registration, as it's an unauthenticated endpoint initially
-    const response = await apiService.post<ApiResponse<RegisterResponse>>(
-      '/auth/register',
-      registerData
-    );
-    return response.data.data;
+    const response = await apiService.post<RegisterResponse>('/auth/register', registerData);
+    return response.data;
   }
 
   async logout(): Promise<void> {

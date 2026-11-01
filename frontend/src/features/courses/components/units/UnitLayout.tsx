@@ -40,7 +40,6 @@ import offlineProgressSync from '@/features/learning-management/services/offline
 import { isOfflineQueuedError } from '@/lib/core/offline/offlineQueuedError';
 import { toast } from 'sonner';
 import {
-  StartCourseStudySessionButton,
   useCourseStudySession,
 } from '@/features/learning-management/study/components/CourseStudySessionProvider';
 
@@ -89,7 +88,12 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
   // ── Page header ────────────────────────────────────────────────────────
   const { setHeader } = usePageHeader();
   const queryClient = useQueryClient();
-  const { activeSession, recordCourseActivity, switchCourseTopic } = useCourseStudySession();
+  const {
+    activeSession,
+    ensureCourseSession,
+    pauseCourseSession,
+    recordCourseActivity,
+  } = useCourseStudySession();
 
   // ── Progress store ─────────────────────────────────────────────────────
   const { progress, bookmarks, notes, markLessonComplete, toggleLessonComplete, toggleBookmark, saveNote } =
@@ -188,19 +192,6 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
     navigateTo(chapterIndex, lessonIndex);
   };
 
-  // ── Page header sync ───────────────────────────────────────────────────
-  useEffect(() => {
-    if (unitData?.title) {
-      setHeader({
-        title: unitData.title,
-        description: unitData.description || 'Unit content and materials',
-        icon: '📘',
-        presentation: 'metadata',
-      });
-    }
-    return () => setHeader(null);
-  }, [unitData?.title, unitData?.description, setHeader]);
-
   // ── Online / offline ───────────────────────────────────────────────────
   useEffect(() => {
     const on = () => setOfflineMode(false);
@@ -221,24 +212,64 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
   };
 
   const typedCurrentTopic = getCurrentTopic() as unknown as Lesson & { resources?: Material[] };
+  // ── Page header sync ───────────────────────────────────────────────────
   useEffect(() => {
-    if (
-      typedCurrentTopic?.id != null &&
-      courseId &&
-      activeSession &&
-      activeSession?.courseId === courseId &&
-      activeSession.topicId !== String(typedCurrentTopic.id)
-    ) {
-      switchCourseTopic(courseId, String(typedCurrentTopic.id), typedCurrentTopic.title);
+    if (unitData?.title) {
+      const isTopicReading = hasSelectedTopic && !selectedMaterialId;
+      setHeader({
+        title: unitData.title,
+        description: unitData.description || 'Unit content and materials',
+        presentation: isTopicReading ? 'compact' : 'metadata',
+        actions: isTopicReading ? (
+          <>
+            <Button
+              type="button"
+              size="icon"
+              variant={activeCoursePanel === 'unit-quiz' ? 'outline' : 'default'}
+              onClick={() => {
+                if (typedCurrentTopic?.id != null) {
+                  recordCourseActivity('reading', courseId, String(typedCurrentTopic.id));
+                }
+                toggleCoursePanel('unit-quiz');
+              }}
+              aria-label={activeCoursePanel === 'unit-quiz' ? 'Back to unit content' : 'Unit quiz'}
+              aria-pressed={activeCoursePanel === 'unit-quiz'}
+              title={activeCoursePanel === 'unit-quiz' ? 'Back to unit content' : 'Unit quiz'}
+              className="h-9 w-9 sm:w-auto sm:px-3"
+            >
+              <ClipboardCheck className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">
+                {activeCoursePanel === 'unit-quiz' ? 'Back to Unit' : 'Unit Quiz'}
+              </span>
+            </Button>
+          </>
+        ) : undefined,
+      });
     }
+    return () => setHeader(null);
   }, [
-    activeSession?.courseId,
-    activeSession?.topicId,
-    activeSession,
+    activeCoursePanel,
+    recordCourseActivity,
+    setHeader,
+    toggleCoursePanel,
+    unitData?.description,
+    unitData?.title,
+  ]);
+  useEffect(() => {
+    if (!hasSelectedTopic || !courseId || typedCurrentTopic?.id == null) return;
+    void ensureCourseSession(
+      courseId,
+      String(typedCurrentTopic.id),
+      typedCurrentTopic.title,
+    );
+    return () => pauseCourseSession();
+  }, [
     courseId,
-    lessonKey,
-    switchCourseTopic,
+    ensureCourseSession,
+    hasSelectedTopic,
+    pauseCourseSession,
     typedCurrentTopic?.id,
+    typedCurrentTopic?.title,
   ]);
   const refreshLearningCaches = async () => {
     if (!user?.id) return;
@@ -495,9 +526,9 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
           )}>
 
             {/* Breadcrumb + progress */}
-            {!selectedMaterialId && <div className="space-y-4">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex min-w-0 items-center gap-3">
+            {!selectedMaterialId && !hasSelectedTopic && <div className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex min-w-0 flex-wrap items-center gap-3">
                 {sidebarCollapsed && selectedMaterialId && (
                   <button
                     type="button"
@@ -534,28 +565,23 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
                   </div>
                 </details>
                 </div>
-                <Button
-                  type="button"
-                  variant={activeCoursePanel === 'unit-quiz' ? 'outline' : 'default'}
-                  onClick={() => {
-                    if (typedCurrentTopic?.id != null) {
-                      recordCourseActivity('reading', courseId, String(typedCurrentTopic.id));
-                    }
-                    toggleCoursePanel('unit-quiz');
-                  }}
-                  aria-pressed={activeCoursePanel === 'unit-quiz'}
-                  className="shrink-0"
-                >
-                  <ClipboardCheck className="mr-2 h-4 w-4" />
-                  {activeCoursePanel === 'unit-quiz' ? 'Back to Unit' : 'Unit Quiz'}
-                </Button>
-                {hasSelectedTopic && typedCurrentTopic?.id != null && courseId && (
-                  <StartCourseStudySessionButton
-                    courseId={courseId}
-                    topicId={String(typedCurrentTopic.id)}
-                    topicTitle={typedCurrentTopic.title}
-                  />
-                )}
+                <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant={activeCoursePanel === 'unit-quiz' ? 'outline' : 'default'}
+                    onClick={() => {
+                      if (typedCurrentTopic?.id != null) {
+                        recordCourseActivity('reading', courseId, String(typedCurrentTopic.id));
+                      }
+                      toggleCoursePanel('unit-quiz');
+                    }}
+                    aria-pressed={activeCoursePanel === 'unit-quiz'}
+                    className="shrink-0"
+                  >
+                    <ClipboardCheck className="mr-2 h-4 w-4" />
+                    {activeCoursePanel === 'unit-quiz' ? 'Back to Unit' : 'Unit Quiz'}
+                  </Button>
+                </div>
               </div>
               <ProgressBar value={unitProgressPercentage} className="h-2" />
             </div>}

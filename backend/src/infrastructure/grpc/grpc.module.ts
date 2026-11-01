@@ -1,137 +1,131 @@
-import { Module } from '@nestjs/common';
-import { ClientsModule, Transport } from '@nestjs/microservices';
+import { Module, OnApplicationShutdown } from '@nestjs/common';
+import {
+  ClientGrpc,
+  ClientProxyFactory,
+  Transport,
+} from '@nestjs/microservices';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { join } from 'path';
 import { existsSync } from 'fs';
 import { throwError } from 'rxjs';
 import { InterceptingCall } from '@grpc/grpc-js';
 
-// Resolve proto path in a runtime-safe way:
-// 1) Prefer the proto copied into the compiled `dist` (production/self-contained)
-// 2) Fallback to the repo `protos` directory for development runs
-const prodProto = join(
-  process.cwd(),
-  'dist',
-  'generated',
-  'grpc',
-  'analytics.proto',
-);
-const devProto = join(process.cwd(), '..', 'protos', 'analytics.proto');
-const protoPath = existsSync(prodProto)
-  ? prodProto
-  : existsSync(devProto)
-    ? devProto
-    : null;
-
-if (!protoPath) {
-  throw new Error(
-    `Proto file not found. Checked these locations:\n - ${prodProto}\n - ${devProto}\n` +
-      'If you are running the built app make sure `nest build` copies protos into dist (see nest-cli.json assets).',
+const resolveProtoPath = (): string => {
+  const prodProto = join(
+    process.cwd(),
+    'dist',
+    'generated',
+    'grpc',
+    'analytics.proto',
   );
-}
+  const devProto = join(process.cwd(), '..', 'protos', 'analytics.proto');
+  const protoPath = existsSync(prodProto)
+    ? prodProto
+    : existsSync(devProto)
+      ? devProto
+      : null;
 
-// Only register the Nest ClientsModule for gRPC when explicitly enabled.
-// This avoids runtime proto-loading errors in development environments
-// where the external gRPC service or protos are not available.
-const grpcImports = [] as any[];
-const enableGrpc = process.env.ENABLE_GRPC === 'true';
+  if (!protoPath) {
+    throw new Error(
+      `Proto file not found. Checked these locations:\n - ${prodProto}\n - ${devProto}\n` +
+        'If you are running the built app make sure `nest build` copies protos into dist (see nest-cli.json assets).',
+    );
+  }
 
-const resolveGrpcTarget = (configuredUrl?: string): string => {
-  const candidate = (configuredUrl ?? '').trim().replace(/^https?:\/\//, '');
+  return protoPath;
+};
 
-  if (!candidate) {
+const createDisabledAnalyticsClient = (): ClientGrpc &
+  OnApplicationShutdown => {
+  const createUnavailableService = () =>
+    new Proxy<
+      Record<string, (...args: unknown[]) => ReturnType<typeof throwError>>
+    >(
+      {},
+      {
+        get:
+          () =>
+          (..._args: unknown[]) =>
+            throwError(
+              () =>
+                new Error(
+                  'Rust analytics gRPC is disabled; set ENABLE_GRPC=true',
+                ),
+            ),
+      },
+    );
+
+  return {
+    getService: <T extends object>() => createUnavailableService() as T,
+    getClientByServiceName: <T = unknown>() => createUnavailableService() as T,
+    onApplicationShutdown: () => undefined,
+  };
+};
+
+const createAnalyticsClient = (
+  configService: ConfigService,
+): ClientGrpc & OnApplicationShutdown => {
+  const enableGrpc = configService.get<boolean | string>('ENABLE_GRPC', true);
+  if (enableGrpc !== true && enableGrpc !== 'true') {
+    return createDisabledAnalyticsClient();
+  }
+
+  const configuredUrl =
+    configService.get<string>('ANALYTICS_GRPC_URL') ||
+    configService.get<string>('RUST_ANALYTICS_GRPC_URL');
+  const grpcUrl = (configuredUrl ?? '').trim().replace(/^https?:\/\//, '');
+
+  if (!grpcUrl) {
     throw new Error(
       'ANALYTICS_GRPC_URL or RUST_ANALYTICS_GRPC_URL must be configured when ENABLE_GRPC=true',
     );
   }
 
-  return candidate;
-};
+  const apiKey = configService.get<string>('RUST_ANALYTICS_API_KEY');
+  if (!apiKey) {
+    throw new Error('RUST_ANALYTICS_API_KEY is required when ENABLE_GRPC=true');
+  }
 
-if (enableGrpc) {
-  grpcImports.push(
-    ClientsModule.registerAsync([
-      {
-        name: 'ANALYTICS_PACKAGE',
-        imports: [ConfigModule],
-        inject: [ConfigService],
-        useFactory: (configService: ConfigService) => {
-          const configuredUrl =
-            configService.get<string>('ANALYTICS_GRPC_URL') ||
-            configService.get<string>('RUST_ANALYTICS_GRPC_URL');
-          const grpcUrl = resolveGrpcTarget(configuredUrl);
-          const apiKey = configService.get<string>('RUST_ANALYTICS_API_KEY');
-
-          if (!apiKey) {
-            throw new Error(
-              'RUST_ANALYTICS_API_KEY is required when ENABLE_GRPC=true',
-            );
-          }
-
-          const apiKeyInterceptor = (options: any, nextCall: any) =>
-            new InterceptingCall(nextCall(options), {
-              start(metadata, listener, next) {
-                metadata.set('x-api-key', apiKey);
-                next(metadata, listener);
-              },
-            });
-
-          return {
-            transport: Transport.GRPC,
-            options: {
-              package: 'analytics',
-              protoPath,
-              url: grpcUrl,
-              loader: {
-                keepCase: false,
-                defaults: true,
-                arrays: true,
-                objects: true,
-              },
-              channelOptions: {
-                interceptors: [apiKeyInterceptor],
-              } as any,
-            },
-          };
-        },
+  const apiKeyInterceptor = (options: any, nextCall: any) =>
+    new InterceptingCall(nextCall(options), {
+      start(metadata, listener, next) {
+        metadata.set('x-api-key', apiKey);
+        next(metadata, listener);
       },
-    ]),
-  );
-}
+    });
 
-// Provide a lightweight stub for the ClientGrpc package token when GRPC is
-// disabled so modules that inject the token do not fail during DI resolution.
-// The stub rejects calls explicitly when the Rust analytics service is disabled.
-const stubAnalyticsPackageProvider = {
-  provide: 'ANALYTICS_PACKAGE',
-  useValue: {
-    getService: () => {
-      return new Proxy(
-        {},
-        {
-          get: () => {
-            return (..._args: any[]) =>
-              throwError(
-                () =>
-                  new Error(
-                    'Rust analytics gRPC is disabled; set ENABLE_GRPC=true',
-                  ),
-              );
-          },
-        },
-      );
+  const client = ClientProxyFactory.create({
+    transport: Transport.GRPC,
+    options: {
+      package: 'analytics',
+      protoPath: resolveProtoPath(),
+      url: grpcUrl,
+      loader: {
+        keepCase: false,
+        defaults: true,
+        arrays: true,
+        objects: true,
+      },
+      channelOptions: {
+        interceptors: [apiKeyInterceptor],
+      } as any,
     },
-  },
-};
+  });
 
-const grpcProviders: any[] = [];
-if (process.env.ENABLE_GRPC !== 'true') {
-  grpcProviders.push(stubAnalyticsPackageProvider);
-}
+  return Object.assign(client, {
+    onApplicationShutdown: () => client.close(),
+  });
+};
 
 @Module({
-  imports: grpcImports,
-  providers: grpcProviders,
-  exports: enableGrpc ? [ClientsModule] : ['ANALYTICS_PACKAGE'],
+  imports: [ConfigModule],
+  providers: [
+    {
+      provide: 'ANALYTICS_PACKAGE',
+      inject: [ConfigService],
+      useFactory: createAnalyticsClient,
+    },
+  ],
+  exports: ['ANALYTICS_PACKAGE'],
 })
 export class GrpcModule {}

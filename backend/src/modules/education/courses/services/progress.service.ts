@@ -1380,7 +1380,10 @@ export class ProgressService {
 
       return this.calculateCourseProgressFromDatabase(userId, courseId);
     } catch (error) {
-      handleServiceError(error, this.logger, 'calculateCourseProgress');
+      this.logger.warn(
+        'Course analytics failed; falling back to local DB progress',
+        { userId, courseId, error: getErrorMessage(error) },
+      );
       return this.calculateCourseProgressFromDatabase(userId, courseId);
     }
   }

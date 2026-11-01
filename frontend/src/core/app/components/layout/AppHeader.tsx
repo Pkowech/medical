@@ -10,8 +10,11 @@ import { usePathname } from 'next/navigation';
 import { useLayoutStore } from '@/core/stores/useLayoutStore';
 import { usePageHeader } from '@/core/providers/HeaderContext';
 import { getPageMetadata } from '@/core/metadata/pageMetadata';
+import { CourseStudySessionIndicator } from '@/features/learning-management/study/components/CourseStudySessionProvider';
 
-export const AppHeader: React.FC = () => {
+export const AppHeader: React.FC<{ showDesktopSidebarToggle?: boolean }> = ({
+  showDesktopSidebarToggle = true,
+}) => {
   const {
     sidebarOpen,
     setSidebarOpen,
@@ -24,12 +27,13 @@ export const AppHeader: React.FC = () => {
   const title = header?.title || route.title;
   const description = header?.description || route.description;
   const isMetadataHeader = header?.presentation === 'metadata';
+  const isCompactHeader = header?.presentation === 'compact';
 
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-card/95 pt-[env(safe-area-inset-top)] shadow-sm backdrop-blur-md dark:bg-card/95">
       <div
         className={`px-3 transition-all duration-300 sm:px-4 md:px-6 lg:px-8 ${
-          isMetadataHeader ? 'py-2' : 'py-3 sm:py-4'
+          isCompactHeader ? 'py-3 sm:py-[18px]' : isMetadataHeader ? 'py-2' : 'py-3 sm:py-4'
         }`}
       >
         <div className="flex min-h-10 items-center gap-3">
@@ -43,23 +47,25 @@ export const AppHeader: React.FC = () => {
           >
             <Menu aria-hidden="true" className="h-6 w-6" />
           </button>
-          <button
-            type="button"
-            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            className="hidden rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:bg-secondary lg:inline-flex"
-            aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            aria-expanded={!sidebarCollapsed}
-            aria-controls="app-sidebar"
-          >
-            {sidebarCollapsed ? (
-              <PanelLeftOpen aria-hidden="true" className="h-5 w-5" />
-            ) : (
-              <PanelLeftClose aria-hidden="true" className="h-5 w-5" />
-            )}
-          </button>
+          {showDesktopSidebarToggle && (
+            <button
+              type="button"
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              className="hidden rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:bg-secondary lg:inline-flex"
+              aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              aria-expanded={!sidebarCollapsed}
+              aria-controls="app-sidebar"
+            >
+              {sidebarCollapsed ? (
+                <PanelLeftOpen aria-hidden="true" className="h-5 w-5" />
+              ) : (
+                <PanelLeftClose aria-hidden="true" className="h-5 w-5" />
+              )}
+            </button>
+          )}
 
-          {!isMetadataHeader && header?.icon && (
+          {!isMetadataHeader && !isCompactHeader && header?.icon && (
             <div aria-hidden="true" className="shrink-0 text-xl sm:text-2xl">
               {header.icon}
             </div>
@@ -69,13 +75,17 @@ export const AppHeader: React.FC = () => {
               <h1 className="truncate text-lg font-bold text-foreground sm:text-xl md:text-2xl">
                 {title}
               </h1>
-              {description && (
+              {!isCompactHeader && description && (
                 <p className="hidden max-w-2xl truncate text-xs text-muted-foreground md:block sm:text-sm">
                   {description}
                 </p>
               )}
             </div>
           )}
+          <div className="ml-auto flex shrink-0 items-center gap-1">
+            <CourseStudySessionIndicator />
+            {header?.actions}
+          </div>
         </div>
       </div>
     </header>

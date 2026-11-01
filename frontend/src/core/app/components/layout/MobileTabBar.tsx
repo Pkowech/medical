@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { NavigationItem } from '@/shared/types/navigationInterface';
+import { useLayoutStore } from '@/core/stores/useLayoutStore';
 import { mobilePrimaryNavigation } from './mobileNavigationConfig';
 
 interface MobileTabBarProps {
@@ -11,6 +12,7 @@ interface MobileTabBarProps {
 
 export function MobileTabBar({ navigationItems }: MobileTabBarProps) {
   const pathname = usePathname();
+  const setSidebarOpen = useLayoutStore(state => state.setSidebarOpen);
   const availableTabs = mobilePrimaryNavigation.flatMap(tab => {
     const item = navigationItems.find(candidate => candidate.href === tab.href);
     return item ? [{ ...tab, item }] : [];
@@ -21,7 +23,7 @@ export function MobileTabBar({ navigationItems }: MobileTabBarProps) {
   return (
     <nav
       aria-label="Primary navigation"
-      className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-card/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_18px_rgba(15,23,42,0.06)] backdrop-blur-lg dark:border-border dark:bg-background/95 lg:hidden"
+      className="fixed inset-x-0 bottom-0 z-[60] border-t border-border bg-card/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_18px_rgba(15,23,42,0.06)] backdrop-blur-lg dark:border-border dark:bg-background/95 lg:hidden"
     >
       <div
         className="mx-auto grid h-16 max-w-xl"
@@ -36,6 +38,7 @@ export function MobileTabBar({ navigationItems }: MobileTabBarProps) {
             <Link
               key={href}
               href={href}
+              onClick={() => setSidebarOpen(false)}
               aria-label={item.label}
               aria-current={isActive ? 'page' : undefined}
               className={`flex min-w-0 flex-col items-center justify-center gap-1 px-1 text-[11px] font-medium transition-colors active:scale-95 motion-reduce:transition-none ${

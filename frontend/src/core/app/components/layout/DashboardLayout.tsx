@@ -70,8 +70,6 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
     const coursePathSegments = pathname?.split('/').filter(Boolean) ?? [];
     const isCoursePage = coursePathSegments[0] === 'courses' && coursePathSegments.length > 2;
-    const isUnitContentPage =
-        coursePathSegments[0] === 'courses' && coursePathSegments[2] === 'units';
     const isMaterialViewPage =
         coursePathSegments[0] === 'study-planner' &&
         coursePathSegments[1] === 'materials' &&
@@ -101,11 +99,12 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                 )}
 
                 {/* Main app column (center) */}
-                <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                <div
+                    className="flex min-h-0 flex-1 flex-col overflow-hidden"
+                    inert={sidebarOpen || undefined}
+                >
                     {!isQuizSessionPage && !isImmersive && (
-                        <div className={cn(isUnitContentPage && 'lg:hidden')}>
-                            <AppHeader />
-                        </div>
+                        <AppHeader showDesktopSidebarToggle={!isFullHeightPage} />
                     )}
 
                     {/* content area */}
@@ -116,7 +115,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                             isFullHeightPage
                                 ? 'overflow-x-hidden overflow-y-auto lg:overflow-hidden'
                                 : 'overflow-auto',
-                            !isQuizSessionPage && !isImmersive && 'pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0',
+                            !isQuizSessionPage && !isImmersive && 'pb-[calc(4.0625rem+env(safe-area-inset-bottom))] lg:pb-0',
                         )}
                     >
                         <div
@@ -149,7 +148,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                     </div>
                 </div>
             </div>
-            {!isQuizSessionPage && !isImmersive && !sidebarOpen && (
+            {!isQuizSessionPage && !isImmersive && (
                 <MobileTabBar navigationItems={navigationItems} />
             )}
         </>

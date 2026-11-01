@@ -43,7 +43,6 @@ import {
 import { StoragePersistenceNotice } from '@/lib/core/offline/StoragePersistenceNotice';
 import type { OfflineQuizQuestion, OfflineTopicBundle } from '@/lib/core/offline/db';
 import {
-  StartCourseStudySessionButton,
   useCourseStudySession,
 } from '@/features/learning-management/study/components/CourseStudySessionProvider';
 
@@ -56,6 +55,7 @@ interface TopicViewerProps {
 type TopicQuizResponseQuestion = {
   id: string;
   text: string;
+  updatedAt?: string | number | Date | null;
   type?: string;
   difficulty?: string;
   options?: Array<{ id: string; text: string }>;
@@ -151,7 +151,9 @@ async function prepareTopicOfflineContent(
     contentRevision: revisionFromTopicContent(
       topic.id,
       pdfMaterials,
-      questions.map(question => ({ id: question.id })),
+      quizResult.status === 'fulfilled'
+        ? quizResult.value.data
+        : [],
     ),
   });
   return { bundle, complete };
@@ -187,7 +189,11 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
   const { setHeader } = usePageHeader();
   const { toggleBookmark, bookmarks, markLessonComplete, progress, notes, saveNote } =
     useCourseProgressStore();
-  const { activeSession, recordCourseActivity, switchCourseTopic } = useCourseStudySession();
+  const {
+    ensureCourseSession,
+    pauseCourseSession,
+    recordCourseActivity,
+  } = useCourseStudySession();
 
   const refreshLearningCaches = async () => {
     if (!userId) return;
@@ -218,10 +224,10 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
   const [isOffline, setIsOffline] = useState(false);
 
   useEffect(() => {
-    if (topic && activeSession?.courseId === courseId && activeSession.topicId !== topicId) {
-      switchCourseTopic(courseId, topicId, topic.title);
-    }
-  }, [activeSession?.courseId, activeSession?.topicId, courseId, switchCourseTopic, topic?.title, topicId]);
+    if (!topic || String(topic.id) !== topicId) return;
+    void ensureCourseSession(courseId, topicId, topic.title);
+    return () => pauseCourseSession();
+  }, [courseId, ensureCourseSession, pauseCourseSession, topic, topicId]);
   const [materialsLoaded, setMaterialsLoaded] = useState(false);
   const [materialsMetadataComplete, setMaterialsMetadataComplete] = useState(true);
   const [offlineBundleLoaded, setOfflineBundleLoaded] = useState(false);
@@ -262,6 +268,8 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
         setLoadError(null);
         const topicData = await topicService.getTopicById(courseId, unitId, topicId);
         setTopic(topicData);
+        let currentMaterials: Material[] = [];
+        let currentMaterialsComplete = true;
 
         // Set page header
         setHeader({
@@ -273,13 +281,16 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
 
         // Fetch materials for this topic
         if (topicData.materials && Array.isArray(topicData.materials)) {
-          setMaterials(topicData.materials);
+          currentMaterials = topicData.materials;
+          setMaterials(currentMaterials);
         } else {
           // Try to fetch materials separately
           try {
             const mats = await materialService.getMaterialsByTopicId(topicId);
-            setMaterials(mats || []);
+            currentMaterials = mats || [];
+            setMaterials(currentMaterials);
           } catch (err) {
+            currentMaterialsComplete = false;
             setMaterialsMetadataComplete(false);
             console.warn('Could not fetch materials:', err);
           }
@@ -288,11 +299,7 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
 
         if (userId) {
           const bundle = await offlineService.getOfflineTopicBundle(userId, topicId);
-          if (bundle && navigator.onLine) {
-            const currentMaterials =
-              topicData.materials && Array.isArray(topicData.materials)
-                ? topicData.materials
-                : materials;
+          if (bundle && navigator.onLine && currentMaterialsComplete) {
             setOfflineBundle(await markBundleStaleIfOutdated(userId, bundle, currentMaterials));
           } else {
             setOfflineBundle(bundle);
@@ -726,6 +733,7 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
             provisional until they sync.
           </div>
         )}
+        <StoragePersistenceNotice />
         {!isOffline &&
           (sessionCacheStatus === 'preparing' ||
             sessionCacheStatus === 'partial' ||
@@ -744,6 +752,22 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
                     : 'This topic is ready for brief interruptions. Its temporary cache is cleared when you leave; use “Download for offline” to keep it.'}
             </div>
           )}
+        {offlineBundle?.stale && (
+          <div
+            role="status"
+            className="flex flex-col gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950 sm:flex-row sm:items-center sm:justify-between dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100"
+          >
+            <p>This offline copy is out of date. Update it before studying this topic offline.</p>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isDownloading || isOffline}
+              onClick={() => void downloadTopicForOffline()}
+            >
+              {isDownloading ? 'Updating…' : 'Update offline copy'}
+            </Button>
+          </div>
+        )}
 
         {showNotes && (
           <section id="topic-notes" aria-label="Topic notes">
@@ -844,11 +868,6 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
 
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row gap-3 justify-between pt-4">
-          <StartCourseStudySessionButton
-            courseId={courseId}
-            topicId={topicId}
-            topicTitle={topic.title}
-          />
           <Button
             variant="outline"
             onClick={handleNavigateToUnit}

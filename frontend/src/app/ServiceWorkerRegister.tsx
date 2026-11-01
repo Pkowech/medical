@@ -3,8 +3,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { requestPersistentStorage } from '@/lib/core/offline/requestPersistentStorage';
 
-const showUpdateBanner = process.env.NEXT_PUBLIC_ENABLE_APP_UPDATE_BANNER === 'true';
-
 export function ServiceWorkerRegister() {
   const [waitingWorker, setWaitingWorker] = useState<ServiceWorker | null>(null);
   const activatingUpdate = useRef(false);
@@ -18,12 +16,7 @@ export function ServiceWorkerRegister() {
     const showWaitingWorker = () => {
       const waiting = registration?.waiting;
       if (!disposed && waiting) {
-        if (showUpdateBanner) {
-          setWaitingWorker(waiting);
-        } else {
-          activatingUpdate.current = Boolean(navigator.serviceWorker.controller);
-          waiting.postMessage({ type: 'SKIP_WAITING' });
-        }
+        setWaitingWorker(waiting);
       }
     };
 
@@ -40,11 +33,13 @@ export function ServiceWorkerRegister() {
           });
         });
         // Check for updates in the background without blocking PWA startup
-        void registration.update().catch(() => {});
+        void registration.update().catch(error => {
+          console.warn('[PWA] Could not check for service worker updates:', error);
+        });
 
         // Best-effort persist without a gesture; InstallAppButton also requests on click.
-        void requestPersistentStorage().then(persisted => {
-          if (persisted) console.log('[PWA] Storage persistence granted by OS.');
+        void requestPersistentStorage().catch(error => {
+          console.warn('[PWA] Could not save persistent-storage status:', error);
         });
       } catch (error) {
         console.error('[PWA] Service worker registration/update failed:', error);

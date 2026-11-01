@@ -105,24 +105,6 @@ export function Sidebar({
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         setSidebarOpen(false);
-        return;
-      }
-      if (event.key !== 'Tab' || !sidebarRef.current) return;
-
-      const focusable = Array.from(
-        sidebarRef.current.querySelectorAll<HTMLElement>(
-          'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])',
-        ),
-      ).filter(element => element.getClientRects().length > 0);
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (!first || !last) return;
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
       }
     };
 
@@ -178,7 +160,7 @@ export function Sidebar({
       {sidebarOpen && !isDesktop && (
         <button
           type="button"
-          className="fixed inset-x-0 bottom-0 top-[calc(4.5rem+env(safe-area-inset-top))] z-40 bg-slate-950/55 backdrop-blur-[1px] lg:hidden"
+          className="fixed inset-x-0 bottom-[calc(4.0625rem+env(safe-area-inset-bottom))] top-[calc(4.0625rem+env(safe-area-inset-top))] z-40 bg-slate-950/55 backdrop-blur-[1px] sm:top-[calc(4.8125rem+env(safe-area-inset-top))] lg:hidden"
           onClick={() => setSidebarOpen(false)}
           aria-label="Close navigation menu"
         />
@@ -188,12 +170,11 @@ export function Sidebar({
         ref={sidebarRef}
         id="app-sidebar"
         role={!isDesktop ? 'dialog' : undefined}
-        aria-modal={!isDesktop && sidebarOpen ? true : undefined}
         aria-label={isDesktop ? 'Main navigation' : 'More navigation'}
         aria-hidden={!isDesktop && !sidebarOpen}
         inert={!isDesktop && !sidebarOpen}
         className={cn(
-          'fixed inset-x-0 bottom-0 top-[calc(4.5rem+env(safe-area-inset-top))] z-50 flex w-full max-w-sm flex-col border-r border-border bg-card shadow-2xl transition-[transform,width] duration-300 ease-out dark:border-border dark:bg-card lg:static lg:inset-auto lg:z-auto lg:h-full lg:w-64 lg:max-w-none lg:translate-x-0 lg:shadow-none',
+          'fixed inset-x-0 bottom-[calc(4.0625rem+env(safe-area-inset-bottom))] top-[calc(4.0625rem+env(safe-area-inset-top))] z-50 flex w-full max-w-none flex-col border-r border-border bg-card shadow-2xl transition-[transform,width] duration-300 ease-out dark:border-border dark:bg-card sm:top-[calc(4.8125rem+env(safe-area-inset-top))] sm:max-w-sm lg:static lg:inset-auto lg:z-auto lg:h-full lg:w-64 lg:max-w-none lg:translate-x-0 lg:shadow-none',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full',
           isDesktop && sidebarCollapsed && 'lg:w-[4.5rem]',
         )}

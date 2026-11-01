@@ -223,5 +223,5 @@ export default withAuth(
 );
 
 export const config = {
-  matcher: ['/((?!api/auth|api/backend|_next/static|_next/image|favicon.ico|.*\\..*).*)'],
+  matcher: ['/((?!api/auth|api/backend|api/connectivity|_next/static|_next/image|favicon.ico|.*\\..*).*)'],
 };

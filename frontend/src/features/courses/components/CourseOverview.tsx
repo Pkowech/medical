@@ -42,7 +42,7 @@ export function CourseOverview() {
   const { data: progress } = useQuery<CourseProgress>({
     queryKey: ['course-overview-progress', courseId, user?.id],
     queryFn: () => courseService.getDetailedCourseProgress(courseId),
-    enabled: Boolean(courseId && user?.id),
+    enabled: Boolean(course && !courseError && user?.id),
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
     meta: { persist: Boolean(user?.id) },

@@ -23,7 +23,7 @@ interface FinishSetupData {
 
 export default function FinishSetupPage() {
   const router = useRouter();
-  const { data: session } = useSession() || {};
+  const { data: session, status: sessionStatus } = useSession();
   const { toast } = useToast();
 
   const [isLoading, setIsLoading] = useState(false);
@@ -44,6 +44,8 @@ export default function FinishSetupPage() {
       setIsFetching(true);
       setFetchError(null);
 
+      if (sessionStatus === 'loading') return;
+
       if (!session?.user?.id) {
         const errorMsg = 'Session not initialized: missing user ID';
         console.warn(errorMsg);
@@ -55,9 +57,7 @@ export default function FinishSetupPage() {
 
       try {
 
-        const user = await userService.getUserProfile(session.user.id);
-        
-
+        const user = await userService.getUserById(session.user.id);
 
         setFormData({
           phoneNumber: user.phoneNumber || '',
@@ -89,7 +89,7 @@ export default function FinishSetupPage() {
     };
 
     fetchUserData();
-  }, [session?.user?.id, toast]);
+  }, [session?.user?.id, sessionStatus, toast]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
