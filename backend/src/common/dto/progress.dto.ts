@@ -446,7 +446,19 @@ export interface UserProgressDetails extends CourseProgress {
   unitProgress: (UnitProgress & {
     unit: { id: string; title: string; order: number };
   })[];
-  topicProgress: Progress[]; // From Prisma
+  topicProgress: Array<
+    Progress & {
+      masteryUnlocked: boolean;
+      nextTopicUnlocked: boolean;
+      failedAttempts: number;
+    }
+  >;
+  materialProgress: Array<{
+    materialId: string;
+    topicId: string | null;
+    isCompleted: boolean;
+    progressPercentage: number;
+  }>;
 }
 
 export interface CourseProgressWithCourse extends CourseProgress {

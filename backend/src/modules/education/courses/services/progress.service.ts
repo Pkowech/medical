@@ -798,7 +798,38 @@ export class ProgressService {
           topicProgressById.set(progress.topicId, progress);
         }
       }
-      const topicProgress = Array.from(topicProgressById.values());
+      const topicProgress = Array.from(topicProgressById.values()).map(
+        progress => {
+          const quizScores =
+            (progress.quizScores as Record<string, unknown> | null) ?? {};
+          return {
+            ...progress,
+            masteryUnlocked: quizScores.masteryUnlocked === true,
+            nextTopicUnlocked: quizScores.nextTopicUnlocked === true,
+            failedAttempts: Number(quizScores.failedAttempts ?? 0),
+          };
+        },
+      );
+      const materialProgressById = new Map<
+        string,
+        UserProgressDetails['materialProgress'][number]
+      >();
+      for (const progress of allProgress) {
+        if (!progress.materialId) continue;
+        const existing = materialProgressById.get(progress.materialId);
+        materialProgressById.set(progress.materialId, {
+          materialId: progress.materialId,
+          topicId: progress.topicId ?? existing?.topicId ?? null,
+          isCompleted:
+            Boolean(existing?.isCompleted) ||
+            progress.isCompleted ||
+            progress.status === ProgressStatus.completed,
+          progressPercentage: Math.max(
+            existing?.progressPercentage ?? 0,
+            Math.min(100, Math.max(0, progress.progressPercentage)),
+          ),
+        });
+      }
 
       const result: UserProgressDetails = {
         id: 'derived',
@@ -814,6 +845,7 @@ export class ProgressService {
         lastAccessedAt: new Date(),
         unitProgress,
         topicProgress,
+        materialProgress: Array.from(materialProgressById.values()),
       };
 
       try {

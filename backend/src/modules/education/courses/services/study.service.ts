@@ -147,7 +147,7 @@ export class StudyService {
         userId,
         topicId: { in: topicIds },
       },
-      select: { topicId: true, status: true, quizScores: true },
+      select: { topicId: true, quizScores: true },
     });
 
     // 3. Resume from the first topic whose mastery quiz has not unlocked progression.
@@ -155,10 +155,7 @@ export class StudyService {
       progress
         .filter((record) => {
           const quizScores = record.quizScores as Record<string, unknown> | null;
-          return (
-            record.status === 'completed' ||
-            quizScores?.nextTopicUnlocked === true
-          );
+          return quizScores?.nextTopicUnlocked === true;
         })
         .map((record) => record.topicId),
     );
@@ -303,8 +300,14 @@ export class StudyService {
       ? Math.max(0, (focusScore - 50) / 50) // Normalized 0–1 relative to 50% baseline
       : 0;
 
-    if (isValid) {
-      const courseId = session.topic?.unit.courseId;
+    const courseId = session.topic?.unit.courseId;
+    const canUpdateCourseProgress = !courseId ||
+      Boolean(await this.prisma.courseEnrollment.findUnique({
+        where: { userId_courseId: { userId, courseId } },
+        select: { id: true },
+      }));
+
+    if (isValid && canUpdateCourseProgress) {
       const activityTopicIds = Array.from(
         new Set(
           activities

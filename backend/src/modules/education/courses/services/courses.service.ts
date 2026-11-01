@@ -1868,7 +1868,6 @@ export class CoursesService {
           });
           const quizScores = previousProgress?.quizScores as Record<string, unknown> | null;
           const previousTopicUnlocked =
-            previousProgress?.status === ProgressStatus.completed ||
             quizScores?.nextTopicUnlocked === true;
 
           if (!previousTopicUnlocked) {

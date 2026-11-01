@@ -4,7 +4,11 @@ import { useAuthStore } from '@/features/auth/store/useAuthStore';
 import { courseService } from '@/features/courses/services/courseService';
 import type { CourseData, Topic } from '@/shared/types/courseInterface';
 import type { Material } from '@/shared/types/materialInterface';
-import type { TopicProgress } from '@/shared/types/progressInterface';
+import type {
+  DetailedCourseProgress,
+  MaterialProgressSummary,
+} from '@/shared/types/progressInterface';
+import { summarizeTopicMaterialProgress } from '@/features/courses/utils/topicMaterialProgress';
 
 interface TopicWithMaterials extends Topic {
   materials?: Material[];
@@ -46,27 +50,35 @@ interface UnitResponse {
  */
 const normalizeUnitToChapters = (
   unit: UnitResponse,
-  topicProgress: TopicProgress[] = [],
+  courseProgress?: DetailedCourseProgress | null,
 ): CourseData => {
   const topics = (unit.topics || []) as TopicWithMaterials[];
+  const topicProgress = courseProgress?.topicProgress ?? [];
   const progressByTopicId = new Map(topicProgress.map(progress => [String(progress.topicId), progress]));
+  const materialProgressById = new Map<string, MaterialProgressSummary>(
+    (courseProgress?.materialProgress ?? []).map(progress => [
+      String(progress.materialId),
+      progress,
+    ]),
+  );
 
   // ── Build one chapter per topic ─────────────────────────────────────────
   const chapters = topics.map(topic => {
     const progress = progressByTopicId.get(String(topic.id));
     const isCompleted = Boolean(progress?.isCompleted || progress?.status === 'completed' || topic.isCompleted);
-    const masteryUnlocked = Boolean(progress?.masteryUnlocked || progress?.status === 'completed' || topic.masteryUnlocked);
-    const quizScores = progress?.quizScores as Record<string, unknown> | undefined;
-    const nextTopicUnlocked = progress?.nextTopicUnlocked ||
-      (typeof quizScores?.nextTopicUnlocked === 'boolean'
-        ? quizScores.nextTopicUnlocked
-        : masteryUnlocked);
+    const masteryUnlocked = progress?.masteryUnlocked === true;
+    const nextTopicUnlocked = progress?.nextTopicUnlocked === true;
     // Collect materials that belong to this topic
     const topicMaterials = (topic.materials || []).map(material => ({
       ...material,
       unitId: material.unitId ?? unit.id,
       topicId: material.topicId ?? topic.id,
     }));
+    const { materialProgress, readingProgressPercentage } =
+      summarizeTopicMaterialProgress(
+        topicMaterials.map(material => material.id),
+        materialProgressById,
+      );
 
     return {
       id: topic.id,
@@ -86,7 +98,9 @@ const normalizeUnitToChapters = (
           isCompleted,
           masteryUnlocked,
           nextTopicUnlocked,
-          failedAttempts: progress?.failedAttempts ?? Number(quizScores?.failedAttempts ?? 0),
+          failedAttempts: progress?.failedAttempts ?? 0,
+          readingProgressPercentage,
+          materialProgress,
           // Attach topic-level materials directly on the lesson so CourseContent
           // can render them without an extra lookup.
           resources: topicMaterials,
@@ -117,6 +131,8 @@ const normalizeUnitToChapters = (
   return {
     id: unit.id,
     courseId: unit.courseId,
+    courseName: courseProgress?.courseName,
+    courseProgressPercentage: courseProgress?.totalProgress,
     title: unit.title || unit.name,
     description: unit.description || '',
     chapters,          // ← now N chapters (one per topic), not 1
@@ -146,18 +162,17 @@ export const useUnitData = (unitId: string, courseIdOverride?: string) => {
           throw new Error(`Unit with ID ${unitId} not found`);
         }
 
-        let topicProgress: TopicProgress[] = [];
+        let courseProgress: DetailedCourseProgress | null = null;
         const courseId = unit.courseId || courseIdOverride;
         if (courseId) {
           try {
-            const progress = await courseService.getDetailedCourseProgress(courseId);
-            topicProgress = progress.topicProgress || [];
+            courseProgress = await courseService.getDetailedCourseProgress(courseId);
           } catch (progressError) {
             console.warn('Failed to load topic progress for unit:', progressError);
           }
         }
 
-        return normalizeUnitToChapters(unit, topicProgress);
+        return normalizeUnitToChapters(unit, courseProgress);
       } catch (err: unknown) {
         console.error('Failed to fetch unit:', err);
         const error = err as {

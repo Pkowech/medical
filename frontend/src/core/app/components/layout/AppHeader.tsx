@@ -72,8 +72,15 @@ export const AppHeader: React.FC<{ showDesktopSidebarToggle?: boolean }> = ({
           )}
           {!isMetadataHeader && (
             <div className="min-w-0 flex-1">
-              <h1 className="truncate text-lg font-bold text-foreground sm:text-xl md:text-2xl">
-                {title}
+              <h1 className="truncate text-base font-bold text-foreground sm:text-xl md:text-2xl">
+                {header?.mobileTitle ? (
+                  <>
+                    <span className="sm:hidden">{header.mobileTitle}</span>
+                    <span className="hidden sm:inline">{title}</span>
+                  </>
+                ) : (
+                  title
+                )}
               </h1>
               {!isCompactHeader && description && (
                 <p className="hidden max-w-2xl truncate text-xs text-muted-foreground md:block sm:text-sm">

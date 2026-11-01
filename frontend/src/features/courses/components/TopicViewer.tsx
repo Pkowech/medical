@@ -759,6 +759,7 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
               lessonKey={`${topicId}-${topicId}`}
               notes={notes}
               saveNote={saveNote}
+              onNoteSaved={() => recordCourseActivity('notes', courseId, topicId)}
             />
           </section>
         )}

@@ -18,6 +18,7 @@ interface NotesPanelProps {
   notes?: Record<string, NoteItem[]> | NoteItem[];
   saveNote?: (lessonKey: string, noteText: string) => void;
   onSaveNoteApi?: (content: string, type?: 'student' | 'ai_generated') => Promise<void>;
+  onNoteSaved?: () => void;
 }
 
 export const NotesPanel = ({
@@ -26,6 +27,7 @@ export const NotesPanel = ({
   notes: propNotes,
   saveNote,
   onSaveNoteApi,
+  onNoteSaved,
 }: NotesPanelProps) => {
   const [noteInput, setNoteInput] = useState('');
   const [noteList, setNoteList] = useState<NoteItem[]>([]);
@@ -44,9 +46,11 @@ export const NotesPanel = ({
     if (onSaveNoteApi) {
       await onSaveNoteApi(noteInput, 'student');
       setNoteInput('');
+      onNoteSaved?.();
     } else if (saveNote) {
       saveNote(lessonKey, noteInput);
       setNoteInput('');
+      onNoteSaved?.();
     }
   };
 

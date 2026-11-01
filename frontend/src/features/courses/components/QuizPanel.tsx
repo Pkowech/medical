@@ -179,11 +179,13 @@ export const QuizPanel = ({
 
       setFinalResult(result);
       setQuizComplete(true);
-      if (scope !== 'assessment' && lessonId != null && activeSession) {
+      if (scope !== 'assessment' && lessonId != null) {
         recordCourseActivity(
           'quiz',
-          courseId ?? activeSession.courseId,
-          scope === 'topic' ? String(lessonId) : activeSession.topicId,
+          courseId ?? activeSession?.courseId,
+          scope === 'topic'
+            ? String(lessonId)
+            : activeSession?.topicId ?? String(lessonId),
           result.score,
         );
       }

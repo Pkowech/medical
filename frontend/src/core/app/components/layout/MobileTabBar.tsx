@@ -41,7 +41,7 @@ export function MobileTabBar({ navigationItems }: MobileTabBarProps) {
               onClick={() => setSidebarOpen(false)}
               aria-label={item.label}
               aria-current={isActive ? 'page' : undefined}
-              className={`flex min-w-0 flex-col items-center justify-center gap-1 px-1 text-[11px] font-medium transition-colors active:scale-95 motion-reduce:transition-none ${
+              className={`flex min-h-11 min-w-0 flex-col items-center justify-center gap-1 px-1 text-xs font-medium transition-colors active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary motion-reduce:transition-none ${
                 isActive
                   ? 'text-blue-700 dark:text-blue-300'
                   : 'text-muted-foreground hover:text-foreground dark:text-muted-foreground dark:hover:text-foreground'

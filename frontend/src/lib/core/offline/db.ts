@@ -133,7 +133,7 @@ export interface OfflineStudySession {
   isActive: boolean;
   pausedDurationSeconds?: number;
   pauseStartedAtMs?: number | null;
-  pauseReason?: 'manual' | 'navigation' | 'visibility' | null;
+  pauseReason?: 'manual' | 'navigation' | 'visibility' | 'idle' | null;
   activities: Array<{
     type: 'reading' | 'material_opened' | 'quiz' | 'notes';
     duration: number;

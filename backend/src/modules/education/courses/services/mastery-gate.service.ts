@@ -56,24 +56,26 @@ export class MasteryGateService {
         };
       }
 
+      const quizScores =
+        (progress.quizScores as Record<string, unknown> | null) ?? {};
+      const assessmentScore = Number(
+        quizScores.bestScore ?? quizScores.lastScore ?? 0,
+      );
       let readinessSignal: ReadinessSignal = 'NOT_READY';
-      if (progress.progressPercentage >= this.PASSING_THRESHOLD) {
+      if (assessmentScore >= this.PASSING_THRESHOLD) {
         readinessSignal = 'SAFE';
-      } else if (progress.progressPercentage >= 50) {
+      } else if (assessmentScore >= 50) {
         readinessSignal = 'BORDERLINE';
       }
 
       return {
         userId,
         topicId,
-        masteryUnlocked: progress.status === 'completed',
+        masteryUnlocked: quizScores.masteryUnlocked === true,
         failedAttempts: Number(
-          (progress.quizScores as Record<string, unknown> | null)?.failedAttempts ?? 0,
+          quizScores.failedAttempts ?? 0,
         ),
-        isEligibleForNextTopic:
-          typeof (progress.quizScores as Record<string, unknown> | null)?.nextTopicUnlocked === 'boolean'
-            ? Boolean((progress.quizScores as Record<string, unknown>).nextTopicUnlocked)
-            : progress.status === 'completed',
+        isEligibleForNextTopic: quizScores.nextTopicUnlocked === true,
         readinessSignal,
       };
     } catch (error) {
@@ -145,6 +147,7 @@ export class MasteryGateService {
             ...previousQuizScores,
             attempts,
             failedAttempts: 0,
+            masteryUnlocked: true,
             lastScore: score,
             bestScore: Math.max(Number(previousQuizScores.bestScore ?? 0), score),
             passedAt: new Date().toISOString(),
@@ -196,6 +199,7 @@ export class MasteryGateService {
           data: {
             quizScores: {
               ...((progress.quizScores as Record<string, unknown> | null) ?? {}),
+              masteryUnlocked: true,
               nextTopicUnlocked,
             },
           },
@@ -217,22 +221,30 @@ export class MasteryGateService {
         };
       } else {
         const newFailedAttempts = failedAttempts + 1;
+        const masteryUnlocked = previousQuizScores.masteryUnlocked === true;
+        const nextTopicUnlocked =
+          previousQuizScores.nextTopicUnlocked === true;
 
         const updateData: any = {
           quizScores: {
             ...previousQuizScores,
             attempts,
             failedAttempts: newFailedAttempts,
-            nextTopicUnlocked: false,
+            masteryUnlocked,
+            nextTopicUnlocked,
             lastScore: score,
             lastAttemptAt: new Date().toISOString(),
           },
           unitId: topic.unitId,
           courseId: topic.unit.courseId,
           progressPercentage: score,
-          status: ProgressStatus.inProgress,
-          isCompleted: false,
-          completedAt: null,
+          ...(masteryUnlocked
+            ? {}
+            : {
+                status: ProgressStatus.inProgress,
+                isCompleted: false,
+                completedAt: null,
+              }),
           lastUpdated: BigInt(Date.now()),
         };
 
@@ -257,10 +269,12 @@ export class MasteryGateService {
 
         return {
           topicId,
-          masteryUnlocked: false,
+          masteryUnlocked,
           failedAttempts: newFailedAttempts,
-          nextTopicUnlocked: false,
-          message: `You scored ${score}%, but need ${threshold}% to pass. Review the material and try again. Attempt ${newFailedAttempts}.`,
+          nextTopicUnlocked,
+          message: masteryUnlocked
+            ? `You scored ${score}%. Your previously earned mastery and topic unlock remain in place.`
+            : `You scored ${score}%, but need ${threshold}% to pass. Review the material and try again. Attempt ${newFailedAttempts}.`,
         };
       }
     } catch (error) {

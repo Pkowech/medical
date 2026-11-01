@@ -1,3 +1,5 @@
+import type { ReadinessSignal } from './mastery.types';
+
 /**
  * Progress, Statistics, and Achievement Types
  * Consolidated single source of truth for all progress-related domain models
@@ -110,6 +112,14 @@ export interface TopicProgress {
   failedAttempts?: number;
   progressPercentage?: number;
   quizScores?: Record<string, unknown>;
+  readinessSignal?: ReadinessSignal;
+}
+
+export interface MaterialProgressSummary {
+  materialId: string;
+  topicId: string | null;
+  isCompleted: boolean;
+  progressPercentage: number;
 }
 
 /**
@@ -122,6 +132,7 @@ export interface DetailedCourseProgress {
   totalProgress: number;
   unitProgress: Array<UnitProgress & { completed?: boolean }>;
   topicProgress: TopicProgress[];
+  materialProgress?: MaterialProgressSummary[];
   lastUpdated?: string;
 }
 

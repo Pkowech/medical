@@ -11,6 +11,7 @@ import React, {
 
 export interface PageHeader {
   title: string;
+  mobileTitle?: string;
   description?: string;
   icon?: React.ReactNode;
   actions?: React.ReactNode;

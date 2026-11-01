@@ -3,7 +3,6 @@ import { useParams, useRouter } from 'next/navigation';
 
 type NavLesson = {
   id: string | number;
-  masteryUnlocked?: boolean;
   nextTopicUnlocked?: boolean;
 };
 type NavChapter = { id: string | number; lessons: NavLesson[] };
@@ -77,13 +76,13 @@ export const useCourseNavigation = (
 
     if (!targetChapter) return;
 
-    if (parentUnitId && chapterIndex > 0 && chapterIndex !== currentChapterIndex) {
+    if (chapterIndex > currentChapterIndex) {
       const previousChapter = chapters[chapterIndex - 1];
       const previousTopic = previousChapter?.lessons?.at(-1);
-      const previousTopicUnlocked = Boolean(
-        previousTopic?.nextTopicUnlocked || previousTopic?.masteryUnlocked,
-      );
-      if (!previousTopicUnlocked) return;
+      if (previousTopic?.nextTopicUnlocked !== true) return;
+    } else if (chapterIndex === currentChapterIndex && lessonIndex > currentLessonIndex) {
+      const previousLesson = targetChapter.lessons[lessonIndex - 1];
+      if (previousLesson?.nextTopicUnlocked !== true) return;
     }
 
     setCurrentChapterIndex(chapterIndex);
@@ -130,12 +129,12 @@ export const useCourseNavigation = (
   const isLastLesson =
     currentChapterIndex === chapters.length - 1 &&
     currentLessonIndex === (currentChapter?.lessons?.length || 1) - 1;
+  const nextLessonInChapter = currentChapter?.lessons?.[currentLessonIndex + 1];
   const isNextTopicLocked = Boolean(
-    parentUnitId &&
-    currentLessonIndex >= (currentChapter?.lessons?.length || 1) - 1 &&
-    currentChapterIndex < chapters.length - 1 &&
-    !currentChapter?.lessons?.at(-1)?.nextTopicUnlocked &&
-    !currentChapter?.lessons?.at(-1)?.masteryUnlocked,
+    (nextLessonInChapter
+      ? currentLesson?.nextTopicUnlocked !== true
+      : currentChapterIndex < chapters.length - 1 &&
+        currentChapter?.lessons?.at(-1)?.nextTopicUnlocked !== true),
   );
 
   return {

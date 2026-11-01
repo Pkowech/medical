@@ -25,7 +25,7 @@ interface ActiveCourseSession {
   lastActivitySeconds: number;
   pausedDurationSeconds: number;
   pauseStartedAtMs: number | null;
-  pauseReason: 'manual' | 'navigation' | 'visibility' | null;
+  pauseReason: 'manual' | 'navigation' | 'visibility' | 'idle' | null;
   isActive: boolean;
   activities: StudySessionActivity[];
   notes: string;
@@ -61,6 +61,18 @@ interface CourseStudySessionContextValue {
 }
 
 const CourseStudySessionContext = createContext<CourseStudySessionContextValue | null>(null);
+const STUDY_IDLE_TIMEOUT_MS = 5 * 60 * 1000;
+
+interface PendingCourseSession {
+  courseId: string;
+  topicId: string;
+  topicTitle: string;
+}
+
+function isMeaningfulStudyActivity(type: StudySessionActivity['type']): boolean {
+  return type === 'reading' || type === 'material_opened' ||
+    type === 'quiz' || type === 'notes';
+}
 
 function formatElapsedTime(totalSeconds: number): string {
   const hours = Math.floor(totalSeconds / 3600);
@@ -93,8 +105,23 @@ function getHttpStatus(error: unknown): number | undefined {
 }
 
 export function CourseStudySessionProvider({ children }: { children: React.ReactNode }) {
-  const { startSession, endSession } = useStudy();
   const userId = useAuthStore(state => state.user?.id);
+
+  return (
+    <CourseStudySessionStateProvider key={userId} userId={userId}>
+      {children}
+    </CourseStudySessionStateProvider>
+  );
+}
+
+function CourseStudySessionStateProvider({
+  children,
+  userId,
+}: {
+  children: React.ReactNode;
+  userId?: string;
+}) {
+  const { startSession, endSession } = useStudy();
   const [activeSession, setActiveSession] = useState<ActiveCourseSession | null>(null);
   const [isEnding, setIsEnding] = useState(false);
   const [sessionReadyUserId, setSessionReadyUserId] = useState<string>();
@@ -103,6 +130,8 @@ export function CourseStudySessionProvider({ children }: { children: React.React
   const isStartingRef = useRef(false);
   const isEndingRef = useRef(false);
   const isPausedByVisibilityRef = useRef(false);
+  const pendingCourseSessionRef = useRef<PendingCourseSession | null>(null);
+  const lastInteractionAtRef = useRef(Date.now());
   activeSessionRef.current = activeSession;
 
   const persistOfflineSession = useCallback(async (session: ActiveCourseSession) => {
@@ -149,25 +178,15 @@ export function CourseStudySessionProvider({ children }: { children: React.React
       setSessionElapsedBase(restored.elapsedSeconds);
       toast.info('Your saved course session and notes were restored.');
     }).catch(error => {
-      console.error('Could not restore the offline study session:', error);
-      toast.error('Could not restore your saved study session.');
+      if (!cancelled) {
+        console.error('Could not restore the offline study session:', error);
+        toast.error('Could not restore your saved study session.');
+      }
     }).finally(() => {
       if (!cancelled) setSessionReadyUserId(userId);
     });
     return () => { cancelled = true; };
   }, [userId]);
-
-  useEffect(() => {
-    if (!activeSession?.isActive) return;
-    const timer = window.setInterval(() => {
-      setActiveSession(current =>
-        current?.isActive
-          ? { ...current, elapsedSeconds: current.elapsedSeconds + 1 }
-          : current,
-      );
-    }, 1000);
-    return () => window.clearInterval(timer);
-  }, [activeSession?.isActive]);
 
   useEffect(() => {
     if (!activeSession || !userId) return;
@@ -210,6 +229,47 @@ export function CourseStudySessionProvider({ children }: { children: React.React
     setActiveSession(updated);
   }, []);
 
+  const startCourseSessionForActivity = useCallback(async (
+    pending: PendingCourseSession,
+    activity: StudySessionActivity,
+  ) => {
+    if (isStartingRef.current) return;
+    isStartingRef.current = true;
+    try {
+      const session = await startSession({ type: 'topic', id: pending.topicId });
+      if (!session) {
+        toast.error('Could not start a study session for this topic.');
+        return;
+      }
+
+      const newSession: ActiveCourseSession = {
+        id: session.id,
+        ...pending,
+        elapsedSeconds: 0,
+        lastActivitySeconds: 0,
+        pausedDurationSeconds: 0,
+        pauseStartedAtMs: null,
+        pauseReason: null,
+        isActive: true,
+        activities: [activity],
+        notes: '',
+      };
+      pendingCourseSessionRef.current = null;
+      lastInteractionAtRef.current = Date.now();
+      activeSessionRef.current = newSession;
+      setActiveSession(newSession);
+      setSessionElapsedBase(0);
+      try {
+        await persistOfflineSession(newSession);
+      } catch (error) {
+        console.error('Could not save the started session on this device:', error);
+        toast.error('Session started, but offline recovery could not be enabled.');
+      }
+    } finally {
+      isStartingRef.current = false;
+    }
+  }, [persistOfflineSession, startSession]);
+
   const recordCourseActivity = useCallback((
     type: StudySessionActivity['type'],
     courseId: string | undefined,
@@ -218,7 +278,32 @@ export function CourseStudySessionProvider({ children }: { children: React.React
     materialId?: string,
   ) => {
     const current = activeSessionRef.current;
-    if (!current || (courseId && current.courseId !== courseId)) return;
+    if (!current) {
+      const pending = pendingCourseSessionRef.current;
+      if (
+        !pending ||
+        !isMeaningfulStudyActivity(type) ||
+        pending.topicId !== topicId ||
+        (courseId && pending.courseId !== courseId)
+      ) {
+        return;
+      }
+      const activity: StudySessionActivity = {
+        type,
+        duration: 0,
+        timestamp: new Date().toISOString(),
+        ...(score === undefined ? {} : { score }),
+        metadata: {
+          topicId,
+          durationSeconds: 0,
+          ...(materialId ? { materialId } : {}),
+        },
+      };
+      void startCourseSessionForActivity(pending, activity);
+      return;
+    }
+    if (courseId && current.courseId !== courseId) return;
+    lastInteractionAtRef.current = Date.now();
     const isMaterialOpen = type === 'material_opened';
     const segmentSeconds = isMaterialOpen
       ? 0
@@ -246,7 +331,7 @@ export function CourseStudySessionProvider({ children }: { children: React.React
     };
     activeSessionRef.current = updated;
     setActiveSession(updated);
-  }, []);
+  }, [startCourseSessionForActivity]);
 
   const switchCourseTopic = useCallback((
     courseId: string,
@@ -284,7 +369,10 @@ export function CourseStudySessionProvider({ children }: { children: React.React
     const current = activeSessionRef.current;
     if (!current) return;
     if (!current.isActive) {
-      if (reason === 'navigation' && current.pauseReason === 'visibility') {
+      if (
+        reason === 'navigation' &&
+        (current.pauseReason === 'visibility' || current.pauseReason === 'idle')
+      ) {
         const pausedForNavigation = { ...current, pauseReason: 'navigation' as const };
         isPausedByVisibilityRef.current = false;
         activeSessionRef.current = pausedForNavigation;
@@ -317,9 +405,44 @@ export function CourseStudySessionProvider({ children }: { children: React.React
       pauseStartedAtMs: null,
       pauseReason: null,
     };
+    lastInteractionAtRef.current = Date.now();
     activeSessionRef.current = resumed;
     setActiveSession(resumed);
   }, []);
+
+  useEffect(() => {
+    if (!activeSession?.isActive) return;
+    const timer = window.setInterval(() => {
+      const current = activeSessionRef.current;
+      if (!current?.isActive) return;
+      if (Date.now() - lastInteractionAtRef.current >= STUDY_IDLE_TIMEOUT_MS) {
+        pauseCourseSession('idle');
+        return;
+      }
+      const updated = { ...current, elapsedSeconds: current.elapsedSeconds + 1 };
+      activeSessionRef.current = updated;
+      setActiveSession(updated);
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [activeSession?.isActive, pauseCourseSession]);
+
+  useEffect(() => {
+    const handleInteraction = () => {
+      lastInteractionAtRef.current = Date.now();
+      if (activeSessionRef.current?.pauseReason === 'idle') {
+        resumeCourseSession();
+      }
+    };
+    const interactionEvents = ['pointerdown', 'keydown', 'scroll', 'touchstart'] as const;
+    for (const eventName of interactionEvents) {
+      window.addEventListener(eventName, handleInteraction, { passive: true });
+    }
+    return () => {
+      for (const eventName of interactionEvents) {
+        window.removeEventListener(eventName, handleInteraction);
+      }
+    };
+  }, [resumeCourseSession]);
 
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -473,14 +596,19 @@ export function CourseStudySessionProvider({ children }: { children: React.React
       }
       if (
         !currentSession.isActive &&
-        currentSession.pauseReason !== 'manual' &&
+        (currentSession.pauseReason === 'navigation' ||
+          currentSession.pauseReason === 'visibility') &&
         document.visibilityState === 'visible'
       ) {
         resumeCourseSession();
       }
       return;
     }
-    if (isStartingRef.current) return;
+    const pending = { courseId, topicId, topicTitle };
+    if (isStartingRef.current) {
+      pendingCourseSessionRef.current = pending;
+      return;
+    }
 
     isStartingRef.current = true;
     try {
@@ -488,50 +616,14 @@ export function CourseStudySessionProvider({ children }: { children: React.React
         await endCourseSession();
         if (activeSessionRef.current) return;
       }
-
-      const session = await startSession({ type: 'topic', id: topicId });
-      if (!session) {
-        toast.error('Could not start a study session for this topic.');
-        return;
-      }
-
-      const newSession: ActiveCourseSession = {
-        id: session.id,
-        courseId,
-        topicId,
-        topicTitle,
-        elapsedSeconds: 0,
-        lastActivitySeconds: 0,
-        pausedDurationSeconds: 0,
-        pauseStartedAtMs: null,
-        pauseReason: null,
-        isActive: true,
-        activities: [{
-          type: 'reading',
-          duration: 0,
-          timestamp: new Date().toISOString(),
-          metadata: { topicId, durationSeconds: 0 },
-        }],
-        notes: '',
-      };
-      activeSessionRef.current = newSession;
-      setActiveSession(newSession);
-      setSessionElapsedBase(0);
-      try {
-        await persistOfflineSession(newSession);
-      } catch (error) {
-        console.error('Could not save the started session on this device:', error);
-        toast.error('Session started, but offline recovery could not be enabled.');
-      }
+      pendingCourseSessionRef.current = pending;
     } finally {
       isStartingRef.current = false;
     }
   }, [
     endCourseSession,
-    persistOfflineSession,
     resumeCourseSession,
     sessionReadyUserId,
-    startSession,
     switchCourseTopic,
     userId,
   ]);
@@ -629,12 +721,14 @@ export function CourseStudySessionIndicator({
   return (
     <details className="relative">
       <summary
-        className="flex h-9 list-none cursor-pointer items-center gap-1.5 rounded-md border border-border px-2 text-xs font-medium text-foreground hover:bg-muted"
+        className="flex min-h-11 list-none cursor-pointer items-center gap-1.5 rounded-md border border-border px-2 text-xs font-medium text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         aria-label="Study session controls"
-        title={`${activeSession.isActive ? 'Tracking study time' : 'Study time paused'}: ${activeSession.topicTitle}`}
+        title={`Study time ${activeSession.isActive ? 'tracking' : 'paused'}: ${activeSession.topicTitle}`}
       >
         <span className={`h-2 w-2 rounded-full ${activeSession.isActive ? 'bg-emerald-500' : 'bg-muted-foreground'}`} />
         <Clock aria-hidden="true" className="h-4 w-4" />
+        <span className="text-[11px] sm:hidden">Study</span>
+        <span className="hidden sm:inline">Study time</span>
         <span className="font-mono tabular-nums" aria-live="off">
           {formatElapsedTime(elapsedSeconds)}
         </span>

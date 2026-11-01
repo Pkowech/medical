@@ -62,6 +62,10 @@ type NormalisedMaterial = {
   unitId?: string | number;
 };
 
+function getMobileTopicTitle(title?: string): string {
+  const words = title?.trim().split(/\s+/).filter(Boolean) ?? [];
+  return words.length > 2 ? words.slice(0, 2).join(' ') : title || 'Topic';
+}
 
 // ---------------------------------------------------------------------------
 // Main component
@@ -220,31 +224,12 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
       const isTopicReading = hasSelectedTopic && !selectedMaterialId;
       setHeader({
         title: unitData.title,
+        mobileTitle: hasSelectedTopic
+          ? getMobileTopicTitle(typedCurrentTopic?.title)
+          : undefined,
         description: unitData.description || 'Unit content and materials',
         canResumeStudySession: isTopicReading,
         presentation: isTopicReading ? 'compact' : 'metadata',
-        actions: isTopicReading ? (
-            <Button
-              type="button"
-              size="icon"
-              variant={activeCoursePanel === 'unit-quiz' ? 'outline' : 'default'}
-              onClick={() => {
-                if (typedCurrentTopic?.id != null) {
-                  recordCourseActivity('reading', courseId, String(typedCurrentTopic.id));
-                }
-                toggleCoursePanel('unit-quiz');
-              }}
-              aria-label={activeCoursePanel === 'unit-quiz' ? 'Back to unit content' : 'Unit quiz'}
-              aria-pressed={activeCoursePanel === 'unit-quiz'}
-              title={activeCoursePanel === 'unit-quiz' ? 'Back to unit content' : 'Unit quiz'}
-              className="h-9 w-9 sm:w-auto sm:px-3"
-            >
-              <ClipboardCheck className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">
-                {activeCoursePanel === 'unit-quiz' ? 'Back to Unit' : 'Unit Quiz'}
-              </span>
-            </Button>
-        ) : undefined,
       });
     }
     return () => setHeader(null);
@@ -527,12 +512,12 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
           selectedMaterialId ? 'flex overflow-hidden p-0' : 'overflow-y-auto p-4 md:p-8',
         )}>
           <div className={cn(
-            'max-w-5xl mx-auto space-y-6 md:space-y-8 pb-20',
+            'max-w-6xl mx-auto space-y-6 md:space-y-8 pb-20',
             selectedMaterialId && 'flex h-full w-full max-w-none flex-1 flex-col space-y-0 pb-0',
           )}>
 
             {/* Breadcrumb + progress */}
-            {!selectedMaterialId && !hasSelectedTopic && <div className="space-y-4">
+            {!selectedMaterialId && <div className="space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex min-w-0 flex-wrap items-center gap-3">
                 {sidebarCollapsed && selectedMaterialId && (
@@ -550,9 +535,16 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
                   items={[
                     { label: 'Courses', href: '/courses' },
                     ...(courseId
-                      ? [{ label: 'Course overview', href: `/courses/${courseId}` }]
+                      ? [{
+                          label: unitData.courseName || 'Course overview',
+                          href: `/courses/${courseId}`,
+                        }]
                       : []),
-                    { label: unitData.title },
+                    {
+                      label: hasSelectedTopic
+                        ? typedCurrentTopic?.title || unitData.title
+                        : unitData.title,
+                    },
                   ]}
                 />
                 <details className="group relative shrink-0">
@@ -581,15 +573,24 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
                       }
                       toggleCoursePanel('unit-quiz');
                     }}
+                    aria-label={activeCoursePanel === 'unit-quiz' ? 'Return to unit content' : 'Open unit quiz'}
                     aria-pressed={activeCoursePanel === 'unit-quiz'}
-                    className="shrink-0"
+                    className="min-h-11 shrink-0"
                   >
                     <ClipboardCheck className="mr-2 h-4 w-4" />
                     {activeCoursePanel === 'unit-quiz' ? 'Back to Unit' : 'Unit Quiz'}
                   </Button>
                 </div>
               </div>
-              <ProgressBar value={unitProgressPercentage} className="h-2" />
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-foreground/75">
+                  {unitData.courseProgressPercentage == null ? 'Unit progress' : 'Course progress'}
+                </p>
+                <ProgressBar
+                  value={unitData.courseProgressPercentage ?? unitProgressPercentage}
+                  className="h-1.5"
+                />
+              </div>
             </div>}
 
             {/* Admin actions - Add Topic */}

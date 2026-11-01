@@ -6,6 +6,7 @@ import { BaseEntity } from '@/shared/types/systemInterface';
 import { User } from '@/shared/types/authInterface';
 import { Material } from '@/shared/types/materialInterface';
 import type { ReadinessSignal } from '@/shared/types/mastery.types';
+import type { MaterialProgressSummary } from '@/shared/types/progressInterface';
 
 export interface Course extends BaseEntity {
   name: string;
@@ -141,8 +142,11 @@ export interface Lesson extends Omit<BaseEntity, 'id'> {
   content: { video?: string; transcript?: string; interactive?: boolean; text?: string };
   isCompleted?: boolean;
   masteryUnlocked?: boolean;
+  nextTopicUnlocked?: boolean;
   failedAttempts?: number;
   readinessSignal?: ReadinessSignal;
+  readingProgressPercentage?: number;
+  materialProgress?: Record<string, MaterialProgressSummary>;
 }
 
  export interface CourseContentProps {
@@ -257,6 +261,8 @@ export interface CourseFilter {
 export interface CourseData {
   id: string;
   courseId?: string;
+  courseName?: string;
+  courseProgressPercentage?: number;
   title: string;
   description: string;
   units?: CourseUnit[];
@@ -274,6 +280,9 @@ export interface CourseData {
       masteryUnlocked?: boolean;
       nextTopicUnlocked?: boolean;
       failedAttempts?: number;
+      readinessSignal?: ReadinessSignal;
+      readingProgressPercentage?: number;
+      materialProgress?: Record<string, MaterialProgressSummary>;
     }>;
   }>;
   resources?: Material[];
@@ -316,6 +325,8 @@ export interface Chapter {
     nextTopicUnlocked?: boolean;
     failedAttempts?: number;
     readinessSignal?: ReadinessSignal;
+    readingProgressPercentage?: number;
+    materialProgress?: Record<string, MaterialProgressSummary>;
   }[];
 }
 

@@ -4,6 +4,7 @@ import { useAuthStore } from '@/features/auth/store/useAuthStore';
 import type { Course, CourseUnit, CourseData } from '@/shared/types/courseInterface';
 import type { Material as CourseMaterial } from '@/shared/types/materialInterface';
 import type { DetailedCourseProgress, TopicProgress, UnitProgress } from '@/shared/types/progressInterface';
+import { summarizeTopicMaterialProgress } from '@/features/courses/utils/topicMaterialProgress';
 
 // Local normalized lesson shape used internally by this hook
 type NormalizedLesson = {
@@ -16,6 +17,12 @@ type NormalizedLesson = {
   masteryUnlocked?: boolean;
   nextTopicUnlocked?: boolean;
   failedAttempts?: number;
+  readinessSignal?: 'SAFE' | 'BORDERLINE' | 'NOT_READY';
+  readingProgressPercentage?: number;
+  materialProgress?: Record<
+    string,
+    NonNullable<DetailedCourseProgress['materialProgress']>[number]
+  >;
 };
 
 export const useCourseData = (courseId: string) => {
@@ -72,6 +79,12 @@ export const useCourseData = (courseId: string) => {
 
       const topicProgressMap: Record<string, TopicProgress> = {};
       const unitProgressMap: Record<string, UnitProgress & { completed?: boolean }> = {};
+      const materialProgressById = new Map(
+        (progressData?.materialProgress ?? []).map(progress => [
+          String(progress.materialId),
+          progress,
+        ]),
+      );
 
       if (progressData) {
         if (Array.isArray(progressData.topicProgress)) {
@@ -100,11 +113,34 @@ export const useCourseData = (courseId: string) => {
 
         if (topics.length > 0) {
           lessonArray = topics.map(topic => {
-            const topicId = String(topic.id ?? topic.name ?? '');
+            const topicIdValue =
+              typeof topic.id === 'string' || typeof topic.id === 'number'
+                ? topic.id
+                : typeof topic.name === 'string' || typeof topic.name === 'number'
+                  ? topic.name
+                  : '';
+            const topicId = String(topicIdValue);
             const topicProgress = topicProgressMap[topicId];
-            const title = String(topic.title || topic.name || topicId);
+            const title =
+              typeof topic.title === 'string'
+                ? topic.title
+                : typeof topic.name === 'string'
+                  ? topic.name
+                  : topicId;
             const description =
               typeof topic.description === 'string' ? topic.description : '';
+            const topicMaterials = Array.isArray(topic.materials)
+              ? (topic.materials as Array<Record<string, unknown>>)
+              : [];
+            const { materialProgress, readingProgressPercentage } =
+              summarizeTopicMaterialProgress(
+                topicMaterials.flatMap(material =>
+                  typeof material.id === 'string' || typeof material.id === 'number'
+                    ? [material.id]
+                    : [],
+                ),
+                materialProgressById,
+              );
 
             return {
               id: topicId,
@@ -116,12 +152,12 @@ export const useCourseData = (courseId: string) => {
                   : '',
               content: { text: description },
               isCompleted: Boolean(topicProgress?.isCompleted || topicProgress?.status === 'completed' || topic.isCompleted),
-              masteryUnlocked: Boolean(topicProgress?.masteryUnlocked || topicProgress?.status === 'completed' || topic.masteryUnlocked),
-              nextTopicUnlocked: topicProgress?.nextTopicUnlocked ||
-                (typeof topicProgress?.quizScores?.['nextTopicUnlocked'] === 'boolean'
-                  ? topicProgress.quizScores['nextTopicUnlocked'] as boolean
-                  : topicProgress?.masteryUnlocked ?? topicProgress?.isCompleted ?? false),
+              masteryUnlocked: topicProgress?.masteryUnlocked === true,
+              nextTopicUnlocked: topicProgress?.nextTopicUnlocked === true,
               failedAttempts: topicProgress?.failedAttempts ?? 0,
+              readinessSignal: topicProgress?.readinessSignal,
+              materialProgress,
+              readingProgressPercentage,
             };
           });
         } else if (
@@ -168,11 +204,8 @@ export const useCourseData = (courseId: string) => {
               duration,
               content: { text: contentText, video: videoUrl },
               isCompleted: topicProgress?.isCompleted ?? false,
-              masteryUnlocked: topicProgress?.masteryUnlocked ?? false,
-              nextTopicUnlocked: topicProgress?.nextTopicUnlocked ||
-                (typeof topicProgress?.quizScores?.['nextTopicUnlocked'] === 'boolean'
-                  ? topicProgress.quizScores['nextTopicUnlocked'] as boolean
-                  : topicProgress?.masteryUnlocked ?? topicProgress?.isCompleted ?? false),
+              masteryUnlocked: topicProgress?.masteryUnlocked === true,
+              nextTopicUnlocked: topicProgress?.nextTopicUnlocked === true,
               failedAttempts: topicProgress?.failedAttempts ?? 0,
             } as NormalizedLesson;
           });
