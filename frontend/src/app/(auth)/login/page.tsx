@@ -122,8 +122,15 @@ function LoginContent() {
 
   useEffect(() => {
     if (searchParams.get('error') === 'google-signin-failed') {
+      const failureReason = searchParams.get('reason');
       setError(
-        'Google sign-in could not be completed. Please try again.'
+        failureReason === 'configuration'
+          ? 'Google sign-in is not configured correctly. Please contact support.'
+          : failureReason === 'identity'
+            ? 'Google could not verify this account. Try another verified Google account.'
+            : failureReason === 'service'
+              ? 'Google sign-in is temporarily unavailable. Please try again shortly.'
+              : 'Google sign-in could not be completed. Please try again.',
       );
     }
 

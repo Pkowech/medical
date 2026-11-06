@@ -17,7 +17,23 @@ const isAbortError = (err: unknown): err is { name: string } =>
   'name' in err &&
   (err as { name: string }).name === 'AbortError';
 
-class GoogleTermsRequiredError extends Error {}
+type GoogleAuthFailure = 'configuration' | 'identity' | 'service' | 'unknown';
+
+class GoogleAuthError extends Error {
+  constructor(
+    message: string,
+    readonly failure: GoogleAuthFailure,
+  ) {
+    super(message);
+    this.name = 'GoogleAuthError';
+  }
+}
+
+class GoogleTermsRequiredError extends GoogleAuthError {
+  constructor() {
+    super('Terms acceptance is required for a new Google account.', 'unknown');
+  }
+}
 
 const GOOGLE_PENDING_TOKEN_COOKIE = 'google-pending-id-token';
 
@@ -126,7 +142,10 @@ async function exchangeGoogleCredential(
     '';
 
   if (!raw) {
-    throw new Error('Google sign-in is temporarily unavailable.');
+    throw new GoogleAuthError(
+      'Google sign-in is not configured.',
+      'configuration',
+    );
   }
 
   let baseUrl = raw.trim();
@@ -139,22 +158,55 @@ async function exchangeGoogleCredential(
     : `${baseWithoutTrailingSlash}/v1`;
   const endpoint = new URL('auth/google', `${apiBase}/`).href;
 
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ idToken, acceptTerms }),
-    cache: 'no-store',
-  });
-  const responseData = (await response.json()) as LoginResponsePayload;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10_000);
+  let response: Response;
+  let responseData: LoginResponsePayload;
+  try {
+    response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({ idToken, acceptTerms }),
+      cache: 'no-store',
+      signal: controller.signal,
+    });
+    const body = await response.text();
+    responseData = body
+      ? (JSON.parse(body) as LoginResponsePayload)
+      : {};
+  } catch (error) {
+    throw new GoogleAuthError(
+      error instanceof Error && error.name === 'AbortError'
+        ? 'Google sign-in service timed out.'
+        : 'Google sign-in service could not be reached.',
+      'service',
+    );
+  } finally {
+    clearTimeout(timeout);
+  }
 
   if (!response.ok) {
-    if (responseData.code === 'GOOGLE_TERMS_REQUIRED') {
-      throw new GoogleTermsRequiredError(responseData.message);
+    const responseMessage =
+      typeof responseData.message === 'string' ? responseData.message : '';
+    const requiresTerms =
+      responseData.code === 'GOOGLE_TERMS_REQUIRED' ||
+      (response.status === 400 &&
+        /accept(?:ing)? the terms/i.test(responseMessage));
+    if (requiresTerms) {
+      throw new GoogleTermsRequiredError();
     }
-    throw new Error(
-      typeof responseData.message === 'string'
-        ? responseData.message
-        : 'Google sign-in was rejected by the authentication service.',
+    const failure: GoogleAuthFailure =
+      response.status === 401 || response.status === 403
+        ? 'identity'
+        : response.status >= 500
+          ? 'service'
+          : 'unknown';
+    throw new GoogleAuthError(
+      'Google sign-in was rejected by the authentication service.',
+      failure,
     );
   }
 
@@ -174,7 +226,10 @@ async function exchangeGoogleCredential(
     !Number.isFinite(expiration) ||
     typeof roleData?.role !== 'string'
   ) {
-    throw new Error('Google sign-in returned incomplete account information.');
+    throw new GoogleAuthError(
+      'Google sign-in returned incomplete account information.',
+      'service',
+    );
   }
 
   const role = roleData.role as Role;
@@ -507,7 +562,7 @@ export const authOptions: NextAuthOptions = {
       }
 
       if (!account.id_token) {
-        return '/login?error=google-signin-failed';
+        return '/login?error=google-signin-failed&reason=identity';
       }
 
       try {
@@ -532,11 +587,10 @@ export const authOptions: NextAuthOptions = {
           );
           return '/google-consent';
         }
-        console.error(
-          '[NextAuth] Google account exchange failed:',
-          error instanceof Error ? error.message : 'Unknown authentication error',
-        );
-        return '/login?error=google-signin-failed';
+        const failure =
+          error instanceof GoogleAuthError ? error.failure : 'unknown';
+        console.error('[NextAuth] Google account exchange failed:', failure);
+        return `/login?error=google-signin-failed&reason=${failure}`;
       }
     },
 

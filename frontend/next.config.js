@@ -96,6 +96,7 @@ const initializePWA = () => {
       skipWaiting: false,
       clientsClaim: true,
       cacheOnFrontEndNav: false,
+      buildExcludes: [/_buildManifest\.js$/, /_ssgManifest\.js$/],
       publicExcludes: [
         '!noprecache/**/*',
         '!pdfjs/**/*',
@@ -236,7 +237,7 @@ const getSecurityHeaders = () => [
       {
         key: 'Permissions-Policy',
         value:
-          'camera=(), microphone=(), geolocation=(), interest-cohort=(), payment=(), usb=(), magnetometer=(), gyroscope=()',
+          'camera=(), microphone=(), geolocation=(), payment=(), usb=(), magnetometer=(), gyroscope=()',
       },
       {
         key: 'Content-Security-Policy',
