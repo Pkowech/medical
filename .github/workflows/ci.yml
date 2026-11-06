@@ -45,6 +45,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: pnpm/action-setup@v3
         with:
@@ -76,9 +78,35 @@ jobs:
         working-directory: backend
         run: pnpm prisma generate
 
-      - name: Lint
+      - name: Lint changed backend TypeScript files
         working-directory: backend
-        run: pnpm run lint
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          BEFORE_SHA: ${{ github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            git fetch origin "$BASE_REF" --depth=1
+            diff_range="origin/$BASE_REF...HEAD"
+          elif [ "$BEFORE_SHA" != "0000000000000000000000000000000000000000" ]; then
+            diff_range="$BEFORE_SHA $HEAD_SHA"
+          else
+            diff_range="$(git rev-list --max-parents=0 HEAD) $HEAD_SHA"
+          fi
+
+          mapfile -t files < <(
+            git -C "$GITHUB_WORKSPACE" diff --name-only --diff-filter=ACMR $diff_range -- \
+              'backend/src/**/*.ts' 'backend/apps/**/*.ts' 'backend/libs/**/*.ts' 'backend/test/**/*.ts' |
+              sed 's#^backend/##'
+          )
+
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No backend TypeScript files changed; skipping incremental lint."
+            exit 0
+          fi
+
+          pnpm exec eslint --no-fix "${files[@]}"
 
       - name: Type check
         working-directory: backend

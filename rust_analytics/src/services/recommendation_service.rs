@@ -332,10 +332,10 @@ impl RecommendationService {
             Ok(items) => {
                 let proto_items = items
                     .into_iter()
-                    .map(|it| CollaborativeRecommendationItem { 
-                        item_id: it.item_id, 
-                        score: it.score, 
-                        reason: it.reason 
+                    .map(|it| CollaborativeRecommendationItem {
+                        item_id: it.item_id,
+                        score: it.score,
+                        reason: it.reason
                     })
                     .collect();
                 Ok(Response::new(CollaborativeRecommendationResponse { items: proto_items }))
@@ -416,10 +416,10 @@ impl RecommendationService {
             Ok(items) => {
                 let proto_items = items
                     .into_iter()
-                    .map(|it| crate::analytics_proto::StudyRecommendationItem { 
-                        recommendation: it.recommendation, 
-                        priority: it.priority, 
-                        estimated_time_hours: it.estimated_time_hours, 
+                    .map(|it| crate::analytics_proto::StudyRecommendationItem {
+                        recommendation: it.recommendation,
+                        priority: it.priority,
+                        estimated_time_hours: it.estimated_time_hours,
                         resource_id: it.resource_id,
                     })
                     .collect();
