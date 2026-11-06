@@ -12,12 +12,17 @@ const nextRecommended = {
 };
 
 const tsFlatRecommended = tsPlugin.configs['flat/recommended'].map(config => {
+  const scopedConfig = {
+    ...config,
+    files: config.files || ['**/*.{ts,tsx,mts,cts}'],
+  };
+
   if (!config.languageOptions) {
-    return config;
+    return scopedConfig;
   }
 
   return {
-    ...config,
+    ...scopedConfig,
     languageOptions: {
       ...config.languageOptions,
       parserOptions: {
@@ -34,7 +39,10 @@ const tsFlatRecommended = tsPlugin.configs['flat/recommended'].map(config => {
 });
 
 const projectWideRules = {
-  files: ['**/*.{ts,tsx,js,jsx}'],
+  files: ['**/*.{ts,tsx}'],
+  plugins: {
+    '@typescript-eslint': tsPlugin,
+  },
   rules: {
     'no-unused-vars': 'off',
     'no-console': ['warn', { allow: ['warn', 'error'] }],
@@ -47,6 +55,15 @@ const projectWideRules = {
     '@typescript-eslint/no-empty-object-type': 'warn',
     '@typescript-eslint/ban-ts-comment': 'warn',
     '@typescript-eslint/no-base-to-string': 'warn',
+  },
+};
+
+const javascriptRules = {
+  files: ['**/*.{js,jsx}'],
+  rules: {
+    'no-unused-vars': 'off',
+    'no-console': ['warn', { allow: ['warn', 'error'] }],
+    'prefer-const': 'warn',
   },
 };
 
@@ -85,5 +102,6 @@ module.exports = [
   },
   ...tsFlatRecommended,
   projectWideRules,
+  javascriptRules,
   typeDefinitionOverrides,
 ];

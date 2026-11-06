@@ -8,7 +8,6 @@ on:
 
 env:
   NODE_VERSION: "22"
-  PNPM_VERSION: "10.32.1"
 
 jobs:
   test-backend:
@@ -16,6 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/medtrack_test
+      DIRECT_URL: postgresql://postgres:postgres@localhost:5432/medtrack_test
       JWT_SECRET: ci-jwt-secret-not-used-in-prod
       JWT_REFRESH_SECRET: ci-jwt-refresh-secret-not-used-in-prod
       REDIS_URL: redis://localhost:6379
@@ -48,7 +48,7 @@ jobs:
 
       - uses: pnpm/action-setup@v3
         with:
-          version: ${{ env.PNPM_VERSION }}
+          version: "11.17.0"
 
       - uses: actions/setup-node@v4
         with:
@@ -56,9 +56,21 @@ jobs:
           cache: pnpm
           cache-dependency-path: backend/pnpm-lock.yaml
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python test dependencies
+        working-directory: backend
+        run: python -m pip install -r tests/requirements.txt
+
       - name: Install dependencies
         working-directory: backend
         run: pnpm install --frozen-lockfile
+
+      - name: Apply database migrations
+        working-directory: backend
+        run: pnpm prisma migrate deploy
 
       - name: Generate Prisma client
         working-directory: backend
@@ -74,17 +86,11 @@ jobs:
 
       - name: Unit tests
         working-directory: backend
-        run: pnpm run test --passWithNoTests
+        run: pnpm run test -- -m "not integration"
 
       - name: E2E tests
         working-directory: backend
-        run: pnpm run test:e2e --passWithNoTests
-
-      - name: Upload coverage
-        uses: codecov/codecov-action@v4
-        with:
-          file: backend/coverage/lcov.info
-          flags: backend
+        run: pnpm run test:e2e
 
   test-frontend:
     name: Frontend — lint, type-check, test
@@ -95,13 +101,21 @@ jobs:
 
       - uses: pnpm/action-setup@v3
         with:
-          version: ${{ env.PNPM_VERSION }}
+          version: "10.28.1"
 
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
           cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python test dependencies
+        working-directory: frontend
+        run: python -m pip install -r tests/requirements.txt
 
       - name: Install dependencies
         working-directory: frontend
@@ -117,13 +131,7 @@ jobs:
 
       - name: Tests
         working-directory: frontend
-        run: pnpm run test:ci --passWithNoTests
-
-      - name: Upload coverage
-        uses: codecov/codecov-action@v4
-        with:
-          file: frontend/coverage/lcov.info
-          flags: frontend
+        run: pnpm run test:ci
 
   test-rust:
     name: Rust analytics — fmt, clippy, test

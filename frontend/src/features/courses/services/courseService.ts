@@ -149,6 +149,7 @@ class CourseService {
         title: 'Preview Course',
         code: 'PREVIEW',
         description: 'Preview course details before enrolling in the full learning experience.',
+        categoryId: 'preview',
         difficulty: 'beginner',
         status: 'published',
         price: 0,
@@ -158,7 +159,7 @@ class CourseService {
         enrollmentCount: 0,
         rating: 0,
         units: [],
-      } as Course;
+      };
     }
 
     const response = await apiService.get<unknown>(`${this.baseUrl}/${courseId}`, {
