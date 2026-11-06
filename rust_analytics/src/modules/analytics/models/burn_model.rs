@@ -1,3 +1,5 @@
+#![allow(clippy::redundant_field_names)]
+
 use burn::{
     config::Config,
     module::Module,
@@ -7,7 +9,6 @@ use burn::{
 
 // Define the configuration for our simple linear model
 #[derive(Config, Debug)]
-#[allow(clippy::redundant_field_names)]
 pub struct LinearModelConfig {
     pub input_size: usize,
     pub output_size: usize,
