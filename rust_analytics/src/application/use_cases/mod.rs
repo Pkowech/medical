@@ -1,18 +1,15 @@
-pub mod goals;
-/// Application layer use cases
-/// Clean Architecture implementation of user-facing workflows
-///
-/// Each use case encapsulates a single business operation:
-/// - Input validation
-/// - Domain service orchestration
-/// - Repository coordination
-/// - Error handling
-///
-/// Use cases are completely independent of:
-/// - gRPC, REST, or any web framework
-/// - Database implementation details
-/// - External service specifics
+//! Application layer use cases following Clean Architecture.
+//!
+//! Each use case encapsulates one business operation:
+//! - Input validation
+//! - Domain service orchestration
+//! - Repository coordination
+//! - Error handling
+//!
+//! Use cases are independent of gRPC, REST, web frameworks, database
+//! implementation details, and external services.
 
+pub mod goals;
 #[cfg(feature = "ml")]
 pub mod performance;
 // pub mod user_profile;  // TODO: Disabled due to missing domain::models infrastructure

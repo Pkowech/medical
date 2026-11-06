@@ -118,7 +118,7 @@ jobs:
 
       - name: Unit tests
         working-directory: backend
-        run: pnpm run test -- -m "not integration"
+        run: python -m pytest tests -m "not integration"
 
       - name: E2E tests
         working-directory: backend

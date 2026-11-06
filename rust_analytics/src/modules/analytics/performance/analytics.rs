@@ -392,9 +392,9 @@ async fn calculate_time_management(
 ) -> Result<TimeManagement, String> {
     let time_stats = sqlx::query!(
         r#"
-        SELECT 
-            AVG(time_spent)::float as avg_time,
-            SUM(time_spent)::float as total_time,
+        SELECT
+            AVG(time_taken)::float as avg_time_seconds,
+            SUM(time_taken)::float as total_time_seconds,
             COUNT(DISTINCT DATE(started_at))::int as "active_days!"
         FROM quiz_attempts
         WHERE user_id = $1
@@ -406,12 +406,12 @@ async fn calculate_time_management(
     .await
     .map_err(|e| format!("Failed to fetch time stats: {}", e))?;
 
-    let total_study_time_minutes = time_stats.total_time.unwrap_or(0.0);
-    let total_hours = total_study_time_minutes / 60.0;
+    let avg_time_seconds = time_stats.avg_time_seconds.unwrap_or(0.0);
+    let total_time_seconds = time_stats.total_time_seconds.unwrap_or(0.0);
 
     Ok(TimeManagement {
-        avg_session_duration_minutes: time_stats.avg_time.unwrap_or(0.0),
-        total_study_time_hours: total_hours,
+        avg_session_duration_minutes: avg_time_seconds / 60.0,
+        total_study_time_hours: total_time_seconds / 3600.0,
         consistency_days: time_stats.active_days,
     })
 }
