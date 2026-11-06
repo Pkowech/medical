@@ -53,6 +53,7 @@ const publicPathRoots = [
   '/terms',
   '/login',
   '/register',
+  '/google-consent',
   '/forgot-password',
   '/reset-password',
   '/verify-email',

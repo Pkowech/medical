@@ -56,8 +56,7 @@ function GoogleConsentContent() {
             : 'Could not complete Google sign-up. Please try again.',
         );
       }
-      router.replace(result?.url ?? '/finish-setup');
-      router.refresh();
+      window.location.assign(result?.url ?? '/finish-setup');
     } catch (submitError) {
       setError(
         submitError instanceof Error

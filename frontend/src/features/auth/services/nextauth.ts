@@ -23,6 +23,7 @@ class GoogleAuthError extends Error {
   constructor(
     message: string,
     readonly failure: GoogleAuthFailure,
+    readonly status?: number,
   ) {
     super(message);
     this.name = 'GoogleAuthError';
@@ -189,12 +190,29 @@ async function exchangeGoogleCredential(
   }
 
   if (!response.ok) {
-    const responseMessage =
-      typeof responseData.message === 'string' ? responseData.message : '';
+    const nestedData =
+      typeof responseData.data === 'object' && responseData.data !== null
+        ? (responseData.data as Record<string, unknown>)
+        : undefined;
+    const errorBody =
+      typeof responseData.error === 'object' && responseData.error !== null
+        ? (responseData.error as Record<string, unknown>)
+        : undefined;
+    const errorCode =
+      responseData.code ??
+      (typeof nestedData?.code === 'string' ? nestedData.code : undefined) ??
+      (typeof errorBody?.code === 'string' ? errorBody.code : undefined);
+    const responseMessages = [
+      responseData.message,
+      nestedData?.message,
+      errorBody?.message,
+    ].filter((value): value is string => typeof value === 'string');
     const requiresTerms =
-      responseData.code === 'GOOGLE_TERMS_REQUIRED' ||
+      errorCode === 'GOOGLE_TERMS_REQUIRED' ||
       (response.status === 400 &&
-        /accept(?:ing)? the terms/i.test(responseMessage));
+        responseMessages.some(message =>
+          /accept(?:ing)? the terms/i.test(message),
+        ));
     if (requiresTerms) {
       throw new GoogleTermsRequiredError();
     }
@@ -207,6 +225,7 @@ async function exchangeGoogleCredential(
     throw new GoogleAuthError(
       'Google sign-in was rejected by the authentication service.',
       failure,
+      response.status,
     );
   }
 
@@ -589,7 +608,12 @@ export const authOptions: NextAuthOptions = {
         }
         const failure =
           error instanceof GoogleAuthError ? error.failure : 'unknown';
-        console.error('[NextAuth] Google account exchange failed:', failure);
+        const status =
+          error instanceof GoogleAuthError ? error.status : undefined;
+        console.error('[NextAuth] Google account exchange failed:', {
+          failure,
+          status,
+        });
         return `/login?error=google-signin-failed&reason=${failure}`;
       }
     },
