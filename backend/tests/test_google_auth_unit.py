@@ -33,6 +33,7 @@ const { BadRequestException, ServiceUnavailableException, UnauthorizedException 
   require('@nestjs/common');
 const { Role } = require('./src/modules/auth/constants/role.constants.ts');
 const { AuthService } = require('./src/modules/auth/services/auth.service.ts');
+const { AllExceptionsFilter } = require('./src/common/filters/all-exceptions.filter.ts');
 const user = {
   id: 'user-1',
   email: 'student@example.com',
@@ -130,6 +131,26 @@ const service = new AuthService(
     error => error instanceof BadRequestException &&
       error.getResponse().code === 'GOOGLE_TERMS_REQUIRED',
   );
+  let errorResponse;
+  const httpResponse = {
+    status: () => httpResponse,
+    json: body => {
+      errorResponse = body;
+    },
+  };
+  new AllExceptionsFilter().catch(
+    new BadRequestException({
+      code: 'GOOGLE_TERMS_REQUIRED',
+      message: 'Accept the Terms of Service before creating an account with Google',
+    }),
+    {
+      switchToHttp: () => ({
+        getResponse: () => httpResponse,
+        getRequest: () => ({ method: 'POST', url: '/v1/auth/google' }),
+      }),
+    },
+  );
+  assert.equal(errorResponse.code, 'GOOGLE_TERMS_REQUIRED');
   assert.equal(createCalls, createCallsBeforeExisting);
 
   googleProfile = { ...googleProfile, email_verified: false };

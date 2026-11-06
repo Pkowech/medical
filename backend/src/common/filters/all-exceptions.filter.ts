@@ -23,6 +23,15 @@ export class AllExceptionsFilter implements ExceptionFilter {
       exception instanceof HttpException
         ? exception.message
         : 'Internal server error';
+    const exceptionResponse =
+      exception instanceof HttpException ? exception.getResponse() : undefined;
+    const code =
+      typeof exceptionResponse === 'object' &&
+      exceptionResponse !== null &&
+      'code' in exceptionResponse &&
+      typeof exceptionResponse.code === 'string'
+        ? exceptionResponse.code
+        : undefined;
 
     // Detailed logging for non-HTTP exceptions (potential 500s)
     if (status >= 500) {
@@ -44,6 +53,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       timestamp: new Date().toISOString(),
       path: request.url,
       message,
+      ...(code ? { code } : {}),
     });
   }
 }
