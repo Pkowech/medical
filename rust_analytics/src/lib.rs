@@ -1313,14 +1313,14 @@ async fn analyze_study_patterns_handler(
     let study_items: Vec<_> = learning_history
         .iter()
         .filter(|item| {
-            item.item_type.as_ref().map(|t| t.as_str()) == Some("study") && item.duration.is_some()
+            item.item_type.as_deref() == Some("study") && item.duration.is_some()
         })
         .collect();
 
     let quiz_items: Vec<_> = learning_history
         .iter()
         .filter(|item| {
-            item.item_type.as_ref().map(|t| t.as_str()) == Some("quiz") && item.score.is_some()
+            item.item_type.as_deref() == Some("quiz") && item.score.is_some()
         })
         .collect();
 

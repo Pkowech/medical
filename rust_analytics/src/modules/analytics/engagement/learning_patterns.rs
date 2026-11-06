@@ -43,12 +43,12 @@ pub fn analyze_learning_patterns(study_df: &DataFrame, quizzes_df: &DataFrame) -
         .unwrap_or(0.0);
 
     // Placeholder logic from the Python version
-    let learning_styles = vec!["visual", "auditory", "kinesthetic", "reading/writing"];
+    let learning_styles = ["visual", "auditory", "kinesthetic", "reading/writing"];
     let mut rng = rand::thread_rng();
     let idx = rng.gen_range(0..learning_styles.len());
     let style = learning_styles[idx];
 
-    let topic_preferences = vec!["Anatomy", "Pharmacology"]; // Hardcoded as in Python
+    let topic_preferences = ["Anatomy", "Pharmacology"]; // Hardcoded as in Python
 
     LearningPatterns {
         average_study_time: avg_study_time,
