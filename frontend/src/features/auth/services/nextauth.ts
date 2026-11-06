@@ -295,9 +295,8 @@ export const authOptions: NextAuthOptions = {
             signal: controller.signal,
           });
 
-          clearTimeout(timeout);
-
           const text = await response.text();
+          clearTimeout(timeout);
 
           let responseData: LoginResponsePayload = {};
           try {
@@ -308,7 +307,7 @@ export const authOptions: NextAuthOptions = {
           }
 
           if (!response.ok) {
-            console.error('Backend authentication failed:', response.status, responseData);
+            console.error('Backend authentication failed with status:', response.status);
 
             if (response.status === 429) {
               throw new AuthError(

@@ -2,7 +2,6 @@
 import { Suspense, useState, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { getSession } from 'next-auth/react';
 import {
   FaUser,
   FaLock,
@@ -72,7 +71,6 @@ function LoginContent() {
     identifier: false,
     password: false,
   });
-  const [_loginAttempts, setLoginAttempts] = useState(0);
   const [message, setMessage] = useState('');
 
   // Determine if identifier is an email
@@ -206,9 +204,6 @@ function LoginContent() {
     setShowSlowRequestHint(false);
     const slowRequestTimer = window.setTimeout(() => setShowSlowRequestHint(true), 8000);
 
-    // Increment login attempts
-    setLoginAttempts(prev => prev + 1);
-
     try {
       const result = await login(identifier, password, twoFactorToken || undefined);
 
@@ -232,17 +227,8 @@ function LoginContent() {
         setShowResendVerification(authError.code === 'EMAIL_NOT_VERIFIED');
       } else if (result?.ok) {
         setSuccess('Login successful! Redirecting...');
-
-        // Keep same-origin callback URLs as client-side paths. Passing the
-        // complete deployment URL can make Next.js perform a full reload.
-        const session = await getSession();
-        const callbackUrl = session?.user?.mfaSetupRequired
-          ? '/mfa-setup'
-          : getSafeCallbackUrl(requestedCallbackUrl);
-
-        // Reload through the browser so the session cookie written by
-        // NextAuth is included in the first protected dashboard request.
-        window.location.assign(callbackUrl);
+        // NextAuth refreshes the session context after sign-in. The auth-state
+        // effect above routes once that session is available.
       }
     } catch (error: unknown) {
       const authError = getAuthErrorDetails(

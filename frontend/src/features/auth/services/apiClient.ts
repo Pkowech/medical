@@ -21,7 +21,8 @@ interface EnhancedApiError extends ApiError {
 class ApiService {
   private static instance: ApiService;
   private api: AxiosInstance;
-  private refreshTokenPromise: Promise<boolean> | null = null;
+  private sessionTokenPromise: Promise<string | undefined> | null = null;
+  private refreshTokenPromise: Promise<string | undefined> | null = null;
   private isSigningOut = false;
 
   private constructor() {
@@ -49,6 +50,27 @@ class ApiService {
     } catch (error) {
       console.error('[Auth] Could not clear offline study content during sign-out:', error);
     }
+  }
+
+  private getSessionAccessToken(): Promise<string | undefined> {
+    if (!this.sessionTokenPromise) {
+      this.sessionTokenPromise = getSession()
+        .then(session => {
+          const token = session?.user?.accessToken || undefined;
+          if (token && session?.user) {
+            useAuthStore.setState({
+              user: session.user as unknown as ReturnType<typeof useAuthStore.getState>['user'],
+              isAuthenticated: true,
+            });
+          }
+          return token;
+        })
+        .finally(() => {
+          this.sessionTokenPromise = null;
+        });
+    }
+
+    return this.sessionTokenPromise;
   }
 
   /**
@@ -109,14 +131,7 @@ class ApiService {
           // session fetch. Read the NextAuth session before sending an
           // authenticated request instead of issuing a tokenless request.
           if (!token && !config.url?.includes('/auth/')) {
-            const session = await getSession();
-            token = session?.user?.accessToken;
-            if (token && session?.user) {
-              useAuthStore.setState({
-                user: session.user as unknown as ReturnType<typeof useAuthStore.getState>['user'],
-                isAuthenticated: true,
-              });
-            }
+            token = await this.getSessionAccessToken();
           }
 
           if (token) {
@@ -218,35 +233,18 @@ class ApiService {
           try {
             // Ensure only one token refresh request is in flight
             if (!this.refreshTokenPromise) {
-              this.refreshTokenPromise = (async () => {
-                // Simply calling getSession() triggers the NextAuth JWT callback,
-                // which handles the background refresh if needed.
-                const session = await getSession();
-                return !!session?.user?.accessToken;
-              })();
+              // getSession triggers the NextAuth JWT callback, which refreshes
+              // an expired backend token before returning the session.
+              this.refreshTokenPromise = this.getSessionAccessToken();
             }
 
-            const refreshSuccess = await this.refreshTokenPromise;
+            const refreshedToken = await this.refreshTokenPromise;
             this.refreshTokenPromise = null;
 
-            if (refreshSuccess) {
-              const newSession = await getSession();
-              if (newSession?.user?.accessToken) {
-                originalRequest.headers = originalRequest.headers || {};
-                originalRequest.headers.Authorization = `Bearer ${newSession.user.accessToken}`;
-
-                // Sync the new token into the store immediately
-                if (newSession?.user) {
-                  useAuthStore.setState({
-                    user: newSession.user as unknown as ReturnType<
-                      typeof useAuthStore.getState
-                    >['user'],
-                    isAuthenticated: true,
-                  });
-                }
-
-                return this.api(originalRequest);
-              }
+            if (refreshedToken) {
+              originalRequest.headers = originalRequest.headers || {};
+              originalRequest.headers.Authorization = `Bearer ${refreshedToken}`;
+              return this.api(originalRequest);
             }
 
             // If we get here, refresh genuinely failed (e.g. refresh token expired)
