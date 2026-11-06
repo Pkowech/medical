@@ -5,6 +5,27 @@
 
 import * as Joi from 'joi';
 
+const httpOriginSchema = () =>
+  Joi.string()
+    .uri({ scheme: ['http', 'https'] })
+    .custom((value: string, helpers: Joi.CustomHelpers) => {
+      try {
+        const url = new URL(value);
+        if (
+          url.username ||
+          url.password ||
+          (url.pathname !== '/' && url.pathname !== '') ||
+          url.search ||
+          url.hash
+        ) {
+          return helpers.error('string.uri');
+        }
+        return value;
+      } catch {
+        return helpers.error('string.uri');
+      }
+    });
+
 export const validationSchema = Joi.object({
   // Application
   NODE_ENV: Joi.string()
@@ -62,8 +83,8 @@ export const validationSchema = Joi.object({
   CORS_CREDENTIALS: Joi.boolean().default(true),
 
   // Rate Limiting
-  RATE_LIMIT_WINDOW_MS: Joi.number().min(1000).default(900000), // 15 minutes
-  RATE_LIMIT_MAX: Joi.number().min(1).default(100),
+  RATE_LIMIT_WINDOW_MS: Joi.number().integer().min(1000).default(900000), // 15 minutes
+  RATE_LIMIT_MAX: Joi.number().integer().min(1).default(100),
   RATE_LIMIT_SKIP_SUCCESS: Joi.boolean().default(false),
   RATE_LIMIT_SKIP_FAILED: Joi.boolean().default(false),
 
@@ -130,9 +151,8 @@ export const validationSchema = Joi.object({
   RUN_INGESTION: Joi.boolean().default(false),
   INGESTION_ROOT_PATH: Joi.string().default('./data/ingestion'),
   HOSTNAME: Joi.string().default('0.0.0.0'),
-  PUBLIC_API_URL: Joi.string()
-    .uri({ scheme: ['http', 'https'] })
-    .optional(),
+  PUBLIC_API_URL: httpOriginSchema().optional(),
+  RENDER_EXTERNAL_URL: httpOriginSchema().optional(),
   ALLOWED_ORIGINS: Joi.string().default(''),
   TRUST_PROXY: Joi.string().trim().default('loopback, linklocal, uniquelocal'),
 

@@ -3,6 +3,8 @@ import { INestApplication, Logger } from '@nestjs/common';
 import { SwaggerModule } from '@nestjs/swagger';
 import { swaggerConfig } from '../../config/swagger.config';
 import { ConfigService } from '@nestjs/config';
+import { API_PREFIX } from '../../config/api.config';
+import { getPublicApiOrigin } from '../../config/public-api-url';
 
 export function setupSwagger(app: INestApplication): void {
   const logger = new Logger('SwaggerSetup');
@@ -16,28 +18,19 @@ export function setupSwagger(app: INestApplication): void {
 
     const environment = configService.get<string>('NODE_ENV', 'development');
     const port = configService.get<number>('PORT', 3002);
-    const serverUrl =
-      configService.get<string>('PUBLIC_API_URL') ??
-      process.env.RENDER_EXTERNAL_URL ??
-      (environment === 'development' ? `http://localhost:${port}` : undefined);
-    let serverOrigin: string | undefined;
-
-    if (serverUrl) {
-      try {
-        serverOrigin = new URL(serverUrl).origin;
-      } catch {
-        logger.warn(
-          'Public API URL is invalid; Swagger will omit its server URL.',
-        );
-      }
-    }
+    const serverOrigin = getPublicApiOrigin(configService, environment, port);
 
     const document = SwaggerModule.createDocument(
       app,
       {
         ...swaggerConfig,
         servers: serverOrigin
-          ? [{ url: `${serverOrigin}/v1`, description: 'API server' }]
+          ? [
+              {
+                url: `${serverOrigin}/${API_PREFIX}`,
+                description: 'API server',
+              },
+            ]
           : [],
       },
       {

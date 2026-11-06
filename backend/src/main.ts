@@ -12,11 +12,12 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { Logger as PinoLogger } from 'nestjs-pino';
 import { AppModule } from './app.module';
+import { API_PREFIX } from './config/api.config';
+import { getPublicApiOrigin } from './config/public-api-url';
 import { setupSwagger } from '#infrastructure/swagger/swagger.setup';
 import { AllExceptionsFilter } from '#common/filters/all-exceptions.filter';
 import { TransformInterceptor } from '#common/interceptors/transform.interceptor';
 
-const API_PREFIX = 'v1';
 const BODY_LIMIT = '3mb';
 const DEFAULT_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
 const bootstrapLogger = new Logger('Bootstrap');
@@ -231,35 +232,13 @@ function configureRateLimiting(
   app.use(apiLimiter);
 }
 
-function getPublicBaseUrl(
-  config: ConfigService,
-  environment: string,
-  port: number,
-): string | undefined {
-  const configuredUrl =
-    config.get<string>('PUBLIC_API_URL') ??
-    process.env.RENDER_EXTERNAL_URL ??
-    (environment === 'development' ? `http://localhost:${port}` : undefined);
-
-  if (!configuredUrl) return undefined;
-
-  try {
-    return new URL(configuredUrl).origin;
-  } catch {
-    Logger.warn(
-      'Public API URL is invalid; startup logs will show relative endpoint paths.',
-    );
-    return undefined;
-  }
-}
-
 function logStartupSummary(
   config: ConfigService,
   environment: string,
   port: number,
   hostname: string,
 ): void {
-  const publicBaseUrl = getPublicBaseUrl(config, environment, port);
+  const publicBaseUrl = getPublicApiOrigin(config, environment, port);
   const endpoint = (path: string) =>
     publicBaseUrl ? `${publicBaseUrl}${path}` : path;
   const redisConfigured = Boolean(
@@ -293,14 +272,15 @@ async function bootstrap(): Promise<void> {
     bufferLogs: true,
     bodyParser: false,
   });
-  const logger = app.get(PinoLogger);
-  const config = app.get(ConfigService);
-  const environment = config.get<string>('NODE_ENV', 'development');
-  const isProduction = environment === 'production';
-  const port = config.get<number>('PORT', 3002);
-  const hostname = config.get<string>('HOSTNAME', '0.0.0.0');
 
   try {
+    const logger = app.get(PinoLogger);
+    const config = app.get(ConfigService);
+    const environment = config.get<string>('NODE_ENV', 'development');
+    const isProduction = environment === 'production';
+    const port = config.get<number>('PORT', 3002);
+    const hostname = config.get<string>('HOSTNAME', '0.0.0.0');
+
     app.useLogger(logger);
     app.enableShutdownHooks();
 
