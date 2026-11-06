@@ -2,7 +2,7 @@ use once_cell::sync::Lazy;
 use prometheus::{Encoder, GaugeVec, IntCounter, IntCounterVec, Opts, Registry, TextEncoder};
 // use std::collections::HashMap; // Not used
 
-static REGISTRY: Lazy<Registry> = Lazy::new(|| Registry::new());
+static REGISTRY: Lazy<Registry> = Lazy::new(Registry::new);
 
 static BKT_GAPS_DERIVED: Lazy<IntCounter> = Lazy::new(|| {
     let c = IntCounter::with_opts(Opts::new(

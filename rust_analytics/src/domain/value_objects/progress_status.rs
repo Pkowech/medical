@@ -1,9 +1,10 @@
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type, Default)]
 #[sqlx(type_name = "progress_status", rename_all = "snake_case")]
 pub enum ProgressStatus {
+    #[default]
     NotStarted,
     InProgress,
     Completed,
@@ -11,12 +12,6 @@ pub enum ProgressStatus {
     Skipped,
     Dropped,
     Reviewed,
-}
-
-impl Default for ProgressStatus {
-    fn default() -> Self {
-        ProgressStatus::NotStarted
-    }
 }
 
 impl fmt::Display for ProgressStatus {

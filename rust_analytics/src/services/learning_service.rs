@@ -29,7 +29,7 @@ impl LearningService {
     fn default_datetime() -> NaiveDateTime {
         Utc.timestamp_opt(0, 0)
             .single()
-            .unwrap_or_else(|| Utc::now())
+            .unwrap_or_else(Utc::now)
             .naive_utc()
     }
 
@@ -80,8 +80,9 @@ impl LearningService {
             let start_date: Option<NaiveDateTime> = row.try_get("start_date").ok();
             let streak_count: i32 = row.try_get("streak_count").unwrap_or(0);
 
-            let status =
-                ProgressStatus::from_str(&status_str).unwrap_or(ProgressStatus::NotStarted);
+            let status = status_str
+                .parse::<ProgressStatus>()
+                .unwrap_or(ProgressStatus::NotStarted);
 
             goals.push(Goal {
                 id,
@@ -102,7 +103,10 @@ impl LearningService {
     }
 
     fn proto_goal_to_internal(g: &crate::analytics_proto::Goal) -> Goal {
-        let status = ProgressStatus::from_str(&g.status).unwrap_or(ProgressStatus::NotStarted);
+        let status = g
+            .status
+            .parse::<ProgressStatus>()
+            .unwrap_or(ProgressStatus::NotStarted);
 
         let target_date = if g.target_date.is_empty() {
             None
@@ -571,9 +575,9 @@ impl LearningService {
         .flatten();
 
         let most_active_time_of_day = match most_active_hour {
-            Some(h) if h >= 5 && h < 12 => "Morning (5am-12pm)".to_string(),
-            Some(h) if h >= 12 && h < 17 => "Afternoon (12pm-5pm)".to_string(),
-            Some(h) if h >= 17 && h < 21 => "Evening (5pm-9pm)".to_string(),
+            Some(h) if (5..12).contains(&h) => "Morning (5am-12pm)".to_string(),
+            Some(h) if (12..17).contains(&h) => "Afternoon (12pm-5pm)".to_string(),
+            Some(h) if (17..21).contains(&h) => "Evening (5pm-9pm)".to_string(),
             Some(_) => "Night (9pm-5am)".to_string(),
             None => "Unknown".to_string(),
         };
@@ -1006,7 +1010,7 @@ impl LearningService {
             }
             .to_string();
 
-            buckets.entry(bucket_key).or_insert(Vec::new()).push(quiz);
+            buckets.entry(bucket_key).or_default().push(quiz);
         }
 
         let mut avg_score_by_focus_bucket = HashMap::new();
@@ -1034,7 +1038,7 @@ impl LearningService {
             if denominator == 0.0 {
                 0.0
             } else {
-                (numerator / denominator).max(-1.0).min(1.0)
+                (numerator / denominator).clamp(-1.0, 1.0)
             }
         } else {
             0.0

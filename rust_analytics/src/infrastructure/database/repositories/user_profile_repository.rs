@@ -123,7 +123,7 @@ impl UserProfileRepository for PostgresUserProfileRepository {
         user_id: &str,
     ) -> Result<crate::modules::analytics::core::feature_extraction::UserFeatures, AnalyticsError>
     {
-        match feature_extraction::extract_user_features(user_id.to_string(), &*self.pool).await {
+        match feature_extraction::extract_user_features(user_id.to_string(), &self.pool).await {
             Ok(features) => Ok(features),
             Err(e) => Err(AnalyticsError::DatabaseError(format!(
                 "Failed to extract user features: {}",

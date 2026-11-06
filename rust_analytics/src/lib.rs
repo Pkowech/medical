@@ -31,6 +31,8 @@ pub use shared::error::{AnalyticsError, Result};
 
 // Import generated gRPC code (disabled due to tonic compatibility)
 pub mod analytics_proto {
+    #![allow(clippy::double_must_use)]
+
     tonic::include_proto!("analytics");
 }
 use crate::api::grpc::MyAnalyticsService;

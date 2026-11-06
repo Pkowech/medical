@@ -51,7 +51,7 @@ pub async fn generate_predictions(
     };
 
     let success_rate_prediction = if avg_score > 0.0 {
-        (avg_score / 100.0).min(1.0).max(0.0)
+        (avg_score / 100.0).clamp(0.0, 1.0)
     } else {
         0.5
     };

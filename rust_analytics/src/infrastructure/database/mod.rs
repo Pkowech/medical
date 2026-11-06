@@ -36,7 +36,7 @@ pub async fn init_pool() -> Result<Pool<Postgres>, Error> {
 
     eprintln!(
         "🔗 Connecting to database at: {}",
-        database_url.split('@').last().unwrap_or("unknown")
+        database_url.split('@').next_back().unwrap_or("unknown")
     );
 
     // Attempt to connect with timeout

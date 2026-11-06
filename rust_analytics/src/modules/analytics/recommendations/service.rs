@@ -155,12 +155,12 @@ async fn build_user_profile(user_id: &str, pool: &Pool<Postgres>) -> Result<User
     .await
     .unwrap_or_default();
 
-    let recent_topics: Vec<String> = recent_topics_raw.into_iter().filter_map(|t| t).collect();
+    let recent_topics: Vec<String> = recent_topics_raw.into_iter().flatten().collect();
 
     // Extract profile data
     let (avg_score, study_time, mut strengths, mut weaknesses) = if let Some(a) = analytics {
         (
-            a.average_score as f64,
+            a.average_score,
             a.total_study_time,
             a.strongest_subjects.unwrap_or_default(),
             a.weakest_subjects.unwrap_or_default(),

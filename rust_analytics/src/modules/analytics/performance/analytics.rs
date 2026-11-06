@@ -142,8 +142,8 @@ async fn calculate_improvement_rate(user_id: &str, pool: &Pool<Postgres>) -> Res
     .map_err(|e| format!("Failed to fetch recent scores: {}", e))?;
 
     // Filter out None values
-    let early_scores: Vec<f64> = early_scores.into_iter().filter_map(|x| x).collect();
-    let recent_scores: Vec<f64> = recent_scores.into_iter().filter_map(|x| x).collect();
+    let early_scores: Vec<f64> = early_scores.into_iter().flatten().collect();
+    let recent_scores: Vec<f64> = recent_scores.into_iter().flatten().collect();
 
     if early_scores.is_empty() || recent_scores.is_empty() {
         return Ok(0.0);
@@ -225,7 +225,7 @@ async fn calculate_consistency_score(user_id: &str, pool: &Pool<Postgres>) -> Re
     .await
     .map_err(|e| format!("Failed to fetch activities: {}", e))?
     .into_iter()
-    .filter_map(|d| d)
+    .flatten()
     .collect();
 
     if activities.is_empty() {
@@ -300,7 +300,7 @@ async fn calculate_topic_mastery(
         if let Some(topic) = record.topic {
             topic_scores
                 .entry(topic)
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(record.percentage);
         }
     }

@@ -201,8 +201,12 @@ impl ProgressStatus {
             ProgressStatus::Reviewed => "reviewed",
         }
     }
+}
 
-    pub fn from_str(s: &str) -> Result<Self> {
+impl std::str::FromStr for ProgressStatus {
+    type Err = AnalyticsError;
+
+    fn from_str(s: &str) -> Result<Self> {
         match s.to_lowercase().as_str() {
             "notstarted" => Ok(ProgressStatus::NotStarted),
             "inprogress" => Ok(ProgressStatus::InProgress),
@@ -385,6 +389,7 @@ impl CourseProgress {
 }
 
 impl LearningPathProgress {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         user_id: impl Into<String>,
         path_id: impl Into<String>,
@@ -1697,7 +1702,7 @@ fn calculate_average_completion_time(goals: &[&Goal]) -> f32 {
                         != chrono::Utc
                             .timestamp_opt(0, 0)
                             .single()
-                            .unwrap_or_else(|| chrono::Utc::now())
+                            .unwrap_or_else(chrono::Utc::now)
                             .naive_utc())
         })
         .copied()

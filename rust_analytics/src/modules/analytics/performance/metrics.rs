@@ -53,7 +53,7 @@ use burn::{
 };
 
 #[allow(dead_code)]
-#[derive(Module, Debug, Clone)]
+#[derive(Module, Debug, Clone, Default)]
 pub struct MyModule {}
 
 #[allow(dead_code)]
@@ -72,7 +72,5 @@ pub fn calculate_metrics<B: Backend>(input_data: Tensor<B, 2>) -> Tensor<B, 2> {
     println!("Calculating metrics with Burn...");
 
     let module = MyModule::new();
-    let output = module.forward(input_data);
-
-    output
+    module.forward(input_data)
 }

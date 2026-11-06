@@ -37,6 +37,7 @@ impl<B: Backend> LinearModel<B> {
 /// Train a simple linear model (weights + bias) using batch gradient descent.
 /// - `inputs`: Vec of feature vectors (n_samples x n_features)
 /// - `labels`: Vec of labels (n_samples)
+///
 /// Returns (weights, bias)
 pub fn train_linear_model(
     inputs: Vec<Vec<f32>>,

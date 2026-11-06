@@ -468,10 +468,8 @@ impl PerformanceService {
 
     pub async fn update_bkt_skill_metrics(
         &self,
-        request: Request<()>,
+        _request: Request<()>,
     ) -> Result<Response<crate::analytics_proto::UpdateBktSkillMetricsResponse>, Status> {
-        let _req = request.into_inner();
-
         match crate::modules::analytics::core::batch_processing::update_bkt_skill_avg_metrics(
             &self.pool,
         )

@@ -252,7 +252,7 @@ fn calculate_collaborative_score(item: &ItemPopularity, similar_users: &[UserSim
     let score =
         (popularity_score * 0.3 + quality_score * 0.3 + similarity_weight * 0.4) * time_factor;
 
-    score.min(1.0).max(0.0)
+    score.clamp(0.0, 1.0)
 }
 
 /// Get popular recommendations as fallback for new users
@@ -327,5 +327,5 @@ pub fn calculate_user_similarity(user1_features: &[f64], user2_features: &[f64])
         return 0.0;
     }
 
-    (dot_product / (magnitude1 * magnitude2)).max(0.0).min(1.0)
+    (dot_product / (magnitude1 * magnitude2)).clamp(0.0, 1.0)
 }

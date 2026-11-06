@@ -187,7 +187,7 @@ impl GoalRepository for PostgresGoalRepository {
         .bind(&goal.id)
         .bind(&goal.user_id)
         .bind(&goal.title)
-        .bind(&goal.status)
+        .bind(goal.status)
         .bind(&goal.category)
         .bind(goal.priority.parse::<i32>().unwrap_or(0))
         .bind(goal.target_date)

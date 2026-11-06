@@ -332,7 +332,7 @@ mod inner {
                 &self.pool,
             )
             .await
-            .map_err(|error| Status::invalid_argument(error))?;
+            .map_err(Status::invalid_argument)?;
 
             Ok(Response::new(ProgressRecordsResponse {
                 records: records
