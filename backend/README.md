@@ -129,6 +129,18 @@ The Node backend uses up to 3 PostgreSQL connections by default, and Rust analyt
 
 Configure Redis with a single `redis://` or `rediss://` endpoint in `REDIS_URL`, or use `REDIS_HOST`, `REDIS_PORT`, `REDIS_USERNAME`, `REDIS_PASSWORD`, and `REDIS_DB`. Sentinel endpoints are not accepted as comma-separated `REDIS_URL` values. The local fallback cache is limited to 10,000 least-recently-used entries and 64 MiB by default; set `REDIS_MEMORY_MAX_ENTRIES` or `REDIS_MEMORY_MAX_BYTES` to adjust those per-process limits. This fallback is process-local and best-effort, not a replacement for shared Redis state.
 
+### Login latency and capacity
+
+The backend exports `medtrack_auth_stage_duration_seconds` with bounded stage and outcome labels. Use its histogram buckets to inspect login p50/p95/p99 in the deployed environment before changing timeout or password-hash settings.
+
+Password verification uses the parameters embedded in each Argon2 hash. Do not lower those parameters to improve latency. Run `pnpm run benchmark:auth-password` from `backend/` to measure a local synthetic baseline; use `AUTH_BENCH_SAMPLES` and `AUTH_BENCH_CONCURRENCY` to set the sample count and concurrency. The benchmark is not a substitute for testing on production-sized hardware.
+
+The default per-process password-verification limit is 2 concurrent operations, with at most 4 queued and a 1.5-second queue wait. Tune `AUTH_MAX_CONCURRENT_PASSWORD_VERIFICATIONS` and `AUTH_PASSWORD_VERIFICATION_QUEUE_TIMEOUT_MS` only against host memory and observed load. Production login attempts are rate-limited to 5 per IP per 15 minutes by default; `AUTH_LOGIN_RATE_LIMIT_MAX` can adjust the limit. Set `TRUST_PROXY` to the actual trusted proxy chain so rate limiting uses the client address safely. The Express limiter uses process-local storage, so deployments with multiple backend replicas should also enforce a shared rate limit at the trusted gateway.
+
+The PostgreSQL pool remains capped at 3 connections per Node process by default; `DATABASE_POOL_MAX` can override it. Include every backend replica and the Rust service when calculating the database plan's total connection budget.
+
+The successful-login audit events are written to a PostgreSQL transactional outbox with the login-state update, then materialized by a background worker. Apply the `20261106204500_login_audit_outbox` migration before deploying this code (`pnpm exec prisma migrate deploy` from `backend/`). Audit records may become visible a few seconds after the login response.
+
 ### Production smoke checklist
 
 - Open the signed-out landing page and use the Features and Courses navigation

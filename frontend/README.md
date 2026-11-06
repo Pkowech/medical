@@ -72,10 +72,12 @@ Create a `.env.local` file:
 
 ```bash
 BACKEND_URL=http://localhost:3002
-AUTH_BACKEND_TIMEOUT_MS=30000
+AUTH_BACKEND_TIMEOUT_MS=8000
 NEXT_PUBLIC_ANALYTICS_URL=http://localhost:5000
 NEXT_PUBLIC_CLAUDE_API_KEY=your_claude_api_key
 ```
+
+`AUTH_BACKEND_TIMEOUT_MS` defaults to 8000 and must be between 1000 and 30000. Choose it from measured backend tail latency plus network overhead; aborting the frontend request does not cancel work already running in the backend.
 
 The browser sends API requests to the same-origin `/api/backend` proxy. For Vercel, set the server-only backend URL to `https://medtrackhubackend.onrender.com` and redeploy. Do not expose this value as a `NEXT_PUBLIC_*` variable. Configure these NextAuth variables for the Production environment as well:
 

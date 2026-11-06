@@ -22,6 +22,9 @@ import { RoleGuard } from '#common/guards/roles.guard';
 import { RolesModule } from './roles.module';
 import { CacheModule } from '@nestjs/cache-manager';
 import { AdminSettingsModule } from '#modules/admin/admin-settings.module';
+import { MetricsModule } from '#infrastructure/metrics/metrics.module';
+import { PasswordVerificationGate } from './services/password-verification-gate';
+import { LoginAuditOutboxProcessor } from './services/login-audit-outbox.processor';
 
 @Global()
 @Module({
@@ -34,6 +37,7 @@ import { AdminSettingsModule } from '#modules/admin/admin-settings.module';
     RolesModule,
     CacheModule.register(),
     AdminSettingsModule,
+    MetricsModule,
   ],
   controllers: [
     AuthController,
@@ -54,6 +58,8 @@ import { AdminSettingsModule } from '#modules/admin/admin-settings.module';
     RoleGuard,
     JwtAuthGuard,
     PermissionCalculationService,
+    PasswordVerificationGate,
+    LoginAuditOutboxProcessor,
   ],
   exports: [
     AuthService,

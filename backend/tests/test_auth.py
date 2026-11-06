@@ -56,10 +56,8 @@ def test_successful_login(session, base_url, registered_user):
         "password": registered_user["credentials"]["password"],
     }
 
-    print(f"Login credentials: {login_credentials}")
     # Act: Send a POST request to the login endpoint
     response = session.post(f"{base_url}/auth/login", json=login_credentials)
-    print(f"Response: {response.text}")
 
     # Assert: Check for a successful response
     assert response.status_code == 200, f"Expected status code 200, but got {response.status_code}. Response: {response.text}"
@@ -103,11 +101,8 @@ def test_logout(session, base_url, registered_user):
 
     logout_data = {"refreshToken": registered_user["refreshToken"]}
 
-    print(f"Access Token: {registered_user['accessToken']}")
-    print(f"Refresh Token: {registered_user['refreshToken']}")
     headers = {"Authorization": f"Bearer {registered_user['accessToken']}"}
     response = session.post(f"{base_url}/auth/logout", headers=headers, json=logout_data)
-    print(f"Response: {response.text}")
 
     # Assert: Check for a successful logout response
     assert response.status_code == 200, f"Expected status code 200, but got {response.status_code}. Response: {response.text}"

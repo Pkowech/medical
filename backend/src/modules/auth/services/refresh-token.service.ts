@@ -22,7 +22,11 @@ export class RefreshTokenService {
     private redisService: RedisService,
   ) {}
 
-  async createRefreshToken(userId: string, expiresInSeconds?: number): Promise<string> {
+  async createRefreshToken(
+    userId: string,
+    expiresInSeconds?: number,
+    deferAudit = false,
+  ): Promise<string> {
     const refreshToken = uuidv4();
     const configuredExpiry = Number.parseInt(
       this.configService.get('JWT_REFRESH_EXPIRATION', '604800'),
@@ -39,43 +43,40 @@ export class RefreshTokenService {
     const tokenKey = `${this.tokenPrefix}${refreshToken}`;
     const userTokensKey = `${this.userTokensPrefix}${userId}`;
 
-    this.logger.debug(`[perf] creating refresh token: ${tokenKey}`);
     const startTime = Date.now();
 
-    await this.redisService.set(tokenKey, tokenData, refreshTokenExpiry);
-
-    if (this.redisService.client) {
-      await this.redisService.client.sadd(userTokensKey, tokenKey);
-    } else {
-      this.logger.warn(
-        'Redis client not available; skipping sadd for user tokens',
-      );
-    }
+    await this.redisService.setAndAddToSet(
+      tokenKey,
+      tokenData,
+      refreshTokenExpiry,
+      userTokensKey,
+      tokenKey,
+    );
 
     const duration = Date.now() - startTime;
     this.logger.debug(
       `[perf] redis set and sadd for refresh token took ${duration}ms`,
     );
 
-    this.logger.debug(
-      `Created refresh token for user ${userId}: ${refreshToken}`,
-    );
-    await this.auditLogService.log(
-      securityEventTypes.tokenRefresh,
-      userId,
-      'unknown',
-      'unknown',
-      { success: true, action: 'create' },
-    );
+    this.logger.debug(`Created refresh token for user ${userId}`);
+    if (!deferAudit) {
+      await this.auditLogService.log(
+        securityEventTypes.tokenRefresh,
+        userId,
+        'unknown',
+        'unknown',
+        { success: true, action: 'create' },
+      );
+    }
 
     return refreshToken;
   }
 
   async validateAndGetUserId(refreshToken: string): Promise<string | null> {
-    this.logger.debug(`Validating refresh token: ${refreshToken}`);
+    this.logger.debug('Validating refresh token');
     try {
       const tokenKey = `${this.tokenPrefix}${refreshToken}`;
-      this.logger.debug(`[perf] validating refresh token: ${tokenKey}`);
+      this.logger.debug('[perf] validating refresh token');
       const startTime = Date.now();
       const data = await this.redisService.get(tokenKey);
       const duration = Date.now() - startTime;
@@ -84,26 +85,26 @@ export class RefreshTokenService {
       );
 
       if (!data) {
-        this.logger.warn(`Refresh token not found in Redis: ${refreshToken}`);
+        this.logger.warn('Refresh token not found in Redis');
         return null;
       }
 
       const tokenData: TokenData = data;
       if (new Date(tokenData.expiresAt) < new Date()) {
         this.logger.warn(
-          `Expired refresh token found: ${refreshToken}. Expires at: ${String(tokenData.expiresAt)}`,
+          `Expired refresh token found. Expires at: ${String(tokenData.expiresAt)}`,
         );
         await this.redisService.del(tokenKey);
         return null;
       }
 
       this.logger.debug(
-        `Refresh token ${refreshToken} is valid for user ${tokenData.userId}`,
+        `Refresh token is valid for user ${tokenData.userId}`,
       );
       return tokenData.userId;
     } catch (error: unknown) {
       this.logger.error(
-        `Error validating refresh token ${refreshToken}: ${String(error)}`,
+        `Error validating refresh token: ${String(error)}`,
       );
       return null;
     }

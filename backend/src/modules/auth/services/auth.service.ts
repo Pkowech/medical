@@ -22,7 +22,7 @@ import {
 import { TokenBlacklistService } from './token-blacklist.service';
 import { SecurityService } from './security.service';
 import { RefreshTokenService } from './refresh-token.service';
-import { AuditLogService } from './audit-log.service';
+import { AuditLogService, type AuditOutboxPayload } from './audit-log.service';
 import { Role, roleHierarchy } from '../constants/role.constants';
 import { RedisService } from '#infrastructure/redis/redis.service';
 import { getErrorMessage, getErrorStack } from '#common/utils/error.utils';
@@ -38,6 +38,9 @@ import type { JwtPayload } from '#common/dto/security.dto';
 import { securityEventTypes } from '#common/dto/security.dto';
 import { Prisma } from '@prisma/client';
 import { AdminSettingsService } from '#modules/admin/services/admin-settings.service';
+import { MetricsService } from '#infrastructure/metrics/metrics.service';
+import { PasswordVerificationGate } from './password-verification-gate';
+import { performance } from 'node:perf_hooks';
 
 interface GoogleIdentityPayload {
   sub?: string;
@@ -48,11 +51,38 @@ interface GoogleIdentityPayload {
   picture?: string;
 }
 
+const AUTH_RESPONSE_USER_SELECT = {
+  id: true,
+  email: true,
+  firstName: true,
+  lastName: true,
+  username: true,
+  careerStage: true,
+  healthcareField: true,
+  studyYear: true,
+  yearOfExperience: true,
+  specialization: true,
+  userRoles: { select: { role: { select: { name: true } } } },
+  securitySettings: {
+    select: {
+      twoFactorEnabled: true,
+      twoFactorSecret: true,
+      isEmailVerified: true,
+    },
+  },
+} satisfies Prisma.UserSelect;
+
+const AUTH_LOGIN_USER_SELECT = {
+  ...AUTH_RESPONSE_USER_SELECT,
+  password: true,
+  isActive: true,
+  isLocked: true,
+  lockedUntil: true,
+  failedLoginAttempts: true,
+} satisfies Prisma.UserSelect;
+
 type AuthResponseUser = Prisma.UserGetPayload<{
-  include: {
-    userRoles: { include: { role: true } };
-    securitySettings: true;
-  };
+  select: typeof AUTH_RESPONSE_USER_SELECT;
 }>;
 
 type AuthResponseOptions = {
@@ -93,6 +123,8 @@ export class AuthService {
     private readonly rolesService: RolesService,
     private readonly roleLimitingService: RoleLimitingService, // Added for guest rate limit
     private readonly configService: ConfigService,
+    private readonly passwordVerificationGate: PasswordVerificationGate,
+    private readonly metrics: MetricsService,
     @Optional()
     private readonly adminSettingsService?: AdminSettingsService,
   ) {
@@ -129,6 +161,37 @@ export class AuthService {
     }
   }
 
+  private async measureAuthStage<T>(
+    stage: string,
+    operation: () => Promise<T>,
+  ): Promise<T> {
+    const startedAt = performance.now();
+    try {
+      const result = await operation();
+      this.metrics.recordAuthStage(
+        stage,
+        performance.now() - startedAt,
+        'success',
+      );
+      return result;
+    } catch (error) {
+      this.metrics.recordAuthStage(
+        stage,
+        performance.now() - startedAt,
+        'failure',
+      );
+      throw error;
+    }
+  }
+
+  private async enqueueAuthenticationAudit(
+    payload: AuditOutboxPayload,
+  ): Promise<void> {
+    await this.prisma.$transaction((transaction) =>
+      this.auditLogService.enqueueInTransaction(transaction, payload),
+    );
+  }
+
   /**
    * Converts a duration string (e.g., '24h', '7d') to milliseconds
    */
@@ -154,58 +217,15 @@ export class AuthService {
     return numValue * (multipliers[unit] || 1);
   }
 
-  /**
-   * Locks a user account after too many failed login attempts
-   */
-  private async lockAccount(userId: string): Promise<void> {
-    const lockedUntil = new Date(Date.now() + this.LOCK_DURATION);
-
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: {
-        isLocked: true,
-        lockedUntil,
-      },
-    });
-
-    await this.auditLogService.log(
-      securityEventTypes.suspiciousActivity,
-      userId,
-      'unknown',
-      'unknown',
-      {
-        reason: 'ACCOUNT_LOCKED_MAX_ATTEMPTS',
-        duration: this.LOCK_DURATION,
-        lockedUntil: lockedUntil.toISOString(),
-      },
-    );
-
-    this.logger.warn(
-      `Account locked for user ${userId} until ${lockedUntil.toISOString()}`,
-    );
-  }
-
   private async getTwoFactorEnabled(
     userId: string,
     user?: { securitySettings?: { twoFactorEnabled?: boolean } | null },
   ): Promise<boolean> {
-    const securitySettings = user?.securitySettings;
-    if (
-      securitySettings &&
-      typeof securitySettings.twoFactorEnabled === 'boolean'
-    ) {
-      return securitySettings.twoFactorEnabled;
+    if (user && 'securitySettings' in user) {
+      return Boolean(user.securitySettings?.twoFactorEnabled);
     }
 
-    const securitySettingsModel = (this.prisma as any).userSecuritySettings;
-    if (
-      !securitySettingsModel ||
-      typeof securitySettingsModel.findUnique !== 'function'
-    ) {
-      return false;
-    }
-
-    const settings = await securitySettingsModel.findUnique({
+    const settings = await this.prisma.userSecuritySettings.findUnique({
       where: { userId },
       select: { twoFactorEnabled: true },
     });
@@ -227,10 +247,7 @@ export class AuthService {
       options.user ??
       (await this.prisma.user.findUnique({
         where: { id: userId },
-        include: {
-          userRoles: { include: { role: true } },
-          securitySettings: true,
-        },
+        select: AUTH_RESPONSE_USER_SELECT,
       }));
 
     if (!user) {
@@ -289,26 +306,42 @@ export class AuthService {
     });
     const refreshToken = mfaSetupRequired
       ? ''
-      : await this.refreshTokenService.createRefreshToken(
-          user.id,
-          Math.ceil(accessTokenLifetimeMs / 1000),
+      : await this.measureAuthStage('refresh_token_write', () =>
+          this.refreshTokenService.createRefreshToken(
+            user.id,
+            Math.ceil(accessTokenLifetimeMs / 1000),
+            true,
+          ),
         );
 
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: {
-        lastLogin: new Date(),
-        failedLoginAttempts: 0,
-        isLocked: false,
-        lockedUntil: null,
-      },
-    });
-    await this.auditLogService.log(
-      securityEventTypes.loginSuccess,
-      user.id,
-      ipAddress || 'unknown',
-      userAgent || 'unknown',
-      { deviceId, userRole: primaryRole },
+    await this.measureAuthStage('login_commit', () =>
+      this.prisma.$transaction(async (transaction) => {
+        await transaction.user.update({
+          where: { id: user.id },
+          data: {
+            lastLogin: new Date(),
+            failedLoginAttempts: 0,
+            isLocked: false,
+            lockedUntil: null,
+          },
+        });
+        await this.auditLogService.enqueueInTransaction(transaction, {
+          eventType: securityEventTypes.loginSuccess,
+          userId: user.id,
+          ipAddress: ipAddress || 'unknown',
+          userAgent: userAgent || 'unknown',
+          eventData: { deviceId, userRole: primaryRole },
+        });
+        if (refreshToken) {
+          await this.auditLogService.enqueueInTransaction(transaction, {
+            eventType: securityEventTypes.tokenRefresh,
+            userId: user.id,
+            ipAddress: 'unknown',
+            userAgent: 'unknown',
+            eventData: { success: true, action: 'create' },
+          });
+        }
+      }),
     );
 
     return {
@@ -373,15 +406,19 @@ export class AuthService {
       return false;
     }
 
-    try {
-      return await argon2.verify(storedHash, providedPassword);
-    } catch (error: unknown) {
-      this.logger.error(
-        `Password verification failed: ${getErrorMessage(error)}`,
-        { stack: getErrorStack(error) },
-      );
-      return false;
-    }
+    return this.passwordVerificationGate.run(() =>
+      this.measureAuthStage('argon2_verify', async () => {
+        try {
+          return await argon2.verify(storedHash, providedPassword);
+        } catch (error: unknown) {
+          this.logger.error(
+            `Password verification failed: ${getErrorMessage(error)}`,
+            { stack: getErrorStack(error) },
+          );
+          return false;
+        }
+      }),
+    );
   }
 
   /**
@@ -454,6 +491,8 @@ export class AuthService {
     const { email, username, password, deviceId, twoFactorToken } = loginDto;
     const identifier = email || username || 'unknown';
     const logContext = { identifier, ipAddress, userAgent };
+    const loginStartedAt = performance.now();
+    let loginOutcome: 'success' | 'failure' | 'rejected' = 'failure';
 
     try {
       // Find user by email or username
@@ -465,27 +504,22 @@ export class AuthService {
               mode: 'insensitive',
             },
           };
-      const user = await this.prisma.user.findFirst({
-        where: whereClause,
-        include: {
-          userRoles: {
-            include: {
-              role: true,
-            },
-          },
-          securitySettings: true,
-        },
-      });
+      const user = await this.measureAuthStage('user_lookup', () =>
+        this.prisma.user.findFirst({
+          where: whereClause,
+          select: AUTH_LOGIN_USER_SELECT,
+        }),
+      );
 
       // User not found
       if (!user) {
-        await this.auditLogService.log(
-          securityEventTypes.loginFailure,
-          'unknown',
-          ipAddress || 'unknown',
-          userAgent || 'unknown',
-          { reason: 'USER_NOT_FOUND', identifier },
-        );
+        await this.enqueueAuthenticationAudit({
+          eventType: securityEventTypes.loginFailure,
+          userId: 'unknown',
+          ipAddress: ipAddress || 'unknown',
+          userAgent: userAgent || 'unknown',
+          eventData: { reason: 'USER_NOT_FOUND', identifier },
+        });
         throw new UnauthorizedException(
           email
             ? 'No account found for this email. Please sign up if you do not have an account.'
@@ -498,13 +532,16 @@ export class AuthService {
         const remainingTime = Math.ceil(
           (user.lockedUntil.getTime() - Date.now()) / 60000,
         );
-        await this.auditLogService.log(
-          securityEventTypes.loginFailure,
-          user.id,
-          ipAddress || 'unknown',
-          userAgent || 'unknown',
-          { reason: 'ACCOUNT_LOCKED', remainingMinutes: remainingTime },
-        );
+        await this.enqueueAuthenticationAudit({
+          eventType: securityEventTypes.loginFailure,
+          userId: user.id,
+          ipAddress: ipAddress || 'unknown',
+          userAgent: userAgent || 'unknown',
+          eventData: {
+            reason: 'ACCOUNT_LOCKED',
+            remainingMinutes: remainingTime,
+          },
+        });
         throw new UnauthorizedException(
           `Account is locked. Please try again in ${remainingTime} minutes.`,
         );
@@ -512,13 +549,13 @@ export class AuthService {
 
       // Check if account is active
       if (!user.isActive) {
-        await this.auditLogService.log(
-          securityEventTypes.loginFailure,
-          user.id,
-          ipAddress || 'unknown',
-          userAgent || 'unknown',
-          { reason: 'ACCOUNT_INACTIVE' },
-        );
+        await this.enqueueAuthenticationAudit({
+          eventType: securityEventTypes.loginFailure,
+          userId: user.id,
+          ipAddress: ipAddress || 'unknown',
+          userAgent: userAgent || 'unknown',
+          eventData: { reason: 'ACCOUNT_INACTIVE' },
+        });
         throw new UnauthorizedException(ErrorMessages.user.inactive);
       }
 
@@ -529,27 +566,66 @@ export class AuthService {
       );
 
       if (!isPasswordValid) {
-        const newFailedAttempts = user.failedLoginAttempts + 1;
+        const { failedAttempts, lockedUntil } =
+          await this.measureAuthStage('failed_attempt_commit', () =>
+            this.prisma.$transaction(async (transaction) => {
+              const updatedUser = await transaction.user.update({
+                where: { id: user.id },
+                data: { failedLoginAttempts: { increment: 1 } },
+                select: { failedLoginAttempts: true },
+              });
+              const shouldLock =
+                updatedUser.failedLoginAttempts >= this.MAX_FAILED_ATTEMPTS;
+              const nextLockedUntil = shouldLock
+                ? new Date(Date.now() + this.LOCK_DURATION)
+                : null;
 
-        await this.prisma.user.update({
-          where: { id: user.id },
-          data: { failedLoginAttempts: newFailedAttempts },
-        });
+              if (nextLockedUntil) {
+                await transaction.user.update({
+                  where: { id: user.id },
+                  data: { isLocked: true, lockedUntil: nextLockedUntil },
+                });
+              }
 
-        await this.auditLogService.log(
-          securityEventTypes.loginFailure,
-          user.id,
-          ipAddress || 'unknown',
-          userAgent || 'unknown',
-          {
-            reason: 'INVALID_PASSWORD',
-            attempts: newFailedAttempts,
-            maxAttempts: this.MAX_FAILED_ATTEMPTS,
-          },
+              await this.auditLogService.enqueueInTransaction(transaction, {
+                eventType: securityEventTypes.loginFailure,
+                userId: user.id,
+                ipAddress: ipAddress || 'unknown',
+                userAgent: userAgent || 'unknown',
+                eventData: {
+                  reason: 'INVALID_PASSWORD',
+                  attempts: updatedUser.failedLoginAttempts,
+                  maxAttempts: this.MAX_FAILED_ATTEMPTS,
+                },
+              });
+
+              if (nextLockedUntil) {
+                await this.auditLogService.enqueueInTransaction(transaction, {
+                  eventType: securityEventTypes.suspiciousActivity,
+                  userId: user.id,
+                  ipAddress: 'unknown',
+                  userAgent: 'unknown',
+                  eventData: {
+                    reason: 'ACCOUNT_LOCKED_MAX_ATTEMPTS',
+                    duration: this.LOCK_DURATION,
+                    lockedUntil: nextLockedUntil.toISOString(),
+                  },
+                });
+              }
+
+              return {
+                failedAttempts: updatedUser.failedLoginAttempts,
+                lockedUntil: nextLockedUntil,
+              };
+            }),
         );
 
-        if (newFailedAttempts >= this.MAX_FAILED_ATTEMPTS) {
-          await this.lockAccount(user.id);
+        if (lockedUntil) {
+          this.logger.warn(
+            `Account locked for user ${user.id} until ${lockedUntil.toISOString()}`,
+          );
+        }
+        if (failedAttempts >= this.MAX_FAILED_ATTEMPTS) {
           throw new UnauthorizedException(
             'Too many failed attempts. Account has been locked.',
           );
@@ -558,9 +634,13 @@ export class AuthService {
         throw new UnauthorizedException('Incorrect password. Please try again.');
       }
 
-      const isEmailVerified = Boolean(
-        user.securitySettings?.isEmailVerified,
-      );
+      const { isEmailVerified, systemSettings } =
+        await this.measureAuthStage('account_checks', async () => ({
+          isEmailVerified: Boolean(
+            user.securitySettings?.isEmailVerified,
+          ),
+          systemSettings: await this.adminSettingsService?.getSettings(),
+        }));
       if (
         this.configService.get<boolean>('ENABLE_EMAIL_VERIFICATION', true) &&
         !isEmailVerified
@@ -571,23 +651,26 @@ export class AuthService {
       }
 
       const securitySettings = user.securitySettings;
-      const systemSettings = await this.adminSettingsService?.getSettings();
       if (
         systemSettings?.twoFactorAuthRequired &&
         !securitySettings?.twoFactorEnabled
       ) {
-        return this.issueAuthResponse(
-          user.id,
-          ipAddress,
-          userAgent,
-          deviceId,
-          {
-            forceMfaSetup: true,
-            user,
-            systemSettings,
-            isEmailVerified,
-          },
+        const response = await this.measureAuthStage('auth_response', () =>
+          this.issueAuthResponse(
+            user.id,
+            ipAddress,
+            userAgent,
+            deviceId,
+            {
+              forceMfaSetup: true,
+              user,
+              systemSettings,
+              isEmailVerified,
+            },
+          ),
         );
+        loginOutcome = 'success';
+        return response;
       }
 
       // Check 2FA if enabled
@@ -596,45 +679,57 @@ export class AuthService {
         securitySettings?.twoFactorSecret
       ) {
         if (!twoFactorToken) {
-          await this.auditLogService.log(
-            securityEventTypes.loginFailure,
-            user.id,
-            ipAddress || 'unknown',
-            userAgent || 'unknown',
-            { reason: '2FA_TOKEN_MISSING' },
-          );
+          await this.enqueueAuthenticationAudit({
+            eventType: securityEventTypes.loginFailure,
+            userId: user.id,
+            ipAddress: ipAddress || 'unknown',
+            userAgent: userAgent || 'unknown',
+            eventData: { reason: '2FA_TOKEN_MISSING' },
+          });
           throw new BadRequestException(
             'Two-factor authentication token required',
           );
         }
 
-        const is2FAValid = await this.securityService.verifyTwoFactor(
-          user.id,
-          twoFactorToken,
+        const is2FAValid = await this.measureAuthStage(
+          'mfa_verification',
+          () =>
+            this.securityService.verifyTwoFactor(
+              user.id,
+              twoFactorToken,
+              user.securitySettings,
+            ),
         );
 
         if (!is2FAValid) {
-          await this.auditLogService.log(
-            securityEventTypes.loginFailure,
-            user.id,
-            ipAddress || 'unknown',
-            userAgent || 'unknown',
-            { reason: 'INVALID_2FA_TOKEN' },
-          );
+          await this.enqueueAuthenticationAudit({
+            eventType: securityEventTypes.loginFailure,
+            userId: user.id,
+            ipAddress: ipAddress || 'unknown',
+            userAgent: userAgent || 'unknown',
+            eventData: { reason: 'INVALID_2FA_TOKEN' },
+          });
           throw new UnauthorizedException(
             'Invalid two-factor authentication token',
           );
         }
       }
 
-      return await this.issueAuthResponse(
-        user.id,
-        ipAddress,
-        userAgent,
-        deviceId,
-        { user, systemSettings, isEmailVerified },
+      const response = await this.measureAuthStage('auth_response', () =>
+        this.issueAuthResponse(
+          user.id,
+          ipAddress,
+          userAgent,
+          deviceId,
+          { user, systemSettings, isEmailVerified },
+        ),
       );
+      loginOutcome = 'success';
+      return response;
     } catch (error) {
+      if (error instanceof ServiceUnavailableException) {
+        loginOutcome = 'rejected';
+      }
       this.logger.error(`Login error: ${getErrorMessage(error)}`, {
         ...logContext,
         stack: getErrorStack(error),
@@ -642,12 +737,21 @@ export class AuthService {
 
       if (
         error instanceof UnauthorizedException ||
-        error instanceof BadRequestException
+        error instanceof BadRequestException ||
+        error instanceof ServiceUnavailableException
       ) {
         throw error;
       }
 
-      throw new UnauthorizedException('Authentication failed');
+      throw new ServiceUnavailableException(
+        'Authentication service is temporarily unavailable.',
+      );
+    } finally {
+      this.metrics.recordAuthStage(
+        'login_total',
+        performance.now() - loginStartedAt,
+        loginOutcome,
+      );
     }
   }
 
@@ -884,7 +988,7 @@ export class AuthService {
       throw new UnauthorizedException('User not found');
     }
 
-    const userRole = (user.userRoles?.[0]?.role.name as Role) || Role.student;
+    const userRole = user.userRoles?.[0]?.role.name || Role.student;
     const allRoles = user.userRoles.map((ur: any) => ur.role.name as Role);
 
     const permissions =

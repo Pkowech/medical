@@ -47,6 +47,7 @@ export const validationSchema = Joi.object({
   TYPEORM_SYNC: Joi.boolean().default(false),
   TYPEORM_LOGGING: Joi.boolean().default(false),
   DATABASE_SSL: Joi.boolean().default(false),
+  DATABASE_POOL_MAX: Joi.number().integer().min(1).max(100).default(3),
   DATABASE_MAX_CONNECTIONS: Joi.number().min(1).max(100).default(10),
   DATABASE_ACQUIRE_TIMEOUT: Joi.number().min(1000).default(60000),
   DATABASE_TIMEOUT: Joi.number().min(1000).default(60000),
@@ -85,6 +86,17 @@ export const validationSchema = Joi.object({
   // Rate Limiting
   RATE_LIMIT_WINDOW_MS: Joi.number().integer().min(1000).default(900000), // 15 minutes
   RATE_LIMIT_MAX: Joi.number().integer().min(1).default(100),
+  AUTH_LOGIN_RATE_LIMIT_MAX: Joi.number().integer().min(1).max(100).default(5),
+  AUTH_MAX_CONCURRENT_PASSWORD_VERIFICATIONS: Joi.number()
+    .integer()
+    .min(1)
+    .max(32)
+    .default(2),
+  AUTH_PASSWORD_VERIFICATION_QUEUE_TIMEOUT_MS: Joi.number()
+    .integer()
+    .min(100)
+    .max(10000)
+    .default(1500),
   RATE_LIMIT_SKIP_SUCCESS: Joi.boolean().default(false),
   RATE_LIMIT_SKIP_FAILED: Joi.boolean().default(false),
 

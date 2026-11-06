@@ -634,6 +634,18 @@ model SecurityAudit {
   @@map("security_audits")
 }
 
+model LoginAuditOutbox {
+  id          String   @id @default(uuid())
+  payload     Json
+  createdAt   DateTime @default(now()) @map("created_at")
+  availableAt DateTime @default(now()) @map("available_at")
+  attempts    Int      @default(0)
+  lastError   String?  @map("last_error")
+
+  @@index([availableAt, createdAt])
+  @@map("login_audit_outbox")
+}
+
 model CourseCategory {
   id            String           @id @default(uuid())
   name          String           @db.VarChar(255)

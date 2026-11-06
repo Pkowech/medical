@@ -1,9 +1,16 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
-import { Counter, Gauge, Registry, collectDefaultMetrics } from 'prom-client';
+import {
+  Counter,
+  Gauge,
+  Histogram,
+  Registry,
+  collectDefaultMetrics,
+} from 'prom-client';
 
 @Injectable()
 export class MetricsService implements OnModuleInit {
   private register: Registry;
+  private readonly authStageDuration: Histogram;
   private requestCounter: Counter;
   private errorCounter: Counter;
   private responseTimeHistogram: Gauge;
@@ -23,6 +30,14 @@ export class MetricsService implements OnModuleInit {
   constructor() {
     // Create a new registry
     this.register = new Registry();
+
+    this.authStageDuration = new Histogram({
+      name: 'medtrack_auth_stage_duration_seconds',
+      help: 'Authentication stage duration in seconds',
+      labelNames: ['stage', 'outcome'],
+      buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10],
+      registers: [this.register],
+    });
 
     // Request counter
     this.requestCounter = new Counter({
@@ -123,6 +138,17 @@ export class MetricsService implements OnModuleInit {
   onModuleInit() {
     // Enable default metrics (GC, memory, eventloop, etc)
     collectDefaultMetrics({ register: this.register });
+  }
+
+  recordAuthStage(
+    stage: string,
+    durationMs: number,
+    outcome: 'success' | 'failure' | 'rejected',
+  ): void {
+    this.authStageDuration.observe(
+      { stage, outcome },
+      Math.max(0, durationMs) / 1000,
+    );
   }
 
   // Increment request counter

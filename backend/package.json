@@ -30,6 +30,7 @@
     "test:e2e": "python -m pytest tests/test_admin_course_upload_student_flow.py",
     "test:integration": "python -m pytest tests",
     "test:all": "python -m pytest tests",
+    "benchmark:auth-password": "tsx scripts/benchmark-auth-password.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:migrate:status": "prisma migrate status",

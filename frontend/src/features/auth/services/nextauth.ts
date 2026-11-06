@@ -272,14 +272,18 @@ export const authOptions: NextAuthOptions = {
             : { username: credentials.identifier }),
         };
 
-        const configuredTimeout = Number.parseInt(
-          process.env.AUTH_BACKEND_TIMEOUT_MS || '8000',
-          10
-        );
+        const timeoutValue = process.env.AUTH_BACKEND_TIMEOUT_MS;
         const timeoutMs =
-          Number.isFinite(configuredTimeout) && configuredTimeout > 0
-            ? configuredTimeout
-            : 8000;
+          timeoutValue === undefined ? 8000 : Number(timeoutValue);
+        if (
+          !Number.isInteger(timeoutMs) ||
+          timeoutMs < 1000 ||
+          timeoutMs > 30000
+        ) {
+          throw new Error(
+            'AUTH_BACKEND_TIMEOUT_MS must be an integer between 1000 and 30000.',
+          );
+        }
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), timeoutMs);
 

@@ -325,6 +325,34 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     this.setInMemory(key, strValue, ttlSeconds);
   }
 
+  async setAndAddToSet<T>(
+    key: string,
+    value: T,
+    ttlSeconds: number,
+    setKey: string,
+    setValue: string,
+  ): Promise<void> {
+    const client = this.getConnectedClient();
+    if (!client) {
+      await this.set(key, value, ttlSeconds);
+      await this.addToSet(setKey, setValue);
+      return;
+    }
+
+    const results = await client
+      .multi()
+      .setex(key, ttlSeconds, this.serializeValue(value))
+      .sadd(setKey, setValue)
+      .exec();
+    const failedCommand = results?.find(([error]) => error);
+    if (!results || failedCommand) {
+      throw failedCommand?.[0] ?? new Error('Redis transaction returned no results');
+    }
+
+    this.deleteFromMemory(key);
+    this.deleteFromMemory(setKey);
+  }
+
   private serializeValue(value: unknown): string {
     if (typeof value === 'string') {
       try {

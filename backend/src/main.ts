@@ -210,7 +210,7 @@ function configureRateLimiting(
       'RATE_LIMIT_WINDOW_MS',
       DEFAULT_RATE_LIMIT_WINDOW_MS,
     ),
-    max: isProduction ? 5 : 50,
+    max: isProduction ? config.get<number>('AUTH_LOGIN_RATE_LIMIT_MAX', 5) : 50,
     message: 'Too many login attempts, please try again after 15 minutes',
     standardHeaders: true,
     legacyHeaders: false,

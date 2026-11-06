@@ -96,10 +96,20 @@ export class SecurityService {
     return { secret: secret.base32, qrCode: qrCodeData };
   }
 
-  async verifyTwoFactor(userId: string, token: string): Promise<boolean> {
-    const settings = await this.prisma.userSecuritySettings.findUnique({
-      where: { userId },
-    });
+  async verifyTwoFactor(
+    userId: string,
+    token: string,
+    knownSettings?: Pick<
+      UserSecuritySettings,
+      'twoFactorEnabled' | 'twoFactorSecret'
+    > | null,
+  ): Promise<boolean> {
+    const settings =
+      knownSettings !== undefined
+        ? knownSettings
+        : await this.prisma.userSecuritySettings.findUnique({
+            where: { userId },
+          });
     if (!settings?.twoFactorSecret) {
       throw new BadRequestException('2FA not set up');
     }

@@ -1,12 +1,26 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { PrismaService } from '#infrastructure/prisma/prisma.service';
+import { Prisma } from '@prisma/client';
 import type {
   AuditLogEntry,
   SecurityEventType,
 } from '#common/dto/security.dto';
 import * as crypto from 'crypto';
 import { getErrorMessage, getErrorStack } from '#common/utils/error.utils';
+
+export interface AuditOutboxPayload {
+  eventType: SecurityEventType;
+  userId: string;
+  ipAddress: string;
+  userAgent: string;
+  eventData?: Record<string, unknown>;
+}
+
+type AuditTransaction = Pick<
+  Prisma.TransactionClient,
+  'user' | 'securityAudit' | 'securityEvent'
+>;
 
 @Injectable()
 export class AuditLogService {
@@ -45,7 +59,7 @@ export class AuditLogService {
       if (userId && !isGuestSession && userId !== 'unknown') {
         user = await this.prisma.user.findUnique({
           where: { id: userId },
-          include: { userRoles: true },
+          select: { id: true, email: true },
         });
       }
 
@@ -111,6 +125,74 @@ export class AuditLogService {
         `Failed to create audit log entry for user ${userId} (Action: ${eventType}): ${getErrorMessage(error)}`,
         getErrorStack(error),
       );
+    }
+  }
+
+  async enqueueInTransaction(
+    transaction: Prisma.TransactionClient,
+    payload: AuditOutboxPayload,
+  ): Promise<void> {
+    await transaction.$executeRaw`
+      INSERT INTO "login_audit_outbox" ("id", "payload")
+      VALUES (
+        ${crypto.randomUUID()},
+        ${JSON.stringify(payload)}::jsonb
+      )
+    `;
+  }
+
+  async persistOutboxEvent(
+    transaction: AuditTransaction,
+    payload: AuditOutboxPayload,
+    timestamp: Date,
+  ): Promise<void> {
+    const isGuestSession = payload.userId.startsWith('guest_');
+    const user =
+      payload.userId && !isGuestSession && payload.userId !== 'unknown'
+        ? await transaction.user.findUnique({
+            where: { id: payload.userId },
+            select: { id: true, email: true },
+          })
+        : null;
+    const effectiveUserId = user?.id ?? null;
+    const eventData = payload.eventData ?? {};
+    const resource =
+      typeof eventData.resource === 'string' ? eventData.resource : 'auth';
+    const details = {
+      userEmail: user?.email ?? 'unknown',
+      isGuestSession,
+      guestSessionId: isGuestSession ? payload.userId : undefined,
+      originalUserId:
+        payload.userId !== effectiveUserId ? payload.userId : undefined,
+      ...eventData,
+    };
+
+    await transaction.securityAudit.create({
+      data: {
+        id: crypto.randomUUID(),
+        userId: effectiveUserId,
+        action: payload.eventType,
+        resource,
+        details,
+        ipAddress: payload.ipAddress || 'unknown',
+        userAgent: payload.userAgent || 'unknown',
+        createdAt: timestamp,
+      },
+    });
+
+    if (effectiveUserId) {
+      await transaction.securityEvent.create({
+        data: {
+          userId: effectiveUserId,
+          eventType: payload.eventType,
+          description: `User ${payload.eventType}`,
+          details,
+          ipAddress: payload.ipAddress || 'unknown',
+          userAgent: payload.userAgent || 'unknown',
+          severity: eventData.success ? 'low' : 'high',
+          createdAt: timestamp,
+        },
+      });
     }
   }
 
