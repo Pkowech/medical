@@ -1,3 +1,5 @@
+#![allow(clippy::double_must_use)]
+
 use crate::shared::error::AnalyticsError;
 /// Repository traits for analytics domain
 /// Provides abstraction over database access for domain services

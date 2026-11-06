@@ -1,3 +1,5 @@
+#![allow(clippy::double_must_use)]
+
 /// Repository trait definitions for domain layer
 /// Implementations should live under infrastructure/database/repositories
 /// and be injected by application layer
