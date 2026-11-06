@@ -8,7 +8,10 @@ pub struct Resource {
     pub resource_type: String,
 }
 
-pub async fn get_related_resources(_assessment_id: &str, pool: &Pool<Postgres>) -> Result<Vec<Resource>, String> {
+pub async fn get_related_resources(
+    _assessment_id: &str,
+    pool: &Pool<Postgres>,
+) -> Result<Vec<Resource>, String> {
     let resources = sqlx::query_as!(
         Resource,
         r#"

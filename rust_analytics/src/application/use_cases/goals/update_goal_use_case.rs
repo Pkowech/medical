@@ -1,11 +1,10 @@
 /// Update Goal Use Case
 /// Updates a learning goal's status, priority, or other properties
-
-use crate::application::dtos::goals::{UpdateGoalRequest, GoalResponse};
+use crate::application::dtos::goals::{GoalResponse, UpdateGoalRequest};
 use crate::domain::repositories::GoalRepository;
 use crate::shared::error::AnalyticsError;
-use std::sync::Arc;
 use chrono::Utc;
+use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct UpdateGoalUseCase {
@@ -17,7 +16,10 @@ impl UpdateGoalUseCase {
         Self { goal_repository }
     }
 
-    pub async fn execute(&self, request: UpdateGoalRequest) -> Result<GoalResponse, AnalyticsError> {
+    pub async fn execute(
+        &self,
+        request: UpdateGoalRequest,
+    ) -> Result<GoalResponse, AnalyticsError> {
         // Validate input
         if request.user_id.is_empty() {
             return Err(AnalyticsError::ValidationError(
@@ -40,9 +42,7 @@ impl UpdateGoalUseCase {
         let mut goal = goals
             .into_iter()
             .find(|g| g.id == request.goal_id)
-            .ok_or_else(|| {
-                AnalyticsError::ValidationError("Goal not found".to_string())
-            })?;
+            .ok_or_else(|| AnalyticsError::ValidationError("Goal not found".to_string()))?;
 
         // Update fields
         if let Some(status) = request.status {
@@ -131,7 +131,10 @@ mod tests {
         }
 
         async fn update_goal(&self, goal: Goal) -> Result<(), AnalyticsError> {
-            *self.updated_goal.lock().expect("mock mutex should not be poisoned") = Some(goal);
+            *self
+                .updated_goal
+                .lock()
+                .expect("mock mutex should not be poisoned") = Some(goal);
             Ok(())
         }
     }

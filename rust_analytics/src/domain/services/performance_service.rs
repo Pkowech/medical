@@ -11,7 +11,9 @@ pub async fn get_performance_analytics(
     pool: &Pool<Postgres>,
 ) -> Result<PerformanceAnalytics, String> {
     crate::modules::analytics::performance::analytics::get_performance_analytics(
-        user_id, assessment_id, pool,
+        user_id,
+        assessment_id,
+        pool,
     )
     .await
 }

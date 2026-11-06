@@ -1,7 +1,7 @@
 use super::data_processor;
+use crate::observability::metrics as obs_metrics;
 use serde::{Deserialize, Serialize};
 use sqlx::{Pool, Postgres};
-use crate::observability::metrics as obs_metrics;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct BatchProcessingResult {
@@ -17,10 +17,9 @@ pub async fn process_analytics_for_users(
     let mut processed_count = 0;
 
     for user_id in user_ids {
-        let (progress_df, quizzes_df, study_time_df) =
-            data_processor::get_user_data(pool, user_id)
-                .await
-                .map_err(|error| format!("Failed to load analytics for user {user_id}: {error}"))?;
+        let (progress_df, quizzes_df, study_time_df) = data_processor::get_user_data(pool, user_id)
+            .await
+            .map_err(|error| format!("Failed to load analytics for user {user_id}: {error}"))?;
         data_processor::process_user_data(&progress_df, &quizzes_df, &study_time_df)
             .map_err(|error| format!("Failed to process analytics for user {user_id}: {error}"))?;
         processed_count += 1;
@@ -37,7 +36,7 @@ pub async fn process_analytics_for_users(
 pub async fn update_bkt_skill_avg_metrics(pool: &Pool<Postgres>) -> Result<(), String> {
     // Query average p_known by skill
     let rows: Vec<(String, f64)> = sqlx::query_as(
-        "SELECT skill_id, AVG(p_known) as avg_p_known FROM user_skill_states GROUP BY skill_id"
+        "SELECT skill_id, AVG(p_known) as avg_p_known FROM user_skill_states GROUP BY skill_id",
     )
     .fetch_all(pool)
     .await

@@ -1,8 +1,10 @@
-use std::sync::Arc;
+use crate::analytics::learning::learning_analytics::calculate_engagement_metrics;
+use crate::application::dtos::engagement::{
+    GetEngagementMetricsRequest, GetEngagementMetricsResponse,
+};
 use crate::domain::repositories::ActivityRepository;
 use crate::shared::error::AnalyticsError;
-use crate::application::dtos::engagement::{GetEngagementMetricsRequest, GetEngagementMetricsResponse};
-use crate::analytics::learning::learning_analytics::calculate_engagement_metrics;
+use std::sync::Arc;
 
 pub struct GetEngagementMetricsUseCase {
     activity_repo: Arc<dyn ActivityRepository + Send + Sync>,
@@ -18,15 +20,19 @@ impl GetEngagementMetricsUseCase {
         req: GetEngagementMetricsRequest,
     ) -> Result<GetEngagementMetricsResponse, AnalyticsError> {
         if req.user_id.is_empty() {
-            return Err(AnalyticsError::ValidationError("user_id is required".to_string()));
+            return Err(AnalyticsError::ValidationError(
+                "user_id is required".to_string(),
+            ));
         }
 
         let activities = self.activity_repo.get_user_activities(&req.user_id).await?;
 
         let engagement = calculate_engagement_metrics(&activities, &req.user_id);
 
-        let (total_courses, completed_courses) =
-            self.activity_repo.get_course_completion_stats(&req.user_id).await?;
+        let (total_courses, completed_courses) = self
+            .activity_repo
+            .get_course_completion_stats(&req.user_id)
+            .await?;
 
         let completion_rate = if total_courses > 0 {
             (completed_courses as f32 / total_courses as f32) * 100.0

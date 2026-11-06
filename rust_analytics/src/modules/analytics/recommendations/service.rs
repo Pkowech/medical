@@ -1,8 +1,8 @@
+use crate::config::AppConfig;
+use crate::observability::metrics as obs_metrics;
 use serde::{Deserialize, Serialize};
 use sqlx::{Pool, Postgres, Row};
 use std::collections::HashMap;
-use crate::config::AppConfig;
-use crate::observability::metrics as obs_metrics;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Recommendation {
@@ -268,7 +268,7 @@ async fn get_candidate_paths(
         )
         ORDER BY lp.title
         LIMIT 100
-        "#
+        "#,
     )
     .bind(user_id)
     .fetch_all(pool)
@@ -303,7 +303,10 @@ async fn get_candidate_paths(
 
 /// Score a learning path using the learner's ability and demonstrated topic needs.
 fn score_learning_path(path: LearningPathCandidate, profile: &UserProfile) -> LearningPathScore {
-    let difficulty_match = match (profile.preferred_difficulty.as_str(), path.difficulty.as_str()) {
+    let difficulty_match = match (
+        profile.preferred_difficulty.as_str(),
+        path.difficulty.as_str(),
+    ) {
         ("beginner", "beginner") => 1.0,
         ("intermediate", "intermediate") => 1.0,
         ("advanced", "advanced") => 1.0,
@@ -367,9 +370,7 @@ fn topics_match(profile_topic: &str, path_topic: &str) -> bool {
 
 /// Combine user-level difficulty fit, topic relevance, and performance into one score.
 fn calculate_final_score(path: &LearningPathScore) -> f64 {
-    path.difficulty_match * 0.4
-        + path.topic_relevance * 0.5
-        + path.ability_match * 0.1
+    path.difficulty_match * 0.4 + path.topic_relevance * 0.5 + path.ability_match * 0.1
 }
 
 /// Generate human-readable reason for recommendation

@@ -1,43 +1,42 @@
+use chrono::{DateTime, Duration, Utc};
+use serde::{Deserialize, Serialize};
 /// Spaced Repetition Analytics Module
-/// 
+///
 /// Provides analytics and aggregation for spaced repetition (SM-2) metrics.
 /// Tracks flashcard progress, intervals, ease factors, and generates insights
 /// on user learning patterns and retention rates.
-/// 
+///
 /// This module connects to the PostgreSQL database to compute:
 /// - Retention statistics (pass rate by interval)
 /// - Ease factor distributions (learning difficulty)
 /// - Review scheduling metrics
 /// - User proficiency trends over time
-
 use sqlx::PgPool;
-use serde::{Deserialize, Serialize};
-use chrono::{DateTime, Utc, Duration};
 use thiserror::Error;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SpacedRepetitionStats {
     /// Total number of flashcards reviewed by user
     pub total_cards: i64,
-    
+
     /// Number of cards due for review today
     pub due_today: i64,
-    
+
     /// Number of mastered cards (ease factor >= 2.5 and interval > 30 days)
     pub mastered_cards: i64,
-    
+
     /// Number of cards in learning phase (repetitions < 2)
     pub learning_cards: i64,
-    
+
     /// Number of cards in relearning phase (failed recent review)
     pub relearning_cards: i64,
-    
+
     /// Average ease factor across all cards
     pub avg_ease_factor: f64,
-    
+
     /// Average interval (days) across all cards
     pub avg_interval_days: f64,
-    
+
     /// Pass rate (successful reviews / total reviews) over recent period
     pub recent_pass_rate: f64,
 }
@@ -46,13 +45,13 @@ pub struct SpacedRepetitionStats {
 pub struct IntervalRetention {
     /// Interval duration (days)
     pub interval_days: i32,
-    
+
     /// Number of reviews at this interval
     pub review_count: i64,
-    
+
     /// Number of successful reviews at this interval
     pub successful_reviews: i64,
-    
+
     /// Pass rate at this interval
     pub pass_rate: f64,
 }
@@ -61,16 +60,16 @@ pub struct IntervalRetention {
 pub struct EaseFactorDistribution {
     /// Bin range (e.g., "1.3-1.9")
     pub range: String,
-    
+
     /// Minimum ease factor in bin
     pub min_ease: f64,
-    
+
     /// Maximum ease factor in bin
     pub max_ease: f64,
-    
+
     /// Number of cards in this ease factor range
     pub card_count: i64,
-    
+
     /// Average pass rate for cards in this range
     pub avg_pass_rate: f64,
 }
@@ -79,19 +78,19 @@ pub struct EaseFactorDistribution {
 pub struct ProgressTrend {
     /// Date of the data point
     pub date: DateTime<Utc>,
-    
+
     /// Total unique cards reviewed on this date
     pub cards_reviewed: i64,
-    
+
     /// Success count on this date
     pub successful_reviews: i64,
-    
+
     /// Failed reviews on this date
     pub failed_reviews: i64,
-    
+
     /// Daily pass rate
     pub daily_pass_rate: f64,
-    
+
     /// Average ease factor on this date
     pub avg_ease_factor: f64,
 }
@@ -100,10 +99,10 @@ pub struct ProgressTrend {
 pub enum SpacedRepetitionError {
     #[error("Database query failed: {0}")]
     DatabaseError(String),
-    
+
     #[error("User not found: {0}")]
     UserNotFound(String),
-    
+
     #[error("Invalid date range")]
     InvalidDateRange,
 }
@@ -543,4 +542,3 @@ mod tests {
         assert_eq!(dist.card_count, 50);
     }
 }
-

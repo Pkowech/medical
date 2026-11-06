@@ -1,6 +1,6 @@
+use crate::observability::metrics as obs_metrics;
 use serde::{Deserialize, Serialize};
 use sqlx::{Pool, Postgres};
-use crate::observability::metrics as obs_metrics;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct StudyRecommendation {

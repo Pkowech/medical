@@ -1,7 +1,7 @@
-use std::sync::Arc;
+use crate::application::dtos::path_analytics::{GetPathAnalyticsRequest, GetPathAnalyticsResponse};
 use crate::domain::repositories::ActivityRepository;
 use crate::shared::error::AnalyticsError;
-use crate::application::dtos::path_analytics::{GetPathAnalyticsRequest, GetPathAnalyticsResponse};
+use std::sync::Arc;
 
 pub struct GetPathAnalyticsUseCase {
     activity_repo: Arc<dyn ActivityRepository + Send + Sync>,
@@ -12,8 +12,14 @@ impl GetPathAnalyticsUseCase {
         Self { activity_repo }
     }
 
-    pub async fn execute(&self, req: GetPathAnalyticsRequest) -> Result<GetPathAnalyticsResponse, AnalyticsError> {
-        let (total, completed) = self.activity_repo.get_learning_path_completion_stats(&req.user_id).await?;
+    pub async fn execute(
+        &self,
+        req: GetPathAnalyticsRequest,
+    ) -> Result<GetPathAnalyticsResponse, AnalyticsError> {
+        let (total, completed) = self
+            .activity_repo
+            .get_learning_path_completion_stats(&req.user_id)
+            .await?;
 
         let completion_rate = if total > 0 {
             (completed as f32 / total as f32) * 100.0

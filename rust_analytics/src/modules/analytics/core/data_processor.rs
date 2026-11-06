@@ -1,5 +1,5 @@
-use polars::prelude::*;
 use polars::lazy::dsl::col;
+use polars::prelude::*;
 use sqlx::{Error, Pool, Postgres};
 
 // Define the data structures for the query results

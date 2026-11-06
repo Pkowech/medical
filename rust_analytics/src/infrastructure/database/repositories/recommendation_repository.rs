@@ -1,6 +1,5 @@
 /// Postgres implementation of RecommendationRepository
 /// Provides personalized learning-path recommendations and persists explicit scores.
-
 use crate::domain::repositories::RecommendationRepository;
 use crate::modules::analytics::recommendations::service::Recommendation;
 use crate::shared::error::AnalyticsError;
@@ -19,12 +18,14 @@ impl PostgresRecommendationRepository {
 
 #[async_trait::async_trait]
 impl RecommendationRepository for PostgresRecommendationRepository {
-    async fn get_recommendations(&self, user_id: &str, limit: usize) -> Result<Vec<Recommendation>, AnalyticsError> {
+    async fn get_recommendations(
+        &self,
+        user_id: &str,
+        limit: usize,
+    ) -> Result<Vec<Recommendation>, AnalyticsError> {
         let recommendations =
             crate::modules::analytics::recommendations::service::get_recommendations_ai(
-                user_id,
-                &self.pool,
-                limit,
+                user_id, &self.pool, limit,
             )
             .await
             .map_err(AnalyticsError::DatabaseError)?;
@@ -32,30 +33,42 @@ impl RecommendationRepository for PostgresRecommendationRepository {
         Ok(recommendations.into_iter().take(limit).collect())
     }
 
-    async fn store_recommendation_score(&self, _user_id: &str, material_id: &str, score: f64) -> Result<(), AnalyticsError> {
+    async fn store_recommendation_score(
+        &self,
+        _user_id: &str,
+        material_id: &str,
+        score: f64,
+    ) -> Result<(), AnalyticsError> {
         sqlx::query(
             r#"
             INSERT INTO recommendation_scores (item_id, score, created_at)
             VALUES ($1, $2, NOW())
             ON CONFLICT (item_id)
             DO UPDATE SET score = EXCLUDED.score, created_at = NOW()
-            "#
+            "#,
         )
         .bind(material_id)
         .bind(score)
         .execute(&*self.pool)
         .await
-        .map_err(|e| AnalyticsError::DatabaseError(format!("Failed to store recommendation score: {}", e)))?;
+        .map_err(|e| {
+            AnalyticsError::DatabaseError(format!("Failed to store recommendation score: {}", e))
+        })?;
 
         Ok(())
     }
 
-    async fn get_user_preferences(&self, user_id: &str) -> Result<serde_json::Value, AnalyticsError> {
+    async fn get_user_preferences(
+        &self,
+        user_id: &str,
+    ) -> Result<serde_json::Value, AnalyticsError> {
         let row = sqlx::query("SELECT preferences FROM user_profiles WHERE user_id = $1")
             .bind(user_id)
             .fetch_optional(&*self.pool)
             .await
-            .map_err(|e| AnalyticsError::DatabaseError(format!("Failed to fetch user preferences: {}", e)))?;
+            .map_err(|e| {
+                AnalyticsError::DatabaseError(format!("Failed to fetch user preferences: {}", e))
+            })?;
 
         if let Some(r) = row {
             let prefs: Option<serde_json::Value> = r.try_get("preferences").ok();

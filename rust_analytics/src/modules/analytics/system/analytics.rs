@@ -39,19 +39,17 @@ pub async fn get_system_analytics(pool: &Pool<Postgres>) -> Result<SystemAnalyti
         .map_err(|e| e.to_string())?
         .unwrap_or(0);
 
-    let published_courses: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM courses WHERE status::text = 'published'",
-    )
-    .fetch_one(pool)
-    .await
-    .map_err(|error| error.to_string())?;
+    let published_courses: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM courses WHERE status::text = 'published'")
+            .fetch_one(pool)
+            .await
+            .map_err(|error| error.to_string())?;
 
-    let active_today: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM users WHERE last_login >= CURRENT_DATE",
-    )
-    .fetch_one(pool)
-    .await
-    .map_err(|error| error.to_string())?;
+    let active_today: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM users WHERE last_login >= CURRENT_DATE")
+            .fetch_one(pool)
+            .await
+            .map_err(|error| error.to_string())?;
 
     let average_course_rating: Option<f64> = sqlx::query_scalar(
         "SELECT AVG(rating)::double precision

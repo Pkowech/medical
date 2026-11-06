@@ -1,12 +1,12 @@
-use sqlx::{Pool, Postgres, Row};
-use tonic::{Request, Response, Status};
-use std::sync::Arc;
-use std::collections::HashMap;
 use crate::analytics_proto::{
     GetEngagementMetricsRequest, GetEngagementMetricsResponse, GetStudyPatternsRequest,
-    GetStudyPatternsResponse, PreferredStudyTimes, QuizAttemptHistoryRequest,
-    QuizAttemptHistoryResponse, QuizAttemptHistoryItem, StudyDurationMetrics,
+    GetStudyPatternsResponse, PreferredStudyTimes, QuizAttemptHistoryItem,
+    QuizAttemptHistoryRequest, QuizAttemptHistoryResponse, StudyDurationMetrics,
 };
+use sqlx::{Pool, Postgres, Row};
+use std::collections::HashMap;
+use std::sync::Arc;
+use tonic::{Request, Response, Status};
 
 pub struct EngagementService {
     pool: Pool<Postgres>,
@@ -33,10 +33,16 @@ impl EngagementService {
 
         Self::validate_user_id(&user_id)?;
 
-        let repo = crate::infrastructure::database::repositories::PostgresActivityRepository::new(Arc::new(self.pool.clone()));
-        let use_case = crate::application::use_cases::engagement::GetEngagementMetricsUseCase::new(std::sync::Arc::new(repo));
+        let repo = crate::infrastructure::database::repositories::PostgresActivityRepository::new(
+            Arc::new(self.pool.clone()),
+        );
+        let use_case = crate::application::use_cases::engagement::GetEngagementMetricsUseCase::new(
+            std::sync::Arc::new(repo),
+        );
 
-        let app_req = crate::application::dtos::engagement::GetEngagementMetricsRequest { user_id: user_id.clone() };
+        let app_req = crate::application::dtos::engagement::GetEngagementMetricsRequest {
+            user_id: user_id.clone(),
+        };
         let result = use_case
             .execute(app_req)
             .await
@@ -72,8 +78,7 @@ impl EngagementService {
             activity_frequency: result.activity_frequency,
             daily_streak: result.daily_streak,
             weekly_streak: result.weekly_streak,
-            total_study_time_minutes: total_study_time_minutes
-                .clamp(0, i32::MAX as i64) as i32,
+            total_study_time_minutes: total_study_time_minutes.clamp(0, i32::MAX as i64) as i32,
             weekly_study_minutes: weekly_metrics.0.clamp(0, i32::MAX as i64) as i32,
             active_study_days_this_week: weekly_metrics.1.clamp(0, i32::MAX as i64) as i32,
         }))
@@ -219,9 +224,8 @@ impl EngagementService {
         let preferred_study_times = PreferredStudyTimes {
             morning: i32::try_from(morning)
                 .map_err(|error| Status::internal(format!("Morning count overflow: {error}")))?,
-            afternoon: i32::try_from(afternoon).map_err(|error| {
-                Status::internal(format!("Afternoon count overflow: {error}"))
-            })?,
+            afternoon: i32::try_from(afternoon)
+                .map_err(|error| Status::internal(format!("Afternoon count overflow: {error}")))?,
             evening: i32::try_from(evening)
                 .map_err(|error| Status::internal(format!("Evening count overflow: {error}")))?,
             night: i32::try_from(night)
@@ -245,8 +249,8 @@ impl EngagementService {
     }
 
     pub async fn get_quiz_attempt_history(
-        &self, 
-        request: Request<QuizAttemptHistoryRequest>
+        &self,
+        request: Request<QuizAttemptHistoryRequest>,
     ) -> Result<Response<QuizAttemptHistoryResponse>, Status> {
         let r = request.into_inner();
         let limit = if r.limit <= 0 { None } else { Some(r.limit) };
@@ -254,11 +258,7 @@ impl EngagementService {
 
         let (attempts, stats, recent_improvement) =
             crate::modules::analytics::engagement::quiz_history::get_quiz_attempt_history(
-                &r.user_id,
-                limit,
-                offset,
-                true,
-                &self.pool,
+                &r.user_id, limit, offset, true, &self.pool,
             )
             .await
             .map_err(|error| Status::internal(format!("Quiz history failed: {error}")))?;
@@ -308,7 +308,13 @@ impl EngagementService {
             })
             .collect();
 
-        match crate::modules::analytics::events::store_batch_events(&req.user_id, mapped, &self.pool).await {
+        match crate::modules::analytics::events::store_batch_events(
+            &req.user_id,
+            mapped,
+            &self.pool,
+        )
+        .await
+        {
             Ok(res) => Ok(Response::new(crate::analytics_proto::BatchEventResponse {
                 success: res.success,
                 processed: res.processed as i32,

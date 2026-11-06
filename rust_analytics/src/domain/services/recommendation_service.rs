@@ -17,9 +17,10 @@ pub async fn get_recommendations_ai(
     limit: usize,
 ) -> Result<Vec<Recommendation>, String> {
     // Delegate to the existing implementation in modules for now.
-    let recs = crate::modules::analytics::recommendations::service::
-        get_recommendations_ai(user_id, pool, limit)
-        .await?;
+    let recs = crate::modules::analytics::recommendations::service::get_recommendations_ai(
+        user_id, pool, limit,
+    )
+    .await?;
 
     // Convert concrete Recommendation type from modules to domain Recommendation
     let out: Vec<Recommendation> = recs

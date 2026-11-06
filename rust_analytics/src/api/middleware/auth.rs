@@ -1,9 +1,13 @@
 use crate::shared::error::AnalyticsError;
+use actix_web::{
+    body::EitherBody,
+    dev::{Service, ServiceRequest, ServiceResponse, Transform},
+    Error, ResponseError,
+};
+use futures_util::future::{ok, LocalBoxFuture, Ready};
 use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
 use std::env;
-use actix_web::{body::EitherBody, dev::{Service, ServiceRequest, ServiceResponse, Transform}, Error, ResponseError};
-use futures_util::future::{ok, LocalBoxFuture, Ready};
 
 pub type AnalyticsResult<T> = std::result::Result<T, AnalyticsError>;
 
@@ -78,7 +82,10 @@ where
     type Error = Error;
     type Future = LocalBoxFuture<'static, std::result::Result<Self::Response, Self::Error>>;
 
-    fn poll_ready(&self, cx: &mut std::task::Context<'_>) -> std::task::Poll<std::result::Result<(), Self::Error>> {
+    fn poll_ready(
+        &self,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<std::result::Result<(), Self::Error>> {
         self.service.poll_ready(cx)
     }
 
@@ -112,7 +119,9 @@ where
                     match validate_token(token) {
                         Ok(_claims) => {
                             let fut = self.service.call(req);
-                            return Box::pin(async move { fut.await.map(|res| res.map_into_left_body()) });
+                            return Box::pin(async move {
+                                fut.await.map(|res| res.map_into_left_body())
+                            });
                         }
                         Err(e) => {
                             eprintln!("Token validation error: {}", e);
@@ -125,7 +134,8 @@ where
             }
         }
 
-        let error = AnalyticsError::AuthenticationFailed("Missing or invalid authentication".to_string());
+        let error =
+            AnalyticsError::AuthenticationFailed("Missing or invalid authentication".to_string());
         let res = req.into_response(error.error_response());
         Box::pin(async { Ok(res.map_into_right_body()) })
     }

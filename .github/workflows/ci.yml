@@ -78,6 +78,10 @@ jobs:
         working-directory: backend
         run: pnpm prisma generate
 
+      - name: Generate gRPC TypeScript client
+        working-directory: backend
+        run: pnpm run generate:proto
+
       - name: Lint changed backend TypeScript files
         working-directory: backend
         env:
@@ -166,6 +170,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/medtrack_test
+      DIRECT_URL: postgresql://postgres:postgres@localhost:5432/medtrack_test
 
     services:
       postgres:
@@ -183,6 +188,24 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v3
+        with:
+          version: "11.17.0"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.23.1"
+          cache: pnpm
+          cache-dependency-path: backend/pnpm-lock.yaml
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: pnpm install --frozen-lockfile
+
+      - name: Apply database migrations for Rust checks
+        working-directory: backend
+        run: pnpm prisma migrate deploy
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable

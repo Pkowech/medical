@@ -35,14 +35,16 @@ impl AppConfig {
     pub fn from_env() -> Result<Self, String> {
         dotenvy::dotenv().ok();
 
-        let database_url = env::var("DATABASE_URL").map_err(|e| format!("DATABASE_URL not set: {}", e))?;
+        let database_url =
+            env::var("DATABASE_URL").map_err(|e| format!("DATABASE_URL not set: {}", e))?;
         let grpc_host = required_env("RUST_ANALYTICS_GRPC_HOST")?;
         let grpc_port = required_env("RUST_ANALYTICS_GRPC_PORT")?;
         let http_host = required_env("RUST_ANALYTICS_HOST")?;
         let http_port = env::var("PORT")
             .or_else(|_| env::var("RUST_ANALYTICS_PORT"))
             .map_err(|_| "PORT or RUST_ANALYTICS_PORT not set".to_string())?;
-        let jwt_secret = env::var("JWT_SECRET").map_err(|e| format!("JWT_SECRET not set: {}", e))?;
+        let jwt_secret =
+            env::var("JWT_SECRET").map_err(|e| format!("JWT_SECRET not set: {}", e))?;
         let rust_api_key = env::var("RUST_ANALYTICS_API_KEY").unwrap_or_default();
 
         let bkt_strength_threshold = env::var("BKT_STRENGTH_THRESHOLD")
@@ -64,8 +66,14 @@ impl AppConfig {
 
         Ok(AppConfig {
             database: DatabaseConfig { url: database_url },
-            grpc: GrpcConfig { host: grpc_host, port: grpc_port },
-            http: HttpConfig { host: http_host, port: http_port },
+            grpc: GrpcConfig {
+                host: grpc_host,
+                port: grpc_port,
+            },
+            http: HttpConfig {
+                host: http_host,
+                port: http_port,
+            },
             jwt_secret,
             rust_api_key,
             bkt_strength_threshold,

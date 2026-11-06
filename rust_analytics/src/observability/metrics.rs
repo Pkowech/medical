@@ -1,30 +1,45 @@
-use prometheus::{Encoder, IntCounter, IntCounterVec, Opts, Registry, TextEncoder, GaugeVec};
 use once_cell::sync::Lazy;
+use prometheus::{Encoder, GaugeVec, IntCounter, IntCounterVec, Opts, Registry, TextEncoder};
 // use std::collections::HashMap; // Not used
 
 static REGISTRY: Lazy<Registry> = Lazy::new(|| Registry::new());
 
 static BKT_GAPS_DERIVED: Lazy<IntCounter> = Lazy::new(|| {
-    let c = IntCounter::with_opts(Opts::new("bkt_gaps_derived_total", "Number of times BKT gaps were used to derive recommendations")).unwrap();
+    let c = IntCounter::with_opts(Opts::new(
+        "bkt_gaps_derived_total",
+        "Number of times BKT gaps were used to derive recommendations",
+    ))
+    .unwrap();
     REGISTRY.register(Box::new(c.clone())).unwrap();
     c
 });
 
 static BKT_UPDATE_TOTAL: Lazy<IntCounter> = Lazy::new(|| {
-    let c = IntCounter::with_opts(Opts::new("bkt_update_total", "Total number of BKT updates performed")).unwrap();
+    let c = IntCounter::with_opts(Opts::new(
+        "bkt_update_total",
+        "Total number of BKT updates performed",
+    ))
+    .unwrap();
     REGISTRY.register(Box::new(c.clone())).unwrap();
     c
 });
 
 static BKT_UPDATE_IMPROVEMENT_TOTAL: Lazy<IntCounter> = Lazy::new(|| {
-    let c = IntCounter::with_opts(Opts::new("bkt_update_improvement_total", "Number of BKT updates where p_known increased")).unwrap();
+    let c = IntCounter::with_opts(Opts::new(
+        "bkt_update_improvement_total",
+        "Number of BKT updates where p_known increased",
+    ))
+    .unwrap();
     REGISTRY.register(Box::new(c.clone())).unwrap();
     c
 });
 
 static ADAPTIVE_QUESTION_SELECTED: Lazy<IntCounterVec> = Lazy::new(|| {
     let c = IntCounterVec::new(
-        Opts::new("adaptive_question_selected_total", "Adaptive questions selected count"),
+        Opts::new(
+            "adaptive_question_selected_total",
+            "Adaptive questions selected count",
+        ),
         &["topic"],
     )
     .unwrap();
@@ -33,13 +48,21 @@ static ADAPTIVE_QUESTION_SELECTED: Lazy<IntCounterVec> = Lazy::new(|| {
 });
 
 static LINFA_PREDICTION_TOTAL: Lazy<IntCounter> = Lazy::new(|| {
-    let c = IntCounter::with_opts(Opts::new("linfa_prediction_total", "Total number of Linfa predictions performed")).unwrap();
+    let c = IntCounter::with_opts(Opts::new(
+        "linfa_prediction_total",
+        "Total number of Linfa predictions performed",
+    ))
+    .unwrap();
     REGISTRY.register(Box::new(c.clone())).unwrap();
     c
 });
 
 static LINFA_FAILURE_TOTAL: Lazy<IntCounter> = Lazy::new(|| {
-    let c = IntCounter::with_opts(Opts::new("linfa_failure_total", "Linfa prediction failures (errors)")).unwrap();
+    let c = IntCounter::with_opts(Opts::new(
+        "linfa_failure_total",
+        "Linfa prediction failures (errors)",
+    ))
+    .unwrap();
     REGISTRY.register(Box::new(c.clone())).unwrap();
     c
 });
@@ -71,7 +94,10 @@ pub fn inc_linfa_failure() {
 // GaugeVec to track aggregated BKT skill average p_known values per skill
 static BKT_SKILL_AVG: Lazy<GaugeVec> = Lazy::new(|| {
     let g = GaugeVec::new(
-        Opts::new("bkt_skill_average_p_known", "Average p_known per skill as tracked by BKT"),
+        Opts::new(
+            "bkt_skill_average_p_known",
+            "Average p_known per skill as tracked by BKT",
+        ),
         &["skill"],
     )
     .unwrap();
@@ -106,4 +132,3 @@ mod tests {
         assert!(out.contains("adaptive_question_selected_total"));
     }
 }
-

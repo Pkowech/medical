@@ -3,34 +3,33 @@ mod inner {
 
     use crate::analytics_proto::{
         analytics_service_server::AnalyticsService, AnalyzeQuestionDifficultyRequest,
-        AnalyzeQuestionDifficultyResponse, AttemptMetricsRequest, BatchEventRequest,
-        AssessmentPerformanceAnalyticsRequest, AssessmentPerformanceAnalyticsResponse,
+        AnalyzeQuestionDifficultyResponse, AssessmentPerformanceAnalyticsRequest,
+        AssessmentPerformanceAnalyticsResponse, AttemptMetricsRequest, BatchEventRequest,
         BatchEventResponse, CalculateCourseProgressRequest, CohortAnalyticsResponse,
-        CollaborativeRecommendationRequest, CollaborativeRecommendationResponse, CourseProgress,
-        CourseStatsResultResponse, DueCard, FocusArea, GetCohortAnalyticsRequest,
-        GetCourseStatisticsRequest, GetCourseAnalyticsRequest, CourseAnalyticsResponse,
-        GetDetailedLearningAnalyticsRequest,
-        GetDetailedLearningAnalyticsResponse, GetDueCardsRequest, GetDueCardsResponse,
-        GetEngagementMetricsRequest, GetEngagementMetricsResponse, GetFocusCorrelationRequest,
-        GetStudyPatternsRequest, GetStudyPatternsResponse,
-        GetFocusCorrelationResponse, GetFocusRecommendationsRequest,
-        GetFocusRecommendationsResponse, GetGoalAnalyticsRequest, GetLearningPathStatisticsRequest,
-        UnifiedRecommendationsRequest, UnifiedRecommendationsResponse,
-        GetSystemAnalyticsRequest, GetSystemAnalyticsResponse, ProgressRecord,
-        ProgressRecordsRequest, ProgressRecordsResponse, ProcessAnalyticsForUsersRequest,
-        ProcessAnalyticsForUsersResponse,
-        GetNextAdaptiveQuestionRequest, GetNextAdaptiveQuestionResponse, GetRecommendationsRequest,
-        GetRecommendationsResponse, GetSpacedRepetitionStatsRequest,
-        GetSpacedRepetitionStatsResponse, GetUserAbilityRequest, GetUserAbilityResponse,
-        GetUserDataForProfileRequest, GetUserDataForProfileResponse, GetUserFeatureVectorRequest,
-        GetUserFeatureVectorResponse, GetUserLearningSummaryRequest, HealthRequest, HealthResponse,
+        CollaborativeRecommendationRequest, CollaborativeRecommendationResponse,
+        CourseAnalyticsResponse, CourseProgress, CourseStatsResultResponse, DueCard, FocusArea,
+        GetCohortAnalyticsRequest, GetCourseAnalyticsRequest, GetCourseStatisticsRequest,
+        GetDetailedLearningAnalyticsRequest, GetDetailedLearningAnalyticsResponse,
+        GetDueCardsRequest, GetDueCardsResponse, GetEngagementMetricsRequest,
+        GetEngagementMetricsResponse, GetFocusCorrelationRequest, GetFocusCorrelationResponse,
+        GetFocusRecommendationsRequest, GetFocusRecommendationsResponse, GetGoalAnalyticsRequest,
+        GetLearningPathStatisticsRequest, GetNextAdaptiveQuestionRequest,
+        GetNextAdaptiveQuestionResponse, GetRecommendationsRequest, GetRecommendationsResponse,
+        GetSpacedRepetitionStatsRequest, GetSpacedRepetitionStatsResponse, GetStudyPatternsRequest,
+        GetStudyPatternsResponse, GetSystemAnalyticsRequest, GetSystemAnalyticsResponse,
+        GetUserAbilityRequest, GetUserAbilityResponse, GetUserDataForProfileRequest,
+        GetUserDataForProfileResponse, GetUserFeatureVectorRequest, GetUserFeatureVectorResponse,
+        GetUserLearningSummaryRequest, HealthRequest, HealthResponse,
         LearningGoalAnalyticsResponse, LearningPathStatsResultResponse, NextStepsRequest,
         NextStepsResponse, PathAnalyticsRequest, PathAnalyticsResponse, PredictBktRequest,
         PredictBktResponse, PredictBurnRequest, PredictBurnResponse, PredictPerformanceRequest,
-        PredictPerformanceResponse, QuizAttemptHistoryRequest, QuizAttemptHistoryResponse,
+        PredictPerformanceResponse, ProcessAnalyticsForUsersRequest,
+        ProcessAnalyticsForUsersResponse, ProgressRecord, ProgressRecordsRequest,
+        ProgressRecordsResponse, QuizAttemptHistoryRequest, QuizAttemptHistoryResponse,
         RelatedResourcesRequest, RelatedResourcesResponse, SpacedRepetitionStatsProto,
         StudyRecommendationsRequest, StudyRecommendationsResponse, TrendingPathsRequest,
-        TrendingPathsResponse, UpdateAttemptMetricsResponse, UpdateBktRequest, UpdateBktResponse,
+        TrendingPathsResponse, UnifiedRecommendationsRequest, UnifiedRecommendationsResponse,
+        UpdateAttemptMetricsResponse, UpdateBktRequest, UpdateBktResponse,
         UserLearningSummaryResponse,
     };
 
@@ -301,7 +300,9 @@ mod inner {
             let analytics =
                 crate::modules::analytics::system::analytics::get_system_analytics(&self.pool)
                     .await
-                    .map_err(|error| Status::internal(format!("System analytics failed: {error}")))?;
+                    .map_err(|error| {
+                        Status::internal(format!("System analytics failed: {error}"))
+                    })?;
 
             Ok(Response::new(GetSystemAnalyticsResponse {
                 total_users: analytics.total_users,
@@ -351,12 +352,13 @@ mod inner {
             request: Request<ProcessAnalyticsForUsersRequest>,
         ) -> Result<Response<ProcessAnalyticsForUsersResponse>, Status> {
             let request = request.into_inner();
-            let result = crate::modules::analytics::core::batch_processing::process_analytics_for_users(
-                &self.pool,
-                &request.user_ids,
-            )
-            .await
-            .map_err(|error| Status::internal(format!("Batch analytics failed: {error}")))?;
+            let result =
+                crate::modules::analytics::core::batch_processing::process_analytics_for_users(
+                    &self.pool,
+                    &request.user_ids,
+                )
+                .await
+                .map_err(|error| Status::internal(format!("Batch analytics failed: {error}")))?;
 
             crate::modules::analytics::core::batch_processing::update_bkt_skill_avg_metrics(
                 &self.pool,

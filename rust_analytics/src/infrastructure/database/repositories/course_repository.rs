@@ -60,15 +60,15 @@ impl CourseRepository for PostgresCourseRepository {
             .into_iter()
             .map(|row| {
                 let unit_id: String = row.try_get("id").unwrap_or_default();
-                    let completed: i64 = row.try_get("completed_count").unwrap_or(0);
-                    let total: i64 = row.try_get("total_count").unwrap_or(0);
-                    let time_spent: i64 = row.try_get("time_spent").unwrap_or(0);
+                let completed: i64 = row.try_get("completed_count").unwrap_or(0);
+                let total: i64 = row.try_get("total_count").unwrap_or(0);
+                let time_spent: i64 = row.try_get("time_spent").unwrap_or(0);
                 let last_access: Option<chrono::NaiveDateTime> = row.try_get("last_access").ok();
                 UnitProgress {
                     unit_id,
-                        completed_count: completed.min(i32::MAX as i64) as i32,
-                        total_count: total.min(i32::MAX as i64) as i32,
-                        time_spent: time_spent.min(i32::MAX as i64) as i32,
+                    completed_count: completed.min(i32::MAX as i64) as i32,
+                    total_count: total.min(i32::MAX as i64) as i32,
+                    time_spent: time_spent.min(i32::MAX as i64) as i32,
                     last_access: last_access.map(|dt| dt.and_utc()),
                 }
             })
@@ -156,9 +156,7 @@ impl CourseRepository for PostgresCourseRepository {
     }
 
     async fn count_total_courses(&self, user_id: &str) -> Result<i32, AnalyticsError> {
-        sqlx::query_scalar::<_, i64>(
-            "SELECT COUNT(*) FROM course_enrollments WHERE user_id = $1",
-        )
+        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM course_enrollments WHERE user_id = $1")
             .bind(user_id)
             .fetch_one(&*self.pool)
             .await

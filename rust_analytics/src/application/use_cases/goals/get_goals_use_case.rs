@@ -1,6 +1,5 @@
 /// Get Learning Goals Use Case
 /// Retrieves user's learning goals and upcoming deadlines
-
 use crate::application::dtos::goals::{GoalsRequest, GoalsResponse};
 use crate::domain::repositories::GoalRepository;
 use crate::shared::error::AnalyticsError;
@@ -61,7 +60,6 @@ impl GetGoalsUseCase {
                 }
             })
             .collect();
-
 
         let total_goals = filtered_goals.len() as i32;
         Ok(GoalsResponse {

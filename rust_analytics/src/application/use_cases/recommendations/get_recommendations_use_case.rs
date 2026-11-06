@@ -1,6 +1,5 @@
 /// Get Recommendations Use Case
 /// Retrieves personalized learning-path recommendations for a user.
-
 use crate::domain::repositories::RecommendationRepository;
 use crate::modules::analytics::recommendations::service::Recommendation as ModuleRecommendation;
 use crate::shared::error::AnalyticsError;
@@ -37,7 +36,9 @@ pub struct GetRecommendationsUseCase {
 
 impl GetRecommendationsUseCase {
     pub fn new(recommendation_repository: Arc<dyn RecommendationRepository>) -> Self {
-        Self { recommendation_repository }
+        Self {
+            recommendation_repository,
+        }
     }
 
     pub async fn execute(

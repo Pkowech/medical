@@ -63,7 +63,7 @@ pub async fn store_batch_events(
     for event in events {
         // Generate a unique ID for the event
         let event_id = Uuid::new_v4().to_string();
-        
+
         // Parse timestamp
         let timestamp = DateTime::parse_from_rfc3339(&event.timestamp)
             .map(|dt| dt.with_timezone(&Utc))

@@ -1,18 +1,18 @@
 //! Example queries using sqlx compile-time checking
-//! 
+//!
 //! These queries are verified against the actual database schema at compile time.
 //! This ensures type safety and prevents runtime errors from invalid SQL.
 
+use chrono::{DateTime, NaiveDateTime, Utc};
 use sqlx::{Pool, Postgres, Row};
-use chrono::{DateTime, Utc, NaiveDateTime};
 
 /// Fetch a user's course progress
-/// 
+///
 /// # Arguments
 /// * `pool` - Database connection pool
 /// * `user_id` - User identifier
 /// * `course_id` - Course identifier
-/// 
+///
 /// # Returns
 /// Result with course progress data or error
 pub async fn get_course_progress(
@@ -38,7 +38,7 @@ pub async fn get_course_progress(
                 ce.enrolled_at AS created_at,
                 COALESCE(ce.last_accessed, ce.enrolled_at) AS updated_at
          FROM course_enrollments ce
-         WHERE ce.user_id = $1 AND ce.course_id = $2"
+         WHERE ce.user_id = $1 AND ce.course_id = $2",
     )
     .bind(user_id)
     .bind(course_id)
@@ -63,11 +63,11 @@ pub async fn get_course_progress(
 }
 
 /// Fetch all courses a user is enrolled in
-/// 
+///
 /// # Arguments
 /// * `pool` - Database connection pool
 /// * `user_id` - User identifier
-/// 
+///
 /// # Returns
 /// Vector of user's course enrollments
 pub async fn get_user_courses(
@@ -80,7 +80,7 @@ pub async fn get_user_courses(
          FROM course_enrollments ce
          JOIN courses c ON ce.course_id = c.id
          WHERE ce.user_id = $1
-         ORDER BY ce.enrolled_at DESC"
+         ORDER BY ce.enrolled_at DESC",
     )
     .bind(user_id)
     .fetch_all(pool)
@@ -104,7 +104,7 @@ pub async fn get_user_courses(
 }
 
 /// Update course progress percentage
-/// 
+///
 /// # Arguments
 /// * `pool` - Database connection pool
 /// * `course_progress_id` - Course progress record ID
@@ -115,9 +115,9 @@ pub async fn update_course_progress(
     progress_percentage: i32,
 ) -> Result<u64, sqlx::Error> {
     let result = sqlx::query(
-           "UPDATE course_enrollments
+        "UPDATE course_enrollments
             SET progress_percentage = $1
-            WHERE id = $2"
+            WHERE id = $2",
     )
     .bind(progress_percentage)
     .bind(course_progress_id)
@@ -128,7 +128,7 @@ pub async fn update_course_progress(
 }
 
 /// Fetch user's recent study activity
-/// 
+///
 /// # Arguments
 /// * `pool` - Database connection pool
 /// * `user_id` - User identifier
@@ -143,7 +143,7 @@ pub async fn get_user_study_activity(
          FROM user_activity 
          WHERE user_id = $1 
          ORDER BY created_at DESC 
-         LIMIT $2"
+         LIMIT $2",
     )
     .bind(user_id)
     .bind(limit as i64)
@@ -170,7 +170,7 @@ pub async fn count_completed_courses(
     let result = sqlx::query(
         "SELECT COUNT(*) as count 
          FROM course_enrollments
-         WHERE user_id = $1 AND status::text = 'completed'"
+         WHERE user_id = $1 AND status::text = 'completed'",
     )
     .bind(user_id)
     .fetch_one(pool)

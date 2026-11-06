@@ -5,8 +5,11 @@ pub mod quiz;
 
 // Re-export models
 pub use course::{CourseProgress, CourseStatsResult, UnitProgress};
-pub use goal::{Goal, LearningGoalProgress, GoalAnalyticsResult, UpcomingDeadline};
-pub use learning_path::{LearningPath, PathProgress, PathUnit, RecommendedPath, LearningPathProgress, LearningPathStatsResult, PhaseProgress};
+pub use goal::{Goal, GoalAnalyticsResult, LearningGoalProgress, UpcomingDeadline};
+pub use learning_path::{
+    LearningPath, LearningPathProgress, LearningPathStatsResult, PathProgress, PathUnit,
+    PhaseProgress, RecommendedPath,
+};
 
 // domain/models: re-export analytics models so domain-level code can import them
 #[cfg(feature = "ml")]

@@ -16,26 +16,26 @@ pub mod config;
 pub mod domain;
 pub mod infrastructure;
 pub mod modules;
+pub mod observability;
 #[cfg(feature = "ml")]
 pub mod services;
-pub mod observability;
 pub mod shared;
 
 // Re-export commonly used items
-pub use shared::error::{AnalyticsError, Result};
-pub use infrastructure::database::init_pool;
-pub use api::middleware::Auth;
 pub use api::middleware::auth::validate_token;
+pub use api::middleware::Auth;
+pub use infrastructure::database::init_pool;
 #[cfg(feature = "ml")]
 pub use modules::analytics;
+pub use shared::error::{AnalyticsError, Result};
 
 // Import generated gRPC code (disabled due to tonic compatibility)
 pub mod analytics_proto {
     tonic::include_proto!("analytics");
 }
-use analytics_proto::analytics_service_server::AnalyticsServiceServer;
 use crate::api::grpc::MyAnalyticsService;
 use crate::observability::metrics as obs_metrics;
+use analytics_proto::analytics_service_server::AnalyticsServiceServer;
 
 fn required_env(name: &str) -> std::io::Result<String> {
     env::var(name).map_err(|_| {
@@ -299,20 +299,18 @@ fn parse_uci_student_dropout(
             Some(value) => return Err(format!("Invalid target value {value:?} in dataset")),
             None => return Err("Dataset row is missing Target".to_string()),
         };
-        let parse_number = |column: usize,
-                            name: &str,
-                            max: f32|
-         -> std::result::Result<f32, String> {
-            let value = record
-                .get(column)
-                .ok_or_else(|| format!("Dataset row is missing {name}"))?
-                .parse::<f32>()
-                .map_err(|error| format!("Invalid {name} in dataset: {error}"))?;
-            if !value.is_finite() || !(0.0..=max).contains(&value) {
-                return Err(format!("{name} must be between 0 and {max}"));
-            }
-            Ok(value / max)
-        };
+        let parse_number =
+            |column: usize, name: &str, max: f32| -> std::result::Result<f32, String> {
+                let value = record
+                    .get(column)
+                    .ok_or_else(|| format!("Dataset row is missing {name}"))?
+                    .parse::<f32>()
+                    .map_err(|error| format!("Invalid {name} in dataset: {error}"))?;
+                if !value.is_finite() || !(0.0..=max).contains(&value) {
+                    return Err(format!("{name} must be between 0 and {max}"));
+                }
+                Ok(value / max)
+            };
 
         features.push(vec![
             parse_number(indexes[0], UCI_DROPOUT_FEATURE_NAMES[0], 26.0)?,
@@ -432,14 +430,13 @@ fn train_binary_benchmark(
         .iter()
         .map(|&index| labels[index])
         .collect();
-    let (weights, bias) =
-        crate::modules::analytics::models::burn_model::train_linear_model(
-            training_features,
-            training_labels,
-            2000,
-            0.05,
-        )
-        .ok_or_else(|| "Model training rejected the dataset".to_string())?;
+    let (weights, bias) = crate::modules::analytics::models::burn_model::train_linear_model(
+        training_features,
+        training_labels,
+        2000,
+        0.05,
+    )
+    .ok_or_else(|| "Model training rejected the dataset".to_string())?;
 
     let validation_labels: Vec<f32> = validation_indexes
         .iter()
@@ -572,29 +569,31 @@ async fn predict_success_rate_handler(
         None => None,
     };
     let model_id = model_id.unwrap_or(user_id);
-    let model_path = match sqlx::query_scalar::<_, String>(
-        r#"SELECT path FROM ml_models
+    let model_path =
+        match sqlx::query_scalar::<_, String>(
+            r#"SELECT path FROM ml_models
            WHERE id = $1 AND is_active = TRUE AND "type" = $2"#,
-    )
-    .bind(model_id.to_string())
-    .bind("logistic_regression")
-    .fetch_optional(pool.get_ref())
-    .await
-    {
-        Ok(Some(path)) => path,
-        Ok(None) => {
-            return HttpResponse::ServiceUnavailable().json(serde_json::json!({
+        )
+        .bind(model_id.to_string())
+        .bind("logistic_regression")
+        .fetch_optional(pool.get_ref())
+        .await
+        {
+            Ok(Some(path)) => path,
+            Ok(None) => return HttpResponse::ServiceUnavailable().json(serde_json::json!({
                 "error": "No active trained prediction model is registered for this user or modelId"
-            }))
-        }
-        Err(error) => {
-            eprintln!("Failed to resolve prediction model: {error}");
-            return HttpResponse::InternalServerError().json(serde_json::json!({
-                "error": "Failed to resolve prediction model"
-            }));
-        }
-    };
-    match crate::modules::analytics::models::burn_model::predict_with_saved_model(input, &model_path) {
+            })),
+            Err(error) => {
+                eprintln!("Failed to resolve prediction model: {error}");
+                return HttpResponse::InternalServerError().json(serde_json::json!({
+                    "error": "Failed to resolve prediction model"
+                }));
+            }
+        };
+    match crate::modules::analytics::models::burn_model::predict_with_saved_model(
+        input,
+        &model_path,
+    ) {
         Ok(prediction) => HttpResponse::Ok().json(serde_json::json!({
             "userId": user_id.to_string(),
             "modelId": model_id.to_string(),
@@ -785,7 +784,10 @@ async fn train_uci_student_benchmark_handler(
                 .json(serde_json::json!({"error": "Failed to download UCI dataset"}));
         }
     };
-    if response.content_length().is_some_and(|length| length > 2_000_000) {
+    if response
+        .content_length()
+        .is_some_and(|length| length > 2_000_000)
+    {
         return HttpResponse::BadGateway()
             .json(serde_json::json!({"error": "UCI dataset exceeds the 2 MB size limit"}));
     }
@@ -810,8 +812,9 @@ async fn train_uci_student_benchmark_handler(
         Ok(dataset) => dataset,
         Err(error) => {
             eprintln!("UCI dataset validation failed: {error}");
-            return HttpResponse::BadGateway()
-                .json(serde_json::json!({"error": "UCI dataset did not match the expected schema"}));
+            return HttpResponse::BadGateway().json(
+                serde_json::json!({"error": "UCI dataset did not match the expected schema"}),
+            );
         }
     };
     let trained_model = match train_uci_student_benchmark(&features, &labels) {
@@ -830,13 +833,11 @@ async fn train_uci_student_benchmark_handler(
         return HttpResponse::InternalServerError()
             .json(serde_json::json!({"error": "Failed to prepare model storage"}));
     }
-    if let Err(error) =
-        crate::modules::analytics::models::burn_model::save_model(
-            &model_path,
-            &trained_model.weights,
-            trained_model.bias,
-        )
-    {
+    if let Err(error) = crate::modules::analytics::models::burn_model::save_model(
+        &model_path,
+        &trained_model.weights,
+        trained_model.bias,
+    ) {
         eprintln!("Failed to save benchmark model: {error}");
         return HttpResponse::InternalServerError()
             .json(serde_json::json!({"error": "Failed to save trained model"}));
@@ -918,7 +919,10 @@ async fn train_uci_student_dropout_benchmark_handler(
             }));
         }
     };
-    if response.content_length().is_some_and(|length| length > 2_000_000) {
+    if response
+        .content_length()
+        .is_some_and(|length| length > 2_000_000)
+    {
         return HttpResponse::BadGateway().json(serde_json::json!({
             "error": "UCI dropout dataset exceeds the 2 MB size limit"
         }));
@@ -1047,9 +1051,15 @@ async fn get_collaborative_recommendations_handler(
     let user_id = match http_req.headers().get("x-user-id") {
         Some(id) => match id.to_str() {
             Ok(s) => s.to_string(),
-            Err(_) => return HttpResponse::BadRequest().json(serde_json::json!({"error": "Invalid x-user-id header format"})),
+            Err(_) => {
+                return HttpResponse::BadRequest()
+                    .json(serde_json::json!({"error": "Invalid x-user-id header format"}))
+            }
         },
-        None => return HttpResponse::Unauthorized().json(serde_json::json!({"error": "Missing x-user-id header"})),
+        None => {
+            return HttpResponse::Unauthorized()
+                .json(serde_json::json!({"error": "Missing x-user-id header"}))
+        }
     };
 
     match crate::modules::analytics::recommendations::collaborative::get_collaborative_recommendations(
@@ -1075,8 +1085,11 @@ async fn get_trending_paths_handler(
     pool: web::Data<Pool<Postgres>>,
     req: web::Query<LimitRequest>,
 ) -> impl Responder {
-    match crate::modules::analytics::recommendations::service::get_trending_paths(req.limit as i64, pool.get_ref())
-        .await
+    match crate::modules::analytics::recommendations::service::get_trending_paths(
+        req.limit as i64,
+        pool.get_ref(),
+    )
+    .await
     {
         Ok(trending_paths) => HttpResponse::Ok().json(trending_paths),
         Err(e) => {
@@ -1206,15 +1219,16 @@ async fn predict_performance_handler(
     pool: web::Data<Pool<Postgres>>,
     req: web::Json<UserSkillRequest>,
 ) -> impl Responder {
-    let skill_repo = crate::infrastructure::database::repositories::PostgresSkillStateRepository::new(
-        std::sync::Arc::new(pool.get_ref().clone()),
-    );
-    let quiz_repo = crate::infrastructure::database::repositories::quiz_repository::PostgresQuizRepository::new(
-        std::sync::Arc::new(pool.get_ref().clone()),
-    );
+    let skill_repo =
+        crate::infrastructure::database::repositories::PostgresSkillStateRepository::new(
+            std::sync::Arc::new(pool.get_ref().clone()),
+        );
+    let quiz_repo =
+        crate::infrastructure::database::repositories::quiz_repository::PostgresQuizRepository::new(
+            std::sync::Arc::new(pool.get_ref().clone()),
+        );
     let use_case = crate::application::use_cases::performance::PredictPerformanceUseCase::new(
-        skill_repo,
-        quiz_repo,
+        skill_repo, quiz_repo,
     );
     let request = crate::application::use_cases::performance::PredictPerformanceRequest {
         user_id: req.user_id.clone(),
@@ -1242,7 +1256,9 @@ async fn get_performance_analytics_handler(
     pool: web::Data<Pool<Postgres>>,
     req: web::Json<UserIdRequest>,
 ) -> impl Responder {
-    match crate::domain::services::get_performance_analytics(&req.user_id, None, pool.get_ref()).await {
+    match crate::domain::services::get_performance_analytics(&req.user_id, None, pool.get_ref())
+        .await
+    {
         Ok(analytics) => HttpResponse::Ok().json(analytics),
         Err(e) => {
             eprintln!("Error getting performance analytics: {}", e);
@@ -1279,7 +1295,9 @@ async fn analyze_study_patterns_handler(
     req: web::Json<UserIdRequest>,
 ) -> impl Responder {
     let learning_history =
-        match crate::modules::analytics::data::get_learning_history(&req.user_id, pool.get_ref()).await {
+        match crate::modules::analytics::data::get_learning_history(&req.user_id, pool.get_ref())
+            .await
+        {
             Ok(history) => history,
             Err(e) => {
                 eprintln!("Error fetching learning history: {}", e);
@@ -1339,10 +1357,11 @@ async fn analyze_study_patterns_handler(
         }
     };
 
-    let patterns = crate::modules::analytics::engagement::learning_patterns::analyze_learning_patterns(
-        &study_df,
-        &quizzes_df,
-    );
+    let patterns =
+        crate::modules::analytics::engagement::learning_patterns::analyze_learning_patterns(
+            &study_df,
+            &quizzes_df,
+        );
     HttpResponse::Ok().json(patterns)
 }
 
@@ -1436,24 +1455,30 @@ async fn process_analytics_for_users_handler(
     pool: web::Data<Pool<Postgres>>,
     req: web::Json<UserIdsRequest>,
 ) -> impl Responder {
-    let response = match crate::modules::analytics::core::batch_processing::process_analytics_for_users(
-        pool.get_ref(),
-        &req.user_ids,
-    )
-    .await
-    {
-        Ok(result) => HttpResponse::Ok().json(result),
-        Err(e) => {
-            eprintln!("Error processing analytics: {}", e);
-            HttpResponse::InternalServerError().json(serde_json::json!({
-                "error": "Failed to process analytics",
-                "details": e
-            }))
-        }
-    };
+    let response =
+        match crate::modules::analytics::core::batch_processing::process_analytics_for_users(
+            pool.get_ref(),
+            &req.user_ids,
+        )
+        .await
+        {
+            Ok(result) => HttpResponse::Ok().json(result),
+            Err(e) => {
+                eprintln!("Error processing analytics: {}", e);
+                HttpResponse::InternalServerError().json(serde_json::json!({
+                    "error": "Failed to process analytics",
+                    "details": e
+                }))
+            }
+        };
 
     // Update aggregated BKT skill average metrics after processing
-    if let Err(err) = crate::modules::analytics::core::batch_processing::update_bkt_skill_avg_metrics(pool.get_ref()).await {
+    if let Err(err) =
+        crate::modules::analytics::core::batch_processing::update_bkt_skill_avg_metrics(
+            pool.get_ref(),
+        )
+        .await
+    {
         eprintln!("Failed to update BKT skill averages metrics: {}", err);
     }
 
@@ -1520,8 +1545,10 @@ async fn predict_with_burn_handler(
         features.material_interaction as f32,
     ];
     let model_path = format!("models/burn/{user_id}.mdl");
-    match crate::modules::analytics::models::burn_model::predict_with_saved_model(input, &model_path)
-    {
+    match crate::modules::analytics::models::burn_model::predict_with_saved_model(
+        input,
+        &model_path,
+    ) {
         Ok(prediction) => HttpResponse::Ok().json(serde_json::json!({
             "userId": user_id.to_string(),
             "predictionType": "trained_logistic_regression",
@@ -1840,8 +1867,7 @@ mod public_dataset_tests {
         let data = std::fs::read(path).expect("read downloaded UCI dataset");
         let (features, labels) =
             parse_uci_student_performance(&data).expect("validate official dataset");
-        let model =
-            train_uci_student_benchmark(&features, &labels).expect("train benchmark model");
+        let model = train_uci_student_benchmark(&features, &labels).expect("train benchmark model");
 
         println!("{}", model.metrics);
         assert_eq!(model.weights.len(), 8);

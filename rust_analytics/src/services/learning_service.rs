@@ -1,25 +1,20 @@
-use sqlx::{Pool, Postgres, Row};
-use tonic::{Request, Response, Status};
 use chrono::{NaiveDate, NaiveDateTime, TimeZone, Utc};
+use sqlx::{Pool, Postgres, Row};
 use std::collections::HashMap;
+use tonic::{Request, Response, Status};
 
-use crate::analytics_proto::{
-    GetUserLearningSummaryRequest, UserLearningSummaryResponse,
-    GetGoalAnalyticsRequest, LearningGoalAnalyticsResponse,
-    GetCourseStatisticsRequest, CourseStatsResultResponse, CourseStatsResult,
-    GetCourseAnalyticsRequest, CourseAnalyticsResponse, CourseUnitPopularity,
-    StrugglingStudent,
-    GetLearningPathStatisticsRequest, LearningPathStatsResultResponse, LearningPathStatsResult,
-    GetDetailedLearningAnalyticsRequest, GetDetailedLearningAnalyticsResponse,
-    CalculateCourseProgressRequest, CourseProgress,
-    GetUserDataForProfileRequest, GetUserDataForProfileResponse,
-    GetCohortAnalyticsRequest, CohortAnalyticsResponse,
-};
 use crate::analytics::learning::learning_analytics::{
-    calculate_goal_analytics,
-    calculate_user_learning_summary,
-    Goal,
-    ProgressStatus,
+    calculate_goal_analytics, calculate_user_learning_summary, Goal, ProgressStatus,
+};
+use crate::analytics_proto::{
+    CalculateCourseProgressRequest, CohortAnalyticsResponse, CourseAnalyticsResponse,
+    CourseProgress, CourseStatsResult, CourseStatsResultResponse, CourseUnitPopularity,
+    GetCohortAnalyticsRequest, GetCourseAnalyticsRequest, GetCourseStatisticsRequest,
+    GetDetailedLearningAnalyticsRequest, GetDetailedLearningAnalyticsResponse,
+    GetGoalAnalyticsRequest, GetLearningPathStatisticsRequest, GetUserDataForProfileRequest,
+    GetUserDataForProfileResponse, GetUserLearningSummaryRequest, LearningGoalAnalyticsResponse,
+    LearningPathStatsResult, LearningPathStatsResultResponse, StrugglingStudent,
+    UserLearningSummaryResponse,
 };
 
 pub struct LearningService {
@@ -63,25 +58,30 @@ impl LearningService {
 
         let mut goals = Vec::new();
         for row in rows {
-            let id: String = row.try_get("id")
+            let id: String = row
+                .try_get("id")
                 .map_err(|e| Status::internal(format!("Row error: {}", e)))?;
-            let user_id_val: String = row.try_get("user_id")
+            let user_id_val: String = row
+                .try_get("user_id")
                 .map_err(|e| Status::internal(format!("Row error: {}", e)))?;
-            let title: String = row.try_get("title")
+            let title: String = row
+                .try_get("title")
                 .map_err(|e| Status::internal(format!("Row error: {}", e)))?;
-            let status_str: String = row.try_get("status_str")
+            let status_str: String = row
+                .try_get("status_str")
                 .map_err(|e| Status::internal(format!("Row error: {}", e)))?;
             let category: Option<String> = row.try_get("category").ok();
             let priority: i32 = row.try_get("priority").unwrap_or(0);
             let target_date: Option<NaiveDate> = row.try_get("target_date").ok();
             let completed_at: Option<NaiveDateTime> = row.try_get("completed_at").ok();
-            let created_at: NaiveDateTime = row.try_get("created_at")
+            let created_at: NaiveDateTime = row
+                .try_get("created_at")
                 .map_err(|e| Status::internal(format!("Row error: {}", e)))?;
             let start_date: Option<NaiveDateTime> = row.try_get("start_date").ok();
             let streak_count: i32 = row.try_get("streak_count").unwrap_or(0);
 
-            let status = ProgressStatus::from_str(&status_str)
-                .unwrap_or(ProgressStatus::NotStarted);
+            let status =
+                ProgressStatus::from_str(&status_str).unwrap_or(ProgressStatus::NotStarted);
 
             goals.push(Goal {
                 id,
@@ -102,8 +102,7 @@ impl LearningService {
     }
 
     fn proto_goal_to_internal(g: &crate::analytics_proto::Goal) -> Goal {
-        let status = ProgressStatus::from_str(&g.status)
-            .unwrap_or(ProgressStatus::NotStarted);
+        let status = ProgressStatus::from_str(&g.status).unwrap_or(ProgressStatus::NotStarted);
 
         let target_date = if g.target_date.is_empty() {
             None
@@ -174,7 +173,8 @@ impl LearningService {
         }
 
         let user_id = req.user_id;
-        let result = calculate_user_learning_summary(&user_id, sessions_internal, attempts_internal);
+        let result =
+            calculate_user_learning_summary(&user_id, sessions_internal, attempts_internal);
 
         match result {
             Ok(summary) => {
@@ -258,13 +258,12 @@ impl LearningService {
             return Err(Status::invalid_argument("user_id required"));
         }
 
-        let total: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM course_enrollments WHERE user_id = $1"
-        )
-        .bind(&user_id)
-        .fetch_one(&self.pool)
-        .await
-        .map_err(|e| Status::internal(format!("DB error: {}", e)))?;
+        let total: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM course_enrollments WHERE user_id = $1")
+                .bind(&user_id)
+                .fetch_one(&self.pool)
+                .await
+                .map_err(|e| Status::internal(format!("DB error: {}", e)))?;
 
         let completed: i64 = sqlx::query_scalar(
             "SELECT COUNT(*) FROM course_enrollments WHERE user_id = $1 AND status::text IN ('completed', 'COMPLETED')"
@@ -280,7 +279,7 @@ impl LearningService {
              LEFT JOIN topics t ON t.id = ss.topic_id
              LEFT JOIN materials m ON m.id = ss.material_id
              JOIN units u ON u.id = COALESCE(t.unit_id, m.unit_id)
-             WHERE ss.user_id = $1"
+             WHERE ss.user_id = $1",
         )
         .bind(&user_id)
         .fetch_one(&self.pool)
@@ -288,7 +287,7 @@ impl LearningService {
         .map_err(|e| Status::internal(format!("DB error: {}", e)))?;
 
         let avg_progress: f64 = sqlx::query_scalar::<_, Option<f64>>(
-            "SELECT AVG(progress_percentage) FROM course_enrollments WHERE user_id = $1"
+            "SELECT AVG(progress_percentage) FROM course_enrollments WHERE user_id = $1",
         )
         .bind(&user_id)
         .fetch_one(&self.pool)
@@ -386,18 +385,15 @@ impl LearningService {
 
         let mut struggling_students = Vec::new();
         for user_id in enrolled_users {
-            let progress =
-                crate::modules::analytics::progress_tracking::calculate_course_progress(
-                    &self.pool,
-                    &user_id,
-                    &course_id,
-                )
-                .await
-                .map_err(|error| {
-                    Status::internal(format!(
-                        "Course progress query failed for user {user_id}: {error}"
-                    ))
-                })?;
+            let progress = crate::modules::analytics::progress_tracking::calculate_course_progress(
+                &self.pool, &user_id, &course_id,
+            )
+            .await
+            .map_err(|error| {
+                Status::internal(format!(
+                    "Course progress query failed for user {user_id}: {error}"
+                ))
+            })?;
             if progress.progress_percentage < 30 {
                 struggling_students.push(StrugglingStudent {
                     user_id,
@@ -448,13 +444,12 @@ impl LearningService {
             return Err(Status::invalid_argument("user_id required"));
         }
 
-        let total: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM learning_path_progress WHERE user_id = $1"
-        )
-        .bind(&user_id)
-        .fetch_one(&self.pool)
-        .await
-        .map_err(|e| Status::internal(format!("DB error: {}", e)))?;
+        let total: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM learning_path_progress WHERE user_id = $1")
+                .bind(&user_id)
+                .fetch_one(&self.pool)
+                .await
+                .map_err(|e| Status::internal(format!("DB error: {}", e)))?;
 
         let completed: i64 = sqlx::query_scalar(
             "SELECT COUNT(*) FROM learning_path_progress WHERE user_id = $1 AND status::text = 'completed'"
@@ -508,27 +503,33 @@ impl LearningService {
             user_id: user_id.clone(),
             goals: vec![],
         });
-        let goal_analytics = self.get_goal_analytics(goal_req).await?
+        let goal_analytics = self
+            .get_goal_analytics(goal_req)
+            .await?
             .into_inner()
             .goal_analytics;
 
         let course_req = Request::new(GetCourseStatisticsRequest {
             user_id: user_id.clone(),
         });
-        let course_stats = self.get_course_statistics(course_req).await?
+        let course_stats = self
+            .get_course_statistics(course_req)
+            .await?
             .into_inner()
             .course_stats;
 
         let path_req = Request::new(GetLearningPathStatisticsRequest {
             user_id: user_id.clone(),
         });
-        let path_stats = self.get_learning_path_statistics(path_req).await?
+        let path_stats = self
+            .get_learning_path_statistics(path_req)
+            .await?
             .into_inner()
             .path_stats;
 
         // Note: To avoid circular dependency with EngagementService, we might need to duplicate queries or share a repo query.
         // But for now, I'll direct query DB for last activity/most active hour as it was in original.
-        
+
         // Get last activity date
         let last_activity_date: Option<NaiveDateTime> = sqlx::query_scalar(
             "SELECT MAX(activity_at) FROM (
@@ -539,7 +540,7 @@ impl LearningService {
                 SELECT last_activity_date AS activity_at
                 FROM learning_path_progress
                 WHERE user_id = $1 AND last_activity_date IS NOT NULL
-            ) AS activities"
+            ) AS activities",
         )
         .bind(&user_id)
         .fetch_optional(&self.pool)
@@ -561,7 +562,7 @@ impl LearningService {
              ) AS activities
              GROUP BY EXTRACT(HOUR FROM activity_at)
              ORDER BY COUNT(*) DESC, EXTRACT(HOUR FROM activity_at) ASC
-             LIMIT 1"
+             LIMIT 1",
         )
         .bind(&user_id)
         .fetch_optional(&self.pool)
@@ -757,11 +758,12 @@ impl LearningService {
             previous_day = Some(day);
         }
 
-        let engagement_service = crate::services::engagement_service::EngagementService::new(self.pool.clone());
+        let engagement_service =
+            crate::services::engagement_service::EngagementService::new(self.pool.clone());
         let engagement_req = Request::new(crate::analytics_proto::GetEngagementMetricsRequest {
             user_id: user_id.clone(),
         });
-        
+
         let engagement = engagement_service
             .get_engagement_metrics(engagement_req)
             .await?
@@ -832,8 +834,8 @@ impl LearningService {
     }
 
     pub async fn calculate_course_progress(
-        &self, 
-        request: Request<CalculateCourseProgressRequest>
+        &self,
+        request: Request<CalculateCourseProgressRequest>,
     ) -> Result<Response<CourseProgress>, Status> {
         let req = request.into_inner();
         let user_id = req.user_id.clone();
@@ -844,9 +846,7 @@ impl LearningService {
         }
 
         let progress = crate::modules::analytics::progress_tracking::calculate_course_progress(
-            &self.pool,
-            &user_id,
-            &course_id,
+            &self.pool, &user_id, &course_id,
         )
         .await
         .map_err(|error| {
@@ -864,8 +864,8 @@ impl LearningService {
     }
 
     pub async fn get_user_data_for_profile(
-        &self, 
-        request: Request<GetUserDataForProfileRequest>
+        &self,
+        request: Request<GetUserDataForProfileRequest>,
     ) -> Result<Response<GetUserDataForProfileResponse>, Status> {
         let _req = request.into_inner();
         Ok(Response::new(GetUserDataForProfileResponse {
@@ -907,34 +907,52 @@ impl LearningService {
         ];
 
         let mut feature_map = std::collections::HashMap::new();
-        feature_map.insert("completed_materials".to_string(), features.completed_materials as f64);
+        feature_map.insert(
+            "completed_materials".to_string(),
+            features.completed_materials as f64,
+        );
         feature_map.insert("average_score".to_string(), features.average_score);
         feature_map.insert("study_time".to_string(), features.study_time as f64);
-        feature_map.insert("difficulty_preference".to_string(), features.difficulty_preference);
+        feature_map.insert(
+            "difficulty_preference".to_string(),
+            features.difficulty_preference,
+        );
         feature_map.insert("learning_style".to_string(), features.learning_style);
         feature_map.insert("engagement_level".to_string(), features.engagement_level);
         feature_map.insert("quiz_performance".to_string(), features.quiz_performance);
-        feature_map.insert("material_interaction".to_string(), features.material_interaction);
+        feature_map.insert(
+            "material_interaction".to_string(),
+            features.material_interaction,
+        );
 
-        Ok(Response::new(crate::analytics_proto::GetUserFeatureVectorResponse {
-            user_id,
-            features: feature_vector,
-            feature_map,
-        }))
+        Ok(Response::new(
+            crate::analytics_proto::GetUserFeatureVectorResponse {
+                user_id,
+                features: feature_vector,
+                feature_map,
+            },
+        ))
     }
 
     pub async fn get_path_analytics(
-        &self, 
-        request: Request<crate::analytics_proto::PathAnalyticsRequest>
+        &self,
+        request: Request<crate::analytics_proto::PathAnalyticsRequest>,
     ) -> Result<Response<crate::analytics_proto::PathAnalyticsResponse>, Status> {
         let req = request.into_inner();
-        
-        match crate::modules::analytics::reports::path_analytics::get_path_analytics(&req.path_id, &self.pool).await {
-            Ok(pa) => Ok(Response::new(crate::analytics_proto::PathAnalyticsResponse { 
-                path_id: pa.path_id, 
-                average_completion_rate: pa.average_completion_rate, 
-                average_time_to_complete: pa.average_time_to_complete 
-            })),
+
+        match crate::modules::analytics::reports::path_analytics::get_path_analytics(
+            &req.path_id,
+            &self.pool,
+        )
+        .await
+        {
+            Ok(pa) => Ok(Response::new(
+                crate::analytics_proto::PathAnalyticsResponse {
+                    path_id: pa.path_id,
+                    average_completion_rate: pa.average_completion_rate,
+                    average_time_to_complete: pa.average_time_to_complete,
+                },
+            )),
             Err(e) => Err(Status::internal(format!("path analytics failed: {}", e))),
         }
     }
@@ -958,7 +976,7 @@ impl LearningService {
                    (jsonb_array_elements(activities)->>'score')::float as quiz_score
             FROM study_sessions
             WHERE user_id = $1 AND focus_score > 0 AND activities IS NOT NULL
-            "#
+            "#,
         )
         .bind(&user_id)
         .fetch_all(&self.pool)
@@ -971,8 +989,11 @@ impl LearningService {
 
         for row in rows {
             let focus: f64 = row.try_get("focus_score").unwrap_or(0.0);
-            let quiz: f64 = row.try_get::<Option<f64>, _>("quiz_score").unwrap_or(None).unwrap_or(0.0);
-            
+            let quiz: f64 = row
+                .try_get::<Option<f64>, _>("quiz_score")
+                .unwrap_or(None)
+                .unwrap_or(0.0);
+
             focus_points.push(focus);
             quiz_points.push(quiz);
 
@@ -982,7 +1003,8 @@ impl LearningService {
                 f if f < 60.0 => "40-60",
                 f if f < 80.0 => "60-80",
                 _ => "80-100",
-            }.to_string();
+            }
+            .to_string();
 
             buckets.entry(bucket_key).or_insert(Vec::new()).push(quiz);
         }
@@ -998,14 +1020,22 @@ impl LearningService {
             let n = focus_points.len() as f64;
             let sum_x: f64 = focus_points.iter().sum();
             let sum_y: f64 = quiz_points.iter().sum();
-            let sum_xy: f64 = focus_points.iter().zip(quiz_points.iter()).map(|(x, y)| x * y).sum();
+            let sum_xy: f64 = focus_points
+                .iter()
+                .zip(quiz_points.iter())
+                .map(|(x, y)| x * y)
+                .sum();
             let sum_x2: f64 = focus_points.iter().map(|x| x * x).sum();
             let sum_y2: f64 = quiz_points.iter().map(|y| y * y).sum();
 
             let numerator = n * sum_xy - sum_x * sum_y;
             let denominator = ((n * sum_x2 - sum_x.powi(2)) * (n * sum_y2 - sum_y.powi(2))).sqrt();
 
-            if denominator == 0.0 { 0.0 } else { (numerator / denominator).max(-1.0).min(1.0) }
+            if denominator == 0.0 {
+                0.0
+            } else {
+                (numerator / denominator).max(-1.0).min(1.0)
+            }
         } else {
             0.0
         };
@@ -1015,15 +1045,18 @@ impl LearningService {
         } else if correlation_coefficient > 0.2 {
             "There's a positive trend between your focus and scores. Try to aim for longer focused sessions.".to_string()
         } else {
-            "We need more data to find a clear pattern. Try recording more focused study sessions.".to_string()
+            "We need more data to find a clear pattern. Try recording more focused study sessions."
+                .to_string()
         };
 
-        Ok(Response::new(crate::analytics_proto::GetFocusCorrelationResponse {
-            correlation: Some(crate::analytics_proto::FocusCorrelation {
-                correlation_coefficient,
-                insight,
-                avg_score_by_focus_bucket,
-            }),
-        }))
+        Ok(Response::new(
+            crate::analytics_proto::GetFocusCorrelationResponse {
+                correlation: Some(crate::analytics_proto::FocusCorrelation {
+                    correlation_coefficient,
+                    insight,
+                    avg_score_by_focus_bucket,
+                }),
+            },
+        ))
     }
 }

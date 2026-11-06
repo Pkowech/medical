@@ -1,7 +1,7 @@
-pub mod error;
-pub mod types;
 pub mod constants;
-pub mod utils;
+pub mod error;
 pub mod traits;
+pub mod types;
+pub mod utils;
 
 pub use error::{AnalyticsError, Result};

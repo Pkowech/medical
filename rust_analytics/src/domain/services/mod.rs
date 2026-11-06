@@ -1,16 +1,16 @@
 #[cfg(feature = "ml")]
-pub mod performance_service;
-pub mod recommendation_service;
-#[cfg(feature = "ml")]
 pub mod bkt_service;
 #[cfg(feature = "ml")]
 pub mod burn_model_service;
+#[cfg(feature = "ml")]
+pub mod performance_service;
+pub mod recommendation_service;
 
+#[cfg(feature = "ml")]
+pub use bkt_service::predict_bkt;
 #[cfg(feature = "ml")]
 pub use performance_service::get_performance_analytics;
 pub use recommendation_service::get_recommendations_ai;
-#[cfg(feature = "ml")]
-pub use bkt_service::predict_bkt;
 
 #[cfg(feature = "ml")]
 pub use crate::domain::services::burn_model_service::predict_with_burn;

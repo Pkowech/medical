@@ -43,8 +43,8 @@ pub mod path_analytics {
 }
 
 pub mod goals {
-    use chrono::NaiveDate;
     use crate::domain::models::Goal;
+    use chrono::NaiveDate;
 
     #[derive(Debug, Clone)]
     pub struct GoalsRequest {

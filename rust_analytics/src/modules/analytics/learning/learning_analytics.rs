@@ -543,10 +543,7 @@ fn identify_subject_strengths_weaknesses(
         .map(|(subject, (score_total, count))| (subject, score_total / count as f32))
         .collect();
 
-    subject_scores.sort_by(|a, b| {
-        b.1.partial_cmp(&a.1)
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
+    subject_scores.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
     let strongest = subject_scores
         .iter()
@@ -992,10 +989,7 @@ pub async fn get_study_sessions_db(
 }
 
 /// SQLx adapter: fetch user IDs for a cohort. Returns an empty vec when cohort_id is None.
-pub async fn get_cohort_users_db(
-    pool: &PgPool,
-    cohort_id: &str,
-) -> Result<Vec<String>> {
+pub async fn get_cohort_users_db(pool: &PgPool, cohort_id: &str) -> Result<Vec<String>> {
     if cohort_id.is_empty() {
         return Ok(Vec::new());
     }
@@ -1197,9 +1191,7 @@ pub async fn get_engagement_data_for_period_db(
 }
 
 /// Calculates cohort statistics. (Placeholder)
-pub fn get_cohort_statistics(
-    _cohort_id: Option<&str>,
-) -> Result<LearningAnalytics> {
+pub fn get_cohort_statistics(_cohort_id: Option<&str>) -> Result<LearningAnalytics> {
     Ok(LearningAnalytics {
         total_courses: 0,
         completed_courses: 0,
@@ -1229,10 +1221,7 @@ pub fn get_cohort_statistics(
 }
 
 /// Calculates percentile rank.
-pub fn calculate_percentile_rank(
-    user_score: f32,
-    all_scores: &[f32],
-) -> Result<f32> {
+pub fn calculate_percentile_rank(user_score: f32, all_scores: &[f32]) -> Result<f32> {
     if all_scores.is_empty() {
         return Err(AnalyticsError::EmptyDataset);
     }
@@ -1282,9 +1271,7 @@ pub fn calculate_trends(data_points: &[ProgressTrend]) -> (String, String, Strin
 }
 
 /// Aggregates statistics for a cohort of users.
-pub fn aggregate_stats(
-    user_stats_list: &[LearningAnalytics],
-) -> Result<LearningAnalytics> {
+pub fn aggregate_stats(user_stats_list: &[LearningAnalytics]) -> Result<LearningAnalytics> {
     if user_stats_list.is_empty() {
         return Err(AnalyticsError::EmptyDataset);
     }
@@ -1515,10 +1502,7 @@ pub struct PerformanceMetricsResult {
 ///
 /// # Returns
 /// * `Result<GoalResult>` - Goal analytics or error
-pub fn calculate_goal_analytics(
-    goals: &[Goal],
-    user_id: &str,
-) -> Result<GoalResult> {
+pub fn calculate_goal_analytics(goals: &[Goal], user_id: &str) -> Result<GoalResult> {
     if user_id.is_empty() {
         return Err(AnalyticsError::InvalidUserId);
     }
@@ -1709,7 +1693,12 @@ fn calculate_average_completion_time(goals: &[&Goal]) -> f32 {
             g.status == ProgressStatus::Completed
                 && g.completed_at.is_some()
                 && (g.start_date.is_some()
-                    || g.created_at != chrono::Utc.timestamp_opt(0, 0).single().unwrap_or_else(|| chrono::Utc::now()).naive_utc())
+                    || g.created_at
+                        != chrono::Utc
+                            .timestamp_opt(0, 0)
+                            .single()
+                            .unwrap_or_else(|| chrono::Utc::now())
+                            .naive_utc())
         })
         .copied()
         .collect();

@@ -8,7 +8,10 @@ pub struct TrendingPath {
     pub popularity: i32,
 }
 
-pub async fn get_trending_paths(limit: i32, pool: &Pool<Postgres>) -> Result<Vec<TrendingPath>, String> {
+pub async fn get_trending_paths(
+    limit: i32,
+    pool: &Pool<Postgres>,
+) -> Result<Vec<TrendingPath>, String> {
     let paths = sqlx::query_as!(
         TrendingPath,
         r#"

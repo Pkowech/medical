@@ -77,14 +77,17 @@ impl ResponseError for AnalyticsError {
             AnalyticsError::InvalidUserId => (StatusCode::BAD_REQUEST, "INVALID_USER_ID"),
             AnalyticsError::InvalidScore => (StatusCode::BAD_REQUEST, "INVALID_SCORE"),
             AnalyticsError::EmptyDataset => (StatusCode::BAD_REQUEST, "EMPTY_DATASET"),
-            AnalyticsError::CalculationError(_) => (StatusCode::INTERNAL_SERVER_ERROR, "CALCULATION_ERROR"),
+            AnalyticsError::CalculationError(_) => {
+                (StatusCode::INTERNAL_SERVER_ERROR, "CALCULATION_ERROR")
+            }
             AnalyticsError::NotFound(_) => (StatusCode::NOT_FOUND, "NOT_FOUND"),
             AnalyticsError::UserNotFound(_) => (StatusCode::NOT_FOUND, "USER_NOT_FOUND"),
             AnalyticsError::InsufficientData => (StatusCode::BAD_REQUEST, "INSUFFICIENT_DATA"),
-            AnalyticsError::DatabaseError(_) | AnalyticsError::InternalError(_) | 
-            AnalyticsError::Cache(_) | AnalyticsError::Prediction(_) | AnalyticsError::Config(_) => {
-                (StatusCode::INTERNAL_SERVER_ERROR, "INTERNAL_ERROR")
-            }
+            AnalyticsError::DatabaseError(_)
+            | AnalyticsError::InternalError(_)
+            | AnalyticsError::Cache(_)
+            | AnalyticsError::Prediction(_)
+            | AnalyticsError::Config(_) => (StatusCode::INTERNAL_SERVER_ERROR, "INTERNAL_ERROR"),
         };
 
         HttpResponse::build(status).json(serde_json::json!({
@@ -104,10 +107,11 @@ impl ResponseError for AnalyticsError {
             AnalyticsError::InsufficientData => StatusCode::BAD_REQUEST,
             AnalyticsError::CalculationError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             AnalyticsError::NotFound(_) | AnalyticsError::UserNotFound(_) => StatusCode::NOT_FOUND,
-            AnalyticsError::DatabaseError(_) | AnalyticsError::InternalError(_) |
-            AnalyticsError::Cache(_) | AnalyticsError::Prediction(_) | AnalyticsError::Config(_) => {
-                StatusCode::INTERNAL_SERVER_ERROR
-            }
+            AnalyticsError::DatabaseError(_)
+            | AnalyticsError::InternalError(_)
+            | AnalyticsError::Cache(_)
+            | AnalyticsError::Prediction(_)
+            | AnalyticsError::Config(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 }
@@ -144,4 +148,3 @@ impl From<actix_web::Error> for AnalyticsError {
 
 /// Result type alias for analytics operations.
 pub type Result<T> = std::result::Result<T, AnalyticsError>;
-
