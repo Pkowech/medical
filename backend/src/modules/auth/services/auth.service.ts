@@ -48,6 +48,22 @@ interface GoogleIdentityPayload {
   picture?: string;
 }
 
+type AuthResponseUser = Prisma.UserGetPayload<{
+  include: {
+    userRoles: { include: { role: true } };
+    securitySettings: true;
+  };
+}>;
+
+type AuthResponseOptions = {
+  forceMfaSetup?: boolean;
+  user?: AuthResponseUser;
+  systemSettings?: Awaited<
+    ReturnType<AdminSettingsService['getSettings']>
+  >;
+  isEmailVerified?: boolean;
+};
+
 /**
  * Authentication Service
  * Handles user authentication, registration, session management, and guest access
@@ -205,15 +221,17 @@ export class AuthService {
     ipAddress?: string,
     userAgent?: string,
     deviceId?: string,
-    forceMfaSetup = false,
+    options: AuthResponseOptions = {},
   ): Promise<AuthResponse> {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      include: {
-        userRoles: { include: { role: true } },
-        securitySettings: { select: { twoFactorEnabled: true } },
-      },
-    });
+    const user =
+      options.user ??
+      (await this.prisma.user.findUnique({
+        where: { id: userId },
+        include: {
+          userRoles: { include: { role: true } },
+          securitySettings: true,
+        },
+      }));
 
     if (!user) {
       throw new NotFoundException('Authenticated user no longer exists');
@@ -241,9 +259,12 @@ export class AuthService {
       user.id,
       user,
     );
-    const systemSettings = await this.adminSettingsService?.getSettings();
+    const systemSettings =
+      'systemSettings' in options
+        ? options.systemSettings
+        : await this.adminSettingsService?.getSettings();
     const mfaSetupRequired =
-      forceMfaSetup ||
+      options.forceMfaSetup ||
       Boolean(
         systemSettings?.twoFactorAuthRequired && !twoFactorEnabled,
       );
@@ -302,7 +323,9 @@ export class AuthService {
         firstName: user.firstName,
         lastName: user.lastName,
         username: user.username ?? '',
-        isEmailVerified: await this.securityService.isEmailVerified(user.id),
+        isEmailVerified:
+          options.isEmailVerified ??
+          (await this.securityService.isEmailVerified(user.id)),
         careerStage: user.careerStage,
         healthcareField: user.healthcareField,
         studyYear: user.studyYear,
@@ -450,6 +473,7 @@ export class AuthService {
               role: true,
             },
           },
+          securitySettings: true,
         },
       });
 
@@ -534,29 +558,19 @@ export class AuthService {
         throw new UnauthorizedException('Incorrect password. Please try again.');
       }
 
-      if (this.configService.get<boolean>('ENABLE_EMAIL_VERIFICATION', true)) {
-        const isEmailVerified = await this.securityService.isEmailVerified(user.id);
-        if (!isEmailVerified) {
-          throw new UnauthorizedException(
-            'Please verify your email address',
-          );
-        }
+      const isEmailVerified = Boolean(
+        user.securitySettings?.isEmailVerified,
+      );
+      if (
+        this.configService.get<boolean>('ENABLE_EMAIL_VERIFICATION', true) &&
+        !isEmailVerified
+      ) {
+        throw new UnauthorizedException(
+          'Please verify your email address',
+        );
       }
 
-      // Get security settings with error handling
-      let securitySettings = null;
-      try {
-        securitySettings = await this.securityService.getSecuritySettings(
-          user.id,
-        );
-      } catch (error: unknown) {
-        this.logger.warn(
-          `Failed to fetch security settings for user ${user.id}: ${getErrorMessage(error)}`,
-          { stack: getErrorStack(error) },
-        );
-        // Continue with null securitySettings - 2FA will be skipped
-      }
-
+      const securitySettings = user.securitySettings;
       const systemSettings = await this.adminSettingsService?.getSettings();
       if (
         systemSettings?.twoFactorAuthRequired &&
@@ -567,7 +581,12 @@ export class AuthService {
           ipAddress,
           userAgent,
           deviceId,
-          true,
+          {
+            forceMfaSetup: true,
+            user,
+            systemSettings,
+            isEmailVerified,
+          },
         );
       }
 
@@ -613,6 +632,7 @@ export class AuthService {
         ipAddress,
         userAgent,
         deviceId,
+        { user, systemSettings, isEmailVerified },
       );
     } catch (error) {
       this.logger.error(`Login error: ${getErrorMessage(error)}`, {
