@@ -3,49 +3,51 @@ import { INestApplication, Logger } from '@nestjs/common';
 import { SwaggerModule } from '@nestjs/swagger';
 import { swaggerConfig } from '../../config/swagger.config';
 import { ConfigService } from '@nestjs/config';
-import { Request, Response } from 'express';
 
-export function setupSwagger(app: INestApplication) {
-  const config = swaggerConfig;
+export function setupSwagger(app: INestApplication): void {
   const logger = new Logger('SwaggerSetup');
+  const configService = app.get(ConfigService);
 
   try {
-    // Use runtime configuration for server URLs so the root `.env` controls
-    // the Swagger server entry instead of hard-coded localhost values.
-    const configService = app.get(ConfigService);
-    const port = configService.get<number>('PORT', 3002);
-    const hostname = configService.get<string>('HOSTNAME', '0.0.0.0');
-    const displayHost =
-      hostname === '0.0.0.0'
-        ? configService.get('NODE_ENV') === 'development'
-          ? 'localhost'
-          : hostname
-        : hostname;
-
-    // Replace servers in swaggerConfig dynamically
-    if (config.servers && Array.isArray(config.servers)) {
-      config.servers = [
-        {
-          url: `http://${displayHost}:${port}`,
-          description: 'Development Server (from .env)',
-        },
-        ...(config.servers.filter((s) => s.url && !s.url.includes('localhost')) ||
-          []),
-      ];
+    if (!configService.get<boolean>('SWAGGER_ENABLED', true)) {
+      logger.log('Swagger documentation is disabled');
+      return;
     }
 
-    // Create Swagger document with options that minimize circular reference issues
-    const swaggerOptions = {
-      ...config,
-      deepScanRoutes: false, // Disable deep scanning to avoid circular dependency detection
-      operationIdFactory: (controllerKey: string, methodKey: string) =>
-        `${controllerKey.replace(/Controller$/, '')}_${methodKey}`,
-      ignoreGlobalPrefix: true,
-    };
+    const environment = configService.get<string>('NODE_ENV', 'development');
+    const port = configService.get<number>('PORT', 3002);
+    const serverUrl =
+      configService.get<string>('PUBLIC_API_URL') ??
+      process.env.RENDER_EXTERNAL_URL ??
+      (environment === 'development' ? `http://localhost:${port}` : undefined);
+    let serverOrigin: string | undefined;
 
-    const document = SwaggerModule.createDocument(app, swaggerOptions);
+    if (serverUrl) {
+      try {
+        serverOrigin = new URL(serverUrl).origin;
+      } catch {
+        logger.warn(
+          'Public API URL is invalid; Swagger will omit its server URL.',
+        );
+      }
+    }
+
+    const document = SwaggerModule.createDocument(
+      app,
+      {
+        ...swaggerConfig,
+        servers: serverOrigin
+          ? [{ url: `${serverOrigin}/v1`, description: 'API server' }]
+          : [],
+      },
+      {
+        deepScanRoutes: false,
+        operationIdFactory: (controllerKey: string, methodKey: string) =>
+          `${controllerKey.replace(/Controller$/, '')}_${methodKey}`,
+        ignoreGlobalPrefix: true,
+      },
+    );
     SwaggerModule.setup('api/docs', app, document, {
-      swaggerUrl: '/api/docs',
       customCss: `
         .swagger-ui .topbar { display: none; }
         .swagger-ui { max-width: 100%; }
@@ -60,26 +62,7 @@ export function setupSwagger(app: INestApplication) {
     logger.log('✅ Swagger documentation enabled at /api/docs');
   } catch (error) {
     logger.warn(
-      `⚠️  Swagger documentation generation failed: ${error instanceof Error ? error.message : String(error)}`
+      `Swagger documentation generation failed: ${error instanceof Error ? error.message : String(error)}`,
     );
-    logger.warn(
-      'API is fully functional, but Swagger docs are unavailable. Use Postman or OpenAPI clients for testing.'
-    );
-    
-    // Register a fallback endpoint that explains the situation
-    app.use('/api/docs', (req: Request, res: Response) => {
-      res.json({
-        message: 'Swagger documentation is temporarily unavailable',
-        reason:
-          'Circular DTO references in schema generation',
-        alternatives: [
-          'Use Postman collections for API testing',
-          'Refer to API documentation files',
-          'Use REST client extensions like REST Client or Thunder Client',
-        ],
-        api_ready: true,
-        status: 'API is fully operational',
-      });
-    });
   }
 }

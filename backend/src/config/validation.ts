@@ -130,7 +130,11 @@ export const validationSchema = Joi.object({
   RUN_INGESTION: Joi.boolean().default(false),
   INGESTION_ROOT_PATH: Joi.string().default('./data/ingestion'),
   HOSTNAME: Joi.string().default('0.0.0.0'),
+  PUBLIC_API_URL: Joi.string()
+    .uri({ scheme: ['http', 'https'] })
+    .optional(),
   ALLOWED_ORIGINS: Joi.string().default(''),
+  TRUST_PROXY: Joi.string().trim().default('loopback, linklocal, uniquelocal'),
 
   // Analytics Service
   ANALYTICS_SERVICE_URL: Joi.string().uri().default(''),

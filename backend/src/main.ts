@@ -1,150 +1,68 @@
+import { json, urlencoded } from 'express';
+import helmet from 'helmet';
+import { rateLimit } from 'express-rate-limit';
 import { NestFactory, Reflector } from '@nestjs/core';
 import {
-  ValidationPipe,
-  ClassSerializerInterceptor,
-  Logger,
   BadRequestException,
+  ClassSerializerInterceptor,
   INestApplication,
+  Logger,
+  ValidationPipe,
 } from '@nestjs/common';
-
+import { ConfigService } from '@nestjs/config';
 import { Logger as PinoLogger } from 'nestjs-pino';
 import { AppModule } from './app.module';
 import { setupSwagger } from '#infrastructure/swagger/swagger.setup';
-import { TransformInterceptor } from '#common/interceptors/transform.interceptor';
 import { AllExceptionsFilter } from '#common/filters/all-exceptions.filter';
-import { ConfigService } from '@nestjs/config';
-import helmet from 'helmet';
-import { rateLimit } from 'express-rate-limit';
-import { json, urlencoded } from 'express';
+import { TransformInterceptor } from '#common/interceptors/transform.interceptor';
 
-async function logRoutes(app: INestApplication) {
-  // Defer slightly to allow Nest/Express to finish wiring the router
-  await new Promise((resolve) => setTimeout(resolve, 100));
+const API_PREFIX = 'v1';
+const BODY_LIMIT = '3mb';
+const DEFAULT_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
+const bootstrapLogger = new Logger('Bootstrap');
 
-  try {
-    // Prefer using the HTTP adapter which is more stable than internal
-    // Express event internals. adapter.getInstance() returns the Express
-    // app/instance which exposes the router.
-
-    const instance: any = app.getHttpAdapter().getInstance();
-    const router =
-      instance && (instance._router || instance.router || instance);
-
-    if (!router || !router.stack) {
-      Logger.debug('Router not available yet, skipping route logging');
-      return;
-    }
-
-    Logger.debug('=======================================================');
-    Logger.debug('🚦 Registered Routes:');
-    router.stack.forEach((layer: any) => {
-      // Some layers are not routes (middleware). Route objects contain `route`.
-      if (layer.route) {
-        const path = layer.route.path || layer.route?.stack?.[0]?.route || '/';
-        // Methods are stored as keys on layer.route.methods
-        const methods = layer.route.methods
-          ? Object.keys(layer.route.methods).filter(
-              (m) => layer.route.methods[m],
-            )
-          : [];
-        const methodStr =
-          methods.length > 0 ? methods.join(',').toUpperCase() : 'ALL';
-        Logger.debug(`   - ${methodStr} ${path}`);
-      }
-    });
-    Logger.debug('=======================================================');
-  } catch (err) {
-    // Non-fatal: route logging is helpful in dev but shouldn't break startup
-    Logger.debug(
-      'Failed to enumerate routes for logging',
-      err && (err as Error).stack ? (err as Error).stack : String(err),
-    );
-  }
+function configureBodyParsing(app: INestApplication): void {
+  app.use(json({ limit: BODY_LIMIT }));
+  app.use(urlencoded({ extended: true, limit: BODY_LIMIT }));
 }
 
-async function bootstrap() {
-  const app = await NestFactory.create(AppModule, {
-    bufferLogs: true,
-    bodyParser: false,
-  });
-  app.use(json({ limit: '3mb' }));
-  app.use(urlencoded({ extended: true, limit: '3mb' }));
-
-  const pinoLogger = app.get(PinoLogger);
-  app.useLogger(pinoLogger);
-
-  pinoLogger.log('Starting bootstrap...');
-  pinoLogger.log('App module created successfully');
-
-  if (process.env.NODE_ENV !== 'production') {
-    pinoLogger.debug(
-      `[startup] ENV SNAPSHOT: ${JSON.stringify({
-        NODE_ENV: process.env.NODE_ENV,
-        ENABLE_REDIS: process.env.ENABLE_REDIS,
-        REDIS_HOST: process.env.REDIS_HOST,
-        REDIS_PORT: process.env.REDIS_PORT,
-        REDIS_URL: process.env.REDIS_URL ? '[REDACTED]' : undefined,
-        POSTGRES_HOST: process.env.POSTGRES_HOST,
-        POSTGRES_PORT: process.env.POSTGRES_PORT,
-        PORT: process.env.PORT,
-      })}`,
-    );
-  }
-
-  // Database connection handled by Prisma
-  Logger.log('🔄 Database connection established via Prisma');
-
-  // Set global prefix with path-to-regexp compatible format
-  // This prevents deprecation warnings about legacy route syntax
-  app.setGlobalPrefix('v1', {
+function configureGlobalApi(app: INestApplication, environment: string): void {
+  app.setGlobalPrefix(API_PREFIX, {
     exclude: ['/health', '/metrics', '/api/docs', '/api/docs-json'],
   });
 
-  // Enhanced Validation pipe with better error handling
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
       transform: true,
       forbidNonWhitelisted: true,
-      skipMissingProperties: false, // IMPORTANT: Don't skip missing properties
-      transformOptions: {
-        enableImplicitConversion: true,
-      },
-      stopAtFirstError: false, // Show all validation errors
-      enableDebugMessages: process.env.NODE_ENV !== 'production',
+      skipMissingProperties: false,
+      transformOptions: { enableImplicitConversion: true },
+      stopAtFirstError: false,
+      enableDebugMessages: environment !== 'production',
       validationError: {
         target: false,
-        value: process.env.NODE_ENV !== 'production',
+        value: false,
       },
-      // CRITICAL: Custom exception factory to ensure 400 status
       exceptionFactory: (errors) => {
-        const messages = errors.map((error) => {
-          const constraints = error.constraints || {};
-          const constraintMessages = Object.values(constraints);
-          return {
-            field: error.property,
-            value:
-              process.env.NODE_ENV !== 'production' ? error.value : undefined,
-            errors: constraintMessages,
-          };
-        });
-
-        // Determine a more specific message if possible, otherwise use a generic one
-        const topLevelMessage =
-          errors.length > 0 && errors[0].constraints
+        const details = errors.map((error) => ({
+          field: error.property,
+          errors: Object.values(error.constraints ?? {}),
+        }));
+        const message =
+          errors[0]?.constraints && Object.values(errors[0].constraints)[0]
             ? Object.values(errors[0].constraints)[0]
             : 'Validation failed';
 
         return new BadRequestException({
           statusCode: 400,
-          message: topLevelMessage, // Use a more specific message
-          errors: messages,
+          message,
+          errors: details,
         });
       },
     }),
   );
 
-  // Global interceptors
   app.useGlobalInterceptors(
     new TransformInterceptor(),
     new ClassSerializerInterceptor(app.get(Reflector), {
@@ -155,66 +73,53 @@ async function bootstrap() {
       excludeExtraneousValues: false,
     }),
   );
-
-  // Global filters
   app.useGlobalFilters(new AllExceptionsFilter());
+}
 
-  // Swagger setup (fail-safe). Swagger can fail during schema generation
-  // if there are circular references in DTOs. Wrap it in try/catch so a
-  // problematic model won't prevent the app from starting. If Swagger
-  // still fails we'll log the error and continue without the docs.
-  try {
-    setupSwagger(app);
-  } catch (err) {
-    Logger.warn('Swagger setup failed, continuing without API docs');
-    Logger.debug(
-      err && (err as Error).stack ? (err as Error).stack : String(err),
+function configureCors(app: INestApplication, config: ConfigService): void {
+  const allowedOrigins = (config.get<string>('ALLOWED_ORIGINS') ?? '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+  const isDevelopment = config.get<string>('NODE_ENV') === 'development';
+
+  if (allowedOrigins.length === 0) {
+    Logger.warn(
+      'ALLOWED_ORIGINS is empty; browser requests are allowed only from local development origins.',
     );
   }
 
-  // CORS configuration
-  Logger.log('Setting up CORS configuration...');
-  const configService = app.get(ConfigService);
-  const allowedOriginsRaw = configService.get<string>('ALLOWED_ORIGINS');
-  
-  if (!allowedOriginsRaw) {
-    Logger.warn('ALLOWED_ORIGINS env var not set; CORS will only allow no-origin requests and localhost in dev');
-  }
-  
-  const allowedOrigins = (allowedOriginsRaw || '')
-    .split(',')
-    .filter((origin) => origin.trim().length > 0)
-    .map((origin) => origin.trim());
-
-  Logger.log('Enabling CORS...');
   app.enableCors({
     origin: (
       origin: string | undefined,
-      callback: (err: Error | null, allow?: boolean) => void,
+      callback: (error: Error | null, allow?: boolean) => void,
     ) => {
-      // Allow requests with no origin (mobile apps, curl, postman, etc.)
       if (!origin) {
-        return callback(null, true);
+        callback(null, true);
+        return;
       }
 
-      // Check if origin is in allowed list or is localhost/127.0.0.1 for dev
-      const isAllowed = allowedOrigins.some((allowedOrigin) => {
-        if (allowedOrigin === origin) {
-          return true;
+      const explicitlyAllowed = allowedOrigins.includes(origin);
+      let isLocalDevelopmentOrigin = false;
+      if (isDevelopment) {
+        try {
+          const hostname = new URL(origin).hostname;
+          isLocalDevelopmentOrigin = [
+            'localhost',
+            '127.0.0.1',
+            '[::1]',
+          ].includes(hostname);
+        } catch {
+          isLocalDevelopmentOrigin = false;
         }
-        if (process.env.NODE_ENV === 'development') {
-          return origin.includes('localhost') || origin.includes('127.0.0.1');
-        }
-        return false;
-      });
-
-      if (!isAllowed) {
-        return callback(
-          new Error('CORS: This origin is not allowed to access the API'),
-          false,
-        );
       }
-      return callback(null, true);
+
+      if (explicitlyAllowed || isLocalDevelopmentOrigin) {
+        callback(null, true);
+        return;
+      }
+
+      callback(new Error('CORS: origin is not allowed'), false);
     },
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
     allowedHeaders: [
@@ -233,188 +138,201 @@ async function bootstrap() {
     credentials: true,
     maxAge: 3600,
   });
+}
 
-  // Security headers - adjusted for development
-  Logger.log('Setting up security headers...');
-  if (process.env.NODE_ENV === 'production') {
-    app.use(
-      helmet({
-        contentSecurityPolicy: {
-          directives: {
-            defaultSrc: ["'self'"],
-            styleSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", 'https:'],
-            scriptSrc: [
-              "'self'",
-              "'unsafe-inline'",
-              "'unsafe-eval'",
-              'https:',
-              'blob:',
-            ],
-            imgSrc: ["'self'", 'data:', 'https:', 'blob:'],
-            connectSrc: ["'self'", 'https:', 'wss:', 'http:', 'ws:'],
-            fontSrc: ["'self'", 'https:', 'data:'],
-            objectSrc: ["'none'"],
-            mediaSrc: ["'self'", 'https:'],
-            frameSrc: ["'self'", 'https:'],
-            formAction: ["'self'"],
-            workerSrc: ["'self'", 'blob:', 'https:'],
-            baseUri: ["'self'"],
-            manifestSrc: ["'self'", 'https:'],
-          },
-        },
-        crossOriginEmbedderPolicy: true,
-        crossOriginOpenerPolicy: true,
-        crossOriginResourcePolicy: { policy: 'same-site' },
-        dnsPrefetchControl: true,
-        frameguard: { action: 'deny' },
-        hidePoweredBy: true,
-        hsts: {
-          maxAge: 31536000,
-          includeSubDomains: true,
-          preload: true,
-        },
-        ieNoOpen: true,
-        noSniff: true,
-        referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
-      }),
-    );
-  } else {
-    // Basic security for development
+function configureSecurity(app: INestApplication, isProduction: boolean): void {
+  if (!isProduction) {
     app.use(
       helmet({
         contentSecurityPolicy: false,
         crossOriginEmbedderPolicy: false,
       }),
     );
+    return;
   }
 
-  // Rate limiting - more lenient for development
-  Logger.log('Setting up rate limiting...');
-  const isProduction = process.env.NODE_ENV === 'production';
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          styleSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", 'https:'],
+          scriptSrc: [
+            "'self'",
+            "'unsafe-inline'",
+            "'unsafe-eval'",
+            'https:',
+            'blob:',
+          ],
+          imgSrc: ["'self'", 'data:', 'https:', 'blob:'],
+          connectSrc: ["'self'", 'https:', 'wss:', 'http:', 'ws:'],
+          fontSrc: ["'self'", 'https:', 'data:'],
+          objectSrc: ["'none'"],
+          mediaSrc: ["'self'", 'https:'],
+          frameSrc: ["'self'", 'https:'],
+          formAction: ["'self'"],
+          workerSrc: ["'self'", 'blob:', 'https:'],
+          baseUri: ["'self'"],
+          manifestSrc: ["'self'", 'https:'],
+        },
+      },
+      crossOriginEmbedderPolicy: true,
+      crossOriginOpenerPolicy: true,
+      crossOriginResourcePolicy: { policy: 'same-site' },
+      dnsPrefetchControl: true,
+      frameguard: { action: 'deny' },
+      hidePoweredBy: true,
+      hsts: {
+        maxAge: 31_536_000,
+        includeSubDomains: true,
+        preload: true,
+      },
+      ieNoOpen: true,
+      noSniff: true,
+      referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+    }),
+  );
+}
 
+function configureRateLimiting(
+  app: INestApplication,
+  isProduction: boolean,
+  config: ConfigService,
+): void {
   app
     .getHttpAdapter()
     .getInstance()
-    .set('trust proxy', 'loopback, linklocal, uniquelocal');
+    .set('trust proxy', config.get<string>('TRUST_PROXY'));
 
   const loginLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: isProduction ? 5 : 50, // More attempts in dev
+    windowMs: config.get<number>(
+      'RATE_LIMIT_WINDOW_MS',
+      DEFAULT_RATE_LIMIT_WINDOW_MS,
+    ),
+    max: isProduction ? 5 : 50,
     message: 'Too many login attempts, please try again after 15 minutes',
     standardHeaders: true,
     legacyHeaders: false,
   });
-
   const apiLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: isProduction ? 500 : 5000, // Increased for xAPI/progress tracking
+    windowMs: config.get<number>(
+      'RATE_LIMIT_WINDOW_MS',
+      DEFAULT_RATE_LIMIT_WINDOW_MS,
+    ),
+    max: config.get<number>('RATE_LIMIT_MAX', isProduction ? 500 : 5000),
     message:
       'Too many requests from this IP, please try again after 15 minutes',
     standardHeaders: true,
     legacyHeaders: false,
   });
 
-  app.use('/auth/login', loginLimiter);
-  app.use('/auth/register', loginLimiter);
+  app.use(`/${API_PREFIX}/auth/login`, loginLimiter);
+  app.use(`/${API_PREFIX}/auth/register`, loginLimiter);
   app.use(apiLimiter);
-
-  Logger.log('Getting port configuration...');
-  const port = configService.get<number>('PORT') || 3002;
-  const hostname = configService.get<string>('HOSTNAME') || '0.0.0.0';
-
-  Logger.log('Logging routes...');
-  if (process.env.NODE_ENV === 'development') {
-    await logRoutes(app);
-  }
-
-  Logger.log('Attempting to start server...');
-  try {
-    await app.listen(port, hostname);
-    Logger.log('Server listening successfully!');
-  } catch (err) {
-    Logger.error(
-      'Failed to start server:',
-      err instanceof Error ? err.message : String(err),
-    );
-    if (err instanceof Error && err.stack) {
-      Logger.error('Stack trace:', err.stack);
-    }
-    throw err;
-  }
-
-  Logger.log('Getting database configuration...');
-  const environment = configService.get('NODE_ENV', 'development');
-  const dbHost = configService.get('POSTGRES_HOST', 'postgres');
-  const redisHost = configService.get('REDIS_HOST', 'redis');
-  const redisUrl = configService.get<string>('REDIS_URL');
-
-  // Display correct URL based on environment
-  const displayHostname =
-    hostname === '0.0.0.0'
-      ? process.env.NODE_ENV === 'development'
-        ? 'localhost'
-        : 'your-server-ip'
-      : hostname;
-
-  const serverUrl = `http://${displayHostname}:${port}`;
-  const apiUrl = `${serverUrl}/v1`;
-
-  Logger.log(`=======================================================`);
-  Logger.log(`🚀 MedTrack Hub Backend Server Started Successfully!`);
-  Logger.log(`=======================================================`);
-  Logger.log(`🌍 Environment: ${environment.toUpperCase()}`);
-  Logger.log(`🔗 API URL: http://${hostname}:${port}/v1`);
-  Logger.log(`📡 Listening on: ${hostname}:${port}`);
-  Logger.log(
-    `🗄️  Database: ${dbHost}:${configService.get('POSTGRES_PORT', 5432)}`,
-  );
-  if (redisUrl) {
-    Logger.log('🔴 Redis URL: configured (credentials redacted)');
-  } else {
-    Logger.log(`🔴 Redis: ${redisHost}:${configService.get('REDIS_PORT', 6379)}`);
-  }
-  Logger.log(`=======================================================`);
-  Logger.log(`📝 API Documentation: ${serverUrl}/api/docs`);
-  Logger.log(`❤️  Health Check: ${apiUrl}/health`);
-  Logger.log(`🔐 Authentication Endpoints:`);
-  Logger.log(`   - POST ${apiUrl}/auth/register`);
-  Logger.log(`   - POST ${apiUrl}/auth/login`);
-  Logger.log(`   - GET ${apiUrl}/auth/profile`);
-  Logger.log(`   - POST ${apiUrl}/auth/refresh`);
-  Logger.log(
-    `📊 Analytics Service: ${configService.get<string>('ANALYTICS_SERVICE_URL')}`,
-  );
-  Logger.log(`=======================================================`);
-
-  // Display password requirements if configured
-  const passwordConfig = configService.get('app.security.password');
-  if (passwordConfig) {
-    Logger.log(`🔒 Password Requirements (${environment}):`);
-    Logger.log(
-      `   - Minimum length: ${
-        passwordConfig.minLength || (environment === 'development' ? 4 : 8)
-      } characters`,
-    );
-    Logger.log(`   - Uppercase required: ${passwordConfig.requireUppercase}`);
-    Logger.log(`   - Numbers required: ${passwordConfig.requireNumbers}`);
-    Logger.log(
-      `   - Special chars required: ${passwordConfig.requireSpecialChars}`,
-    );
-    Logger.log(`=======================================================`);
-  }
-
-  Logger.log('Bootstrap function completed successfully!');
 }
 
-bootstrap().catch((error) => {
-  Logger.error(
-    '💥 Application failed to start:',
-    error instanceof Error ? error.message : String(error),
-  );
-  if (error instanceof Error && error.stack) {
-    Logger.error('Full error:', error.stack);
-  }
-  process.exit(1);
-});
+function getPublicBaseUrl(
+  config: ConfigService,
+  environment: string,
+  port: number,
+): string | undefined {
+  const configuredUrl =
+    config.get<string>('PUBLIC_API_URL') ??
+    process.env.RENDER_EXTERNAL_URL ??
+    (environment === 'development' ? `http://localhost:${port}` : undefined);
 
-Logger.log('Bootstrap promise initiated');
+  if (!configuredUrl) return undefined;
+
+  try {
+    return new URL(configuredUrl).origin;
+  } catch {
+    Logger.warn(
+      'Public API URL is invalid; startup logs will show relative endpoint paths.',
+    );
+    return undefined;
+  }
+}
+
+function logStartupSummary(
+  config: ConfigService,
+  environment: string,
+  port: number,
+  hostname: string,
+): void {
+  const publicBaseUrl = getPublicBaseUrl(config, environment, port);
+  const endpoint = (path: string) =>
+    publicBaseUrl ? `${publicBaseUrl}${path}` : path;
+  const redisConfigured = Boolean(
+    config.get<string>('REDIS_URL') ||
+    config.get<boolean>('ENABLE_REDIS', false),
+  );
+  const analyticsConfigured = Boolean(
+    config.get<string>('ANALYTICS_GRPC_URL') ||
+    config.get<string>('RUST_ANALYTICS_GRPC_URL') ||
+    config.get<string>('ANALYTICS_SERVICE_URL') ||
+    config.get<string>('RUST_ANALYTICS_URL'),
+  );
+
+  bootstrapLogger.log('Backend started successfully');
+  bootstrapLogger.log(`Environment: ${environment}`);
+  bootstrapLogger.log(`Listening address: ${hostname}:${port}`);
+  bootstrapLogger.log(`API: ${endpoint(`/${API_PREFIX}`)}`);
+  bootstrapLogger.log(`Health check: ${endpoint('/health')}`);
+  bootstrapLogger.log(`API documentation: ${endpoint('/api/docs')}`);
+  bootstrapLogger.log(
+    `Database: ${config.get<string>('DATABASE_URL') || config.get<string>('POSTGRES_HOST') ? 'configured' : 'not configured'}`,
+  );
+  bootstrapLogger.log(`Redis: ${redisConfigured ? 'configured' : 'disabled'}`);
+  bootstrapLogger.log(
+    `Analytics service: ${analyticsConfigured ? 'configured' : 'not configured'}`,
+  );
+}
+
+async function bootstrap(): Promise<void> {
+  const app = await NestFactory.create(AppModule, {
+    bufferLogs: true,
+    bodyParser: false,
+  });
+  const logger = app.get(PinoLogger);
+  const config = app.get(ConfigService);
+  const environment = config.get<string>('NODE_ENV', 'development');
+  const isProduction = environment === 'production';
+  const port = config.get<number>('PORT', 3002);
+  const hostname = config.get<string>('HOSTNAME', '0.0.0.0');
+
+  try {
+    app.useLogger(logger);
+    app.enableShutdownHooks();
+
+    configureBodyParsing(app);
+    configureGlobalApi(app, environment);
+    configureCors(app, config);
+    configureSecurity(app, isProduction);
+    configureRateLimiting(app, isProduction, config);
+    setupSwagger(app);
+
+    await app.listen(port, hostname);
+    logStartupSummary(config, environment, port, hostname);
+  } catch (error) {
+    try {
+      await app.close();
+    } catch (closeError) {
+      bootstrapLogger.error(
+        `Failed to close application after startup failure: ${safeErrorMessage(closeError)}`,
+      );
+    }
+    throw error;
+  }
+}
+
+function safeErrorMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.replace(/([a-z][a-z\d+.-]*:\/\/)[^/@\s]+@/gi, '$1[REDACTED]@');
+}
+
+bootstrap().catch((error: unknown) => {
+  bootstrapLogger.error(
+    `Application failed to start: ${safeErrorMessage(error)}`,
+  );
+  process.exitCode = 1;
+});
