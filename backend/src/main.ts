@@ -257,7 +257,9 @@ function logStartupSummary(
   bootstrapLogger.log(`Listening address: ${hostname}:${port}`);
   bootstrapLogger.log(`API: ${endpoint(`/${API_PREFIX}`)}`);
   bootstrapLogger.log(`Health check: ${endpoint('/health')}`);
-  bootstrapLogger.log(`API documentation: ${endpoint('/api/docs')}`);
+  bootstrapLogger.log(
+    `API documentation: ${endpoint('/api/docs')} (Swagger UI)`,
+  );
   bootstrapLogger.log(
     `Database: ${config.get<string>('DATABASE_URL') || config.get<string>('POSTGRES_HOST') ? 'configured' : 'not configured'}`,
   );
