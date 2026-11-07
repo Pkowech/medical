@@ -139,6 +139,7 @@ RUN esbuild dist/src/main.js \
       --external:'@nestjs/typeorm' \
       --external:'@nestjs/sequelize' \
       --external:'@nestjs/mikro-orm' \
+      --external:swagger-ui-dist \
       --external:mongoose \
       --external:typeorm \
       --external:sequelize \
@@ -159,10 +160,10 @@ RUN esbuild dist/src/main.js \
 #   is what previously bloated the image to 864MB.
 #
 #   This tiny standalone manifest, installed in its own empty directory,
-#   lets pnpm resolve ONLY the transitive closure these runtime packages actually
-#   need — including small runtime helpers like node-gyp-build, detect-libc,
-#   and semver automatically, with no more manual discovery via failed
-#   deploys.
+#   lets pnpm resolve ONLY the transitive closure these runtime packages
+#   actually need — including small runtime helpers like node-gyp-build,
+#   detect-libc, and semver automatically, with no more manual discovery via
+#   failed deploys.
 ################################################################
 FROM base AS prod-deps
 WORKDIR /prod-deps
