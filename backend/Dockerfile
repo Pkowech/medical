@@ -178,9 +178,6 @@ RUN cat <<'EOF' > package.json
     "@prisma/client-runtime-utils": "^7.8.0",
     "@grpc/proto-loader": "^0.7.15",
     "swagger-ui-dist": "^5.32.13"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": ["argon2", "protobufjs", "sharp"]
   }
 }
 EOF
@@ -189,6 +186,8 @@ onlyBuiltDependencies:
   - argon2
   - protobufjs
   - sharp
+allowBuilds:
+  '@scarf/scarf': false
 EOF
 
 # --ignore-scripts avoids @prisma/client's postinstall (`prisma generate`),
