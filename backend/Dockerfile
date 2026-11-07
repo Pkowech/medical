@@ -149,7 +149,8 @@ RUN esbuild dist/src/main.js \
 
 ################################################################
 # Stage 4: prod-deps — ISOLATED install of only the native/external
-#   packages esbuild couldn't bundle (argon2, sharp, @prisma/client shell).
+#   packages esbuild couldn't bundle (argon2, sharp, @prisma/client shell,
+#   swagger-ui-dist for Swagger's static UI assets).
 #
 #   Deliberately NOT installing from backend/package.json — doing that
 #   installs pnpm's --prod resolution of the ENTIRE dependency list, which
@@ -158,7 +159,7 @@ RUN esbuild dist/src/main.js \
 #   is what previously bloated the image to 864MB.
 #
 #   This tiny standalone manifest, installed in its own empty directory,
-#   lets pnpm resolve ONLY the transitive closure these 4 packages actually
+#   lets pnpm resolve ONLY the transitive closure these runtime packages actually
 #   need — including small runtime helpers like node-gyp-build, detect-libc,
 #   and semver automatically, with no more manual discovery via failed
 #   deploys.
@@ -174,7 +175,8 @@ RUN cat <<'EOF' > package.json
     "sharp": "^0.34.5",
     "@prisma/client": "^7.8.0",
     "@prisma/client-runtime-utils": "^7.8.0",
-    "@grpc/proto-loader": "^0.7.15"
+    "@grpc/proto-loader": "^0.7.15",
+    "swagger-ui-dist": "^5.32.13"
   },
   "pnpm": {
     "onlyBuiltDependencies": ["argon2", "protobufjs", "sharp"]
