@@ -35,6 +35,7 @@ import useSchedule from '../../study/hooks/useSchedule';
 import CalendarGrid from './CalendarGrid';
 import { EventEditor } from './EventEditor';
 import { EventCard } from './EventCard';
+import { toast } from 'sonner';
 
 const EVENT_TYPES = {
   lecture: { label: 'Lecture', color: 'bg-blue-100 text-blue-700', icon: GraduationCap },
@@ -63,6 +64,7 @@ export default function ScheduleComponent() {
     events,
     filteredEvents,
     isLoading,
+    error: scheduleError,
     currentDate,
     setCurrentDate,
     view,
@@ -73,6 +75,7 @@ export default function ScheduleComponent() {
     deleteEvent,
     toggleCompletion,
     hasOverlap,
+    fetchEvents,
   } = useSchedule();
 
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -132,22 +135,27 @@ export default function ScheduleComponent() {
     setOverlapError(null);
     try {
       setIsSubmitting(true);
-      await createEvent(eventData as Omit<Event, 'id'>);
+      await createEvent({ ...eventData, date: startDate, endDate } as Omit<Event, 'id'>);
 
       if (user?.id) {
-        const dateFormatted = (eventData.date as Date).toLocaleString(undefined, { 
+        const dateFormatted = startDate.toLocaleString(undefined, {
           month: 'short', 
           day: '2-digit', 
           hour: '2-digit', 
           minute: '2-digit' 
         });
-        await createNotification(
-          user.id, 
-          `You've scheduled "${eventData.title}" for ${dateFormatted}.`,
-          'New Event Scheduled',
-          'success',
-          '/schedule'
-        );
+        try {
+          await createNotification(
+            user.id,
+            `You've scheduled "${eventData.title}" for ${dateFormatted}.`,
+            'New Event Scheduled',
+            'success',
+            '/study-planner/schedule',
+          );
+        } catch (notificationError) {
+          console.error('Event created, but its notification failed:', notificationError);
+          toast.warning('Event created, but its notification could not be sent.');
+        }
       }
 
       setIsAddOpen(false);
@@ -206,11 +214,19 @@ export default function ScheduleComponent() {
     try {
       await deleteEvent(id);
       setIsDetailsOpen(false);
-      if (user?.id) {
-        await createNotification(user.id, 'Event deleted successfully', 'Schedule Update', 'info');
-      }
     } catch (error) {
       console.error('Failed to delete event:', error);
+      toast.error('Event could not be deleted. Please try again.');
+      return;
+    }
+
+    if (user?.id) {
+      try {
+        await createNotification(user.id, 'Event deleted successfully', 'Schedule Update', 'info');
+      } catch (notificationError) {
+        console.error('Event deleted, but its notification failed:', notificationError);
+        toast.warning('Event deleted, but its notification could not be sent.');
+      }
     }
   };
 
@@ -389,6 +405,18 @@ export default function ScheduleComponent() {
                 </Select>
               </div>
             </div>
+
+            {scheduleError && (
+              <div
+                role="status"
+                className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200"
+              >
+                <span>Some schedule items may be missing. {scheduleError}</span>
+                <Button type="button" variant="outline" size="sm" onClick={() => void fetchEvents()}>
+                  Retry
+                </Button>
+              </div>
+            )}
 
             {/* Calendar Grid */}
             {isLoading ? (

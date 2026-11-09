@@ -17,7 +17,7 @@ export default function StudyPlannerClient() {
   }, [setHeader]);
 
   return (
-    <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
+    <div className="w-full min-w-0 flex-1">
       <StudyDashboard />
     </div>
   );

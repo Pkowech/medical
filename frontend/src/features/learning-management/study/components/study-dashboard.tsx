@@ -152,8 +152,8 @@ export const StudyDashboard: React.FC = () => {
   };
 
   return (
-    <div className="p-3 bg-background/50 dark:bg-card/50 min-h-screen">
-      <nav aria-label="Study planner shortcuts" className="mb-4 grid grid-cols-3 gap-2 sm:gap-3">
+    <div className="min-w-0 space-y-4 bg-background/50 dark:bg-card/50">
+      <nav aria-label="Study planner shortcuts" className="grid grid-cols-3 gap-2 sm:gap-3">
         {[
           { href: '/study-planner/schedule', label: 'Schedule', icon: CalendarDays },
           { href: '/study-planner/goals', label: 'Goals', icon: Target },
@@ -172,12 +172,12 @@ export const StudyDashboard: React.FC = () => {
 
       {/* AI-Generated Practice Quizzes */}
       {autoQuizzesError && (
-        <p role="status" className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+        <p role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
           Personalized practice quizzes are temporarily unavailable. Your study progress is still up to date.
         </p>
       )}
       {autoQuizzes.length > 0 && (
-        <div className="mb-6">
+        <div>
           <h5 className="text-lg font-semibold mb-3 text-foreground dark:text-foreground flex items-center gap-2">
             <span>✨</span>
             AI-Generated Practice Quizzes
@@ -204,42 +204,29 @@ export const StudyDashboard: React.FC = () => {
       )}
 
       {/* Stats Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+      <div className="grid grid-cols-2 gap-3">
         <div className="bg-card/80 dark:bg-card/50 backdrop-blur-sm rounded-lg shadow-sm border border-border dark:border-border/50 p-4">
-          <h6 className="text-lg font-semibold mb-2 text-foreground dark:text-foreground">Total Study Time</h6>
-          <p className="text-4xl font-bold text-blue-600 dark:text-blue-400">
-            {Math.round((stats?.totalTime || 0) / 60)}h
+          <h6 className="text-sm font-semibold text-foreground dark:text-foreground">Study time</h6>
+          <p className="mt-1 text-3xl font-bold text-blue-600 dark:text-blue-400">
+            {formatStudyTime(stats?.totalTime || 0)}
           </p>
-          <p className="text-sm text-muted-foreground dark:text-muted-foreground">this week</p>
+          <p className="text-xs text-muted-foreground dark:text-muted-foreground">This week</p>
         </div>
         <div className="bg-card/80 dark:bg-card/50 backdrop-blur-sm rounded-lg shadow-sm border border-border dark:border-border/50 p-4">
-          <h6 className="text-lg font-semibold mb-2 text-foreground dark:text-foreground">Study Sessions</h6>
-          <p className="text-4xl font-bold text-blue-600 dark:text-blue-400">{stats?.totalSessions || 0}</p>
-          <p className="text-sm text-muted-foreground dark:text-muted-foreground">completed</p>
+          <h6 className="text-sm font-semibold text-foreground dark:text-foreground">Sessions</h6>
+          <p className="mt-1 text-3xl font-bold text-blue-600 dark:text-blue-400">{stats?.totalSessions || 0}</p>
+          <p className="text-xs text-muted-foreground dark:text-muted-foreground">Completed</p>
         </div>
       </div>
 
-      <div className="mb-4">
+      <div>
         <ReviewQueue />
       </div>
 
-      {/* Course Progress */}
-      <div className="bg-card/80 dark:bg-card/50 backdrop-blur-sm rounded-lg shadow-sm border border-border dark:border-border/50 p-4 mb-4">
+      {courseProgress.length > 0 && (
+      <div className="bg-card/80 dark:bg-card/50 backdrop-blur-sm rounded-lg shadow-sm border border-border dark:border-border/50 p-4">
         <h6 className="text-lg font-semibold mb-2 text-foreground dark:text-foreground">Course Progress</h6>
-        {courseProgress.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-border p-5 dark:border-border">
-            <p className="text-sm text-muted-foreground dark:text-muted-foreground">
-              No enrolled courses yet. Browse courses to start building your learning progress.
-            </p>
-            <button
-              type="button"
-              onClick={() => router.push('/courses')}
-              className="mt-3 text-sm font-semibold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
-            >
-              Browse courses
-            </button>
-          </div>
-        ) : courseProgress.map(course => (
+        {courseProgress.map(course => (
           <button
             key={course.id}
             type="button"
@@ -259,15 +246,12 @@ export const StudyDashboard: React.FC = () => {
           </button>
         ))}
       </div>
+      )}
 
-      {/* Unit Progress */}
-      <div className="bg-card/80 dark:bg-card/50 backdrop-blur-sm rounded-lg shadow-sm border border-border dark:border-border/50 p-4 mb-4">
+      {unitProgress.length > 0 && (
+      <div className="bg-card/80 dark:bg-card/50 backdrop-blur-sm rounded-lg shadow-sm border border-border dark:border-border/50 p-4">
         <h6 className="text-lg font-semibold mb-2 text-foreground dark:text-foreground">Unit Progress</h6>
-        {unitProgress.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-border p-5 text-sm text-muted-foreground dark:border-border dark:text-muted-foreground">
-            Unit progress appears here after you begin lessons in an enrolled course.
-          </p>
-        ) : unitProgress.map(unit => {
+        {unitProgress.map(unit => {
           const courseName = courseProgress.find(course => course.id === unit.courseId)?.name;
 
           return (
@@ -301,8 +285,10 @@ export const StudyDashboard: React.FC = () => {
           );
         })}
       </div>
+      )}
 
       {/* Peer Comparison */}
+      {peerStats && (
       <div className="bg-card/80 dark:bg-card/50 backdrop-blur-sm rounded-lg shadow-sm border border-border dark:border-border/50 p-4">
         <div className="flex items-center justify-between mb-2">
           <h6 className="text-lg font-semibold text-foreground dark:text-foreground">
@@ -329,17 +315,21 @@ export const StudyDashboard: React.FC = () => {
             </div>
           </div>
         )}
-        {!peerStats && (
-          <p className="text-sm text-muted-foreground dark:text-muted-foreground">
-            Peer comparisons will appear when enough cohort progress data is available.
-          </p>
-        )}
       </div>
+      )}
 
       {/* Goals Integration */}
-      <div className="mt-4">
+      <div>
         <GoalsProgressWidget />
       </div>
     </div>
   );
 };
+
+function formatStudyTime(totalMinutes: number): string {
+  const minutes = Math.max(0, Math.round(totalMinutes));
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  return remainingMinutes === 0 ? `${hours}h` : `${hours}h ${remainingMinutes}m`;
+}

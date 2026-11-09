@@ -4,6 +4,11 @@ import type { ScheduleEvent } from '@/shared/types/studyInterface';
 export type { ScheduleEvent as Event };
 export type { ScheduleEvent };
 
+export interface ScheduleFetchResult {
+  events: ScheduleEvent[];
+  errors: string[];
+}
+
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Serialize errors safely for logging so we show useful fields
@@ -47,36 +52,33 @@ const safeString = (val: unknown, fallback = ''): string => {
 };
 
 const scheduleService = {
-  async getSessions(userId?: string, _startDate?: Date, _endDate?: Date): Promise<ScheduleEvent[]> {
-    try {
-      const [events, studySessions, goals, groups, deadlines, reviews] = await Promise.all([
-        this.getRawEvents(_startDate, _endDate),
-        this.getStudySessions(userId, _startDate, _endDate),
-        this.getGoals(userId, _startDate, _endDate),
-        this.getStudyGroups(_startDate, _endDate),
-        this.getDeadlines(userId, _startDate, _endDate),
-        this.getScheduledReviews(userId, _startDate, _endDate),
-      ]);
+  async getSessions(userId?: string, _startDate?: Date, _endDate?: Date): Promise<ScheduleFetchResult> {
+    const sourceNames = ['schedule events', 'study sessions', 'goals', 'study groups', 'deadlines', 'reviews'];
+    const results = await Promise.allSettled([
+      this.getRawEvents(_startDate, _endDate),
+      this.getStudySessions(userId, _startDate, _endDate),
+      this.getGoals(userId, _startDate, _endDate),
+      this.getStudyGroups(_startDate, _endDate),
+      this.getDeadlines(userId, _startDate, _endDate),
+      this.getScheduledReviews(userId, _startDate, _endDate),
+    ]);
 
-      const allMerged = [...events, ...studySessions, ...goals, ...groups, ...deadlines, ...reviews];
-      
-      // Deduplicate by ID to prevent React key collision errors
-      const seen = new Set<string>();
-      const deduplicated = allMerged.filter(ev => {
-        if (!ev.id) return true; // Keep items without ID (though they should have one)
-        if (seen.has(ev.id)) return false;
-        seen.add(ev.id);
-        return true;
-      });
+    const errors = results.flatMap((result, index) => {
+      if (result.status === 'fulfilled') return [];
+      console.error(`Error fetching ${sourceNames[index]}:`, result.reason);
+      return [`${sourceNames[index]} could not be loaded.`];
+    });
+    const allEvents = results.flatMap(result => result.status === 'fulfilled' ? result.value : []);
 
-      console.warn(
-        `scheduleService: Total merged: ${allMerged.length}, Deduplicated: ${deduplicated.length} (ScheduleEvents: ${events.length}, Sessions: ${studySessions.length}, Goals: ${goals.length}, Groups: ${groups.length}, Deadlines: ${deadlines.length}, Reviews: ${reviews.length})`,
-      );
-      return deduplicated;
-    } catch (error) {
-      console.error('Error fetching merged sessions:', error);
-      return [];
-    }
+    const seen = new Set<string>();
+    const events = allEvents.filter(event => {
+      if (!event.id) return true;
+      if (seen.has(event.id)) return false;
+      seen.add(event.id);
+      return true;
+    });
+
+    return { events, errors };
   },
 
   async getScheduledReviews(
@@ -107,7 +109,7 @@ const scheduleService = {
       }).filter(review => !Number.isNaN(review.date.getTime()));
     } catch (error) {
       console.error('Error fetching scheduled course reviews:', serializeError(error));
-      return [];
+      throw error;
     }
   },
 
@@ -142,7 +144,7 @@ const scheduleService = {
         .filter(Boolean) as ScheduleEvent[];
     } catch (error) {
       console.error('Error fetching deadlines:', serializeError(error));
-      return [];
+      throw error;
     }
   },
 
@@ -182,7 +184,7 @@ const scheduleService = {
         .filter(Boolean) as ScheduleEvent[];
     } catch (error) {
       console.error('Error fetching raw events:', serializeError(error));
-      return [];
+      throw error;
     }
   },
 
@@ -220,7 +222,7 @@ const scheduleService = {
         .filter(Boolean) as ScheduleEvent[];
     } catch (error) {
       console.error('Error fetching study sessions:', serializeError(error));
-      return [];
+      throw error;
     }
   },
 
@@ -256,7 +258,7 @@ const scheduleService = {
         .filter(Boolean) as ScheduleEvent[];
     } catch (error) {
       console.error('Error fetching learning goals:', serializeError(error));
-      return [];
+      throw error;
     }
   },
 
@@ -290,7 +292,7 @@ const scheduleService = {
         .filter(Boolean) as ScheduleEvent[];
     } catch (error) {
       console.error('Error fetching study groups:', serializeError(error));
-      return [];
+      throw error;
     }
   },
 

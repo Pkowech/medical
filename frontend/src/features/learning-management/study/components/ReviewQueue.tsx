@@ -46,7 +46,7 @@ export const ReviewQueue: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex min-h-[200px] items-center justify-center" role="status">
+      <div className="flex min-h-24 items-center justify-center" role="status" aria-live="polite">
         <p className="text-muted-foreground">Loading review queue...</p>
       </div>
     );
@@ -58,7 +58,9 @@ export const ReviewQueue: React.FC = () => {
         <div>
           <h3 className="text-lg font-semibold">Course review queue</h3>
           <p className="text-sm text-muted-foreground">
-            {dueCards.length} {dueCards.length === 1 ? 'card' : 'cards'} due
+            {error
+              ? 'Due cards unavailable'
+              : `${dueCards.length} ${dueCards.length === 1 ? 'card' : 'cards'} due`}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -72,15 +74,16 @@ export const ReviewQueue: React.FC = () => {
           >
             <RefreshCw className="h-4 w-4" />
           </Button>
-          <Button
-            type="button"
-            onClick={handleStartReview}
-            disabled={dueCards.length === 0}
-            className="flex items-center gap-2"
-          >
-            <Play className="h-4 w-4" />
-            Start review
-          </Button>
+          {!error && dueCards.length > 0 && (
+            <Button
+              type="button"
+              onClick={handleStartReview}
+              className="flex items-center gap-2"
+            >
+              <Play className="h-4 w-4" />
+              Start review
+            </Button>
+          )}
         </div>
       </CardHeader>
       <CardContent>
@@ -90,9 +93,6 @@ export const ReviewQueue: React.FC = () => {
               <AlertCircle className="h-4 w-4 shrink-0" />
               {error}
             </span>
-            <Button type="button" variant="outline" size="sm" onClick={() => void fetchDueCards()}>
-              Retry
-            </Button>
           </div>
         ) : dueCards.length === 0 ? (
           <p className="text-center text-sm text-muted-foreground">
