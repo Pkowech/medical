@@ -192,9 +192,15 @@ const MedicalEducationDashboard = () => {
   const trendPoints = selectedTrendMetric === 'score'
     ? assessmentTrends
     : (data.weeklyProgress || []).map(point => ({ label: point.day, value: point.hours }));
+  const hasTrendHistory = assessmentTrends.length > 0
+    || (data.weeklyProgress || []).some(point => point.hours > 0);
   const hasTrendData = selectedTrendMetric === 'score'
     ? trendPoints.length > 0
     : trendPoints.some(point => point.value > 0);
+  const hasFlashcardActivity = Boolean(
+    data.flashcards?.due || data.flashcards?.mastered || data.flashcards?.learning,
+  );
+  const enrolledCourses = data.courseData?.filter(course => (course.progressPercentage ?? 0) < 100) ?? [];
   const activeCourse = data.courseData?.find(course => course.progressPercentage < 100);
   const firstCourse = data.courseData?.[0];
   const displayCourse = activeCourse ?? firstCourse;
@@ -300,7 +306,7 @@ const MedicalEducationDashboard = () => {
 
   return (
     <div className="min-h-[calc(100dvh-4rem)] w-full min-w-0 bg-background p-3 sm:p-4 md:p-6">
-      <div className="mx-auto w-full max-w-screen-2xl min-w-0 space-y-4 sm:space-y-6">
+      <div className="mx-auto w-full max-w-screen-2xl min-w-0 space-y-4">
         <section className="grid grid-cols-1 gap-4 lg:grid-cols-12" aria-label="Study overview">
           <div className="relative isolate overflow-hidden rounded-3xl border border-border bg-linear-to-br from-white via-indigo-50 to-cyan-50 p-6 text-foreground shadow-sm dark:border-border dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 dark:text-foreground sm:p-8 lg:col-span-8">
             <div className="pointer-events-none absolute -right-16 -top-24 -z-10 h-72 w-72 rounded-full bg-indigo-500/20 blur-3xl" />
@@ -484,44 +490,44 @@ const MedicalEducationDashboard = () => {
           </div>
         </section>
 
-        <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-3">
-          <div className="space-y-6 lg:col-span-2">
-            {/* Daily Flashcards */}
-            <div className="rounded-2xl border border-border bg-card p-6 text-card-foreground shadow-sm">
-              <div className="mb-4 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <BookMarked className="h-5 w-5 text-indigo-500" />
-                  <h3 className="font-semibold text-foreground dark:text-foreground">Daily flashcards</h3>
+        <div className={`grid grid-cols-1 items-start gap-4 ${hasFlashcardActivity ? 'lg:grid-cols-3' : ''}`}>
+          {hasFlashcardActivity && (
+            <div className="space-y-6 lg:col-span-2">
+              <div className="rounded-2xl border border-border bg-card p-4 text-card-foreground shadow-sm sm:p-5">
+                <div className="mb-4 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <BookMarked className="h-5 w-5 text-indigo-500" />
+                    <h3 className="font-semibold text-foreground dark:text-foreground">Daily flashcards</h3>
+                  </div>
+                  {(data.flashcards?.due || 0) > 0 && (
+                    <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300">
+                      {data.flashcards?.due} due
+                    </span>
+                  )}
                 </div>
-                {(data.flashcards?.due || 0) > 0 && (
-                  <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300">
-                    {data.flashcards?.due} due
-                  </span>
-                )}
-              </div>
-              <div className="grid grid-cols-3 divide-x divide-border rounded-xl bg-muted py-4 text-center">
-                <div>
-                  <p className="text-xl font-semibold text-foreground dark:text-foreground">{data.flashcards?.due || 0}</p>
-                  <p className="mt-1 text-xs text-muted-foreground dark:text-muted-foreground">Due today</p>
-                </div>
-                <div>
-                  <p className="text-xl font-semibold text-foreground dark:text-foreground">{data.flashcards?.mastered || 0}</p>
-                  <p className="mt-1 text-xs text-muted-foreground dark:text-muted-foreground">Mastered</p>
-                </div>
-                <div>
-                  <p className="text-xl font-semibold text-foreground dark:text-foreground">{data.flashcards?.learning || 0}</p>
-                  <p className="mt-1 text-xs text-muted-foreground dark:text-muted-foreground">In progress</p>
+                <div className="grid grid-cols-3 divide-x divide-border rounded-xl bg-muted py-4 text-center">
+                  <div>
+                    <p className="text-xl font-semibold text-foreground dark:text-foreground">{data.flashcards?.due || 0}</p>
+                    <p className="mt-1 text-xs text-muted-foreground dark:text-muted-foreground">Due today</p>
+                  </div>
+                  <div>
+                    <p className="text-xl font-semibold text-foreground dark:text-foreground">{data.flashcards?.mastered || 0}</p>
+                    <p className="mt-1 text-xs text-muted-foreground dark:text-muted-foreground">Mastered</p>
+                  </div>
+                  <div>
+                    <p className="text-xl font-semibold text-foreground dark:text-foreground">{data.flashcards?.learning || 0}</p>
+                    <p className="mt-1 text-xs text-muted-foreground dark:text-muted-foreground">In progress</p>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-          <div className="h-full">
+          )}
+          <div className={hasFlashcardActivity ? 'h-full' : 'max-w-xl'}>
             <GoalsProgressWidget />
           </div>
         </div>
 
-        {/* Recommended Study Sessions - Improved empty state */}
-        {(data.recommendedStudy?.length || 0) > 0 ? (
+        {Boolean(data.recommendedStudy?.length) && (
           <div className="bg-card text-card-foreground backdrop-blur-sm rounded-2xl p-6 border border-border">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
@@ -578,28 +584,13 @@ const MedicalEducationDashboard = () => {
               ))}
             </div>
           </div>
-        ) : (
-          <div className="bg-card text-card-foreground rounded-2xl p-8 border border-border text-center">
-            <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
-              <Target className="w-8 h-8 text-emerald-600 dark:text-emerald-400" />
-            </div>
-            <h3 className="text-xl font-bold text-foreground dark:text-foreground mb-2">Start Your Learning Journey</h3>
-            <p className="text-muted-foreground dark:text-muted-foreground mb-6 max-w-md mx-auto">
-              Complete a few lessons and our Smart Analytics will recommend personalized study sessions just for you.
-            </p>
-            <button 
-              onClick={() => router.push('/courses')}
-              className="bg-linear-to-r from-emerald-500 to-teal-600 text-white font-semibold px-6 py-3 rounded-xl hover:opacity-90 transition-opacity"
-            >
-              Browse Courses →
-            </button>
-          </div>
         )}
 
         {/* Note: Stats are now in the hero section above */}
 
         {/* Performance Trends Over Time */}
-        <div className="bg-card text-card-foreground rounded-2xl p-6 border border-border shadow-sm relative overflow-hidden">
+        {hasTrendHistory && (
+          <div className="relative overflow-hidden rounded-2xl border border-border bg-card p-4 text-card-foreground shadow-sm sm:p-5">
           {/* Subtle Background Grid Line */}
           <div className="absolute inset-x-0 top-32 border-t border-border z-0" />
           <div className="absolute inset-x-0 top-44 border-t border-border z-0" />
@@ -669,7 +660,7 @@ const MedicalEducationDashboard = () => {
               })}
             </div>
           ) : (
-            <div className="h-64 flex flex-col items-center justify-center gap-2 text-center text-muted-foreground dark:text-muted-foreground">
+            <div className="flex flex-col items-center justify-center gap-2 py-8 text-center text-muted-foreground dark:text-muted-foreground">
               <BarChart3 className="h-8 w-8 text-slate-300 dark:text-muted-foreground" />
               <p className="text-sm font-medium">
                 {selectedTrendMetric === 'score'
@@ -681,7 +672,7 @@ const MedicalEducationDashboard = () => {
             </div>
           )}
           
-          <div className="mt-8 pt-6 border-t border-border dark:border-border/50 flex flex-wrap items-center justify-between gap-4 text-sm relative z-10">
+          <div className="mt-4 border-t border-border pt-4 flex flex-wrap items-center justify-between gap-4 text-sm relative z-10">
             <div className="flex items-center gap-6">
               <div className="flex items-center gap-2">
                 <div className={`w-3 h-3 rounded-full ${selectedTrendMetric === 'score' ? 'bg-indigo-500' : 'bg-emerald-500'}`}></div>
@@ -691,10 +682,12 @@ const MedicalEducationDashboard = () => {
               </div>
             </div>
           </div>
-        </div>
+          </div>
+        )}
 
         {/* Upcoming Deadlines */}
-        <div className="bg-card text-card-foreground rounded-2xl p-6 border border-border">
+        {Boolean(data.upcomingDeadlines?.length) && (
+          <div className="rounded-2xl border border-border bg-card p-4 text-card-foreground sm:p-5">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <AlertCircle className="w-5 h-5 text-orange-500" />
@@ -709,8 +702,7 @@ const MedicalEducationDashboard = () => {
             </button>
           </div>
           <div className="space-y-3">
-            {data.upcomingDeadlines && data.upcomingDeadlines.length > 0 ? (
-              data.upcomingDeadlines.map((deadline: Deadline) => (
+              {data.upcomingDeadlines?.map((deadline: Deadline) => (
                 <div
                   key={deadline.id}
                   onClick={() => {
@@ -751,19 +743,14 @@ const MedicalEducationDashboard = () => {
                     <ChevronRight className="w-5 h-5 text-muted-foreground" />
                   </div>
                 </div>
-              ))
-            ) : (
-              <div className="text-center py-8 bg-muted rounded-xl border border-dashed border-border">
-                <Calendar className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-                <p className="text-sm font-medium text-foreground dark:text-muted-foreground">No upcoming deadlines</p>
-                <p className="text-xs text-muted-foreground max-w-[200px] mx-auto mt-1">You're all caught up! Enjoy your free time or start ahead.</p>
-              </div>
-            )}
+              ))}
           </div>
-        </div>
+          </div>
+        )}
 
         {/* Enrolled Units */}
-        <div className="bg-card text-card-foreground rounded-2xl p-6 border border-border">
+        {enrolledCourses.length > 0 && (
+          <div className="rounded-2xl border border-border bg-card p-4 text-card-foreground sm:p-5">
           <div className="mb-5 flex flex-col items-start gap-2 sm:mb-6 sm:flex-row sm:items-center sm:justify-between">
             <h3 className="text-lg font-semibold text-foreground dark:text-foreground">Enrolled Units</h3>
             <button 
@@ -773,10 +760,8 @@ const MedicalEducationDashboard = () => {
               Browse Catalog
             </button>
           </div>
-          {(data.courseData?.filter(course => (course.progressPercentage ?? 0) < 100).length ?? 0) > 0 ? (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              {data.courseData
-              ?.filter((course: { progressPercentage?: number }) => (course.progressPercentage ?? 0) < 100)
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              {enrolledCourses
               .map((course: { id?: string; unitId?: string; nextTopicId?: string; name?: string; progressPercentage?: number; color?: string; nextTopic?: string; timeLeft?: string; lastUpdated?: number }, index) => (
               <div
                 key={`${course.id ?? 'course'}-${course.unitId ?? index}`}
@@ -833,15 +818,10 @@ const MedicalEducationDashboard = () => {
                   </div>
                 </div>
               </div>
-            ))}
-            </div>
-          ) : (
-            <div className="rounded-xl border border-dashed border-border bg-muted/40 px-5 py-8 text-center">
-              <GraduationCap aria-hidden="true" className="mx-auto mb-2 h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-              <p className="text-sm font-medium text-foreground">No courses in progress. Start something new from the catalog.</p>
-            </div>
-          )}
-        </div>
+          ))}
+          </div>
+          </div>
+        )}
 
       </div>
       

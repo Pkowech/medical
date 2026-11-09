@@ -147,25 +147,27 @@ export const GoalsProgressWidget: React.FC = () => {
   }
 
   return (
-    <div className="rounded-2xl border border-border bg-card p-6 text-card-foreground shadow-sm">
-      <div className="mb-4 flex items-center justify-between">
+    <div className="rounded-2xl border border-border bg-card p-4 text-card-foreground shadow-sm sm:p-5">
+      <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center space-x-3">
           <div className="rounded-lg bg-green-100 p-2 dark:bg-green-950/50">
             <Target className="h-5 w-5 text-green-600 dark:text-green-400" />
           </div>
           <h3 className="text-lg font-semibold text-foreground">Learning Goals</h3>
         </div>
-        <Link
-          href="/study-planner/goals"
-          className="flex items-center space-x-1 text-sm font-medium text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300"
-        >
-          <span>View All</span>
-          <ChevronRight className="w-4 h-4" />
-        </Link>
+        {goals.length > 0 && (
+          <Link
+            href="/study-planner/goals"
+            className="flex items-center space-x-1 text-sm font-medium text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300"
+          >
+            <span>View All</span>
+            <ChevronRight className="w-4 h-4" />
+          </Link>
+        )}
       </div>
 
       {/* Quick Stats */}
-      {analytics && (
+      {analytics && goals.length > 0 && (
         <div className="mt-6 grid grid-cols-2 gap-4 border-t border-border pt-6 text-center">
           <div>
             <div className="text-2xl font-bold text-foreground">{analytics.activeGoals}</div>
@@ -181,18 +183,14 @@ export const GoalsProgressWidget: React.FC = () => {
       )}
 
       {goals.length === 0 ? (
-        <div className="text-center py-8">
-          <Target className="mx-auto mb-3 h-12 w-12 text-muted-foreground" />
-          <h4 className="mb-2 text-lg font-medium text-foreground">No Active Goals</h4>
-          <p className="mb-4 text-muted-foreground">
-            Set learning goals to track your progress and stay motivated
-          </p>
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-dashed border-border bg-muted/40 px-4 py-3">
+          <p className="text-sm text-muted-foreground">No goals yet</p>
           <Link
             href="/study-planner/goals"
-            className="inline-flex items-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
+            className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-green-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700"
           >
-            <Target className="w-4 h-4" />
-            <span>Create Your First Goal</span>
+            <Target aria-hidden="true" className="h-4 w-4" />
+            <span>Create goal</span>
           </Link>
         </div>
       ) : (
