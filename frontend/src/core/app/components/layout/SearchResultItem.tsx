@@ -22,7 +22,7 @@ export const SearchResultItem: React.FC<SearchResultItemProps> = ({ course, onSe
   else if (course.type === 'topic') href = `/topics/${course.id}`;
   else if (course.type === 'material') href = `/materials/${course.id}`;
   else if (course.type === 'user') href = `/profile/${course.id}`;
-  else if (course.type === 'quiz') href = `/quiz/${course.id}`;
+  else if (course.type === 'quiz') href = '/assessment';
   else if (course.type === 'case') href = `/clinical-cases/${course.id}`;
 
   return (

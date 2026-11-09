@@ -11,6 +11,7 @@ import { SEARCH_RESULT_ROUTES, SEARCH_RESULT_COLORS, SearchResultType } from '..
  */
 export function getSearchResultRoute(type: string, id: string): string {
   const baseRoute = SEARCH_RESULT_ROUTES[type as SearchResultType] || '/';
+  if (type === 'quiz') return baseRoute;
   return `${baseRoute}/${id}`;
 }
 

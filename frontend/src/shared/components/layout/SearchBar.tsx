@@ -76,7 +76,7 @@ export default function SearchBar() {
     switch (result.type) {
       case 'course': return `/courses/${result.id}`;
       case 'material': return `/materials/${result.id}`;
-      case 'quiz': return `/quizzes/${result.id}`;
+      case 'quiz': return '/assessment';
       case 'unit': return `/units/${result.id}`;
       case 'topic': return `/topics/${result.id}`;
       case 'case': return `/materials/clinical-cases/${result.id}`;

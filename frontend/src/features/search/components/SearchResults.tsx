@@ -186,7 +186,7 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
               else if (r.type === 'material') href = `/materials/${r.id}`;
               else if (r.type === 'unit') href = `/units/${r.id}`;
               else if (r.type === 'topic') href = `/topics/${r.id}`;
-              else if (r.type === 'quiz') href = `/quiz/${r.id}`;
+              else if (r.type === 'quiz') href = '/assessment';
               else if (r.type === 'case') href = `/clinical-cases/${r.id}`;
 
               const relevanceLevel = getRelevanceLevel(r.relevance);

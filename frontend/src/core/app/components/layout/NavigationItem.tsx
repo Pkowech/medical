@@ -21,6 +21,7 @@ export const NavigationItemComponent: React.FC<NavigationItemProps> = ({
   // Determine if this item or any of its children are active
   const isActive = (path?: string) => {
     if (!path) return false;
+    if (path === '/assessment' && pathname?.startsWith('/quiz/')) return true;
     if (pathname === path) return true;
     if (path !== '/' && pathname.startsWith(`${path}/`)) return true;
     return false;

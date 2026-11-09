@@ -259,11 +259,6 @@ export const pageMetadata: RouteMetadata[] = [
     description: 'Track your course progress, study activity, and goals.',
   },
   {
-    path: '/quiz',
-    title: 'Quizzes',
-    description: 'Browse quizzes and practice medical topics.',
-  },
-  {
     path: '/quiz/history',
     title: 'Quiz History',
     description: 'Review your previous quiz attempts and results.',

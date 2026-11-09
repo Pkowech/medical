@@ -86,7 +86,7 @@ export const SEARCH_RESULT_ROUTES: Record<SearchResultType, string> = {
   material: '/materials',
   unit: '/units',
   topic: '/topics',
-  quiz: '/quiz',
+  quiz: '/assessment',
   clinical_case: '/clinical-cases',
   user: '/profile',
 };

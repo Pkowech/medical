@@ -38,15 +38,9 @@ const navigationConfig: NavigationItem[] = [
     icon: Brain,
     children: [
       {
-        id: 'assessments',
-        label: 'Assessments',
-        href: '/assessment',
-        icon: FileText,
-      },
-      {
         id: 'quizzes',
-        label: 'Quizzes',
-        href: '/quiz',
+        label: 'Quizzes & Assessments',
+        href: '/assessment',
         icon: Target,
         children: [
           {
