@@ -2,7 +2,6 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import {
   Brain,
@@ -16,7 +15,6 @@ import {
   BookOpen,
   ArrowRight,
   RotateCcw,
-  Stethoscope,
   GraduationCap,
   Award,
   Layers,
@@ -26,7 +24,6 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/shared/components/ui/card';
 import { Button } from '@/shared/components/ui/button';
 import { Badge } from '@/shared/components/ui/badge';
-import { Progress } from '@/shared/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
 import { useAssessments } from '@/features/assessment/hooks/useAssessments';
 import { AdaptiveQuiz } from '@/features/assessment/components/adaptiveQuiz/AdaptiveQuiz';
@@ -34,16 +31,22 @@ import { PerformanceAnalyticsContent } from '@/features/assessment/components/Pe
 import type { Assessment } from '@/features/assessment/services/assessmentService';
 
 export function AssessmentDashboard() {
-  const router = useRouter();
   const { data: session } = useSession();
-  const { assessments, summary, loading, refreshAssessments } = useAssessments();
+  const {
+    assessments,
+    summary,
+    history,
+    historyError,
+    loading,
+    refreshAssessments,
+  } = useAssessments();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [selectedType, setSelectedType] = useState<string>('All');
   const [isAdaptiveActive, setIsAdaptiveActive] = useState(false);
 
-  const categories = ['All', 'General Medicine', 'Cardiology', 'Pharmacology', 'Emergency Medicine', 'Neurology'];
+  const categories = ['All', ...new Set(assessments.map(assessment => assessment.category))];
 
   const filteredAssessments = assessments.filter(assessment => {
     const matchesCategory = selectedCategory === 'All' || assessment.category.toLowerCase() === selectedCategory.toLowerCase();
@@ -55,23 +58,8 @@ export function AssessmentDashboard() {
     return matchesCategory && matchesType && matchesSearch;
   });
 
-  const getDifficultyBadge = (difficulty: Assessment['difficulty']) => {
-    switch (difficulty) {
-      case 'easy':
-        return <Badge variant="outline" className="border-green-500/30 text-green-600 dark:text-green-400 bg-green-500/10">Easy</Badge>;
-      case 'medium':
-        return <Badge variant="outline" className="border-amber-500/30 text-amber-600 dark:text-amber-400 bg-amber-500/10">Intermediate</Badge>;
-      case 'hard':
-        return <Badge variant="outline" className="border-red-500/30 text-red-600 dark:text-red-400 bg-red-500/10">Advanced</Badge>;
-      default:
-        return null;
-    }
-  };
-
   const getTypeBadge = (type: Assessment['type']) => {
     switch (type) {
-      case 'exam':
-        return <Badge className="bg-purple-600 text-white hover:bg-purple-700">Comprehensive Exam</Badge>;
       case 'adaptive':
         return <Badge className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white">AI Adaptive</Badge>;
       default:
@@ -112,7 +100,7 @@ export function AssessmentDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-foreground">
-              {overallScore !== null && Number.isFinite(overallScore) ? `${overallScore.toFixed(1)}%` : '78.5%'}
+              {loading ? '…' : overallScore !== null && Number.isFinite(overallScore) ? `${overallScore.toFixed(1)}%` : '—'}
             </div>
             <p className="text-xs text-muted-foreground mt-1">Weighted average across completed tests</p>
           </CardContent>
@@ -124,7 +112,7 @@ export function AssessmentDashboard() {
             <CheckCircle2 className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">{totalAttempts > 0 ? totalAttempts : 14}</div>
+            <div className="text-2xl font-bold text-foreground">{loading ? '…' : summary ? totalAttempts : '—'}</div>
             <p className="text-xs text-muted-foreground mt-1">Evaluations submitted to date</p>
           </CardContent>
         </Card>
@@ -135,7 +123,7 @@ export function AssessmentDashboard() {
             <Target className="h-4 w-4 text-purple-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">{questionsAttempted > 0 ? questionsAttempted : 185}</div>
+            <div className="text-2xl font-bold text-foreground">{loading ? '…' : summary ? questionsAttempted : '—'}</div>
             <p className="text-xs text-muted-foreground mt-1">Clinical question items resolved</p>
           </CardContent>
         </Card>
@@ -146,8 +134,8 @@ export function AssessmentDashboard() {
             <TrendingUp className="h-4 w-4 text-amber-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">Level 3</div>
-            <p className="text-xs text-muted-foreground mt-1">Passing standard on target</p>
+            <div className="text-2xl font-bold text-foreground">—</div>
+            <p className="text-xs text-muted-foreground mt-1">No readiness assessment available</p>
           </CardContent>
         </Card>
       </div>
@@ -264,7 +252,6 @@ export function AssessmentDashboard() {
                   <CardHeader className="space-y-3 pb-4">
                     <div className="flex items-center justify-between gap-2">
                       {getTypeBadge(assessment.type)}
-                      {getDifficultyBadge(assessment.difficulty)}
                     </div>
                     <div>
                       <span className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
@@ -291,7 +278,7 @@ export function AssessmentDashboard() {
                       </div>
                       <div className="flex items-center gap-1.5">
                         <Target className="h-3.5 w-3.5 text-muted-foreground" />
-                        <span>Pass: {assessment.passingScore}%</span>
+                        <span>{assessment.passingScore > 0 ? `Pass: ${assessment.passingScore}%` : 'Pass score n/a'}</span>
                       </div>
                       <div className="flex items-center gap-1.5">
                         <GraduationCap className="h-3.5 w-3.5 text-muted-foreground" />
@@ -332,69 +319,11 @@ export function AssessmentDashboard() {
           {summary ? (
             <PerformanceAnalyticsContent userId={session?.user?.id || ''} data={summary} />
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Target className="h-5 w-5 text-blue-500" />
-                    Specialty Knowledge Breakdown
-                  </CardTitle>
-                  <CardDescription>Accuracy rate across clinical domains</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {[
-                    { specialty: 'General Medicine & Physical Exam', score: 88, status: 'Strong' },
-                    { specialty: 'Cardiovascular Pathology', score: 76, status: 'Proficient' },
-                    { specialty: 'Pharmacology & Toxicology', score: 62, status: 'Needs Review' },
-                    { specialty: 'Emergency & Trauma Resuscitation', score: 58, status: 'High Risk' },
-                    { specialty: 'Neurology & Localizing Signs', score: 72, status: 'Proficient' },
-                  ].map((item, idx) => (
-                    <div key={idx} className="space-y-1.5">
-                      <div className="flex justify-between text-xs">
-                        <span className="font-medium text-foreground">{item.specialty}</span>
-                        <span className="font-semibold">{item.score}%</span>
-                      </div>
-                      <Progress
-                        value={item.score}
-                        className={`h-2 ${item.score < 65 ? '[&>div]:bg-red-500' : item.score < 75 ? '[&>div]:bg-amber-500' : '[&>div]:bg-green-500'}`}
-                      />
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <AlertTriangle className="h-5 w-5 text-amber-500" />
-                    High-Yield Topics Recommended for Review
-                  </CardTitle>
-                  <CardDescription>AI-detected clinical concepts requiring reinforcement</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {[
-                    { topic: 'ACLS Arrhythmia Algorithms', reason: 'Repeated errors on VTach vs VFib differentiation' },
-                    { topic: 'Cytochrome P450 Drug Interactions', reason: 'Low accuracy on warfarin & macrolide interactions' },
-                    { topic: 'Cranial Nerve Localization', reason: 'Missed brainstem stroke syndromes in recent cases' },
-                  ].map((rec, i) => (
-                    <div key={i} className="p-3 rounded-lg border border-border bg-muted/30 space-y-1">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-semibold text-foreground">{rec.topic}</span>
-                        <Badge variant="outline" className="text-xs text-amber-600 border-amber-500/30">Priority</Badge>
-                      </div>
-                      <p className="text-xs text-muted-foreground">{rec.reason}</p>
-                    </div>
-                  ))}
-                  <div className="pt-2">
-                    <Button variant="outline" className="w-full text-xs" asChild>
-                      <Link href="/flashcards">
-                        Practice Flashcards for These Topics <ChevronRight className="h-3.5 w-3.5 ml-1" />
-                      </Link>
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+            <Card>
+              <CardContent className="p-8 text-center text-sm text-muted-foreground">
+                Assessment analytics will appear here after your first completed assessment.
+              </CardContent>
+            </Card>
           )}
         </TabsContent>
 
@@ -413,59 +342,48 @@ export function AssessmentDashboard() {
               </Button>
             </CardHeader>
             <CardContent>
-              <div className="divide-y divide-border">
-                {[
-                  {
-                    title: 'Clinical Practice Foundations',
-                    type: 'Modular Quiz',
-                    date: 'Yesterday, 3:45 PM',
-                    score: 90,
-                    passed: true,
-                    assessmentId: 'quiz-gm101-basics',
-                  },
-                  {
-                    title: 'Cardiovascular Pathology & ECG',
-                    type: 'Comprehensive Exam',
-                    date: '3 days ago',
-                    score: 76,
-                    passed: true,
-                    assessmentId: 'cardiology-core-exam',
-                  },
-                  {
-                    title: 'Emergency Medicine: Acute Trauma',
-                    type: 'Comprehensive Exam',
-                    date: '1 week ago',
-                    score: 58,
-                    passed: false,
-                    assessmentId: 'emergency-trauma-resuscitation',
-                  },
-                ].map((item, idx) => (
-                  <div key={idx} className="py-3.5 flex items-center justify-between gap-4">
+              {historyError ? (
+                <p className="py-4 text-sm text-muted-foreground" role="status">
+                  Assessment history couldn’t be loaded. Try refreshing the page.
+                </p>
+              ) : history.length === 0 ? (
+                <p className="py-4 text-sm text-muted-foreground">
+                  No completed assessment attempts yet.
+                </p>
+              ) : (
+                <div className="divide-y divide-border">
+                  {history.map(item => (
+                    <div key={item.id} className="py-3.5 flex items-center justify-between gap-4">
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold text-foreground">{item.title}</span>
-                        <Badge variant="secondary" className="text-xs">{item.type}</Badge>
+                        <span className="text-sm font-semibold text-foreground">{item.quizTitle}</span>
+                        <Badge variant="secondary" className="text-xs">Quiz</Badge>
                       </div>
-                      <span className="text-xs text-muted-foreground">{item.date}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(item.completedAt).toLocaleString()}
+                      </span>
                     </div>
 
                     <div className="flex items-center gap-4">
                       <div className="text-right">
-                        <div className={`text-sm font-bold ${item.passed ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                          {item.score}%
+                        <div className="text-sm font-bold">
+                          {Number.isFinite(item.score) ? `${item.score.toFixed(1)}%` : '—'}
                         </div>
-                        <span className="text-xs text-muted-foreground">{item.passed ? 'Passed' : 'Needs Retake'}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {item.correctAnswers}/{item.totalQuestions} correct
+                        </span>
                       </div>
 
                       <Button variant="ghost" size="sm" asChild>
-                        <Link href={`/assessment/${item.assessmentId}`}>
-                          Retake
+                        <Link href={`/assessment/${item.quizId}`}>
+                          Review
                         </Link>
                       </Button>
                     </div>
                   </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

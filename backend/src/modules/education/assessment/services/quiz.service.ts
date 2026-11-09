@@ -486,6 +486,10 @@ export class QuizService {
         select: {
           id: true,
           title: true,
+          description: true,
+          timeLimit: true,
+          questionCount: true,
+          isAdaptive: true,
           maxAttempts: true,
           passingScore: true,
           isPublished: true,

@@ -43,6 +43,21 @@ export class QuizController {
     return this.quizService.getQuestionsByUnit(unitId);
   }
 
+  @Get()
+  @ApiOperation({ summary: 'List published quizzes' })
+  async findMany(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.quizService.findMany(
+      {
+        page: Math.max(1, Number.parseInt(page ?? '1', 10) || 1),
+        limit: Math.min(100, Math.max(1, Number.parseInt(limit ?? '100', 10) || 100)),
+      },
+      { isPublished: true },
+    );
+  }
+
   @Get('topic/:topicId')
   @ApiOperation({ summary: 'Get questions for a topic-based quiz' })
   async getQuestionsByTopic(@Param('topicId') topicId: string) {
