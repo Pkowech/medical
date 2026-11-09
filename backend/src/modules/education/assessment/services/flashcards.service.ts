@@ -343,16 +343,30 @@ export class FlashcardsService {
 
     const result = this.sm2Algorithm.reviewCard(sm2Card, quality);
 
-    const updatedUserProgress = await this.prisma.userFlashcardProgress.update({
-      where: { id: userFlashcardProgressId },
-      data: {
-        easeFactor: result.updated.easeFactor,
-        interval: result.updated.interval,
-        nextReview: result.updated.nextReviewDate,
-        lastReview: new Date(),
-        correctStreak: result.updated.correctStreak,
-        repetitions: result.updated.repetitions,
-      },
+    const reviewedAt = new Date();
+    const updatedUserProgress = await this.prisma.$transaction(async (tx) => {
+      const progress = await tx.userFlashcardProgress.update({
+        where: { id: userFlashcardProgressId },
+        data: {
+          easeFactor: result.updated.easeFactor,
+          interval: result.updated.interval,
+          nextReview: result.updated.nextReviewDate,
+          lastReview: reviewedAt,
+          correctStreak: result.updated.correctStreak,
+          repetitions: result.updated.repetitions,
+        },
+      });
+
+      await tx.flashcardResult.create({
+        data: {
+          userId,
+          flashcardId: userProgress.flashcardId,
+          passed: quality >= 3,
+          attemptedAt: reviewedAt,
+        },
+      });
+
+      return progress;
     });
 
     // Invalidate Redis cache keys
@@ -439,6 +453,15 @@ export class FlashcardsService {
             correctStreak: review.updated.correctStreak,
             lastReview: now,
             nextReview: review.updated.nextReviewDate,
+          },
+        });
+
+        await tx.flashcardResult.create({
+          data: {
+            userId,
+            flashcardId: flashcard.id,
+            passed: answer.isCorrect,
+            attemptedAt: now,
           },
         });
       }

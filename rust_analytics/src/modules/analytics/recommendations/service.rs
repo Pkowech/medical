@@ -258,7 +258,13 @@ async fn get_candidate_paths(
             lp.title,
             lp.description,
             lp.difficulty::text AS difficulty,
-            lp.path_structure
+            ARRAY(
+                SELECT DISTINCT lpm.title
+                FROM learning_path_phases lpp
+                JOIN learning_path_modules lpm ON lpm.phase_id = lpp.id
+                WHERE lpp.learning_path_id = lp.id
+                ORDER BY lpm.title
+            ) AS module_titles
         FROM learning_paths lp
         WHERE lp.status = 'published'
         AND NOT EXISTS (
@@ -280,9 +286,7 @@ async fn get_candidate_paths(
         .map(|row| {
             let title: String = row.try_get("title").unwrap_or_default();
             let description: Option<String> = row.try_get("description").ok();
-            let path_structure: Option<serde_json::Value> =
-                row.try_get("path_structure").unwrap_or(None);
-            let mut topics = extract_topics_from_structure(&path_structure);
+            let mut topics: Vec<String> = row.try_get("module_titles").unwrap_or_default();
             topics.push(title.clone());
             if let Some(description) = description.as_deref() {
                 topics.push(description.to_string());
@@ -438,19 +442,6 @@ async fn infer_learning_style(user_id: &str, pool: &Pool<Postgres>) -> Result<St
     } else {
         Ok("reading_writing".to_string())
     }
-}
-
-/// Extract topics from path structure JSON
-fn extract_topics_from_structure(structure: &Option<serde_json::Value>) -> Vec<String> {
-    if let Some(serde_json::Value::Object(map)) = structure {
-        if let Some(serde_json::Value::Array(topics)) = map.get("topics") {
-            return topics
-                .iter()
-                .filter_map(|t| t.as_str().map(|s| s.to_string()))
-                .collect();
-        }
-    }
-    vec![]
 }
 
 #[allow(dead_code)]

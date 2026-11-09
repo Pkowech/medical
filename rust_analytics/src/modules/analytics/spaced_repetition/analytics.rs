@@ -211,7 +211,7 @@ impl SpacedRepetitionAnalytics {
         .await
         .map_err(|e| SpacedRepetitionError::DatabaseError(e.to_string()))?;
 
-        // Calculate recent pass rate from flashcard_results (if available)
+        // Calculate the pass rate from reviews recorded in the previous seven days.
         let recent_pass_rate: Option<f64> = sqlx::query_scalar(
             r#"
             SELECT 
@@ -341,12 +341,14 @@ impl SpacedRepetitionAnalytics {
                 r#"
                 SELECT 
                   COALESCE(
-                    SUM(CASE WHEN passed THEN 1 ELSE 0 END)::FLOAT / 
+                    SUM(CASE WHEN fr.passed THEN 1 ELSE 0 END)::FLOAT /
                     NULLIF(COUNT(*)::FLOAT, 0),
                     0.0
                   )
                 FROM flashcard_results fr
-                INNER JOIN user_flashcard_progress ufp ON fr.user_id = ufp.user_id
+                INNER JOIN user_flashcard_progress ufp
+                  ON fr.user_id = ufp.user_id
+                 AND fr.flashcard_id = ufp.flashcard_id
                 WHERE fr.user_id = $1 
                 AND ufp.ease_factor >= $2 
                 AND ufp.ease_factor < $3
@@ -387,7 +389,7 @@ impl SpacedRepetitionAnalytics {
             r#"
             SELECT 
               DATE_TRUNC('day', attempted_at) as date,
-              COUNT(DISTINCT unit_id) as cards_reviewed,
+              COUNT(DISTINCT flashcard_id) as cards_reviewed,
               SUM(CASE WHEN passed THEN 1 ELSE 0 END) as successful,
               SUM(CASE WHEN NOT passed THEN 1 ELSE 0 END) as failed
             FROM flashcard_results
@@ -451,7 +453,7 @@ impl SpacedRepetitionAnalytics {
             r#"
             SELECT 
               t.name,
-              COUNT(ufp.id) as card_count,
+              COUNT(DISTINCT ufp.id) as card_count,
               COALESCE(
                 SUM(CASE WHEN fr.passed THEN 1 ELSE 0 END)::FLOAT / 
                 NULLIF(COUNT(fr.id)::FLOAT, 0),
@@ -460,8 +462,10 @@ impl SpacedRepetitionAnalytics {
             FROM user_flashcard_progress ufp
             INNER JOIN flashcards f ON ufp.flashcard_id = f.id
             INNER JOIN questions q ON f.question_id = q.id
-            LEFT JOIN flashcard_results fr ON ufp.user_id = fr.user_id
-            LEFT JOIN topics t ON q.unit_id = t.unit_id
+            LEFT JOIN flashcard_results fr
+              ON fr.user_id = ufp.user_id
+             AND fr.flashcard_id = ufp.flashcard_id
+            INNER JOIN topics t ON t.id = ANY(q.topic_ids)
             WHERE ufp.user_id = $1 
             AND (ufp.correct_streak = 0 OR ufp.ease_factor < 1.8)
             GROUP BY t.name

@@ -275,9 +275,24 @@ model Flashcard {
   updatedAt    DateTime                @updatedAt @map("updated_at")
   question     Question?               @relation(fields: [questionId], references: [id])
   userProgress UserFlashcardProgress[]
+  results      FlashcardResult[]
 
   @@index([questionId])
   @@map("flashcards")
+}
+
+model FlashcardResult {
+  id          String    @id @default(uuid())
+  userId      String    @map("user_id")
+  flashcardId String    @map("flashcard_id")
+  passed      Boolean
+  attemptedAt DateTime  @default(now()) @map("attempted_at")
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  flashcard   Flashcard @relation(fields: [flashcardId], references: [id], onDelete: Cascade)
+
+  @@index([userId, attemptedAt])
+  @@index([userId, flashcardId, attemptedAt])
+  @@map("flashcard_results")
 }
 
 model UserFlashcardProgress {
@@ -389,6 +404,7 @@ model User {
   userActivities                 UserActivity[]
   userBadges                     UserBadge[]                     @relation("UserUserBadges")
   userFlashcardProgresses        UserFlashcardProgress[]
+  flashcardResults               FlashcardResult[]
   googleDriveConnection          GoogleDriveConnection?
   analytics                      UserLearningAnalytics?
   UserResponse                   UserResponse[]
