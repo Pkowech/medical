@@ -61,10 +61,10 @@ export function Sidebar({
   const unreadNotifications = notifications.filter(notification => !notification.read);
   const visibleNavigationItems = isDesktop
     ? navigationItems
-    : navigationItems.filter(
-        item =>
-          !mobilePrimaryNavigation.some(tab => tab.href === item.href) ||
-          Boolean(item.children?.length) || item.id === 'search',
+    : navigationItems.flatMap(item =>
+        mobilePrimaryNavigation.some(tab => tab.href === item.href)
+          ? item.children ?? []
+          : [item],
       );
 
   useEffect(() => {

@@ -43,15 +43,13 @@ export function MobileTabBar({ navigationItems }: MobileTabBarProps) {
               aria-current={isActive ? 'page' : undefined}
               className={`flex min-h-11 min-w-0 flex-col items-center justify-center gap-1 px-1 text-xs font-medium transition-colors active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary motion-reduce:transition-none ${
                 isActive
-                  ? 'text-blue-700 dark:text-blue-300'
+                  ? 'text-emerald-700 dark:text-emerald-400'
                   : 'text-muted-foreground hover:text-foreground dark:text-muted-foreground dark:hover:text-foreground'
               }`}
             >
               <Icon
                 aria-hidden="true"
-                className={`h-5 w-5 transition-transform motion-reduce:transition-none ${
-                  isActive ? 'scale-105' : ''
-                }`}
+                className="h-[18px] w-[18px] transition-transform motion-reduce:transition-none"
               />
               <span className="max-w-full truncate">{label}</span>
             </Link>

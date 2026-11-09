@@ -54,7 +54,7 @@ export const NavigationItemComponent: React.FC<NavigationItemProps> = ({
       <div className={`flex min-w-0 items-center ${showLabel ? 'space-x-3' : 'justify-center'}`}>
         <item.icon
           aria-hidden="true"
-          className={`h-5 w-5 shrink-0 ${item.color || 'text-muted-foreground dark:text-muted-foreground'}`}
+          className={`h-[18px] w-[18px] shrink-0 ${item.color || 'text-muted-foreground dark:text-muted-foreground'}`}
         />
         {showLabel && (
           <>
