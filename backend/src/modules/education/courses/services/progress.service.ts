@@ -880,7 +880,7 @@ export class ProgressService {
 
   async getUserOverallProgress(
     userId: string,
-  ): Promise<OverallProgress | undefined> {
+  ): Promise<OverallProgress> {
     const cacheKey = cacheKeys.progressOverall(userId);
     const cached = await this.redisService.get<OverallProgress>(cacheKey);
     if (cached) {
@@ -922,7 +922,7 @@ export class ProgressService {
       return result;
     } catch (error) {
       handleServiceError(error, this.logger, 'getUserOverallProgress');
-      return undefined;
+      throw error;
     }
   }
 
@@ -993,7 +993,7 @@ export class ProgressService {
       return result;
     } catch (error) {
       handleServiceError(error, this.logger, 'getCourseProgress');
-      return [];
+      throw error;
     }
   }
 
@@ -1168,7 +1168,7 @@ export class ProgressService {
         .filter((unit): unit is NonNullable<typeof unit> => unit !== null);
     } catch (error) {
       handleServiceError(error, this.logger, 'getEnrolledUnitsDashboard');
-      return [];
+      throw error;
     }
   }
 
@@ -1281,11 +1281,32 @@ export class ProgressService {
     return { totalMinutes, weeklyStudyTime };
   }
 
-  getUserAchievements(): any[] {
-    // Assuming an Achievement model or similar for achievements
-    // For now, returning a mock or empty array if no Achievement model exists
-    // You would replace this with actual database queries for achievements
-    return [];
+  async getUserAchievements(userId: string): Promise<
+    Array<{
+      id: string;
+      title: string;
+      description: string;
+      icon: string;
+      dateEarned: string;
+    }>
+  > {
+    const userBadges = await this.prisma.userBadge.findMany({
+      where: { userId },
+      include: {
+        badge: {
+          select: { name: true, description: true, imageUrl: true },
+        },
+      },
+      orderBy: { awardedAt: 'desc' },
+    });
+
+    return userBadges.map((userBadge) => ({
+      id: userBadge.badgeId,
+      title: userBadge.badge.name,
+      description: userBadge.badge.description ?? '',
+      icon: userBadge.badge.imageUrl ?? 'trophy',
+      dateEarned: userBadge.awardedAt.toISOString(),
+    }));
   }
 
   async calculateOverallProgress(userId: string): Promise<number | undefined> {
@@ -1763,16 +1784,7 @@ export class ProgressService {
         `Error getting peer comparison for user ${userId}:`,
         error,
       );
-      return {
-        yourAverage: 0,
-        cohortAverage: 0,
-        topPerformer: 0,
-        rank: 0,
-        percentile: 0,
-        totalStudents: 0,
-        cohortLabel: 'Platform-Wide Medical Learners',
-        cohortTier: 'GLOBAL',
-      };
+      throw error;
     }
   }
 
@@ -1780,13 +1792,12 @@ export class ProgressService {
    * Get user streak information (current and longest)
    */
   async getUserStreaks(userId: string): Promise<
-    | {
-        userId: string;
-        currentStreak: number;
-        longestStreak: number;
-        lastActivityDate: Date | null;
-      }
-    | undefined
+    {
+      userId: string;
+      currentStreak: number;
+      longestStreak: number;
+      lastActivityDate: Date | null;
+    }
   > {
     try {
       const learningActivities = await this.prisma.userActivity.findMany({
@@ -1820,7 +1831,7 @@ export class ProgressService {
       };
     } catch (error) {
       this.logger.error(`Error getting user streaks for ${userId}:`, error);
-      return undefined;
+      throw error;
     }
   }
 

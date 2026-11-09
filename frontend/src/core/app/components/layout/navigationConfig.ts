@@ -117,7 +117,7 @@ const navigationConfig: NavigationItem[] = [
   },
   {
     id: 'progress-tracking',
-    label: 'Progress & Analytics',
+    label: 'Progress',
     href: '/progress',
     icon: BarChart,
     children: [

@@ -440,6 +440,7 @@ export interface Specialization {
  */
 export interface ProgressData {
   overallProgress: number;
+  dataWarnings?: string[];
   dailyStreak?: number;
   weeklyStudyMinutes?: number;
   totalHoursStudied?: number;

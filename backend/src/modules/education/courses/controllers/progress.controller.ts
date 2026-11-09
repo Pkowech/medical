@@ -7,14 +7,13 @@ import {
   UseGuards,
   Request,
   ParseUUIDPipe,
-  ValidationPipe,
   Headers,
   Query,
   HttpCode,
   HttpStatus,
-  BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
-import { Request as ExpressRequest } from 'express';
+import { User } from '@prisma/client';
 import {
   ApiTags,
   ApiOperation,
@@ -22,15 +21,13 @@ import {
   ApiParam,
   ApiQuery,
 } from '@nestjs/swagger';
-import { ProgressStatus } from '@prisma/client';
+import { Role } from '#modules/auth/constants/role.constants';
+import { getUserPrimaryRole } from '#common/utils/role.util';
+import { CurrentUser } from '#common/decorators/current-user.decorator';
 import { ProgressService } from '../services/progress.service';
 import { JwtAuthGuard } from '#modules/auth/guards/jwt-auth.guard';
 import { AssessmentAnalyticsService } from '../../../ai-analytics/services/assessment-analytics.service';
 import { StudyService } from '../services/study.service';
-
-interface UserRequest extends ExpressRequest {
-  user?: { id: string };
-}
 
 @ApiTags('Progress')
 @Controller('progress')
@@ -42,18 +39,30 @@ export class ProgressController {
     private readonly studyService: StudyService,
   ) {}
 
+  private assertCanReadUserProgress(
+    currentUser: User,
+    requestedUserId: string,
+  ): void {
+    if (
+      currentUser.id !== requestedUserId &&
+      getUserPrimaryRole(currentUser) !== Role.admin
+    ) {
+      throw new ForbiddenException('You can only access your own progress');
+    }
+  }
+
   @Get('dashboard/:userId')
   @ApiOperation({
     summary: 'Get aggregated study dashboard data to reduce HTTP round-trips',
   })
   @ApiParam({ name: 'userId', description: 'User ID' })
   @ApiResponse({ status: 200, description: 'Aggregated dashboard data' })
-  async getDashboardData(@Param('userId') userIdParam: string, @Request() req: UserRequest) {
-    if (userIdParam === 'me' && (!req.user?.id)) {
-      throw new BadRequestException('User ID not available in request');
-    }
-    const userId = userIdParam === 'me' ? req.user!.id : userIdParam;
-    const achievements = this.progressService.getUserAchievements();
+  async getDashboardData(
+    @Param('userId') userIdParam: string,
+    @CurrentUser() currentUser: User,
+  ) {
+    const userId = userIdParam === 'me' ? currentUser.id : userIdParam;
+    this.assertCanReadUserProgress(currentUser, userId);
     
     // Fetch all components with individual error handling to ensure resilience
     // If one service (e.g. gRPC analytics) is down, we still want to show the rest
@@ -66,6 +75,7 @@ export class ProgressController {
       streaksResult,
       deadlinesResult,
       dueReviewsResult,
+      achievementsResult,
     ] = await Promise.allSettled([
       this.progressService.getUserOverallProgress(userId),
       this.progressService.getCourseProgress(userId),
@@ -75,7 +85,26 @@ export class ProgressController {
       this.progressService.getUserStreaks(userId),
       this.studyService.getDeadlines(userId),
       this.studyService.getDueReviews(userId),
+      this.progressService.getUserAchievements(userId),
     ]);
+
+    const unavailableSections = [
+      ...(overviewResult.status === 'rejected' ||
+      !overviewResult.value ||
+      !overviewResult.value.stats
+        ? ['overview']
+        : []),
+      ...(coursesResult.status === 'rejected' ? ['courses'] : []),
+      ...(enrolledUnitsResult.status === 'rejected' ? ['enrolled units'] : []),
+      ...(activitiesResult.status === 'rejected' ? ['activities'] : []),
+      ...(peerComparisonResult.status === 'rejected' ? ['peer comparison'] : []),
+      ...(streaksResult.status === 'rejected' || !streaksResult.value
+        ? ['streaks']
+        : []),
+      ...(deadlinesResult.status === 'rejected' ? ['deadlines'] : []),
+      ...(dueReviewsResult.status === 'rejected' ? ['due reviews'] : []),
+      ...(achievementsResult.status === 'rejected' ? ['achievements'] : []),
+    ];
 
     return {
       overview: overviewResult.status === 'fulfilled' ? overviewResult.value : null,
@@ -86,11 +115,13 @@ export class ProgressController {
         overviewResult.status === 'fulfilled'
           ? overviewResult.value?.stats?.weeklyStudyTime ?? null
           : null,
-      achievements,
+      achievements:
+        achievementsResult.status === 'fulfilled' ? achievementsResult.value : [],
       peerComparison: peerComparisonResult.status === 'fulfilled' ? peerComparisonResult.value : null,
       streaks: streaksResult.status === 'fulfilled' ? streaksResult.value : null,
       deadlines: deadlinesResult.status === 'fulfilled' ? deadlinesResult.value : [],
       dueReviews: dueReviewsResult.status === 'fulfilled' ? dueReviewsResult.value : [],
+      unavailableSections,
     };
   }
 
@@ -106,7 +137,11 @@ export class ProgressController {
     description: 'Progress overview retrieved successfully',
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async getProgressOverview(@Param('userId', ParseUUIDPipe) userId: string) {
+  async getProgressOverview(
+    @Param('userId', ParseUUIDPipe) userId: string,
+    @CurrentUser() currentUser: User,
+  ) {
+    this.assertCanReadUserProgress(currentUser, userId);
     // Return the full overall progress object (includes stats, streaks, enrollments)
     return this.progressService.getUserOverallProgress(userId);
   }
@@ -130,7 +165,11 @@ export class ProgressController {
     description: 'Course progress retrieved successfully',
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async getCourseProgress(@Param('userId', ParseUUIDPipe) userId: string) {
+  async getCourseProgress(
+    @Param('userId', ParseUUIDPipe) userId: string,
+    @CurrentUser() currentUser: User,
+  ) {
+    this.assertCanReadUserProgress(currentUser, userId);
     return this.progressService.getCourseProgress(userId);
   }
 
@@ -168,8 +207,8 @@ export class ProgressController {
     description: 'User achievements retrieved successfully',
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  getUserAchievements() {
-    return this.progressService.getUserAchievements();
+  getUserAchievements(@CurrentUser() currentUser: User) {
+    return this.progressService.getUserAchievements(currentUser.id);
   }
 
   @Get('peer-comparison/:userId')
@@ -180,7 +219,11 @@ export class ProgressController {
     description: 'Peer comparison data retrieved successfully',
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async getPeerComparison(@Param('userId', ParseUUIDPipe) userId: string) {
+  async getPeerComparison(
+    @Param('userId', ParseUUIDPipe) userId: string,
+    @CurrentUser() currentUser: User,
+  ) {
+    this.assertCanReadUserProgress(currentUser, userId);
     return this.progressService.getPeerComparison(userId);
   }
 
@@ -224,7 +267,9 @@ export class ProgressController {
   })
   async getUserLearningAnalytics(
     @Param('userId', ParseUUIDPipe) userId: string,
+    @CurrentUser() currentUser: User,
   ) {
+    this.assertCanReadUserProgress(currentUser, userId);
     return this.assessmentAnalyticsService.getUserLearningAnalytics(userId);
   }
 
@@ -247,7 +292,11 @@ export class ProgressController {
     },
   })
   @ApiResponse({ status: 404, description: 'User not found' })
-  async getUserStreaks(@Param('userId', ParseUUIDPipe) userId: string) {
+  async getUserStreaks(
+    @Param('userId', ParseUUIDPipe) userId: string,
+    @CurrentUser() currentUser: User,
+  ) {
+    this.assertCanReadUserProgress(currentUser, userId);
     return this.progressService.getUserStreaks(userId);
   }
 
@@ -255,7 +304,11 @@ export class ProgressController {
   @ApiOperation({ summary: 'Get progress data for synchronization' })
   @ApiQuery({ name: 'userId', description: 'User ID' })
   @ApiResponse({ status: 200, description: 'Progress data retrieved' })
-  async getSyncProgress(@Query('userId', ParseUUIDPipe) userId: string) {
+  async getSyncProgress(
+    @Query('userId', ParseUUIDPipe) userId: string,
+    @CurrentUser() currentUser: User,
+  ) {
+    this.assertCanReadUserProgress(currentUser, userId);
     return this.progressService.getProgressByUser(userId);
   }
 

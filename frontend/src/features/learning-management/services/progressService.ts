@@ -123,7 +123,7 @@ const normalizeDashboardActivity = (item: RawActivity): ProgressActivity => {
       asString(item.date, '') ||
       asString(item.createdAt, '') ||
       asString(item.timestamp, '') ||
-      new Date().toISOString(),
+      '',
     durationMinutes,
     score,
   };
@@ -133,6 +133,7 @@ const generateId = (): string => `${Math.random().toString(36).slice(2)}${Date.n
 
 interface DashboardApiResponse {
   overview?: UnknownRecord;
+  unavailableSections?: string[];
   courses?: RawCourseProgress[];
   activities?: RawActivity[];
   weeklyStudyTime?: Array<{ date: string; minutes: number }> | null;
@@ -179,7 +180,7 @@ const progressService = {
           asString(item.date, '') ||
           asString(item.createdAt, '') ||
           asString(item.timestamp, '') ||
-          new Date().toISOString();
+          '';
         const title =
           asString(item.title, '') ||
           asString(item.name, '') ||
@@ -224,26 +225,8 @@ const progressService = {
 
       return Array.isArray(raw) ? raw.map(normalize) : [];
     } catch (error) {
-      console.error('Error fetching recent activities:', error);
-
-      // Return placeholder data if API fails
-      return [
-        {
-          id: '1',
-          type: 'course',
-          title: 'Completed quiz in Physiology Fundamentals',
-          date: new Date().toISOString(),
-          durationMinutes: 30,
-          score: 88,
-        },
-        {
-          id: '2',
-          type: 'material',
-          title: 'Downloaded Anatomy Lecture Notes',
-          date: new Date(Date.now() - 3600000).toISOString(),
-          durationMinutes: 10,
-        },
-      ];
+      console.error('Error fetching recent activities:', formatError(error));
+      throw error;
     }
   },
 
@@ -252,25 +235,8 @@ const progressService = {
       const response = await api.get<Achievement[]>('/progress/achievements');
       return response.data as Achievement[];
     } catch (error) {
-      console.error('Error fetching achievements:', error);
-
-      // Return placeholder data if API fails
-      return [
-        {
-          id: '1',
-          title: 'Fast Learner',
-          description: 'Completed 5 courses',
-          icon: 'trophy',
-          dateEarned: new Date(Date.now() - 86400000 * 7).toISOString(),
-        },
-        {
-          id: '2',
-          title: 'Consistent Student',
-          description: 'Maintained a 10-day streak',
-          icon: 'calendar',
-          dateEarned: new Date().toISOString(),
-        },
-      ];
+      console.error('Error fetching achievements:', formatError(error));
+      throw error;
     }
   },
 
@@ -354,6 +320,12 @@ const progressService = {
       const dueReviews = Array.isArray(dueReviewsData) ? (dueReviewsData as UnknownRecord[]) : [];
       const mastery = masteryRes?.data || {};
       const deadlines = Array.isArray(deadlinesData) ? (deadlinesData as UnknownRecord[]) : [];
+      const dataWarnings = new Set(
+        Array.isArray(dashboardData.unavailableSections)
+          ? dashboardData.unavailableSections
+          : [],
+      );
+      if (masteryResult.status === 'rejected') dataWarnings.add('mastery data');
 
 
       // Map progressTrends to performanceTrends
@@ -402,7 +374,11 @@ const progressService = {
         }
       });
 
-      if (monthlyData.size === 0) {
+      const hasTrendMetrics = Array.from(monthlyData.values()).some(
+        month => month.scoreCount > 0 || month.hoursCount > 0,
+      );
+      if (!hasTrendMetrics) {
+        monthlyData.clear();
         recentActivities.forEach(activity => {
           const date = new Date(activity.date);
           if (!activity.date || Number.isNaN(date.getTime())) return;
@@ -419,8 +395,9 @@ const progressService = {
         });
       }
 
-      const performanceTrends = Array.from(monthlyData.values())
-        .sort((left, right) => left.month.localeCompare(right.month))
+      const performanceTrends = Array.from(monthlyData.entries())
+        .sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey))
+        .map(([, month]) => month)
         .map(month => ({
           month: month.month,
           score: month.scoreCount > 0 ? Math.round(month.totalScore / month.scoreCount) : 0,
@@ -437,13 +414,13 @@ const progressService = {
         : stats.overallProgress || 0;
 
       // Calculate average mastery from p_known values
-      const masteryValues = Object.values(mastery) as number[];
-      const averageMastery = masteryValues.length > 0
-        ? masteryValues.reduce((a, b) => a + b, 0) / masteryValues.length * 100
-        : stats.averageScore || 0;
+      const masteryValues = Object.values(mastery).filter(
+        (value): value is number => typeof value === 'number' && Number.isFinite(value),
+      );
 
       const result: ProgressData = {
         overallProgress,
+        dataWarnings: Array.from(dataWarnings),
         stats: {
           overallProgress,
           coursesCompleted: stats.coursesCompleted || 0,
@@ -453,9 +430,12 @@ const progressService = {
             typeof stats.totalStudyTime === 'number'
               ? Math.round((stats.totalStudyTime / 60) * 10) / 10
               : 0,
-          averageScore: Math.round(averageMastery),
+          averageScore:
+            typeof stats.averageScore === 'number' && Number.isFinite(stats.averageScore)
+              ? Math.round(stats.averageScore)
+              : 0,
           streak: stats.streak || 0,
-          lastActivity: stats.lastActivity || new Date().toISOString(),
+          lastActivity: stats.lastActivity || null,
         },
         coursesCompleted: stats.coursesCompleted || 0,
         totalCourses: stats.totalCourses || 0,

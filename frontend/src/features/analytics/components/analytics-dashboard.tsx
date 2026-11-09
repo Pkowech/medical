@@ -20,22 +20,23 @@ import { getLearningPathRecommendations } from '@/features/learning-management/s
 import { PerformanceAnalyticsContent } from '@/features/assessment/components/PerformanceAnalytics'; // Renamed to avoid conflict
 import { usePageHeader } from '@/core/providers/HeaderContext';
 import { useLearningStreak } from '@/shared/hooks/useProgress';
+import { apiService } from '@/features/auth/services/apiClient';
 
 function AnalyticsErrorCard({ title, message }: { title: string; message: string }) {
   return (
-    <Card className="border-red-200 bg-red-50">
+    <Card className="border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/20">
       <CardHeader>
-        <CardTitle className="text-red-700">{title}</CardTitle>
+        <CardTitle className="text-red-700 dark:text-red-400">{title}</CardTitle>
       </CardHeader>
       <CardContent>
-        <p className="text-red-600">{message}</p>
+        <p className="text-red-600 dark:text-red-300">{message}</p>
       </CardContent>
     </Card>
   );
 }
 
 export default function AnalyticsDashboard() {
-  const { data: session } = useSession() || {};
+  const { data: session } = useSession();
   const { setHeader } = usePageHeader();
   const userId = session?.user?.id;
   const {
@@ -60,7 +61,10 @@ export default function AnalyticsDashboard() {
     error: errorUserAnalytics,
   } = useQuery<UserAnalytics | null>({
     queryKey: ['userAnalytics', userId],
-    queryFn: () => userService.getUserAnalytics(userId as string),
+    queryFn: () => {
+      if (!userId) throw new Error('User is not authenticated');
+      return userService.getUserAnalytics(userId);
+    },
     enabled: !!userId,
     throwOnError: false,
   });
@@ -83,23 +87,18 @@ export default function AnalyticsDashboard() {
   } = useQuery<PerformanceData | null>({
     queryKey: ['performanceData', userId, 'summary'],
     queryFn: async () => {
-      const res = await fetch('/api/backend/assessment-progress/summary', {
-        headers: {
-          Authorization: `Bearer ${session?.user?.accessToken}`,
-        },
-      });
-      if (!res.ok) {
-        throw new Error('Failed to fetch performance data');
-      }
-      const payload = await res.json();
-      return payload.data ?? payload;
+      const response = await apiService.get<PerformanceData>('/assessment-progress/summary');
+      return response.data;
     },
     enabled: !!userId && !!session?.user?.accessToken,
     throwOnError: false,
   });
 
   const progressData = {
-    labels: userAnalytics?.progressOverTime?.map(p => new Date(p.date).toLocaleDateString()) || [],
+    labels: userAnalytics?.progressOverTime?.map(p => {
+      const date = new Date(p.date);
+      return Number.isNaN(date.getTime()) ? p.date : date.toLocaleDateString();
+    }) || [],
     datasets: [
       {
         label: 'Progress',
@@ -123,7 +122,7 @@ export default function AnalyticsDashboard() {
 
   if (isLoadingUserAnalytics) {
     return (
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 py-4" aria-busy="true" aria-live="polite">
         <div className="space-y-6">
           <div className="animate-pulse">
             <div className="h-8 bg-secondary rounded w-1/3 mb-4"></div>
@@ -153,23 +152,23 @@ export default function AnalyticsDashboard() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto px-4 py-4">
       <Tabs defaultValue="overview" className="w-full">
         <TabsList className="grid w-full grid-cols-2 md:grid-cols-4">
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="progress">Progress</TabsTrigger>
+          <TabsTrigger value="progress">Learning trends</TabsTrigger>
           <TabsTrigger value="performance">Performance</TabsTrigger>
           <TabsTrigger value="recommendations">Recommendations</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="mt-6">
+        <TabsContent value="overview" className="mt-4">
           {errorUserAnalytics ? (
             <AnalyticsErrorCard
               title="Overview Unavailable"
               message={errorUserAnalytics instanceof Error ? errorUserAnalytics.message : 'Failed to load your analytics.'}
             />
           ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Courses Completed</CardTitle>
@@ -191,7 +190,10 @@ export default function AnalyticsDashboard() {
                     ? 'Loading…'
                     : errorPerformanceData
                       ? 'Unavailable'
-                      : performanceData && (performanceData.totalAttempts ?? 0) > 0
+                      : performanceData &&
+                          typeof performanceData.overallScore === 'number' &&
+                          Number.isFinite(performanceData.overallScore) &&
+                          (performanceData.totalAttempts === undefined || performanceData.totalAttempts > 0)
                         ? `${performanceData.overallScore.toFixed(1)}%`
                         : 'No scores yet'}
                 </div>
@@ -231,7 +233,10 @@ export default function AnalyticsDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  {Math.round((userAnalytics?.completionRate || 0) * 100)}%
+                  {typeof userAnalytics?.completionRate === 'number' &&
+                  Number.isFinite(userAnalytics.completionRate)
+                    ? `${Math.round(userAnalytics.completionRate * 100)}%`
+                    : '—'}
                 </div>
                 <p className="text-xs text-muted-foreground">Completed enrollments</p>
               </CardContent>
@@ -256,7 +261,7 @@ export default function AnalyticsDashboard() {
           )}
         </TabsContent>
 
-        <TabsContent value="progress" className="mt-6">
+        <TabsContent value="progress" className="mt-4">
           {errorUserAnalytics ? (
             <AnalyticsErrorCard
               title="Progress Unavailable"
@@ -278,7 +283,7 @@ export default function AnalyticsDashboard() {
           </Card>
           <Card className="mt-6">
             <CardHeader>
-              <CardTitle>Module Completion</CardTitle>
+              <CardTitle>Course Completion by Course</CardTitle>
             </CardHeader>
             <CardContent>
               {userAnalytics?.moduleCompletion && userAnalytics.moduleCompletion.length > 0 ? (
@@ -292,7 +297,7 @@ export default function AnalyticsDashboard() {
           )}
         </TabsContent>
 
-        <TabsContent value="performance" className="mt-6">
+        <TabsContent value="performance" className="mt-4">
           {isLoadingPerformanceData ? (
             <Card><CardContent className="p-6 text-center">Loading performance analytics...</CardContent></Card>
           ) : errorPerformanceData ? (
@@ -300,8 +305,8 @@ export default function AnalyticsDashboard() {
               title="Performance Unavailable"
               message={errorPerformanceData instanceof Error ? errorPerformanceData.message : 'Failed to load performance analytics.'}
             />
-          ) : performanceData ? (
-            <PerformanceAnalyticsContent userId={userId as string} data={performanceData} />
+          ) : performanceData && userId ? (
+            <PerformanceAnalyticsContent userId={userId} data={performanceData} />
           ) : (
             <Card>
               <CardContent className="p-8 text-center">
@@ -315,7 +320,7 @@ export default function AnalyticsDashboard() {
           )}
         </TabsContent>
 
-        <TabsContent value="recommendations" className="mt-6">
+        <TabsContent value="recommendations" className="mt-4">
           {isLoadingLearningPathRecommendations ? (
             <Card><CardContent className="p-6 text-center">Loading recommendations...</CardContent></Card>
           ) : errorLearningPathRecommendations ? (

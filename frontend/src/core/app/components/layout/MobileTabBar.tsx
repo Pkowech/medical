@@ -31,7 +31,9 @@ export function MobileTabBar({ navigationItems }: MobileTabBarProps) {
       >
         {availableTabs.map(({ href, label, item }) => {
           const isActive =
-            pathname === href || (href !== '/dashboard' && pathname.startsWith(`${href}/`));
+            pathname === href ||
+            (href !== '/dashboard' && pathname.startsWith(`${href}/`)) ||
+            (href === '/progress' && pathname === '/analytics');
           const Icon = item.icon;
 
           return (
