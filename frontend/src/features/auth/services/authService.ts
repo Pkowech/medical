@@ -11,6 +11,7 @@ import {
 } from '@/shared/types/authInterface';
 import { ApiResponse, Session } from '@/shared/types';
 import { hasPermission, hasAnyPermission, Role } from '@/lib/auth/roles';
+import { getSafeRoles } from '@/shared/enums/role.enum';
 import { offlineService } from '@/lib/core/offline/offlineService';
 
 type GenericRecord = Record<string, unknown>;
@@ -219,7 +220,7 @@ class AuthService {
     if (!user) return false;
 
     const rolesArray = Array.isArray(requiredRoles) ? requiredRoles : [requiredRoles];
-    const userRoles = user.roles && user.roles.length > 0 ? user.roles : [user.role];
+    const userRoles = getSafeRoles(user.roles ?? user.role ?? [], [Role.guest]);
 
     return rolesArray.some(role => userRoles.includes(role as Role));
   }

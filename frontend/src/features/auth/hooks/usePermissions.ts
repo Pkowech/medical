@@ -1,5 +1,5 @@
 import { useSession } from 'next-auth/react';
-import { Role } from '@/shared/enums/role.enum';
+import { getSafeRoles, Role } from '@/shared/enums/role.enum';
 import { navigationPermissions } from '@/core/app/components/layout/permissionConfig';
 import navigationConfig from '@/core/app/components/layout/navigationConfig';
 
@@ -25,12 +25,7 @@ export const usePermissions = () => {
   };
 
   // Use all user roles if available, otherwise fall back to primary role
-  const roles =
-    user?.roles && user.roles.length > 0
-      ? (user.roles as Role[])
-      : user?.role
-        ? [user.role as Role]
-        : [Role.guest];
+  const roles = getSafeRoles(user?.roles ?? user?.role, [Role.guest]);
 
   const highestRole = getHighestRole(roles);
 

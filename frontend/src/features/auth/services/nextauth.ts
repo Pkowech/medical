@@ -7,7 +7,7 @@ import {
   LoginResponsePayload,
   Permission,
 } from '@/shared/types/authInterface'; // Rename User to avoid conflict
-import { Role } from '@/shared/enums/role.enum'; // Import Role as a value
+import { getSafeRoles, Role } from '@/shared/enums/role.enum'; // Import Role as a value
 import { JWT } from 'next-auth/jwt';
 import { AuthError, AuthErrorCode, AUTH_ERROR_MESSAGES } from './authErrors';
 
@@ -669,11 +669,15 @@ export const authOptions: NextAuthOptions = {
 
       if (account && user) {
         const sessionUser = user as User;
+        const normalizedRoles = getSafeRoles(
+          sessionUser.roles ?? user.role ?? [],
+          (user.role as Role) || Role.guest,
+        );
         return {
           ...token,
           id: user.id,
           role: user.role as Role,
-          roles: sessionUser.roles || [user.role as Role], // Store all user roles
+          roles: normalizedRoles.length > 0 ? normalizedRoles : [(user.role as Role) || Role.guest],
           accessToken: sessionUser.accessToken || '',
           permissions: sessionUser.permissions || [],
           accessTokenExpires: sessionUser.accessTokenExpires || Date.now() + 24 * 60 * 60 * 1000,
@@ -783,7 +787,7 @@ export const authOptions: NextAuthOptions = {
       session.error = typeof token.error === 'string' ? token.error : undefined;
       session.user.id = (token.id as string) || '';
       session.user.role = (token.role as Role) || Role.guest;
-      session.user.roles = ((token.roles as Role[]) || [token.role as Role]) as Role[];
+      session.user.roles = getSafeRoles(token.roles ?? token.role ?? session.user.role, session.user.role);
       session.user.permissions = (token.permissions as string[]) || [];
       session.user.firstName = (token.firstName as string) || '';
       session.user.lastName = (token.lastName as string) || '';

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/features/auth/services/nextauth';
-import { Role } from '@/shared/enums/role.enum';
+import { getSafeRoles, Role } from '@/shared/enums/role.enum';
 
 export async function proxyToAdmin(req: NextRequest, backendPath: string) {
   try {
@@ -10,9 +10,8 @@ export async function proxyToAdmin(req: NextRequest, backendPath: string) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const isAdmin =
-      session.user.role === Role.admin ||
-      session.user.roles?.includes(Role.admin);
+    const userRoles = getSafeRoles(session.user.roles ?? session.user.role ?? [], [Role.guest]);
+    const isAdmin = session.user.role === Role.admin || userRoles.includes(Role.admin);
 
     if (!isAdmin) {
       return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 });

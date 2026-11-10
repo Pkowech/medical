@@ -6,6 +6,25 @@ export enum Role {
   admin = 'admin',
 }
 
+export function getSafeRoles(value: unknown, fallback: Role | Role[] = [Role.guest]): Role[] {
+  const candidates = Array.isArray(value) ? value : [value];
+  const valid = candidates.reduce<Role[]>((roles, candidate) => {
+    if (typeof candidate !== 'string') return roles;
+    const normalized = candidate.trim();
+    if (Object.values(Role).includes(normalized as Role)) {
+      roles.push(normalized as Role);
+    }
+    return roles;
+  }, []);
+
+  if (valid.length > 0) {
+    return [...new Set(valid)];
+  }
+
+  const fallbackRoles = Array.isArray(fallback) ? fallback : [fallback];
+  return fallbackRoles.filter((role): role is Role => Object.values(Role).includes(role as Role));
+}
+
 // Default role for new user registration
 export const defaultRegistrationRole: Role = Role.student;
 

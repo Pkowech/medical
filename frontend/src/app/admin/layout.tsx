@@ -1,7 +1,7 @@
 'use client';
 
 import React, { ReactNode, useEffect } from 'react';
-import { Role } from '@/shared/enums/role.enum';
+import { getSafeRoles, Role } from '@/shared/enums/role.enum';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import AppErrorBoundary from '@/features/security/components/AppErrorBoundary';
@@ -24,11 +24,10 @@ const AdminLayoutContent: React.FC<AdminLayoutProps> = ({ children }) => {
   const { setSidebarOpen } = useLayoutStore();
   const pathname = usePathname();
 
-  const isAdmin =
-    user?.role === Role.admin || (user?.roles?.includes(Role.admin) ?? false);
+  const userRoles = getSafeRoles(user?.roles ?? user?.role ?? [], [Role.guest]);
+  const isAdmin = user?.role === Role.admin || userRoles.includes(Role.admin);
   const isInstructor =
-    user?.role === Role.instructor ||
-    (user?.roles?.includes(Role.instructor) ?? false);
+    user?.role === Role.instructor || userRoles.includes(Role.instructor);
   const canAccessAuthoring =
     isInstructor && pathname.startsWith('/admin/assessment/quizzes');
   const canAccessAdminArea = isAdmin || canAccessAuthoring;
