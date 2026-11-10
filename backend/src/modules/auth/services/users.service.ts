@@ -92,6 +92,7 @@ export class UsersService {
   private readonly logger = new Logger(UsersService.name);
   private readonly CACHE_PREFIX = 'user';
   private readonly CACHE_TTL = 3600;
+  private readonly profileAnalyticsTimeoutMs = 15_000;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -489,28 +490,63 @@ export class UsersService {
   }
 
   async getUserProfile(userId: string): Promise<UserProfileResponseDto> {
-    console.log(`[UsersService] getUserProfile starting for ${userId}`);
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: userSelect,
     });
 
     if (!user) {
-      console.warn(`[UsersService] User ${userId} not found`);
       throw new NotFoundException(`User with ID ${userId} not found`);
     }
 
-    console.log(`[UsersService] User found, fetching analytics for ${userId}`);
-    const analytics =
-      await this.userAnalyticsService.getUserProfileStats(userId);
+    let analyticsAvailable = true;
+    let analytics: Awaited<
+      ReturnType<UserAnalyticsService['getUserProfileStats']>
+    >;
+    let analyticsTimeout: ReturnType<typeof setTimeout> | undefined;
+    try {
+      analytics = await Promise.race([
+        this.userAnalyticsService.getUserProfileStats(userId),
+        new Promise<never>((_, reject) => {
+          analyticsTimeout = setTimeout(
+            () => reject(new Error('Profile analytics request timed out')),
+            this.profileAnalyticsTimeoutMs,
+          );
+        }),
+      ]);
+    } catch (error) {
+      analyticsAvailable = false;
+      this.logger.error(
+        `Failed to load profile analytics for user ${userId}: ${getErrorMessage(error)}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      analytics = {
+        coursesEnrolled: 0,
+        coursesCompleted: 0,
+        completionRate: 0,
+        totalStudyTime: 0,
+        averageScore: 0,
+        assessmentsTaken: 0,
+        completedItems: 0,
+        badges: 0,
+        points: user.points,
+        level: null,
+        currentStreak: 0,
+        lastActiveDate: null,
+        strongestSubjects: [],
+        weakestSubjects: [],
+        enrollments: [],
+        recentActivity: [],
+      };
+    } finally {
+      if (analyticsTimeout) clearTimeout(analyticsTimeout);
+    }
 
-    console.log(
-      `[UsersService] Analytics fetched, mapping response for ${userId}`,
-    );
     const userDto = await this.mapUserToDto(user as UserWithRelations);
     const profileData: UserProfileResponseDto = {
       ...userDto,
       totalCourses: analytics.coursesEnrolled,
+      analyticsAvailable,
       stats: {
         coursesEnrolled: analytics.coursesEnrolled,
         coursesCompleted: analytics.coursesCompleted,
@@ -529,7 +565,6 @@ export class UsersService {
       })),
     };
 
-    console.log(`[UsersService] getUserProfile complete for ${userId}`);
     return profileData;
   }
 
@@ -537,13 +572,11 @@ export class UsersService {
     userId: string,
     updateUserDto: UpdateUserDto,
   ): Promise<BaseUserResponseDto> {
-    console.log(`[UsersService] updateProfile starting for ${userId}`);
     const existingUser = await this.prisma.user.findUnique({
       where: { id: userId },
       select: userSelect,
     });
     if (!existingUser) {
-      console.warn(`[UsersService] User ${userId} not found`);
       throw new NotFoundException(`User with ID ${userId} not found`);
     }
 

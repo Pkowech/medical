@@ -2,7 +2,7 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { usePermissions } from '@/features/auth/hooks/usePermissions';
 import { RoleList } from '@/features/security/components/RoleList';
 import { RoleForm } from '@/features/security/components/RoleForm';
@@ -22,7 +22,9 @@ export default function AdminRolesPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingRole, setEditingRole] = useState<RoleEntity | null>(null);
 
-  const fetchRoles = async () => {
+  const fetchRoles = useCallback(async () => {
+    if (!isAdmin) return;
+
     try {
       setLoading(true);
       setError(null);
@@ -34,11 +36,15 @@ export default function AdminRolesPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [isAdmin]);
 
   useEffect(() => {
-    fetchRoles();
-  }, []);
+    if (isAdmin) {
+      void fetchRoles();
+    } else {
+      setLoading(false);
+    }
+  }, [fetchRoles, isAdmin]);
 
   const handleCreateOrUpdateRole = async (roleData: RoleEntity) => {
     try {
@@ -51,7 +57,7 @@ export default function AdminRolesPage() {
       }
       setIsFormOpen(false);
       setEditingRole(null);
-      fetchRoles(); // Refresh the list
+      void fetchRoles();
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Failed to save role.');
       console.error(error);
@@ -62,7 +68,7 @@ export default function AdminRolesPage() {
     if (window.confirm('Are you sure you want to delete this role?')) {
       try {
         await adminService.deleteRole(roleId);
-        fetchRoles(); // Refresh the list
+        void fetchRoles();
       } catch (error) {
         setError(error instanceof Error ? error.message : 'Failed to delete role.');
         console.error(error);

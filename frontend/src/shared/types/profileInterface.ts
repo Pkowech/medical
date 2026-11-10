@@ -111,6 +111,7 @@ export interface UserProfileResponse extends UserProfileBase {
   totalCourses: number;
   stats: UserProfileStats;
   recentActivity: UserActivity[];
+  analyticsAvailable: boolean;
   role?: string;
   permissions?: string[];
 }

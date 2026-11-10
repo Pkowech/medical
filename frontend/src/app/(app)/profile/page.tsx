@@ -14,6 +14,7 @@ import { healthcareFieldLabel } from '@/shared/utils/healthcareProfile';
 
 export default function ProfilePage() {
   const { isLoading, session } = useRequireAuth();
+  const [profileError, setProfileError] = useState<string | null>(null);
 
   const [profile, setProfile] = useState<LocalUserProfile>({
     firstName: '',
@@ -39,10 +40,8 @@ export default function ProfilePage() {
     const fetchProfile = async () => {
       if (session?.user?.id) {
         try {
-          const userProfile = await userService.getUserProfile(session.user.id);
-          
-
-
+          setProfileError(null);
+          const userProfile = await userService.getMyProfile();
           if (!userProfile) {
             return;
           }
@@ -69,10 +68,11 @@ export default function ProfilePage() {
             totalStudyTime: userProfile.stats?.totalStudyTime || 0,
             averageScore: userProfile.stats?.averageScore || 0,
           });
-        } catch (error: unknown) {
-          if (process.env.NODE_ENV !== 'production') {
-            console.error('Error fetching profile:', error);
+          if (!userProfile.analyticsAvailable) {
+            setProfileError('Learning statistics are temporarily unavailable.');
           }
+        } catch {
+          setProfileError('Unable to load your profile. Please try again.');
         }
       }
     };
@@ -115,6 +115,12 @@ export default function ProfilePage() {
           <Edit className="mr-2 h-4 w-4" /> Edit Profile
         </Button>
       </div>
+
+      {profileError && (
+        <div className="mb-6 rounded-md border border-destructive/30 p-3 text-sm text-destructive" role="alert">
+          {profileError}
+        </div>
+      )}
 
       {/* Profile Completeness Indicator */}
       <div className="mb-8">

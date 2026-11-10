@@ -463,6 +463,12 @@ export class UserProfileResponseDto extends BaseUserResponseDto {
   stats!: UserStatsDto;
 
   @ApiProperty({
+    description: 'Whether learning analytics were available for this response',
+  })
+  @IsBoolean()
+  analyticsAvailable!: boolean;
+
+  @ApiProperty({
     description: 'Recent user activities',
     type: () => UserActivityDto,
     isArray: true,

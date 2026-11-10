@@ -13,6 +13,7 @@ import adminNavigationConfig, {
   instructorAssessmentNavigationConfig,
 } from '@/core/app/components/layout/adminNavigationConfig';
 import { DashboardLayout } from '@/core/app/components/layout/DashboardLayout';
+import { CourseStudySessionProvider } from '@/features/learning-management/study/components/CourseStudySessionProvider';
 
 interface AdminLayoutProps {
   children: ReactNode;
@@ -64,17 +65,19 @@ const AdminLayoutContent: React.FC<AdminLayoutProps> = ({ children }) => {
 
   return (
     <AppErrorBoundary>
-      <DashboardLayout
-        navigationItems={
-          isAdmin
-            ? adminNavigationConfig
-            : instructorAssessmentNavigationConfig
-        }
-        user={user ?? null}
-        isLoading={authLoading}
-      >
-        {children}
-      </DashboardLayout>
+      <CourseStudySessionProvider>
+        <DashboardLayout
+          navigationItems={
+            isAdmin
+              ? adminNavigationConfig
+              : instructorAssessmentNavigationConfig
+          }
+          user={user ?? null}
+          isLoading={authLoading}
+        >
+          {children}
+        </DashboardLayout>
+      </CourseStudySessionProvider>
     </AppErrorBoundary>
   );
 };

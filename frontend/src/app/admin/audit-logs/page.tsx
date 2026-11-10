@@ -23,6 +23,11 @@ export default function AdminAuditLogsPage() {
   const pageSize = 20;
 
   useEffect(() => {
+    if (!isAdmin) {
+      setLoading(false);
+      return;
+    }
+
     let current = true;
     setLoading(true);
     setError(null);
@@ -42,7 +47,7 @@ export default function AdminAuditLogsPage() {
     return () => {
       current = false;
     };
-  }, [page, refreshVersion]);
+  }, [isAdmin, page, refreshVersion]);
 
   if (!isAdmin) {
     return (

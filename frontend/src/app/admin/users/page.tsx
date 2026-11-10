@@ -14,6 +14,21 @@ import { Role as RoleEnum } from '@/shared/enums/role.enum';
 import { Button } from '@/shared/components/ui/button';
 import { PlusCircle } from 'lucide-react';
 
+function getRequestErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message) return error.message;
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'message' in error &&
+    typeof error.message === 'string' &&
+    error.message
+  ) {
+    return error.message;
+  }
+  if (typeof error === 'string' && error) return error;
+  return fallback;
+}
+
 export default function AdminUsersPage() {
   const { allRoles } = usePermissions();
   const { isAuthenticated, isLoading: authLoading, user } = useAuth();
@@ -24,6 +39,8 @@ export default function AdminUsersPage() {
   const [roles, setRoles] = useState<RoleEntity[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [canRetryFetch, setCanRetryFetch] = useState(false);
+  const [rolesError, setRolesError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
@@ -33,6 +50,7 @@ export default function AdminUsersPage() {
   const [totalUsers, setTotalUsers] = useState(0);
   const [deletingUserId, setDeletingUserId] = useState<string>();
   const [refreshVersion, setRefreshVersion] = useState(0);
+  const [rolesRefreshVersion, setRolesRefreshVersion] = useState(0);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
 
@@ -44,25 +62,29 @@ export default function AdminUsersPage() {
   useEffect(() => {
     if (!isAdmin) return;
     let current = true;
+    setRolesError(null);
     void adminService
       .getRoles()
       .then(fetchedRoles => {
         if (current) setRoles(fetchedRoles);
       })
-      .catch(err => {
-        console.error('Failed to fetch roles.', err);
+      .catch(error => {
+        if (current) {
+          setRolesError(getRequestErrorMessage(error, 'Failed to fetch roles.'));
+        }
       });
 
     return () => {
       current = false;
     };
-  }, [isAdmin]);
+  }, [isAdmin, rolesRefreshVersion]);
 
   useEffect(() => {
     if (!isAdmin) return;
     let current = true;
     setLoading(true);
     setError(null);
+    setCanRetryFetch(false);
 
     void adminService
       .getUsers(page, 10, {
@@ -76,10 +98,10 @@ export default function AdminUsersPage() {
         setTotalUsers(result.pagination.total);
         setTotalPages(result.pagination.totalPages);
       })
-      .catch(err => {
+      .catch(requestError => {
         if (!current) return;
-        setError('Failed to fetch users.');
-        console.error(err);
+        setError(getRequestErrorMessage(requestError, 'Failed to fetch users.'));
+        setCanRetryFetch(true);
       })
       .finally(() => {
         if (current) setLoading(false);
@@ -102,9 +124,9 @@ export default function AdminUsersPage() {
       setIsFormOpen(false);
       setEditingUser(null);
       setRefreshVersion(version => version + 1);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save user.');
-      console.error(err);
+    } catch (requestError) {
+      setCanRetryFetch(false);
+      setError(getRequestErrorMessage(requestError, 'Failed to save user.'));
     }
   };
 
@@ -118,9 +140,9 @@ export default function AdminUsersPage() {
         setTotalUsers(currentTotal => Math.max(0, currentTotal - 1));
         if (users.length === 1 && page > 1) setPage(currentPage => currentPage - 1);
         setRefreshVersion(version => version + 1);
-      } catch (err) {
-        setError('Failed to delete user.');
-        console.error(err);
+      } catch (requestError) {
+        setCanRetryFetch(false);
+        setError(getRequestErrorMessage(requestError, 'Failed to delete user.'));
       } finally {
         setDeletingUserId(undefined);
       }
@@ -160,7 +182,40 @@ export default function AdminUsersPage() {
           </Button>
         </div>
 
-        {error && <div className="text-center text-red-500">Error: {error}</div>}
+        {error && (
+          <div
+            className="flex items-center justify-between gap-4 rounded-md border border-destructive/30 p-3 text-sm text-destructive"
+            role="alert"
+          >
+            <span>{error}</span>
+            {canRetryFetch && (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={loading}
+                onClick={() => setRefreshVersion(version => version + 1)}
+              >
+                Retry
+              </Button>
+            )}
+          </div>
+        )}
+
+        {rolesError && (
+          <div
+            className="flex items-center justify-between gap-4 rounded-md border border-destructive/30 p-3 text-sm text-destructive"
+            role="alert"
+          >
+            <span>{rolesError}</span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setRolesRefreshVersion(version => version + 1)}
+            >
+              Retry roles
+            </Button>
+          </div>
+        )}
 
         {isFormOpen && (
           <UserForm

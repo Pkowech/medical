@@ -14,16 +14,21 @@ type OutboxRow = {
   createdAt: Date;
 };
 
+const MAX_BATCH_SIZE = 10;
+const MAX_OUTBOX_RETRIES = 8;
+const MAX_BACKOFF_SECONDS = 300;
+
 function decodePayload(value: Prisma.JsonValue): AuditOutboxPayload | null {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     return null;
   }
 
-  const record = value;
-  const validEventTypes: string[] = Object.values(securityEventTypes);
+  const record = value as Record<string, unknown>;
+  const validEventTypes = new Set<string>(Object.values(securityEventTypes));
+
   if (
     typeof record.eventType !== 'string' ||
-    !validEventTypes.includes(record.eventType) ||
+    !validEventTypes.has(record.eventType) ||
     typeof record.userId !== 'string' ||
     typeof record.ipAddress !== 'string' ||
     typeof record.userAgent !== 'string'
@@ -34,9 +39,7 @@ function decodePayload(value: Prisma.JsonValue): AuditOutboxPayload | null {
   const eventData = record.eventData;
   if (
     eventData !== undefined &&
-    (typeof eventData !== 'object' ||
-      eventData === null ||
-      Array.isArray(eventData))
+    (typeof eventData !== 'object' || eventData === null || Array.isArray(eventData))
   ) {
     return null;
   }
@@ -46,7 +49,7 @@ function decodePayload(value: Prisma.JsonValue): AuditOutboxPayload | null {
     userId: record.userId,
     ipAddress: record.ipAddress,
     userAgent: record.userAgent,
-    ...(eventData ? { eventData } : {}),
+    ...(eventData ? { eventData: eventData as Record<string, unknown> } : {}),
   };
 }
 
@@ -61,11 +64,11 @@ export class LoginAuditOutboxProcessor {
 
   @Cron('*/2 * * * * *')
   async processPendingEvents(): Promise<void> {
-    for (let processed = 0; processed < 10; processed += 1) {
+    for (let processed = 0; processed < MAX_BATCH_SIZE; processed += 1) {
       let selectedId: string | undefined;
 
       try {
-        const result = await this.prisma.$transaction(async (transaction) => {
+        const row = await this.prisma.$transaction(async (transaction) => {
           const rows = await transaction.$queryRaw<OutboxRow[]>`
             SELECT "id", "payload", "created_at" AS "createdAt"
             FROM "login_audit_outbox"
@@ -74,76 +77,112 @@ export class LoginAuditOutboxProcessor {
             LIMIT 1
             FOR UPDATE SKIP LOCKED
           `;
-          const row = rows[0];
-          if (!row) {
-            return 'empty' as const;
-          }
-          selectedId = row.id;
 
-          const payload = decodePayload(row.payload);
+          const currentRow = rows[0];
+          if (!currentRow) {
+            return null;
+          }
+
+          selectedId = currentRow.id;
+          const payload = decodePayload(currentRow.payload);
           if (!payload) {
-            await this.deferEvent(transaction, row.id, 'InvalidPayload');
-            return 'deferred' as const;
+            const isRetained = await this.retryOrDrop(transaction, currentRow.id, 'InvalidPayload');
+            if (isRetained) {
+              this.logger.error(
+                `Deferred malformed authentication audit outbox event ${currentRow.id}`,
+              );
+            } else {
+              this.logger.warn(
+                `Dropped malformed authentication audit outbox event ${currentRow.id} after ${MAX_OUTBOX_RETRIES} failed attempts`,
+              );
+            }
+            return null;
           }
 
           await this.auditLogService.persistOutboxEvent(
             transaction,
             payload,
-            row.createdAt,
+            currentRow.createdAt,
           );
           await transaction.$executeRaw`
-            DELETE FROM "login_audit_outbox" WHERE "id" = ${row.id}
+            DELETE FROM "login_audit_outbox" WHERE "id" = ${currentRow.id}
           `;
-          return 'processed' as const;
+
+          return currentRow;
         });
 
-        if (result === 'empty') {
+        if (!row) {
           return;
-        }
-        if (result === 'deferred') {
-          this.logger.error(
-            `Deferred malformed authentication audit outbox event ${selectedId}`,
-          );
         }
       } catch (error) {
         const errorType = error instanceof Error ? error.name : 'UnknownError';
         this.logger.error(
           `Failed to persist authentication audit outbox event ${selectedId ?? 'unknown'}: ${errorType}`,
         );
-        if (selectedId) {
-          const failedId = selectedId;
-          try {
-            await this.prisma.$transaction(async (transaction) => {
-              await this.deferEvent(transaction, failedId, errorType);
-            });
-          } catch (retryError) {
-            const retryErrorType =
-              retryError instanceof Error ? retryError.name : 'UnknownError';
-            this.logger.error(
-              `Failed to defer authentication audit outbox event ${failedId}: ${retryErrorType}`,
+
+        if (!selectedId) {
+          return;
+        }
+
+        try {
+          const shouldRetry = await this.prisma.$transaction(async (transaction) =>
+            this.retryOrDrop(transaction, selectedId!, errorType),
+          );
+
+          if (shouldRetry) {
+            this.logger.warn(
+              `Requeued authentication audit outbox event ${selectedId} after transient persistence failure`,
             );
-            return;
+          } else {
+            this.logger.warn(
+              `Dropped authentication audit outbox event ${selectedId} after ${MAX_OUTBOX_RETRIES} persistence failures`,
+            );
           }
-        } else {
+        } catch (retryError) {
+          const retryErrorType =
+            retryError instanceof Error ? retryError.name : 'UnknownError';
+          this.logger.error(
+            `Failed to requeue authentication audit outbox event ${selectedId}: ${retryErrorType}`,
+          );
           return;
         }
       }
     }
   }
 
-  private async deferEvent(
+  private async retryOrDrop(
     transaction: Prisma.TransactionClient,
     id: string,
     errorType: string,
-  ): Promise<void> {
+  ): Promise<boolean> {
+    const rows = await transaction.$queryRaw<{ attempts: number }[]>`
+      SELECT "attempts"
+      FROM "login_audit_outbox"
+      WHERE "id" = ${id}
+      FOR UPDATE
+    `;
+
+    const attempts = Number(rows[0]?.attempts ?? 0);
+    if (attempts >= MAX_OUTBOX_RETRIES) {
+      await transaction.$executeRaw`
+        DELETE FROM "login_audit_outbox" WHERE "id" = ${id}
+      `;
+      return false;
+    }
+
     await transaction.$executeRaw`
       UPDATE "login_audit_outbox"
       SET
         "attempts" = "attempts" + 1,
         "available_at" = CURRENT_TIMESTAMP
-          + (LEAST(300, POWER(2, LEAST("attempts", 8))) * INTERVAL '1 second'),
+          + (
+            LEAST(${MAX_BACKOFF_SECONDS}, POWER(2, LEAST("attempts", 8))) * INTERVAL '1 second'
+          ),
         "last_error" = ${errorType.slice(0, 100)}
       WHERE "id" = ${id}
     `;
+
+    return true;
   }
 }
+

@@ -32,7 +32,8 @@ const protectedRoutes: Record<string, string> = {
   '/admin': 'manage_system',
   '/admin/users': 'manage_users',
   '/admin/roles': 'manage_roles',
-  '/admin/audit': 'view_audit_logs',
+  '/admin/assessment/quizzes': 'create_content',
+  '/admin/audit-logs': 'view_audit_logs',
   '/analytics': 'view_analytics',
   '/study-groups': 'join_study_groups',
   '/study-groups/manage': 'manage_study_groups',
@@ -157,7 +158,9 @@ export default withAuth(
     const sortedRoutes = Object.keys(protectedRoutes).sort((a, b) => b.length - a.length);
 
     // Find the first protected route that matches the current pathname
-    const requiredPermissionKey = sortedRoutes.find(route => pathname.startsWith(route));
+    const requiredPermissionKey = sortedRoutes.find(
+      route => pathname === route || pathname.startsWith(`${route}/`),
+    );
 
     if (requiredPermissionKey) {
       const requiredPermission = protectedRoutes[requiredPermissionKey];
