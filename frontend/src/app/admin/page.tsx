@@ -3,17 +3,15 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Users, 
-  Settings, 
-  BarChart3, 
   FileText, 
-  Shield, 
   Clock, 
   AlertCircle,
   TrendingUp,
   UserCheck,
   BookOpen,
   ArrowUpRight,
-  Plus,
+  Library,
+  ClipboardList,
   RefreshCcw
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/shared/components/ui/card';
@@ -47,52 +45,36 @@ export default function AdminDashboardPage() {
 
   const adminActions = [
     {
-      title: 'User Management',
-      description: 'Manage user accounts, roles, and access levels.',
+      title: 'Manage users',
+      description: 'View accounts and update user access.',
       icon: Users,
       href: '/admin/users',
       color: 'text-blue-500',
       bgColor: 'bg-blue-500/10',
     },
     {
-      title: 'Content Management',
-      description: 'Create and organize courses, modules, and materials.',
-      icon: FileText,
+      title: 'Courses & content',
+      description: 'Organize courses, units, and learning materials.',
+      icon: Library,
       href: '/admin/content',
       color: 'text-purple-500',
       bgColor: 'bg-purple-500/10',
     },
     {
-      title: 'System Settings',
-      description: 'Configure platform-wide settings and integrations.',
-      icon: Settings,
-      href: '/admin/settings',
-      color: 'text-orange-500',
-      bgColor: 'bg-orange-500/10',
+      title: 'Quiz authoring',
+      description: 'Create and publish assessment quizzes.',
+      icon: FileText,
+      href: '/admin/assessment/quizzes',
+      color: 'text-emerald-500',
+      bgColor: 'bg-emerald-500/10',
     },
     {
-      title: 'Analytics & Reports',
-      description: 'Deep dive into system performance and user trends.',
-      icon: BarChart3,
-      href: '/admin/analytics',
-      color: 'text-green-500',
-      bgColor: 'bg-green-500/10',
-    },
-    {
-      title: 'Roles & Permissions',
-      description: 'Define fine-grained access control policies.',
-      icon: Shield,
-      href: '/admin/roles',
-      color: 'text-red-500',
-      bgColor: 'bg-red-500/10',
-    },
-    {
-      title: 'Audit Logs',
-      description: 'Monitor system changes and security events.',
-      icon: Clock,
+      title: 'Audit activity',
+      description: 'Review administrative and security events.',
+      icon: ClipboardList,
       href: '/admin/audit-logs',
-      color: 'text-muted-foreground',
-      bgColor: 'bg-slate-500/10',
+      color: 'text-amber-500',
+      bgColor: 'bg-amber-500/10',
     },
   ];
 
@@ -130,22 +112,15 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="container mx-auto px-4 py-8 space-y-8 animate-in fade-in duration-700">
-      {/* Header Section */}
-      <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground dark:text-foreground tracking-tight">Admin Control Center</h1>
-          <p className="text-muted-foreground dark:text-muted-foreground mt-1">Monitor and manage your medical education ecosystem.</p>
-        </div>
-        <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center justify-end gap-3">
           <Button variant="outline" size="sm" onClick={fetchStats} className="bg-card/50 dark:bg-card/50 backdrop-blur-sm">
             <RefreshCcw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Refresh Data
           </Button>
           <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/20" onClick={() => router.push('/admin/users')}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add User
+            <Users className="h-4 w-4 mr-2" />
+            Manage Users
           </Button>
-        </div>
       </div>
 
       {/* Analytics Service Unavailable Message */}
@@ -214,14 +189,14 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-      {/* Main Admin Actions */}
+      {/* Common admin tasks */}
       <div className="space-y-6">
         <div className="flex items-center gap-2">
-          <h2 className="text-xl font-semibold text-foreground dark:text-foreground">Management Hub</h2>
+          <h2 className="text-xl font-semibold text-foreground">Quick access</h2>
           <div className="h-1 flex-1 bg-muted dark:bg-card rounded-full"></div>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {adminActions.map((action) => (
             <Link
               key={action.title}
@@ -231,12 +206,12 @@ export default function AdminDashboardPage() {
               <Card className="group cursor-pointer hover:border-blue-500/50 transition-all duration-300 shadow-sm hover:shadow-xl bg-card dark:bg-card/50 border-border dark:border-border/50">
               <CardContent className="p-6">
                 <div className="flex items-start gap-4">
-                  <div className={`p-4 rounded-2xl ${action.bgColor} transition-transform group-hover:scale-110 duration-300`}>
-                    <action.icon className={`h-6 w-6 ${action.color}`} />
+                  <div className={`rounded-xl p-3 ${action.bgColor} transition-transform group-hover:scale-105 duration-300`}>
+                    <action.icon className={`h-5 w-5 ${action.color}`} />
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center justify-between">
-                      <h3 className="font-bold text-lg text-foreground dark:text-foreground">{action.title}</h3>
+                      <h3 className="font-semibold text-base text-foreground">{action.title}</h3>
                       <ArrowUpRight className="h-4 w-4 text-slate-300 group-hover:text-blue-500 transition-colors" />
                     </div>
                     <p className="text-sm text-muted-foreground dark:text-muted-foreground mt-1 leading-relaxed">

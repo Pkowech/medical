@@ -11,8 +11,10 @@ import { RoleEntity } from '@/shared/types/systemInterface';
 import { Button } from '@/shared/components/ui/button';
 import { PlusCircle } from 'lucide-react';
 import { Role as RoleEnum } from '@/shared/enums/role.enum';
+import { usePageHeader } from '@/core/providers/HeaderContext';
 
 export default function AdminRolesPage() {
+  const { setHeader } = usePageHeader();
   const { allRoles } = usePermissions();
   const isAdmin = allRoles?.includes(RoleEnum.admin);
 
@@ -21,6 +23,27 @@ export default function AdminRolesPage() {
   const [error, setError] = useState<string | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingRole, setEditingRole] = useState<RoleEntity | null>(null);
+
+  useEffect(() => {
+    setHeader({
+      title: 'Roles and Permissions',
+      description: 'Manage platform roles and access permissions.',
+      actions: isAdmin ? (
+        <Button
+          size="sm"
+          onClick={() => {
+            setEditingRole(null);
+            setIsFormOpen(true);
+          }}
+        >
+          <PlusCircle className="mr-2 h-4 w-4" />
+          <span className="hidden sm:inline">Add New Role</span>
+          <span className="sm:hidden">Add Role</span>
+        </Button>
+      ) : undefined,
+    });
+    return () => setHeader(null);
+  }, [isAdmin, setHeader]);
 
   const fetchRoles = useCallback(async () => {
     if (!isAdmin) return;
@@ -96,18 +119,6 @@ export default function AdminRolesPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Role and Permission Management</h1>
-        <Button
-          onClick={() => {
-            setEditingRole(null);
-            setIsFormOpen(true);
-          }}
-        >
-          <PlusCircle className="mr-2 h-4 w-4" /> Add New Role
-        </Button>
-      </div>
-
       {error && (
         <div
           className="flex items-center justify-between gap-4 rounded-md border border-destructive/30 p-3 text-sm text-destructive"

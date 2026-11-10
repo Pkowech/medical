@@ -86,13 +86,6 @@ export default function AdminSettingsPage() {
 
   return (
     <main className="mx-auto max-w-4xl space-y-6 p-6">
-      <header>
-        <h1 className="text-2xl font-bold">System Settings</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Persisted settings are applied globally to platform authentication and availability.
-        </p>
-      </header>
-
       {loadError && (
         <p className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-800" role="alert">
           {loadError}

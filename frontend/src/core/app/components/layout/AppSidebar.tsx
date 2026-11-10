@@ -59,6 +59,7 @@ export function Sidebar({
   const { streak, longestStreak, isLoading: isStreakLoading, error: streakError } =
     useLearningStreak();
   const unreadNotifications = notifications.filter(notification => !notification.read);
+  const isAdminNavigation = navigationItems.some(item => item.href === '/admin');
   const visibleNavigationItems = isDesktop
     ? navigationItems
     : navigationItems.flatMap(item =>
@@ -211,6 +212,7 @@ export function Sidebar({
             isDesktop && sidebarCollapsed
               ? 'mx-2 flex min-h-12 items-center justify-center p-2'
               : 'px-3 py-2',
+            isAdminNavigation && 'hidden',
           )}
           title={
             typeof streak === 'number' && typeof longestStreak === 'number'
@@ -260,7 +262,7 @@ export function Sidebar({
         )}>
           {!isDesktop && (
             <p className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground dark:text-muted-foreground">
-              More
+              {isAdminNavigation ? 'Admin menu' : 'More'}
             </p>
           )}
           {visibleNavigationItems.map(item => (

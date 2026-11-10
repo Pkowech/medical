@@ -7,7 +7,6 @@ import { usePermissions } from '@/features/auth/hooks/usePermissions';
 import AuditLogTable from '@/features/security/components/AuditLogTable';
 import { securityAuditService } from '@/features/security/services/securityAuditService';
 import { AuditLog } from '@/shared/types/systemInterface';
-import { ScrollText } from 'lucide-react';
 import { Role } from '@/shared/enums/role.enum';
 import { Button } from '@/shared/components/ui/button';
 
@@ -58,15 +57,8 @@ export default function AdminAuditLogsPage() {
     );
   }
 
-  if (loading) {
-    return <div className="text-center py-8">Loading Audit Logs...</div>;
-  }
-
   return (
-    <div className="space-y-8">
-      <h1 className="text-3xl font-bold flex items-center">
-        <ScrollText className="mr-2" /> Audit Logs
-      </h1>
+    <div className="space-y-6">
       {error && (
         <div className="flex items-center justify-between gap-4 rounded-md border border-destructive/30 p-3 text-sm text-destructive" role="alert">
           <span>{error}</span>
@@ -76,11 +68,13 @@ export default function AdminAuditLogsPage() {
         </div>
       )}
       {loading ? (
-        <p className="py-4 text-center" role="status">Loading audit logs...</p>
+        <p className="py-8 text-center text-sm text-muted-foreground" role="status">Loading audit logs...</p>
       ) : (
         <>
-          <AuditLogTable logs={auditLogs} />
-          <div className="flex items-center justify-end gap-3">
+          <div className="overflow-x-auto rounded-lg border">
+            <AuditLogTable logs={auditLogs} />
+          </div>
+          <div className="flex flex-wrap items-center justify-end gap-3">
             <Button
               variant="outline"
               size="sm"

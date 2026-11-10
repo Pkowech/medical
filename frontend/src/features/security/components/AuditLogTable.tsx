@@ -17,7 +17,7 @@ interface AuditLogTableProps {
 
 const AuditLogTable: React.FC<AuditLogTableProps> = ({ logs }) => {
   return (
-    <Table>
+    <Table className="min-w-[48rem]">
       <TableHeader>
         <TableRow>
           <TableHead>Actor</TableHead>
@@ -28,15 +28,23 @@ const AuditLogTable: React.FC<AuditLogTableProps> = ({ logs }) => {
         </TableRow>
       </TableHeader>
       <TableBody>
-        {logs.map(log => (
-          <TableRow key={log.id}>
-            <TableCell>{log.user?.name || 'System / Deleted User'}</TableCell>
-            <TableCell>{log.action}</TableCell>
-            <TableCell>{log.entity}</TableCell>
-            <TableCell>{log.entityId}</TableCell>
-            <TableCell>{new Date(log.timestamp).toLocaleString()}</TableCell>
+        {logs.length > 0 ? (
+          logs.map(log => (
+            <TableRow key={log.id}>
+              <TableCell>{log.user?.name || 'System / Deleted User'}</TableCell>
+              <TableCell>{log.action}</TableCell>
+              <TableCell>{log.entity}</TableCell>
+              <TableCell>{log.entityId}</TableCell>
+              <TableCell>{new Date(log.timestamp).toLocaleString()}</TableCell>
+            </TableRow>
+          ))
+        ) : (
+          <TableRow>
+            <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
+              No audit events found.
+            </TableCell>
           </TableRow>
-        ))}
+        )}
       </TableBody>
     </Table>
   );

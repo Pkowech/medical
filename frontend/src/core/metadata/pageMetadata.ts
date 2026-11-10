@@ -341,8 +341,8 @@ export const pageMetadata: RouteMetadata[] = [
   },
   {
     path: '/admin',
-    title: 'Admin Control Center',
-    description: 'Manage platform users, courses, and administration.',
+    title: 'Admin Dashboard',
+    description: 'Manage the platform, its content, and users.',
   },
   {
     path: '/admin/analytics',
@@ -358,6 +358,11 @@ export const pageMetadata: RouteMetadata[] = [
     path: '/admin/content',
     title: 'Content Management',
     description: 'Manage learning content published on the platform.',
+  },
+  {
+    path: '/admin/assessment/quizzes',
+    title: 'Quiz Authoring',
+    description: 'Import quizzes and manage questions in the shared question bank.',
   },
   {
     path: '/admin/materials/upload',

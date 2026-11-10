@@ -1,26 +1,58 @@
 import {
-  Users,
-  Settings,
-  BarChart3,
-  FileText,
-  Shield,
-  User,
-  Clock,
   AlertCircle,
+  BarChart3,
+  Clock,
+  FileText,
+  LayoutDashboard,
+  Library,
+  LockKeyhole,
+  Settings,
+  Shield,
+  Users,
 } from 'lucide-react';
+import type { NavigationItem } from '@/shared/types/navigationInterface';
 
-import { NavigationItem } from '@/shared/types/navigationInterface';
-
-/**
- * Admin-specific navigation items
- * Displayed in admin layout sidebar
- * These items are only visible to admin users
- */
 const adminNavigationConfig: NavigationItem[] = [
   {
     id: 'dashboard',
-    label: 'Admin Dashboard',
+    label: 'Dashboard',
     href: '/admin',
+    icon: LayoutDashboard,
+  },
+  {
+    id: 'management',
+    label: 'Management',
+    icon: Users,
+    children: [
+      {
+        id: 'users',
+        label: 'Users',
+        href: '/admin/users',
+        icon: Users,
+      },
+      {
+        id: 'content',
+        label: 'Courses & Content',
+        href: '/admin/content',
+        icon: Library,
+      },
+      {
+        id: 'upload-materials',
+        label: 'Upload Materials',
+        href: '/admin/materials/upload',
+        icon: FileText,
+      },
+      {
+        id: 'quiz-authoring',
+        label: 'Quiz Authoring',
+        href: '/admin/assessment/quizzes',
+        icon: FileText,
+      },
+    ],
+  },
+  {
+    id: 'insights',
+    label: 'Insights',
     icon: BarChart3,
     children: [
       {
@@ -38,54 +70,29 @@ const adminNavigationConfig: NavigationItem[] = [
     ],
   },
   {
-    id: 'users',
-    label: 'User Management',
-    href: '/admin/users',
-    icon: Users,
-  },
-  {
-    id: 'settings',
-    label: 'System Settings',
-    href: '/admin/settings',
-    icon: Settings,
-  },
-  {
-    id: 'content',
-    label: 'Content Management',
-    href: '/admin/content',
-    icon: FileText,
+    id: 'security',
+    label: 'Access & Security',
+    icon: LockKeyhole,
     children: [
       {
-        id: 'upload-materials',
-        label: 'Upload Materials',
-        href: '/admin/materials/upload',
-        icon: FileText,
+        id: 'roles',
+        label: 'Roles & Permissions',
+        href: '/admin/roles',
+        icon: Shield,
       },
       {
-        id: 'quiz-authoring',
-        label: 'Quiz Authoring',
-        href: '/admin/assessment/quizzes',
-        icon: FileText,
+        id: 'audit-logs',
+        label: 'Audit Logs',
+        href: '/admin/audit-logs',
+        icon: Clock,
       },
     ],
   },
   {
-    id: 'roles',
-    label: 'Roles & Permissions',
-    href: '/admin/roles',
-    icon: Shield,
-  },
-  {
-    id: 'audit-logs',
-    label: 'Audit Logs',
-    href: '/admin/audit-logs',
-    icon: Clock,
-  },
-  {
-    id: 'profile',
-    label: 'Profile',
-    href: '/profile',
-    icon: User,
+    id: 'settings',
+    label: 'Settings',
+    href: '/admin/settings',
+    icon: Settings,
   },
 ];
 

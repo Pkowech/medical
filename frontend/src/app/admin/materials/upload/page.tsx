@@ -1,20 +1,35 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import FileUpload from '@/shared/components/forms/FileUpload';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/shared/components/ui/card';
 import { Button } from '@/shared/components/ui/button';
-import { ArrowLeft, Library, Upload } from 'lucide-react';
+import { Library, Upload } from 'lucide-react';
 import { useToast } from '@/shared/components/ui/use-toast';
 import { MaterialLibraryPicker } from '@/features/materials/components/MaterialLibraryPicker';
 import { materialService } from '@/features/courses/services/materialService';
 import { Material } from '@/shared/types/materialInterface';
+import Link from 'next/link';
+import { useEffect } from 'react';
+import { usePageHeader } from '@/core/providers/HeaderContext';
 
 export default function MaterialUploadPage() {
-  const router = useRouter();
+  const { setHeader } = usePageHeader();
   const { toast } = useToast();
   const [showLibraryPicker, setShowLibraryPicker] = useState(false);
+
+  useEffect(() => {
+    setHeader({
+      title: 'Materials Library',
+      description: 'Upload and manage shared learning materials.',
+      actions: (
+        <Button asChild size="sm" variant="outline">
+          <Link href="/admin/content">Back to content</Link>
+        </Button>
+      ),
+    });
+    return () => setHeader(null);
+  }, [setHeader]);
 
   // ── Handle fresh file upload ───────────────────────────────────────────────
   const handleUploadComplete = (material: unknown) => {
@@ -45,23 +60,7 @@ export default function MaterialUploadPage() {
   };
 
   return (
-    <div className="container mx-auto py-8 max-w-4xl">
-      <div className="mb-6">
-        <Button
-          variant="ghost"
-          onClick={() => router.back()}
-          className="mb-4 pl-0 hover:pl-2 transition-all"
-        >
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back
-        </Button>
-        <h1 className="text-3xl font-bold tracking-tight">Materials Library</h1>
-        <p className="text-muted-foreground mt-2">
-          Upload a new file{' '}
-          <span className="text-muted-foreground mx-1">·</span> or attach an existing R2
-          textbook to another course or topic — no re-upload needed.
-        </p>
-      </div>
+    <div className="container mx-auto max-w-4xl py-6">
 
       {/* ── Action cards ─────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
@@ -100,9 +99,9 @@ export default function MaterialUploadPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="flex-1 flex flex-col justify-end">
-            <div className="rounded-lg bg-blue-50 border border-blue-100 p-4 mb-4 text-sm text-blue-800">
-              <p className="font-medium mb-1">How it works</p>
-              <ol className="list-decimal list-inside space-y-1 text-xs text-blue-700">
+            <div className="mb-4 rounded-lg border border-primary/20 bg-primary/5 p-4 text-sm">
+              <p className="mb-1 font-medium">How it works</p>
+              <ol className="list-inside list-decimal space-y-1 text-xs text-muted-foreground">
                 <li>Browse the R2 library of uploaded files.</li>
                 <li>Pick the textbook chapter or slide deck you want to reuse.</li>
                 <li>Give it a context-specific display title for the new course.</li>

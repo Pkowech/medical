@@ -33,11 +33,16 @@ export const NavigationItemComponent: React.FC<NavigationItemProps> = ({
   );
   const effectiveActive = isItemActive || isChildActive || propActive;
   const activeStateClasses = effectiveActive
-    ? 'bg-blue-50/80 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 shadow-sm'
+    ? 'bg-primary/10 text-primary ring-1 ring-inset ring-primary/15'
     : 'text-muted-foreground dark:text-muted-foreground hover:bg-background dark:hover:bg-card hover:text-foreground dark:hover:text-foreground';
+  const parentActiveClasses = isItemActive
+    ? activeStateClasses
+    : isChildActive
+      ? 'bg-muted/50 text-foreground'
+      : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground';
 
   useEffect(() => {
-    setIsExpanded(Boolean(isChildActive));
+    if (isChildActive) setIsExpanded(true);
   }, [isChildActive, item.id]);
 
   const toggleExpanded = () => {
@@ -47,8 +52,8 @@ export const NavigationItemComponent: React.FC<NavigationItemProps> = ({
 
   const showLabel = !sidebarCollapsed || sidebarOpen;
 
-  const baseClasses = `w-full flex items-center ${showLabel ? 'justify-between px-4' : 'justify-center px-2'} py-2.5 text-left text-sm font-semibold rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 ${activeStateClasses}`;
-  const parentRowClasses = `w-full flex items-center justify-between text-left text-sm font-semibold rounded-xl transition-colors ${activeStateClasses}`;
+  const baseClasses = `w-full flex items-center ${showLabel ? 'justify-between px-4' : 'justify-center px-2'} py-2 text-left text-sm font-medium rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 ${activeStateClasses}`;
+  const parentRowClasses = `w-full flex items-center justify-between text-left text-sm font-semibold rounded-lg transition-colors ${parentActiveClasses}`;
 
   const itemLabel = (
     <>
@@ -91,7 +96,7 @@ export const NavigationItemComponent: React.FC<NavigationItemProps> = ({
               type="button"
               onClick={toggleExpanded}
               title={!showLabel ? item.label : undefined}
-              className={`flex min-w-0 flex-1 items-center rounded-l-xl ${showLabel ? 'px-4' : 'justify-center px-2'} py-2.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500`}
+              className={`flex min-w-0 flex-1 cursor-pointer items-center rounded-l-xl ${showLabel ? 'px-4' : 'justify-center px-2'} py-2.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500`}
               aria-expanded={isExpanded}
               aria-controls={childrenId}
             >
@@ -106,7 +111,7 @@ export const NavigationItemComponent: React.FC<NavigationItemProps> = ({
             <button
               type="button"
               onClick={toggleExpanded}
-              className={`shrink-0 rounded-md p-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${showLabel ? 'mr-2' : 'mr-1'}`}
+              className={`shrink-0 cursor-pointer rounded-md p-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${showLabel ? 'mr-2' : 'mr-1'}`}
               aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${item.label}`}
               aria-expanded={isExpanded}
               aria-controls={childrenId}

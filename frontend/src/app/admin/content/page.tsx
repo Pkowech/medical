@@ -13,6 +13,7 @@ import { TopicForm } from '@/features/courses/components/TopicForm';
 import { AdminCourseList } from '@/features/courses/components/AdminCourseList';
 import { Button } from '@/shared/components/ui/button';
 import { PlusCircle, AlertCircle } from 'lucide-react';
+import { usePageHeader } from '@/core/providers/HeaderContext';
 
 type FormMode = 'none' | 'course' | 'unit' | 'topic';
 
@@ -37,12 +38,32 @@ interface FormContext {
 }
 
 export default function AdminContentPage() {
+  const { setHeader } = usePageHeader();
   const [courses, setCourses] = useState<Course[]>([]);
   const [loadingCourseIds, setLoadingCourseIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [formContext, setFormContext] = useState<FormContext>({ mode: 'none' });
+
+  useEffect(() => {
+    setHeader({
+      title: 'Content Management',
+      description: 'Create and manage courses, units, and topics.',
+      actions: (
+        <Button
+          size="sm"
+          onClick={() => setFormContext({ mode: 'course' })}
+          className="gap-2"
+        >
+          <PlusCircle className="h-4 w-4" />
+          <span className="hidden sm:inline">Create Course</span>
+          <span className="sm:hidden">Create</span>
+        </Button>
+      ),
+    });
+    return () => setHeader(null);
+  }, [setHeader]);
 
   // Load all courses with their units and topics
   const fetchCourses = async () => {
@@ -275,21 +296,6 @@ export default function AdminContentPage() {
 
   return (
     <div className="space-y-8">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold">Content Management</h1>
-          <p className="text-muted-foreground mt-1">Create and manage courses, units, and topics</p>
-        </div>
-        <Button
-          onClick={() => setFormContext({ mode: 'course' })}
-          className="gap-2"
-        >
-          <PlusCircle className="h-4 w-4" />
-          Create Course
-        </Button>
-      </div>
-
       {/* Success/Error Messages */}
       {successMessage && (
         <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative">

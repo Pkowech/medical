@@ -119,17 +119,17 @@ export const UserList: React.FC<UserListProps> = ({
           </p>
         ) : (
           <div className="overflow-x-auto">
-            <Table>
+            <Table className="min-w-[36rem] lg:min-w-[64rem]">
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Role</TableHead>
-                  <TableHead>Course Progress</TableHead>
+                  <TableHead className="hidden lg:table-cell">Course Progress</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Created At</TableHead>
-                  <TableHead>Last Login</TableHead>
-                  <TableHead>Progress Synced</TableHead>
+                  <TableHead className="hidden lg:table-cell">Created At</TableHead>
+                  <TableHead className="hidden lg:table-cell">Last Login</TableHead>
+                  <TableHead className="hidden lg:table-cell">Progress Synced</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -141,7 +141,7 @@ export const UserList: React.FC<UserListProps> = ({
                     <TableCell>
                       <Badge variant="secondary">{user.role}</Badge>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden lg:table-cell">
                       <div className="flex flex-col">
                         <span className="text-sm text-muted-foreground">
                           {user.completedCourses ?? 0} / {user.totalCourses ?? 0}
@@ -163,13 +163,13 @@ export const UserList: React.FC<UserListProps> = ({
                         {user.status}
                       </Badge>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden lg:table-cell">
                       {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden lg:table-cell">
                       {user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString() : 'N/A'}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden lg:table-cell">
                       {user.progressLastUpdated ? formatLastUpdated(user.progressLastUpdated) : 'N/A'}
                     </TableCell>
                     <TableCell className="text-right">
@@ -199,7 +199,9 @@ export const UserList: React.FC<UserListProps> = ({
           </div>
         )}
         <div className="mt-4 flex items-center justify-between gap-3 text-sm text-muted-foreground">
-          <span>{loading ? 'Updating results...' : `${totalUsers} users`}</span>
+          <span>
+            {loading && users.length > 0 ? 'Updating results...' : `${totalUsers} users`}
+          </span>
           <div className="flex items-center gap-2">
             <Button
               variant="outline"

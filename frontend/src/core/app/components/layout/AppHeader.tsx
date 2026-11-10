@@ -40,18 +40,18 @@ export const AppHeader: React.FC<{ showDesktopSidebarToggle?: boolean }> = ({
           <button
             type="button"
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="mr-1 rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted dark:hover:bg-secondary lg:hidden"
+            className="mr-1 inline-flex min-h-10 min-w-10 cursor-pointer items-center justify-center rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:bg-secondary lg:hidden"
             aria-label="Open navigation sidebar"
             aria-expanded={sidebarOpen}
             aria-controls="app-sidebar"
           >
-            <Menu aria-hidden="true" className="h-6 w-6" />
+            <Menu aria-hidden="true" className="h-5 w-5" />
           </button>
           {showDesktopSidebarToggle && (
             <button
               type="button"
               onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              className="hidden rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:bg-secondary lg:inline-flex"
+              className="hidden cursor-pointer rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:bg-secondary lg:inline-flex"
               aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
               title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
               aria-expanded={!sidebarCollapsed}

@@ -58,12 +58,7 @@ export function PerformanceDashboard() {
   }, []);
 
   return (
-    <div className="p-6 space-y-8 bg-background/50 dark:bg-card/50 min-h-screen">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground dark:text-foreground">System Performance Dashboard</h1>
-        <p className="text-sm text-muted-foreground">Real-time frontend telemetry, Web Vitals, API response latency, and resource metrics.</p>
-      </div>
-
+    <div className="space-y-6">
       {/* Page Load Metrics */}
       <div className="bg-card/80 dark:bg-card/50 backdrop-blur-sm rounded-lg shadow-sm border border-border dark:border-border/50 p-6">
         <h2 className="text-xl font-semibold mb-4 text-foreground dark:text-foreground">Page Load Performance (Web Vitals)</h2>

@@ -23,12 +23,12 @@ export default function SystemAnalyticsDashboard() {
 
   if (error || !systemAnalytics) {
     return (
-      <Card className="border-red-200 bg-red-50">
+      <Card className="border-destructive/30 bg-destructive/5">
         <CardHeader>
-          <CardTitle className="text-red-700">Failed to Load System Analytics</CardTitle>
+          <CardTitle className="text-destructive">Failed to Load System Analytics</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-red-600">
+          <p className="text-sm text-muted-foreground">
             {error instanceof Error
               ? error.message
               : 'System analytics are currently unavailable.'}

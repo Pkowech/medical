@@ -13,6 +13,7 @@ import { RoleEntity } from '@/shared/types/systemInterface';
 import { Role as RoleEnum } from '@/shared/enums/role.enum';
 import { Button } from '@/shared/components/ui/button';
 import { PlusCircle } from 'lucide-react';
+import { usePageHeader } from '@/core/providers/HeaderContext';
 
 function getRequestErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message) return error.message;
@@ -30,6 +31,7 @@ function getRequestErrorMessage(error: unknown, fallback: string): string {
 }
 
 export default function AdminUsersPage() {
+  const { setHeader } = usePageHeader();
   const { allRoles } = usePermissions();
   const { isAuthenticated, isLoading: authLoading, user } = useAuth();
 
@@ -53,6 +55,27 @@ export default function AdminUsersPage() {
   const [rolesRefreshVersion, setRolesRefreshVersion] = useState(0);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    setHeader({
+      title: 'User Management',
+      description: 'Manage user accounts and access.',
+      actions: isAdmin ? (
+        <Button
+          size="sm"
+          onClick={() => {
+            setEditingUser(null);
+            setIsFormOpen(true);
+          }}
+        >
+          <PlusCircle className="mr-2 h-4 w-4" />
+          <span className="hidden sm:inline">Add New User</span>
+          <span className="sm:hidden">Add User</span>
+        </Button>
+      ) : undefined,
+    });
+    return () => setHeader(null);
+  }, [isAdmin, setHeader]);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => setDebouncedSearch(search.trim()), 250);
@@ -170,18 +193,6 @@ export default function AdminUsersPage() {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="space-y-8">
-        <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold">User Management</h1>
-          <Button
-            onClick={() => {
-              setEditingUser(null);
-              setIsFormOpen(true);
-            }}
-          >
-            <PlusCircle className="mr-2 h-4 w-4" /> Add New User
-          </Button>
-        </div>
-
         {error && (
           <div
             className="flex items-center justify-between gap-4 rounded-md border border-destructive/30 p-3 text-sm text-destructive"
@@ -229,11 +240,6 @@ export default function AdminUsersPage() {
           />
         )}
 
-        {loading && (
-          <div className="text-center text-sm text-muted-foreground" role="status">
-            Updating users...
-          </div>
-        )}
         <UserList
           loading={loading}
           users={users}

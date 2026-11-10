@@ -6,6 +6,22 @@ import type { NavigationItem } from '@/shared/types/navigationInterface';
 import { useLayoutStore } from '@/core/stores/useLayoutStore';
 import { mobilePrimaryNavigation } from './mobileNavigationConfig';
 
+const adminPrimaryNavigation = [
+  { href: '/admin', label: 'Home' },
+  { href: '/admin/users', label: 'Users' },
+  { href: '/admin/content', label: 'Content' },
+  { href: '/admin/analytics', label: 'Insights' },
+  { href: '/admin/settings', label: 'Settings' },
+] as const;
+
+function findNavigationItem(items: NavigationItem[], href: string): NavigationItem | undefined {
+  for (const item of items) {
+    if (item.href === href) return item;
+    const childMatch = item.children && findNavigationItem(item.children, href);
+    if (childMatch) return childMatch;
+  }
+}
+
 interface MobileTabBarProps {
   navigationItems: NavigationItem[];
 }
@@ -13,10 +29,16 @@ interface MobileTabBarProps {
 export function MobileTabBar({ navigationItems }: MobileTabBarProps) {
   const pathname = usePathname();
   const setSidebarOpen = useLayoutStore(state => state.setSidebarOpen);
-  const availableTabs = mobilePrimaryNavigation.flatMap(tab => {
-    const item = navigationItems.find(candidate => candidate.href === tab.href);
-    return item ? [{ ...tab, item }] : [];
-  });
+  const isAdminNavigation = navigationItems.some(item => item.href === '/admin');
+  const availableTabs = isAdminNavigation
+    ? adminPrimaryNavigation.flatMap(tab => {
+        const item = findNavigationItem(navigationItems, tab.href);
+        return item ? [{ ...tab, item }] : [];
+      })
+    : mobilePrimaryNavigation.flatMap(tab => {
+        const item = navigationItems.find(candidate => candidate.href === tab.href);
+        return item ? [{ ...tab, item }] : [];
+      });
 
   if (!availableTabs.length) return null;
 
@@ -30,10 +52,17 @@ export function MobileTabBar({ navigationItems }: MobileTabBarProps) {
         style={{ gridTemplateColumns: `repeat(${availableTabs.length}, minmax(0, 1fr))` }}
       >
         {availableTabs.map(({ href, label, item }) => {
-          const isActive =
-            pathname === href ||
-            (href !== '/dashboard' && pathname.startsWith(`${href}/`)) ||
-            (href === '/progress' && pathname === '/analytics');
+          const isActive = isAdminNavigation
+            ? pathname === href ||
+              (href !== '/admin' && pathname.startsWith(`${href}/`)) ||
+              (href === '/admin/content' &&
+                ['/admin/materials/', '/admin/assessment/'].some(prefix =>
+                  pathname.startsWith(prefix),
+                )) ||
+              (href === '/admin/analytics' && pathname === '/admin/performance')
+            : pathname === href ||
+              (href !== '/dashboard' && pathname.startsWith(`${href}/`)) ||
+              (href === '/progress' && pathname === '/analytics');
           const Icon = item.icon;
 
           return (
