@@ -243,6 +243,7 @@ export interface SystemAnalytics {
   completedCourses?: number;
   totalEnrollments?: number;
   totalAssessments?: number;
+  totalAttempts?: number;
   totalPaths?: number;
   averageCompletionRate?: number;
   overallCompletionRate?: number;

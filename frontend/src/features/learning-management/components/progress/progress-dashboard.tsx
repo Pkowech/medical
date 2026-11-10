@@ -39,6 +39,7 @@ export const ProgressDashboard = () => {
 
   const [progressData, setProgressData] = useState<ProgressData | null>(null);
   const [weaknessChains, setWeaknessChains] = useState<WeaknessChain[]>([]);
+  const [weaknessError, setWeaknessError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
@@ -56,6 +57,7 @@ export const ProgressDashboard = () => {
       }
 
       const loadWeaknessChains = async () => {
+        setWeaknessError(null);
         try {
           const response = await fetch('/api/assessments/analytics/weakness-chains');
           if (!response.ok) throw new Error(`Request failed with status ${response.status}`);
@@ -65,6 +67,7 @@ export const ProgressDashboard = () => {
           }
         } catch (error) {
           console.error('Error fetching weakness chains:', error);
+          if (active) setWeaknessError('Weak-topic insights are unavailable.');
         }
       };
 
@@ -98,6 +101,10 @@ export const ProgressDashboard = () => {
   const attentionChains = weaknessChains.filter(
     chain => chain.riskLevel === 'HIGH' || chain.riskLevel === 'MEDIUM',
   );
+  const unavailableSections = [
+    ...(progressData?.dataWarnings ?? []),
+    ...(weaknessError ? ['weak-topic insights'] : []),
+  ];
   const assessmentChartData = {
     labels: assessmentTrends.map((trend) => trend.month),
     datasets: [
@@ -146,11 +153,11 @@ export const ProgressDashboard = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      {progressData?.dataWarnings && progressData.dataWarnings.length > 0 && (
+      {unavailableSections.length > 0 && (
         <Card className="border-amber-300 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/20">
           <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-amber-900 dark:text-amber-200">
-              Some progress data is unavailable ({progressData.dataWarnings.join(', ')}). The sections below may be incomplete.
+              Some progress data is unavailable ({unavailableSections.join(', ')}). The sections below may be incomplete.
             </p>
             <button
               type="button"
@@ -244,8 +251,8 @@ export const ProgressDashboard = () => {
         <StatCard
           icon={Clock}
           title="Study Hours"
-          value={progressData?.stats?.studyHours ?? '—'}
-          subtitle="All-time total"
+          value={progressData?.stats?.studyHours ?? 'No data yet'}
+          subtitle={progressData?.stats?.studyHours === undefined ? 'Study time has not been reported' : 'All-time total'}
           colorClass="bg-indigo-500"
         />
         <StatCard

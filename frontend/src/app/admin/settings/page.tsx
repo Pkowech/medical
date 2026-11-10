@@ -8,6 +8,7 @@ import {
   settingsService,
   type SystemSettings,
 } from '@/features/admin/services/settingsService';
+import { Button } from '@/shared/components/ui/button';
 
 const DEFAULT_SETTINGS: SystemSettings = {
   platformName: '',
@@ -28,6 +29,7 @@ export default function AdminSettingsPage() {
   const [settings, setSettings] = useState<SystemSettings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
+  const [loadVersion, setLoadVersion] = useState(0);
   const [saveError, setSaveError] = useState('');
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -35,6 +37,8 @@ export default function AdminSettingsPage() {
   useEffect(() => {
     if (!isAdmin) return;
     let active = true;
+    setLoading(true);
+    setLoadError('');
     settingsService
       .getSettings()
       .then(value => {
@@ -53,7 +57,7 @@ export default function AdminSettingsPage() {
     return () => {
       active = false;
     };
-  }, [isAdmin]);
+  }, [isAdmin, loadVersion]);
 
   const saveSettings = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -87,12 +91,21 @@ export default function AdminSettingsPage() {
   return (
     <main className="mx-auto max-w-4xl space-y-6 p-6">
       {loadError && (
-        <p className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-800" role="alert">
-          {loadError}
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm" role="alert">
+          <p className="text-muted-foreground">{loadError}</p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setLoadVersion(version => version + 1)}
+          >
+            Retry loading settings
+          </Button>
+        </div>
       )}
 
-      <form onSubmit={saveSettings} className="space-y-6">
+      <form onSubmit={saveSettings}>
+        <fieldset disabled={Boolean(loadError) || saving} className="min-w-0 space-y-6 border-0 p-0">
         <section className="space-y-5 rounded-lg border bg-card p-6 shadow-sm">
           <h2 className="flex items-center gap-2 text-lg font-semibold">
             <Settings className="h-5 w-5" aria-hidden="true" />
@@ -248,6 +261,7 @@ export default function AdminSettingsPage() {
             {saving ? 'Saving...' : 'Save system settings'}
           </button>
         </div>
+        </fieldset>
       </form>
     </main>
   );

@@ -34,7 +34,7 @@ export function PerformanceDashboard() {
     const updateMetrics = () => {
       const allMetrics = performanceMonitor.getMetrics();
       const formattedMetrics = allMetrics.map(metric => ({
-        timestamp: Date.now(),
+        timestamp: metric.timestamp,
         value: metric.value,
         name: metric.name,
       }));
@@ -50,8 +50,7 @@ export function PerformanceDashboard() {
       setResourceMetrics(resources);
     };
 
-    // Update metrics every second
-    const interval = setInterval(updateMetrics, 1000);
+    const interval = setInterval(updateMetrics, 5000);
     updateMetrics();
 
     return () => clearInterval(interval);
@@ -93,25 +92,37 @@ export function PerformanceDashboard() {
       {/* API Performance */}
       <div className="bg-card/80 dark:bg-card/50 backdrop-blur-sm rounded-lg shadow-sm border border-border dark:border-border/50 p-6">
         <h2 className="text-xl font-semibold mb-4 text-foreground dark:text-foreground">API Latency & Performance</h2>
-        <div className="h-80">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={apiMetrics}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="timestamp" />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Line type="monotone" dataKey="duration" stroke="#8884d8" name="Duration (ms)" />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
+        {apiMetrics.length > 0 ? (
+          <div className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={apiMetrics}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis
+                  dataKey="timestamp"
+                  tickFormatter={value => new Date(Number(value)).toLocaleTimeString()}
+                />
+                <YAxis />
+                <Tooltip
+                  labelFormatter={value => new Date(Number(value)).toLocaleString()}
+                />
+                <Legend />
+                <Line type="monotone" dataKey="duration" stroke="#2563eb" name="Duration (ms)" />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        ) : (
+          <p className="py-8 text-center text-sm text-muted-foreground" role="status">
+            API request measurements will appear as requests are recorded in this session.
+          </p>
+        )}
       </div>
 
       {/* Resource Loading */}
       <div className="bg-card/80 dark:bg-card/50 backdrop-blur-sm rounded-lg shadow-sm border border-border dark:border-border/50 p-6">
         <h2 className="text-xl font-semibold mb-4 text-foreground dark:text-foreground">Resource Loading</h2>
+        {resourceMetrics.length > 0 ? (
         <div className="overflow-x-auto">
-          <table className="min-w-full">
+          <table className="min-w-full text-sm">
             <thead>
               <tr className="border-b border-border dark:border-border/50">
                 <th className="px-4 py-2 text-left text-foreground dark:text-foreground">Resource</th>
@@ -132,23 +143,39 @@ export function PerformanceDashboard() {
             </tbody>
           </table>
         </div>
+        ) : (
+          <p className="py-4 text-center text-sm text-muted-foreground" role="status">
+            No resource measurements have been recorded in this session.
+          </p>
+        )}
       </div>
 
       {/* Custom Metrics */}
       <div className="bg-card/80 dark:bg-card/50 backdrop-blur-sm rounded-lg shadow-sm border border-border dark:border-border/50 p-6">
         <h2 className="text-xl font-semibold mb-4 text-foreground dark:text-foreground">Custom Metrics</h2>
-        <div className="h-80">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={metrics}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="timestamp" />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Line type="monotone" dataKey="value" stroke="#82ca9d" name="Value" />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
+        {metrics.length > 0 ? (
+          <div className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={metrics}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis
+                  dataKey="timestamp"
+                  tickFormatter={value => new Date(Number(value)).toLocaleTimeString()}
+                />
+                <YAxis />
+                <Tooltip
+                  labelFormatter={value => new Date(Number(value)).toLocaleString()}
+                />
+                <Legend />
+                <Line type="monotone" dataKey="value" stroke="#2563eb" name="Value" />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        ) : (
+          <p className="py-8 text-center text-sm text-muted-foreground" role="status">
+            Custom performance measurements will appear as they are recorded.
+          </p>
+        )}
       </div>
     </div>
   );

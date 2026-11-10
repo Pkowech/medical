@@ -1,7 +1,7 @@
 import React from 'react';
 import { AlertTriangle, TrendingDown, BookOpen, ArrowRight } from 'lucide-react';
 import { useHighRiskTopics } from '../hooks/useHighRiskTopics';
-import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 interface HighRiskTopicsCardProps {
   userId: string;
@@ -9,7 +9,6 @@ interface HighRiskTopicsCardProps {
 
 export const HighRiskTopicsCard: React.FC<HighRiskTopicsCardProps> = ({ userId }) => {
   const { data: topics, isLoading, isError } = useHighRiskTopics(userId);
-  const router = useRouter();
 
   if (isLoading) {
     return (
@@ -48,10 +47,11 @@ export const HighRiskTopicsCard: React.FC<HighRiskTopicsCardProps> = ({ userId }
 
         <div className="space-y-3">
           {topics.map((topic, index) => (
-            <div 
+            <Link
               key={index}
+              href="/flashcards"
+              aria-label={`Review flashcards for ${topic.topic}`}
               className="group/item flex items-center justify-between p-4 bg-background/50 dark:bg-card/40 rounded-xl border border-border dark:border-border/30 hover:border-red-200 dark:hover:border-red-800/50 hover:bg-card dark:hover:bg-card transition-all cursor-pointer"
-              onClick={() => router.push('/flashcards')}
             >
               <div className="flex items-center gap-4">
                 <div className="relative">
@@ -77,16 +77,16 @@ export const HighRiskTopicsCard: React.FC<HighRiskTopicsCardProps> = ({ userId }
               <div className="p-2 rounded-lg bg-muted dark:bg-card group-hover/item:bg-red-50 dark:group-hover/item:bg-red-900/30 transition-colors">
                 <ArrowRight className="w-4 h-4 text-muted-foreground group-hover/item:text-red-600 transition-colors" />
               </div>
-            </div>
+            </Link>
           ))}
         </div>
         
-        <button 
-          onClick={() => router.push('/flashcards')}
-          className="w-full mt-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold text-sm transition-all shadow-lg shadow-red-500/20 active:scale-[0.98]"
+        <Link
+          href="/flashcards"
+          className="mt-6 flex w-full items-center justify-center rounded-xl bg-red-600 py-3 text-sm font-bold text-white shadow-lg shadow-red-500/20 transition-colors hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         >
           Review All Struggling Topics
-        </button>
+        </Link>
       </div>
     </div>
   );

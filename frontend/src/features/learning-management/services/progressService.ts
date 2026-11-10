@@ -425,11 +425,16 @@ const progressService = {
           overallProgress,
           coursesCompleted: stats.coursesCompleted || 0,
           totalCourses: stats.totalCourses || 0,
-          totalStudyTime: typeof stats.totalStudyTime === 'number' ? stats.totalStudyTime : 0,
+          totalStudyTime:
+            typeof stats.totalStudyTime === 'number' && Number.isFinite(stats.totalStudyTime)
+              ? stats.totalStudyTime
+              : undefined,
           studyHours:
-            typeof stats.totalStudyTime === 'number'
-              ? Math.round((stats.totalStudyTime / 60) * 10) / 10
-              : 0,
+            typeof stats.studyHours === 'number' && Number.isFinite(stats.studyHours)
+              ? stats.studyHours
+              : typeof stats.totalStudyTime === 'number' && Number.isFinite(stats.totalStudyTime)
+                ? Math.round((stats.totalStudyTime / 60) * 10) / 10
+                : undefined,
           averageScore:
             typeof stats.averageScore === 'number' && Number.isFinite(stats.averageScore)
               ? Math.round(stats.averageScore)

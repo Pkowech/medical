@@ -60,6 +60,12 @@ export function Sidebar({
     useLearningStreak();
   const unreadNotifications = notifications.filter(notification => !notification.read);
   const isAdminNavigation = navigationItems.some(item => item.href === '/admin');
+  const profileLabel = user ? healthcareProfileLabel(user) : '';
+  const profileDetails =
+    user && (user.specialization?.trim() || user.healthcareField)
+      ? profileLabel
+      : null;
+  const accountRoleLabel = isAdminNavigation ? 'Administrator' : profileLabel;
   const visibleNavigationItems = isDesktop
     ? navigationItems
     : navigationItems.flatMap(item =>
@@ -408,7 +414,7 @@ export function Sidebar({
                 title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
               >
                 {theme === 'dark' ? (
-                  <Sun aria-hidden="true" className="h-5 w-5 text-yellow-500" />
+                  <Sun aria-hidden="true" className="h-5 w-5 text-primary" />
                 ) : (
                   <Moon aria-hidden="true" className="h-5 w-5" />
                 )}
@@ -437,7 +443,11 @@ export function Sidebar({
               aria-label="Account menu"
               aria-expanded={sidebarUserMenuOpen}
               aria-haspopup="menu"
-              title={isDesktop && sidebarCollapsed ? user.fullName || `${user.firstName} ${user.lastName}` : undefined}
+              title={
+                isDesktop && sidebarCollapsed
+                  ? `${user.fullName || `${user.firstName} ${user.lastName}`} · ${accountRoleLabel}`
+                  : undefined
+              }
             >
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-200">
                 <span className="text-sm font-semibold">
@@ -451,8 +461,13 @@ export function Sidebar({
                       {user.fullName || `${user.firstName} ${user.lastName}`}
                     </span>
                     <span className="block truncate text-xs text-muted-foreground">
-                      {healthcareProfileLabel(user)}
+                      {accountRoleLabel}
                     </span>
+                    {isAdminNavigation && profileDetails && (
+                      <span className="block truncate text-[11px] text-muted-foreground">
+                        {profileDetails}
+                      </span>
+                    )}
                   </span>
                   <ChevronDown aria-hidden="true" className="h-4 w-4 shrink-0 text-muted-foreground" />
                 </>

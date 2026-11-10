@@ -9,72 +9,72 @@ import { AnalyticsMetrics } from '@/shared/types/analyticsInterface';
 export function ConsolidatedAnalyticsView() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // const [progressData, setProgressData] = useState<any | null>(null);
   const [analyticsMetrics, setAnalyticsMetrics] = useState<AnalyticsMetrics | null>(null);
 
   useEffect(() => {
+    let active = true;
     const fetchData = async () => {
       setIsLoading(true);
       setError(null);
       try {
-        // const [pd, am] = await Promise.all([
-        //   consolidatedAnalyticsService.getProgressData(),
-        //   consolidatedAnalyticsService.getAnalyticsMetrics(),
-        // ]);
-        // setProgressData(pd);
         const am = await aiAnalyticsService.getAnalyticsMetrics();
-        setAnalyticsMetrics(am);
+        if (active) setAnalyticsMetrics(am);
       } catch (err) {
         console.error('Failed to fetch consolidated analytics data:', err);
-        setError('Failed to load consolidated analytics data. Please try again.');
+        if (active) setError('Failed to load consolidated analytics data. Please try again.');
       } finally {
-        setIsLoading(false);
+        if (active) setIsLoading(false);
       }
     };
 
-    fetchData();
+    void fetchData();
+    return () => {
+      active = false;
+    };
   }, []);
 
   if (error) {
     return (
-      <div className="flex items-center justify-center p-8 text-red-600">
-        <AlertCircle className="mr-2 h-5 w-5" />
-        <span>{error}</span>
-      </div>
+      <Card className="border-destructive/30 bg-destructive/5">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-destructive">
+            <AlertCircle className="h-5 w-5" />
+            Analytics unavailable
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm text-muted-foreground">{error}</CardContent>
+      </Card>
     );
   }
 
-  if (isLoading || !analyticsMetrics) {
-    return <div>Loading...</div>;
+  if (isLoading) {
+    return <p className="py-8 text-center text-sm text-muted-foreground" role="status">Loading analytics...</p>;
+  }
+
+  if (!analyticsMetrics) {
+    return (
+      <Card>
+        <CardContent className="py-8 text-center text-sm text-muted-foreground" role="status">
+          Analytics data is not available yet.
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
     <div className="space-y-6">
-      {/* <Card>
-        <CardHeader>
-          <CardTitle>Progress Data</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={progressData.weeklyProgress}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="day" />
-              <YAxis />
-              <Tooltip />
-              <Bar dataKey="studyTime" fill="#8884d8" />
-            </BarChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card> */}
-
       <Card>
         <CardHeader>
           <CardTitle>Analytics Metrics</CardTitle>
         </CardHeader>
         <CardContent>
-          <p>Average Score: {analyticsMetrics.quizPerformance?.avgScore}</p>
-          {/* <p>Completion Rate: {analyticsMetrics.userAnalytics?.completionRate}</p>
-          <p>Total Study Time: {analyticsMetrics.userAnalytics?.totalStudyHours}</p> */}
+          <p>
+            Average Score:{' '}
+            {typeof analyticsMetrics.quizPerformance?.avgScore === 'number' &&
+            Number.isFinite(analyticsMetrics.quizPerformance.avgScore)
+              ? `${analyticsMetrics.quizPerformance.avgScore.toFixed(1)}%`
+              : 'Not reported'}
+          </p>
         </CardContent>
       </Card>
     </div>

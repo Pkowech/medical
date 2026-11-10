@@ -21,15 +21,16 @@ import { PerformanceAnalyticsContent } from '@/features/assessment/components/Pe
 import { usePageHeader } from '@/core/providers/HeaderContext';
 import { useLearningStreak } from '@/shared/hooks/useProgress';
 import { apiService } from '@/features/auth/services/apiClient';
+import Link from 'next/link';
 
 function AnalyticsErrorCard({ title, message }: { title: string; message: string }) {
   return (
-    <Card className="border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/20">
+    <Card className="border-destructive/30 bg-destructive/5">
       <CardHeader>
-        <CardTitle className="text-red-700 dark:text-red-400">{title}</CardTitle>
+        <CardTitle className="text-destructive">{title}</CardTitle>
       </CardHeader>
       <CardContent>
-        <p className="text-red-600 dark:text-red-300">{message}</p>
+        <p className="text-sm text-muted-foreground">{message}</p>
       </CardContent>
     </Card>
   );
@@ -167,6 +168,20 @@ export default function AnalyticsDashboard() {
               title="Overview Unavailable"
               message={errorUserAnalytics instanceof Error ? errorUserAnalytics.message : 'Failed to load your analytics.'}
             />
+          ) : !userAnalytics ? (
+            <Card>
+              <CardContent className="flex flex-col items-center gap-3 p-8 text-center">
+                <p className="text-sm text-muted-foreground">
+                  Learning analytics are not available yet. Continue studying to build your progress summary.
+                </p>
+                <Link
+                  href="/progress"
+                  className="text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  View learning progress
+                </Link>
+              </CardContent>
+            </Card>
           ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <Card>
@@ -211,9 +226,16 @@ export default function AnalyticsDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  {userAnalytics?.totalStudyHours?.toFixed(1) || 0}
+                  {typeof userAnalytics?.totalStudyHours === 'number' &&
+                  Number.isFinite(userAnalytics.totalStudyHours)
+                    ? userAnalytics.totalStudyHours.toFixed(1)
+                    : 'No data yet'}
                 </div>
-                <p className="text-xs text-muted-foreground">Total time spent learning</p>
+                <p className="text-xs text-muted-foreground">
+                  {typeof userAnalytics?.totalStudyHours === 'number'
+                    ? 'Total time spent learning'
+                    : 'Study time has not been reported'}
+                </p>
               </CardContent>
             </Card>
             <Card>
@@ -236,9 +258,14 @@ export default function AnalyticsDashboard() {
                   {typeof userAnalytics?.completionRate === 'number' &&
                   Number.isFinite(userAnalytics.completionRate)
                     ? `${Math.round(userAnalytics.completionRate * 100)}%`
-                    : '—'}
+                    : 'No data yet'}
                 </div>
-                <p className="text-xs text-muted-foreground">Completed enrollments</p>
+                <p className="text-xs text-muted-foreground">
+                  {typeof userAnalytics?.completionRate === 'number' &&
+                  Number.isFinite(userAnalytics.completionRate)
+                    ? 'Completed enrollments'
+                    : 'Course completion has not been reported'}
+                </p>
               </CardContent>
             </Card>
             <Card>
@@ -248,12 +275,20 @@ export default function AnalyticsDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  {isLoadingLearningStreak ? '…' : typeof learningStreak === 'number' ? learningStreak : '—'}
+                  {isLoadingLearningStreak
+                    ? 'Loading…'
+                    : typeof learningStreak === 'number'
+                      ? learningStreak
+                      : learningStreakError
+                        ? 'Unavailable'
+                        : 'No data yet'}
                 </div>
                 <p className="text-xs text-muted-foreground">
                   {learningStreakError
                     ? `Learning streak unavailable: ${learningStreakError.message}`
-                    : 'Consecutive days with learning activity'}
+                    : typeof learningStreak === 'number'
+                      ? 'Consecutive days with learning activity'
+                      : 'No streak data has been reported'}
                 </p>
               </CardContent>
             </Card>

@@ -22,6 +22,16 @@ export interface AdminUserFilters {
   status?: string;
 }
 
+interface SystemTotals {
+  users?: number;
+  courses?: number;
+  quizzes?: number;
+  attempts?: number;
+  units?: number;
+  questions?: number;
+  quizCompletionRate?: number;
+}
+
 export class AdminService {
   private readonly baseUrl = '/admin';
 
@@ -161,41 +171,45 @@ export class AdminService {
   }
 
   async getSystemAnalytics(): Promise<SystemAnalytics | null> {
-    try {
-      const response = await apiService.get<
-        | { users?: number; courses?: number; quizzes?: number; attempts?: number; units?: number; questions?: number; quizCompletionRate?: number }
-        | { data: { users?: number; courses?: number; quizzes?: number; attempts?: number; units?: number; questions?: number; quizCompletionRate?: number } }>(
-        '/admin/system-overview/data',
-        {
-          timeout: 15000,
-        }
-      );
+    const [metricsResult, summaryResult] = await Promise.allSettled([
+      apiService.get<unknown>('/admin/system-overview/data', { timeout: 15000 }),
+      apiService.get<unknown>('/admin/system-overview/summary', { timeout: 15000 }),
+    ]);
 
-      const analytics = this.normalizeSystemAnalytics(response.data);
-      if (!analytics) {
-        this.logger.warn('getSystemAnalytics: backend returned empty body', response.data);
-        return null;
-      }
+    const metrics =
+      metricsResult.status === 'fulfilled'
+        ? this.normalizeSystemAnalytics(metricsResult.value.data)
+        : null;
+    const summary =
+      summaryResult.status === 'fulfilled'
+        ? this.normalizeSystemSummary(summaryResult.value.data)
+        : null;
 
-      return {
-        totalUsers: analytics.users ?? 0,
-        totalCourses: analytics.courses ?? 0,
-        totalAssessments: analytics.quizzes ?? 0,
-        averageCompletionRate: analytics.quizCompletionRate ?? 0,
-        overallCompletionRate: analytics.quizCompletionRate ?? 0,
-        lastUpdated: Date.now(),
-      };
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error
-          ? error.message
-          : typeof error === 'string'
-          ? error
-          : JSON.stringify(error);
-
-      this.logger.error('Error fetching system stats:', errorMessage);
+    if (metricsResult.status === 'rejected') {
+      this.logger.warn('getSystemAnalytics: system totals are unavailable', metricsResult.reason);
+    }
+    if (summaryResult.status === 'rejected') {
+      this.logger.warn('getSystemAnalytics: active learner totals are unavailable', summaryResult.reason);
+    }
+    if (!metrics && !summary) {
+      this.logger.error('Error fetching system stats:', 'Both system analytics endpoints failed.');
       return null;
     }
+
+    return {
+      totalUsers: metrics?.users ?? summary?.totalUsers ?? 0,
+      activeUsers: summary?.activeLearners,
+      activeLearners: summary?.activeLearners,
+      totalCourses: metrics?.courses ?? summary?.totalCourses ?? 0,
+      totalAssessments: metrics?.quizzes,
+      totalAttempts: metrics?.attempts,
+      completedCourses: summary?.completedCourses,
+      totalPaths: summary?.totalPaths,
+      totalEnrollments: summary?.totalEnrollments,
+      averageCompletionRate: metrics?.quizCompletionRate,
+      overallCompletionRate: summary?.overallCompletionRate,
+      lastUpdated: Date.now(),
+    };
   }
 
   private unwrapPayload<T>(payload: unknown): T {
@@ -277,54 +291,57 @@ export class AdminService {
     };
   }
 
-  private normalizeSystemAnalytics(
-    payload: unknown | null | undefined,
-  ): {
-    users?: number;
-    courses?: number;
-    quizzes?: number;
-    attempts?: number;
-    units?: number;
-    questions?: number;
-    quizCompletionRate?: number;
-  } | null {
+  private normalizeSystemAnalytics(payload: unknown): SystemTotals | null {
     if (!payload) {
       return null;
     }
 
     const unwrapped = this.unwrapPayload<unknown>(payload);
-    if (unwrapped && typeof unwrapped === 'object') {
+    if (unwrapped && typeof unwrapped === 'object' && !Array.isArray(unwrapped)) {
       const nested = unwrapped as { data?: unknown };
-      return nested.data && typeof nested.data === 'object'
-        ? (nested.data as {
-            users?: number;
-            courses?: number;
-            quizzes?: number;
-            attempts?: number;
-            units?: number;
-            questions?: number;
-            quizCompletionRate?: number;
-          })
-        : (unwrapped as {
-            users?: number;
-            courses?: number;
-            quizzes?: number;
-            attempts?: number;
-            units?: number;
-            questions?: number;
-            quizCompletionRate?: number;
-          });
+      const source =
+        nested.data && typeof nested.data === 'object' && !Array.isArray(nested.data)
+          ? (nested.data as Record<string, unknown>)
+          : (unwrapped as Record<string, unknown>);
+      const toOptionalNumber = (value: unknown) =>
+        typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+      const analytics: SystemTotals = {
+        users: toOptionalNumber(source.users),
+        courses: toOptionalNumber(source.courses),
+        quizzes: toOptionalNumber(source.quizzes),
+        attempts: toOptionalNumber(source.attempts),
+        units: toOptionalNumber(source.units),
+        questions: toOptionalNumber(source.questions),
+        quizCompletionRate: toOptionalNumber(source.quizCompletionRate),
+      };
+
+      return Object.values(analytics).some(value => value !== undefined) ? analytics : null;
     }
 
-    return payload as {
-      users?: number;
-      courses?: number;
-      quizzes?: number;
-      attempts?: number;
-      units?: number;
-      questions?: number;
-      quizCompletionRate?: number;
+    return null;
+  }
+
+  private normalizeSystemSummary(payload: unknown): Partial<SystemAnalytics> | null {
+    const unwrapped = this.unwrapPayload<unknown>(payload);
+    if (!unwrapped || typeof unwrapped !== 'object' || Array.isArray(unwrapped)) {
+      return null;
+    }
+
+    const record = unwrapped as Record<string, unknown>;
+    const toOptionalNumber = (value: unknown) =>
+      typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+
+    const summary: Partial<SystemAnalytics> = {
+      totalUsers: toOptionalNumber(record.totalUsers),
+      activeLearners: toOptionalNumber(record.activeLearners),
+      totalCourses: toOptionalNumber(record.totalCourses),
+      completedCourses: toOptionalNumber(record.completedCourses),
+      totalPaths: toOptionalNumber(record.totalPaths),
+      totalEnrollments: toOptionalNumber(record.totalEnrollments),
+      overallCompletionRate: toOptionalNumber(record.overallCompletionRate),
     };
+
+    return Object.values(summary).some(value => value !== undefined) ? summary : null;
   }
 
   private readonly logger = {

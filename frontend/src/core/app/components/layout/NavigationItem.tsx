@@ -34,16 +34,16 @@ export const NavigationItemComponent: React.FC<NavigationItemProps> = ({
   const effectiveActive = isItemActive || isChildActive || propActive;
   const activeStateClasses = effectiveActive
     ? 'bg-primary/10 text-primary ring-1 ring-inset ring-primary/15'
-    : 'text-muted-foreground dark:text-muted-foreground hover:bg-background dark:hover:bg-card hover:text-foreground dark:hover:text-foreground';
+    : 'text-foreground/75 hover:bg-background hover:text-foreground dark:hover:bg-card';
   const parentActiveClasses = isItemActive
     ? activeStateClasses
     : isChildActive
       ? 'bg-muted/50 text-foreground'
-      : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground';
+      : 'text-foreground/75 hover:bg-muted/60 hover:text-foreground';
 
   useEffect(() => {
-    if (isChildActive) setIsExpanded(true);
-  }, [isChildActive, item.id]);
+    setIsExpanded(Boolean(isChildActive));
+  }, [isChildActive]);
 
   const toggleExpanded = () => {
     if (sidebarCollapsed && !sidebarOpen) onExpandSidebar?.();
