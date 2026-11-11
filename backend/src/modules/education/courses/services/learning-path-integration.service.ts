@@ -25,9 +25,7 @@ import { getErrorMessage, getErrorStack } from '#common/utils/error.utils';
 import {
   ProgressData,
   ModuleProgressUpdate,
-  PathStructure,
   Phase,
-  Module,
   TargetCriteriaDto as TargetCriteria,
   PathProgressWithLearningPath,
   PathProgressWithMilestones,
@@ -982,7 +980,7 @@ export class LearningPathIntegrationService {
         where: {
           userId,
           category: GoalCategory.clinical_cases,
-          status: GoalStatus.active as unknown as ProgressStatus,
+          status: GoalStatus.active,
         },
         select: {
           id: true,
@@ -1205,7 +1203,7 @@ export class LearningPathIntegrationService {
             `Complete milestone in learning path: ${pathProgress.learningPath.title}`,
           type: GoalType.custom,
           category: GoalCategory.learning_path,
-          priority: (milestone.required ? 'high' : 'medium') as any, // 2 = high, 1 = medium
+          priority: milestone.required ? 'high' : 'medium',
           status: GoalStatus.active,
           targetCriteria: {
             type: 'boolean',
@@ -1326,8 +1324,8 @@ export class LearningPathIntegrationService {
           const completedModules =
             this.getCompletedModulesCount(fullPathProgress);
           const totalModules = this.getTotalModulesCount(
-            (fullPathProgress.learningPath as any).phases ||
-              (fullPathProgress.learningPath as any).pathStructure,
+            fullPathProgress.learningPath.phases ||
+              fullPathProgress.learningPath.pathStructure,
           );
           const completionPercentage =
             totalModules > 0 ? (completedModules / totalModules) * 100 : 0;

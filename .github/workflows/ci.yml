@@ -203,6 +203,9 @@ jobs:
         working-directory: backend
         run: pnpm install --frozen-lockfile
 
+      - name: Configure protobuf compiler
+        run: echo "PROTOC=$GITHUB_WORKSPACE/backend/node_modules/grpc-tools/bin/protoc" >> "$GITHUB_ENV"
+
       - name: Apply database migrations for Rust checks
         working-directory: backend
         run: pnpm prisma migrate deploy
@@ -223,9 +226,6 @@ jobs:
             rust_analytics/target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('rust_analytics/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-cargo-
-
-      - name: Install protobuf compiler
-        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
 
       - name: Format code (auto)
         working-directory: rust_analytics

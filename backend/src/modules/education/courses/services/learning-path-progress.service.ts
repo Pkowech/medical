@@ -18,7 +18,7 @@ import {
   LearningPathStartDto,
   LearningPathUpdateDto,
 } from '#common/dto/learning-paths.dto';
-import { PathStructure, Phase, Module } from '#common/dto/learning.dto';
+import { PathStructure } from '#common/dto/learning.dto';
 import {
   PhaseProgress,
   ModuleProgress,
@@ -99,14 +99,14 @@ export class LearningPathProgressService {
           study_sessions: [],
           performance_trends: [],
           preferences: startDto.preferences
-            ? (startDto.preferences as Prisma.JsonObject)
+            ? { ...startDto.preferences }
             : {},
           learning_velocity: {
             modules_per_week: 0,
             hours_per_week: 0,
             consistency_score: 0,
           },
-        } as Prisma.JsonObject,
+        },
       },
     });
 
@@ -151,7 +151,7 @@ export class LearningPathProgressService {
     progress.moduleProgress = initialStructure.moduleProgress.map((module) => ({
       ...module,
       ...existingModules[module.moduleId],
-    })) as unknown as Prisma.JsonArray;
+    }));
     progress.phaseProgress = initialStructure.phaseProgress.map((phase) => ({
       ...phase,
       ...existingPhases[phase.phaseId],
@@ -661,7 +661,7 @@ export class LearningPathProgressService {
       learningPath.analytics &&
       typeof learningPath.analytics === 'object' &&
       !Array.isArray(learningPath.analytics)
-        ? (learningPath.analytics as Prisma.JsonObject)
+        ? learningPath.analytics
         : {};
     await this.prisma.learningPath.update({
       where: { id: learningPathId },
@@ -714,7 +714,7 @@ export class LearningPathProgressService {
       learningPath.analytics &&
       typeof learningPath.analytics === 'object' &&
       !Array.isArray(learningPath.analytics)
-        ? (learningPath.analytics as Prisma.JsonObject)
+        ? learningPath.analytics
         : {};
 
     await this.prisma.learningPath.update({
