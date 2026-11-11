@@ -341,6 +341,55 @@ def test_admin_can_delete_user(user_factory):
     assert response.status_code in [200, 204], f"Expected 200 or 204, got {response.status_code}. Response: {response.text}"
 
 
+def test_student_can_set_and_edit_own_username(user_factory):
+    """
+    Tests that a user can set and later change their username.
+    """
+    student = user_factory(role="student")
+    student_id = student["user"]["id"]
+    headers = {"Authorization": f"Bearer {student['accessToken']}"}
+
+    for submitted_username, expected_username in [
+        ("MyChosenUsername", "mychosenusername"),
+        ("another_username", "another_username"),
+    ]:
+        response = user_factory.session.patch(
+            f"{user_factory.base_url}/users/{student_id}",
+            headers=headers,
+            json={"username": submitted_username},
+        )
+
+        assert response.status_code == 200, (
+            f"Expected 200, got {response.status_code}. Response: {response.text}"
+        )
+        assert extract_data(response.json())["username"] == expected_username
+
+
+def test_student_can_delete_own_account(user_factory):
+    """
+    Tests that an authenticated user can delete their own account.
+    """
+    student = user_factory(role="student")
+    student_id = student["user"]["id"]
+    headers = {"Authorization": f"Bearer {student['accessToken']}"}
+
+    response = user_factory.session.delete(
+        f"{user_factory.base_url}/users/me",
+        headers=headers,
+    )
+
+    assert response.status_code == 200, (
+        f"Expected 200, got {response.status_code}. Response: {response.text}"
+    )
+    assert response.json()["data"] is None
+
+    profile_response = user_factory.session.get(
+        f"{user_factory.base_url}/users/{student_id}",
+        headers=headers,
+    )
+    assert profile_response.status_code == 404
+
+
 def test_student_cannot_delete_user(user_factory):
     """
     Tests that a non-admin user cannot delete a user.

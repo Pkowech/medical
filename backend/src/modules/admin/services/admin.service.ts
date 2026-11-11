@@ -7,6 +7,7 @@ import { Prisma, RoleName } from '@prisma/client';
 import * as argon2 from 'argon2';
 import { AdminCreateUserDto, AdminUpdateUserDto } from '../dto/admin-user.dto';
 import { CreateRoleDto, UpdateRoleDto } from '#common/dto/roles.dto';
+import { UsersService } from '#modules/auth/services/users.service';
 
 interface AdminUserFilters {
   search?: string;
@@ -21,6 +22,7 @@ export class AdminService extends BaseAnalyticsService {
   constructor(
     protected readonly prisma: PrismaService,
     protected readonly redis: RedisService,
+    private readonly usersService: UsersService,
   ) {
     super(prisma, redis);
   }
@@ -240,7 +242,7 @@ export class AdminService extends BaseAnalyticsService {
   }
 
   async deleteUser(id: string) {
-    await this.prisma.user.delete({ where: { id } });
+    await this.usersService.remove(id);
     return { id, deleted: true };
   }
 

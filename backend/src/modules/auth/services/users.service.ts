@@ -113,6 +113,7 @@ export class UsersService {
       where: { id: userId },
       select: {
         email: true,
+        username: true,
         preferences: true,
         securitySettings: {
           select: {
@@ -133,6 +134,7 @@ export class UsersService {
 
     return {
       email: user.email,
+      username: user.username,
       theme: this.stringSetting(preferences.theme, ['light', 'dark', 'system'], 'system'),
       notifications: {
         email: this.booleanSetting(notifications.email, true),
@@ -594,13 +596,14 @@ export class UsersService {
       prismaData.email = updateUserDto.email;
     }
     if (updateUserDto.username !== undefined) {
+      const username = updateUserDto.username.trim().toLowerCase();
       const existingUsername = await this.findByUsername(
-        updateUserDto.username,
+        username,
       );
       if (existingUsername && existingUsername.id !== userId) {
         throw new ConflictException('User with this username already exists');
       }
-      prismaData.username = updateUserDto.username;
+      prismaData.username = username;
     }
     if (updateUserDto.phoneNumber !== undefined) {
       prismaData.phoneNumber = updateUserDto.phoneNumber;

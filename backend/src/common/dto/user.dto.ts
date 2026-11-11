@@ -16,6 +16,7 @@ import {
   IsNotEmpty,
   IsIn,
   MaxLength,
+  Matches,
   Min,
   Max,
 } from 'class-validator';
@@ -33,10 +34,6 @@ enum RoleStrings {
   INSTRUCTOR = 'instructor',
   ADMIN = 'admin',
 }
-
-// Use Prisma's RoleName enum as the canonical role type for runtime/database operations
-type RoleValues = RoleName;
-type Role = RoleName;
 
 // ============================================================================
 // CORE USER INTERFACES
@@ -192,6 +189,9 @@ export class CreateUserDto {
   @ApiProperty({ description: 'Username', required: false })
   @IsOptional()
   @IsString()
+  @MinLength(3)
+  @MaxLength(30)
+  @Matches(/^[a-zA-Z0-9_-]+$/)
   username?: string;
 
   @ApiProperty({ description: 'First name', required: false })

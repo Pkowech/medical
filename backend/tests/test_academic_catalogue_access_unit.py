@@ -186,7 +186,24 @@ function makeCourse(status = 'published') {
       { id: 'draft-unit', isPublished: false, materials: [], topics: [] },
     ],
     createdBy: null,
-    prerequisites: [],
+    prerequisites: [
+      {
+        type: 'required',
+        prerequisite: {
+          id: 'published-prerequisite',
+          title: 'Published prerequisite',
+          status: 'published',
+        },
+      },
+      {
+        type: 'required',
+        prerequisite: {
+          id: 'draft-prerequisite',
+          title: 'Draft prerequisite',
+          status: 'draft',
+        },
+      },
+    ],
     enrollments: [],
   };
 }
@@ -215,6 +232,10 @@ function makeService(course) {
   publishedCourse.canManageCourse = async () => false;
   const studentView = await publishedCourse.findOne('course-1', 'student-1');
   assert.deepEqual(studentView.units.map(unit => unit.id), ['published-unit']);
+  assert.deepEqual(
+    studentView.prerequisites.map(item => item.prerequisite.id),
+    ['published-prerequisite'],
+  );
 
   const admin = makeService(makeCourse('draft'));
   admin.canManageCourse = async () => true;
@@ -223,6 +244,10 @@ function makeService(course) {
     'published-unit',
     'draft-unit',
   ]);
+  assert.deepEqual(
+    adminView.prerequisites.map(item => item.prerequisite.id),
+    ['published-prerequisite', 'draft-prerequisite'],
+  );
 
   const unauthorizedAssigner = Object.create(CoursesService.prototype);
   unauthorizedAssigner.prisma = {

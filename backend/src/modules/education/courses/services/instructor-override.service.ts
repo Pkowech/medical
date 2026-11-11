@@ -5,6 +5,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { NotificationPriority } from '@prisma/client';
 import { PrismaService } from '#infrastructure/prisma/prisma.service';
+import { RedisService } from '#infrastructure/redis/redis.service';
 import { getErrorMessage } from '#common/utils/error.utils';
 
 export type OverrideAction = 'hide' | 'mark_irrelevant' | 'update_explanation';
@@ -21,9 +22,17 @@ export interface ApplyOverrideDto {
 export class InstructorOverrideService {
   private readonly logger = new Logger(InstructorOverrideService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly redisService: RedisService,
+  ) {}
 
   async applyOverride(dto: ApplyOverrideDto): Promise<void> {
+    const question = await this.prisma.question.findUnique({
+      where: { id: dto.questionId },
+      select: { unitId: true, topicIds: true },
+    });
+
     // Log the override
     await this.prisma.instructorOverride.create({
       data: {
@@ -69,6 +78,24 @@ export class InstructorOverrideService {
         }
         break;
     }
+
+    await Promise.all([
+      this.redisService.delPattern('questions:*'),
+      this.redisService.delPattern('unit:*:questions:v2'),
+      this.redisService.delPattern('unit:*:questions:v3:*'),
+      this.redisService.delPattern('topic:*:questions:v2'),
+      this.redisService.delPattern('topic:*:questions:v3:*'),
+      this.redisService.delPattern('unit_quiz:*'),
+      ...(question?.unitId
+        ? [
+            this.redisService.del(`unit:${question.unitId}:questions:v2`),
+            this.redisService.del(`unit_quiz:${question.unitId}`),
+          ]
+        : []),
+      ...(question?.topicIds ?? []).map((topicId) =>
+        this.redisService.del(`topic:${topicId}:questions:v2`),
+      ),
+    ]);
 
     this.logger.log(
       `Instructor ${dto.instructorId} applied "${dto.action}" to question ${dto.questionId}.`,

@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
@@ -14,10 +15,12 @@ import { Bell, Globe, Moon, Shield, Sun, User } from 'lucide-react';
 import { Settings } from '@/shared/types';
 import { useAuthStore } from '@/features/auth/store/useAuthStore';
 import { useTheme } from '@/app/providers';
-import { changePasswordSchema } from '@/lib/auth/validations';
+import { changePasswordSchema, usernameSchema } from '@/lib/auth/validations';
 import { getAuthErrorDetails } from '@/features/auth/services/authErrors';
 import { TwoFactorAuth } from '@/features/auth/components/TwoFactorAuth';
 import { PushNotificationSettings } from '@/features/community/PushNotificationSettings';
+import { userService } from '@/features/profile/services/userService';
+import { authService } from '@/features/auth/services/authService';
 
 interface UserSettings {
   email: string;
@@ -38,6 +41,7 @@ interface UserSettings {
 
 export default function SettingsPage() {
   const { isLoading, session } = useRequireAuth();
+  const { update: updateSession } = useSession();
   const router = useRouter();
   const { setTheme } = useTheme();
   const changePassword = useAuthStore(state => state.changePassword);
@@ -52,6 +56,10 @@ export default function SettingsPage() {
   });
   const [passwordFormError, setPasswordFormError] = useState('');
   const [changingPassword, setChangingPassword] = useState(false);
+  const [username, setUsername] = useState('');
+  const [usernameError, setUsernameError] = useState('');
+  const [savingUsername, setSavingUsername] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   const [settings, setSettings] = useState<UserSettings>({
     email: '',
@@ -96,6 +104,7 @@ export default function SettingsPage() {
           showLocation: response.data.privacy?.showLocation ?? false,
           allowMessages: response.data.privacy?.allowMessages ?? true,
         };
+        setUsername(response.data.username || session?.user?.username || '');
         setSettings(loadedSettings);
         setTheme(loadedSettings.theme);
         setSettingsLoadFailed(false);
@@ -143,6 +152,57 @@ export default function SettingsPage() {
       toast.error(authError.message);
     } finally {
       setChangingPassword(false);
+    }
+  };
+
+  const handleSaveUsername = async () => {
+    setUsernameError('');
+    const normalizedUsername = username.trim().toLowerCase();
+    const validation = usernameSchema.safeParse(normalizedUsername);
+    if (!validation.success) {
+      const message = validation.error.issues[0]?.message ?? 'Enter a valid username.';
+      setUsernameError(message);
+      return;
+    }
+    if (!session?.user?.id) {
+      setUsernameError('You must be signed in to update your username.');
+      return;
+    }
+
+    setSavingUsername(true);
+    try {
+      await userService.updateUserProfile(session.user.id, { username: normalizedUsername });
+      await updateSession({
+        user: { ...session.user, username: normalizedUsername },
+      });
+      setUsername(normalizedUsername);
+      toast.success('Username updated successfully.');
+    } catch (error: unknown) {
+      const message = getAuthErrorDetails(error, 'Could not update your username.').message;
+      setUsernameError(message);
+      toast.error(message);
+    } finally {
+      setSavingUsername(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (
+      !window.confirm(
+        'Permanently delete your account and associated learning data? This cannot be undone.'
+      )
+    ) {
+      return;
+    }
+
+    setDeletingAccount(true);
+    try {
+      await apiService.delete('/users/me');
+      await authService.logout();
+    } catch (error: unknown) {
+      const message = getAuthErrorDetails(error, 'Could not delete your account.').message;
+      toast.error(message);
+      setDeletingAccount(false);
     }
   };
 
@@ -232,6 +292,42 @@ export default function SettingsPage() {
                       {session?.user?.email || 'user@example.com'}
                     </p>
                   </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label htmlFor="account-username" className="block text-sm font-medium">
+                    Username
+                  </label>
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <Input
+                      id="account-username"
+                      autoComplete="username"
+                      value={username}
+                      onChange={event => {
+                        setUsername(event.target.value);
+                        setUsernameError('');
+                      }}
+                      maxLength={30}
+                      placeholder="Choose a username"
+                      aria-describedby={usernameError ? 'account-username-error' : undefined}
+                    />
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={handleSaveUsername}
+                      disabled={savingUsername || !username.trim()}
+                    >
+                      {savingUsername ? 'Saving...' : 'Save username'}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Use 3–30 letters, numbers, underscores, or hyphens.
+                  </p>
+                  {usernameError && (
+                    <p id="account-username-error" role="alert" className="text-sm text-red-600">
+                      {usernameError}
+                    </p>
+                  )}
                 </div>
 
                 <Button variant="secondary" size="sm" onClick={() => router.push('/profile')}>
@@ -489,17 +585,27 @@ export default function SettingsPage() {
                   </Button>
                 </form>
 
-                <p className="text-sm text-muted-foreground dark:text-muted-foreground">
-                  To request account deletion, contact{' '}
-                  <a
-                    className="underline"
-                    href="mailto:aaronrono427@gmail.com?subject=Account%20deletion%20request"
-                  >
-                    support
-                  </a>
-                  .
-                </p>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-destructive/40">
+            <CardHeader>
+              <CardTitle>Delete account</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Permanently remove your account and associated personal learning data. This action
+                cannot be undone.
+              </p>
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={handleDeleteAccount}
+                disabled={deletingAccount}
+              >
+                {deletingAccount ? 'Deleting account...' : 'Delete my account'}
+              </Button>
             </CardContent>
           </Card>
 

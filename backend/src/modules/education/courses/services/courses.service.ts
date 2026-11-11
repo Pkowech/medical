@@ -710,7 +710,9 @@ export class CoursesService {
           prerequisites: {
             select: {
               type: true,
-              prerequisite: { select: { id: true, title: true } },
+              prerequisite: {
+                select: { id: true, title: true, status: true },
+              },
             },
           },
           enrollments: { select: { id: true } },
@@ -786,7 +788,12 @@ export class CoursesService {
         visibleCourse = { ...course, materials, units };
       }
 
-      const normalizedPrereqs = (course.prerequisites || []).map((p) => ({
+      const visiblePrerequisites = canManage
+        ? course.prerequisites || []
+        : (course.prerequisites || []).filter(
+            (p) => p.prerequisite.status === CourseStatus.published,
+          );
+      const normalizedPrereqs = visiblePrerequisites.map((p) => ({
         prerequisite: {
           id: p.prerequisite.id,
           title: p.prerequisite.title ?? '',
@@ -1677,6 +1684,9 @@ export class CoursesService {
       await this.redisService.delPattern(`${this.CACHE_PREFIX}:search:*`);
       await this.redisService.delPattern(`${this.CACHE_PREFIX}:featured:*`);
       await this.redisService.delPattern(`${this.CACHE_PREFIX}:recommended:*`);
+      await this.redisService.delPattern(
+        `${this.CACHE_PREFIX}:recommended-v2:*`,
+      );
       this.logger.debug('Course cache cleared', { courseId: course.id });
     } catch (error) {
       this.logger.error('Error clearing cache', {

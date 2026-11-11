@@ -10,9 +10,11 @@ import { AdminAnalyticsController } from './controllers/admin-analytics.controll
 import { AdminService } from './services/admin.service';
 import { AdminController } from './controllers/admin.controller';
 import { AdminSettingsModule } from './admin-settings.module';
+import { UsersModule } from '#modules/auth/users.module';
 
 @Module({
   imports: [
+    UsersModule,
     AdminSettingsModule,
     HttpModule,
     RedisModule,

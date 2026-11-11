@@ -324,6 +324,7 @@ export interface FeatureFlag {
 // Settings interface
 export interface Settings {
   email: string;
+  username?: string | null;
   theme: ThemeMode;
   language?: string;
   timezone?: string;

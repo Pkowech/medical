@@ -99,7 +99,8 @@ export class QuizService {
   ) {}
 
   async importQuiz(data: ImportQuizDto, creatorId: string): Promise<Quiz> {
-    let { courseId, unitId, topicId } = data;
+    let { courseId, unitId } = data;
+    const { topicId } = data;
     if (unitId) {
       const unit = await this.prisma.unit.findUnique({
         where: { id: unitId },
@@ -262,10 +263,15 @@ export class QuizService {
   private async invalidateAssessmentCaches(
     unitIds: string[] = [],
     topicIds: string[] = [],
+    quizIds: string[] = [],
   ): Promise<void> {
     await Promise.all([
       this.redisService.delPattern('questions:*'),
       this.redisService.delPattern('quizzes:*'),
+      this.redisService.delPattern('unit:*:questions:v2'),
+      this.redisService.delPattern('unit:*:questions:v3:*'),
+      this.redisService.delPattern('topic:*:questions:v2'),
+      this.redisService.delPattern('topic:*:questions:v3:*'),
       ...unitIds.flatMap((unitId) => [
         this.redisService.del(`unit:${unitId}:questions:v2`),
         this.redisService.del(`unit_quiz:${unitId}`),
@@ -273,7 +279,111 @@ export class QuizService {
       ...topicIds.map((topicId) =>
         this.redisService.del(`topic:${topicId}:questions:v2`),
       ),
+      ...quizIds.map((quizId) => this.redisService.del(`quiz:${quizId}`)),
     ]);
+  }
+
+  private async assertPublishedUnit(unitId: string): Promise<void> {
+    const unit = await this.prisma.unit.findUnique({
+      where: { id: unitId },
+      select: {
+        isPublished: true,
+        course: { select: { status: true } },
+      },
+    });
+
+    if (
+      !unit ||
+      !unit.isPublished ||
+      unit.course.status !== 'published'
+    ) {
+      throw new NotFoundException(`Published unit ${unitId} not found`);
+    }
+  }
+
+  private async getVisibleTopic(topicId: string) {
+    const topic = await this.prisma.topic.findUnique({
+      where: { id: topicId },
+      select: {
+        id: true,
+        unitId: true,
+        unit: {
+          select: {
+            id: true,
+            isPublished: true,
+            course: { select: { status: true } },
+          },
+        },
+      },
+    });
+
+    if (
+      !topic ||
+      !topic.unit.isPublished ||
+      topic.unit.course.status !== 'published'
+    ) {
+      throw new NotFoundException(`Published topic ${topicId} not found`);
+    }
+
+    return topic;
+  }
+
+  private getUnitQuestionsCacheKey(
+    unitId: string,
+    quizzes: Array<{ id: string; isPublished: boolean; updatedAt: Date }>,
+  ): string {
+    const version = quizzes
+      .map(
+        ({ id, isPublished, updatedAt }) =>
+          `${id}:${isPublished ? 'published' : 'draft'}:${updatedAt.getTime()}`,
+      )
+      .sort()
+      .join('|');
+    return `unit:${unitId}:questions:v3:${version || 'none'}`;
+  }
+
+  private getTopicQuestionsCacheKey(
+    topicId: string,
+    quizzes: Array<{ id: string; isPublished: boolean; updatedAt: Date }>,
+  ): string {
+    const version = quizzes
+      .map(
+        ({ id, isPublished, updatedAt }) =>
+          `${id}:${isPublished ? 'published' : 'draft'}:${updatedAt.getTime()}`,
+      )
+      .sort()
+      .join('|');
+    return `topic:${topicId}:questions:v3:${version || 'none'}`;
+  }
+
+  private isQuizParentPublished(quiz: {
+    unitId: string | null;
+    topicId: string | null;
+    unit?: {
+      isPublished: boolean;
+      course: { status: string };
+    } | null;
+    topic?: {
+      unit: { isPublished: boolean; course: { status: string } };
+    } | null;
+  }): boolean {
+    if (
+      quiz.unitId &&
+      (!quiz.unit ||
+        !quiz.unit.isPublished ||
+        quiz.unit.course.status !== 'published')
+    ) {
+      return false;
+    }
+    if (
+      quiz.topicId &&
+      (!quiz.topic ||
+        !quiz.topic.unit.isPublished ||
+        quiz.topic.unit.course.status !== 'published')
+    ) {
+      return false;
+    }
+    return true;
   }
 
   private async ensureTopicPracticeQuiz(
@@ -379,6 +489,7 @@ export class QuizService {
     await this.invalidateAssessmentCaches(
       quiz.unitId ? [quiz.unitId] : [],
       quiz.topicId ? [quiz.topicId] : [],
+      [quiz.id],
     );
     await this.searchSync.syncEntity('quiz', quizId);
     return publishedQuiz;
@@ -392,7 +503,7 @@ export class QuizService {
     if (cachedQuiz) {
       try {
         return JSON.parse(cachedQuiz);
-      } catch (err) {
+      } catch {
         this.logger.warn(`Corrupt cache for quiz creation: ${cacheKey}`);
         await this.redisService.del(cacheKey);
       }
@@ -435,6 +546,11 @@ export class QuizService {
       throw new BadRequestException('Failed to create quiz');
     }
 
+    await this.invalidateAssessmentCaches(
+      quiz.unitId ? [quiz.unitId] : [],
+      quiz.topicId ? [quiz.topicId] : [],
+      [quiz.id],
+    );
     await this.redisService.set(cacheKey, JSON.stringify(quiz), 24 * 60 * 60); // 1 day TTL
     this.logger.log(`Created quiz ${quiz.id} by user ${creatorId}`);
 
@@ -458,7 +574,7 @@ export class QuizService {
           `Retrieved cached quizzes for filters: ${JSON.stringify(filters)}`,
         );
         return JSON.parse(cachedResult);
-      } catch (err) {
+      } catch {
         this.logger.warn(`Corrupt cache for quizzes list: ${cacheKey}`);
         await this.redisService.del(cacheKey);
       }
@@ -467,7 +583,40 @@ export class QuizService {
     const { page = 1, limit = 10 } = pagination;
     const skip = (page - 1) * limit;
 
-    const where: any = {};
+    const where: any = {
+      AND: [
+        {
+          OR: [
+            { unitId: null },
+            {
+              unit: {
+                is: {
+                  isPublished: true,
+                  course: { is: { status: 'published' } },
+                },
+              },
+            },
+          ],
+        },
+        {
+          OR: [
+            { topicId: null },
+            {
+              topic: {
+                is: {
+                  unit: {
+                    is: {
+                      isPublished: true,
+                      course: { is: { status: 'published' } },
+                    },
+                  },
+                },
+              },
+            },
+          ],
+        },
+      ],
+    };
     if (filters?.unitId) {
       where.unitId = filters.unitId;
     }
@@ -532,7 +681,7 @@ export class QuizService {
       try {
         this.logger.log(`Retrieved cached quiz ${id}`);
         return JSON.parse(cachedQuiz);
-      } catch (err) {
+      } catch {
         this.logger.warn(`Corrupt cache for quiz ${id}`);
         await this.redisService.del(cacheKey);
       }
@@ -611,11 +760,15 @@ export class QuizService {
       });
     });
 
-    await this.redisService.del(`quiz:${id}`);
-    // Invalidate unit-level generated quiz cache if this quiz belongs to a unit
-    if (quiz.unitId) {
-      await this.redisService.del(`unit_quiz:${quiz.unitId}`);
-    }
+    await this.invalidateAssessmentCaches(
+      [existingQuiz.unitId, quiz.unitId].filter(
+        (unitId): unitId is string => Boolean(unitId),
+      ),
+      [existingQuiz.topicId, quiz.topicId].filter(
+        (topicId): topicId is string => Boolean(topicId),
+      ),
+      [id],
+    );
     this.logger.log(`Updated quiz ${id} by user ${creatorId}`);
 
     // Sync to global search index
@@ -646,20 +799,32 @@ export class QuizService {
       await tx.quiz.delete({ where: { id } });
     });
 
-    await this.redisService.del(`quiz:${id}`);
+    await this.invalidateAssessmentCaches(
+      existingQuiz.unitId ? [existingQuiz.unitId] : [],
+      existingQuiz.topicId ? [existingQuiz.topicId] : [],
+      [id],
+    );
     this.logger.log(`Deleted quiz ${id} by user ${creatorId}`);
   }
 
   @ApiOperation({ summary: 'Get questions for a unit' })
   @ApiResponse({ status: 200, description: 'Questions retrieved successfully' })
   async getQuestionsByUnit(unitId: string): Promise<PublicQuizQuestion[]> {
-    const cacheKey = `unit:${unitId}:questions:v2`;
+    await this.assertPublishedUnit(unitId);
+
+    const quizVersions = await this.prisma.quiz.findMany({
+      where: { unitId, topicId: null },
+      select: { id: true, isPublished: true, updatedAt: true },
+    });
+    const publishedQuiz = quizVersions.find((quiz) => quiz.isPublished);
+
+    const cacheKey = this.getUnitQuestionsCacheKey(unitId, quizVersions);
     const cachedQuestions = await this.redisService.get(cacheKey);
     if (cachedQuestions) {
       try {
         this.logger.debug(`Retrieved cached questions for unit ${unitId}`);
         return JSON.parse(cachedQuestions);
-      } catch (err) {
+      } catch {
         this.logger.warn(`Corrupt cache for unit ${unitId} questions`);
         await this.redisService.del(cacheKey);
       }
@@ -671,23 +836,30 @@ export class QuizService {
         orderBy: { order: 'asc' as const },
       },
     };
-    const quiz = await this.prisma.quiz.findFirst({
-      where: { unitId, topicId: null, isPublished: true },
-      include: {
-        questions: {
-          orderBy: { order: 'asc' },
-          include: { question: { include: optionInclude } },
-        },
-      },
-    });
-
-    const questions: PublicQuizQuestion[] = quiz
-      ? quiz.questions.map(({ question }) =>
-          this.toPublicQuizQuestion(question),
-        )
+    const questions: PublicQuizQuestion[] = publishedQuiz
+      ? await this.prisma.quiz
+          .findFirst({
+            where: { unitId, topicId: null, isPublished: true },
+            include: {
+              questions: {
+                where: { question: { isActive: true } },
+                orderBy: { order: 'asc' },
+                include: { question: { include: optionInclude } },
+              },
+            },
+          })
+          .then((quiz) =>
+            (quiz?.questions ?? []).map(({ question }) =>
+              this.toPublicQuizQuestion(question),
+            ),
+          )
       : await this.prisma.question
           .findMany({
-            where: { unitId, isActive: true },
+            where: {
+              unitId,
+              isActive: true,
+              quizQuestions: { none: {} },
+            },
             orderBy: { createdAt: 'desc' },
             include: optionInclude,
           })
@@ -714,6 +886,22 @@ export class QuizService {
         ],
       },
       include: {
+        unit: {
+          select: {
+            isPublished: true,
+            course: { select: { status: true } },
+          },
+        },
+        topic: {
+          select: {
+            unit: {
+              select: {
+                isPublished: true,
+                course: { select: { status: true } },
+              },
+            },
+          },
+        },
         questions: {
           orderBy: { order: 'asc' },
           include: {
@@ -736,6 +924,12 @@ export class QuizService {
       );
     }
 
+    if (!this.isQuizParentPublished(quiz)) {
+      throw new NotFoundException(
+        `Published assessment ${assessmentId} not found`,
+      );
+    }
+
     return quiz.questions.map(({ question }) =>
       this.toPublicQuizQuestion(question),
     );
@@ -747,37 +941,74 @@ export class QuizService {
     description: 'Topic questions retrieved successfully',
   })
   async getQuestionsByTopic(topicId: string): Promise<PublicQuizQuestion[]> {
-    const cacheKey = `topic:${topicId}:questions:v2`;
+    const topic = await this.getVisibleTopic(topicId);
+    const quizVersions = await this.prisma.quiz.findMany({
+      where: {
+        topicId,
+        OR: [{ unitId: null }, { unitId: topic.unitId }],
+      },
+      select: { id: true, isPublished: true, updatedAt: true },
+    });
+    const publishedQuizIds = quizVersions
+      .filter((quiz) => quiz.isPublished)
+      .map((quiz) => quiz.id);
+    const cacheKey = this.getTopicQuestionsCacheKey(topicId, quizVersions);
     const cachedQuestions = await this.redisService.get(cacheKey);
     if (cachedQuestions) {
       try {
         this.logger.debug(`Retrieved cached questions for topic ${topicId}`);
         return JSON.parse(cachedQuestions);
-      } catch (err) {
+      } catch {
         this.logger.warn(`Corrupt cache for topic ${topicId} questions`);
         await this.redisService.del(cacheKey);
       }
     }
 
-    const questions = await this.prisma.question.findMany({
-      where: {
-        isActive: true,
-        topicIds: {
-          has: topicId,
-        },
+    const optionInclude = {
+      options: {
+        select: { id: true, text: true, order: true },
+        orderBy: { order: 'asc' as const },
       },
-      orderBy: { createdAt: 'desc' },
-      include: {
-        options: {
-          select: { id: true, text: true, order: true },
-          orderBy: { order: 'asc' },
+    };
+    const [publishedQuizzes, standaloneQuestions] = await Promise.all([
+      publishedQuizIds.length
+        ? this.prisma.quiz.findMany({
+            where: { id: { in: publishedQuizIds }, isPublished: true },
+            include: {
+              questions: {
+                where: { question: { isActive: true } },
+                orderBy: { order: 'asc' },
+                include: { question: { include: optionInclude } },
+              },
+            },
+          })
+        : Promise.resolve([]),
+      this.prisma.question.findMany({
+        where: {
+          isActive: true,
+          topicIds: { has: topicId },
+          quizQuestions: { none: {} },
         },
-      },
-    });
+        orderBy: { createdAt: 'desc' },
+        include: optionInclude,
+      }),
+    ]);
 
-    const publicQuestions = questions.map((question) =>
-      this.toPublicQuizQuestion(question),
-    );
+    const questionById = new Map<
+      string,
+      Question & { options: Array<Pick<Option, 'id' | 'text' | 'order'>> }
+    >();
+    for (const quiz of publishedQuizzes) {
+      for (const { question } of quiz.questions) {
+        questionById.set(question.id, question);
+      }
+    }
+    for (const question of standaloneQuestions) {
+      questionById.set(question.id, question);
+    }
+    const publicQuestions = Array.from(questionById.values())
+      .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
+      .map((question) => this.toPublicQuizQuestion(question));
     await this.redisService.set(
       cacheKey,
       JSON.stringify(publicQuestions),
@@ -833,7 +1064,7 @@ export class QuizService {
     if (cachedResults) {
       try {
         return JSON.parse(cachedResults);
-      } catch (err) {
+      } catch {
         this.logger.warn(`Corrupt cache for quiz results: ${cacheKey}`);
         await this.redisService.del(cacheKey);
       }
@@ -1284,7 +1515,7 @@ export class QuizService {
             userId,
             questionId: response.questionId,
             attemptId: attempt.id,
-            answer: response.selectedAnswers as Prisma.InputJsonValue,
+            answer: response.selectedAnswers,
             isCorrect: response.isCorrect,
             score: response.earnedPoints,
           })),
@@ -1541,7 +1772,7 @@ export class QuizService {
                   userId,
                   questionId: response.questionId,
                   attemptId,
-                  answer: response.selectedAnswers as Prisma.InputJsonValue,
+                  answer: response.selectedAnswers,
                   isCorrect: response.isCorrect,
                   score: response.earnedPoints,
                 })),
@@ -1557,7 +1788,7 @@ export class QuizService {
               id: attemptId,
               userId,
               topicId,
-              responses: normalizedResponses as Prisma.InputJsonValue,
+              responses: normalizedResponses,
               score,
             },
             update: {},
@@ -1635,13 +1866,15 @@ export class QuizService {
    */
   @ApiOperation({ summary: 'Generate a quiz for a unit' })
   async generateUnitQuiz(unitId: string, creatorId: string): Promise<Quiz> {
+    await this.assertPublishedUnit(unitId);
+
     const cacheKey = `unit_quiz:${unitId}`;
     const cachedQuiz = await this.redisService.get(cacheKey);
     if (cachedQuiz) {
       try {
         this.logger.log(`Retrieved cached unit quiz for unit ${unitId}`);
         return JSON.parse(cachedQuiz);
-      } catch (err) {
+      } catch {
         this.logger.warn(`Corrupt cache for unit quiz: ${cacheKey}`);
         await this.redisService.del(cacheKey);
       }
@@ -1696,6 +1929,7 @@ export class QuizService {
       throw new BadRequestException('Failed to generate unit quiz');
     }
 
+    await this.invalidateAssessmentCaches([unitId], [], [quiz.id]);
     await this.redisService.set(cacheKey, JSON.stringify(quiz), 3600);
 
     // Sync to global search index
@@ -1708,7 +1942,7 @@ export class QuizService {
    * Source of truth for grading a single question attempt
    */
   private validateAnswer(question: Question, answer: any): boolean {
-    const grading = QuizUtils.gradeAnswer(question as any, answer);
+    const grading = QuizUtils.gradeAnswer(question, answer);
     return grading.isCorrect;
   }
 

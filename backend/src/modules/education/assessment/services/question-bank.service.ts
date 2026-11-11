@@ -102,6 +102,8 @@ export class QuestionBankService {
     );
     await Promise.all([
       this.redisService.delPattern('questions:*'),
+      this.redisService.delPattern('unit:*:questions:v3:*'),
+      this.redisService.delPattern('topic:*:questions:v3:*'),
       ...(dto.unitId
         ? [
             this.redisService.del(`unit:${dto.unitId}:questions:v2`),
@@ -112,7 +114,7 @@ export class QuestionBankService {
         this.redisService.del(`topic:${topicId}:questions:v2`),
       ),
     ]);
-    return question as Question;
+    return question;
   }
 
   @ApiOperation({ summary: 'Find questions based on filters' })
@@ -274,7 +276,7 @@ export class QuestionBankService {
   async updateQuestionStatistics(
     questionId: string,
     isCorrect: boolean,
-    responseTime: number,
+    _responseTime: number,
   ): Promise<void> {
     const question = await this.prisma.question.findUnique({
       where: { id: questionId },
@@ -300,6 +302,8 @@ export class QuestionBankService {
     });
     await Promise.all([
       this.redisService.delPattern('questions:*'),
+      this.redisService.delPattern('unit:*:questions:v3:*'),
+      this.redisService.delPattern('topic:*:questions:v3:*'),
       ...(question.unitId
         ? [
             this.redisService.del(`unit:${question.unitId}:questions:v2`),

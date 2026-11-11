@@ -380,6 +380,19 @@ export class UsersController {
     return ApiResponseDto.success(undefined, 'Password updated successfully');
   }
 
+  @Delete('me')
+  @ApiOperation({ summary: 'Delete the authenticated user account' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Account and associated user data deleted successfully',
+  })
+  async deleteMyAccount(
+    @CurrentUser() user: AuthenticatedRequest['user'],
+  ): Promise<ApiResponseDto<null>> {
+    await this.usersService.remove(user.id);
+    return ApiResponseDto.success(null, 'Account deleted successfully');
+  }
+
   @Delete(':id')
   @Roles(Role.admin)
   @ApiOperation({ summary: 'Delete user (Admin only)' })

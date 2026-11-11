@@ -101,9 +101,17 @@ export class AssessmentAnalyticsService implements OnModuleInit {
     if (unitId) {
       const unit = await this.prisma.unit.findUnique({
         where: { id: unitId },
-        select: { id: true, courseId: true },
+        select: {
+          id: true,
+          courseId: true,
+          isPublished: true,
+          course: { select: { status: true } },
+        },
       });
       if (!unit) throw new NotFoundException(`Unit ${unitId} not found`);
+      if (!unit.isPublished || unit.course.status !== 'published') {
+        throw new NotFoundException(`Published unit ${unitId} not found`);
+      }
       if (courseId && courseId !== unit.courseId) {
         throw new BadRequestException('The selected unit does not belong to the course');
       }
@@ -111,9 +119,12 @@ export class AssessmentAnalyticsService implements OnModuleInit {
     } else if (courseId) {
       const course = await this.prisma.course.findUnique({
         where: { id: courseId },
-        select: { id: true },
+        select: { id: true, status: true },
       });
       if (!course) throw new NotFoundException(`Course ${courseId} not found`);
+      if (course.status !== 'published') {
+        throw new NotFoundException(`Published course ${courseId} not found`);
+      }
     }
 
     const startTime = Date.now();
@@ -127,8 +138,25 @@ export class AssessmentAnalyticsService implements OnModuleInit {
     // Check cache first
     const cachedSession = await this.redisService.get<string>(cacheKey);
     if (cachedSession) {
-      this.logger.log(`Retrieved cached session for user ${userId}`);
-      return JSON.parse(cachedSession) as AdaptiveQuizSession;
+      const session = JSON.parse(cachedSession) as AdaptiveQuizSession;
+      const visibleQuestions = await Promise.all(
+        session.questions.map((question) =>
+          this.isAdaptiveQuestionVisible(question.id, session),
+        ),
+      );
+      if (visibleQuestions.every(Boolean)) {
+        this.logger.log(`Retrieved cached session for user ${userId}`);
+        return session;
+      }
+      await Promise.all([
+        this.redisService.del(cacheKey),
+        this.redisService.del(
+          ANALYTICS_CACHE_CONFIG.ASSESSMENT.ADAPTIVE_SESSION(
+            userId,
+            session.sessionId,
+          ),
+        ),
+      ]);
     }
 
     return await this.requestDeduplicationService.executeWithDedup(
@@ -249,6 +277,17 @@ export class AssessmentAnalyticsService implements OnModuleInit {
       );
     }
     const session: AdaptiveQuizSession = JSON.parse(sessionData);
+    const visibleQuestions = await Promise.all(
+      session.questions.map((question) =>
+        this.isAdaptiveQuestionVisible(question.id, session),
+      ),
+    );
+    if (!visibleQuestions.every(Boolean)) {
+      await this.redisService.del(sessionCacheKey);
+      throw new NotFoundException(
+        'This adaptive quiz is no longer available for its content scope',
+      );
+    }
 
     try {
       const currentQuestion = session.questions[
@@ -555,21 +594,66 @@ export class AssessmentAnalyticsService implements OnModuleInit {
     session: AdaptiveQuizSession,
   ): Promise<Question | null> {
     return this.prisma.question.findFirst({
-      where: {
-        id: {
-          equals: questionId,
-          notIn: session.questions.map((question) => question.id),
-        },
-        isActive: true,
-        type: { in: [QuestionType.multiple_choice, QuestionType.true_false] },
-        ...(session.unitId
-          ? { unitId: session.unitId }
-          : session.courseId
-            ? { courseId: session.courseId }
-            : {}),
-      },
+      where: this.getAdaptiveQuestionWhere(questionId, session),
       include: { options: true },
     });
+  }
+
+  private getAdaptiveQuestionWhere(
+    questionId: string,
+    session: AdaptiveQuizSession,
+  ): Prisma.QuestionWhereInput {
+    return {
+      id: {
+        equals: questionId,
+        notIn: session.questions
+          .map((question) => question.id)
+          .filter((id) => id !== questionId),
+      },
+      isActive: true,
+      type: { in: [QuestionType.multiple_choice, QuestionType.true_false] },
+      AND: [
+        {
+          OR: [
+            { unitId: null, courseId: null },
+            {
+              unitId: null,
+              course: { is: { status: 'published' } },
+            },
+            {
+              unit: {
+                is: {
+                  isPublished: true,
+                  course: { is: { status: 'published' } },
+                },
+              },
+            },
+          ],
+        },
+      ],
+      ...(session.unitId
+        ? { unitId: session.unitId }
+        : session.courseId
+          ? { courseId: session.courseId }
+          : {}),
+    };
+  }
+
+  private async isAdaptiveQuestionVisible(
+    questionId: string,
+    session: AdaptiveQuizSession,
+  ): Promise<boolean> {
+    const sessionWithoutQuestion = {
+      ...session,
+      questions: session.questions.filter(
+        (question) => question.id !== questionId,
+      ),
+    };
+    const question = await this.prisma.question.findFirst({
+      where: this.getAdaptiveQuestionWhere(questionId, sessionWithoutQuestion),
+      select: { id: true },
+    });
+    return !!question;
   }
 
   onModuleInit() {
