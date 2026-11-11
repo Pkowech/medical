@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { getErrorMessage } from '#common/utils/error.utils';
 import { PrismaService } from '#infrastructure/prisma/prisma.service';
 import {
@@ -14,14 +14,34 @@ import {
 } from '@prisma/client';
 
 @Injectable()
-export class RoleInitializationService {
+export class RoleInitializationService implements OnApplicationBootstrap {
   private readonly logger = new Logger(RoleInitializationService.name);
 
   constructor(private readonly prisma: PrismaService) {}
 
+  async onApplicationBootstrap(): Promise<void> {
+    await this.initializeDefaultRoles();
+  }
+
   async initializeDefaultRoles() {
     try {
       await this.prisma.$transaction(async (tx) => {
+        const roleNames = Object.values(Role);
+        const existingRoles = await tx.role.findMany({
+          where: { name: { in: roleNames } },
+          select: { name: true },
+        });
+        const existingRoleNames = new Set(
+          existingRoles.map((role) => role.name),
+        );
+        const missingRoleNames = new Set(
+          roleNames.filter((roleName) => !existingRoleNames.has(roleName)),
+        );
+
+        if (missingRoleNames.size === 0) {
+          return;
+        }
+
         // Ensure all default permissions exist
         const permissions = await this.createDefaultPermissions(tx);
         const permissionMap: Record<string, PrismaPermission> =
@@ -95,7 +115,7 @@ export class RoleInitializationService {
         };
 
         // Build final permission sets with inheritance
-        const roles = (Object.values(Role)).map((role) => {
+        const roles = Object.values(Role).map((role) => {
           const inherited = inheritedPermissions[role].flatMap(
             (r) => baseRolePermissions[r],
           );
@@ -119,14 +139,13 @@ export class RoleInitializationService {
 
         // Upsert roles
         for (const roleData of roles) {
+          if (!missingRoleNames.has(roleData.name)) {
+            continue;
+          }
+
           const upsertedRole = await tx.role.upsert({
             where: { name: roleData.name },
-            update: {
-              description: roleData.description,
-              color: roleData.color,
-              hierarchyLevel: roleData.hierarchyLevel,
-              isActive: roleData.isActive,
-            },
+            update: {},
             create: {
               name: roleData.name,
               description: ROLE_DESCRIPTIONS[roleData.name],
@@ -137,23 +156,18 @@ export class RoleInitializationService {
               updatedAt: new Date(),
             },
           });
-          this.logger.log(`Role ${roleData.name} upserted successfully`);
+          this.logger.debug(`Role ${roleData.name} upserted successfully`);
 
-          // Delete existing RolePermission entries for this role
-          await tx.rolePermission.deleteMany({
-            where: { roleId: upsertedRole.id },
-          });
-
-          // Create new RolePermission entries
-          for (const permissionId of roleData.permissionIds) {
-            await tx.rolePermission.create({
-              data: {
+          if (roleData.permissionIds.length > 0) {
+            await tx.rolePermission.createMany({
+              data: roleData.permissionIds.map((permissionId) => ({
                 roleId: upsertedRole.id,
                 permissionId,
                 assignedAt: new Date(),
                 createdAt: new Date(),
                 updatedAt: new Date(),
-              },
+              })),
+              skipDuplicates: true,
             });
           }
         }
@@ -382,10 +396,10 @@ export class RoleInitializationService {
       try {
         const permission = await tx.permission.upsert({
           where: { name: permData.name },
-          update: { ...permData, updatedAt: new Date() },
+          update: {},
           create: { ...permData, createdAt: new Date(), updatedAt: new Date() },
         });
-        this.logger.log(
+        this.logger.debug(
           `Created/Updated permission: ${permission.name} (ID: ${permission.id})`,
         );
         permissions.push(permission);
