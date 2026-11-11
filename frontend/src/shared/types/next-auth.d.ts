@@ -21,7 +21,7 @@ declare module 'next-auth' {
     permissions: string[];
     isEmailVerified: boolean;
     mfaSetupRequired?: boolean;
-    careerStage?: 'student' | 'professional' | null;
+    careerStage?: 'student' | 'postgraduate' | 'professional' | null;
     healthcareField?: string | null;
     studyYear?: number | null;
     yearOfExperience?: number | null;
@@ -53,7 +53,7 @@ declare module 'next-auth/jwt' {
     permissions: string[];
     isEmailVerified: boolean;
     mfaSetupRequired?: boolean;
-    careerStage?: 'student' | 'professional' | null;
+    careerStage?: 'student' | 'postgraduate' | 'professional' | null;
     healthcareField?: string | null;
     studyYear?: number | null;
     yearOfExperience?: number | null;

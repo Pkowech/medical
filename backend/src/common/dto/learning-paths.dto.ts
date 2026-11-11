@@ -6,6 +6,7 @@ import {
   IsArray,
   IsNumber,
   IsEnum,
+  IsIn,
   IsObject,
   Min,
   Max,
@@ -17,6 +18,7 @@ import {
   LearningPathStatus,
   LearningPathType,
 } from '@prisma/client';
+import { CAREER_STAGES } from '#common/constants/career-stages';
 
 export class ModuleDto {
   @ApiProperty({ description: 'Module ID' })
@@ -161,6 +163,16 @@ export class CreateLearningPathDto {
   @IsString()
   description?: string;
 
+  @ApiPropertyOptional({
+    description: 'Career stages this path is designed for',
+    enum: CAREER_STAGES,
+    isArray: true,
+  })
+  @IsOptional()
+  @IsArray()
+  @IsIn(CAREER_STAGES, { each: true })
+  targetCareerStages?: string[];
+
   @ApiPropertyOptional({ enum: LearningPathType, description: 'Path type' })
   @IsOptional()
   @IsEnum(LearningPathType)
@@ -236,6 +248,16 @@ export class UpdateLearningPathDto {
   @IsOptional()
   @IsString()
   description?: string;
+
+  @ApiPropertyOptional({
+    description: 'Career stages this path is designed for',
+    enum: CAREER_STAGES,
+    isArray: true,
+  })
+  @IsOptional()
+  @IsArray()
+  @IsIn(CAREER_STAGES, { each: true })
+  targetCareerStages?: string[];
 
   @ApiPropertyOptional({
     description: 'Path structure with phases and modules',

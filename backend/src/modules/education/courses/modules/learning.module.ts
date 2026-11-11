@@ -15,6 +15,7 @@ import { LearningPathEventsService } from '../services/learning-path-events.serv
 import { LearningPathIntegrationService } from '../services/learning-path-integration.service';
 import { ProgressService } from '../services/progress.service';
 import { LearningPathProgressService } from '../services/learning-path-progress.service';
+import { LearningPathEligibilityService } from '../services/learning-path-eligibility.service';
 import { LearningPathsService } from '../services/learning-paths.service';
 import { LearningService } from '../services/learning.service';
 
@@ -41,6 +42,7 @@ import { XapiListeners } from '../listeners/xapi.listeners';
     LearningPathIntegrationService,
     ProgressService,
     LearningPathProgressService,
+    LearningPathEligibilityService,
     XapiService,
     XapiListeners,
     // ensure Prisma and other providers available via module imports
@@ -53,6 +55,7 @@ import { XapiListeners } from '../listeners/xapi.listeners';
     LearningPathIntegrationService,
     ProgressService,
     LearningPathProgressService,
+    LearningPathEligibilityService,
     LearningPathsService,
     LearningService,
     XapiService,

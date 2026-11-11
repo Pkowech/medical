@@ -79,7 +79,7 @@ export interface User extends UserBase {
   accessTokenExpires?: number;
   refreshToken?: string;
   specialization?: string | null;
-  careerStage?: 'student' | 'professional' | null;
+  careerStage?: 'student' | 'postgraduate' | 'professional' | null;
   healthcareField?: string | null;
   studyYear?: number | null;
   yearOfExperience?: number | null;
@@ -173,7 +173,7 @@ export interface RegisterDTO extends AuthRequestBase {
   bio?: string;
   location?: string;
   specialization?: string;
-  careerStage?: 'student' | 'professional';
+  careerStage?: 'student' | 'postgraduate' | 'professional';
   healthcareField?: string;
   studyYear?: number;
   yearOfExperience?: number;

@@ -10,6 +10,8 @@ import { RedisService } from '#infrastructure/redis/redis.service';
 import { getErrorMessage } from '#common/utils/error.utils';
 import { ANALYTICS_CACHE_CONFIG } from './analytics-cache.constants';
 import { LearningPath } from '@prisma/client';
+import { normalizeCareerStage } from '#common/constants/career-stages';
+import { evaluateLearningPathEligibility } from '#common/utils/learning-path-eligibility';
 
 export interface RecommendationScore {
   pathId: string;
@@ -40,6 +42,15 @@ export class LearningPathRecommendationsService {
     limit: number = 10,
   ): Promise<RecommendationScore[]> {
     try {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { careerStage: true },
+      });
+      const careerStage = normalizeCareerStage(user?.careerStage);
+      if (!careerStage) {
+        return [];
+      }
+
       const rustRecommendations =
         await this.learningAnalyticsService.getPathRecommendations(
           userId,
@@ -49,6 +60,7 @@ export class LearningPathRecommendationsService {
       const recommendations = await this.enrichRustRecommendations(
         rustRecommendations,
         limit,
+        careerStage,
       );
       return recommendations;
     } catch (error) {
@@ -70,6 +82,7 @@ export class LearningPathRecommendationsService {
       confidence: number;
     }>,
     limit: number,
+    careerStage: string,
   ): Promise<RecommendationScore[]> {
     const rankedRecommendations = rustRecs.slice(0, limit);
     const pathIds = rankedRecommendations.map(
@@ -81,13 +94,22 @@ export class LearningPathRecommendationsService {
       where: {
         id: { in: pathIds },
         status: 'published',
+        targetCareerStages: { has: careerStage },
       },
     });
 
     const pathsById = new Map(paths.map((path) => [path.id, path]));
     return rankedRecommendations.flatMap((recommendation) => {
       const path = pathsById.get(recommendation.pathId);
-      if (!path) return [];
+      if (
+        !path ||
+        !evaluateLearningPathEligibility(
+          path.targetCareerStages,
+          careerStage,
+        ).eligible
+      ) {
+        return [];
+      }
 
       return [
         {
@@ -123,10 +145,20 @@ export class LearningPathRecommendationsService {
     const cacheKey = `${ANALYTICS_CACHE_CONFIG.RECOMMENDATIONS.COLLABORATIVE(
       userId,
       limit,
-    )}:enriched:v2`;
+    )}:enriched:v3`;
 
     try {
-      const cached = await this.redisService.get(cacheKey);
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { careerStage: true },
+      });
+      const careerStage = normalizeCareerStage(user?.careerStage);
+      if (!careerStage) {
+        return [];
+      }
+      const stageCacheKey = `${cacheKey}:${careerStage}`;
+
+      const cached = await this.redisService.get(stageCacheKey);
       if (cached) {
         this.logger.debug(
           `Cache HIT for collaborative recommendations ${userId}`,
@@ -149,11 +181,12 @@ export class LearningPathRecommendationsService {
       const recommendations = await this.enrichCollaborativeRecommendations(
         rustRecs,
         limit,
+        careerStage,
       );
 
       // Cache the result
       await this.redisService.set(
-        cacheKey,
+        stageCacheKey,
         JSON.stringify(recommendations),
         this.CACHE_TTL,
       );
@@ -173,6 +206,7 @@ export class LearningPathRecommendationsService {
   private async enrichCollaborativeRecommendations(
     rustRecs: Array<{ item_id: string; score: number; reason: string }>,
     limit: number,
+    careerStage: string,
   ): Promise<RecommendationScore[]> {
     const pathIds = rustRecs.map((recommendation) => recommendation.item_id);
 
@@ -184,6 +218,7 @@ export class LearningPathRecommendationsService {
       where: {
         id: { in: pathIds },
         status: 'published',
+        targetCareerStages: { has: careerStage },
       },
       include: {
         milestones: true,
@@ -194,7 +229,13 @@ export class LearningPathRecommendationsService {
     const pathsById = new Map(paths.map((path) => [path.id, path]));
     return rustRecs.flatMap((recommendation) => {
       const path = pathsById.get(recommendation.item_id);
-      if (!path) {
+      if (
+        !path ||
+        !evaluateLearningPathEligibility(
+          path.targetCareerStages,
+          careerStage,
+        ).eligible
+      ) {
         return [];
       }
 

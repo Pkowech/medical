@@ -65,8 +65,16 @@ export class OnboardingController {
   async getStarterPaths(
     @Query('field') field?: string,
     @Query('specialization') specialization?: string,
-    @Query('limit') limit: number = 4,
+    @Query('limit') limit?: string,
+    @Query('careerStage') careerStage?: string,
+    @Query('targetExam') targetExam?: string,
   ) {
-    return this.onboardingService.getSuggestedStarterPaths(field, specialization, limit);
+    return this.onboardingService.getSuggestedStarterPaths(
+      field,
+      specialization,
+      Number(limit ?? 4),
+      careerStage,
+      targetExam,
+    );
   }
 }

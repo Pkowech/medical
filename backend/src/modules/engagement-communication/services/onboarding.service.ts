@@ -5,7 +5,6 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '#infrastructure/prisma/prisma.service';
-import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   CompleteOnboardingDto,
   OnboardingStatusResponseDto,
@@ -15,16 +14,17 @@ import {
   UserActivityType,
   ProgressStatus,
 } from '@prisma/client';
-import { getErrorMessage } from '#common/utils/error.utils';
+import {
+  CareerStage,
+  normalizeCareerStage,
+} from '#common/constants/career-stages';
+import { createHash } from 'node:crypto';
 
 @Injectable()
 export class OnboardingService {
   private readonly logger = new Logger(OnboardingService.name);
 
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly eventEmitter: EventEmitter2,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   /**
    * Retrieves current onboarding & healthcare profile completeness for a user,
@@ -50,7 +50,7 @@ export class OnboardingService {
 
     const preferences =
       user.preferences && typeof user.preferences === 'object' && !Array.isArray(user.preferences)
-        ? (user.preferences as Prisma.JsonObject)
+        ? user.preferences
         : {};
 
     const targetExam = typeof preferences['targetExam'] === 'string' ? preferences['targetExam'] : null;
@@ -58,14 +58,19 @@ export class OnboardingService {
     const dailyGoalMinutes = typeof preferences['dailyGoalMinutes'] === 'number' ? preferences['dailyGoalMinutes'] : null;
     const focusTopics = Array.isArray(preferences['focusTopics']) ? (preferences['focusTopics'] as string[]) : [];
 
-    const isCompleted = Boolean(user.healthcareField && user.careerStage);
+    const hasStageContext =
+      user.careerStage === 'professional'
+        ? user.yearOfExperience !== null
+        : (user.careerStage === 'student' || user.careerStage === 'postgraduate') &&
+          user.studyYear !== null;
+    const isCompleted = Boolean(user.healthcareField && user.careerStage && hasStageContext);
 
     // Calculate completeness %
     const totalChecks = 6;
     let completedChecks = 0;
     if (user.healthcareField) completedChecks++;
     if (user.careerStage) completedChecks++;
-    if (user.studyYear || user.yearOfExperience !== null) completedChecks++;
+    if (hasStageContext) completedChecks++;
     if (user.specialization) completedChecks++;
     if (targetExam || institution) completedChecks++;
     if (dailyGoalMinutes || focusTopics.length > 0) completedChecks++;
@@ -76,6 +81,9 @@ export class OnboardingService {
     const suggestedStarterPaths = await this.getSuggestedStarterPaths(
       user.healthcareField,
       user.specialization,
+      4,
+      user.careerStage,
+      targetExam,
     );
 
     return {
@@ -98,43 +106,68 @@ export class OnboardingService {
 
   /**
    * Completes onboarding by saving user's healthcare profile, preferences,
-   * seeds a tailored starter learning goal, and emits completion events.
+   * seeds a tailored starter learning goal, and queues a completion event.
    */
   async completeOnboarding(
     userId: string,
     dto: CompleteOnboardingDto,
   ): Promise<OnboardingStatusResponseDto> {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true, preferences: true },
-    });
-
-    if (!user) {
-      throw new NotFoundException('User not found');
+    const careerStage = normalizeCareerStage(dto.careerStage);
+    if (!careerStage) {
+      throw new BadRequestException('Career stage must be student, postgraduate, or professional');
+    }
+    const isInTraining = careerStage === 'student' || careerStage === 'postgraduate';
+    if (!dto.healthcareField.trim()) {
+      throw new BadRequestException('Healthcare field is required');
+    }
+    if (isInTraining && dto.studyYear == null) {
+      throw new BadRequestException('Study or training year is required for this career stage');
+    }
+    if (isInTraining && dto.yearOfExperience != null) {
+      throw new BadRequestException('Years in practice only applies to practicing professionals');
+    }
+    if (careerStage === 'professional' && dto.yearOfExperience == null) {
+      throw new BadRequestException('Years in practice is required for practicing professionals');
+    }
+    if (careerStage === 'professional' && dto.studyYear != null) {
+      throw new BadRequestException('Study year does not apply to practicing professionals');
     }
 
-    try {
+    await this.prisma.$transaction(async transaction => {
+      const user = await transaction.user.findUnique({
+        where: { id: userId },
+        select: { id: true, preferences: true },
+      });
+
+      if (!user) {
+        throw new NotFoundException('User not found');
+      }
+
       const existingPreferences =
         user.preferences && typeof user.preferences === 'object' && !Array.isArray(user.preferences)
-          ? (user.preferences as Prisma.JsonObject)
+          ? user.preferences
           : {};
+      const existingCompletionTime = existingPreferences.onboardingCompletedAt;
+      const onboardingCompletedAt =
+        typeof existingCompletionTime === 'string'
+          ? existingCompletionTime
+          : new Date().toISOString();
 
       const updatedPreferences: Prisma.JsonObject = {
         ...existingPreferences,
         onboardingCompleted: true,
-        onboardingCompletedAt: new Date().toISOString(),
-        ...(dto.institution ? { institution: dto.institution } : {}),
-        ...(dto.targetExam ? { targetExam: dto.targetExam } : {}),
+        onboardingCompletedAt,
+        institution: dto.institution?.trim() || null,
+        targetExam: dto.targetExam?.trim() || null,
         ...(dto.focusTopics ? { focusTopics: dto.focusTopics } : {}),
         ...(dto.dailyGoalMinutes ? { dailyGoalMinutes: dto.dailyGoalMinutes } : {}),
       };
 
-      // 1. Update User Record
-      await this.prisma.user.update({
+      await transaction.user.update({
         where: { id: userId },
         data: {
           healthcareField: dto.healthcareField.toLowerCase().trim(),
-          careerStage: dto.careerStage.toLowerCase().trim(),
+          careerStage,
           studyYear: dto.studyYear ?? null,
           yearOfExperience: dto.yearOfExperience ?? null,
           specialization: dto.specialization?.trim() ?? null,
@@ -142,141 +175,150 @@ export class OnboardingService {
         },
       });
 
-      // 2. Seed an initial Starter Learning Goal if user has none
-      await this.seedStarterLearningGoal(userId, dto);
+      await this.seedStarterLearningGoal(transaction, userId, dto, careerStage);
 
-      // 3. Log Profile Update Activity
-      await this.prisma.userActivity.create({
-        data: {
+      await transaction.userActivity.upsert({
+        where: { sourceKey: `onboarding-completed:${userId}` },
+        create: {
           userId,
+          sourceKey: `onboarding-completed:${userId}`,
           type: UserActivityType.PROFILE_UPDATE,
-          description: `Completed onboarding: ${dto.healthcareField} (${dto.careerStage})`,
+          description: `Completed onboarding: ${dto.healthcareField} (${careerStage})`,
           details: {
             healthcareField: dto.healthcareField,
-            careerStage: dto.careerStage,
-            studyYear: dto.studyYear,
-            specialization: dto.specialization,
-            targetExam: dto.targetExam,
+            careerStage,
+            studyYear: dto.studyYear ?? null,
+            specialization: dto.specialization ?? null,
+            targetExam: dto.targetExam ?? null,
           },
         },
+        update: {},
       });
 
-      // 4. Emit event for downstream streak, recommendation, or notification listeners
-      this.eventEmitter.emit('user.onboarding.completed', {
+      const eventPayload: Prisma.InputJsonObject = {
         userId,
-        timestamp: new Date(),
-        data: dto,
+        timestamp: onboardingCompletedAt,
+        data: {
+          healthcareField: dto.healthcareField,
+          careerStage,
+          studyYear: dto.studyYear ?? null,
+          yearOfExperience: dto.yearOfExperience ?? null,
+          specialization: dto.specialization ?? null,
+          institution: dto.institution ?? null,
+          targetExam: dto.targetExam ?? null,
+          focusTopics: dto.focusTopics ?? [],
+          dailyGoalMinutes: dto.dailyGoalMinutes ?? null,
+        },
+      };
+      const eventDedupeKey = createHash('sha256')
+        .update(`user.onboarding.completed:${userId}`)
+        .digest('hex');
+      await transaction.applicationOutboxEvent.upsert({
+        where: { dedupeKey: eventDedupeKey },
+        create: {
+          eventType: 'user.onboarding.completed',
+          aggregateId: userId,
+          dedupeKey: eventDedupeKey,
+          payload: eventPayload,
+        },
+        update: {},
       });
+    });
 
-      this.logger.log(`User ${userId} completed onboarding as ${dto.healthcareField}`);
-
-      return this.getOnboardingStatus(userId);
-    } catch (error) {
-      this.logger.error(`Error completing onboarding for user ${userId}:`, getErrorMessage(error));
-      throw new BadRequestException(`Failed to complete onboarding: ${getErrorMessage(error)}`);
-    }
+    this.logger.log(`User ${userId} completed onboarding as ${dto.healthcareField}`);
+    return this.getOnboardingStatus(userId);
   }
 
-  /**
-   * Suggests top starter pathways matching user's field or fallback to top published.
-   * Priority order:
-   *   1. Exact seeded paths by stable ID (real-world curriculum anchors)
-   *   2. Specialization match
-   *   3. Category/field match
-   *   4. Fallback: top published
-   */
+  /** Suggests published paths relevant to the learner's field and goals. */
   async getSuggestedStarterPaths(
     healthcareField?: string | null,
     specialization?: string | null,
     limit: number = 4,
+    careerStage?: string | null,
+    targetExam?: string | null,
   ) {
-    // Tier 1: Try stable real-world path IDs first
+    const normalizedField = healthcareField?.toLowerCase().replace(/[_-]/g, ' ').trim();
+    const normalizedSpecialization = specialization?.toLowerCase().trim();
+    const normalizedTargetExam = targetExam?.toLowerCase().trim();
+    const normalizedStage = careerStage?.toLowerCase().trim();
+    const resultLimit = Number.isFinite(limit)
+      ? Math.min(Math.max(Math.floor(limit), 1), 12)
+      : 4;
     const candidatePathIds = this.getCanonicalPathIds(healthcareField);
-    if (candidatePathIds.length > 0) {
-      const anchoredPaths = await this.prisma.learningPath.findMany({
-        where: {
-          id: { in: candidatePathIds },
-          status: 'published',
-        },
-        select: {
-          id: true,
-          title: true,
-          description: true,
-          difficulty: true,
-          estimatedDurationWeeks: true,
-          specialization: true,
-          pathType: true,
-          category: { select: { name: true } },
-        },
-        take: limit,
-      });
 
-      if (anchoredPaths.length > 0) {
-        return anchoredPaths;
-      }
+    const fieldConditions: Prisma.LearningPathWhereInput[] = [];
+    if (normalizedField) {
+      fieldConditions.push(
+        { title: { contains: normalizedField, mode: 'insensitive' } },
+        { description: { contains: normalizedField, mode: 'insensitive' } },
+        { specialization: { contains: normalizedField, mode: 'insensitive' } },
+        { category: { name: { contains: normalizedField, mode: 'insensitive' } } },
+      );
     }
 
-    // Tier 2: Dynamic match on specialization & field
-    const conditions: Prisma.LearningPathWhereInput[] = [];
+    const candidateConditions: Prisma.LearningPathWhereInput[] = [
+      ...fieldConditions,
+      ...(candidatePathIds.length > 0 ? [{ id: { in: candidatePathIds } }] : []),
+    ];
 
-    if (specialization) {
-      conditions.push({
-        specialization: { contains: specialization, mode: 'insensitive' },
-      });
+    if (candidateConditions.length === 0) {
+      return [];
     }
 
-    if (healthcareField) {
-      conditions.push({
-        specialization: { contains: healthcareField, mode: 'insensitive' },
-      });
-      conditions.push({
-        category: {
-          name: { contains: healthcareField, mode: 'insensitive' },
-        },
-      });
-    }
-
-    if (conditions.length > 0) {
-      const matched = await this.prisma.learningPath.findMany({
-        where: {
-          status: 'published',
-          OR: conditions,
-        },
-        select: {
-          id: true,
-          title: true,
-          description: true,
-          difficulty: true,
-          estimatedDurationWeeks: true,
-          specialization: true,
-          pathType: true,
-          category: { select: { name: true } },
-        },
-        orderBy: { createdAt: 'desc' },
-        take: limit,
-      });
-
-      if (matched.length > 0) {
-        return matched;
-      }
-    }
-
-    // Tier 3: Fallback to top published paths
-    return this.prisma.learningPath.findMany({
-      where: { status: 'published' },
+    const candidates = await this.prisma.learningPath.findMany({
+      where: {
+        status: 'published',
+        OR: candidateConditions,
+        ...(normalizedStage ? { targetCareerStages: { has: normalizedStage } } : {}),
+      },
       select: {
         id: true,
         title: true,
         description: true,
         difficulty: true,
         estimatedDurationWeeks: true,
+        estimatedHoursPerWeek: true,
         specialization: true,
+        targetCareerStages: true,
         pathType: true,
         category: { select: { name: true } },
       },
       orderBy: { createdAt: 'desc' },
-      take: limit,
+      take: 100,
     });
+
+    const stagePreferredTypes: Record<string, string[]> = {
+      student: ['STANDARD_STUDY', 'CLINICAL_COMPETENCY', 'EXAM_BLUEPRINT'],
+      postgraduate: ['CLINICAL_COMPETENCY', 'EXAM_BLUEPRINT', 'STANDARD_STUDY'],
+      professional: ['CLINICAL_COMPETENCY', 'EXAM_BLUEPRINT', 'STANDARD_STUDY'],
+    };
+    const preferredTypes = stagePreferredTypes[normalizedStage ?? ''] ?? [];
+
+    return candidates
+      .map(path => {
+        const pathText = [
+          path.title,
+          path.description,
+          path.specialization,
+          path.category?.name,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+        let score = candidatePathIds.includes(path.id) ? 20 : 0;
+
+        if (normalizedField && pathText.includes(normalizedField)) score += 10;
+        if (normalizedSpecialization && pathText.includes(normalizedSpecialization)) score += 30;
+        if (normalizedTargetExam && pathText.includes(normalizedTargetExam)) score += 40;
+
+        const stageRank = preferredTypes.indexOf(path.pathType);
+        if (stageRank >= 0) score += (preferredTypes.length - stageRank) * 2;
+
+        return { path, score };
+      })
+      .sort((a, b) => b.score - a.score)
+      .slice(0, resultLimit)
+      .map(({ path }) => path);
   }
 
   /**
@@ -309,50 +351,54 @@ export class OnboardingService {
    * Automatically creates a tailored starter LearningGoal for the new student/practitioner.
    */
   private async seedStarterLearningGoal(
+    transaction: Prisma.TransactionClient,
     userId: string,
     dto: CompleteOnboardingDto,
+    careerStage: CareerStage,
   ): Promise<void> {
-    try {
-      const existingGoalCount = await this.prisma.learningGoal.count({
-        where: { userId },
-      });
+    const existingGoalCount = await transaction.learningGoal.count({
+      where: { userId },
+    });
 
-      if (existingGoalCount > 0) {
-        return; // Don't overwrite if they already have goals
-      }
-
-      const targetTitle = dto.targetExam
-        ? `Prepare for ${dto.targetExam}`
-        : dto.studyYear
-        ? `Master ${dto.healthcareField.toUpperCase()} Year ${dto.studyYear} Core Competencies`
-        : `Complete ${dto.healthcareField.toUpperCase()} Foundational Curriculum`;
-
-      const targetDate = new Date();
-      targetDate.setMonth(targetDate.getMonth() + 3); // 3 months target (standard term/quarter)
-
-      await this.prisma.learningGoal.create({
-        data: {
-          userId,
-          title: targetTitle,
-          description: `Initial goal established during onboarding to guide clinical study and milestones.`,
-          category: dto.healthcareField,
-          targetDate,
-          progress: 0,
-          status: ProgressStatus.notStarted,
-          priority: 1,
-          metadata: {
-            createdFromOnboarding: true,
-            institution: dto.institution ?? null,
-            targetExam: dto.targetExam ?? null,
-            focusTopics: dto.focusTopics ?? [],
-          },
-        },
-      });
-
-      this.logger.debug(`Seeded starter goal "${targetTitle}" for user ${userId}`);
-    } catch (err) {
-      this.logger.warn(`Failed to seed starter goal during onboarding: ${getErrorMessage(err)}`);
-      // Non-blocking: continue
+    if (existingGoalCount > 0) {
+      return;
     }
+
+    const targetTitle = dto.targetExam
+      ? `Prepare for ${dto.targetExam}`
+      : careerStage === 'professional'
+        ? `Advance ${dto.healthcareField.toUpperCase()} Clinical Practice`
+        : careerStage === 'postgraduate'
+          ? `Complete ${dto.healthcareField.toUpperCase()} Specialty Training`
+          : dto.studyYear
+            ? `Master ${dto.healthcareField.toUpperCase()} Year ${dto.studyYear} Core Competencies`
+            : `Complete ${dto.healthcareField.toUpperCase()} Foundational Curriculum`;
+
+    const targetDate = new Date();
+    targetDate.setMonth(targetDate.getMonth() + 3);
+
+    await transaction.learningGoal.upsert({
+      where: { sourceKey: `onboarding-starter-goal:${userId}` },
+      create: {
+        userId,
+        sourceKey: `onboarding-starter-goal:${userId}`,
+        title: targetTitle,
+        description: `Initial goal established during onboarding to guide clinical study and milestones.`,
+        category: dto.healthcareField,
+        targetDate,
+        progress: 0,
+        status: ProgressStatus.notStarted,
+        priority: 1,
+        metadata: {
+          createdFromOnboarding: true,
+          institution: dto.institution ?? null,
+          targetExam: dto.targetExam ?? null,
+          focusTopics: dto.focusTopics ?? [],
+        },
+      },
+      update: {},
+    });
+
+    this.logger.debug(`Seeded starter goal "${targetTitle}" for user ${userId}`);
   }
 }

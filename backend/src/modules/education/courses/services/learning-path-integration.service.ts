@@ -39,6 +39,8 @@ import {
   mapProgressByKey,
   normalizeProgressArray,
 } from '../utils/path-progress-normalizer';
+import { normalizeCareerStage } from '#common/constants/career-stages';
+import { evaluateLearningPathEligibility } from '#common/utils/learning-path-eligibility';
 
 @Injectable()
 export class LearningPathIntegrationService {
@@ -1632,6 +1634,15 @@ export class LearningPathIntegrationService {
 
   async getRecommendedPaths(userId: string, limit: number = 5): Promise<any[]> {
     try {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { careerStage: true },
+      });
+      const careerStage = normalizeCareerStage(user?.careerStage);
+      if (!careerStage) {
+        return [];
+      }
+
       const recommendations =
         await this.recommendationsService.getRecommendations(userId, limit);
 
@@ -1650,28 +1661,37 @@ export class LearningPathIntegrationService {
           where: {
             id: { notIn: enrolledPathIds },
             status: 'published' as any,
+            targetCareerStages: { has: careerStage },
           },
           take: limit,
           orderBy: { createdAt: 'desc' },
         });
 
-        return fallbackPaths.map((path) => ({
+        return fallbackPaths
+          .filter(path => evaluateLearningPathEligibility(path.targetCareerStages, careerStage).eligible)
+          .map((path) => ({
           id: path.id,
           title: path.title,
           description: path.description,
           difficulty: path.difficulty,
           estimatedDurationWeeks: path.estimatedDurationWeeks,
           estimatedHours: path.estimatedHours,
-        }));
+          }));
       }
 
       // Already enriched by LearningPathRecommendationsService
       const pathIds = recommendations.map((r) => r.pathId);
       const paths = await this.prisma.learningPath.findMany({
-        where: { id: { in: pathIds } },
+        where: {
+          id: { in: pathIds },
+          status: 'published',
+          targetCareerStages: { has: careerStage },
+        },
       });
 
-      return paths.map((path) => ({
+      return paths
+        .filter(path => evaluateLearningPathEligibility(path.targetCareerStages, careerStage).eligible)
+        .map((path) => ({
         id: path.id,
         title: path.title,
         description: path.description,
@@ -1680,7 +1700,7 @@ export class LearningPathIntegrationService {
         estimatedHours: path.estimatedHours,
         recommendationScore: recommendations.find((r) => r.pathId === path.id)
           ?.score,
-      }));
+        }));
     } catch (error) {
       this.logger.error(
         `Error getting recommended paths for user ${userId}: ${getErrorMessage(error)}`,

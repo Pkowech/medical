@@ -30,9 +30,11 @@ export function healthcareProfileLabel(profile: {
   const field = healthcareFieldLabel(profile.healthcareField);
   const stage = profile.careerStage === 'student'
     ? 'Student'
-    : profile.careerStage === 'professional'
-      ? 'Professional'
-      : '';
+    : profile.careerStage === 'postgraduate'
+      ? 'Postgraduate'
+      : profile.careerStage === 'professional'
+        ? 'Professional'
+        : '';
   const focus = profile.specialization?.trim();
 
   if (focus && field) return `${focus} · ${field} ${stage}`.trim();

@@ -37,6 +37,7 @@ import { OnboardingController } from './controllers/onboarding.controller';
 
 // Onboarding Services
 import { OnboardingService } from './services/onboarding.service';
+import { ApplicationOutboxProcessor } from './services/application-outbox.processor';
 
 @Module({
   imports: [
@@ -70,6 +71,7 @@ import { OnboardingService } from './services/onboarding.service';
     RewardsService,
     PeerBenchmarkingService,
     OnboardingService,
+    ApplicationOutboxProcessor,
   ],
   exports: [
     ChatService,

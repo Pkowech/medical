@@ -12,6 +12,7 @@ import {
   Prisma,
   ProgressStatus,
   UserActivityType,
+  LearningPathStatus,
 } from '@prisma/client';
 import {
   LearningPathStartDto,
@@ -28,12 +29,14 @@ import {
   normalizeProgressArray,
   mapProgressByKey,
 } from '../utils/path-progress-normalizer';
+import { LearningPathEligibilityService } from './learning-path-eligibility.service';
 
 @Injectable()
 export class LearningPathProgressService {
   constructor(
     private prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly learningPathEligibilityService: LearningPathEligibilityService,
   ) {}
 
   async startLearningPath(
@@ -58,6 +61,12 @@ export class LearningPathProgressService {
     if (!learningPath) {
       throw new NotFoundException('Learning path not found');
     }
+
+    if (learningPath.status !== LearningPathStatus.published) {
+      throw new BadRequestException('Learning path is not available for enrollment');
+    }
+
+    this.learningPathEligibilityService.assertEligible(learningPath, user);
 
     const existing = await this.prisma.learningPathProgress.findFirst({
       where: { userId, learningPathId: startDto.learningPathId },

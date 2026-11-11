@@ -26,6 +26,9 @@ import {
 import { PathStructure } from '../../../../common/dto/learning.dto';
 import { LearningAnalyticsService } from '../../../ai-analytics/services/learning-analytics.service';
 import { LearningPathProgressService } from './learning-path-progress.service';
+import { LearningPathEligibilityService } from './learning-path-eligibility.service';
+import { normalizeCareerStage } from '#common/constants/career-stages';
+import { evaluateLearningPathEligibility } from '#common/utils/learning-path-eligibility';
 
 @Injectable()
 export class LearningPathsService {
@@ -36,6 +39,7 @@ export class LearningPathsService {
     private readonly eventEmitter: EventEmitter2,
     private readonly learningAnalyticsService: LearningAnalyticsService,
     private readonly learningPathProgressService: LearningPathProgressService,
+    private readonly learningPathEligibilityService: LearningPathEligibilityService,
   ) {}
 
   async create(
@@ -55,6 +59,7 @@ export class LearningPathsService {
             difficulty: createDto.difficulty as CourseDifficulty,
             estimatedDurationWeeks: createDto.estimatedDurationWeeks,
             estimatedHoursPerWeek: createDto.estimatedHoursPerWeek,
+            targetCareerStages: createDto.targetCareerStages ?? [],
             createdBy: userId,
             status: LearningPathStatus.draft,
           },
@@ -220,11 +225,23 @@ export class LearningPathsService {
 
     try {
       const updatedPath = await this.prisma.$transaction(async (tx) => {
+        if (updateDto.pathStructure) {
+          const existingProgress = await tx.learningPathProgress.count({
+            where: { learningPathId: id },
+          });
+          if (existingProgress > 0) {
+            throw new BadRequestException(
+              'Cannot change a learning path structure after learners have enrolled. Duplicate the path to publish a revised structure.',
+            );
+          }
+        }
+
         const path = await tx.learningPath.update({
           where: { id },
           data: {
             title: updateDto.title,
             description: updateDto.description,
+            targetCareerStages: updateDto.targetCareerStages,
             updatedAt: new Date(),
           },
           include: {
@@ -237,7 +254,7 @@ export class LearningPathsService {
         }
 
         return path;
-      });
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
       this.eventEmitter.emit('learning-path.updated', {
         learningPathId: id,
@@ -250,7 +267,8 @@ export class LearningPathsService {
     } catch (error) {
       if (
         error instanceof NotFoundException ||
-        error instanceof ForbiddenException
+        error instanceof ForbiddenException ||
+        error instanceof BadRequestException
       ) {
         throw error;
       }
@@ -397,9 +415,11 @@ export class LearningPathsService {
         customizations?.estimatedHoursPerWeek ??
         originalPath.estimatedHoursPerWeek ??
         0,
+      targetCareerStages:
+        customizations?.targetCareerStages ?? originalPath.targetCareerStages,
       pathStructure: (customizations?.pathStructure || (originalPath as any).pathStructure || {
         phases: (originalPath as any).phases || [],
-      }) as any,
+      }),
     };
 
     return this.create(duplicateData, userId);
@@ -589,6 +609,15 @@ export class LearningPathsService {
     learningPath: LearningPath,
   ): Promise<void> {
     const errors: string[] = [];
+    const targetCareerStages = learningPath.targetCareerStages ?? [];
+
+    if (targetCareerStages.length === 0) {
+      errors.push('At least one target career stage is required');
+    } else if (
+      targetCareerStages.some(stage => !normalizeCareerStage(stage))
+    ) {
+      errors.push('Target career stages contain an unsupported value');
+    }
 
     if (!learningPath.title?.trim()) {
       errors.push('Title is required');
@@ -756,7 +785,7 @@ export class LearningPathsService {
         { description: { contains: filters.search, mode: 'insensitive' } },
         { specialization: { contains: filters.search, mode: 'insensitive' } },
       ];
-      where.OR = where.OR ? [...(where.OR as Prisma.LearningPathWhereInput[]), ...searchConditions] : searchConditions;
+      where.OR = where.OR ? [...where.OR, ...searchConditions] : searchConditions;
     }
 
     if (filters.createdById) {
@@ -775,12 +804,24 @@ export class LearningPathsService {
     userId: string,
     limit: number = 5,
   ): Promise<LearningPath[]> {
-    let userProfile: { healthcareField: string | null; specialization: string | null } | null = null;
+    let userProfile: {
+      healthcareField: string | null;
+      specialization: string | null;
+      careerStage: string | null;
+    } | null = null;
     try {
       userProfile = await this.prisma.user.findUnique({
         where: { id: userId },
-        select: { healthcareField: true, specialization: true },
+        select: {
+          healthcareField: true,
+          specialization: true,
+          careerStage: true,
+        },
       });
+
+      if (!userProfile || !normalizeCareerStage(userProfile.careerStage)) {
+        return [];
+      }
 
       // Get path recommendations from analytics service
       const recommendations =
@@ -801,6 +842,7 @@ export class LearningPathsService {
         where: {
           id: { in: pathIds },
           status: 'published',
+          targetCareerStages: { has: normalizeCareerStage(userProfile.careerStage)! },
         },
         include: {
           _count: { select: { progress: true } },
@@ -812,7 +854,9 @@ export class LearningPathsService {
         return this.getCohortOrTrendingPaths(userProfile, limit);
       }
 
-      return paths;
+      return paths.filter(
+        path => this.learningPathEligibilityService.evaluate(path, userProfile!).eligible,
+      );
     } catch (error) {
       this.logger.warn(
         `Error getting recommended paths for user ${userId}:`,
@@ -823,13 +867,22 @@ export class LearningPathsService {
   }
 
   /**
-   * Fallback for recommendations: prioritize published paths matching the user's
-   * healthcare field or specialization before defaulting to global trending paths.
+   * Fallback for recommendations: return only published paths eligible for the
+   * user's career stage, preferring matches to their field or specialization.
    */
   async getCohortOrTrendingPaths(
-    user: { healthcareField?: string | null; specialization?: string | null } | null,
+    user: {
+      healthcareField?: string | null;
+      specialization?: string | null;
+      careerStage?: string | null;
+    } | null,
     limit: number = 5,
   ): Promise<LearningPath[]> {
+    const careerStage = normalizeCareerStage(user?.careerStage);
+    if (!user || !careerStage) {
+      return [];
+    }
+
     try {
       const cohortConditions: Prisma.LearningPathWhereInput[] = [];
 
@@ -852,6 +905,7 @@ export class LearningPathsService {
         const cohortPaths = await this.prisma.learningPath.findMany({
           where: {
             status: 'published',
+            targetCareerStages: { has: careerStage },
             OR: cohortConditions,
           },
           include: { _count: { select: { progress: true } } },
@@ -860,14 +914,28 @@ export class LearningPathsService {
         });
 
         if (cohortPaths.length > 0) {
-          return cohortPaths;
+          return cohortPaths.filter(
+            path => this.learningPathEligibilityService.evaluate(path, user).eligible,
+          );
         }
       }
+
+      const eligibleTrendingPaths = await this.prisma.learningPath.findMany({
+        where: {
+          status: 'published',
+          targetCareerStages: { has: careerStage },
+        },
+        include: { _count: { select: { progress: true } } },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+      });
+      return eligibleTrendingPaths.filter(
+        path => this.learningPathEligibilityService.evaluate(path, user).eligible,
+      );
     } catch (err) {
       this.logger.warn('Error fetching cohort-specific paths fallback:', err);
+      return [];
     }
-
-    return this.getTrendingPaths(limit);
   }
 
   /**
@@ -920,6 +988,15 @@ export class LearningPathsService {
     limit: number = 5,
   ): Promise<LearningPath[]> {
     try {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { careerStage: true },
+      });
+      const careerStage = normalizeCareerStage(user?.careerStage);
+      if (!careerStage) {
+        return [];
+      }
+
       // Get collaborative recommendations from analytics
       const collaborativeRecs =
         await this.learningAnalyticsService.getCollaborativeRecommendations(
@@ -932,14 +1009,22 @@ export class LearningPathsService {
       }
 
       const pathIds = collaborativeRecs.map((rec) => rec.item_id);
-      return await this.prisma.learningPath.findMany({
+      const paths = await this.prisma.learningPath.findMany({
         where: {
           id: { in: pathIds },
           status: 'published',
+          targetCareerStages: { has: careerStage },
         },
         include: { _count: { select: { progress: true } } },
         take: limit,
       });
+      return paths.filter(
+        path =>
+          evaluateLearningPathEligibility(
+            path.targetCareerStages,
+            careerStage,
+          ).eligible,
+      );
     } catch (error) {
       this.logger.warn(
         `Error getting collaborative paths for user ${userId}:`,

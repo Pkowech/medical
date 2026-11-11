@@ -5,10 +5,15 @@ import {
   IsOptional,
   IsNumber,
   IsArray,
+  IsIn,
+  IsNotEmpty,
+  IsInt,
+  MaxLength,
   Min,
   Max,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { CAREER_STAGES } from '#common/constants/career-stages';
 
 export class OnboardingStepDto {
   @ApiProperty({ example: 'discipline' })
@@ -36,27 +41,30 @@ export class CompleteOnboardingDto {
     description: 'Healthcare field: medicine, nursing, pharmacy, dentistry, allied_health, etc.',
   })
   @IsString()
+  @IsNotEmpty()
+  @MaxLength(80)
   healthcareField!: string;
 
   @ApiProperty({
     example: 'student',
-    description: 'Career stage: student, resident_intern, licensed_professional, educator',
+    description: 'Career stage: student, postgraduate, professional',
   })
   @IsString()
+  @IsIn(CAREER_STAGES)
   careerStage!: string;
 
-  @ApiPropertyOptional({ example: 4, description: 'Year of study (1 to 6)' })
+  @ApiPropertyOptional({ example: 4, description: 'Current study or training year (1 to 6)' })
   @IsOptional()
-  @IsNumber()
+  @IsInt()
   @Min(1)
   @Max(6)
   studyYear?: number;
 
-  @ApiPropertyOptional({ example: 2, description: 'Years of professional experience' })
+  @ApiPropertyOptional({ example: 2, description: 'Years in professional practice' })
   @IsOptional()
-  @IsNumber()
+  @IsInt()
   @Min(0)
-  @Max(60)
+  @Max(50)
   yearOfExperience?: number;
 
   @ApiPropertyOptional({
@@ -64,6 +72,7 @@ export class CompleteOnboardingDto {
     description: 'Specialization or sub-track (e.g., Clinical Pharmacy, Pediatrics, Critical Care)',
   })
   @IsOptional()
+  @MaxLength(120)
   @IsString()
   specialization?: string;
 
@@ -72,6 +81,7 @@ export class CompleteOnboardingDto {
     description: 'Institution, school, or hospital',
   })
   @IsOptional()
+  @MaxLength(120)
   @IsString()
   institution?: string;
 
@@ -80,6 +90,7 @@ export class CompleteOnboardingDto {
     description: 'Target exam, board certification, or primary milestone',
   })
   @IsOptional()
+  @MaxLength(120)
   @IsString()
   targetExam?: string;
 
@@ -132,6 +143,10 @@ export class OnboardingStatusResponseDto {
     description: string | null;
     difficulty: string;
     estimatedDurationWeeks: number | null;
+    estimatedHoursPerWeek: number | null;
     specialization: string | null;
+    targetCareerStages: string[];
+    pathType: string;
+    category: { name: string } | null;
   }>;
 }

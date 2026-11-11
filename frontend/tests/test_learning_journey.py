@@ -61,12 +61,33 @@ def test_new_user_can_skip_optional_profile_but_still_get_onboarding():
     onboarding = read_frontend("src/app/(app)/onboarding/page.tsx")
 
     assert "Profile details are optional, but new users should still see onboarding." in finish_setup
+    assert "Specialization" not in finish_setup
+    assert "Years of Experience" not in finish_setup
     assert "router.push('/onboarding')" in finish_setup
     assert "onboardingCompleted: true" in onboarding
     assert "setFinished(true)" in onboarding
     assert "setStep(4)" in onboarding
+    assert "Current training stage" in onboarding
+    assert "Postgraduate / Resident / Trainee" in onboarding
+    assert "We only ask for this after we know your stage and discipline." in onboarding
     assert "Start Learning" in onboarding
     assert "router.push('/dashboard')" in onboarding
+
+
+def test_onboarding_suggestions_are_published_and_field_relevant():
+    onboarding_service = read_backend(
+        "src/modules/engagement-communication/services/onboarding.service.ts"
+    )
+    suggestions = onboarding_service.split(
+        "async getSuggestedStarterPaths(", 1
+    )[1].split("private getCanonicalPathIds(", 1)[0]
+
+    assert "status: 'published'" in suggestions
+    assert "fieldConditions" in suggestions
+    assert "targetCareerStages: { has: normalizedStage }" in suggestions
+    assert "candidateConditions.length === 0" in suggestions
+    assert "return [];" in suggestions
+    assert "Fallback to top published" not in suggestions
 
 
 def test_new_learner_has_course_discovery_and_learning_path_entry_points():

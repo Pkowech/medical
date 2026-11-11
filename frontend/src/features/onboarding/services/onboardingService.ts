@@ -18,7 +18,9 @@ export interface StarterPathItem {
   description: string | null;
   difficulty: string;
   estimatedDurationWeeks: number | null;
+  estimatedHoursPerWeek?: number | null;
   specialization: string | null;
+  targetCareerStages?: string[];
   /** LearningPathType: STANDARD_STUDY | EXAM_BLUEPRINT | CLINICAL_COMPETENCY */
   pathType?: string;
   category?: { name: string } | null;
@@ -60,14 +62,21 @@ class OnboardingService {
     return data as OnboardingStatusResponse;
   }
 
-  async getStarterPaths(field?: string, specialization?: string): Promise<StarterPathItem[]> {
+  async getStarterPaths(
+    field?: string,
+    specialization?: string,
+    careerStage?: string,
+    targetExam?: string,
+  ): Promise<StarterPathItem[]> {
     const params = new URLSearchParams();
     if (field) params.append('field', field);
     if (specialization) params.append('specialization', specialization);
+    if (careerStage) params.append('careerStage', careerStage);
+    if (targetExam) params.append('targetExam', targetExam);
     const res = await apiService.get<StarterPathItem[] | { data: StarterPathItem[] }>(`/onboarding/starter-paths?${params}`);
     const data = res.data;
-    if (data && typeof data === 'object' && 'data' in data && Array.isArray((data as any).data)) {
-      return (data as any).data;
+    if (data && typeof data === 'object' && 'data' in data && Array.isArray(data.data)) {
+      return data.data;
     }
     return Array.isArray(data) ? data : [];
   }

@@ -71,6 +71,7 @@ model Option {
 model UserActivity {
   id          String           @id @default(uuid())
   userId      String           @map("user_id")
+  sourceKey   String?          @unique @map("source_key")
   type        UserActivityType
   description String?
   details     Json?
@@ -662,6 +663,23 @@ model LoginAuditOutbox {
   @@map("login_audit_outbox")
 }
 
+model ApplicationOutboxEvent {
+  id          String    @id @default(uuid())
+  eventType   String    @map("event_type")
+  aggregateId String?   @map("aggregate_id")
+  dedupeKey   String    @unique @map("dedupe_key")
+  payload     Json
+  createdAt   DateTime  @default(now()) @map("created_at")
+  availableAt DateTime  @default(now()) @map("available_at")
+  attempts    Int       @default(0)
+  lastError   String?   @map("last_error")
+  lockedAt    DateTime? @map("locked_at")
+  processedAt DateTime? @map("processed_at")
+
+  @@index([processedAt, availableAt, createdAt])
+  @@map("application_outbox_events")
+}
+
 model CourseCategory {
   id            String           @id @default(uuid())
   name          String           @db.VarChar(255)
@@ -1126,6 +1144,7 @@ model LearningPath {
   createdBy              String?                 @map("created_by")
   categoryId             String?                 @map("category_id")
   specialization         String?                 @map("specialization")
+  targetCareerStages     String[]                @default([]) @map("target_career_stages")
   pathType               LearningPathType        @default(STANDARD_STUDY) @map("path_type")
   blueprintMappings      BlueprintMapping[]
   learningGoals          LearningGoal[]
@@ -1298,6 +1317,7 @@ model LearningPathModuleProgress {
 model LearningGoal {
   id                      String                 @id @default(uuid())
   userId                  String                 @map("user_id")
+  sourceKey               String?                @unique @map("source_key")
   courseId                String?
   title                   String                 @db.VarChar(255)
   description             String?

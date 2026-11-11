@@ -17,8 +17,6 @@ interface FinishSetupData {
   phoneNumber?: string;
   bio?: string;
   location?: string;
-  specialization?: string;
-  yearOfExperience?: number | string;
 }
 
 export default function FinishSetupPage() {
@@ -34,8 +32,6 @@ export default function FinishSetupPage() {
     phoneNumber: '',
     bio: '',
     location: '',
-    specialization: '',
-    yearOfExperience: '',
   });
 
   // Fetch user profile on mount to show current data
@@ -63,8 +59,6 @@ export default function FinishSetupPage() {
           phoneNumber: user.phoneNumber || '',
           bio: user.bio || '',
           location: user.location || '',
-          specialization: user.specialization || '',
-          yearOfExperience: user.yearOfExperience || '',
         });
         setFetchError(null);
       } catch (error) {
@@ -119,14 +113,7 @@ export default function FinishSetupPage() {
       if (formData.phoneNumber) updateData.phoneNumber = formData.phoneNumber;
       if (formData.bio) updateData.bio = formData.bio;
       if (formData.location) updateData.location = formData.location;
-      if (formData.specialization) updateData.specialization = formData.specialization;
-      if (formData.yearOfExperience) updateData.yearOfExperience = parseInt(String(formData.yearOfExperience), 10);
-
-
-
       await userService.updateUserProfile(session.user.id, updateData as Partial<User>);
-
-
 
       toast({
         title: 'Success!',
@@ -269,39 +256,6 @@ export default function FinishSetupPage() {
                     onChange={handleChange}
                     placeholder="City, Country"
                     helperText="Optional • helps connect with others nearby"
-                    disabled={isLoading}
-                  />
-                </div>
-              </div>
-
-              {/* Professional Information Section */}
-              <div className="bg-background/50 dark:bg-secondary/20 rounded-lg p-4">
-                <h3 className="text-sm font-semibold text-muted-foreground dark:text-muted-foreground mb-3">
-                  Professional Information
-                </h3>
-
-                <FormField
-                  label="Specialization"
-                  type="text"
-                  name="specialization"
-                  value={formData.specialization || ''}
-                  onChange={handleChange}
-                  placeholder="e.g., Cardiology, Surgery, Internal Medicine"
-                  helperText="Optional • your area of expertise"
-                  disabled={isLoading}
-                />
-
-                <div className="mt-4">
-                  <FormField
-                    label="Years of Experience"
-                    type="number"
-                    name="yearOfExperience"
-                    value={formData.yearOfExperience?.toString() || ''}
-                    onChange={handleChange}
-                    placeholder="0-70"
-                    min="0"
-                    max="70"
-                    helperText="Optional • your professional experience in years"
                     disabled={isLoading}
                   />
                 </div>

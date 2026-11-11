@@ -11,12 +11,15 @@ const { LearningPathRecommendationsService } =
 let requestedLimit;
 let query;
 const prisma = {
+  user: {
+    findUnique: async () => ({ careerStage: 'student' }),
+  },
   learningPath: {
     findMany: async (args) => {
       query = args;
       return [
-        { id: 'path-third', estimatedDurationWeeks: 8 },
-        { id: 'path-first', estimatedDurationWeeks: 4 },
+        { id: 'path-third', estimatedDurationWeeks: 8, targetCareerStages: ['student'] },
+        { id: 'path-first', estimatedDurationWeeks: 4, targetCareerStages: ['student'] },
       ];
     },
   },
@@ -44,6 +47,7 @@ const service = new LearningPathRecommendationsService(
   assert.deepEqual(query.where, {
     id: { in: ['path-first', 'unpublished-path', 'path-third'] },
     status: 'published',
+    targetCareerStages: { has: 'student' },
   });
   assert.deepEqual(
     recommendations.map(({ pathId, score }) => ({ pathId, score })),

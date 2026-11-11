@@ -26,6 +26,26 @@ import { toast } from 'sonner';
 import { useSession } from 'next-auth/react';
 import { healthcareFields, healthcareFieldLabel } from '@/shared/utils/healthcareProfile';
 
+type CareerStage = 'student' | 'postgraduate' | 'professional' | '';
+
+const stageOptions: Array<{ value: Exclude<CareerStage, ''>; label: string; helper: string }> = [
+  {
+    value: 'student',
+    label: 'Student / Undergraduate',
+    helper: 'Choose your program and study year to tailor the curriculum.',
+  },
+  {
+    value: 'postgraduate',
+    label: 'Postgraduate / Resident / Trainee',
+    helper: 'This helps match training blocks and specialty milestones.',
+  },
+  {
+    value: 'professional',
+    label: 'Practicing Professional',
+    helper: 'We can focus on clinical practice and competency development.',
+  },
+];
+
 const tourSlides = [
   {
     title: 'Your Dashboard',
@@ -36,13 +56,13 @@ const tourSlides = [
   {
     title: 'Rapid Review & Practicals',
     description:
-      'Quickly reinforce weak areas with high-yield clinical quizzes, drug cards, and case studies tailored to your year.',
+      'Quickly reinforce weak areas with high-yield clinical quizzes, drug cards, and case studies tailored to your current stage.',
     icon: '⚡',
   },
   {
     title: 'Study Groups & Cohort Peers',
     description:
-      'Collaborate and benchmark against peers in your exact discipline, year, and course tracks.',
+      'Collaborate and benchmark against peers in your exact discipline, stage, and learning track.',
     icon: '👥',
   },
 ];
@@ -54,7 +74,7 @@ export default function OnboardingPage() {
   const [step, setStep] = useState(0);
   const [profile, setProfile] = useState({
     name: '',
-    careerStage: '' as 'student' | 'professional' | '',
+    careerStage: '' as CareerStage,
     healthcareField: '',
     otherHealthcareField: '',
     studyYear: '',
@@ -79,12 +99,16 @@ export default function OnboardingPage() {
           field.value === user.healthcareField ||
           field.label.toLowerCase() === user.healthcareField?.toLowerCase(),
       );
-      const userPrefs = (user.preferences as Record<string, any>) || {};
+      const userPrefs = (user.preferences as Record<string, unknown>) || {};
+      const savedDailyGoal =
+        typeof userPrefs.dailyGoalMinutes === 'number'
+          ? Math.min(240, Math.max(15, Math.round(userPrefs.dailyGoalMinutes / 15) * 15))
+          : 45;
 
       setProfile(p => ({
         ...p,
         name: user.fullName || `${user.firstName || ''} ${user.lastName || ''}`.trim(),
-        careerStage: (user.careerStage as 'student' | 'professional') || '',
+        careerStage: (user.careerStage as CareerStage) || '',
         healthcareField: user.healthcareField
           ? knownField ? knownField.value : 'other'
           : '',
@@ -97,9 +121,13 @@ export default function OnboardingPage() {
             ? String(user.yearOfExperience)
             : '',
         specialty: user.specialization || '',
-        institution: userPrefs.institution || '',
-        targetExam: userPrefs.targetExam || '',
+        institution: typeof userPrefs.institution === 'string' ? userPrefs.institution : '',
+        targetExam: typeof userPrefs.targetExam === 'string' ? userPrefs.targetExam : '',
       }));
+      setGoals({
+        daily: String(savedDailyGoal),
+        weekly: String(savedDailyGoal * 7),
+      });
     }
   }, [user]);
 
@@ -110,13 +138,27 @@ export default function OnboardingPage() {
 
   const handleFinish = async () => {
     if (!user) return;
-    if (
-      !profile.careerStage ||
-      !profile.healthcareField ||
-      (profile.healthcareField === 'other' && !profile.otherHealthcareField.trim())
-    ) {
+    if (!profile.careerStage || !profile.healthcareField) {
       setStep(1);
-      toast.error('Complete your healthcare path details before finishing setup.');
+      toast.error('Choose your stage and healthcare field before finishing setup.');
+      return;
+    }
+
+    if (profile.healthcareField === 'other' && !profile.otherHealthcareField.trim()) {
+      setStep(1);
+      toast.error('Tell us which healthcare field you are in so the right learning tracks can be suggested.');
+      return;
+    }
+
+    if (profile.careerStage !== 'professional' && !profile.studyYear) {
+      setStep(1);
+      toast.error('Add your current study or training year so we can calibrate learning milestones.');
+      return;
+    }
+
+    if (profile.careerStage === 'professional' && !profile.yearsExperience) {
+      setStep(1);
+      toast.error('Add a few years of practice experience so your recommendations are correctly framed.');
       return;
     }
 
@@ -126,7 +168,7 @@ export default function OnboardingPage() {
         ? profile.otherHealthcareField.trim()
         : profile.healthcareField;
     const studyYear =
-      careerStage === 'student' && profile.studyYear
+      careerStage !== 'professional' && profile.studyYear
         ? Number(profile.studyYear)
         : undefined;
     const yearsExperience =
@@ -235,14 +277,28 @@ export default function OnboardingPage() {
     );
   }
 
-  // Step 1: Discipline & Program Level
+  // Step 1: Stage & Program Context
   if (step === 1) {
+    const selectedStage = profile.careerStage;
+    const hasDiscipline =
+      Boolean(profile.healthcareField) &&
+      (profile.healthcareField !== 'other' || Boolean(profile.otherHealthcareField.trim()));
+    const studyYearOptions = selectedStage === 'postgraduate' ? 5 : 6;
+    const stageYearLabel =
+      selectedStage === 'student'
+        ? 'Year of study'
+        : selectedStage === 'postgraduate'
+          ? 'Training year'
+          : selectedStage === 'professional'
+            ? 'Years in practice'
+            : 'Stage year';
+
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-background p-6">
         <div className="w-full max-w-lg bg-card rounded-2xl shadow-xl border border-border p-8 flex flex-col">
           <div className="mb-6">
             <div className="flex justify-between items-center mb-2">
-              <h2 className="text-2xl font-bold text-foreground">Discipline & Program</h2>
+              <h2 className="text-2xl font-bold text-foreground">Your Learning Stage</h2>
               <span className="text-sm font-medium text-blue-600 dark:text-blue-400">Step 1 of 3</span>
             </div>
             <div className="w-full bg-muted h-1.5 rounded-full overflow-hidden">
@@ -251,15 +307,52 @@ export default function OnboardingPage() {
           </div>
 
           <form
-            className="space-y-4"
+            className="space-y-5"
             onSubmit={e => {
               e.preventDefault();
+              if (!selectedStage || !profile.healthcareField) {
+                toast.error('Choose both your stage and healthcare field before continuing.');
+                return;
+              }
               nextStep();
             }}
           >
             <div>
+              <label className="block text-sm font-semibold text-foreground mb-2">Current training stage</label>
+              <div className="grid gap-3">
+                {stageOptions.map(option => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() =>
+                      setProfile(p => ({
+                        ...p,
+                        careerStage: option.value,
+                      }))
+                    }
+                    className={`text-left rounded-xl border p-3 transition-all ${
+                      selectedStage === option.value
+                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 shadow-sm'
+                        : 'border-border bg-background hover:border-blue-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <div className="font-semibold text-foreground">{option.label}</div>
+                        <div className="text-xs text-muted-foreground mt-1">{option.helper}</div>
+                      </div>
+                      {selectedStage === option.value ? (
+                        <span className="rounded-full bg-blue-600 px-2 py-1 text-[10px] font-semibold text-white">Selected</span>
+                      ) : null}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
               <label htmlFor="healthcare-field" className="block text-sm font-semibold text-foreground mb-1.5">
-                Healthcare Discipline
+                Healthcare discipline
               </label>
               <select
                 id="healthcare-field"
@@ -268,7 +361,7 @@ export default function OnboardingPage() {
                 onChange={e => setProfile(p => ({ ...p, healthcareField: e.target.value }))}
                 required
               >
-                <option value="">Select your discipline</option>
+                <option value="">Select your field</option>
                 {healthcareFields.map(field => (
                   <option key={field.value} value={field.value}>
                     {field.label}
@@ -280,7 +373,7 @@ export default function OnboardingPage() {
             {profile.healthcareField === 'other' && (
               <div>
                 <label htmlFor="other-healthcare-field" className="block text-sm font-semibold text-foreground mb-1.5">
-                  Specify Your Discipline
+                  Specify your discipline
                 </label>
                 <input
                   id="other-healthcare-field"
@@ -295,99 +388,92 @@ export default function OnboardingPage() {
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label htmlFor="career-stage" className="block text-sm font-semibold text-foreground mb-1.5">
-                  Current Stage
-                </label>
-                <select
-                  id="career-stage"
-                  className="w-full px-3 py-2.5 rounded-xl border border-input bg-background text-foreground focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-                  value={profile.careerStage}
-                  onChange={e =>
-                    setProfile(p => ({
-                      ...p,
-                      careerStage: e.target.value as 'student' | 'professional' | '',
-                    }))
-                  }
-                  required
-                >
-                  <option value="">Select stage</option>
-                  <option value="student">Student / Trainee</option>
-                  <option value="professional">Practicing Professional</option>
-                </select>
+            {selectedStage && (
+              <div className="grid gap-3 sm:grid-cols-2">
+                {selectedStage !== 'professional' ? (
+                  <div>
+                    <label htmlFor="study-year" className="block text-sm font-semibold text-foreground mb-1.5">
+                      {stageYearLabel}
+                    </label>
+                    <select
+                      id="study-year"
+                      value={profile.studyYear}
+                      onChange={e => setProfile(p => ({ ...p, studyYear: e.target.value }))}
+                      required
+                      className="w-full px-3 py-2.5 rounded-xl border border-input bg-background text-foreground focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                    >
+                      <option value="">Select year</option>
+                      {Array.from({ length: studyYearOptions }, (_, index) => index + 1).map(y => (
+                        <option key={y} value={y}>
+                          {selectedStage === 'student' ? `Year ${y}` : `Training Year ${y}`}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <div>
+                    <label htmlFor="years-experience" className="block text-sm font-semibold text-foreground mb-1.5">
+                      Years in practice
+                    </label>
+                    <input
+                      id="years-experience"
+                      type="number"
+                      min="0"
+                      max="50"
+                      value={profile.yearsExperience}
+                      onChange={e => setProfile(p => ({ ...p, yearsExperience: e.target.value }))}
+                      required
+                      placeholder="e.g. 3"
+                      className="w-full px-3 py-2.5 rounded-xl border border-input bg-background text-foreground focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <label htmlFor="institution" className="block text-sm font-semibold text-foreground mb-1.5">
+                    Institution / school / hospital (optional)
+                  </label>
+                  <div className="relative">
+                    <School className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      id="institution"
+                      type="text"
+                      maxLength={120}
+                      value={profile.institution}
+                      onChange={e => setProfile(p => ({ ...p, institution: e.target.value }))}
+                      placeholder="e.g. Kenyatta University, Nairobi Hospital"
+                      className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-input bg-background text-foreground focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                    />
+                  </div>
+                </div>
               </div>
+            )}
 
-              {profile.careerStage === 'student' ? (
-                <div>
-                  <label htmlFor="study-year" className="block text-sm font-semibold text-foreground mb-1.5">
-                    Year of Study
-                  </label>
-                  <select
-                    id="study-year"
-                    value={profile.studyYear}
-                    onChange={e => setProfile(p => ({ ...p, studyYear: e.target.value }))}
-                    required
-                    className="w-full px-3 py-2.5 rounded-xl border border-input bg-background text-foreground focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-                  >
-                    <option value="">Select year</option>
-                    {[1, 2, 3, 4, 5, 6].map(y => (
-                      <option key={y} value={y}>Year {y} (Level {y})</option>
-                    ))}
-                  </select>
-                </div>
-              ) : profile.careerStage === 'professional' ? (
-                <div>
-                  <label htmlFor="years-experience" className="block text-sm font-semibold text-foreground mb-1.5">
-                    Experience (Years)
-                  </label>
-                  <input
-                    id="years-experience"
-                    type="number"
-                    min="0"
-                    max="60"
-                    value={profile.yearsExperience}
-                    onChange={e => setProfile(p => ({ ...p, yearsExperience: e.target.value }))}
-                    required
-                    placeholder="e.g. 3"
-                    className="w-full px-3 py-2.5 rounded-xl border border-input bg-background text-foreground focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-                  />
-                </div>
-              ) : null}
-            </div>
-
-            <div>
-              <label htmlFor="institution" className="block text-sm font-semibold text-foreground mb-1.5">
-                Institution / School / Hospital (optional)
-              </label>
-              <div className="relative">
-                <School className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
+            {selectedStage && hasDiscipline && (
+              <div>
+                <label htmlFor="specialty" className="block text-sm font-semibold text-foreground mb-1.5">
+                  Specialization / sub-track (optional)
+                </label>
                 <input
-                  id="institution"
+                  id="specialty"
                   type="text"
                   maxLength={120}
-                  value={profile.institution}
-                  onChange={e => setProfile(p => ({ ...p, institution: e.target.value }))}
-                  placeholder="e.g. Kenyatta University, Nairobi Hospital"
-                  className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-input bg-background text-foreground focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                  value={profile.specialty}
+                  onChange={e => setProfile(p => ({ ...p, specialty: e.target.value }))}
+                  placeholder={
+                    selectedStage === 'professional'
+                      ? 'e.g. Emergency Medicine, Radiology, Pharmacotherapy'
+                      : 'e.g. Clinical Pharmacy, Paediatrics, Orthopedics'
+                  }
+                  className="w-full px-4 py-2.5 rounded-xl border border-input bg-background text-foreground focus:ring-2 focus:ring-blue-500 outline-none transition-all"
                 />
+                <p className="text-xs text-muted-foreground mt-1">
+                  {selectedStage === 'student'
+                    ? 'Use this if you have a concentration, track, or program pathway.'
+                    : 'We only ask for this after we know your stage and discipline.'}
+                </p>
               </div>
-            </div>
-
-            <div>
-              <label htmlFor="specialty" className="block text-sm font-semibold text-foreground mb-1.5">
-                Specialization / Sub-Track (optional)
-              </label>
-              <input
-                id="specialty"
-                type="text"
-                maxLength={120}
-                value={profile.specialty}
-                onChange={e => setProfile(p => ({ ...p, specialty: e.target.value }))}
-                placeholder="e.g. Clinical Pharmacy, Paediatrics, Pharmacotherapy"
-                className="w-full px-4 py-2.5 rounded-xl border border-input bg-background text-foreground focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-              />
-            </div>
+            )}
 
             <div className="pt-3 flex flex-col space-y-2">
               <Button
@@ -570,8 +656,17 @@ export default function OnboardingPage() {
 
   // Step 4: High-Value Confirmation with Matched Starter Pathways!
   if (finished) {
-    const fieldLabel = healthcareFieldLabel(profile.healthcareField);
+    const fieldLabel =
+      profile.healthcareField === 'other'
+        ? profile.otherHealthcareField.trim() || 'Your discipline'
+        : healthcareFieldLabel(profile.healthcareField) || 'Your discipline';
     const starterPaths: StarterPathItem[] = completedStatus?.suggestedStarterPaths || [];
+    const stageLabel =
+      profile.careerStage === 'student'
+        ? `Year ${profile.studyYear} student`
+        : profile.careerStage === 'postgraduate'
+          ? `Training year ${profile.studyYear}`
+          : `${profile.yearsExperience} years in practice`;
 
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-background p-6">
@@ -581,7 +676,8 @@ export default function OnboardingPage() {
           </div>
           <h2 className="text-3xl font-bold mb-2 text-foreground">You&apos;re All Set for {fieldLabel}!</h2>
           <p className="text-muted-foreground mb-6 max-w-lg leading-relaxed">
-            Your profile is calibrated for {profile.careerStage === 'student' ? `Year ${profile.studyYear}` : 'Professional Practice'} {profile.specialty ? `in ${profile.specialty}` : ''}. We have seeded your starter goal and matched your curriculum.
+            Recommendations are tailored for {stageLabel}
+            {profile.specialty ? ` in ${profile.specialty}` : ''}. Choose a short learning path to get started.
           </p>
 
           {/* Calibrated Badge Strip */}
@@ -591,7 +687,7 @@ export default function OnboardingPage() {
             </span>
             {profile.studyYear && (
               <span className="px-3 py-1 rounded-full text-xs font-semibold bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300">
-                Level {profile.studyYear}
+                {profile.careerStage === 'postgraduate' ? 'Training year' : 'Study year'} {profile.studyYear}
               </span>
             )}
             {profile.targetExam && (
@@ -605,10 +701,10 @@ export default function OnboardingPage() {
           </div>
 
           {/* Matched Starter Pathways Cards */}
-          {starterPaths.length > 0 && (
+          {starterPaths.length > 0 ? (
             <div className="w-full text-left space-y-3 mb-8">
               <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                <BookOpen className="w-4 h-4 text-blue-600" /> Your Matched Curricula
+                <BookOpen className="w-4 h-4 text-blue-600" /> Learning paths for you
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {starterPaths.slice(0, 4).map(path => {
@@ -619,9 +715,9 @@ export default function OnboardingPage() {
                       ? { label: 'Exam Blueprint', cls: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300' }
                       : { label: 'Study Path', cls: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' };
                   return (
-                    <div
+                    <Link
                       key={path.id}
-                      onClick={() => router.push(`/learning-paths/${path.id}`)}
+                      href={`/learning-paths/${path.id}`}
                       className="p-4 rounded-xl border border-border bg-muted/40 hover:bg-muted/80 hover:border-blue-500/50 cursor-pointer transition-all flex flex-col justify-between"
                     >
                       <div>
@@ -629,13 +725,18 @@ export default function OnboardingPage() {
                           <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${pathTypeBadge.cls}`}>
                             {pathTypeBadge.label}
                           </span>
-                          {path.estimatedDurationWeeks && (
+                          {path.estimatedDurationWeeks !== null && path.estimatedDurationWeeks !== undefined && (
                             <span className="text-[11px] text-muted-foreground flex items-center gap-1">
-                              <Clock className="w-3 h-3" /> {path.estimatedDurationWeeks}w
+                              <Clock className="w-3 h-3" /> {path.estimatedDurationWeeks} weeks
                             </span>
                           )}
                         </div>
                         <h4 className="text-sm font-semibold text-foreground line-clamp-1">{path.title}</h4>
+                        {path.estimatedHoursPerWeek ? (
+                          <span className="text-[11px] text-muted-foreground">
+                            About {path.estimatedHoursPerWeek} hours per week
+                          </span>
+                        ) : null}
                         {path.category?.name && (
                           <span className="text-[10px] text-muted-foreground/80 italic">{path.category.name}</span>
                         )}
@@ -644,10 +745,23 @@ export default function OnboardingPage() {
                       <div className="mt-3 flex items-center text-xs font-semibold text-blue-600 dark:text-blue-400">
                         Explore Curriculum <ArrowRight className="w-3.5 h-3.5 ml-1" />
                       </div>
-                    </div>
+                    </Link>
                   );
                 })}
               </div>
+            </div>
+          ) : (
+            <div className="w-full rounded-xl border border-border bg-muted/40 p-5 mb-8 text-left">
+              <h3 className="font-semibold text-foreground">No exact match yet</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                We couldn&apos;t find a published path for this combination. Browse the catalog to see all available learning paths.
+              </p>
+              <Link
+                href="/learning-paths"
+                className="inline-flex items-center gap-1 mt-3 text-sm font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                Browse learning paths <ArrowRight className="w-4 h-4" />
+              </Link>
             </div>
           )}
 
@@ -656,7 +770,7 @@ export default function OnboardingPage() {
             className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-6 rounded-xl transition-all shadow-xl shadow-blue-500/20 text-base"
             onClick={() => router.push('/dashboard')}
           >
-            Go to Your Dashboard
+            Start Learning
           </Button>
         </div>
       </div>

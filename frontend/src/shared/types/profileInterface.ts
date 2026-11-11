@@ -52,7 +52,7 @@ export interface UserProfileBase extends BaseEntity {
   profileImage?: string;
   bio?: string;
   location?: string;
-  careerStage?: 'student' | 'professional' | null;
+  careerStage?: 'student' | 'postgraduate' | 'professional' | null;
   healthcareField?: string | null;
   studyYear?: number | null;
   specialization?: string | null;
@@ -147,7 +147,7 @@ export interface LocalUserProfile {
   phoneNumber: string;
   bio: string;
   location: string;
-  careerStage: 'student' | 'professional' | '';
+  careerStage: 'student' | 'postgraduate' | 'professional' | '';
   healthcareField: string;
   studyYear: number | null;
   specialization: string;
@@ -171,7 +171,7 @@ export interface ProfileUpdateRequest {
   phoneNumber?: string;
   bio?: string;
   location?: string;
-  careerStage?: 'student' | 'professional' | null;
+  careerStage?: 'student' | 'postgraduate' | 'professional' | null;
   healthcareField?: string | null;
   studyYear?: number | null;
   specialization?: string | null;
