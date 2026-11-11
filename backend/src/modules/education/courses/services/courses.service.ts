@@ -1034,6 +1034,18 @@ export class CoursesService {
         );
       }
 
+      const [enrollmentCount, progressCount, curriculumCourseCount] =
+        await Promise.all([
+          this.prisma.courseEnrollment.count({ where: { courseId: id } }),
+          this.prisma.progress.count({ where: { courseId: id } }),
+          this.prisma.curriculumCourse.count({ where: { courseId: id } }),
+        ]);
+      if (enrollmentCount > 0 || progressCount > 0 || curriculumCourseCount > 0) {
+        throw new BadRequestException(
+          'Cannot delete a course with student history or curriculum references. Archive it or create a new curriculum version instead.',
+        );
+      }
+
       await this.prisma.course.delete({ where: { id } });
       await this.clearCache(existingCourse);
       this.logger.log('Course deleted successfully', { courseId: id, userId });
@@ -1687,6 +1699,12 @@ export class CoursesService {
       await this.redisService.delPattern(
         `${this.CACHE_PREFIX}:recommended-v2:*`,
       );
+      await Promise.all([
+        this.redisService.delPattern('unit:*:questions:v3:*'),
+        this.redisService.delPattern('topic:*:questions:v3:*'),
+        this.redisService.delPattern('quizzes:*'),
+        this.redisService.delPattern('quiz:*'),
+      ]);
       this.logger.debug('Course cache cleared', { courseId: course.id });
     } catch (error) {
       this.logger.error('Error clearing cache', {
@@ -1815,15 +1833,16 @@ export class CoursesService {
         },
       });
 
-      const topicQuizProgress = await this.prisma.progress.findMany({
+      const topicQuizAttempts = await this.prisma.quizAttempt.findMany({
         where: {
           userId,
-          topicId: { not: null },
-          materialId: null,
-          quizScores: { not: Prisma.JsonNull },
+          completedAt: { not: null },
         },
-        orderBy: { updatedAt: 'desc' },
-        select: { topicId: true, quizScores: true },
+        orderBy: { completedAt: 'desc' },
+        select: {
+          percentage: true,
+          quiz: { select: { topicId: true } },
+        },
       });
 
       const completed = enrollments.filter(
@@ -1835,16 +1854,14 @@ export class CoursesService {
       ).length;
 
       const bestQuizScoreByTopic = new Map<string, number>();
-      for (const progress of topicQuizProgress) {
-        if (!progress.topicId || bestQuizScoreByTopic.has(progress.topicId)) continue;
+      for (const attempt of topicQuizAttempts) {
+        const topicId = attempt.quiz.topicId;
+        if (!topicId) continue;
 
-        const quizScores = progress.quizScores as Record<string, unknown> | null;
-        const score = typeof quizScores?.bestScore === 'number'
-          ? quizScores.bestScore
-          : typeof quizScores?.lastScore === 'number'
-            ? quizScores.lastScore
-            : undefined;
-        if (score !== undefined) bestQuizScoreByTopic.set(progress.topicId, score);
+        bestQuizScoreByTopic.set(
+          topicId,
+          Math.max(bestQuizScoreByTopic.get(topicId) ?? 0, attempt.percentage),
+        );
       }
       const quizScores = Array.from(bestQuizScoreByTopic.values());
       const avgScore = quizScores.length > 0

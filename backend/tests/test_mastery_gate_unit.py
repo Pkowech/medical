@@ -76,3 +76,70 @@ const service = new MasteryGateService(prisma, {}, {}, {});
 });
 """
     )
+
+
+def test_passing_quiz_does_not_complete_reading_progress():
+    run_typescript(
+        r"""
+const assert = require('node:assert/strict');
+const { MasteryGateService } =
+  require('./src/modules/education/courses/services/mastery-gate.service.ts');
+const progress = {
+  id: 'topic-progress-1',
+  userId: 'user-1',
+  topicId: 'topic-1',
+  unitId: 'unit-1',
+  courseId: 'course-1',
+  status: 'inProgress',
+  progressPercentage: 35,
+  isCompleted: false,
+  completedAt: null,
+  quizScores: {},
+};
+const updates = [];
+const prisma = {
+  topic: {
+    findUnique: async () => ({
+      id: 'topic-1',
+      unitId: 'unit-1',
+      unit: { id: 'unit-1', courseId: 'course-1' },
+    }),
+  },
+  progress: {
+    findFirst: async () => progress,
+    update: async ({ data }) => {
+      updates.push(data);
+      Object.assign(progress, data);
+      return progress;
+    },
+    create: async () => { throw new Error('unexpected progress creation'); },
+  },
+};
+const service = new MasteryGateService(
+  prisma,
+  { del: async () => {} },
+  { emit: () => {} },
+  { evaluateGates: async () => ({ canProceed: false, pKnown: 0.4 }) },
+);
+service.unlockNextTopic = async () => ({
+  unlocked: true,
+  nextTopicId: 'topic-2',
+});
+
+(async () => {
+  await service.onQuizComplete('user-1', 'topic-1', true, 85);
+  for (const update of updates) {
+    assert.equal('progressPercentage' in update, false);
+    assert.equal('status' in update, false);
+    assert.equal('isCompleted' in update, false);
+    assert.equal('completedAt' in update, false);
+  }
+  assert.equal(progress.progressPercentage, 35);
+  assert.equal(progress.isCompleted, false);
+  assert.equal(progress.quizScores.masteryUnlocked, true);
+})().catch(error => {
+  console.error(error);
+  process.exitCode = 1;
+});
+"""
+    )

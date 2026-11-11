@@ -45,14 +45,14 @@ export class QuizController {
 
   @Get()
   @ApiOperation({ summary: 'List published quizzes' })
-  async findMany(
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
-  ) {
+  async findMany(@Query('page') page?: string, @Query('limit') limit?: string) {
     return this.quizService.findMany(
       {
         page: Math.max(1, Number.parseInt(page ?? '1', 10) || 1),
-        limit: Math.min(100, Math.max(1, Number.parseInt(limit ?? '100', 10) || 100)),
+        limit: Math.min(
+          100,
+          Math.max(1, Number.parseInt(limit ?? '100', 10) || 100),
+        ),
       },
       { isPublished: true },
     );
@@ -165,8 +165,8 @@ export class QuizController {
     const userId = req.user.id;
 
     if (type === 'full') {
-      const { unitId, answers } = body as SubmitQuizDto;
-      return this.quizService.submitQuiz(userId, unitId, answers);
+      const { unitId, attemptId, answers } = body as SubmitQuizDto;
+      return this.quizService.submitQuiz(userId, unitId, attemptId, answers);
     }
 
     // Default to single answer submission

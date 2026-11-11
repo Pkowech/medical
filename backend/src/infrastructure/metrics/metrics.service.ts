@@ -26,6 +26,7 @@ export class MetricsService implements OnModuleInit {
   private analyticsRequestsTotal: Counter;
   private analyticsDegradationTotal: Counter;
   private analyticsDegradationRatePercent: Gauge;
+  private readonly applicationOutboxEvents: Gauge;
 
   constructor() {
     // Create a new registry
@@ -133,6 +134,13 @@ export class MetricsService implements OnModuleInit {
       help: 'Current analytics degradation rate as percentage',
       registers: [this.register],
     });
+
+    this.applicationOutboxEvents = new Gauge({
+      name: 'application_outbox_events',
+      help: 'Application outbox events by processing state',
+      labelNames: ['state'],
+      registers: [this.register],
+    });
   }
 
   onModuleInit() {
@@ -193,6 +201,16 @@ export class MetricsService implements OnModuleInit {
     this.analyticsDegradationRatePercent.set(rate);
   }
 
+  setApplicationOutboxCounts(counts: {
+    pending: number;
+    failed: number;
+    stale: number;
+  }): void {
+    this.applicationOutboxEvents.set({ state: 'pending' }, counts.pending);
+    this.applicationOutboxEvents.set({ state: 'failed' }, counts.failed);
+    this.applicationOutboxEvents.set({ state: 'stale' }, counts.stale);
+  }
+
   // Increment error counter
   incrementErrorCounter(
     method: string,
@@ -231,6 +249,9 @@ export class MetricsService implements OnModuleInit {
     analyticsRequestsTotal: number;
     analyticsDegradationTotal: number;
     analyticsDegradationRatePercent: number;
+    applicationOutboxPending: number;
+    applicationOutboxFailed: number;
+    applicationOutboxStale: number;
   }> {
     const getCounter = async (name: string) => {
       const metric = this.register.getSingleMetric(name);
@@ -253,6 +274,17 @@ export class MetricsService implements OnModuleInit {
       return typeof m.values[0]?.value === 'number' ? m.values[0].value : 0;
     };
 
+    const getOutboxGauge = async (state: string): Promise<number> => {
+      const metric = this.register.getSingleMetric('application_outbox_events');
+      if (!metric) {
+        return 0;
+      }
+      const values = await metric.get();
+      return (
+        values.values.find((value) => value.labels.state === state)?.value ?? 0
+      );
+    };
+
     return {
       xapiStatementsTotal: await getCounter('xapi_statements_total'),
       xapiDuplicatesTotal: await getCounter('xapi_duplicates_total'),
@@ -268,6 +300,9 @@ export class MetricsService implements OnModuleInit {
       analyticsDegradationRatePercent: await getGauge(
         'analytics_degradation_rate_percent',
       ),
+      applicationOutboxPending: await getOutboxGauge('pending'),
+      applicationOutboxFailed: await getOutboxGauge('failed'),
+      applicationOutboxStale: await getOutboxGauge('stale'),
     };
   }
 }

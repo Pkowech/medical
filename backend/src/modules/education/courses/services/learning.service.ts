@@ -25,6 +25,7 @@ import { LearningPathProgressService } from './learning-path-progress.service';
 import { getErrorMessage, getErrorStack } from '#common/utils/error.utils';
 import { LearningAnalyticsService } from '../../../ai-analytics/services/learning-analytics.service';
 import { StudyAnalyticsService } from '../../../ai-analytics/services/study-analytics.service';
+import { writeApplicationOutboxEvent } from '#infrastructure/outbox/application-outbox-event';
 
 @Injectable()
 export class LearningService {
@@ -56,46 +57,49 @@ export class LearningService {
         );
       }
 
-      await this.prisma.courseEnrollment.upsert({
-        where: { userId_courseId: { userId, courseId } },
-        create: {
-          userId,
-          courseId,
-          status: EnrollmentStatus.active,
-          progressPercentage: 0,
-        },
-        update: { status: EnrollmentStatus.active },
-      });
+      await this.prisma.$transaction(async transaction => {
+        await transaction.courseEnrollment.upsert({
+          where: { userId_courseId: { userId, courseId } },
+          create: {
+            userId,
+            courseId,
+            status: EnrollmentStatus.active,
+            progressPercentage: 0,
+          },
+          update: { status: EnrollmentStatus.active },
+        });
 
-      const existingProgress = await this.prisma.progress.findFirst({
-        where: { userId, courseId, topicId: null, materialId: null },
-      });
+        const existingProgress = await transaction.progress.findFirst({
+          where: { userId, courseId, topicId: null, materialId: null },
+        });
+        if (existingProgress) {
+          this.logger.warn(
+            `User ${userId} already enrolled in course ${courseId}`,
+          );
+          return;
+        }
 
-      if (existingProgress) {
-        this.logger.warn(
-          `User ${userId} already enrolled in course ${courseId}`,
-        );
-        return;
-      }
-
-      await this.prisma.progress.create({
-        data: {
-          userId,
-          topicId: null as any,
-          materialId: null as any,
-          unitId: null as any,
-          courseId,
-          progressPercentage: 0,
-          timeSpent: 0,
-          status: ProgressStatus.notStarted,
-          lastAccessedAt: new Date(),
-        },
-      });
-
-      this.eventEmitter.emit('course.enrolled', {
-        userId,
-        courseId,
-        enrollmentData: { timestamp: new Date() },
+        const enrolledAt = new Date();
+        await transaction.progress.create({
+          data: {
+            userId,
+            courseId,
+            progressPercentage: 0,
+            timeSpent: 0,
+            status: ProgressStatus.notStarted,
+            lastAccessedAt: enrolledAt,
+          },
+        });
+        await writeApplicationOutboxEvent(transaction, {
+          eventType: 'course.enrolled',
+          aggregateId: courseId,
+          dedupeKey: `course-enrolled:${userId}:${courseId}`,
+          payload: {
+            userId,
+            courseId,
+            enrollmentData: { timestamp: enrolledAt.toISOString() },
+          },
+        });
       });
 
       this.logger.log(
@@ -144,12 +148,6 @@ export class LearningService {
 
       await this.learningPathProgressService.startLearningPath(userId, {
         learningPathId: pathId,
-      });
-
-      this.eventEmitter.emit('learning-path.enrolled', {
-        userId,
-        pathId,
-        enrollmentData: { timestamp: new Date() },
       });
 
       this.logger.log(

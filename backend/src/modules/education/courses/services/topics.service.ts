@@ -327,6 +327,17 @@ export class TopicsService {
 
   async remove(id: string, userId: string): Promise<void> {
     const existing = await this.getTopicForManagement(id, userId);
+    const [progressCount, skillStateCount, subtopicCount] = await Promise.all([
+      this.prisma.progress.count({ where: { topicId: id } }),
+      this.prisma.userSkillState.count({ where: { topicId: id } }),
+      this.prisma.topic.count({ where: { parentTopicId: id } }),
+    ]);
+    if (progressCount > 0 || skillStateCount > 0 || subtopicCount > 0) {
+      throw new BadRequestException(
+        'Cannot delete a topic with student progress or subtopics. Keep it in the historical curriculum or create a new curriculum version.',
+      );
+    }
+
     try {
       await this.prisma.$transaction(async prisma => {
         const laterTopics = await prisma.topic.findMany({

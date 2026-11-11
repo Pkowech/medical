@@ -268,6 +268,7 @@ export class AiAnalyticsService implements OnModuleInit {
     }
   }
 
+  /** @deprecated Learning events must be committed with their domain records. */
   async batchTrackEvents(
     events: Array<{
       userId: string;

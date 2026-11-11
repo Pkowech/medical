@@ -22,43 +22,27 @@ impl ActivityRepository for PostgresActivityRepository {
         &self,
         user_id: &str,
     ) -> Result<Vec<NaiveDateTime>, AnalyticsError> {
-        let mut activities: Vec<NaiveDateTime> = Vec::new();
-
-        // Get enrolled-course activity
-        if let Ok(rows) = sqlx::query_scalar::<_, NaiveDateTime>(
-            "SELECT last_accessed FROM course_enrollments WHERE user_id = $1 AND last_accessed IS NOT NULL ORDER BY last_accessed DESC LIMIT 100"
+        sqlx::query_scalar::<_, NaiveDateTime>(
+            "SELECT created_at
+             FROM user_activities
+             WHERE user_id = $1
+               AND type::text IN (
+                   'LEARNING',
+                   'quiz_attempt',
+                   'study_session',
+                   'flashcard_review',
+                   'flashcard_session'
+               )
+             ORDER BY created_at DESC",
         )
         .bind(user_id)
         .fetch_all(&*self.pool)
-        .await {
-            activities.extend(rows);
-        }
-
-        // Get learning path activities
-        if let Ok(rows) = sqlx::query_scalar::<_, NaiveDateTime>(
-            "SELECT last_activity_date FROM learning_path_progress WHERE user_id = $1 ORDER BY last_activity_date DESC LIMIT 100"
-        )
-        .bind(user_id)
-        .fetch_all(&*self.pool)
-        .await {
-            activities.extend(rows);
-        }
-
-        // Get material progress activities
-        if let Ok(rows) = sqlx::query_scalar::<_, NaiveDateTime>(
-            "SELECT last_accessed_at FROM topic_progress WHERE user_id = $1 AND material_id IS NOT NULL ORDER BY last_accessed_at DESC LIMIT 100"
-        )
-        .bind(user_id)
-        .fetch_all(&*self.pool)
-        .await {
-            activities.extend(rows);
-        }
-
-        // Sort descending by time
-        activities.sort_by(|a, b| b.cmp(a));
-        activities.dedup();
-
-        Ok(activities)
+        .await
+        .map_err(|error| {
+            AnalyticsError::DatabaseError(format!(
+                "Failed to fetch qualifying learning activities: {error}"
+            ))
+        })
     }
 
     async fn get_course_completion_stats(

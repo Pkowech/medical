@@ -57,7 +57,7 @@ export function useQuiz(unitId: string, userId: string) {
         setIsLoading(false);
         return;
       }
-      
+
       try {
         setIsLoading(true);
 
@@ -84,12 +84,14 @@ export function useQuiz(unitId: string, userId: string) {
 
         // Load questions directly from backend
         const response = await apiService.get<ApiQuizQuestion[]>(`/quizzes/unit/${unitId}`);
-        setQuestions(response.data.map((question) => ({
-          id: question.id,
-          question_text: question.text,
-          options: question.options || [],
-          explanation: question.explanation || undefined,
-        })));
+        setQuestions(
+          response.data.map(question => ({
+            id: question.id,
+            question_text: question.text,
+            options: question.options || [],
+            explanation: question.explanation || undefined,
+          }))
+        );
       } catch (err) {
         setError(err instanceof Error ? err : new Error('Failed to load quiz'));
       } finally {
@@ -115,7 +117,7 @@ export function useQuiz(unitId: string, userId: string) {
 
       // OPTIMISTIC UI: Update state immediately
       setCurrentState(newState);
-      
+
       // BACKGROUND SYNC: Save to IndexedDB and sync without blocking UI
       quizStorage.saveQuizState(newState).catch(err => {
         console.error('Failed to save quiz state to IndexedDB:', err);
@@ -135,7 +137,6 @@ export function useQuiz(unitId: string, userId: string) {
       quizStorage.saveQuizResponse(response).catch(err => {
         console.error('Failed to save quiz response:', err);
       });
-
     },
     [currentState, userId, questions]
   );
@@ -182,10 +183,12 @@ export function useQuiz(unitId: string, userId: string) {
     const lastUpdated = Date.now();
 
     // Transform answers for backend
-    const formattedAnswers = Object.entries(currentState.answers).map(([questionId, selectedOption]) => ({
-      questionId,
-      selectedOption,
-    }));
+    const formattedAnswers = Object.entries(currentState.answers).map(
+      ([questionId, selectedOption]) => ({
+        questionId,
+        selectedOption,
+      })
+    );
 
     // High-stakes unit quizzes must complete online; drafts stay local until then.
     const updatedState = {
@@ -206,19 +209,16 @@ export function useQuiz(unitId: string, userId: string) {
 
     const submission = {
       unitId,
+      attemptId: currentState.id,
       answers: formattedAnswers,
     };
 
     try {
-      const response = await apiService.post(
-        '/quizzes/submit?type=full',
-        submission,
-        {
-          headers: {
-            'X-Client-Timestamp': String(lastUpdated),
-          },
+      const response = await apiService.post('/quizzes/submit?type=full', submission, {
+        headers: {
+          'X-Client-Timestamp': String(lastUpdated),
         },
-      );
+      });
 
       await quizStorage.saveQuizState({ ...updatedState, synced: true });
       return response.data;

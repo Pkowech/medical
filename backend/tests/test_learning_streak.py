@@ -69,3 +69,38 @@ def test_returns_zero_streaks_without_learning_activity(
         "currentStreak": 0,
         "longestStreak": 0,
     }
+
+
+def test_quiz_attempts_are_included_in_user_streaks() -> None:
+    probe = r'''import { ProgressService } from "./src/modules/education/courses/services/progress.service.ts";
+const service = Object.create(ProgressService.prototype);
+let queriedTypes: string[] = [];
+service.prisma = {
+  userActivity: {
+    findMany: async ({ where }: { where: { type: { in: string[] } } }) => {
+      queriedTypes = where.type.in;
+      return [{ createdAt: new Date() }];
+    },
+  },
+};
+(async () => {
+  const streaks = await service.getUserStreaks("user-1");
+  console.log(JSON.stringify({ streaks, queriedTypes }));
+})();'''
+    completed = subprocess.run(
+        [
+            shutil.which("node") or "node",
+            str(BACKEND_DIR / "node_modules" / "tsx" / "dist" / "cli.mjs"),
+            "--eval",
+            probe,
+        ],
+        cwd=BACKEND_DIR,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    result = json.loads(completed.stdout)
+    assert "QUIZ_ATTEMPT" in result["queriedTypes"]
+    assert "LEARNING" in result["queriedTypes"]
+    assert "LOGIN" not in result["queriedTypes"]
+    assert result["streaks"]["currentStreak"] == 1

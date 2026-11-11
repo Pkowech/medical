@@ -568,6 +568,7 @@ export class MaterialsController {
   @ApiOperation({ summary: 'Serve a local PDF file by hash' })
   async serveLocalPdf(
     @Param('fileHash') fileHash: string,
+    @GetUser() user: PrismaUser,
     @Res({ passthrough: true }) response: Response,
   ) {
     if (!fileHash) {
@@ -575,13 +576,13 @@ export class MaterialsController {
     }
 
     const { content, mimeType, fileName } =
-      await this.materialsService.serveLocalPdfByHash(fileHash);
+      await this.materialsService.serveLocalPdfByHash(fileHash, user.id);
 
     response.set({
       'Content-Type': mimeType,
       'Content-Disposition': `inline; filename="${fileName}"`,
       'Content-Length': content.length,
-      'Cache-Control': 'public, max-age=86400', // Cache for 1 day
+      'Cache-Control': 'private, no-store',
     });
 
     return new StreamableFile(content);

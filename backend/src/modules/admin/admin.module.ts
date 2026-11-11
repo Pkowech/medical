@@ -11,10 +11,12 @@ import { AdminService } from './services/admin.service';
 import { AdminController } from './controllers/admin.controller';
 import { AdminSettingsModule } from './admin-settings.module';
 import { UsersModule } from '#modules/auth/users.module';
+import { EngagementCommunicationModule } from '#modules/engagement-communication/engagement-communication.module';
 
 @Module({
   imports: [
     UsersModule,
+    EngagementCommunicationModule,
     AdminSettingsModule,
     HttpModule,
     RedisModule,

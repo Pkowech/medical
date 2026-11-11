@@ -100,6 +100,7 @@ model OfflinePracticeAttempt {
   @@map("offline_practice_attempts")
 }
 
+/// Deprecated generic ingestion record. Learning facts belong in domain records.
 model AnalyticsEvent {
   id        String   @id
   userId    String   @map("user_id")
@@ -286,6 +287,7 @@ model FlashcardResult {
   id          String    @id @default(uuid())
   userId      String    @map("user_id")
   flashcardId String    @map("flashcard_id")
+  sourceKey   String?   @unique @map("source_key")
   passed      Boolean
   attemptedAt DateTime  @default(now()) @map("attempted_at")
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -382,6 +384,9 @@ model User {
   materialEvents                 MaterialEvent[]
   materialShares                 MaterialShare[]
   materials                      Material[]
+  academicContentReviews         AcademicContentReview[]         @relation("AcademicContentReviewer")
+  contentReportsFiled            AcademicContentReport[]         @relation("ContentReportReporter")
+  contentReportsModerated        AcademicContentReport[]         @relation("ContentReportModerator")
   notifications                  Notification[]
   pushSubscriptions              PushSubscription[]
   predictionAudits               PredictionAudit[]
@@ -441,6 +446,13 @@ model GoogleDriveConnection {
   user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("google_drive_connections")
+}
+
+model ProcessedBktUpdate {
+  eventId   String   @id @map("event_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("processed_bkt_updates")
 }
 
 model UserSkillState {
@@ -675,8 +687,10 @@ model ApplicationOutboxEvent {
   lastError   String?   @map("last_error")
   lockedAt    DateTime? @map("locked_at")
   processedAt DateTime? @map("processed_at")
+  failedAt    DateTime? @map("failed_at")
 
   @@index([processedAt, availableAt, createdAt])
+  @@index([failedAt, processedAt, availableAt])
   @@map("application_outbox_events")
 }
 
@@ -700,6 +714,68 @@ model CourseCategory {
   @@map("course_categories")
 }
 
+model Institution {
+  id         String              @id @default(uuid())
+  name       String              @db.VarChar(255)
+  slug       String              @unique @db.VarChar(100)
+  country    String?             @db.VarChar(100)
+  createdAt  DateTime            @default(now()) @map("created_at")
+  updatedAt  DateTime            @updatedAt @map("updated_at")
+  programmes AcademicProgramme[]
+
+  @@map("institutions")
+}
+
+model AcademicProgramme {
+  id            String                @id @default(uuid())
+  institutionId String                @map("institution_id")
+  name          String                @db.VarChar(255)
+  code          String?               @db.VarChar(50)
+  slug          String                @db.VarChar(100)
+  description   String?
+  isActive      Boolean               @default(true) @map("is_active")
+  createdAt     DateTime              @default(now()) @map("created_at")
+  updatedAt     DateTime              @updatedAt @map("updated_at")
+  institution   Institution           @relation(fields: [institutionId], references: [id], onDelete: Restrict)
+  curricula     ProgrammeCurriculum[]
+
+  @@unique([institutionId, slug])
+  @@unique([institutionId, code])
+  @@index([institutionId])
+  @@map("academic_programmes")
+}
+
+model ProgrammeCurriculum {
+  id            String            @id @default(uuid())
+  programmeId   String            @map("programme_id")
+  version       Int
+  title         String            @db.VarChar(255)
+  status        CurriculumStatus  @default(draft)
+  effectiveFrom DateTime?         @map("effective_from") @db.Date
+  effectiveTo   DateTime?         @map("effective_to") @db.Date
+  createdAt     DateTime          @default(now()) @map("created_at")
+  updatedAt     DateTime          @updatedAt @map("updated_at")
+  programme     AcademicProgramme @relation(fields: [programmeId], references: [id], onDelete: Restrict)
+  academicYears AcademicYear[]
+
+  @@unique([programmeId, version])
+  @@index([programmeId, status])
+  @@map("programme_curricula")
+}
+
+model AcademicYear {
+  id           String              @id @default(uuid())
+  curriculumId String              @map("curriculum_id")
+  yearNumber   Int                 @map("year_number")
+  name         String              @db.VarChar(100)
+  curriculum   ProgrammeCurriculum @relation(fields: [curriculumId], references: [id], onDelete: Restrict)
+  courses      CurriculumCourse[]
+
+  @@unique([curriculumId, yearNumber])
+  @@index([curriculumId])
+  @@map("academic_years")
+}
+
 model Course {
   id                String                   @id @default(uuid())
   name              String                   @db.VarChar(255)
@@ -708,6 +784,7 @@ model Course {
   description       String?
   difficulty        CourseDifficulty         @default(beginner)
   status            CourseStatus             @default(draft)
+  contentVersion      Int                      @default(1) @map("content_version")
   categoryId        String?                  @map("category_id")
   createdById       String?                  @map("created_by_id")
   estimatedHours    Int?                     @default(0) @map("estimated_hours")
@@ -739,6 +816,7 @@ model Course {
   progress          Progress[]
   units             Unit[]
   learningPathModules LearningPathModule[]
+  curriculumCourses   CurriculumCourse[]
 
   @@index([code])
   @@index([categoryId])
@@ -761,6 +839,36 @@ model CoursePrerequisite {
   @@map("course_prerequisites")
 }
 
+model CurriculumCourse {
+  id             String                         @id @default(uuid())
+  academicYearId String                         @map("academic_year_id")
+  courseId       String                         @map("course_id")
+  term           String?                        @db.VarChar(100)
+  order          Int
+  isRequired     Boolean                        @default(true) @map("is_required")
+  academicYear   AcademicYear                   @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  course         Course                         @relation(fields: [courseId], references: [id], onDelete: Restrict)
+  prerequisites  CurriculumCoursePrerequisite[] @relation("CurriculumPrerequisiteTo")
+  requiredFor    CurriculumCoursePrerequisite[] @relation("CurriculumPrerequisiteFor")
+
+  @@unique([academicYearId, courseId])
+  @@unique([academicYearId, order])
+  @@index([courseId])
+  @@map("curriculum_courses")
+}
+
+model CurriculumCoursePrerequisite {
+  curriculumCourseId             String           @map("curriculum_course_id")
+  prerequisiteCurriculumCourseId String           @map("prerequisite_curriculum_course_id")
+  type                           PrerequisiteType @default(required)
+  curriculumCourse               CurriculumCourse @relation("CurriculumPrerequisiteTo", fields: [curriculumCourseId], references: [id], onDelete: Restrict)
+  prerequisiteCurriculumCourse   CurriculumCourse @relation("CurriculumPrerequisiteFor", fields: [prerequisiteCurriculumCourseId], references: [id], onDelete: Restrict)
+
+  @@id([curriculumCourseId, prerequisiteCurriculumCourseId])
+  @@index([prerequisiteCurriculumCourseId])
+  @@map("curriculum_course_prerequisites")
+}
+
 model Unit {
   id                      String                   @id @default(uuid())
   name                    String                   @db.VarChar(255)
@@ -770,6 +878,7 @@ model Unit {
   content                 String?
   estimatedDuration       Int?                     @map("estimated_duration")
   learningObjectives      Json?                    @map("learning_objectives")
+  contentVersion          Int                      @default(1) @map("content_version")
   isPublished             Boolean                  @default(false) @map("is_published")
   courseId                String                   @map("course_id")
   estimatedMinutes        Int?                     @default(0) @map("estimated_minutes")
@@ -813,6 +922,10 @@ model Topic {
   unitId                  String                   @map("unit_id")
   categoryId              String?                  @map("category_id")
   estimatedMinutes        Int?                     @default(0) @map("estimated_minutes")
+  learningObjectives      Json?                    @map("learning_objectives")
+  contentVersion          Int                      @default(1) @map("content_version")
+  status                  AcademicContentStatus    @default(published)
+  parentTopicId           String?                  @map("parent_topic_id")
   createdAt               DateTime                 @default(now()) @map("created_at")
   updatedAt               DateTime                 @updatedAt @map("updated_at")
   /// Full-text search vector for PostgreSQL tsvector queries (@@ operator).
@@ -835,12 +948,15 @@ model Topic {
   progress                Progress[]
   analyticsOverrides      AnalyticsOverride[]
   notes                   Note[]
+  parent                  Topic?                   @relation("TopicSubtopics", fields: [parentTopicId], references: [id], onDelete: Restrict)
+  subtopics               Topic[]                  @relation("TopicSubtopics")
   unit                    Unit                     @relation(fields: [unitId], references: [id], onDelete: Cascade)
   userSkillStates         UserSkillState[]
 
   @@unique([unitId, order])
   @@unique([unitId, slug])
   @@index([unitId])
+  @@index([parentTopicId])
   @@index([categoryId])
   @@index([fts], type: Gin)
   @@index([name])
@@ -859,6 +975,14 @@ model Material {
   difficulty          Float?                   @default(0.5)
   duration            Int?                     @default(0)
   version             Int                      @default(1)
+  status              AcademicContentStatus    @default(published)
+  tags                String[]                 @default([])
+  learningObjectives  Json?                    @map("learning_objectives")
+  sourceCitation      String?                  @map("source_citation")
+  copyrightHolder     String?                  @map("copyright_holder")
+  copyrightLicense    String?                  @map("copyright_license")
+  archivedAt          DateTime?                @map("archived_at")
+  withdrawnAt         DateTime?                @map("withdrawn_at")
   metadata            Json?
   courseId            String?                  @map("course_id")
   unitId              String?                  @map("unit_id")
@@ -889,6 +1013,7 @@ model Material {
   progress            Progress[]
   studentNotes        Note[]
   xapiStatements      XapiStatement[]
+  reports             AcademicContentReport[]  @relation("ReportedMaterial")
 
   @@index([fileId])
   @@index([courseId])
@@ -899,6 +1024,58 @@ model Material {
   @@index([fts], type: Gin)
   @@index([title])
   @@map("materials")
+}
+
+model AcademicContentVersion {
+  id          String                    @id @default(uuid())
+  entityType  AcademicContentEntityType @map("entity_type")
+  entityId    String                    @map("entity_id")
+  version     Int
+  snapshot    Json
+  createdById String?                   @map("created_by_id")
+  createdAt   DateTime                  @default(now()) @map("created_at")
+
+  @@unique([entityType, entityId, version])
+  @@index([entityType, entityId, createdAt])
+  @@map("academic_content_versions")
+}
+
+model AcademicContentReview {
+  id         String                    @id @default(uuid())
+  entityType AcademicContentEntityType @map("entity_type")
+  entityId   String                    @map("entity_id")
+  version    Int
+  decision   AcademicReviewDecision
+  feedback   String?
+  reviewerId String                    @map("reviewer_id")
+  reviewedAt DateTime                  @default(now()) @map("reviewed_at")
+  reviewer   User                      @relation("AcademicContentReviewer", fields: [reviewerId], references: [id], onDelete: Restrict)
+
+  @@index([entityType, entityId, version])
+  @@index([reviewerId, reviewedAt])
+  @@map("academic_content_reviews")
+}
+
+model AcademicContentReport {
+  id          String                    @id @default(uuid())
+  entityType  AcademicContentEntityType @map("entity_type")
+  entityId    String                    @map("entity_id")
+  materialId  String?                   @map("material_id")
+  reporterId  String                    @map("reporter_id")
+  moderatorId String?                   @map("moderator_id")
+  reason      String                    @db.VarChar(100)
+  details     String?
+  status      AcademicReportStatus      @default(open)
+  resolution  String?
+  createdAt   DateTime                  @default(now()) @map("created_at")
+  updatedAt   DateTime                  @updatedAt @map("updated_at")
+  material    Material?                 @relation("ReportedMaterial", fields: [materialId], references: [id], onDelete: SetNull)
+  reporter    User                      @relation("ContentReportReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  moderator   User?                     @relation("ContentReportModerator", fields: [moderatorId], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId, status])
+  @@index([reporterId, createdAt])
+  @@map("academic_content_reports")
 }
 
 model RecommendationScore {
@@ -937,6 +1114,7 @@ model MaterialEvent {
   overrideReason String?  @map("override_reason")
   material       Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
   user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveries     MaterialEventDelivery[]
 
   @@unique([userId, materialId, eventType], name: "material_events_user_material_type_idx")
   @@index([userId])
@@ -945,6 +1123,16 @@ model MaterialEvent {
   @@index([createdAt])
   @@index([isOverride])
   @@map("material_events")
+}
+
+model MaterialEventDelivery {
+  eventId         String        @id @map("event_id")
+  materialEventId String        @map("material_event_id")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  materialEvent   MaterialEvent @relation(fields: [materialEventId], references: [id], onDelete: Cascade)
+
+  @@index([materialEventId, createdAt])
+  @@map("material_event_deliveries")
 }
 
 model XapiStatement {
@@ -2165,6 +2353,41 @@ enum CourseStatus {
   published
   archived
   under_review
+}
+
+enum CurriculumStatus {
+  draft
+  under_review
+  published
+  retired
+}
+
+enum AcademicContentStatus {
+  draft
+  under_review
+  published
+  archived
+  withdrawn
+}
+
+enum AcademicContentEntityType {
+  course
+  unit
+  topic
+  material
+}
+
+enum AcademicReviewDecision {
+  approved
+  changes_requested
+  rejected
+}
+
+enum AcademicReportStatus {
+  open
+  reviewing
+  resolved
+  dismissed
 }
 
 enum EnrollmentStatus {

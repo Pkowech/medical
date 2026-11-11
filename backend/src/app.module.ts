@@ -143,10 +143,8 @@ const redisModules = shouldEnableRedis
     // AI & Analytics
     AiAnalyticsModule,
 
-    // Modules requiring Redis - only enable when ENABLE_REDIS=true
-    ...(shouldEnableRedis
-      ? [AnalyticsQueueModule, EngagementCommunicationModule]
-      : []),
+    ...(shouldEnableRedis ? [AnalyticsQueueModule] : []),
+    EngagementCommunicationModule,
     AdminModule,
     AdminSettingsModule,
 

@@ -177,12 +177,8 @@ export class SessionsController {
     }
 
     try {
-      const sessions = await this.sessionTrackingService.getUserSessions(
-        user.id,
-      );
-      for (const session of sessions) {
-        await this.sessionTrackingService.removeSession(session.id, user.id);
-      }
+      const sessionCount =
+        await this.sessionTrackingService.revokeAllSessions(user.id);
       await this.auditLogService.log(
         securityEventTypes.sessionRevoked,
         user.id,
@@ -191,7 +187,7 @@ export class SessionsController {
         {
           action: 'revoke_all_sessions',
           success: true,
-          sessionCount: sessions.length,
+          sessionCount,
         },
       );
     } catch (error) {

@@ -67,6 +67,7 @@ class QuizService {
 
   async submitUnitQuiz(
     unitId: string | number,
+    attemptId: string,
     answers: Array<{ questionId: string; selectedOption: string }>
   ): Promise<{
     percentage: number;
@@ -77,7 +78,7 @@ class QuizService {
       percentage: number;
       isPassed: boolean;
       recommendations?: QuizPerformanceRecommendations;
-    }>(`${this.baseUrl}/submit?type=full`, { unitId, answers });
+    }>(`${this.baseUrl}/submit?type=full`, { unitId, attemptId, answers });
     return response.data;
   }
 

@@ -92,9 +92,6 @@ export class PrescriptiveAnalyticsService implements OnModuleInit {
       // Increment metrics
       this.metrics.recordAnalyticsEvaluation('success');
 
-      // Cache the successful result
-      await this.updateSkillStateCache(userId, topicId, pKnown);
-
       return this.makeDecision(
         userId,
         topicId,
@@ -140,39 +137,6 @@ export class PrescriptiveAnalyticsService implements OnModuleInit {
       explanation,
       supportOptions,
     };
-  }
-
-  private async updateSkillStateCache(
-    userId: string,
-    topicId: string,
-    pKnown: number,
-  ) {
-    try {
-      await this.prisma.userSkillState.upsert({
-        where: {
-          userId_skillId: {
-            userId,
-            skillId: topicId,
-          },
-        },
-        update: {
-          pKnown,
-          lastUpdated: new Date(),
-          attempts: { increment: 1 },
-        },
-        create: {
-          userId,
-          skillId: topicId,
-          pKnown,
-          lastUpdated: new Date(),
-          attempts: 1,
-        },
-      });
-    } catch (error) {
-      this.logger.warn(
-        `Failed to update skill state cache for user ${userId}: ${getErrorMessage(error)}`,
-      );
-    }
   }
 
   private async handleDegradation(

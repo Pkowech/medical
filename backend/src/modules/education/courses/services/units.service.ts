@@ -742,6 +742,26 @@ export class UnitsService {
         );
       }
 
+      const topicIds = await this.prisma.topic.findMany({
+        where: { unitId: id },
+        select: { id: true },
+      });
+      const [unitProgressCount, topicProgressCount, completionCount] =
+        await Promise.all([
+          this.prisma.progress.count({ where: { unitId: id } }),
+          topicIds.length
+            ? this.prisma.progress.count({
+                where: { topicId: { in: topicIds.map(({ id: topicId }) => topicId) } },
+              })
+            : Promise.resolve(0),
+          this.prisma.unitCompletion.count({ where: { unitId: id } }),
+        ]);
+      if (unitProgressCount > 0 || topicProgressCount > 0 || completionCount > 0) {
+        throw new BadRequestException(
+          'Cannot delete a unit with student progress. Keep it in the historical curriculum or create a new curriculum version.',
+        );
+      }
+
       await this.prisma.$transaction(async (prisma) => {
         const laterUnits = await prisma.unit.findMany({
           where: {
@@ -993,7 +1013,13 @@ export class UnitsService {
         cacheKeys.unitById(unit.id),
         cacheKeys.unitsByCourse(unit.courseId),
       ];
-      await Promise.all(keys.map((key) => this.redisService.del(key)));
+      await Promise.all([
+        ...keys.map((key) => this.redisService.del(key)),
+        this.redisService.delPattern('unit:*:questions:v3:*'),
+        this.redisService.delPattern('topic:*:questions:v3:*'),
+        this.redisService.delPattern('quizzes:*'),
+        this.redisService.delPattern('quiz:*'),
+      ]);
     } catch (error) {
       this.logger.error('Error clearing cache for unit', {
         unitId: unit.id,
@@ -1004,7 +1030,13 @@ export class UnitsService {
 
   private async clearCacheForCourse(courseId: string): Promise<void> {
     try {
-      await this.redisService.del(cacheKeys.unitsByCourse(courseId));
+      await Promise.all([
+        this.redisService.del(cacheKeys.unitsByCourse(courseId)),
+        this.redisService.delPattern('unit:*:questions:v3:*'),
+        this.redisService.delPattern('topic:*:questions:v3:*'),
+        this.redisService.delPattern('quizzes:*'),
+        this.redisService.delPattern('quiz:*'),
+      ]);
     } catch (error) {
       this.logger.error('Error clearing cache for course units', {
         courseId,

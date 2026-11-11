@@ -53,8 +53,11 @@ const formatError = (error: unknown): string => {
     if (err.response) {
       const response = err.response as Record<string, unknown>;
       const statusVal = response.status;
-      const status = typeof statusVal === 'number' || typeof statusVal === 'string' ? String(statusVal) : 'unknown';
-      const data = response.data as Record<string, unknown> || {};
+      const status =
+        typeof statusVal === 'number' || typeof statusVal === 'string'
+          ? String(statusVal)
+          : 'unknown';
+      const data = (response.data as Record<string, unknown>) || {};
       const messageVal = data.message ?? data.error;
       const message = typeof messageVal === 'string' ? messageVal : 'API Error';
       return `HTTP ${status}: ${message}`;
@@ -75,7 +78,8 @@ const formatError = (error: unknown): string => {
     }
     if (err.code) {
       const codeVal = err.code;
-      const code = typeof codeVal === 'string' || typeof codeVal === 'number' ? String(codeVal) : 'unknown';
+      const code =
+        typeof codeVal === 'string' || typeof codeVal === 'number' ? String(codeVal) : 'unknown';
       const msgVal = err.message;
       const msg = typeof msgVal === 'string' ? msgVal : 'Network error';
       return `Error ${code}: ${msg}`;
@@ -89,7 +93,6 @@ const formatError = (error: unknown): string => {
   }
   return typeof error === 'string' ? error : '[object Object]';
 };
-
 
 /**
  * Get current client timestamp for offline conflict resolution
@@ -111,7 +114,9 @@ const normalizeDashboardActivity = (item: RawActivity): ProgressActivity => {
   const metadata = asRecord(item.metadata);
   const durationMinutes =
     asNumber(item.durationMinutes) ??
-    (details ? asNumber(details.studyTimeDeltaMinutes) ?? asNumber(details.timeSpent) : undefined) ??
+    (details
+      ? (asNumber(details.studyTimeDeltaMinutes) ?? asNumber(details.timeSpent))
+      : undefined) ??
     (metadata ? asNumber(metadata.duration) : undefined);
   const score = asNumber(item.score) ?? (details ? asNumber(details.score) : undefined);
 
@@ -120,10 +125,7 @@ const normalizeDashboardActivity = (item: RawActivity): ProgressActivity => {
     type: asString(item.type, '') || asString(item.kind, '') || 'activity',
     title: asString(item.title, '') || asString(item.description, '') || 'Activity',
     date:
-      asString(item.date, '') ||
-      asString(item.createdAt, '') ||
-      asString(item.timestamp, '') ||
-      '',
+      asString(item.date, '') || asString(item.createdAt, '') || asString(item.timestamp, '') || '',
     durationMinutes,
     score,
   };
@@ -249,10 +251,10 @@ const progressService = {
       // Use allSettled to ensure that even if one endpoint (e.g. gRPC-backed mastery) fails,
       // the dashboard can still render with the remaining data.
       const [progressResult, masteryResult] = await Promise.allSettled([
-         api.get<DashboardApiResponse>(`/progress/dashboard/${userId}`),
-         api.get<Record<string, number>>(`/blueprint/mastery/${userId}`),
+        api.get<DashboardApiResponse>(`/progress/dashboard/${userId}`),
+        api.get<Record<string, number>>(`/blueprint/mastery/${userId}`),
       ]);
-      
+
       const dashboardRes = progressResult.status === 'fulfilled' ? progressResult.value : null;
       const masteryRes = masteryResult.status === 'fulfilled' ? masteryResult.value : null;
 
@@ -263,7 +265,7 @@ const progressService = {
         console.warn('Mastery data is currently unavailable:', formatError(masteryResult.reason));
       }
 
-      const dashboardData = dashboardRes?.data || {} as DashboardApiResponse;
+      const dashboardData = dashboardRes?.data || ({} as DashboardApiResponse);
       const {
         overview: overviewRes,
         courses: coursesRes,
@@ -272,13 +274,13 @@ const progressService = {
         peerComparison: peerRes,
         deadlines: deadlinesRes,
         dueReviews: dueReviewsRes,
-        enrolledUnits: enrolledUnitsRes
+        enrolledUnits: enrolledUnitsRes,
       } = dashboardData;
 
       // Compatibility wrapping to match previous structure expectations (where each was an Axios response or null)
       // Actually, we can just extract the data directly since getDashboardData returns the *data* directly, not Axios responses.
       // Wait, `dashboardRes` IS an Axios response. `dashboardRes.data` contains the object associated.
-      
+
       const overviewData = overviewRes;
       const activitiesData = activitiesRes;
       const coursesData = Array.isArray(coursesRes) ? coursesRes : [];
@@ -310,34 +312,48 @@ const progressService = {
           };
       // Support different streak field names returned by backend
       const statsRecord = stats as unknown as UnknownRecord;
-      stats.streak = stats.streak ?? (statsRecord['streakDays'] as number | undefined) ?? (statsRecord['currentStreak'] as number | undefined) ?? 0;
-      
-      const enrolledUnitsRaw: UnknownRecord[] = Array.isArray(enrolledUnitsRes) ? (enrolledUnitsRes as UnknownRecord[]) : [];
+      stats.streak =
+        stats.streak ??
+        (statsRecord['streakDays'] as number | undefined) ??
+        (statsRecord['currentStreak'] as number | undefined) ??
+        0;
+
+      const enrolledUnitsRaw: UnknownRecord[] = Array.isArray(enrolledUnitsRes)
+        ? (enrolledUnitsRes as UnknownRecord[])
+        : [];
       const recentActivities = Array.isArray(activitiesData)
         ? activitiesData.map(activity => normalizeDashboardActivity(activity as RawActivity))
         : [];
-      const achievements = Array.isArray(achievementsData) ? (achievementsData as Achievement[]) : [];
+      const achievements = Array.isArray(achievementsData)
+        ? (achievementsData as Achievement[])
+        : [];
       const dueReviews = Array.isArray(dueReviewsData) ? (dueReviewsData as UnknownRecord[]) : [];
       const mastery = masteryRes?.data || {};
       const deadlines = Array.isArray(deadlinesData) ? (deadlinesData as UnknownRecord[]) : [];
       const dataWarnings = new Set(
-        Array.isArray(dashboardData.unavailableSections)
-          ? dashboardData.unavailableSections
-          : [],
+        Array.isArray(dashboardData.unavailableSections) ? dashboardData.unavailableSections : []
       );
       if (masteryResult.status === 'rejected') dataWarnings.add('mastery data');
 
-
       // Map progressTrends to performanceTrends
-      interface RawTrend { date?: string; type?: string; value?: number | string }
-      const rawTrends = ((stats as unknown) as Record<string, unknown>)['progressTrends'] as RawTrend[] | undefined || [];
-      const monthlyData = new Map<string, {
-        month: string;
-        totalScore: number;
-        scoreCount: number;
-        totalHours: number;
-        hoursCount: number;
-      }>();
+      interface RawTrend {
+        date?: string;
+        type?: string;
+        value?: number | string;
+      }
+      const rawTrends =
+        ((stats as unknown as Record<string, unknown>)['progressTrends'] as
+          RawTrend[] | undefined) || [];
+      const monthlyData = new Map<
+        string,
+        {
+          month: string;
+          totalScore: number;
+          scoreCount: number;
+          totalHours: number;
+          hoursCount: number;
+        }
+      >();
 
       const getMonthBucket = (date: Date) => {
         const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
@@ -354,15 +370,15 @@ const progressService = {
         }
         return bucket;
       };
-      
-      rawTrends.forEach((trend) => {
+
+      rawTrends.forEach(trend => {
         if (!trend || !trend.date) return;
         const date = new Date(trend.date);
         if (Number.isNaN(date.getTime())) return;
         const bucket = getMonthBucket(date);
         const value = Number(trend.value);
         if (!Number.isFinite(value)) return;
-        
+
         // Aggregate based on trend type
         const type = String(trend.type || '').toLowerCase();
         if (['score', 'assessment', 'average_score'].includes(type)) {
@@ -375,7 +391,7 @@ const progressService = {
       });
 
       const hasTrendMetrics = Array.from(monthlyData.values()).some(
-        month => month.scoreCount > 0 || month.hoursCount > 0,
+        month => month.scoreCount > 0 || month.hoursCount > 0
       );
       if (!hasTrendMetrics) {
         monthlyData.clear();
@@ -409,13 +425,17 @@ const progressService = {
       const unitProgressValues = enrolledUnitsRaw
         .map(unit => unit.progressPercentage)
         .filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
-      const overallProgress = unitProgressValues.length > 0
-        ? Math.round(unitProgressValues.reduce((total, value) => total + value, 0) / unitProgressValues.length)
-        : stats.overallProgress || 0;
+      const overallProgress =
+        unitProgressValues.length > 0
+          ? Math.round(
+              unitProgressValues.reduce((total, value) => total + value, 0) /
+                unitProgressValues.length
+            )
+          : stats.overallProgress || 0;
 
       // Calculate average mastery from p_known values
       const masteryValues = Object.values(mastery).filter(
-        (value): value is number => typeof value === 'number' && Number.isFinite(value),
+        (value): value is number => typeof value === 'number' && Number.isFinite(value)
       );
 
       const result: ProgressData = {
@@ -449,77 +469,83 @@ const progressService = {
         courseProgress: coursesData.flatMap(course => {
           const courseId = asString(course.courseId, '') || asString(course.id, '');
           if (!courseId) return [];
-          const progressPercentage = asNumber(course.progressPercentage)
-            ?? asNumber(course.progress)
-            ?? 0;
-          return [{
-            id: courseId,
-            title: asString(course.title, '') || asString(course.courseName, '') || 'Untitled Course',
-            progressPercentage,
-            completed: course.completed === true || progressPercentage >= 100,
-            lastAccessedAt: asString(course.lastAccessedAt, '') || undefined,
-          }];
+          const progressPercentage =
+            asNumber(course.progressPercentage) ?? asNumber(course.progress) ?? 0;
+          return [
+            {
+              id: courseId,
+              title:
+                asString(course.title, '') || asString(course.courseName, '') || 'Untitled Course',
+              progressPercentage,
+              completed: course.completed === true || progressPercentage >= 100,
+              lastAccessedAt: asString(course.lastAccessedAt, '') || undefined,
+            },
+          ];
         }),
-        recentActivities: Array.isArray(recentActivities) ? (recentActivities as unknown as ProgressActivity[]) : [],
+        recentActivities: Array.isArray(recentActivities)
+          ? (recentActivities as unknown as ProgressActivity[])
+          : [],
         recentActivity: [],
         achievements: Array.isArray(achievements) ? achievements : [],
-        upcomingDeadlines: Array.isArray(deadlines) ? deadlines.map((d: UnknownRecord) => {
-          const courseObj = d.course as UnknownRecord | undefined;
-          let courseTitle = 'General';
-          if (courseObj && typeof courseObj === 'object' && 'title' in courseObj) {
-            const title = courseObj.title;
-            courseTitle = typeof title === 'string' ? title : 'General';
-          }
-          
-          const dueDateVal = d.dueDate;
-          const dueDate = typeof dueDateVal === 'string' ? dueDateVal : '';
-          
-          const priorityVal = d.priority;
-          let priorityStr: 'medium' | 'high' | 'low' = 'medium';
-          if (typeof priorityVal === 'string') {
-            const normalized = priorityVal.toLowerCase();
-            if (normalized === 'high' || normalized === 'low') {
-              priorityStr = normalized;
-            }
-          }
-          
-          const idVal = d.id;
-          const id = typeof idVal === 'string' ? idVal : '';
+        upcomingDeadlines: Array.isArray(deadlines)
+          ? deadlines.map((d: UnknownRecord) => {
+              const courseObj = d.course as UnknownRecord | undefined;
+              let courseTitle = 'General';
+              if (courseObj && typeof courseObj === 'object' && 'title' in courseObj) {
+                const title = courseObj.title;
+                courseTitle = typeof title === 'string' ? title : 'General';
+              }
 
-          const courseIdVal = d.courseId;
-          const courseId = typeof courseIdVal === 'string' ? courseIdVal : undefined;
-          
-          const titleVal = d.title;
-          const title = typeof titleVal === 'string' ? titleVal : '';
-          
-          const typeVal = d.type;
-          let type: 'exam' | 'assignment' | 'quiz' | 'goal' | 'schedule' = 'assignment';
-          if (typeof typeVal === 'string') {
-            const normalized = typeVal.toLowerCase();
-            if (['exam', 'assignment', 'quiz', 'goal', 'schedule'].includes(normalized)) {
-              type = normalized as 'exam' | 'assignment' | 'quiz' | 'goal' | 'schedule';
-            } else if (normalized === 'deadline') {
-              type = 'assignment';
-            }
-          }
-          
-          return {
-            id,
-            courseId,
-            title,
-            course: courseTitle,
-            date: dueDate,
-            daysLeft: dueDate ? Math.ceil((new Date(dueDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : 0,
-            priority: priorityStr,
-            type,
-          } as Deadline;
-        }) : [],
+              const dueDateVal = d.dueDate;
+              const dueDate = typeof dueDateVal === 'string' ? dueDateVal : '';
+
+              const priorityVal = d.priority;
+              let priorityStr: 'medium' | 'high' | 'low' = 'medium';
+              if (typeof priorityVal === 'string') {
+                const normalized = priorityVal.toLowerCase();
+                if (normalized === 'high' || normalized === 'low') {
+                  priorityStr = normalized;
+                }
+              }
+
+              const idVal = d.id;
+              const id = typeof idVal === 'string' ? idVal : '';
+
+              const courseIdVal = d.courseId;
+              const courseId = typeof courseIdVal === 'string' ? courseIdVal : undefined;
+
+              const titleVal = d.title;
+              const title = typeof titleVal === 'string' ? titleVal : '';
+
+              const typeVal = d.type;
+              let type: 'exam' | 'assignment' | 'quiz' | 'goal' | 'schedule' = 'assignment';
+              if (typeof typeVal === 'string') {
+                const normalized = typeVal.toLowerCase();
+                if (['exam', 'assignment', 'quiz', 'goal', 'schedule'].includes(normalized)) {
+                  type = normalized as 'exam' | 'assignment' | 'quiz' | 'goal' | 'schedule';
+                } else if (normalized === 'deadline') {
+                  type = 'assignment';
+                }
+              }
+
+              return {
+                id,
+                courseId,
+                title,
+                course: courseTitle,
+                date: dueDate,
+                daysLeft: dueDate
+                  ? Math.ceil((new Date(dueDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+                  : 0,
+                priority: priorityStr,
+                type,
+              } as Deadline;
+            })
+          : [],
         weeklyProgress: Array.from({ length: 7 }, (_, i) => {
           const studyDay = dashboardData.weeklyStudyTime?.[i];
           const [year, month, day] = (studyDay?.date ?? '').split('-').map(Number);
-          const d = studyDay && year && month && day
-            ? new Date(year, month - 1, day)
-            : new Date();
+          const d = studyDay && year && month && day ? new Date(year, month - 1, day) : new Date();
           if (!studyDay) d.setDate(d.getDate() - (6 - i));
           return {
             day: d.toLocaleString('default', { weekday: 'short' }),
@@ -527,7 +553,7 @@ const progressService = {
               typeof studyDay?.minutes === 'number'
                 ? Math.round((studyDay.minutes / 60) * 10) / 10
                 : 0,
-            target: 4
+            target: 4,
           };
         }),
         studyGroups: [],
@@ -551,28 +577,28 @@ const progressService = {
         },
         aiInsights: [],
       };
-      
+
       // Course-level progress comes from `courses`; use enrolled units only to
       // attach a convenient next-unit hint for the dashboard.
       const courseProgressList: CourseProgress[] = result.courseProgress || [];
       result.courseData = courseProgressList.map((cp, idx) => {
-         const enrolledUnit = enrolledUnitsRaw.find(unit => unit.courseId === cp.id);
-         const colors = [
+        const enrolledUnit = enrolledUnitsRaw.find(unit => unit.courseId === cp.id);
+        const colors = [
           'from-blue-500 to-indigo-600',
           'from-emerald-500 to-teal-600',
           'from-rose-500 to-red-600',
-          'from-purple-500 to-fuchsia-600'
-         ];
-         return {
-           id: cp.id,
-           unitId: asString(enrolledUnit?.unitId, '') || undefined,
-           nextTopicId: asString(enrolledUnit?.nextTopicId, '') || undefined,
-           name: cp.title,
-           progressPercentage: cp.progressPercentage,
-           color: colors[idx % colors.length] || 'from-gray-500 to-slate-600',
-           nextTopic: 'Continue Learning',
-           timeLeft: 'N/A'
-         };
+          'from-purple-500 to-fuchsia-600',
+        ];
+        return {
+          id: cp.id,
+          unitId: asString(enrolledUnit?.unitId, '') || undefined,
+          nextTopicId: asString(enrolledUnit?.nextTopicId, '') || undefined,
+          name: cp.title,
+          progressPercentage: cp.progressPercentage,
+          color: colors[idx % colors.length] || 'from-gray-500 to-slate-600',
+          nextTopic: 'Continue Learning',
+          timeLeft: 'N/A',
+        };
       });
 
       return result;
@@ -617,23 +643,27 @@ const progressService = {
     }
 
     try {
-      await api.post<void>('/progress/sync', {
-        ...progress,
-      }, {
-        headers: {
-          'X-Client-Timestamp': `${getClientTimestamp()}`, // Milliseconds for conflict resolution
+      await api.post<void>(
+        '/progress/sync',
+        {
+          ...progress,
         },
-      });
+        {
+          headers: {
+            'X-Client-Timestamp': `${getClientTimestamp()}`, // Milliseconds for conflict resolution
+            'X-Idempotency-Key': crypto.randomUUID(),
+          },
+        }
+      );
     } catch (error) {
       if (isOfflineQueuedError(error)) return;
-      if (((error as { response?: { status?: number } })?.response?.status) === 409) {
+      if ((error as { response?: { status?: number } })?.response?.status === 409) {
         console.warn('Progress sync conflict: server has newer data.');
       }
       console.error('Error updating content progress:', formatError(error));
       throw error;
     }
   },
-
 
   /**
    * Get study sessions for user
@@ -660,9 +690,7 @@ const progressService = {
    */
   async getStudyStatistics(period: 'week' | 'month' | 'year' = 'month'): Promise<StudyStatistics> {
     try {
-      const response = await api.get<StudyStatistics>(
-        `/study/data/summary?period=${period}`
-      );
+      const response = await api.get<StudyStatistics>(`/study/data/summary?period=${period}`);
       return response.data || {};
     } catch (error) {
       console.error('Error fetching study statistics:', error);
@@ -675,9 +703,7 @@ const progressService = {
    */
   async getLearningPathProgress(_userId: string): Promise<LearningPathProgressSummary[]> {
     try {
-      const response = await api.get<LearningPathProgressSummary[]>(
-        `/learning-paths/my-progress`
-      );
+      const response = await api.get<LearningPathProgressSummary[]>(`/learning-paths/my-progress`);
       return Array.isArray(response.data) ? response.data : [];
     } catch (error) {
       console.error('Error fetching learning path progress:', formatError(error));
@@ -697,11 +723,11 @@ const progressService = {
         `/progress/dashboard/${userId}`
       );
       let progressList = response.data?.enrolledUnits || [];
-      
+
       if (courseId) {
         progressList = progressList.filter(p => p.courseId === courseId);
       }
-      
+
       return Array.isArray(progressList) ? progressList : [];
     } catch (error) {
       console.error('Error fetching unit progress:', formatError(error));
@@ -738,20 +764,24 @@ const progressService = {
     progressData: { percentage: number; completedItems: number; totalItems: number }
   ): Promise<void> {
     try {
-      await api.post('/learning/progress', {
-        courseId,
-        progress: progressData.percentage,
-        timeSpent: 0,
-        metadata: progressData,
-      }, {
-        headers: {
-          'X-Client-Timestamp': `${getClientTimestamp()}`,
+      await api.post(
+        '/learning/progress',
+        {
+          courseId,
+          progress: progressData.percentage,
+          timeSpent: 0,
+          metadata: progressData,
         },
-      });
+        {
+          headers: {
+            'X-Client-Timestamp': `${getClientTimestamp()}`,
+          },
+        }
+      );
     } catch (error) {
       if (isOfflineQueuedError(error)) return;
       // Handle 409 Conflict - server has newer data
-      if (((error as { response?: { status?: number } })?.response?.status) === 409) {
+      if ((error as { response?: { status?: number } })?.response?.status === 409) {
         console.warn('Conflict detected in course sync: server has newer data');
         return; // Non-fatal
       }
@@ -768,9 +798,7 @@ const progressService = {
       throw new Error('getUserStreaks: userId is required');
     }
     try {
-      const response = await api.get<LearningStreakSummary>(
-        `/progress/streaks/${userId}`,
-      );
+      const response = await api.get<LearningStreakSummary>(`/progress/streaks/${userId}`);
       return response.data;
     } catch (error) {
       console.error('Error fetching user streaks:', error);
@@ -800,7 +828,7 @@ const progressService = {
     if (!activities || activities.length === 0) return 0;
 
     const daySet = new Set<string>();
-    activities.forEach((a) => {
+    activities.forEach(a => {
       const dStr = a.date;
       if (!dStr) return;
       const d = new Date(dStr);

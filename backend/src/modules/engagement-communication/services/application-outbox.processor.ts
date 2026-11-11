@@ -1,8 +1,14 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '#infrastructure/prisma/prisma.service';
+import { MetricsService } from '#infrastructure/metrics/metrics.service';
 
 type ClaimedOutboxEvent = {
   id: string;
@@ -15,6 +21,9 @@ const MAX_BATCH_SIZE = 10;
 const MAX_OUTBOX_RETRIES = 8;
 const LOCK_TIMEOUT_MS = 5 * 60 * 1000;
 const MAX_RETRY_DELAY_MS = 5 * 60 * 1000;
+const STALE_EVENT_AGE_MS = 10 * 60 * 1000;
+
+export type OutboxEventState = 'pending' | 'processed' | 'failed';
 
 @Injectable()
 export class ApplicationOutboxProcessor {
@@ -23,6 +32,7 @@ export class ApplicationOutboxProcessor {
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly metrics: MetricsService,
   ) {}
 
   @Cron('*/2 * * * * *')
@@ -46,11 +56,12 @@ export class ApplicationOutboxProcessor {
             aggregateId: null,
             payload: {},
             lastError: null,
+            failedAt: null,
           },
         });
       } catch (error) {
         const nextAttempt = event.attempts + 1;
-        const hasRetriesRemaining = nextAttempt < MAX_OUTBOX_RETRIES;
+        const isDeadLetter = nextAttempt >= MAX_OUTBOX_RETRIES;
         const retryDelay = Math.min(
           1000 * 2 ** Math.min(event.attempts, 8),
           MAX_RETRY_DELAY_MS,
@@ -61,17 +72,117 @@ export class ApplicationOutboxProcessor {
             attempts: { increment: 1 },
             availableAt: new Date(Date.now() + retryDelay),
             lockedAt: null,
-            lastError: error instanceof Error ? error.name : 'UnknownError',
+            failedAt: isDeadLetter ? new Date() : null,
+            lastError: getSafeErrorCode(error),
           },
         });
         this.logger.error(
-          hasRetriesRemaining
-            ? `Failed to publish outbox event ${event.id} (${event.eventType}); retry scheduled`
-            : `Outbox event ${event.id} (${event.eventType}) reached the retry limit and requires intervention`,
-          error instanceof Error ? error.stack : undefined,
+          isDeadLetter
+            ? `Outbox event ${event.id} (${event.eventType}) reached the retry limit and was dead-lettered`
+            : `Failed to publish outbox event ${event.id} (${event.eventType}); retry scheduled`,
         );
       }
     }
+  }
+
+  @Cron('*/30 * * * * *')
+  async updateOutboxMonitoring(): Promise<void> {
+    const now = new Date();
+    const staleBefore = new Date(now.getTime() - STALE_EVENT_AGE_MS);
+    const [pending, failed, stale] = await Promise.all([
+      this.prisma.applicationOutboxEvent.count({
+        where: { processedAt: null, failedAt: null },
+      }),
+      this.prisma.applicationOutboxEvent.count({
+        where: { failedAt: { not: null } },
+      }),
+      this.prisma.applicationOutboxEvent.count({
+        where: {
+          processedAt: null,
+          failedAt: null,
+          createdAt: { lt: staleBefore },
+        },
+      }),
+    ]);
+
+    this.metrics.setApplicationOutboxCounts({ pending, failed, stale });
+    if (stale > 0) {
+      this.logger.warn(
+        `${stale} application outbox event(s) have remained unprocessed for over 10 minutes`,
+      );
+    }
+  }
+
+  async inspectEvents(state: OutboxEventState = 'pending', limit = 50) {
+    const take = Math.max(1, Math.min(200, Math.floor(limit)));
+    const where: Prisma.ApplicationOutboxEventWhereInput =
+      state === 'processed'
+        ? { processedAt: { not: null } }
+        : state === 'failed'
+          ? { failedAt: { not: null } }
+          : { processedAt: null, failedAt: null };
+
+    return this.prisma.applicationOutboxEvent.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take,
+      select: {
+        id: true,
+        eventType: true,
+        aggregateId: true,
+        dedupeKey: true,
+        payload: true,
+        createdAt: true,
+        availableAt: true,
+        attempts: true,
+        lastError: true,
+        lockedAt: true,
+        processedAt: true,
+        failedAt: true,
+      },
+    });
+  }
+
+  async replayEvent(id: string): Promise<void> {
+    await this.prisma.$transaction(async transaction => {
+      const rows = await transaction.$queryRaw<Array<{ id: string }>>`
+        SELECT "id"
+        FROM "application_outbox_events"
+        WHERE "id" = ${id}
+        FOR UPDATE
+      `;
+      if (!rows.length) {
+        throw new NotFoundException('Outbox event not found');
+      }
+
+      const event = await transaction.applicationOutboxEvent.findUniqueOrThrow({
+        where: { id },
+        select: { lockedAt: true, processedAt: true, failedAt: true },
+      });
+      if (
+        event.lockedAt &&
+        event.lockedAt.getTime() > Date.now() - LOCK_TIMEOUT_MS
+      ) {
+        throw new ConflictException('Outbox event is currently being processed');
+      }
+      if (!event.failedAt) {
+        throw new ConflictException(
+          'Only dead-lettered events can be replayed',
+        );
+      }
+
+      await transaction.applicationOutboxEvent.update({
+        where: { id },
+        data: {
+          attempts: 0,
+          availableAt: new Date(),
+          lastError: null,
+          lockedAt: null,
+          processedAt: null,
+          failedAt: null,
+        },
+      });
+    });
   }
 
   private async claimNextEvent(): Promise<ClaimedOutboxEvent | null> {
@@ -81,6 +192,7 @@ export class ApplicationOutboxProcessor {
         SELECT "id"
         FROM "application_outbox_events"
         WHERE "processed_at" IS NULL
+        AND "failed_at" IS NULL
           AND "attempts" < ${MAX_OUTBOX_RETRIES}
           AND "available_at" <= CURRENT_TIMESTAMP
           AND ("locked_at" IS NULL OR "locked_at" < ${staleLockBefore})
@@ -105,4 +217,14 @@ export class ApplicationOutboxProcessor {
       });
     });
   }
+}
+
+function getSafeErrorCode(error: unknown): string {
+  if (
+    error instanceof Error &&
+    /^[A-Za-z][A-Za-z0-9_]{0,79}$/.test(error.name)
+  ) {
+    return error.name;
+  }
+  return 'UnknownError';
 }

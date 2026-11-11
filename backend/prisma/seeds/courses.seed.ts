@@ -43,6 +43,12 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { seedLearningPaths } from './learning-paths.seed';
 
+if (process.env.NODE_ENV === 'production') {
+  throw new Error(
+    'The development catalogue seed is disabled in production. Use a reviewed, staged catalogue import.',
+  );
+}
+
 // ─── Prisma setup ─────────────────────────────────────────────────────────────
 
 const { pool: _pool, prisma } = createSeedPrisma();

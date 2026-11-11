@@ -7,7 +7,7 @@
 //! The module is designed to integrate with web frameworks (Actix-web, Axum)
 //! and PostgreSQL databases via ORM clients (sqlx, prisma-client-rust).
 
-use chrono::{Datelike, Local, NaiveDate, NaiveDateTime, TimeZone, Timelike};
+use chrono::{Datelike, Local, NaiveDate, NaiveDateTime, TimeZone, Timelike, Utc};
 use sqlx::{PgPool, Row};
 use std::collections::HashMap;
 
@@ -1036,7 +1036,7 @@ pub async fn get_progress_data_for_period_db(
 
     // total study time from valid study sessions
     let total_course_time: i64 = sqlx::query_scalar(
-        "SELECT COALESCE(SUM(duration), 0) FROM study_sessions WHERE user_id = $1 AND is_valid = true AND start_time BETWEEN $2 AND $3",
+        "SELECT COALESCE(SUM(duration), 0) FROM study_sessions WHERE user_id = $1 AND is_valid = true AND end_time IS NOT NULL AND end_time BETWEEN $2 AND $3",
     )
     .bind(user_id)
     .bind(start_date)
@@ -1622,23 +1622,26 @@ fn calculate_daily_streak(activities: &[NaiveDateTime]) -> i32 {
         return 0;
     }
 
-    let mut sorted = activities.to_vec();
-    sorted.sort_by(|a, b| b.cmp(a));
+    let activity_days: Vec<NaiveDate> = activities.iter().map(|activity| activity.date()).collect();
+    let today = Utc::now().date_naive();
+    let mut current_date = if activity_days.contains(&today) {
+        today
+    } else if let Some(yesterday) = today.pred_opt() {
+        yesterday
+    } else {
+        return 0;
+    };
+    if !activity_days.contains(&current_date) {
+        return 0;
+    }
 
-    let today = Local::now().naive_local().date();
     let mut streak = 0;
-    let mut current_date = today;
-
-    for activity in sorted {
-        let activity_date = activity.date();
-        let days_diff = (current_date - activity_date).num_days();
-
-        if days_diff == streak as i64 {
-            streak += 1;
-            current_date = activity_date;
-        } else {
+    while activity_days.contains(&current_date) && streak < 366 {
+        streak += 1;
+        let Some(previous_date) = current_date.pred_opt() else {
             break;
-        }
+        };
+        current_date = previous_date;
     }
 
     streak
@@ -1861,6 +1864,36 @@ pub fn calculate_performance_score(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::Duration;
+
+    #[test]
+    fn daily_streak_uses_utc_days_and_accepts_activity_from_yesterday() {
+        let today = Utc::now().date_naive();
+        let midnight = today.and_hms_opt(12, 0, 0).unwrap();
+        let activities = [
+            midnight,
+            (today - Duration::days(1)).and_hms_opt(12, 0, 0).unwrap(),
+            (today - Duration::days(2)).and_hms_opt(12, 0, 0).unwrap(),
+        ];
+
+        assert_eq!(calculate_daily_streak(&activities), 3);
+        assert_eq!(
+            calculate_daily_streak(&activities[1..]),
+            2,
+            "a streak ending yesterday remains active today"
+        );
+    }
+
+    #[test]
+    fn daily_streak_stops_at_a_missed_day() {
+        let today = Utc::now().date_naive();
+        let activities = [
+            today.and_hms_opt(12, 0, 0).unwrap(),
+            (today - Duration::days(2)).and_hms_opt(12, 0, 0).unwrap(),
+        ];
+
+        assert_eq!(calculate_daily_streak(&activities), 1);
+    }
 
     #[test]
     fn test_study_session_creation() {

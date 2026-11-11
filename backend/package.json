@@ -39,6 +39,8 @@
     "prisma:studio": "prisma studio",
     "prisma:db:push": "prisma db push",
     "prisma:db:pull": "prisma db pull",
+    "admin:bootstrap": "tsx scripts/bootstrap-admin.ts",
+    "catalogue:import": "tsx scripts/import-catalogue.ts",
     "seed": "tsx prisma/seeds/seed.ts && tsx prisma/seeds/courses.seed.ts",
     "seed:paths": "tsx prisma/seeds/learning-paths.seed.ts",
     "docker:dev": "docker-compose up server-dev --build",

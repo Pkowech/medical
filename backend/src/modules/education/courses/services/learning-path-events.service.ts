@@ -166,6 +166,7 @@ export class LearningPathEventsService {
         `Error handling course enrollment: ${getErrorMessage(error)}`,
         getErrorStack(error),
       );
+      throw error;
     }
   }
 
@@ -237,6 +238,7 @@ export class LearningPathEventsService {
         `Error handling learning path enrollment: ${getErrorMessage(error)}`,
         getErrorStack(error),
       );
+      throw error;
     }
   }
 
@@ -420,6 +422,7 @@ export class LearningPathEventsService {
         `Error handling study session: ${getErrorMessage(error)}`,
         getErrorStack(error),
       );
+      throw error;
     }
   }
 }

@@ -40,6 +40,28 @@ pub trait SkillStateRepository: Send + Sync {
     /// Increment attempt count for a skill
     async fn increment_attempts(&self, user_id: &str, skill_id: &str)
         -> Result<(), AnalyticsError>;
+
+    async fn update_user_skill_state_once(
+        &self,
+        event_id: &str,
+        user_id: &str,
+        skill_id: &str,
+        is_correct: bool,
+    ) -> Result<(f64, bool, bool), AnalyticsError> {
+        let p_known_prev = self.get_user_skill_state(user_id, skill_id).await?;
+        let p_known_prev = p_known_prev
+            .unwrap_or(crate::modules::analytics::performance::bkt::BKTParams::default().p_init);
+        let p_known = crate::modules::analytics::performance::bkt::update_p_known(
+            p_known_prev,
+            is_correct,
+            &crate::modules::analytics::performance::bkt::BKTParams::default(),
+        );
+        let _ = event_id;
+        self.update_user_skill_state(user_id, skill_id, p_known)
+            .await?;
+        self.increment_attempts(user_id, skill_id).await?;
+        Ok((p_known, true, p_known > p_known_prev))
+    }
 }
 
 /// Quiz and assessment repository trait

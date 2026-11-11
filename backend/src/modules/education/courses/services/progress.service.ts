@@ -67,6 +67,22 @@ export class ProgressService {
     }
   }
 
+  private getOccurrenceTime(clientTimestamp?: number | bigint): Date {
+    if (clientTimestamp === undefined) return new Date();
+
+    const milliseconds = Number(clientTimestamp);
+    const occurredAt = new Date(milliseconds);
+    if (
+      !Number.isSafeInteger(milliseconds) ||
+      Number.isNaN(occurredAt.getTime())
+    ) {
+      throw new BadRequestException(
+        'Client timestamp must be valid milliseconds.',
+      );
+    }
+    return occurredAt;
+  }
+
   async invalidateUserProgressCache(userId: string): Promise<void> {
     await this.clearCache(userId);
   }
@@ -92,7 +108,8 @@ export class ProgressService {
       throw new NotFoundException(`Material with ID ${materialId} not found`);
     }
 
-    const materialCourseId = material.courseId ?? material.unit?.courseId ?? undefined;
+    const materialCourseId =
+      material.courseId ?? material.unit?.courseId ?? undefined;
     if (
       (associations.courseId && associations.courseId !== materialCourseId) ||
       (associations.unitId && associations.unitId !== material.unitId) ||
@@ -118,45 +135,42 @@ export class ProgressService {
         ? (material.metadata as Record<string, unknown>)
         : {};
     if (metadata.shareWithCourse === false || !materialCourseId) {
-      throw new ForbiddenException('This material has not been shared with you.');
+      throw new ForbiddenException(
+        'This material has not been shared with you.',
+      );
     }
 
-    const [
-      course,
-      instructorAssignment,
-      enrollment,
-      groupMemberships,
-      roles,
-    ] = await Promise.all([
-      this.prisma.course.findUnique({
-        where: { id: materialCourseId },
-        select: { createdById: true },
-      }),
-      this.prisma.courseInstructor.findUnique({
-        where: {
-          courseId_userId: { courseId: materialCourseId, userId },
-        },
-        select: { id: true },
-      }),
-      this.prisma.courseEnrollment.findUnique({
-        where: {
-          userId_courseId: { userId, courseId: materialCourseId },
-        },
-        select: { status: true },
-      }),
-      this.prisma.studyGroupMember.findMany({
-        where: {
-          userId,
-          status: MemberStatus.active,
-          studyGroup: { is: { status: StudyGroupStatus.active } },
-        },
-        select: { studyGroup: { select: { metadata: true } } },
-      }),
-      this.prisma.userRole.findMany({
-        where: { userId },
-        select: { role: { select: { name: true } } },
-      }),
-    ]);
+    const [course, instructorAssignment, enrollment, groupMemberships, roles] =
+      await Promise.all([
+        this.prisma.course.findUnique({
+          where: { id: materialCourseId },
+          select: { createdById: true },
+        }),
+        this.prisma.courseInstructor.findUnique({
+          where: {
+            courseId_userId: { courseId: materialCourseId, userId },
+          },
+          select: { id: true },
+        }),
+        this.prisma.courseEnrollment.findUnique({
+          where: {
+            userId_courseId: { userId, courseId: materialCourseId },
+          },
+          select: { status: true },
+        }),
+        this.prisma.studyGroupMember.findMany({
+          where: {
+            userId,
+            status: MemberStatus.active,
+            studyGroup: { is: { status: StudyGroupStatus.active } },
+          },
+          select: { studyGroup: { select: { metadata: true } } },
+        }),
+        this.prisma.userRole.findMany({
+          where: { userId },
+          select: { role: { select: { name: true } } },
+        }),
+      ]);
 
     const isAdmin = roles.some(({ role }) => role.name === RoleName.admin);
     const isInstructor =
@@ -174,11 +188,7 @@ export class ProgressService {
       );
     });
 
-    if (
-      !isAdmin &&
-      !isInstructor &&
-      !(isEnrolled || isCourseGroupMember)
-    ) {
+    if (!isAdmin && !isInstructor && !(isEnrolled || isCourseGroupMember)) {
       throw new ForbiddenException(
         'Enroll in this course to access its materials.',
       );
@@ -199,6 +209,7 @@ export class ProgressService {
         progressPercentage,
         timeSpent,
         clientTimestamp,
+        idempotencyKey,
       } = updateDto;
       const progressValue = Number.isFinite(progressPercentage)
         ? Math.max(0, Math.min(100, Math.floor(progressPercentage ?? 0)))
@@ -206,6 +217,7 @@ export class ProgressService {
       const timeSpentDelta = Number.isFinite(timeSpent)
         ? Math.max(0, Math.min(1440, Math.floor(timeSpent ?? 0)))
         : 0;
+      const occurredAt = this.getOccurrenceTime(clientTimestamp);
 
       if (materialId) {
         await this.authorizeMaterialProgress(userId, materialId, {
@@ -224,8 +236,41 @@ export class ProgressService {
       }
 
       let updatedCourseProgress: any = null;
+      let duplicateRequest = false;
+      const sourceKey = idempotencyKey
+        ? `progress-sync:${userId}:${idempotencyKey}`
+        : undefined;
 
       await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+        if (sourceKey) {
+          const activity = await tx.userActivity.createMany({
+            data: [
+              {
+                userId,
+                sourceKey,
+                type: UserActivityType.LEARNING,
+                description: 'Synced learning progress',
+                details: {
+                  sourceType: 'progress_sync',
+                  sourceId: idempotencyKey,
+                  courseId,
+                  unitId,
+                  materialId,
+                  topicId,
+                  timeSpentMinutes: timeSpentDelta,
+                  occurredAt: occurredAt.toISOString(),
+                },
+                createdAt: occurredAt,
+              },
+            ],
+            skipDuplicates: true,
+          });
+          if (activity.count === 0) {
+            duplicateRequest = true;
+            return;
+          }
+        }
+
         // Material progress - only if material exists
         if (materialId) {
           // Validate material exists
@@ -257,7 +302,7 @@ export class ProgressService {
             });
 
             const now = new Date();
-            const currentTimestamp = clientTimestamp ?? BigInt(now.getTime());
+            const currentTimestamp = BigInt(occurredAt.getTime());
 
             if (existing) {
               const preserveCompletion =
@@ -273,11 +318,11 @@ export class ProgressService {
                 data: {
                   isCompleted: materialCompleted,
                   completedAt: materialCompleted
-                    ? existing.completedAt ?? now
+                    ? (existing.completedAt ?? now)
                     : null,
                   status: materialCompleted
                     ? ProgressStatus.completed
-                    : status ?? ProgressStatus.inProgress,
+                    : (status ?? ProgressStatus.inProgress),
                   progressPercentage: materialProgressPercentage,
                   completionPercentage: materialProgressPercentage,
                   lastAccessedAt: now,
@@ -309,47 +354,52 @@ export class ProgressService {
         // Only create if we have at least topic or material, and validate they exist
         if (topicId || materialId) {
           const now = new Date();
-          const currentTimestamp = clientTimestamp ?? BigInt(now.getTime());
+          const currentTimestamp = BigInt(occurredAt.getTime());
 
           // Validate that referenced entities exist
           const validationPromises = [];
           if (topicId) {
             validationPromises.push(
-              tx.topic.findUnique({ where: { id: topicId } }).then(t => ({ topic: t })),
+              tx.topic
+                .findUnique({ where: { id: topicId } })
+                .then((t) => ({ topic: t })),
             );
           }
           if (materialId) {
             validationPromises.push(
-              tx.material.findUnique({ where: { id: materialId } }).then(m => ({ material: m })),
+              tx.material
+                .findUnique({ where: { id: materialId } })
+                .then((m) => ({ material: m })),
             );
           }
           if (unitId) {
             validationPromises.push(
-              tx.unit.findUnique({ where: { id: unitId } }).then(u => ({ unit: u })),
+              tx.unit
+                .findUnique({ where: { id: unitId } })
+                .then((u) => ({ unit: u })),
             );
           }
           if (courseId) {
             validationPromises.push(
-              tx.course.findUnique({ where: { id: courseId } }).then(c => ({ course: c })),
+              tx.course
+                .findUnique({ where: { id: courseId } })
+                .then((c) => ({ course: c })),
             );
           }
 
           const validationResults = await Promise.all(validationPromises);
 
           // Check if all required entities exist
-          const hasErrors = validationResults.some(result => {
+          const hasErrors = validationResults.some((result) => {
             const key = Object.keys(result)[0];
             const entity = result[key as keyof typeof result];
             return entity === null;
           });
 
           if (hasErrors) {
-            this.logger.warn(
-              `Progress validation failed - some entities do not exist`,
-              { userId, topicId, materialId, unitId, courseId },
+            throw new NotFoundException(
+              'Progress references a missing course, unit, topic, or material.',
             );
-            // Skip progress creation if validation fails
-            return;
           }
 
           // Use findFirst + update/create instead of upsert because upsert doesn't
@@ -378,12 +428,15 @@ export class ProgressService {
             status === ProgressStatus.completed || preserveCompletion;
           const effectiveStatus = isCompleted
             ? ProgressStatus.completed
-            : status ?? ProgressStatus.inProgress;
+            : (status ?? ProgressStatus.inProgress);
           const effectiveProgressPercentage = isCompleted
             ? 100
             : status === ProgressStatus.notStarted
               ? 0
-              : Math.max(existingProgress?.progressPercentage ?? 0, progressValue);
+              : Math.max(
+                  existingProgress?.progressPercentage ?? 0,
+                  progressValue,
+                );
           const baseData = {
             progressPercentage: effectiveProgressPercentage,
             completionPercentage: effectiveProgressPercentage,
@@ -392,7 +445,7 @@ export class ProgressService {
             lastUpdated: currentTimestamp,
             status: effectiveStatus,
             completedAt: isCompleted
-              ? existingProgress?.completedAt ?? now
+              ? (existingProgress?.completedAt ?? now)
               : null,
           };
 
@@ -445,23 +498,29 @@ export class ProgressService {
         }
 
         // Activity
-        await tx.userActivity.create({
-          data: {
-            userId,
-            type: UserActivityType.LEARNING,
-            description: `Studied ${materialId ? 'material' : unitId ? 'unit' : topicId ? 'topic' : 'course'}: ${timeSpentDelta} minutes`,
-            details: {
-              courseId,
-              unitId,
-              materialId,
-              topicId,
-              timeSpent: timeSpentDelta,
-              studyTimeDeltaMinutes: timeSpentDelta,
-              progressPercentage: progressValue,
+        if (!sourceKey) {
+          await tx.userActivity.create({
+            data: {
+              userId,
+              type: UserActivityType.LEARNING,
+              description: `Studied ${materialId ? 'material' : unitId ? 'unit' : topicId ? 'topic' : 'course'}: ${timeSpentDelta} minutes`,
+              details: {
+                courseId,
+                unitId,
+                materialId,
+                topicId,
+                timeSpent: timeSpentDelta,
+                studyTimeDeltaMinutes: timeSpentDelta,
+                progressPercentage: progressValue,
+                occurredAt: occurredAt.toISOString(),
+              },
+              createdAt: occurredAt,
             },
-          },
-        });
+          });
+        }
       });
+
+      if (duplicateRequest) return updatedCourseProgress;
 
       await this.clearCache(userId, courseId);
       this.logger.log('Progress updated successfully', {
@@ -531,6 +590,7 @@ export class ProgressService {
     userId: string,
     materialId: string,
     clientTimestamp?: bigint,
+    idempotencyKey?: string,
   ): Promise<Progress | undefined> {
     try {
       const material = await this.prisma.material.findUnique({
@@ -555,6 +615,7 @@ export class ProgressService {
 
       const courseId = unit.courseId;
       const topicId = material.topicId;
+      const occurredAt = this.getOccurrenceTime(clientTimestamp);
 
       let materialProgress: Progress | undefined;
       await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
@@ -571,7 +632,10 @@ export class ProgressService {
 
         // Check for conflict if clientTimestamp provided
         if (clientTimestamp !== undefined) {
-          if (existingProgress && existingProgress.lastUpdated > clientTimestamp) {
+          if (
+            existingProgress &&
+            existingProgress.lastUpdated > clientTimestamp
+          ) {
             throw new ConflictException(
               'Server has newer data. Please refresh and retry.',
             );
@@ -579,12 +643,16 @@ export class ProgressService {
         }
 
         const now = new Date();
-        const currentTimestamp = clientTimestamp ?? BigInt(now.getTime());
+        const currentTimestamp = BigInt(occurredAt.getTime());
 
         const progressData = {
           isCompleted: true,
           completedAt: now,
           lastUpdated: currentTimestamp,
+          status: ProgressStatus.completed,
+          progressPercentage: 100,
+          completionPercentage: 100,
+          lastAccessedAt: now,
         };
 
         materialProgress = existingProgress
@@ -601,19 +669,32 @@ export class ProgressService {
 
         // Unit and Course progress updates are removed here as they are now derived aggregates.
 
-        await tx.userActivity.create({
-          data: {
-            userId,
-            type: UserActivityType.LEARNING,
-            description: `Marked material as read: ${materialId}`,
-            details: {
-              materialId,
-              unitId: material.unitId,
-              topicId: material.topicId,
-              courseId,
-            },
+        const activityData = {
+          userId,
+          ...(idempotencyKey
+            ? { sourceKey: `material-read:${userId}:${idempotencyKey}` }
+            : {}),
+          type: UserActivityType.LEARNING,
+          description: `Marked material as read: ${materialId}`,
+          details: {
+            sourceType: 'material_read',
+            sourceId: idempotencyKey ?? materialId,
+            occurredAt: occurredAt.toISOString(),
+            materialId,
+            unitId: material.unitId,
+            topicId: material.topicId,
+            courseId,
           },
-        });
+          createdAt: occurredAt,
+        };
+        if (idempotencyKey) {
+          await tx.userActivity.createMany({
+            data: [activityData],
+            skipDuplicates: true,
+          });
+        } else {
+          await tx.userActivity.create({ data: activityData });
+        }
       });
 
       this.events.emit('progress.updated', {
@@ -794,12 +875,16 @@ export class ProgressService {
 
       const topicProgressById = new Map<string, (typeof allProgress)[number]>();
       for (const progress of allProgress) {
-        if (progress.topicId && progress.materialId === null && !topicProgressById.has(progress.topicId)) {
+        if (
+          progress.topicId &&
+          progress.materialId === null &&
+          !topicProgressById.has(progress.topicId)
+        ) {
           topicProgressById.set(progress.topicId, progress);
         }
       }
       const topicProgress = Array.from(topicProgressById.values()).map(
-        progress => {
+        (progress) => {
           const quizScores =
             (progress.quizScores as Record<string, unknown> | null) ?? {};
           return {
@@ -878,9 +963,7 @@ export class ProgressService {
     }
   }
 
-  async getUserOverallProgress(
-    userId: string,
-  ): Promise<OverallProgress> {
+  async getUserOverallProgress(userId: string): Promise<OverallProgress> {
     const cacheKey = cacheKeys.progressOverall(userId);
     const cached = await this.redisService.get<OverallProgress>(cacheKey);
     if (cached) {
@@ -1032,7 +1115,10 @@ export class ProgressService {
         progress = await this.prisma.progress.update({
           where: { id: progress.id },
           data: {
-            status: progress.status === ProgressStatus.notStarted ? ProgressStatus.inProgress : progress.status,
+            status:
+              progress.status === ProgressStatus.notStarted
+                ? ProgressStatus.inProgress
+                : progress.status,
             lastAccessedAt: new Date(),
           },
         });
@@ -1050,7 +1136,9 @@ export class ProgressService {
         this.prisma.courseEnrollment.findMany({
           where: {
             userId,
-            status: { in: [EnrollmentStatus.active, EnrollmentStatus.completed] },
+            status: {
+              in: [EnrollmentStatus.active, EnrollmentStatus.completed],
+            },
           },
           select: { courseId: true },
         }),
@@ -1069,13 +1157,18 @@ export class ProgressService {
             },
           },
           orderBy: [{ updatedAt: 'desc' }, { lastAccessedAt: 'desc' }],
-          select: { unitId: true, status: true, progressPercentage: true, lastAccessedAt: true },
+          select: {
+            unitId: true,
+            status: true,
+            progressPercentage: true,
+            lastAccessedAt: true,
+          },
         }),
       ]);
 
-      const courseIds = enrollments.map(enrollment => enrollment.courseId);
+      const courseIds = enrollments.map((enrollment) => enrollment.courseId);
       const activeUnitIds = unitProgressRows
-        .map(progress => progress.unitId)
+        .map((progress) => progress.unitId)
         .filter((id): id is string => Boolean(id));
       const units = await this.prisma.unit.findMany({
         where: {
@@ -1093,27 +1186,39 @@ export class ProgressService {
         },
       });
 
-      const unitProgressById = new Map<string, (typeof unitProgressRows)[number]>();
+      const unitProgressById = new Map<
+        string,
+        (typeof unitProgressRows)[number]
+      >();
       for (const progress of unitProgressRows) {
         if (progress.unitId && !unitProgressById.has(progress.unitId)) {
           unitProgressById.set(progress.unitId, progress);
         }
       }
 
-      const topics = units.flatMap(unit => unit.topics);
-      const topicProgress = topics.length > 0
-        ? await this.prisma.progress.findMany({
-            where: {
-              userId,
-              topicId: { in: topics.map(topic => topic.id) },
-              materialId: null,
-            },
-            orderBy: { updatedAt: 'desc' },
-            select: { topicId: true, status: true, isCompleted: true, updatedAt: true },
-          })
-        : [];
+      const topics = units.flatMap((unit) => unit.topics);
+      const topicProgress =
+        topics.length > 0
+          ? await this.prisma.progress.findMany({
+              where: {
+                userId,
+                topicId: { in: topics.map((topic) => topic.id) },
+                materialId: null,
+              },
+              orderBy: { updatedAt: 'desc' },
+              select: {
+                topicId: true,
+                status: true,
+                isCompleted: true,
+                updatedAt: true,
+              },
+            })
+          : [];
 
-      const progressByTopicId = new Map<string, (typeof topicProgress)[number]>();
+      const progressByTopicId = new Map<
+        string,
+        (typeof topicProgress)[number]
+      >();
       for (const progress of topicProgress) {
         if (progress.topicId && !progressByTopicId.has(progress.topicId)) {
           progressByTopicId.set(progress.topicId, progress);
@@ -1121,33 +1226,43 @@ export class ProgressService {
       }
 
       return units
-        .map(unit => {
+        .map((unit) => {
           const unitProgress = unitProgressById.get(unit.id);
           if (unitProgress?.status === ProgressStatus.dropped) return null;
 
-          const completedTopics = unit.topics.filter(topic => {
+          const completedTopics = unit.topics.filter((topic) => {
             const topicRecord = progressByTopicId.get(topic.id);
-            return topicRecord?.isCompleted || topicRecord?.status === ProgressStatus.completed;
+            return (
+              topicRecord?.isCompleted ||
+              topicRecord?.status === ProgressStatus.completed
+            );
           }).length;
           const totalTopics = unit.topics.length;
-          const hasTopicProgress = unit.topics.some(topic => {
+          const hasTopicProgress = unit.topics.some((topic) => {
             const topicRecord = progressByTopicId.get(topic.id);
-            return topicRecord?.isCompleted ||
+            return (
+              topicRecord?.isCompleted ||
               topicRecord?.status === ProgressStatus.inProgress ||
-              topicRecord?.status === ProgressStatus.completed;
+              topicRecord?.status === ProgressStatus.completed
+            );
           });
-          const isCompleted = unitProgress?.status === ProgressStatus.completed ||
+          const isCompleted =
+            unitProgress?.status === ProgressStatus.completed ||
             (totalTopics > 0 && completedTopics === totalTopics);
           if (!unitProgress && !hasTopicProgress) return null;
 
-          const nextTopic = unit.topics.find(topic => {
+          const nextTopic = unit.topics.find((topic) => {
             const topicRecord = progressByTopicId.get(topic.id);
-            return !topicRecord?.isCompleted && topicRecord?.status !== ProgressStatus.completed;
+            return (
+              !topicRecord?.isCompleted &&
+              topicRecord?.status !== ProgressStatus.completed
+            );
           });
 
           return {
             courseId: unit.courseId,
-            courseTitle: unit.course.title || unit.course.name || 'Untitled Course',
+            courseTitle:
+              unit.course.title || unit.course.name || 'Untitled Course',
             unitId: unit.id,
             unitTitle: unit.title || unit.name,
             unitDescription: unit.description,
@@ -1155,8 +1270,10 @@ export class ProgressService {
               ? 100
               : totalTopics > 0
                 ? Math.round((completedTopics / totalTopics) * 100)
-                : unitProgress?.progressPercentage ?? 0,
-            status: isCompleted ? ProgressStatus.completed : ProgressStatus.inProgress,
+                : (unitProgress?.progressPercentage ?? 0),
+            status: isCompleted
+              ? ProgressStatus.completed
+              : ProgressStatus.inProgress,
             isCompleted,
             nextTopicId: nextTopic?.id,
             nextTopicName: nextTopic?.name,
@@ -1180,9 +1297,7 @@ export class ProgressService {
     });
   }
 
-  async getStudyTimeSummary(
-    userId: string,
-  ): Promise<{
+  async getStudyTimeSummary(userId: string): Promise<{
     totalMinutes: number;
     weeklyStudyTime: Array<{ date: string; minutes: number }>;
   }> {
@@ -1190,87 +1305,38 @@ export class ProgressService {
     today.setUTCHours(0, 0, 0, 0);
     const startDate = new Date(today);
     startDate.setUTCDate(startDate.getUTCDate() - 6);
+    const endDate = new Date(today);
+    endDate.setUTCDate(endDate.getUTCDate() + 1);
 
-    const activities = await this.prisma.userActivity.findMany({
-      where: {
-        userId,
-        type: UserActivityType.LEARNING,
-      },
-      select: { id: true, createdAt: true, details: true },
-      orderBy: { createdAt: 'asc' },
-    });
+    const [totalSummary, sessions] = await Promise.all([
+      this.prisma.studySession.aggregate({
+        where: {
+          userId,
+          isValid: true,
+          endTime: { not: null },
+        },
+        _sum: { duration: true },
+      }),
+      this.prisma.studySession.findMany({
+        where: {
+          userId,
+          isValid: true,
+          endTime: { gte: startDate, lt: endDate },
+        },
+        select: { duration: true, endTime: true },
+      }),
+    ]);
+
     const minutesByDate = new Map<string, number>();
-    const legacySnapshots = new Map<
-      string,
-      { minutes: number; createdAt: Date }
-    >();
-    const studySessions = new Map<string, { date: string; minutes: number }>();
-
-    for (const activity of activities) {
-      const date = activity.createdAt.toISOString().slice(0, 10);
-      const details =
-        activity.details &&
-        typeof activity.details === 'object' &&
-        !Array.isArray(activity.details)
-          ? (activity.details as Record<string, unknown>)
-          : {};
-
-      if (typeof details.studyTimeDeltaMinutes === 'number') {
-        minutesByDate.set(
-          date,
-          (minutesByDate.get(date) ?? 0) + Math.max(0, details.studyTimeDeltaMinutes),
-        );
-        continue;
-      }
-
-      const duration = details.timeSpent;
-      const contentId = [
-        details.materialId,
-        details.topicId,
-        details.unitId,
-        details.courseId,
-      ].find((id): id is string => typeof id === 'string' && id.length > 0);
-
-      if (typeof duration === 'number' && duration > 0 && contentId) {
-        const contentKey = contentId;
-        const previous = legacySnapshots.get(contentKey);
-        const sessionRestarted =
-          previous !== undefined &&
-          activity.createdAt.getTime() - previous.createdAt.getTime() > 10 * 60 * 1000;
-        const delta =
-          previous === undefined || sessionRestarted || duration < previous.minutes
-            ? duration
-            : duration - previous.minutes;
-        minutesByDate.set(date, (minutesByDate.get(date) ?? 0) + delta);
-        legacySnapshots.set(contentKey, { minutes: duration, createdAt: activity.createdAt });
-        continue;
-      }
-
-      const sessionId = details.sessionId;
-      const sessionDuration = details.duration;
-      if (
-        typeof sessionId === 'string' &&
-        typeof sessionDuration === 'number' &&
-        sessionDuration > 0
-      ) {
-        const previous = studySessions.get(sessionId);
-        if (!previous || sessionDuration > previous.minutes) {
-          studySessions.set(sessionId, { date, minutes: sessionDuration });
-        }
-      }
-    }
-
-    for (const session of studySessions.values()) {
+    for (const session of sessions) {
+      if (!session.endTime) continue;
+      const date = session.endTime.toISOString().slice(0, 10);
       minutesByDate.set(
-        session.date,
-        (minutesByDate.get(session.date) ?? 0) + session.minutes,
+        date,
+        (minutesByDate.get(date) ?? 0) + Math.max(0, session.duration ?? 0),
       );
     }
 
-    const totalMinutes = Array.from(minutesByDate.values()).reduce(
-      (total, minutes) => total + minutes,
-      0,
-    );
     const weeklyStudyTime = Array.from({ length: 7 }, (_, index) => {
       const date = new Date(startDate);
       date.setUTCDate(startDate.getUTCDate() + index);
@@ -1278,7 +1344,10 @@ export class ProgressService {
       return { date: key, minutes: minutesByDate.get(key) ?? 0 };
     });
 
-    return { totalMinutes, weeklyStudyTime };
+    return {
+      totalMinutes: totalSummary._sum.duration ?? 0,
+      weeklyStudyTime,
+    };
   }
 
   async getUserAchievements(userId: string): Promise<
@@ -1333,7 +1402,8 @@ export class ProgressService {
     userId: string,
     courseId: string,
   ): Promise<
-    { percentage: number; completedUnits: number; totalUnits: number } | undefined
+    | { percentage: number; completedUnits: number; totalUnits: number }
+    | undefined
   > {
     try {
       const [units, topicProgressRows, unitProgressRows] = await Promise.all([
@@ -1412,12 +1482,13 @@ export class ProgressService {
           : 0;
         const isCompleted =
           unitProgress?.completed ||
-          (topicPercentages.length > 0 && topicPercentages.every((value) => value === 100));
+          (topicPercentages.length > 0 &&
+            topicPercentages.every((value) => value === 100));
         const unitPercentage = isCompleted
           ? 100
           : topicPercentages.length
             ? topicPercentage
-            : unitProgress?.percentage ?? 0;
+            : (unitProgress?.percentage ?? 0);
 
         totalUnitPercentage += unitPercentage;
         if (isCompleted) completedUnits += 1;
@@ -1720,7 +1791,10 @@ export class ProgressService {
       }
 
       const cohortUserIds = new Set(cohortEnrollments.map((e) => e.userId));
-      const totalStudents = Math.max(cohortUserIds.size, userProgress.length > 0 ? 1 : 0);
+      const totalStudents = Math.max(
+        cohortUserIds.size,
+        userProgress.length > 0 ? 1 : 0,
+      );
 
       const cohortAverage =
         cohortEnrollments.length > 0
@@ -1752,7 +1826,9 @@ export class ProgressService {
       const topPerformer =
         allUserAverages.length > 0 ? Math.max(...allUserAverages) : 0;
 
-      const usersAhead = allUserAverages.filter((avg) => avg > userAverage).length;
+      const usersAhead = allUserAverages.filter(
+        (avg) => avg > userAverage,
+      ).length;
       const userRank = userProgress.length > 0 ? usersAhead + 1 : 0;
       const percentile =
         allUserAverages.length > 0 && userProgress.length > 0
@@ -1791,19 +1867,25 @@ export class ProgressService {
   /**
    * Get user streak information (current and longest)
    */
-  async getUserStreaks(userId: string): Promise<
-    {
-      userId: string;
-      currentStreak: number;
-      longestStreak: number;
-      lastActivityDate: Date | null;
-    }
-  > {
+  async getUserStreaks(userId: string): Promise<{
+    userId: string;
+    currentStreak: number;
+    longestStreak: number;
+    lastActivityDate: Date | null;
+  }> {
     try {
       const learningActivities = await this.prisma.userActivity.findMany({
         where: {
           userId,
-          type: UserActivityType.LEARNING,
+          type: {
+            in: [
+              UserActivityType.LEARNING,
+              UserActivityType.QUIZ_ATTEMPT,
+              UserActivityType.STUDY_SESSION,
+              UserActivityType.FLASHCARD_REVIEW,
+              UserActivityType.FLASHCARD_SESSION,
+            ],
+          },
         },
         orderBy: { createdAt: 'desc' },
         select: { createdAt: true },

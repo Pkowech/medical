@@ -10,7 +10,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '#infrastructure/prisma/prisma.service';
 import * as argon2 from 'argon2';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { google } from 'googleapis';
 import {
   CreateUserDto,
@@ -41,6 +41,7 @@ import { AdminSettingsService } from '#modules/admin/services/admin-settings.ser
 import { MetricsService } from '#infrastructure/metrics/metrics.service';
 import { PasswordVerificationGate } from './password-verification-gate';
 import { performance } from 'node:perf_hooks';
+import { SessionTrackingService } from './session-tracking.service';
 
 interface GoogleIdentityPayload {
   sub?: string;
@@ -74,6 +75,14 @@ const AUTH_RESPONSE_USER_SELECT = {
 
 const AUTH_LOGIN_USER_SELECT = {
   ...AUTH_RESPONSE_USER_SELECT,
+  securitySettings: {
+    select: {
+      twoFactorEnabled: true,
+      twoFactorSecret: true,
+      backupCodes: true,
+      isEmailVerified: true,
+    },
+  },
   password: true,
   isActive: true,
   isLocked: true,
@@ -125,6 +134,7 @@ export class AuthService {
     private readonly configService: ConfigService,
     private readonly passwordVerificationGate: PasswordVerificationGate,
     private readonly metrics: MetricsService,
+    private readonly sessionTrackingService: SessionTrackingService,
     @Optional()
     private readonly adminSettingsService?: AdminSettingsService,
   ) {
@@ -304,6 +314,7 @@ export class AuthService {
       secret: this.JWT_SECRET,
       expiresIn: Math.floor(accessTokenLifetimeMs / 1000),
     });
+    const sessionId = randomUUID();
     const refreshToken = mfaSetupRequired
       ? ''
       : await this.measureAuthStage('refresh_token_write', () =>
@@ -311,6 +322,7 @@ export class AuthService {
             user.id,
             Math.ceil(accessTokenLifetimeMs / 1000),
             true,
+            sessionId,
           ),
         );
 
@@ -344,12 +356,24 @@ export class AuthService {
       }),
     );
 
+    const expiresAt = new Date(Date.now() + accessTokenLifetimeMs);
+    await this.sessionTrackingService.trackSession(sessionId, {
+      id: sessionId,
+      userId: user.id,
+      role: primaryRole,
+      token: accessToken,
+      deviceId,
+      ipAddress,
+      userAgent,
+      createdAt: new Date(),
+      expiresAt,
+      isActive: true,
+    });
+
     return {
       accessToken,
       refreshToken,
-      expiresAt: new Date(
-        Date.now() + accessTokenLifetimeMs,
-      ),
+      expiresAt,
       user: {
         id: user.id,
         email: user.email,
@@ -987,6 +1011,15 @@ export class AuthService {
     if (!user) {
       throw new UnauthorizedException('User not found');
     }
+    if (
+      !user.isActive ||
+      (user.isLocked &&
+        user.lockedUntil &&
+        user.lockedUntil > new Date())
+    ) {
+      await this.refreshTokenService.revokeRefreshToken(refreshToken);
+      throw new UnauthorizedException('Account is inactive or locked');
+    }
 
     const userRole = user.userRoles?.[0]?.role.name || Role.student;
     const allRoles = user.userRoles.map((ur: any) => ur.role.name as Role);
@@ -1014,12 +1047,26 @@ export class AuthService {
       expiresIn: Math.floor(accessTokenLifetimeMs / 1000),
     });
 
+    const sessionId =
+      (await this.refreshTokenService.getSessionId(refreshToken)) ??
+      randomUUID();
     const newRefreshToken = await this.refreshTokenService.createRefreshToken(
       user.id,
       Math.ceil(accessTokenLifetimeMs / 1000),
+      true,
+      sessionId,
     );
+    const expiresAt = new Date(Date.now() + accessTokenLifetimeMs);
+    await this.sessionTrackingService.trackSession(sessionId, {
+      id: sessionId,
+      userId: user.id,
+      role: userRole,
+      token: accessToken,
+      expiresAt,
+      createdAt: new Date(),
+      isActive: true,
+    });
     await this.refreshTokenService.revokeRefreshToken(refreshToken);
-
     await this.auditLogService.log(
       securityEventTypes.tokenRefresh,
       user.id,
@@ -1029,9 +1076,6 @@ export class AuthService {
     );
 
     const isEmailVerified = await this.securityService.isEmailVerified(user.id);
-    const expiresAt = new Date(
-      Date.now() + accessTokenLifetimeMs,
-    );
 
     return {
       accessToken,
@@ -1071,14 +1115,15 @@ export class AuthService {
 
       // Blacklist access token if provided
       if (accessToken) {
-        await this.tokenBlacklistService.blacklistToken(accessToken);
+        const revoked =
+          await this.sessionTrackingService.endSessionByToken(
+            userId,
+            accessToken,
+          );
+        if (!revoked) {
+          await this.tokenBlacklistService.blacklistToken(accessToken);
+        }
       }
-
-      // Revoke all active sessions
-      await this.prisma.userSession.updateMany({
-        where: { userId, revokedAt: null },
-        data: { revokedAt: new Date() },
-      });
 
       await this.auditLogService.log(
         securityEventTypes.logoutSuccess,
@@ -1102,11 +1147,7 @@ export class AuthService {
    */
   async logoutAllDevices(userId: string): Promise<void> {
     await this.refreshTokenService.revokeAllUserTokens(userId);
-
-    await this.prisma.userSession.updateMany({
-      where: { userId, revokedAt: null },
-      data: { revokedAt: new Date() },
-    });
+    await this.sessionTrackingService.revokeAllSessions(userId);
 
     await this.auditLogService.log(
       securityEventTypes.sessionRevoked,

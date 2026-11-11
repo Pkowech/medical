@@ -65,6 +65,7 @@ const prisma = {
 };
 const usersService = { create: async () => ({ id: user.id }) };
 let createCalls = 0;
+const trackedSessions = [];
 usersService.create = async data => {
   createCalls += 1;
   usersService.lastCreateData = data;
@@ -88,6 +89,7 @@ const service = new AuthService(
   { get: (key, fallback) => key === 'GOOGLE_CLIENT_ID' ? configClientId : fallback },
   {},
   { recordAuthStage: () => undefined },
+  { trackSession: async (id, session) => { trackedSessions.push({ id, session }); } },
 );
 
 (async () => {
@@ -108,6 +110,9 @@ const service = new AuthService(
   assert.equal(created.refreshToken, 'app-refresh-token');
   assert.equal(created.user.id, user.id);
   assert.equal(created.roles.role, Role.student);
+  assert.equal(trackedSessions.length, 1);
+  assert.equal(trackedSessions[0].session.token, created.accessToken);
+  assert.equal(trackedSessions[0].session.userId, user.id);
   assert.deepEqual(securitySettingsUpsertCalls.at(-1), {
     where: { userId: user.id },
     update: { isEmailVerified: true },

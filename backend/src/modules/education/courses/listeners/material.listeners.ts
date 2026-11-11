@@ -9,20 +9,23 @@ import * as path from 'path';
 export interface MaterialViewEvent {
   materialId: string;
   userId: string;
+  eventId: string;
   page?: number;
-  timestamp: Date;
+  timestamp: string | Date;
 }
 
 export interface MaterialDownloadEvent {
   materialId: string;
   userId: string;
-  timestamp: Date;
+  eventId: string;
+  timestamp: string | Date;
 }
 
 export interface MaterialUploadEvent {
   materialId: string;
   userId: string;
-  timestamp: Date;
+  eventId: string;
+  timestamp: string | Date;
 }
 
 @Injectable()
@@ -48,28 +51,10 @@ export class MaterialListeners {
         return;
       }
 
-      await this.prisma.materialEvent.upsert({
-        where: {
-          material_events_user_material_type_idx: {
-            userId: event.userId,
-            materialId: event.materialId,
-            eventType: 'view',
-          },
-        },
-        update: {
-          lastOccurredAt: event.timestamp,
-          viewCount: { increment: 1 },
-          lastPage: event.page,
-        },
-        create: {
-          userId: event.userId,
-          materialId: event.materialId,
-          eventType: 'view',
-          viewCount: 1,
-          lastPage: event.page,
-          lastOccurredAt: event.timestamp,
-        },
-      });
+      await this.recordMaterialAccess(
+        { ...event, timestamp: new Date(event.timestamp) },
+        'view',
+      );
 
       this.logger.debug(`Material view event recorded`, {
         materialId: event.materialId,
@@ -93,26 +78,10 @@ export class MaterialListeners {
         return;
       }
 
-      await this.prisma.materialEvent.upsert({
-        where: {
-          material_events_user_material_type_idx: {
-            userId: event.userId,
-            materialId: event.materialId,
-            eventType: 'download',
-          },
-        },
-        update: {
-          lastOccurredAt: event.timestamp,
-          downloadCount: { increment: 1 },
-        },
-        create: {
-          userId: event.userId,
-          materialId: event.materialId,
-          eventType: 'download',
-          downloadCount: 1,
-          lastOccurredAt: event.timestamp,
-        },
-      });
+      await this.recordMaterialAccess(
+        { ...event, timestamp: new Date(event.timestamp) },
+        'download',
+      );
 
       this.logger.debug(`Material download event recorded`, {
         materialId: event.materialId,
@@ -127,12 +96,20 @@ export class MaterialListeners {
   async handleMaterialUpload(event: MaterialUploadEvent) {
     try {
       // 1. Record upload event
-      await this.prisma.materialEvent.create({
-        data: {
+      await this.prisma.materialEvent.upsert({
+        where: {
+          material_events_user_material_type_idx: {
+            userId: event.userId,
+            materialId: event.materialId,
+            eventType: 'upload',
+          },
+        },
+        update: { lastOccurredAt: new Date(event.timestamp) },
+        create: {
           userId: event.userId,
           materialId: event.materialId,
           eventType: 'upload',
-          lastOccurredAt: event.timestamp,
+          lastOccurredAt: new Date(event.timestamp),
         },
       });
 
@@ -156,7 +133,55 @@ export class MaterialListeners {
         userId: event.userId,
       });
     } catch (error) {
-      this.logger.error(`Error in handleMaterialUpload: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.error(
+        `Error in handleMaterialUpload: ${error instanceof Error ? error.name : 'UnknownError'}`,
+      );
+      throw error;
     }
+  }
+
+  private async recordMaterialAccess(
+    event: MaterialViewEvent | MaterialDownloadEvent,
+    eventType: 'view' | 'download',
+  ): Promise<void> {
+    await this.prisma.$transaction(async transaction => {
+      const materialEvent = await transaction.materialEvent.upsert({
+        where: {
+          material_events_user_material_type_idx: {
+            userId: event.userId,
+            materialId: event.materialId,
+            eventType,
+          },
+        },
+        update: {},
+        create: {
+          userId: event.userId,
+          materialId: event.materialId,
+          eventType,
+          lastOccurredAt: event.timestamp,
+        },
+      });
+      const delivery = await transaction.materialEventDelivery.createMany({
+        data: [{ eventId: event.eventId, materialEventId: materialEvent.id }],
+        skipDuplicates: true,
+      });
+      if (delivery.count === 0) return;
+
+      await transaction.materialEvent.update({
+        where: { id: materialEvent.id },
+        data: {
+          lastOccurredAt:
+            event.timestamp < materialEvent.lastOccurredAt
+              ? materialEvent.lastOccurredAt
+              : event.timestamp,
+          ...(eventType === 'view'
+            ? {
+                viewCount: { increment: 1 },
+                lastPage: (event as MaterialViewEvent).page,
+              }
+            : { downloadCount: { increment: 1 } }),
+        },
+      });
+    });
   }
 }

@@ -733,16 +733,16 @@ impl LearningService {
         } as f32;
 
         let activity_dates: Vec<NaiveDate> = sqlx::query_scalar(
-            "SELECT activity_date
-             FROM (
-                 SELECT DISTINCT start_time::date AS activity_date
-                 FROM study_sessions
-                 WHERE user_id = $1 AND is_valid = true AND end_time IS NOT NULL
-                 UNION
-                 SELECT DISTINCT accessed_at::date AS activity_date
-                 FROM unit_accesses
-                 WHERE user_id = $1
-             ) AS activity_days
+            "SELECT DISTINCT created_at::date AS activity_date
+             FROM user_activities
+             WHERE user_id = $1
+               AND type::text IN (
+                   'LEARNING',
+                   'quiz_attempt',
+                   'study_session',
+                   'flashcard_review',
+                   'flashcard_session'
+               )
              ORDER BY activity_date",
         )
         .bind(&user_id)

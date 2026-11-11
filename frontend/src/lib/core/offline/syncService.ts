@@ -146,7 +146,8 @@ class SyncService {
         failedChanges,
         retryableFailedChanges,
         isFlushing: this.isFlushing,
-        readyToSync: reachable && pendingItems.some(item => (item.nextAttemptAt ?? 0) <= Date.now()),
+        readyToSync:
+          reachable && pendingItems.some(item => (item.nextAttemptAt ?? 0) <= Date.now()),
         latestFailure: items
           .filter(item => item.lastError)
           .sort((a, b) => b.createdAt - a.createdAt)[0]?.lastError,
@@ -293,6 +294,7 @@ class SyncService {
             ...cleanHeaders,
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
             'X-Client-Timestamp': String(item.lastUpdated || item.createdAt),
+            'X-Idempotency-Key': String(item.id),
             'Content-Type': 'application/json',
           };
 

@@ -12,7 +12,7 @@ import {
   IFileStorage,
 } from '#infrastructure/storage/file-storage.interface';
 
-import { createHash } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import { Readable } from 'stream';
 import {
   hashBuffer,
@@ -43,6 +43,7 @@ import { GoogleDriveService } from '#infrastructure/storage/google-drive.service
 // delegated to the Gotenberg service configured via `GOTENBERG_URL`.
 
 import { GlobalSearchSyncService } from '#infrastructure/search/services/global-search-sync.service';
+import { writeApplicationOutboxEvent } from '#infrastructure/outbox/application-outbox-event';
 
 export interface RegisterExternalResourceDto {
   title: string;
@@ -92,6 +93,20 @@ export class MaterialsService {
     );
   }
 
+  private assertLocalStorageAvailable(): void {
+    const environment = this.configService.get<string>('NODE_ENV');
+    if (environment !== 'development' && environment !== 'test') {
+      throw new ForbiddenException(
+        'Local file browsing is only available in development and test environments.',
+      );
+    }
+    if (this.storageProvider !== 'local') {
+      throw new BadRequestException(
+        'Local file access is only available in local storage mode',
+      );
+    }
+  }
+
   /**
    * Search for files in the local PHARMACY directory
    */
@@ -104,11 +119,7 @@ export class MaterialsService {
       directory: string;
     }>
   > {
-    if (this.storageProvider !== 'local') {
-      throw new BadRequestException(
-        'File search is only available in local storage mode',
-      );
-    }
+    this.assertLocalStorageAvailable();
 
     try {
       const results: Array<{
@@ -177,11 +188,7 @@ export class MaterialsService {
     mimeType: string;
     fileName: string;
   }> {
-    if (this.storageProvider !== 'local') {
-      throw new BadRequestException(
-        'Local file access is only available in local storage mode',
-      );
-    }
+    this.assertLocalStorageAvailable();
 
     try {
       // Security check: ensure the file is within the allowed storage path
@@ -263,11 +270,7 @@ export class MaterialsService {
       path: string;
     }>
   > {
-    if (this.storageProvider !== 'local') {
-      throw new BadRequestException(
-        'Directory listing is only available in local storage mode',
-      );
-    }
+    this.assertLocalStorageAvailable();
 
     try {
       const dirPath = path.join(this.localStoragePath, relativePath);
@@ -544,7 +547,7 @@ export class MaterialsService {
       const signedUrl = await this.getMaterialDownloadUrl(id);
 
       // Track download event
-      this.eventEmitter.emit('material.download', {
+      await this.enqueueMaterialAccessEvent('material.download', {
         materialId: id,
         userId,
         timestamp: new Date(),
@@ -569,7 +572,7 @@ export class MaterialsService {
       await this.assertCanReadMaterial(material, userId);
 
       // Emit view event for tracking
-      this.eventEmitter.emit('material.view', {
+      await this.enqueueMaterialAccessEvent('material.view', {
         materialId,
         userId,
         page,
@@ -910,27 +913,44 @@ export class MaterialsService {
         }
       }
 
-      const material = await this.prisma.material.create({
-        data: {
-          title: title || file.originalname,
-          description,
-          type: type || MaterialType.other,
-          fileId: fileRecord.id,
-          previewFileId: previewFileRecord?.id || null,
-          courseId: courseId || null,
-          unitId: unitId || null, // Unplaced records are personal library uploads.
-          topicId: topicId || null,
-          userId,
-          category,
-          difficulty: difficulty || 0.5,
-          metadata: { ...(tags ? { tags } : {}), shareWithCourse },
-        },
-        include: {
-          file: true,
-          previewFile: true,
-          unit: true,
-          user: { select: { id: true, firstName: true, lastName: true } },
-        },
+      const eventId = randomUUID();
+      const timestamp = new Date();
+      const material = await this.prisma.$transaction(async transaction => {
+        const createdMaterial = await transaction.material.create({
+          data: {
+            title: title || file.originalname,
+            description,
+            type: type || MaterialType.other,
+            fileId: fileRecord.id,
+            previewFileId: previewFileRecord?.id || null,
+            courseId: courseId || null,
+            unitId: unitId || null,
+            topicId: topicId || null,
+            userId,
+            category,
+            difficulty: difficulty || 0.5,
+            metadata: { ...(tags ? { tags } : {}), shareWithCourse },
+          },
+          include: {
+            file: true,
+            previewFile: true,
+            unit: true,
+            user: { select: { id: true, firstName: true, lastName: true } },
+          },
+        });
+
+        await writeApplicationOutboxEvent(transaction, {
+          eventType: 'material.upload',
+          aggregateId: createdMaterial.id,
+          dedupeKey: `material-upload:${createdMaterial.id}`,
+          payload: {
+            materialId: createdMaterial.id,
+            userId,
+            eventId,
+            timestamp: timestamp.toISOString(),
+          },
+        });
+        return createdMaterial;
       });
 
       // Explicitly update FTS vector (replacing DB trigger)
@@ -938,18 +958,6 @@ export class MaterialsService {
 
       // Sync to global search index
       await this.searchSync.syncEntity('material', material.id);
-
-      // Emit upload event for tracking
-      this.eventEmitter.emit('material.upload', {
-        materialId: material.id,
-        userId,
-        courseId,
-        unitId,
-        topicId,
-        fileId: fileRecord.id,
-        isNewFile: !existingFile,
-        timestamp: new Date(),
-      });
 
       this.logger.log('Material created', { materialId: material.id, userId });
       return material;
@@ -2009,7 +2017,7 @@ export class MaterialsService {
 
       // Emit view event for analytics (lastPage if provided)
       if (materialId) {
-        this.eventEmitter.emit('material.view', {
+        await this.enqueueMaterialAccessEvent('material.view', {
           materialId,
           userId,
           page: lastPage,
@@ -2027,6 +2035,30 @@ export class MaterialsService {
     } catch (error) {
       handleServiceError(error, this.logger, 'registerLocalProgress');
     }
+  }
+
+  private async enqueueMaterialAccessEvent(
+    eventType: 'material.view' | 'material.download',
+    event: {
+      materialId: string;
+      userId: string;
+      page?: number;
+      timestamp: Date;
+    },
+  ): Promise<void> {
+    const eventId = randomUUID();
+    await this.prisma.$transaction(transaction =>
+      writeApplicationOutboxEvent(transaction, {
+        eventType,
+        aggregateId: event.materialId,
+        dedupeKey: `${eventType}:${eventId}`,
+        payload: {
+          ...event,
+          eventId,
+          timestamp: event.timestamp.toISOString(),
+        },
+      }),
+    );
   }
 
   async getFileMetadata(fileId: string, userId: string): Promise<File> {
@@ -2339,60 +2371,80 @@ export class MaterialsService {
   /**
    * Serve local PDF file by hash from seed-data
    */
-  async serveLocalPdfByHash(fileHash: string) {
+  async serveLocalPdfByHash(fileHash: string, userId: string) {
     try {
-      // Find file record by hash
       const file = await this.prisma.file.findFirst({
-        where: { hash: fileHash },
+        where: { hash: fileHash, key: { startsWith: 'local:' } },
+        include: { materials: true, previewMaterials: true },
       });
 
-      if (!file || !file.key?.startsWith('local:')) {
+      if (!file) {
         throw new NotFoundException(
           `File with hash ${fileHash} not found or is not a local file`,
         );
       }
 
-      // Construct path to seed-data
-      const seedDataPath = path.resolve(
-        __dirname,
-        '../../..',
-        'seed-data',
-        'pdfs',
-      );
-      const filePath = path.resolve(seedDataPath, file.filename);
-
-      // Also check if file is in parent directory (for kenya-national-medicines-formulary)
-      let fileBuffer: Buffer;
-      try {
-        fileBuffer = await fs.readFile(filePath);
-      } catch {
-        // Try parent directory
-        const parentPath = path.resolve(
-          __dirname,
-          '../../..',
-          '..',
-          file.filename,
-        );
+      const associatedMaterials = [
+        ...(file.materials ?? []),
+        ...(file.previewMaterials ?? []),
+      ];
+      let canRead = false;
+      for (const material of associatedMaterials) {
         try {
-          fileBuffer = await fs.readFile(parentPath);
-        } catch {
-          throw new NotFoundException(`PDF file not found: ${file.filename}`);
+          await this.assertCanReadMaterial(material, userId);
+          canRead = true;
+          break;
+        } catch (error) {
+          if (
+            !(error instanceof ForbiddenException) &&
+            !(error instanceof NotFoundException)
+          ) {
+            throw error;
+          }
         }
       }
+      if (!canRead) {
+        throw new NotFoundException(
+          `File with hash ${fileHash} not found or is not available`,
+        );
+      }
 
-      this.logger.log('Serving local PDF', {
-        filename: file.filename,
-        hash: fileHash,
-      });
-
-      return {
-        content: fileBuffer,
-        mimeType: 'application/pdf',
-        fileName: file.filename,
-      };
+      return await this.readLocalPdfFile(file.filename, fileHash);
     } catch (error) {
       handleServiceError(error, this.logger, 'serveLocalPdfByHash');
     }
+  }
+
+  private async readLocalPdfFile(fileName: string, fileHash: string) {
+    const seedDataPath = path.resolve(
+      __dirname,
+      '../../..',
+      'seed-data',
+      'pdfs',
+    );
+
+    let fileBuffer: Buffer;
+    try {
+      fileBuffer = await fs.readFile(path.resolve(seedDataPath, fileName));
+    } catch {
+      const parentPath = path.resolve(__dirname, '../../..', '..', fileName);
+      try {
+        fileBuffer = await fs.readFile(parentPath);
+      } catch {
+        throw new NotFoundException(`PDF file not found: ${fileName}`);
+      }
+    }
+
+    this.logger.log('Serving local PDF', {
+      filename: fileName,
+      hash: fileHash,
+    });
+
+    return {
+      content: fileBuffer,
+      mimeType: 'application/pdf',
+      fileName,
+    };
   }
 
   async getMaterialPreviewUrl(materialId: string): Promise<string | undefined> {
@@ -2414,9 +2466,8 @@ export class MaterialsService {
       }
 
       if (file.key.startsWith('local:')) {
-        const fileHash = file.hash;
-        if (fileHash) {
-          return `/api/materials/local/serve/${fileHash}`;
+        if (file.hash) {
+          return `/api/materials/local/serve/${file.hash}`;
         }
         return undefined;
       }
@@ -2472,7 +2523,10 @@ export class MaterialsService {
       }
 
       if (file.key.startsWith('local:')) {
-        return this.serveLocalPdfByHash(file.key.slice('local:'.length));
+        return this.readLocalPdfFile(
+          file.filename,
+          file.key.slice('local:'.length),
+        );
       }
 
       const fileName = file.filename || file.key.split('/').pop() || 'preview.pdf';

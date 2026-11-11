@@ -353,6 +353,14 @@ export class SubmitQuizDto {
   @IsNotEmpty()
   unitId!: string;
 
+  @ApiProperty({
+    description:
+      'Stable client-generated ID used to make submission retries safe',
+  })
+  @IsUUID()
+  @IsNotEmpty()
+  attemptId!: string;
+
   @ApiProperty({ type: () => [QuizAnswerDto] })
   @IsArray()
   @ValidateNested({ each: true })

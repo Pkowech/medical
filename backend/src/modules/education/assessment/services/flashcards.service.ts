@@ -15,6 +15,7 @@ import {
   UserFlashcardProgress,
   QuestionDifficulty,
   Prisma,
+  UserActivityType,
 } from '@prisma/client';
 import { QuestionNotFoundException } from '../../../../common/exceptions/not-found.exception';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
@@ -357,12 +358,27 @@ export class FlashcardsService {
         },
       });
 
-      await tx.flashcardResult.create({
+      const flashcardResult = await tx.flashcardResult.create({
         data: {
           userId,
           flashcardId: userProgress.flashcardId,
           passed: quality >= 3,
           attemptedAt: reviewedAt,
+        },
+      });
+
+      await tx.userActivity.create({
+        data: {
+          userId,
+          sourceKey: `flashcard-result:${flashcardResult.id}`,
+          type: UserActivityType.FLASHCARD_REVIEW,
+          description: 'Reviewed a flashcard',
+          details: {
+            sourceId: flashcardResult.id,
+            flashcardId: userProgress.flashcardId,
+            passed: quality >= 3,
+          },
+          createdAt: reviewedAt,
         },
       });
 
@@ -381,6 +397,7 @@ export class FlashcardsService {
     userId: string,
     topicId: string | null,
     answers: Array<{ questionId: string; isCorrect: boolean }>,
+    attemptId?: string,
   ): Promise<number> {
     const now = new Date();
     const scheduledCount = await this.prisma.$transaction(async (tx) => {
@@ -396,6 +413,15 @@ export class FlashcardsService {
           throw new NotFoundException(
             `Question ${answer.questionId} not found for topic ${topicId}`,
           );
+        }
+        const sourceKey = attemptId
+          ? `quiz-review:${attemptId}:${answer.questionId}`
+          : undefined;
+        if (
+          sourceKey &&
+          (await tx.flashcardResult.findUnique({ where: { sourceKey } }))
+        ) {
+          continue;
         }
 
         let flashcard = await tx.flashcard.findFirst({
@@ -460,6 +486,7 @@ export class FlashcardsService {
           data: {
             userId,
             flashcardId: flashcard.id,
+            sourceKey,
             passed: answer.isCorrect,
             attemptedAt: now,
           },

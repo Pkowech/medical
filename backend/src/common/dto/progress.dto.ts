@@ -13,6 +13,7 @@ import {
   IsObject,
   IsArray,
   ValidateNested,
+  MaxLength,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import {
@@ -120,6 +121,14 @@ export class UpdateProgressDto {
   @IsOptional()
   @IsNumber()
   clientTimestamp?: number;
+
+  @ApiPropertyOptional({
+    description: 'Stable key used to deduplicate retried progress updates',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  idempotencyKey?: string;
 }
 
 export class ProgressUpdateDto extends UpdateProgressDto {

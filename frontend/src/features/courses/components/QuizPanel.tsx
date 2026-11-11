@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
   quizService,
@@ -10,6 +10,7 @@ import { useXapi } from '@/lib/xapi/useXapi';
 import { URLS } from '@/lib/urls';
 import { CheckCircle, XCircle, AlertCircle, RefreshCw, Send } from 'lucide-react';
 import { useCourseStudySession } from '@/features/learning-management/study/components/CourseStudySessionProvider';
+import { v4 as uuidv4 } from 'uuid';
 
 interface Question {
   id: string;
@@ -42,6 +43,7 @@ export const QuizPanel = ({
   onReturn,
   immersive = false,
 }: QuizPanelProps) => {
+  const attemptId = useMemo(() => uuidv4(), [lessonId, scope]);
   const { trackAction, XAPI_VERBS } = useXapi();
   const { activeSession, recordCourseActivity } = useCourseStudySession();
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -94,7 +96,7 @@ export const QuizPanel = ({
     if (!selectedOption || isSubmitted || isSubmitting) return;
 
     const currentQuestion = questions[currentQuestionIndex];
-    const selected = currentQuestion.options.find((option) => option.id === selectedOption);
+    const selected = currentQuestion.options.find(option => option.id === selectedOption);
     setIsSubmitting(true);
     setSubmissionError(null);
 
@@ -106,18 +108,22 @@ export const QuizPanel = ({
         ...previous,
         [currentQuestion.id]: [selectedOption],
       }));
-      if (result.correct) setScore((previous) => previous + 1);
+      if (result.correct) setScore(previous => previous + 1);
 
-      trackAction(XAPI_VERBS.ATTEMPTED, {
-        id: `${URLS.BASE}/quizzes/${lessonId || 'general'}/question/${currentQuestion.id}`,
-        definition: {
-          name: { 'en-US': currentQuestion.text },
-          type: 'http://adlnet.gov/expapi/activities/question',
+      trackAction(
+        XAPI_VERBS.ATTEMPTED,
+        {
+          id: `${URLS.BASE}/quizzes/${lessonId || 'general'}/question/${currentQuestion.id}`,
+          definition: {
+            name: { 'en-US': currentQuestion.text },
+            type: 'http://adlnet.gov/expapi/activities/question',
+          },
         },
-      }, {
-        success: result.correct,
-        response: selected?.text,
-      });
+        {
+          success: result.correct,
+          response: selected?.text,
+        }
+      );
     } catch (error) {
       setSubmissionError(error instanceof Error ? error.message : 'Answer could not be submitted.');
     } finally {
@@ -158,16 +164,17 @@ export const QuizPanel = ({
           questions.map(question => ({
             questionId: question.id,
             selectedAnswers: submittedAnswers[question.id] || [],
-          })),
+          }))
         );
         result = topicResult;
       } else if ((scope === 'unit' || scope === 'assessment') && lessonId) {
         const unitResult = await quizService.submitUnitQuiz(
           lessonId,
+          attemptId,
           questions.map(question => ({
             questionId: question.id,
             selectedOption: submittedAnswers[question.id]?.[0] || '',
-          })),
+          }))
         );
         result = {
           ...result,
@@ -183,10 +190,8 @@ export const QuizPanel = ({
         recordCourseActivity(
           'quiz',
           courseId ?? activeSession?.courseId,
-          scope === 'topic'
-            ? String(lessonId)
-            : activeSession?.topicId ?? String(lessonId),
-          result.score,
+          scope === 'topic' ? String(lessonId) : (activeSession?.topicId ?? String(lessonId)),
+          result.score
         );
       }
       if (scope === 'topic' && lessonId) {
@@ -202,21 +207,27 @@ export const QuizPanel = ({
           console.warn('Quiz passed, but topic data could not be refreshed:', error);
         }
       }
-      trackAction(XAPI_VERBS.COMPLETED, {
-        id: `${URLS.BASE}/quizzes/${lessonId || 'general'}`,
+      trackAction(
+        XAPI_VERBS.COMPLETED,
+        {
+          id: `${URLS.BASE}/quizzes/${lessonId || 'general'}`,
           definition: {
-          name: { 'en-US': `${scope === 'topic' ? 'Topic Mastery Quiz' : scope === 'assessment' ? 'Assessment' : 'Unit Quiz'}: ${lessonTitle || (scope === 'topic' ? 'Topic' : scope === 'assessment' ? 'Assessment' : 'Unit')}` },
-          type: 'http://adlnet.gov/expapi/activities/assessment',
-        }
-      }, {
-        score: {
-          scaled: result.score / 100,
-          raw: result.score,
-          min: 0,
-          max: 100,
+            name: {
+              'en-US': `${scope === 'topic' ? 'Topic Mastery Quiz' : scope === 'assessment' ? 'Assessment' : 'Unit Quiz'}: ${lessonTitle || (scope === 'topic' ? 'Topic' : scope === 'assessment' ? 'Assessment' : 'Unit')}`,
+            },
+            type: 'http://adlnet.gov/expapi/activities/assessment',
+          },
         },
-        success: result.passed,
-      });
+        {
+          score: {
+            scaled: result.score / 100,
+            raw: result.score,
+            min: 0,
+            max: 100,
+          },
+          success: result.passed,
+        }
+      );
     } catch (error) {
       setSubmissionError(error instanceof Error ? error.message : 'Could not save quiz results.');
     } finally {
@@ -254,14 +265,21 @@ export const QuizPanel = ({
     const passed = finalResult?.passed ?? scorePercentage >= (scope === 'topic' ? 70 : 80);
     return (
       <div className="bg-card/80 dark:bg-card/50 backdrop-blur-sm rounded-xl p-8 shadow-sm border border-border dark:border-border/50 text-center animate-in fade-in zoom-in duration-500 motion-reduce:animate-none">
-        <div className={`w-20 h-20 mx-auto rounded-full flex items-center justify-center mb-6 ${passed ? 'bg-green-100 dark:bg-green-500/20' : 'bg-red-100 dark:bg-red-500/20'}`}>
-          {passed ? <CheckCircle className="w-10 h-10 text-green-600" /> : <AlertCircle className="w-10 h-10 text-red-600" />}
+        <div
+          className={`w-20 h-20 mx-auto rounded-full flex items-center justify-center mb-6 ${passed ? 'bg-green-100 dark:bg-green-500/20' : 'bg-red-100 dark:bg-red-500/20'}`}
+        >
+          {passed ? (
+            <CheckCircle className="w-10 h-10 text-green-600" />
+          ) : (
+            <AlertCircle className="w-10 h-10 text-red-600" />
+          )}
         </div>
         <h3 className="text-2xl font-bold text-foreground dark:text-foreground">Quiz Complete!</h3>
         <p className="text-muted-foreground mt-2 mb-6 text-lg">
-          Your score: <span className="font-bold text-foreground dark:text-foreground">{scorePercentage}%</span>
+          Your score:{' '}
+          <span className="font-bold text-foreground dark:text-foreground">{scorePercentage}%</span>
         </p>
-        
+
         {passed ? (
           <div className="bg-green-50 dark:bg-green-900/20 border border-green-100 dark:border-green-800/30 p-4 rounded-lg mb-8">
             <p className="text-green-800 dark:text-green-300 font-medium">
@@ -286,37 +304,36 @@ export const QuizPanel = ({
           </p>
         )}
 
-        {finalResult?.recommendations?.topics.map((topic) => (
+        {finalResult?.recommendations?.topics.map(topic => (
           <section
             key={topic.topicId}
             className="mb-6 rounded-xl border border-border bg-background/70 p-4 text-left"
           >
-            <h4 className="font-semibold">
-              Learning diagnosis: {topic.topicName}
-            </h4>
+            <h4 className="font-semibold">Learning diagnosis: {topic.topicName}</h4>
             <p className="mt-2 text-sm text-muted-foreground">
               {topic.diagnosis === 'prerequisite_gap'
                 ? 'Prior quiz evidence suggests a gap in mapped prerequisite knowledge.'
                 : topic.diagnosis === 'target_content_gap'
                   ? 'Mapped prerequisites look sufficiently strong; the current difficulty is more likely specific to this topic.'
-                  : 'There is not enough prerequisite evidence to tell whether the difficulty is foundational or specific to this topic.'}
-              {' '}Topic accuracy: {Math.round(topic.accuracy * 100)}%; confidence: {topic.confidence}.
+                  : 'There is not enough prerequisite evidence to tell whether the difficulty is foundational or specific to this topic.'}{' '}
+              Topic accuracy: {Math.round(topic.accuracy * 100)}%; confidence: {topic.confidence}.
             </p>
             {topic.prerequisiteEvidence.length > 0 && (
               <ul className="mt-3 space-y-1 text-xs text-muted-foreground">
-                {topic.prerequisiteEvidence.map((evidence) => (
+                {topic.prerequisiteEvidence.map(evidence => (
                   <li key={evidence.unitId}>
-                    {evidence.unitName}: {evidence.accuracy === null
+                    {evidence.unitName}:{' '}
+                    {evidence.accuracy === null
                       ? 'no prior answers'
-                      : `${Math.round(evidence.accuracy * 100)}% accuracy`}
-                    {' '}({evidence.sampleSize} responses)
+                      : `${Math.round(evidence.accuracy * 100)}% accuracy`}{' '}
+                    ({evidence.sampleSize} responses)
                   </li>
                 ))}
               </ul>
             )}
             {topic.recommendations.length > 0 && (
               <ul className="mt-3 space-y-2">
-                {topic.recommendations.map((recommendation) => (
+                {topic.recommendations.map(recommendation => (
                   <li key={`${recommendation.kind}:${recommendation.id}`}>
                     <Link
                       href={recommendation.href}
@@ -353,11 +370,13 @@ export const QuizPanel = ({
   const currentQuestion = questions[currentQuestionIndex];
 
   return (
-    <div className={`${
-      immersive
-        ? 'mt-0 rounded-2xl border border-border bg-card/80 p-4 shadow-sm backdrop-blur-sm dark:border-border dark:bg-card/70 sm:p-6'
-        : 'mt-6 rounded-xl border border-border bg-card/80 p-6 shadow-sm backdrop-blur-sm dark:border-border/50 dark:bg-card/50'
-    } animate-in slide-in-from-bottom-4 duration-500 motion-reduce:animate-none`}>
+    <div
+      className={`${
+        immersive
+          ? 'mt-0 rounded-2xl border border-border bg-card/80 p-4 shadow-sm backdrop-blur-sm dark:border-border dark:bg-card/70 sm:p-6'
+          : 'mt-6 rounded-xl border border-border bg-card/80 p-6 shadow-sm backdrop-blur-sm dark:border-border/50 dark:bg-card/50'
+      } animate-in slide-in-from-bottom-4 duration-500 motion-reduce:animate-none`}
+    >
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-lg font-bold text-foreground dark:text-foreground">
           {scope === 'topic'
@@ -393,7 +412,7 @@ export const QuizPanel = ({
             {currentQuestion.text}
           </h4>
           <div className="space-y-3">
-            {currentQuestion.options.map((option) => {
+            {currentQuestion.options.map(option => {
               const isSelected = selectedOption === option.id;
               const isCorrect = isSubmitted && isSelected && answerCorrect === true;
               const isIncorrect = isSubmitted && isSelected && answerCorrect === false;
@@ -403,7 +422,8 @@ export const QuizPanel = ({
 
               if (isSubmitted) {
                 if (isCorrect) {
-                  borderClass = 'border-green-500 dark:border-green-500/50 ring-1 ring-green-500/20';
+                  borderClass =
+                    'border-green-500 dark:border-green-500/50 ring-1 ring-green-500/20';
                   bgClass = 'bg-green-50/50 dark:bg-green-500/10';
                   textClass = 'text-green-700 dark:text-green-400';
                 } else if (isIncorrect) {
@@ -435,15 +455,25 @@ export const QuizPanel = ({
 
           {isSubmitted && (
             <div className="mt-6 p-4 bg-blue-50/50 dark:bg-blue-500/5 border border-blue-100 dark:border-blue-800/30 rounded-xl animate-in fade-in slide-in-from-top-2 duration-300">
-              <p className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-1">Explanation</p>
-              <p className="text-sm text-muted-foreground dark:text-muted-foreground">{currentQuestion.explanation || 'Answer recorded.'}</p>
+              <p className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-1">
+                Explanation
+              </p>
+              <p className="text-sm text-muted-foreground dark:text-muted-foreground">
+                {currentQuestion.explanation || 'Answer recorded.'}
+              </p>
             </div>
           )}
         </div>
 
-        {submissionError && <p role="alert" className="text-sm text-red-600">{submissionError}</p>}
+        {submissionError && (
+          <p role="alert" className="text-sm text-red-600">
+            {submissionError}
+          </p>
+        )}
 
-        <div className={`flex gap-4 ${immersive ? 'sticky bottom-0 -mx-4 mt-3 bg-gradient-to-t from-white via-white/95 to-transparent px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-4 dark:from-slate-900 dark:via-slate-900/95 sm:-mx-6 sm:px-6' : ''}`}>
+        <div
+          className={`flex gap-4 ${immersive ? 'sticky bottom-0 -mx-4 mt-3 bg-gradient-to-t from-white via-white/95 to-transparent px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-4 dark:from-slate-900 dark:via-slate-900/95 sm:-mx-6 sm:px-6' : ''}`}
+        >
           {!isSubmitted ? (
             <button
               onClick={handleSubmit}

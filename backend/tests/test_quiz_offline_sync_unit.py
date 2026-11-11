@@ -35,8 +35,26 @@ const questions = [
   },
   { id: 'question-2', points: 1, options: [{ id: 'option-2-correct', isCorrect: true }] },
 ];
+let questionWhere;
 const prisma = {
-  question: { findMany: async () => questions },
+  topic: {
+    findUnique: async () => ({
+      id: topicId,
+      name: 'Topic',
+      unitId: 'unit-1',
+      unit: {
+        id: 'unit-1',
+        isPublished: true,
+        course: { id: 'course-1', status: 'published' },
+      },
+    }),
+  },
+  question: {
+    findMany: async args => {
+      questionWhere = args.where;
+      return questions;
+    },
+  },
   offlinePracticeAttempt: { upsert: async () => ({}) },
 };
 let masteryCalls = 0;
@@ -60,6 +78,7 @@ const service = new QuizService(prisma, {}, {}, {}, masteryGate, {}, {}, {});
     formative: true,
   });
   assert.equal(masteryCalls, 0);
+  assert.ok(questionWhere.AND[1].OR.some(entry => entry.quizQuestions?.some));
 
   let upsertCalls = 0;
   prisma.offlinePracticeAttempt.upsert = async () => {

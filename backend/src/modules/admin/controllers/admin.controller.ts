@@ -8,6 +8,7 @@ import {
   Param,
   Query,
   Delete,
+  BadRequestException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -28,6 +29,10 @@ import { PrismaService } from '#infrastructure/prisma/prisma.service';
 import { AdminCreateUserDto, AdminUpdateUserDto } from '../dto/admin-user.dto';
 import { AdminSettingsService } from '../services/admin-settings.service';
 import { AdminSystemSettingsDto } from '../dto/system-settings.dto';
+import {
+  ApplicationOutboxProcessor,
+  OutboxEventState,
+} from '#modules/engagement-communication/services/application-outbox.processor';
 
 @ApiTags('Admin')
 @Controller('admin')
@@ -39,6 +44,7 @@ export class AdminController {
   constructor(
    private readonly adminService: AdminService,
    private readonly adminSettingsService: AdminSettingsService,
+   private readonly outboxProcessor: ApplicationOutboxProcessor,
    private readonly prisma: PrismaService) {}
 
   @Get('settings')
@@ -184,5 +190,34 @@ export class AdminController {
       orderBy: { lastOccurredAt: 'desc' },
       take,
     });
+  }
+
+  @Get('outbox/events')
+  @Action('read')
+  @ApiOperation({ summary: 'Inspect application outbox events' })
+  async getOutboxEvents(
+    @Query('state') state: OutboxEventState = 'pending',
+    @Query('limit') limit = '50',
+  ) {
+    const supportedStates: OutboxEventState[] = [
+      'pending',
+      'processed',
+      'failed',
+    ];
+    if (!supportedStates.includes(state)) {
+      throw new BadRequestException('Unsupported outbox event state');
+    }
+    return this.outboxProcessor.inspectEvents(
+      state,
+      Number.parseInt(limit, 10) || 50,
+    );
+  }
+
+  @Post('outbox/events/:id/replay')
+  @Action('update')
+  @ApiOperation({ summary: 'Replay an application outbox event' })
+  async replayOutboxEvent(@Param('id') id: string) {
+    await this.outboxProcessor.replayEvent(id);
+    return { id, status: 'pending' };
   }
 }

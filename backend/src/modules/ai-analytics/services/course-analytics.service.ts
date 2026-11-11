@@ -14,7 +14,6 @@ import {
 } from './analytics-cache.constants';
 import { getErrorMessage } from '#common/utils/error.utils';
 import { RecommendationItemDto } from '#common/dto/analytics.dto';
-import { v4 as uuidv4 } from 'uuid';
 
 /**
  * CourseAnalyticsService
@@ -226,41 +225,17 @@ export class CourseAnalyticsService implements OnModuleInit {
   }
 
   /**
-   * Track a course/learning event for analytics
+   * @deprecated No current learning flow uses analytics_events as a source.
    */
   async trackCourseEvent(
     userId: string,
     eventType: string,
     metadata: Record<string, unknown>,
   ): Promise<void> {
-    try {
-      await this.prisma.analyticsEvent.create({
-        data: {
-          id: uuidv4(),
-          userId,
-          eventType,
-          data: metadata as any,
-          timestamp: new Date(),
-        },
-      });
-
-      // Fire-and-forget batch event to gRPC/Rust
-      void this.callGrpc(
-        this.analyticsServiceGrpc.updateBkt({
-          userId: userId,
-          skillId: metadata.skillId as string,
-          isCorrect: (metadata.isCorrect as boolean) || false,
-        }),
-      ).catch((err) => {
-        this.logger.warn(
-          `Failed to batch event to Rust: ${getErrorMessage(err)}`,
-        );
-      });
-    } catch (error) {
-      this.logger.error(
-        `Failed to track course event: ${getErrorMessage(error)}`,
-      );
-    }
+    this.logger.warn(
+      `Ignoring deprecated analytics event "${eventType}" for user ${userId}; persist learning evidence in its domain record.`,
+    );
+    void metadata;
   }
 
   /**

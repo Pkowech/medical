@@ -649,6 +649,54 @@ export class AssessmentAnalyticsService implements OnModuleInit {
             },
           ],
         },
+        {
+          OR: [
+            { quizQuestions: { none: {} } },
+            {
+              quizQuestions: {
+                some: { quiz: { is: { topicPracticeForId: { not: null } } } },
+              },
+            },
+            {
+              quizQuestions: {
+                some: {
+                  quiz: {
+                    is: {
+                      isPublished: true,
+                      AND: [
+                        {
+                          OR: [
+                            { unitId: null, topicId: null },
+                            {
+                              unit: {
+                                is: {
+                                  isPublished: true,
+                                  course: { is: { status: 'published' } },
+                                },
+                              },
+                            },
+                            {
+                              topic: {
+                                is: {
+                                  unit: {
+                                    is: {
+                                      isPublished: true,
+                                      course: { is: { status: 'published' } },
+                                    },
+                                  },
+                                },
+                              },
+                            },
+                          ],
+                        },
+                      ],
+                    },
+                  },
+                },
+              },
+            },
+          ],
+        },
       ],
       ...(session.unitId
         ? { unitId: session.unitId }
@@ -858,19 +906,25 @@ export class AssessmentAnalyticsService implements OnModuleInit {
     userId: string,
     skillId: string,
     isCorrect: boolean,
+    eventId?: string,
   ): Promise<void> {
     await this.callGrpc(
       this.analyticsServiceGrpc.updateBkt({
         userId,
         skillId,
         isCorrect,
+        eventId: eventId ?? '',
       }),
     );
     const cacheKey = ANALYTICS_CACHE_CONFIG.ASSESSMENT.PREDICTIONS(
       userId,
       skillId,
     );
-    await this.redisService.del(cacheKey);
+    await this.redisService.del(cacheKey).catch((error) => {
+      this.logger.warn(
+        `BKT update succeeded for skill ${skillId}, but its cache could not be invalidated: ${error instanceof Error ? error.name : 'UnknownError'}`,
+      );
+    });
   }
 
   /**
@@ -1035,7 +1089,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
   }
 
   /**
-   * Track assessment submission event
+   * @deprecated Uses the legacy generic analytics_events ingestion pipeline.
    */
   async trackAssessmentSubmission(
     userId: string,

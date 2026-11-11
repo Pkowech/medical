@@ -6,6 +6,7 @@ import { PrismaModule } from '#infrastructure/prisma/prisma.module';
 import { RedisModule } from '#infrastructure/redis/redis.module';
 import { GrpcModule } from '#infrastructure/grpc/grpc.module';
 import { AuthModule } from '#modules/auth/auth.module';
+import { MetricsModule } from '#infrastructure/metrics/metrics.module';
 
 // Communication Controllers
 import { ChatController } from './controllers/chat.controller';
@@ -45,6 +46,7 @@ import { ApplicationOutboxProcessor } from './services/application-outbox.proces
     RedisModule,
     forwardRef(() => AuthModule),
     GrpcModule,
+    MetricsModule,
     HttpModule,
     ...(process.env.ENABLE_REDIS === 'true' ? [AnalyticsQueueModule] : []),
     ConfigModule,
@@ -84,6 +86,7 @@ import { ApplicationOutboxProcessor } from './services/application-outbox.proces
     RewardsService,
     PeerBenchmarkingService,
     OnboardingService,
+    ApplicationOutboxProcessor,
   ],
 })
 export class EngagementCommunicationModule {}

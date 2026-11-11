@@ -315,6 +315,119 @@ service.logger = { error: () => undefined, log: () => undefined };
     )
 
 
+def test_full_quiz_submission_replays_existing_attempt_and_rejects_reuse():
+    run_typescript(
+        r"""
+const assert = require('node:assert/strict');
+const { ConflictException } = require('@nestjs/common');
+const { QuizService } =
+  require('./src/modules/education/assessment/services/quiz.service.ts');
+
+const recommendations = { topics: [], recommendations: [] };
+const quiz = {
+  id: 'quiz-1',
+  unitId: 'unit-1',
+  topicId: null,
+  isPublished: true,
+  maxAttempts: 1,
+  questions: [{ questionId: 'question-1', question: { id: 'question-1', topicIds: [] } }],
+  unit: {
+    isPublished: true,
+    course: { status: 'published' },
+    courseId: 'course-1',
+  },
+};
+const attempt = {
+  id: '123e4567-e89b-42d3-a456-426614174000',
+  userId: 'student-1',
+  quizId: quiz.id,
+  quiz: { id: quiz.id, unitId: quiz.unitId, topicId: null, unit: quiz.unit },
+  answers: [{ questionId: 'question-1', selectedOption: 'option-1' }],
+  feedback: recommendations,
+  responses: [{ questionId: 'question-1', isCorrect: true }],
+  score: 100,
+};
+let attemptCountCalls = 0;
+const service = Object.create(QuizService.prototype);
+service.prisma = {
+  quiz: {
+    findFirst: async () => {
+      throw new Error('A retry must not depend on the live quiz');
+    },
+  },
+  quizAttempt: {
+    findUnique: async () => attempt,
+    count: async () => { attemptCountCalls += 1; return 1; },
+  },
+};
+service.recommendationService = {
+  recommendForAnswers: async () => {
+    throw new Error('Stored recommendations should be replayed');
+  },
+};
+
+(async () => {
+  const replay = await service.submitQuiz(
+    'student-1',
+    'quiz-1',
+    '123e4567-e89b-42d3-a456-426614174000',
+    [{ questionId: 'question-1', selectedOption: 'option-1' }],
+  );
+  assert.equal(replay.id, attempt.id);
+  assert.deepEqual(replay.recommendations, recommendations);
+  assert.equal('responses' in replay, false);
+  assert.equal('quiz' in replay, false);
+  assert.equal(attemptCountCalls, 0);
+
+  await assert.rejects(
+    service.submitQuiz(
+      'student-1',
+      'quiz-1',
+      '123e4567-e89b-42d3-a456-426614174000',
+      [{ questionId: 'question-1', selectedOption: 'option-2' }],
+    ),
+    error => error instanceof ConflictException,
+  );
+  await assert.rejects(
+    service.submitQuiz(
+      'another-student',
+      'quiz-1',
+      '123e4567-e89b-42d3-a456-426614174000',
+      [{ questionId: 'question-1', selectedOption: 'option-1' }],
+    ),
+    error => error instanceof ConflictException,
+  );
+
+  let raceLookupCount = 0;
+  const raceService = Object.create(QuizService.prototype);
+  raceService.prisma = {
+    quiz: { findFirst: async () => quiz },
+    quizAttempt: {
+      findUnique: async () => {
+        raceLookupCount += 1;
+        return raceLookupCount === 1 ? null : attempt;
+      },
+      count: async () => 0,
+    },
+    $transaction: async () => { throw { code: 'P2002' }; },
+  };
+  raceService.recommendationService = service.recommendationService;
+  const concurrentReplay = await raceService.submitQuiz(
+    'student-1',
+    'quiz-1',
+    '123e4567-e89b-42d3-a456-426614174000',
+    [{ questionId: 'question-1', selectedOption: 'option-1' }],
+  );
+  assert.equal(concurrentReplay.id, attempt.id);
+  assert.equal(raceLookupCount, 2);
+})().catch(error => {
+  console.error(error);
+  process.exitCode = 1;
+});
+"""
+    )
+
+
 def test_hiding_question_invalidates_question_discovery_caches():
     run_typescript(
         r"""
@@ -346,6 +459,8 @@ service.logger = { log: () => undefined };
   });
   assert.ok(patterns.includes('unit:*:questions:v3:*'));
   assert.ok(patterns.includes('topic:*:questions:v3:*'));
+  assert.ok(patterns.includes('quizzes:*'));
+  assert.ok(patterns.includes('quiz:*'));
 })().catch(error => {
   console.error(error);
   process.exitCode = 1;
@@ -387,6 +502,37 @@ service.logger = { debug: () => undefined, error: () => undefined };
 (async () => {
   await service.clearCache({ id: 'course-1', code: 'MED-101' });
   assert.ok(patterns.includes('course:recommended-v2:*'));
+  assert.ok(patterns.includes('unit:*:questions:v3:*'));
+  assert.ok(patterns.includes('topic:*:questions:v3:*'));
+  assert.ok(patterns.includes('quizzes:*'));
+  assert.ok(patterns.includes('quiz:*'));
+})().catch(error => {
+  console.error(error);
+  process.exitCode = 1;
+});
+"""
+    )
+
+
+def test_unit_visibility_changes_invalidate_question_discovery_caches():
+    run_typescript(
+        r"""
+const assert = require('node:assert/strict');
+const { UnitsService } =
+  require('./src/modules/education/courses/services/units.service.ts');
+
+const patterns = [];
+const service = Object.create(UnitsService.prototype);
+service.redisService = {
+  del: async () => undefined,
+  delPattern: async pattern => { patterns.push(pattern); },
+};
+service.logger = { error: () => undefined };
+
+(async () => {
+  await service.clearCacheForUnit({ id: 'unit-1', courseId: 'course-1' });
+  assert.ok(patterns.includes('unit:*:questions:v3:*'));
+  assert.ok(patterns.includes('topic:*:questions:v3:*'));
 })().catch(error => {
   console.error(error);
   process.exitCode = 1;
@@ -424,6 +570,89 @@ service.prisma = {
     isPublished: true,
     course: { is: { status: 'published' } },
   });
+  assert.ok(query.AND[1].OR.some(entry => entry.quizQuestions?.some));
+})().catch(error => {
+  console.error(error);
+  process.exitCode = 1;
+});
+"""
+    )
+
+
+def test_answer_submission_filters_inactive_and_unpublished_content():
+    run_typescript(
+        r"""
+const assert = require('node:assert/strict');
+const { NotFoundException } = require('@nestjs/common');
+const { QuizService } =
+  require('./src/modules/education/assessment/services/quiz.service.ts');
+
+let query;
+let attempts = 0;
+const service = Object.create(QuizService.prototype);
+service.prisma = {
+  question: {
+    findFirst: async args => {
+      query = args.where;
+      return null;
+    },
+  },
+};
+service.recordAttempt = async () => { attempts += 1; };
+
+(async () => {
+  await assert.rejects(
+    service.submitAnswer('student-1', 'hidden-question', 'option-1'),
+    error => error instanceof NotFoundException,
+  );
+  assert.equal(query.isActive, true);
+  assert.ok(query.AND[0].OR.some(entry => entry.unit?.is?.isPublished));
+  assert.ok(query.AND[1].OR.some(entry => entry.quizQuestions?.some));
+  assert.equal(attempts, 0);
+})().catch(error => {
+  console.error(error);
+  process.exitCode = 1;
+});
+"""
+    )
+
+
+def test_full_quiz_submission_rechecks_current_parent_publication():
+    run_typescript(
+        r"""
+const assert = require('node:assert/strict');
+const { NotFoundException } = require('@nestjs/common');
+const { QuizService } =
+  require('./src/modules/education/assessment/services/quiz.service.ts');
+
+const service = Object.create(QuizService.prototype);
+service.prisma = {
+  quiz: {
+    findFirst: async () => ({
+      id: 'quiz-1',
+      unitId: 'unit-1',
+      topicId: null,
+      unit: {
+        courseId: 'course-1',
+        isPublished: false,
+        course: { status: 'published' },
+      },
+      topic: null,
+      questions: [{ questionId: 'question-1' }],
+    }),
+  },
+};
+
+(async () => {
+  await assert.rejects(
+    service.submitQuiz(
+      'student-1',
+      'unit-1',
+      '123e4567-e89b-42d3-a456-426614174000',
+      [],
+    ),
+    error => error instanceof NotFoundException,
+  );
 })().catch(error => {
   console.error(error);
   process.exitCode = 1;

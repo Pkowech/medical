@@ -37,6 +37,7 @@ export interface TokenValidationResult {
 export interface TokenData {
   token: string;
   userId: string;
+  sessionId?: string;
   deviceId?: string;
   expiresAt: Date;
 }

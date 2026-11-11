@@ -119,6 +119,72 @@ pnpm run test:cov
 
 ## Deployment
 
+### Database bootstrap, backup, and restore
+
+The backend CI workflow applies every checked-in migration to a fresh PostgreSQL
+database and compares the resulting schema with `prisma/schema.prisma`. Use
+`pnpm prisma migrate deploy` for deployments; do not use `migrate reset` or
+`db push` against production.
+
+The demo and development seed scripts are disabled when `NODE_ENV=production`.
+Default role and permission records are initialized by the application. For an
+initial administrator, start the application in a private environment so role
+initialization completes, then run `pnpm admin:bootstrap` with
+`ADMIN_BOOTSTRAP_CONFIRM=true`, `ADMIN_BOOTSTRAP_EMAIL`, and
+`ADMIN_BOOTSTRAP_PASSWORD` set only in the process environment. The password
+must be at least 16 characters. The command creates a new account only; it
+never changes an existing account's password or elevates an existing
+non-admin. Rotate the bootstrap password after first sign-in.
+
+Before a production migration, take a provider-native snapshot and a logical
+backup. For a PostgreSQL logical backup, use a protected shell and a restricted
+backup destination:
+
+```bash
+pg_dump --format=custom --no-owner --no-acl "$DIRECT_URL" --file medtrack-pre-migration.dump
+pg_restore --list medtrack-pre-migration.dump
+```
+
+Restore only into a separately verified recovery database, then validate
+application health and representative records before considering a
+cutover. Prisma migrations are forward-only; rollback a failed deployment with
+a tested restore or a reviewed forward-fix migration, not by editing migration
+history. Keep database and R2 backups/inventories separate. Do not remove R2
+objects during reconciliation unless each object is conclusively matched to a
+record or approved for deletion.
+
+The development and demo seeds are not used to load production academic data.
+Use the versioned catalogue importer for reviewed course, unit, and topic JSON.
+Each file must have `schemaVersion: 1`; provide course `code`, `name`, `title`,
+`description`, and `units`, then stable `slug`, `name`, `title`, `description`,
+`order`, `estimatedMinutes`, and nested `topics` for each unit. Topics require
+the same stable slug, name, description, order, and estimated duration fields.
+The importer rejects duplicate slugs/orders and conflicting existing content.
+It only creates missing records, never deletes or overwrites records, and new
+courses/units remain unpublished pending normal review and publication.
+
+Run the read-only preflight against staging first; it prints record counts and
+the SHA-256 of the exact input file:
+
+```bash
+pnpm run catalogue:import -- ./reviewed-catalogue.json
+```
+
+After review, apply only that exact file in a transaction:
+
+```bash
+pnpm run catalogue:import -- ./reviewed-catalogue.json --apply --confirm-sha256=<preflight-sha256>
+```
+
+The JSON report lists the number of records to create versus records that
+already match the file. Production additionally requires
+`CATALOGUE_IMPORT_ALLOW_PRODUCTION=true` in
+the protected process environment. Re-run the preflight after any file change,
+review the hash and conflict output, and keep the import file and resulting
+report with the deployment record. The importer does not publish content or
+remove catalogue records; content edits and removals require separately
+reviewed changes.
+
 ### Deploy backend and Rust analytics together on Render
 
 The [backend Dockerfile](./Dockerfile) builds both services into one image. Configure the Render web service with the repository root (`.`) as its root directory and `backend/Dockerfile` as its Dockerfile path. Set the service environment variables required by the backend and Rust analytics, including `DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET`, `JWT_REFRESH_SECRET`, and `RUST_ANALYTICS_API_KEY`.

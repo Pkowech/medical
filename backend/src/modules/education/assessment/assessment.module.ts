@@ -30,6 +30,7 @@ import { WeaknessOrchestrationService } from './services/weakness-orchestration.
 import { AssessmentRecommendationService } from './services/assessment-recommendation.service';
 
 import { SM2AlgorithmService } from './services/sm2-algorithm.service';
+import { QuizSubmissionListener } from './services/quiz-submission.listener';
 
 @Module({
   imports: [
@@ -64,6 +65,7 @@ import { SM2AlgorithmService } from './services/sm2-algorithm.service';
     QuizGenerationService,
     WeaknessOrchestrationService,
     AssessmentRecommendationService,
+    QuizSubmissionListener,
   ],
   exports: [
     QuizService,

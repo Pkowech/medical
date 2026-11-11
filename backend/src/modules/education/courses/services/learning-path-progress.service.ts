@@ -30,6 +30,7 @@ import {
   mapProgressByKey,
 } from '../utils/path-progress-normalizer';
 import { LearningPathEligibilityService } from './learning-path-eligibility.service';
+import { writeApplicationOutboxEvent } from '#infrastructure/outbox/application-outbox-event';
 
 @Injectable()
 export class LearningPathProgressService {
@@ -81,33 +82,48 @@ export class LearningPathProgressService {
       learningPath.phases,
     );
 
-    const progress = await this.prisma.learningPathProgress.create({
-      data: {
-        user: { connect: { id: userId } },
-        learningPath: { connect: { id: startDto.learningPathId } },
-        status: ProgressStatus.inProgress,
-        overallProgressPercentage: 0,
-        phaseProgress: phaseProgress as unknown as Prisma.JsonArray,
-        moduleProgress: moduleProgress as unknown as Prisma.JsonArray,
-        milestonesAchieved: [],
-        totalTimeSpentMinutes: 0,
-        startedAt: new Date(),
-        lastAccessedAt: new Date(),
-        streakDays: 0,
-        lastActivityDate: new Date(),
-        analytics: {
-          study_sessions: [],
-          performance_trends: [],
-          preferences: startDto.preferences
-            ? { ...startDto.preferences }
-            : {},
-          learning_velocity: {
-            modules_per_week: 0,
-            hours_per_week: 0,
-            consistency_score: 0,
+    const enrolledAt = new Date();
+    const progress = await this.prisma.$transaction(async transaction => {
+      const createdProgress = await transaction.learningPathProgress.create({
+        data: {
+          user: { connect: { id: userId } },
+          learningPath: { connect: { id: startDto.learningPathId } },
+          status: ProgressStatus.inProgress,
+          overallProgressPercentage: 0,
+          phaseProgress: phaseProgress as unknown as Prisma.JsonArray,
+          moduleProgress: moduleProgress as unknown as Prisma.JsonArray,
+          milestonesAchieved: [],
+          totalTimeSpentMinutes: 0,
+          startedAt: enrolledAt,
+          lastAccessedAt: enrolledAt,
+          streakDays: 0,
+          lastActivityDate: enrolledAt,
+          analytics: {
+            study_sessions: [],
+            performance_trends: [],
+            preferences: startDto.preferences
+              ? { ...startDto.preferences }
+              : {},
+            learning_velocity: {
+              modules_per_week: 0,
+              hours_per_week: 0,
+              consistency_score: 0,
+            },
           },
         },
-      },
+      });
+
+      await writeApplicationOutboxEvent(transaction, {
+        eventType: 'learning-path.enrolled',
+        aggregateId: createdProgress.id,
+        dedupeKey: `learning-path-enrolled:${userId}:${startDto.learningPathId}`,
+        payload: {
+          userId,
+          pathId: startDto.learningPathId,
+          enrollmentData: { timestamp: enrolledAt.toISOString() },
+        },
+      });
+      return createdProgress;
     });
 
     // analytics (enrollment count)

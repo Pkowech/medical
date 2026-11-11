@@ -22,6 +22,12 @@ import * as argon2 from 'argon2';
 import { randomUUID } from 'crypto';
 import { createSeedPrisma } from './seed-db';
 
+if (process.env.NODE_ENV === 'production') {
+  throw new Error(
+    'The demo seed is disabled in production. Use the reviewed catalogue import and admin bootstrap procedures.',
+  );
+}
+
 const { pool: _seedPool, prisma } = createSeedPrisma();
 
 async function seedJamesBarchokUser(

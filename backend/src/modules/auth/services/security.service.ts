@@ -47,9 +47,20 @@ export class SecurityService {
   private generateBackupCodes(count = 10): string[] {
     const codes: string[] = [];
     for (let i = 0; i < count; i++) {
-      codes.push(Math.random().toString(36).substr(2, 10).toUpperCase());
+      codes.push(crypto.randomBytes(16).toString('hex').toUpperCase());
     }
     return codes;
+  }
+
+  private normalizeBackupCode(code: string): string {
+    return code.replace(/[\s-]/g, '').toUpperCase();
+  }
+
+  private hashBackupCode(code: string): string {
+    return crypto
+      .createHash('sha256')
+      .update(this.normalizeBackupCode(code))
+      .digest('hex');
   }
 
   async setupTwoFactor(
@@ -71,7 +82,7 @@ export class SecurityService {
     const settingsData = {
       userId,
       twoFactorSecret: secret.base32,
-      backupCodes: this.generateBackupCodes(),
+      backupCodes: [],
     };
 
     if (!settings) {
@@ -101,7 +112,7 @@ export class SecurityService {
     token: string,
     knownSettings?: Pick<
       UserSecuritySettings,
-      'twoFactorEnabled' | 'twoFactorSecret'
+      'twoFactorEnabled' | 'twoFactorSecret' | 'backupCodes'
     > | null,
   ): Promise<boolean> {
     const settings =
@@ -119,7 +130,29 @@ export class SecurityService {
       encoding: 'base32',
       token,
     });
-    if (!isValid) return false;
+    if (!isValid) {
+      if (!settings.twoFactorEnabled) return false;
+
+      const backupCodes = settings.backupCodes ?? [];
+      const normalizedCode = this.normalizeBackupCode(token);
+      const hashedCode = this.hashBackupCode(normalizedCode);
+      const matchingCode = backupCodes.find(
+        (code) => code === hashedCode || code === normalizedCode,
+      );
+      if (!matchingCode) return false;
+
+      const result = await this.prisma.userSecuritySettings.updateMany({
+        where: {
+          userId,
+          twoFactorEnabled: true,
+          backupCodes: { has: matchingCode },
+        },
+        data: {
+          backupCodes: backupCodes.filter((code) => code !== matchingCode),
+        },
+      });
+      return result.count > 0;
+    }
 
     if (!settings.twoFactorEnabled) {
       await this.prisma.userSecuritySettings.update({
@@ -473,11 +506,16 @@ export class SecurityService {
     if (!settings) {
       throw new NotFoundException('Security settings not found');
     }
+    if (!settings.twoFactorEnabled) {
+      throw new BadRequestException(
+        'Enable two-factor authentication before generating backup codes',
+      );
+    }
 
     const newCodes = this.generateBackupCodes();
     await this.prisma.userSecuritySettings.update({
       where: { userId },
-      data: { backupCodes: newCodes },
+      data: { backupCodes: newCodes.map((code) => this.hashBackupCode(code)) },
     });
     return newCodes;
   }

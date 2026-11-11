@@ -2,6 +2,12 @@ import 'dotenv/config';
 import { PrismaClient, Permission } from '@prisma/client';
 import { createSeedPrisma } from './seed-db';
 
+if (process.env.NODE_ENV === 'production') {
+  throw new Error(
+    'The development role seed is disabled in production. Default roles are initialized by the application.',
+  );
+}
+
 const { pool: _seedPool, prisma } = createSeedPrisma();
 
 async function main() {

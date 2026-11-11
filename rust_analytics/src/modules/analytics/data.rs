@@ -247,7 +247,7 @@ pub async fn get_progress_data_for_period_db(
     }
 
     let total_course_time: i64 = sqlx::query_scalar(
-            "SELECT COALESCE(SUM(duration), 0) FROM study_sessions WHERE user_id = $1 AND is_valid = true AND start_time BETWEEN $2 AND $3",
+            "SELECT COALESCE(SUM(duration), 0) FROM study_sessions WHERE user_id = $1 AND is_valid = true AND end_time IS NOT NULL AND end_time BETWEEN $2 AND $3",
         )
         .bind(user_id)
         .bind(start_date)

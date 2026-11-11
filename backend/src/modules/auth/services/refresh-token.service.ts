@@ -26,6 +26,7 @@ export class RefreshTokenService {
     userId: string,
     expiresInSeconds?: number,
     deferAudit = false,
+    sessionId?: string,
   ): Promise<string> {
     const refreshToken = uuidv4();
     const configuredExpiry = Number.parseInt(
@@ -37,6 +38,7 @@ export class RefreshTokenService {
     const tokenData: TokenData = {
       token: refreshToken,
       userId,
+      sessionId,
       expiresAt: new Date(Date.now() + refreshTokenExpiry * 1000),
     };
 
@@ -110,6 +112,16 @@ export class RefreshTokenService {
     }
   }
 
+  async getSessionId(refreshToken: string): Promise<string | null> {
+    const tokenData = await this.redisService.get<TokenData>(
+      `${this.tokenPrefix}${refreshToken}`,
+    );
+    if (!tokenData || new Date(tokenData.expiresAt) < new Date()) {
+      return null;
+    }
+    return tokenData.sessionId ?? null;
+  }
+
   async validateRefreshToken(
     refreshToken: string,
     userId: string,
@@ -174,5 +186,17 @@ export class RefreshTokenService {
       );
     }
     await this.redisService.del(userTokensKey);
+  }
+
+  async revokeSessionTokens(userId: string, sessionId: string): Promise<void> {
+    const userTokensKey = `${this.userTokensPrefix}${userId}`;
+    const tokenKeys = await this.redisService.getSetMembers(userTokensKey);
+    for (const tokenKey of tokenKeys) {
+      if (!tokenKey.startsWith(this.tokenPrefix)) continue;
+      const tokenData = await this.redisService.get<TokenData>(tokenKey);
+      if (tokenData?.sessionId !== sessionId) continue;
+      await this.redisService.del(tokenKey);
+      await this.redisService.removeFromSet(userTokensKey, tokenKey);
+    }
   }
 }

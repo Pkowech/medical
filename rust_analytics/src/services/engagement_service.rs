@@ -3,6 +3,7 @@ use crate::analytics_proto::{
     GetStudyPatternsResponse, PreferredStudyTimes, QuizAttemptHistoryItem,
     QuizAttemptHistoryRequest, QuizAttemptHistoryResponse, StudyDurationMetrics,
 };
+use chrono::{Duration, Utc};
 use sqlx::{Pool, Postgres, Row};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -58,16 +59,28 @@ impl EngagementService {
         .await
         .map_err(|error| Status::internal(format!("Total study-time query failed: {error}")))?;
 
+        let today = Utc::now().date_naive();
+        let weekly_start = today
+            .and_hms_opt(0, 0, 0)
+            .ok_or_else(|| Status::internal("Invalid UTC day boundary"))?
+            - Duration::days(6);
+        let weekly_end = today
+            .succ_opt()
+            .and_then(|date| date.and_hms_opt(0, 0, 0))
+            .ok_or_else(|| Status::internal("Invalid UTC day boundary"))?;
         let weekly_metrics: (i64, i64) = sqlx::query_as(
             "SELECT COALESCE(SUM(duration), 0)::bigint,
-                    COUNT(DISTINCT start_time::date)::bigint
+                    COUNT(DISTINCT end_time::date)::bigint
              FROM study_sessions
              WHERE user_id = $1
                AND is_valid = true
                AND end_time IS NOT NULL
-               AND start_time >= date_trunc('day', NOW()) - INTERVAL '6 days'",
+               AND end_time >= $2
+               AND end_time < $3",
         )
         .bind(&user_id)
+        .bind(weekly_start)
+        .bind(weekly_end)
         .fetch_one(&self.pool)
         .await
         .map_err(|error| Status::internal(format!("Weekly study metrics query failed: {error}")))?;

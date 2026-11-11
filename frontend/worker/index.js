@@ -159,6 +159,7 @@ async function flushOutboxFromWorker(db, owner, onSynced) {
     const headers = new Headers(item.headers ?? {});
     headers.delete('authorization');
     headers.set('X-Client-Timestamp', String(item.lastUpdated || item.createdAt));
+    headers.set('X-Idempotency-Key', String(item.id));
     headers.set('Content-Type', 'application/json');
 
     let response;

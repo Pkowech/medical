@@ -12,6 +12,7 @@ import {
   HttpCode,
   HttpStatus,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import { User } from '@prisma/client';
 import {
@@ -39,6 +40,16 @@ export class ProgressController {
     private readonly studyService: StudyService,
   ) {}
 
+  private parseClientTimestamp(value?: string): bigint | undefined {
+    if (value === undefined) return undefined;
+    if (!/^\d+$/.test(value)) {
+      throw new BadRequestException(
+        'X-Client-Timestamp must be epoch milliseconds.',
+      );
+    }
+    return BigInt(value);
+  }
+
   private assertCanReadUserProgress(
     currentUser: User,
     requestedUserId: string,
@@ -63,7 +74,7 @@ export class ProgressController {
   ) {
     const userId = userIdParam === 'me' ? currentUser.id : userIdParam;
     this.assertCanReadUserProgress(currentUser, userId);
-    
+
     // Fetch all components with individual error handling to ensure resilience
     // If one service (e.g. gRPC analytics) is down, we still want to show the rest
     const [
@@ -97,7 +108,9 @@ export class ProgressController {
       ...(coursesResult.status === 'rejected' ? ['courses'] : []),
       ...(enrolledUnitsResult.status === 'rejected' ? ['enrolled units'] : []),
       ...(activitiesResult.status === 'rejected' ? ['activities'] : []),
-      ...(peerComparisonResult.status === 'rejected' ? ['peer comparison'] : []),
+      ...(peerComparisonResult.status === 'rejected'
+        ? ['peer comparison']
+        : []),
       ...(streaksResult.status === 'rejected' || !streaksResult.value
         ? ['streaks']
         : []),
@@ -107,27 +120,36 @@ export class ProgressController {
     ];
 
     return {
-      overview: overviewResult.status === 'fulfilled' ? overviewResult.value : null,
+      overview:
+        overviewResult.status === 'fulfilled' ? overviewResult.value : null,
       courses: coursesResult.status === 'fulfilled' ? coursesResult.value : [],
-      enrolledUnits: enrolledUnitsResult.status === 'fulfilled' ? enrolledUnitsResult.value : [],
-      activities: activitiesResult.status === 'fulfilled' ? activitiesResult.value : [],
+      enrolledUnits:
+        enrolledUnitsResult.status === 'fulfilled'
+          ? enrolledUnitsResult.value
+          : [],
+      activities:
+        activitiesResult.status === 'fulfilled' ? activitiesResult.value : [],
       weeklyStudyTime:
         overviewResult.status === 'fulfilled'
-          ? overviewResult.value?.stats?.weeklyStudyTime ?? null
+          ? (overviewResult.value?.stats?.weeklyStudyTime ?? null)
           : null,
       achievements:
-        achievementsResult.status === 'fulfilled' ? achievementsResult.value : [],
-      peerComparison: peerComparisonResult.status === 'fulfilled' ? peerComparisonResult.value : null,
-      streaks: streaksResult.status === 'fulfilled' ? streaksResult.value : null,
-      deadlines: deadlinesResult.status === 'fulfilled' ? deadlinesResult.value : [],
-      dueReviews: dueReviewsResult.status === 'fulfilled' ? dueReviewsResult.value : [],
+        achievementsResult.status === 'fulfilled'
+          ? achievementsResult.value
+          : [],
+      peerComparison:
+        peerComparisonResult.status === 'fulfilled'
+          ? peerComparisonResult.value
+          : null,
+      streaks:
+        streaksResult.status === 'fulfilled' ? streaksResult.value : null,
+      deadlines:
+        deadlinesResult.status === 'fulfilled' ? deadlinesResult.value : [],
+      dueReviews:
+        dueReviewsResult.status === 'fulfilled' ? dueReviewsResult.value : [],
       unavailableSections,
     };
   }
-
-
-
-
 
   @Get('overview/:userId')
   @ApiOperation({ summary: 'Get user progress overview across all units' })
@@ -243,14 +265,14 @@ export class ProgressController {
     @Param('materialId', ParseUUIDPipe) materialId: string,
     @Request() req: any,
     @Headers('X-Client-Timestamp') clientTimestampHeader?: string,
+    @Headers('X-Idempotency-Key') idempotencyKey?: string,
   ) {
-    const clientTimestamp = clientTimestampHeader
-      ? BigInt(clientTimestampHeader)
-      : undefined;
+    const clientTimestamp = this.parseClientTimestamp(clientTimestampHeader);
     return this.progressService.markMaterialAsRead(
       req.user.id,
       materialId,
       clientTimestamp,
+      idempotencyKey,
     );
   }
 
@@ -320,10 +342,9 @@ export class ProgressController {
     @Request() req: any,
     @Body() progress: any,
     @Headers('X-Client-Timestamp') clientTimestampHeader?: string,
+    @Headers('X-Idempotency-Key') idempotencyKeyHeader?: string,
   ) {
-    const clientTimestamp = clientTimestampHeader
-      ? BigInt(clientTimestampHeader)
-      : undefined;
+    const clientTimestamp = this.parseClientTimestamp(clientTimestampHeader);
 
     if (
       progress.courseId ||
@@ -337,6 +358,7 @@ export class ProgressController {
         progressPercentage: progress.progressPercentage ?? 100,
         timeSpent: progress.timeSpentMinutes ?? progress.timeSpent ?? 0,
         clientTimestamp,
+        idempotencyKey: idempotencyKeyHeader ?? progress.idempotencyKey,
       });
     }
     return { success: true, count: 0 };

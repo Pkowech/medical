@@ -420,6 +420,11 @@ impl PerformanceService {
         let user_id = req.user_id;
         let skill_id = req.skill_id;
         let is_correct = req.is_correct;
+        let event_id = if req.event_id.is_empty() {
+            None
+        } else {
+            Some(req.event_id)
+        };
 
         Self::validate_user_skill(&user_id, &skill_id)?;
 
@@ -430,6 +435,7 @@ impl PerformanceService {
             user_id: user_id.clone(),
             skill_id: skill_id.clone(),
             is_correct,
+            event_id,
         };
         let result = use_case
             .execute(app_req)

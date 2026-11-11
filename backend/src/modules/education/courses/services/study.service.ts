@@ -11,13 +11,8 @@ import { BadRequestException } from '@nestjs/common/exceptions/bad-request.excep
 import { ProgressService } from '../services/progress.service';
 import { StudyAnalyticsService } from '#modules/ai-analytics/services/study-analytics.service';
 import { LearningAnalyticsService } from '#modules/ai-analytics/services/learning-analytics.service';
-import {
-  LearningRecommendation,
-  StudyActivity,
-  QuizScore,
-  StudyStats,
-  ProgressUpdateDto,
-} from '#common/dto';
+import { LearningRecommendation, StudyActivity, StudyStats } from '#common/dto';
+import { writeApplicationOutboxEvent } from '#infrastructure/outbox/application-outbox-event';
 
 @Injectable()
 export class StudyService {
@@ -133,10 +128,14 @@ export class StudyService {
       select: { id: true },
     });
 
-    this.logger.log(`Unit ${unitId} has ${topics.length} topics: ${topics.map((t) => t.id).join(', ')}`);
+    this.logger.log(
+      `Unit ${unitId} has ${topics.length} topics: ${topics.map((t) => t.id).join(', ')}`,
+    );
 
     if (!topics.length) {
-      this.logger.warn(`No topics found for unit ${unitId}, returning undefined`);
+      this.logger.warn(
+        `No topics found for unit ${unitId}, returning undefined`,
+      );
       return undefined;
     }
 
@@ -154,7 +153,10 @@ export class StudyService {
     const completedSet = new Set(
       progress
         .filter((record) => {
-          const quizScores = record.quizScores as Record<string, unknown> | null;
+          const quizScores = record.quizScores as Record<
+            string,
+            unknown
+          > | null;
           return quizScores?.nextTopicUnlocked === true;
         })
         .map((record) => record.topicId),
@@ -204,7 +206,9 @@ export class StudyService {
       select: { id: true },
     });
 
-    this.logger.log(`getNextTopicForCourse: Course ${courseId} has ${units.length} units`);
+    this.logger.log(
+      `getNextTopicForCourse: Course ${courseId} has ${units.length} units`,
+    );
 
     for (const unit of units) {
       const unitProgress = await this.progressService.calculateUnitProgress(
@@ -225,7 +229,9 @@ export class StudyService {
 
     // If all units done, return first topic of first unit (Review mode)
     if (units.length > 0) {
-      this.logger.log(`All units complete, returning first topic of first unit`);
+      this.logger.log(
+        `All units complete, returning first topic of first unit`,
+      );
       return this.getNextTopicForUnit(userId, units[0].id);
     }
 
@@ -301,150 +307,96 @@ export class StudyService {
       : 0;
 
     const courseId = session.topic?.unit.courseId;
-    const canUpdateCourseProgress = !courseId ||
-      Boolean(await this.prisma.courseEnrollment.findUnique({
-        where: { userId_courseId: { userId, courseId } },
-        select: { id: true },
-      }));
 
-    if (isValid && canUpdateCourseProgress) {
+    if (isValid) {
       const activityTopicIds = Array.from(
         new Set(
           activities
-            .map(activity => activity.metadata?.topicId)
-            .filter((topicId): topicId is string => typeof topicId === 'string'),
+            .map((activity) => activity.metadata?.topicId)
+            .filter(
+              (topicId): topicId is string => typeof topicId === 'string',
+            ),
         ),
       );
-      const activityTopics = courseId && activityTopicIds.length
-        ? await this.prisma.topic.findMany({
-            where: {
-              id: { in: activityTopicIds },
-              unit: { courseId },
-            },
-            include: { unit: true },
-          })
-        : [];
+      const activityTopics =
+        courseId && activityTopicIds.length
+          ? await this.prisma.topic.findMany({
+              where: {
+                id: { in: activityTopicIds },
+                unit: { courseId },
+              },
+              include: { unit: true },
+            })
+          : [];
 
       if (activityTopics.length > 0) {
-        const topicIds = new Set(activityTopics.map(topic => topic.id));
-        const durationsByTopic = new Map<string, number>();
-        const activitiesByTopic = new Map<string, StudyActivity[]>();
-        for (const activity of activities) {
-          const topicId = activity.metadata?.topicId;
-          if (typeof topicId !== 'string' || !topicIds.has(topicId)) continue;
-
-          const metadataSeconds = activity.metadata?.durationSeconds;
-          const activityMinutes = activity.duration || 0;
-          const seconds = typeof metadataSeconds === 'number' &&
-              Number.isFinite(metadataSeconds)
-            ? Math.max(0, metadataSeconds)
-            : Number.isFinite(activityMinutes)
-              ? Math.max(0, activityMinutes) * 60
-              : 0;
-          durationsByTopic.set(topicId, (durationsByTopic.get(topicId) ?? 0) + seconds);
-          activitiesByTopic.set(topicId, [
-            ...(activitiesByTopic.get(topicId) ?? []),
-            activity,
-          ]);
-        }
-
-        const totalSegmentSeconds = Array.from(durationsByTopic.values())
-          .reduce((total, seconds) => total + seconds, 0);
-        const segmentScale = totalSegmentSeconds > activeDurationSeconds && totalSegmentSeconds > 0
-          ? activeDurationSeconds / totalSegmentSeconds
-          : 1;
-        const topicMinutes = new Map<string, number>();
-        const minuteRemainders: Array<{ topicId: string; remainder: number }> = [];
-        let totalAllocatedMinutes = 0;
-        for (const [topicId, seconds] of durationsByTopic) {
-          const exactMinutes = (seconds * segmentScale) / 60;
-          const wholeMinutes = Math.floor(exactMinutes);
-          topicMinutes.set(topicId, wholeMinutes);
-          totalAllocatedMinutes += wholeMinutes;
-          minuteRemainders.push({ topicId, remainder: exactMinutes - wholeMinutes });
-        }
-        let remainingMinutes = Math.max(0, duration - totalAllocatedMinutes);
-        minuteRemainders.sort((left, right) => right.remainder - left.remainder);
-        for (let index = 0; remainingMinutes > 0 && minuteRemainders.length; index += 1) {
-          const topicId = minuteRemainders[index % minuteRemainders.length].topicId;
-          topicMinutes.set(topicId, (topicMinutes.get(topicId) ?? 0) + 1);
-          remainingMinutes -= 1;
-        }
-
-        const unitMinutes = new Map<string, number>();
         for (const topic of activityTopics) {
-          const topicDuration = topicMinutes.get(topic.id) ?? 0;
-          if (topicDuration <= 0) continue;
-          const topicActivities = activitiesByTopic.get(topic.id) ?? [];
-          await this.updateTopicProgress({
-            ...session,
-            topicId: topic.id,
-            duration: topicDuration,
-            topic,
-            activities: topicActivities as any,
-          });
           await this.ensureTopicReviewCards(userId, topic.id);
-          unitMinutes.set(
-            topic.unitId,
-            (unitMinutes.get(topic.unitId) ?? 0) + topicDuration,
-          );
-        }
-
-        for (const [unitId, timeSpent] of unitMinutes) {
-          if (courseId) {
-            await this.progressService.updateUnitMaterialTopicProgress(
-              session.userId,
-              { courseId, unitId, timeSpent },
-            );
-          }
         }
       } else if (session.topic) {
-        await this.updateTopicProgress({
-          ...session,
-          topic: session.topic,
-          activities: activities as any,
-        });
         await this.ensureTopicReviewCards(userId, session.topic.id);
-        if (session.topic.unitId) {
-          const progressUpdateDto: ProgressUpdateDto = {
-            courseId: session.topic.unit.courseId,
-            unitId: session.topic.unitId,
-            timeSpent: duration,
-          };
-          await this.progressService.updateUnitMaterialTopicProgress(
-            session.userId,
-            progressUpdateDto,
-          );
-        }
-      } else {
-        await this.prisma.userActivity.create({
-          data: {
-            userId: session.userId,
-            type: UserActivityType.LEARNING,
-            description: `Completed a ${duration}-minute study session`,
-            details: {
-              sessionId: session.id,
-              topicId: session.topicId,
-              duration,
-            },
-          },
-        });
       }
     }
 
-    const endedSession = await this.prisma.studySession.update({
-      where: { id: sessionId },
-      data: {
-        endTime,
-        duration,
-        notes,
-        activities: activities as any,
-        focusScore,
-        isValid,
-        invalidReason,
-        learningGain,
-        quizAttemptIds,
-      },
+    const materialsCovered = activities
+      .map((activity) => activity.metadata?.materialId)
+      .filter((id): id is string => typeof id === 'string');
+    const clinicalCasesCompleted = activities
+      .map((activity) => activity.metadata?.caseId)
+      .filter((id): id is string => typeof id === 'string');
+    const endedSession = await this.prisma.$transaction(async (tx) => {
+      const updatedSession = await tx.studySession.update({
+        where: { id: sessionId },
+        data: {
+          endTime,
+          duration,
+          notes,
+          activities: activities as any,
+          focusScore,
+          isValid,
+          invalidReason,
+          learningGain,
+          quizAttemptIds,
+        },
+      });
+
+      if (isValid) {
+        await tx.userActivity.upsert({
+          where: { sourceKey: `study-session:${session.id}` },
+          create: {
+            userId: session.userId,
+            sourceKey: `study-session:${session.id}`,
+            type: UserActivityType.STUDY_SESSION,
+            description: `Completed a ${duration}-minute study session`,
+            details: {
+              studySessionId: session.id,
+              topicId: session.topicId,
+              materialId: session.materialId,
+              durationMinutes: duration,
+            },
+            createdAt: endTime,
+          },
+          update: {},
+        });
+      }
+
+      await writeApplicationOutboxEvent(tx, {
+        eventType: 'user.study.session',
+        aggregateId: sessionId,
+        dedupeKey: `study-session-completed:${sessionId}`,
+        payload: {
+          userId: session.userId,
+          sessionData: {
+            durationMinutes: duration,
+            materialsCovered,
+            coursesCovered: courseId ? [courseId] : [],
+            assessmentsCompleted: [],
+            clinicalCasesCompleted,
+          },
+        },
+      });
+
+      return updatedSession;
     });
     await this.progressService.invalidateUserProgressCache(userId);
     return endedSession;
@@ -508,92 +460,23 @@ export class StudyService {
     });
   }
 
-  private async updateTopicProgress(
-    session: StudySession & {
-      user: User;
-      topic: Topic;
-      activities: StudyActivity[];
-    },
-  ): Promise<void> {
-    let progress = await this.prisma.progress.findFirst({
-      where: {
-        userId: session.userId,
-        topicId: session.topicId,
-      },
-    });
-
-    if (!progress) {
-      progress = await this.prisma.progress.create({
-        data: {
-          userId: session.userId,
-          topicId: session.topicId,
-          timeSpent: 0,
-          completionPercentage: 0,
-          streakDays: 0,
-          lastStudiedAt: new Date(),
-          quizScores: [],
-        },
-      });
-    }
-
-    const timeSpent = (progress.timeSpent || 0) + (session.duration || 0);
-    const lastStudiedAt = new Date();
-
-    const quizScores: QuizScore[] = (
-      (session.activities as StudyActivity[]) || []
-    )
-      .filter((act) => act?.type === 'quiz')
-      .map((act) => ({
-        quizId: (act as any).quizId || (act as any).type,
-        score: (act as any).score || 0,
-        date: new Date(),
-      }));
-
-    const existingScores: QuizScore[] = Array.isArray(progress.quizScores)
-      ? (progress.quizScores as unknown as QuizScore[])
-      : [];
-    const updatedQuizScores = [...existingScores, ...quizScores];
-    const completionPercentage = Math.min(
-      100,
-      (progress.completionPercentage || 0) + quizScores.length * 10,
-    );
-
-    let streakDays = progress.streakDays || 0;
-    const lastStudied = progress.lastStudiedAt;
-    if (lastStudied && this.isConsecutiveDay(lastStudied, lastStudiedAt)) {
-      streakDays += 1;
-    }
-
-    await this.prisma.progress.update({
-      where: { id: progress.id },
-      data: {
-        timeSpent,
-        lastStudiedAt,
-        quizScores: updatedQuizScores as any,
-        completionPercentage,
-        streakDays,
-      },
-    });
-  }
-
-  private isConsecutiveDay(lastDate: Date, currentDate: Date): boolean {
-    const diffTime = Math.abs(currentDate.getTime() - lastDate.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays === 1;
-  }
-
   async getStudyStats(userId: string): Promise<StudyStats> {
     if (!userId) {
       throw new BadRequestException('User ID is required');
     }
 
+    const completedSessionWhere = {
+      userId,
+      isValid: true,
+      endTime: { not: null },
+    };
     const [totalTimeResult, totalSessions] = await Promise.all([
       this.prisma.studySession.aggregate({
-        where: { userId },
+        where: completedSessionWhere,
         _sum: { duration: true },
       }),
       this.prisma.studySession.count({
-        where: { userId },
+        where: completedSessionWhere,
       }),
     ]);
 
@@ -771,7 +654,7 @@ export class StudyService {
         dueDate: d.dueDate,
         type: (d.metadata as any)?.type || 'deadline', // use metadata type if available
         courseId: d.courseId,
-        course: (d.course)?.title || 'General',
+        course: d.course?.title || 'General',
         priority: d.priority || 'medium',
       })),
       ...goalDeadlines.map((g) => ({
@@ -780,7 +663,7 @@ export class StudyService {
         dueDate: g.targetDate,
         type: 'goal',
         courseId: g.courseId,
-        course: (g.course)?.title || 'General Learning',
+        course: g.course?.title || 'General Learning',
         priority: g.priority ? String(g.priority) : 'medium',
       })),
       ...scheduleEvents.map((e) => ({
@@ -789,7 +672,7 @@ export class StudyService {
         dueDate: e.date,
         type: e.type || 'schedule',
         courseId: e.courseId,
-        course: (e.course)?.title || 'Academic',
+        course: e.course?.title || 'Academic',
         priority:
           e.priority === 3 ? 'high' : e.priority === 2 ? 'medium' : 'low',
       })),
@@ -797,7 +680,8 @@ export class StudyService {
 
     // 4. Sort by date ascending
     return combined.sort(
-      (a, b) => new Date(a.dueDate || 0).getTime() - new Date(b.dueDate || 0).getTime(),
+      (a, b) =>
+        new Date(a.dueDate || 0).getTime() - new Date(b.dueDate || 0).getTime(),
     );
   }
 
@@ -806,7 +690,9 @@ export class StudyService {
 
     if (!topicId) {
       // Course likely complete or empty. Return generic info.
-      this.logger.log(`No topic found for course ${courseId}, returning completed`);
+      this.logger.log(
+        `No topic found for course ${courseId}, returning completed`,
+      );
       return { completed: true, message: 'Course completed!' };
     }
 

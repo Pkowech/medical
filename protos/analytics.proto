@@ -206,7 +206,9 @@ service AnalyticsService {
   rpc GetStudyPatterns(GetStudyPatternsRequest) returns (GetStudyPatternsResponse);
   rpc GetRecommendations(GetRecommendationsRequest) returns (GetRecommendationsResponse);
   rpc GetUnifiedRecommendations(UnifiedRecommendationsRequest) returns (UnifiedRecommendationsResponse);
-  rpc UpdateAttemptMetrics (AttemptMetricsRequest) returns (UpdateAttemptMetricsResponse);
+  rpc UpdateAttemptMetrics (AttemptMetricsRequest) returns (UpdateAttemptMetricsResponse) {
+    option deprecated = true;
+  }
   rpc GetUserAbility (GetUserAbilityRequest) returns (GetUserAbilityResponse);
   rpc GetNextAdaptiveQuestion (GetNextAdaptiveQuestionRequest) returns (GetNextAdaptiveQuestionResponse);
   rpc UpdateBkt(UpdateBktRequest) returns (UpdateBktResponse);
@@ -224,7 +226,9 @@ service AnalyticsService {
   rpc GetFilteredRecommendations(GetFilteredRecommendationsRequest) returns (GetFilteredRecommendationsResponse);
   rpc GetUserFeatureVector(GetUserFeatureVectorRequest) returns (GetUserFeatureVectorResponse);
   rpc UpdateBktSkillMetrics (UpdateBktSkillMetricsRequest) returns (UpdateBktSkillMetricsResponse);
-  rpc BatchTrackEvents (BatchEventRequest) returns (BatchEventResponse);
+  rpc BatchTrackEvents (BatchEventRequest) returns (BatchEventResponse) {
+    option deprecated = true;
+  }
   rpc GetCollaborativeRecommendations (CollaborativeRecommendationRequest) returns (CollaborativeRecommendationResponse);
   rpc GetTrendingPaths (TrendingPathsRequest) returns (TrendingPathsResponse);
   rpc GetPathAnalytics (PathAnalyticsRequest) returns (PathAnalyticsResponse);
@@ -426,6 +430,7 @@ message UpdateBktRequest {
   string user_id = 1;
   string skill_id = 2;
   bool is_correct = 3;
+  string event_id = 4;
 }
 
 message UpdateBktResponse {

@@ -495,12 +495,6 @@ export class LearningPathsService {
         learningPathId: pathId,
       });
 
-      this.eventEmitter.emit('learning-path.enrolled', {
-        userId,
-        pathId,
-        enrollmentData: { timestamp: new Date() },
-      });
-
       this.logger.log(`User ${userId} successfully enrolled in learning path ${pathId}`);
     } catch (error) {
       this.logger.error(`Error enrolling user ${userId} in learning path ${pathId}`, {

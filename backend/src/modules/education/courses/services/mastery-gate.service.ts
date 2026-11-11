@@ -139,10 +139,6 @@ export class MasteryGateService {
         // Quiz passed - unlock mastery
         const updateData: any = {
           lastUpdated: BigInt(Date.now()),
-          progressPercentage: Math.max(
-            progress?.progressPercentage || 0,
-            score || 0,
-          ),
           quizScores: {
             ...previousQuizScores,
             attempts,
@@ -154,9 +150,6 @@ export class MasteryGateService {
           },
           unitId: topic.unitId,
           courseId: topic.unit.courseId,
-          status: 'completed',
-          isCompleted: true,
-          completedAt: new Date(),
         };
 
         progress = await this.prisma.progress.update({
@@ -180,12 +173,9 @@ export class MasteryGateService {
           topicId,
         );
 
-        // Architecture Decision: Prescriptive analytics has authority.
-        // Even if quiz is passed, if p_known < threshold, we can block unlocking of NEXT topic.
         let message = `Congratulations! You've mastered this topic with a score of ${score}%.`;
 
-        // A passing mastery quiz unlocks the next topic. Prescriptive analytics
-        // can recommend additional review, but must not leave the next topic locked.
+        // The assessment pass owns curriculum unlocks; BKT is a recommendation signal.
         const nextTopicResult = await this.unlockNextTopic(userId, topicId);
         const nextTopicUnlocked = nextTopicResult.unlocked;
         const nextTopicId = nextTopicResult.nextTopicId;
@@ -237,14 +227,6 @@ export class MasteryGateService {
           },
           unitId: topic.unitId,
           courseId: topic.unit.courseId,
-          progressPercentage: score,
-          ...(masteryUnlocked
-            ? {}
-            : {
-                status: ProgressStatus.inProgress,
-                isCompleted: false,
-                completedAt: null,
-              }),
           lastUpdated: BigInt(Date.now()),
         };
 
