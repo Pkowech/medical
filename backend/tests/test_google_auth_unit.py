@@ -55,10 +55,13 @@ const prisma = {
     update: async () => user,
   },
   userSecuritySettings: {
+    findUnique: async () => null,
     upsert: async args => {
       securitySettingsUpsertCalls.push(args);
     },
   },
+  $transaction: async callback =>
+    callback({ user: { update: async () => user } }),
 };
 const usersService = { create: async () => ({ id: user.id }) };
 let createCalls = 0;
@@ -73,13 +76,18 @@ const service = new AuthService(
   { isEmailVerified: async () => true },
   { createRefreshToken: async () => 'app-refresh-token' },
   {},
-  { log: async () => undefined },
+  {
+    log: async () => undefined,
+    enqueueInTransaction: async () => undefined,
+  },
   {},
   { getEffectivePermissionsForRole: async () => ['access_courses'] },
   usersService,
   {},
   {},
   { get: (key, fallback) => key === 'GOOGLE_CLIENT_ID' ? configClientId : fallback },
+  {},
+  { recordAuthStage: () => undefined },
 );
 
 (async () => {
