@@ -3,6 +3,7 @@ import {
   BarChart3,
   Clock,
   FileText,
+  GraduationCap,
   LayoutDashboard,
   Library,
   LockKeyhole,
@@ -18,6 +19,12 @@ const adminNavigationConfig: NavigationItem[] = [
     label: 'Dashboard',
     href: '/admin',
     icon: LayoutDashboard,
+  },
+  {
+    id: 'student-dashboard',
+    label: 'Student Dashboard',
+    href: '/dashboard',
+    icon: GraduationCap,
   },
   {
     id: 'management',
