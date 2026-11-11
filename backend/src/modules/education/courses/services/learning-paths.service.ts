@@ -20,7 +20,6 @@ import {
   CourseDifficulty,
   LearningPathStatus,
   LearningPathCategory,
-  ProgressStatus,
   PathModuleType,
 } from '@prisma/client';
 import { PathStructure } from '../../../../common/dto/learning.dto';
@@ -29,6 +28,7 @@ import { LearningPathProgressService } from './learning-path-progress.service';
 import { LearningPathEligibilityService } from './learning-path-eligibility.service';
 import { normalizeCareerStage } from '#common/constants/career-stages';
 import { evaluateLearningPathEligibility } from '#common/utils/learning-path-eligibility';
+import { getRecommendationWindow } from '#common/utils/recommendation-limits';
 
 @Injectable()
 export class LearningPathsService {
@@ -226,12 +226,9 @@ export class LearningPathsService {
     try {
       const updatedPath = await this.prisma.$transaction(async (tx) => {
         if (updateDto.pathStructure) {
-          const existingProgress = await tx.learningPathProgress.count({
-            where: { learningPathId: id },
-          });
-          if (existingProgress > 0) {
+          if (await this.hasLearnerProgress(tx, id)) {
             throw new BadRequestException(
-              'Cannot change a learning path structure after learners have enrolled. Duplicate the path to publish a revised structure.',
+              'Cannot change a learning path structure after learners have progress. Duplicate the path to publish a revised structure.',
             );
           }
         }
@@ -355,6 +352,41 @@ export class LearningPathsService {
     }
   }
 
+  private async hasLearnerProgress(
+    tx: Prisma.TransactionClient,
+    pathId: string,
+  ): Promise<boolean> {
+    if (await tx.learningPathProgress.count({ where: { learningPathId: pathId } })) {
+      return true;
+    }
+
+    const phases = await tx.learningPathPhase.findMany({
+      where: { learningPathId: pathId },
+      select: {
+        id: true,
+        modules: { select: { id: true } },
+      },
+    });
+    const phaseIds = phases.map(phase => phase.id);
+    const moduleIds = phases.flatMap(phase =>
+      phase.modules.map(module => module.id),
+    );
+    const [phaseProgress, moduleProgress] = await Promise.all([
+      phaseIds.length
+        ? tx.learningPathPhaseProgress.count({
+            where: { phaseId: { in: phaseIds } },
+          })
+        : 0,
+      moduleIds.length
+        ? tx.learningPathModuleProgress.count({
+            where: { moduleId: { in: moduleIds } },
+          })
+        : 0,
+    ]);
+
+    return phaseProgress + moduleProgress > 0;
+  }
+
   async remove(id: string, userId: string): Promise<void> {
     const learningPath = await this.findOne(id);
 
@@ -364,21 +396,16 @@ export class LearningPathsService {
       );
     }
 
-    const activeEnrollments = await this.prisma.learningPathProgress.count({
-      where: {
-        learningPathId: id,
-        status: { in: [ProgressStatus.notStarted, ProgressStatus.inProgress] },
-      },
-    });
-
-    if (activeEnrollments > 0) {
-      throw new BadRequestException(
-        'Cannot delete learning path with active enrollments',
-      );
-    }
-
     try {
-      await this.prisma.learningPath.delete({ where: { id } });
+      await this.prisma.$transaction(async tx => {
+        if (await this.hasLearnerProgress(tx, id)) {
+          throw new BadRequestException(
+            'Cannot delete a learning path with learner progress. Duplicate or archive the path instead.',
+          );
+        }
+
+        await tx.learningPath.delete({ where: { id } });
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
       this.eventEmitter.emit('learning-path.deleted', {
         learningPathId: id,
@@ -386,6 +413,21 @@ export class LearningPathsService {
         data: learningPath,
       });
     } catch (error) {
+      if (
+        error instanceof BadRequestException ||
+        error instanceof ForbiddenException ||
+        error instanceof NotFoundException
+      ) {
+        throw error;
+      }
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        (error.code === 'P2003' || error.code === 'P2034')
+      ) {
+        throw new BadRequestException(
+          'Cannot delete a learning path while learner progress exists or is changing.',
+        );
+      }
       throw new BadRequestException(
         `Failed to delete learning path: ${getErrorMessage(error)}`,
       );
@@ -804,6 +846,7 @@ export class LearningPathsService {
     userId: string,
     limit: number = 5,
   ): Promise<LearningPath[]> {
+    const window = getRecommendationWindow(limit, 5);
     let userProfile: {
       healthcareField: string | null;
       specialization: string | null;
@@ -827,7 +870,7 @@ export class LearningPathsService {
       const recommendations =
         await this.learningAnalyticsService.getPathRecommendations(
           userId,
-          limit,
+          window.candidateLimit,
         );
 
       // Map recommendation IDs to actual learning paths
@@ -835,7 +878,7 @@ export class LearningPathsService {
 
       if (pathIds.length === 0) {
         // Fallback to cohort-prioritized trending paths
-        return this.getCohortOrTrendingPaths(userProfile, limit);
+        return this.getCohortOrTrendingPaths(userProfile, window.resultLimit);
       }
 
       const paths = await this.prisma.learningPath.findMany({
@@ -847,22 +890,37 @@ export class LearningPathsService {
         include: {
           _count: { select: { progress: true } },
         },
-        take: limit,
+        take: window.candidateLimit,
       });
 
-      if (paths.length === 0) {
-        return this.getCohortOrTrendingPaths(userProfile, limit);
+      const pathsById = new Map(paths.map(path => [path.id, path]));
+      const eligiblePaths = pathIds.flatMap(pathId => {
+        const path = pathsById.get(pathId);
+        return path &&
+          this.learningPathEligibilityService.evaluate(path, userProfile!)
+            .eligible
+          ? [path]
+          : [];
+      });
+      if (eligiblePaths.length >= window.resultLimit) {
+        return eligiblePaths.slice(0, window.resultLimit);
       }
 
-      return paths.filter(
-        path => this.learningPathEligibilityService.evaluate(path, userProfile!).eligible,
+      const fallbackPaths = await this.getCohortOrTrendingPaths(
+        userProfile,
+        window.resultLimit,
       );
+      const includedIds = new Set(eligiblePaths.map(path => path.id));
+      return [
+        ...eligiblePaths,
+        ...fallbackPaths.filter(path => !includedIds.has(path.id)),
+      ].slice(0, window.resultLimit);
     } catch (error) {
       this.logger.warn(
         `Error getting recommended paths for user ${userId}:`,
         error,
       );
-      return this.getCohortOrTrendingPaths(userProfile, limit);
+      return this.getCohortOrTrendingPaths(userProfile, window.resultLimit);
     }
   }
 
@@ -987,6 +1045,7 @@ export class LearningPathsService {
     userId: string,
     limit: number = 5,
   ): Promise<LearningPath[]> {
+    const window = getRecommendationWindow(limit, 5);
     try {
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
@@ -1001,7 +1060,7 @@ export class LearningPathsService {
       const collaborativeRecs =
         await this.learningAnalyticsService.getCollaborativeRecommendations(
           userId,
-          limit,
+          window.candidateLimit,
         );
 
       if (collaborativeRecs.length === 0) {
@@ -1016,15 +1075,21 @@ export class LearningPathsService {
           targetCareerStages: { has: careerStage },
         },
         include: { _count: { select: { progress: true } } },
-        take: limit,
+        take: pathIds.length,
       });
-      return paths.filter(
-        path =>
-          evaluateLearningPathEligibility(
-            path.targetCareerStages,
-            careerStage,
-          ).eligible,
-      );
+      const pathsById = new Map(paths.map(path => [path.id, path]));
+      return pathIds
+        .flatMap(pathId => {
+          const path = pathsById.get(pathId);
+          return path &&
+            evaluateLearningPathEligibility(
+              path.targetCareerStages,
+              careerStage,
+            ).eligible
+            ? [path]
+            : [];
+        })
+        .slice(0, window.resultLimit);
     } catch (error) {
       this.logger.warn(
         `Error getting collaborative paths for user ${userId}:`,

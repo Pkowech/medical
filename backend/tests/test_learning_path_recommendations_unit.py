@@ -43,7 +43,7 @@ const service = new LearningPathRecommendationsService(
 
 (async () => {
   const recommendations = await service.getRecommendations('user-1', 3);
-  assert.equal(requestedLimit, 3);
+  assert.equal(requestedLimit, 15);
   assert.deepEqual(query.where, {
     id: { in: ['path-first', 'unpublished-path', 'path-third'] },
     status: 'published',
@@ -57,6 +57,64 @@ const service = new LearningPathRecommendationsService(
     ],
   );
   assert.deepEqual(recommendations[0].reasons, ['best fit']);
+})().catch(error => {
+  console.error(error);
+  process.exitCode = 1;
+});
+"""
+    )
+
+
+def test_stage_filtering_fills_requested_limit_from_ranked_candidates():
+    run_typescript(
+        r"""
+const assert = require('node:assert/strict');
+const { LearningPathRecommendationsService } =
+  require('./src/modules/ai-analytics/services/learning-path-recommendations.service.ts');
+
+let requestedLimit;
+let queriedIds;
+const service = new LearningPathRecommendationsService(
+  {
+    user: { findUnique: async () => ({ careerStage: 'student' }) },
+    learningPath: {
+      findMany: async args => {
+        queriedIds = args.where.id.in;
+        return [
+          { id: 'eligible-second', targetCareerStages: ['student'] },
+          { id: 'eligible-first', targetCareerStages: ['student'] },
+        ];
+      },
+    },
+  },
+  {
+    getPathRecommendations: async (_userId, limit) => {
+      requestedLimit = limit;
+      return [
+        { pathId: 'professional-only', score: 1, reasons: [], confidence: 1 },
+        { pathId: 'eligible-first', score: 0.9, reasons: [], confidence: 0.9 },
+        { pathId: 'other-stage', score: 0.8, reasons: [], confidence: 0.8 },
+        { pathId: 'eligible-second', score: 0.7, reasons: [], confidence: 0.7 },
+      ];
+    },
+  },
+  {},
+  {},
+);
+
+(async () => {
+  const recommendations = await service.getRecommendations('user-1', 2);
+  assert.equal(requestedLimit, 10);
+  assert.deepEqual(queriedIds, [
+    'professional-only',
+    'eligible-first',
+    'other-stage',
+    'eligible-second',
+  ]);
+  assert.deepEqual(
+    recommendations.map(recommendation => recommendation.pathId),
+    ['eligible-first', 'eligible-second'],
+  );
 })().catch(error => {
   console.error(error);
   process.exitCode = 1;

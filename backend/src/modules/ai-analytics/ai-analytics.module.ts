@@ -34,6 +34,7 @@ import { PredictionValidatorService } from './services/prediction-validator.serv
 import { AbTestingService } from './services/ab-testing.service';
 import { SkillTrajectoryService } from './services/skill-trajectory.service';
 import { WeaknessChainService } from './services/weakness-chain.service';
+import { OnboardingCompletedListener } from './services/onboarding-completed.listener';
 
 // Define the BullMQ module registration in a constant.
 // Export it so other modules (that need the raw queue provider) can import
@@ -88,6 +89,7 @@ export const bullModuleForAnalytics = BullModule.registerQueueAsync({
     AbTestingService,
     SkillTrajectoryService,
     WeaknessChainService,
+    OnboardingCompletedListener,
     // Provide a noop/mock queue when Redis is disabled so DI still resolves
     ...(process.env.ENABLE_REDIS === 'true'
       ? []

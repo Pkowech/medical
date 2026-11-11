@@ -1194,7 +1194,7 @@ model LearningPathProgress {
   completedAt               DateTime?      @map("completed_at")
   lastAccessedAt            DateTime?      @map("last_accessed_at")
   lastActivityDate          DateTime?      @map("last_activity_date")
-  learningPath              LearningPath   @relation(fields: [learningPathId], references: [id], onDelete: Cascade)
+  learningPath              LearningPath   @relation(fields: [learningPathId], references: [id], onDelete: Restrict)
   user                      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, learningPathId])
@@ -1286,7 +1286,7 @@ model LearningPathPhaseProgress {
   lastAccessedAt     DateTime?         @map("last_accessed_at")
 
   user               User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  phase              LearningPathPhase @relation(fields: [phaseId], references: [id], onDelete: Cascade)
+  phase              LearningPathPhase @relation(fields: [phaseId], references: [id], onDelete: Restrict)
 
   @@unique([userId, phaseId])
   @@index([userId])
@@ -1306,7 +1306,7 @@ model LearningPathModuleProgress {
   lastAccessedAt     DateTime?          @map("last_accessed_at")
 
   user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  module             LearningPathModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  module             LearningPathModule @relation(fields: [moduleId], references: [id], onDelete: Restrict)
 
   @@unique([userId, moduleId])
   @@index([userId])
@@ -1425,6 +1425,7 @@ model LearningSuggestion {
 model StudyEvent {
   id           String   @id @default(uuid())
   userId       String   @map("user_id")
+  sourceKey    String?  @unique @map("source_key")
   eventType    String   @map("event_type") @db.VarChar(100)
   duration     Int?
   resourceId   String?  @map("resource_id")

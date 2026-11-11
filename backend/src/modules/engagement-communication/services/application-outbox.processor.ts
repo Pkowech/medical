@@ -12,6 +12,7 @@ type ClaimedOutboxEvent = {
 };
 
 const MAX_BATCH_SIZE = 10;
+const MAX_OUTBOX_RETRIES = 8;
 const LOCK_TIMEOUT_MS = 5 * 60 * 1000;
 const MAX_RETRY_DELAY_MS = 5 * 60 * 1000;
 
@@ -33,6 +34,9 @@ export class ApplicationOutboxProcessor {
       }
 
       try {
+        if (this.eventEmitter.listenerCount(event.eventType) === 0) {
+          throw new Error(`No listener registered for ${event.eventType}`);
+        }
         await this.eventEmitter.emitAsync(event.eventType, event.payload);
         await this.prisma.applicationOutboxEvent.update({
           where: { id: event.id },
@@ -45,6 +49,8 @@ export class ApplicationOutboxProcessor {
           },
         });
       } catch (error) {
+        const nextAttempt = event.attempts + 1;
+        const hasRetriesRemaining = nextAttempt < MAX_OUTBOX_RETRIES;
         const retryDelay = Math.min(
           1000 * 2 ** Math.min(event.attempts, 8),
           MAX_RETRY_DELAY_MS,
@@ -59,7 +65,9 @@ export class ApplicationOutboxProcessor {
           },
         });
         this.logger.error(
-          `Failed to publish outbox event ${event.id} (${event.eventType}); retry scheduled`,
+          hasRetriesRemaining
+            ? `Failed to publish outbox event ${event.id} (${event.eventType}); retry scheduled`
+            : `Outbox event ${event.id} (${event.eventType}) reached the retry limit and requires intervention`,
           error instanceof Error ? error.stack : undefined,
         );
       }
@@ -73,6 +81,7 @@ export class ApplicationOutboxProcessor {
         SELECT "id"
         FROM "application_outbox_events"
         WHERE "processed_at" IS NULL
+          AND "attempts" < ${MAX_OUTBOX_RETRIES}
           AND "available_at" <= CURRENT_TIMESTAMP
           AND ("locked_at" IS NULL OR "locked_at" < ${staleLockBefore})
         ORDER BY "created_at"

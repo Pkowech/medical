@@ -221,6 +221,7 @@ CREATE TABLE "question_options" (
 CREATE TABLE "user_activities" (
     "id" TEXT NOT NULL,
     "user_id" TEXT NOT NULL,
+    "source_key" TEXT,
     "type" "UserActivityType" NOT NULL,
     "description" TEXT,
     "details" JSONB,
@@ -376,6 +377,17 @@ CREATE TABLE "flashcards" (
     "updated_at" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "flashcards_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "flashcard_results" (
+    "id" TEXT NOT NULL,
+    "user_id" TEXT NOT NULL,
+    "flashcard_id" TEXT NOT NULL,
+    "passed" BOOLEAN NOT NULL,
+    "attempted_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "flashcard_results_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -627,6 +639,35 @@ CREATE TABLE "security_audits" (
     "updated_at" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "security_audits_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "login_audit_outbox" (
+    "id" TEXT NOT NULL,
+    "payload" JSONB NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "available_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "attempts" INTEGER NOT NULL DEFAULT 0,
+    "last_error" TEXT,
+
+    CONSTRAINT "login_audit_outbox_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "application_outbox_events" (
+    "id" TEXT NOT NULL,
+    "event_type" TEXT NOT NULL,
+    "aggregate_id" TEXT,
+    "dedupe_key" TEXT NOT NULL,
+    "payload" JSONB NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "available_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "attempts" INTEGER NOT NULL DEFAULT 0,
+    "last_error" TEXT,
+    "locked_at" TIMESTAMP(3),
+    "processed_at" TIMESTAMP(3),
+
+    CONSTRAINT "application_outbox_events_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -930,6 +971,7 @@ CREATE TABLE "learning_paths" (
     "created_by" TEXT,
     "category_id" TEXT,
     "specialization" TEXT,
+    "target_career_stages" TEXT[] DEFAULT ARRAY[]::TEXT[],
     "path_type" "LearningPathType" NOT NULL DEFAULT 'STANDARD_STUDY',
 
     CONSTRAINT "learning_paths_pkey" PRIMARY KEY ("id")
@@ -1049,6 +1091,7 @@ CREATE TABLE "learning_path_module_progress" (
 CREATE TABLE "learning_goals" (
     "id" TEXT NOT NULL,
     "user_id" TEXT NOT NULL,
+    "source_key" TEXT,
     "courseId" TEXT,
     "title" VARCHAR(255) NOT NULL,
     "description" TEXT,
@@ -1130,6 +1173,7 @@ CREATE TABLE "learning_suggestions" (
 CREATE TABLE "study_events" (
     "id" TEXT NOT NULL,
     "user_id" TEXT NOT NULL,
+    "source_key" TEXT,
     "event_type" VARCHAR(100) NOT NULL,
     "duration" INTEGER,
     "resource_id" TEXT,
@@ -1761,6 +1805,9 @@ CREATE INDEX "questions_difficulty_idx" ON "questions"("difficulty");
 CREATE INDEX "question_options_question_id_idx" ON "question_options"("question_id");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "user_activities_source_key_key" ON "user_activities"("source_key");
+
+-- CreateIndex
 CREATE INDEX "user_activities_user_id_idx" ON "user_activities"("user_id");
 
 -- CreateIndex
@@ -1858,6 +1905,12 @@ CREATE INDEX "user_responses_attempt_id_idx" ON "user_responses"("attempt_id");
 
 -- CreateIndex
 CREATE INDEX "flashcards_question_id_idx" ON "flashcards"("question_id");
+
+-- CreateIndex
+CREATE INDEX "flashcard_results_user_id_attempted_at_idx" ON "flashcard_results"("user_id", "attempted_at");
+
+-- CreateIndex
+CREATE INDEX "flashcard_results_user_id_flashcard_id_attempted_at_idx" ON "flashcard_results"("user_id", "flashcard_id", "attempted_at");
 
 -- CreateIndex
 CREATE INDEX "user_flashcard_progress_user_id_idx" ON "user_flashcard_progress"("user_id");
@@ -1987,6 +2040,15 @@ CREATE INDEX "security_audits_action_idx" ON "security_audits"("action");
 
 -- CreateIndex
 CREATE INDEX "security_audits_created_at_idx" ON "security_audits"("created_at");
+
+-- CreateIndex
+CREATE INDEX "login_audit_outbox_available_at_created_at_idx" ON "login_audit_outbox"("available_at", "created_at");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "application_outbox_events_dedupe_key_key" ON "application_outbox_events"("dedupe_key");
+
+-- CreateIndex
+CREATE INDEX "application_outbox_events_processed_at_available_at_created_idx" ON "application_outbox_events"("processed_at", "available_at", "created_at");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "course_categories_slug_key" ON "course_categories"("slug");
@@ -2280,6 +2342,9 @@ CREATE INDEX "learning_path_module_progress_module_id_idx" ON "learning_path_mod
 CREATE UNIQUE INDEX "learning_path_module_progress_user_id_module_id_key" ON "learning_path_module_progress"("user_id", "module_id");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "learning_goals_source_key_key" ON "learning_goals"("source_key");
+
+-- CreateIndex
 CREATE INDEX "learning_goals_user_id_idx" ON "learning_goals"("user_id");
 
 -- CreateIndex
@@ -2326,6 +2391,9 @@ CREATE INDEX "learning_suggestions_material_id_idx" ON "learning_suggestions"("m
 
 -- CreateIndex
 CREATE INDEX "learning_suggestions_score_idx" ON "learning_suggestions"("score");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "study_events_source_key_key" ON "study_events"("source_key");
 
 -- CreateIndex
 CREATE INDEX "study_events_user_id_idx" ON "study_events"("user_id");
@@ -2739,6 +2807,12 @@ ALTER TABLE "user_responses" ADD CONSTRAINT "user_responses_user_id_fkey" FOREIG
 ALTER TABLE "flashcards" ADD CONSTRAINT "flashcards_question_id_fkey" FOREIGN KEY ("question_id") REFERENCES "questions"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "flashcard_results" ADD CONSTRAINT "flashcard_results_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "flashcard_results" ADD CONSTRAINT "flashcard_results_flashcard_id_fkey" FOREIGN KEY ("flashcard_id") REFERENCES "flashcards"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "user_flashcard_progress" ADD CONSTRAINT "user_flashcard_progress_flashcard_id_fkey" FOREIGN KEY ("flashcard_id") REFERENCES "flashcards"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -2901,7 +2975,7 @@ ALTER TABLE "blueprint_mappings" ADD CONSTRAINT "blueprint_mappings_learning_pat
 ALTER TABLE "blueprint_mappings" ADD CONSTRAINT "blueprint_mappings_topic_id_fkey" FOREIGN KEY ("topic_id") REFERENCES "topics"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "learning_path_progress" ADD CONSTRAINT "learning_path_progress_learning_path_id_fkey" FOREIGN KEY ("learning_path_id") REFERENCES "learning_paths"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "learning_path_progress" ADD CONSTRAINT "learning_path_progress_learning_path_id_fkey" FOREIGN KEY ("learning_path_id") REFERENCES "learning_paths"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "learning_path_progress" ADD CONSTRAINT "learning_path_progress_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -2925,13 +2999,13 @@ ALTER TABLE "learning_path_modules" ADD CONSTRAINT "learning_path_modules_quiz_i
 ALTER TABLE "learning_path_phase_progress" ADD CONSTRAINT "learning_path_phase_progress_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "learning_path_phase_progress" ADD CONSTRAINT "learning_path_phase_progress_phase_id_fkey" FOREIGN KEY ("phase_id") REFERENCES "learning_path_phases"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "learning_path_phase_progress" ADD CONSTRAINT "learning_path_phase_progress_phase_id_fkey" FOREIGN KEY ("phase_id") REFERENCES "learning_path_phases"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "learning_path_module_progress" ADD CONSTRAINT "learning_path_module_progress_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "learning_path_module_progress" ADD CONSTRAINT "learning_path_module_progress_module_id_fkey" FOREIGN KEY ("module_id") REFERENCES "learning_path_modules"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "learning_path_module_progress" ADD CONSTRAINT "learning_path_module_progress_module_id_fkey" FOREIGN KEY ("module_id") REFERENCES "learning_path_modules"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "learning_goals" ADD CONSTRAINT "learning_goals_courseId_fkey" FOREIGN KEY ("courseId") REFERENCES "courses"("id") ON DELETE SET NULL ON UPDATE CASCADE;

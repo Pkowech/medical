@@ -235,20 +235,26 @@ export class AiAnalyticsService implements OnModuleInit {
     eventType: string,
     data: any,
     timestamp: string,
+    sourceKey?: string,
   ) {
     if (!userId || !eventType || !timestamp) {
       throw new Error('Missing required event data');
     }
 
     try {
-      const result = await this.prisma.studyEvent.create({
-        data: {
-          userId,
-          eventType,
-          metadata: data,
-          createdAt: new Date(timestamp),
-        },
-      });
+      const eventData = {
+        userId,
+        eventType,
+        metadata: data,
+        createdAt: new Date(timestamp),
+      };
+      const result = sourceKey
+        ? await this.prisma.studyEvent.upsert({
+            where: { sourceKey },
+            create: { ...eventData, sourceKey },
+            update: {},
+          })
+        : await this.prisma.studyEvent.create({ data: eventData });
 
       // Invalidate relevant caches when event is tracked
       await this.invalidateUserCaches(userId);

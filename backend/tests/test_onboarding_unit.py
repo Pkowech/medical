@@ -271,6 +271,62 @@ const service = new LearningPathsService(
     )
 
 
+def test_personalized_recommendations_preserve_rank_and_fill_from_eligible_paths():
+    run_typescript(
+        r"""
+const assert = require('node:assert/strict');
+const { LearningPathsService } =
+  require('./src/modules/education/courses/services/learning-paths.service.ts');
+const { LearningPathEligibilityService } =
+  require('./src/modules/education/courses/services/learning-path-eligibility.service.ts');
+
+let requestedLimit;
+const service = new LearningPathsService(
+  {
+    user: {
+      findUnique: async () => ({
+        healthcareField: 'pharmacy',
+        specialization: null,
+        careerStage: 'student',
+      }),
+    },
+    learningPath: {
+      findMany: async () => [
+        { id: 'eligible-second', targetCareerStages: ['student'] },
+        { id: 'eligible-first', targetCareerStages: ['student'] },
+      ],
+    },
+  },
+  {},
+  {
+    getPathRecommendations: async (_userId, limit) => {
+      requestedLimit = limit;
+      return [
+        { pathId: 'professional-only' },
+        { pathId: 'eligible-first' },
+        { pathId: 'eligible-second' },
+      ];
+    },
+  },
+  {},
+  new LearningPathEligibilityService(),
+);
+
+(async () => {
+  const paths = await service.getRecommendedPaths('user-1', 2);
+  assert.equal(requestedLimit, 10);
+  assert.deepEqual(paths.map(path => path.id), [
+    'eligible-first',
+    'eligible-second',
+  ]);
+})().catch(error => {
+  console.error(error);
+  process.exitCode = 1;
+});
+"""
+    )
+
+
 def test_legacy_and_collaborative_recommendations_filter_by_stage():
     run_typescript(
         r"""
@@ -552,6 +608,7 @@ const prisma = {
   },
 };
 const processor = new ApplicationOutboxProcessor(prisma, {
+  listenerCount: () => 1,
   emitAsync: async (eventType, payload) => { emitted = { eventType, payload }; },
 });
 
@@ -565,6 +622,286 @@ const processor = new ApplicationOutboxProcessor(prisma, {
   assert.ok(processedUpdate.data.processedAt instanceof Date);
   assert.equal(processedUpdate.data.aggregateId, null);
   assert.deepEqual(processedUpdate.data.payload, {});
+})().catch(error => {
+  console.error(error);
+  process.exitCode = 1;
+});
+"""
+    )
+
+
+def test_legacy_onboarding_status_does_not_suggest_paths_without_a_stage():
+    run_typescript(
+        r"""
+const assert = require('node:assert/strict');
+const { OnboardingService } =
+  require('./src/modules/engagement-communication/services/onboarding.service.ts');
+
+let pathQueries = 0;
+const service = new OnboardingService({
+  user: {
+    findUnique: async () => ({
+      id: 'legacy-user',
+      healthcareField: 'pharmacy',
+      careerStage: null,
+      studyYear: null,
+      yearOfExperience: null,
+      specialization: null,
+      preferences: null,
+    }),
+  },
+  learningPath: {
+    findMany: async () => {
+      pathQueries++;
+      return [];
+    },
+  },
+});
+
+(async () => {
+  const status = await service.getOnboardingStatus('legacy-user');
+  assert.equal(status.isCompleted, false);
+  assert.deepEqual(status.suggestedStarterPaths, []);
+  assert.equal(pathQueries, 0);
+})().catch(error => {
+  console.error(error);
+  process.exitCode = 1;
+});
+"""
+    )
+
+
+def test_path_deletion_preserves_completed_learner_progress():
+    run_typescript(
+        r"""
+const assert = require('node:assert/strict');
+const { BadRequestException } = require('@nestjs/common');
+const { LearningPathsService } =
+  require('./src/modules/education/courses/services/learning-paths.service.ts');
+
+let pathDeleted = false;
+const service = new LearningPathsService(
+  {
+    learningPath: {
+      findUnique: async () => ({
+        id: 'path-1',
+        createdBy: 'owner-1',
+        phases: [],
+        milestones: [],
+        _count: { progress: 1 },
+      }),
+    },
+    $transaction: async callback => callback({
+      learningPathProgress: {
+        count: async args => {
+          assert.deepEqual(args.where, { learningPathId: 'path-1' });
+          return 1;
+        },
+      },
+      learningPathPhase: { findMany: async () => [] },
+      learningPath: { delete: async () => { pathDeleted = true; } },
+    }),
+  },
+  {},
+  {},
+  {},
+  {},
+);
+
+(async () => {
+  await assert.rejects(
+    () => service.remove('path-1', 'owner-1'),
+    error => error instanceof BadRequestException &&
+      /learner progress/.test(error.message),
+  );
+  assert.equal(pathDeleted, false);
+})().catch(error => {
+  console.error(error);
+  process.exitCode = 1;
+});
+"""
+    )
+
+
+def test_structural_path_edits_preserve_relational_phase_progress():
+    run_typescript(
+        r"""
+const assert = require('node:assert/strict');
+const { BadRequestException } = require('@nestjs/common');
+const { LearningPathsService } =
+  require('./src/modules/education/courses/services/learning-paths.service.ts');
+
+let phasesDeleted = false;
+const service = new LearningPathsService(
+  {
+    learningPath: {
+      findUnique: async () => ({
+        id: 'path-1',
+        createdBy: 'owner-1',
+        phases: [],
+        milestones: [],
+        _count: { progress: 0 },
+      }),
+    },
+    $transaction: async callback => callback({
+      learningPathProgress: { count: async () => 0 },
+      learningPathPhase: {
+        findMany: async () => [{ id: 'phase-1', modules: [{ id: 'module-1' }] }],
+        deleteMany: async () => { phasesDeleted = true; },
+      },
+      learningPathPhaseProgress: { count: async () => 1 },
+      learningPathModuleProgress: { count: async () => 0 },
+      learningPath: { update: async () => assert.fail('path must not update') },
+    }),
+  },
+  {},
+  {},
+  {},
+  {},
+);
+
+(async () => {
+  await assert.rejects(
+    () => service.update('path-1', {
+      pathStructure: {
+        phases: [{ id: 'phase-2', title: 'Revised', modules: [] }],
+      },
+    }, 'owner-1'),
+    error => error instanceof BadRequestException &&
+      /learners have progress/.test(error.message),
+  );
+  assert.equal(phasesDeleted, false);
+})().catch(error => {
+  console.error(error);
+  process.exitCode = 1;
+});
+"""
+    )
+
+
+def test_outbox_does_not_ack_events_without_a_consumer():
+    run_typescript(
+        r"""
+const assert = require('node:assert/strict');
+const { ApplicationOutboxProcessor } =
+  require('./src/modules/engagement-communication/services/application-outbox.processor.ts');
+
+let claimed = false;
+let emitted = false;
+let retryUpdate;
+const prisma = {
+  $transaction: async callback => callback({
+    $queryRaw: async () => {
+      if (claimed) return [];
+      claimed = true;
+      return [{ id: 'event-1' }];
+    },
+    applicationOutboxEvent: {
+      update: async () => ({
+        id: 'event-1',
+        eventType: 'unhandled.event',
+        payload: { userId: 'user-1' },
+        attempts: 0,
+      }),
+    },
+  }),
+  applicationOutboxEvent: {
+    update: async args => { retryUpdate = args; },
+  },
+};
+const processor = new ApplicationOutboxProcessor(prisma, {
+  listenerCount: () => 0,
+  emitAsync: async () => { emitted = true; },
+});
+processor.logger = { error: () => {} };
+
+(async () => {
+  await processor.processPendingEvents();
+  assert.equal(emitted, false);
+  assert.equal(retryUpdate.where.id, 'event-1');
+  assert.equal(retryUpdate.data.attempts.increment, 1);
+  assert.equal(retryUpdate.data.lockedAt, null);
+  assert.equal(retryUpdate.data.processedAt, undefined);
+})().catch(error => {
+  console.error(error);
+  process.exitCode = 1;
+});
+"""
+    )
+
+
+def test_onboarding_completion_listener_uses_an_idempotent_analytics_event():
+    run_typescript(
+        r"""
+const assert = require('node:assert/strict');
+const { OnboardingCompletedListener } =
+  require('./src/modules/ai-analytics/services/onboarding-completed.listener.ts');
+
+let tracked;
+const listener = new OnboardingCompletedListener({
+  trackEvent: async (...args) => { tracked = args; },
+});
+
+(async () => {
+  await listener.handle({
+    userId: 'user-1',
+    timestamp: '2026-11-11T12:00:00.000Z',
+    data: {
+      healthcareField: 'pharmacy',
+      careerStage: 'student',
+      institution: 'not copied to analytics',
+    },
+  });
+  assert.deepEqual(tracked, [
+    'user-1',
+    'user.onboarding.completed',
+    { healthcareField: 'pharmacy', careerStage: 'student' },
+    '2026-11-11T12:00:00.000Z',
+    'onboarding-completed:user-1:2026-11-11T12:00:00.000Z',
+  ]);
+})().catch(error => {
+  console.error(error);
+  process.exitCode = 1;
+});
+"""
+    )
+
+
+def test_analytics_event_source_key_uses_a_unique_upsert():
+    run_typescript(
+        r"""
+const assert = require('node:assert/strict');
+const { AiAnalyticsService } =
+  require('./src/modules/ai-analytics/services/ai-analytics.service.ts');
+
+let upsertArgs;
+const service = Object.create(AiAnalyticsService.prototype);
+service.prisma = {
+  studyEvent: {
+    upsert: async args => {
+      upsertArgs = args;
+      return { id: 'event-1' };
+    },
+    create: async () => assert.fail('idempotent event must upsert'),
+  },
+};
+service.invalidateUserCaches = async () => {};
+service.logger = { error: () => {} };
+
+(async () => {
+  await service.trackEvent(
+    'user-1',
+    'user.onboarding.completed',
+    { careerStage: 'student' },
+    '2026-11-11T12:00:00.000Z',
+    'onboarding-completed:user-1:2026-11-11T12:00:00.000Z',
+  );
+  assert.equal(
+    upsertArgs.where.sourceKey,
+    'onboarding-completed:user-1:2026-11-11T12:00:00.000Z',
+  );
+  assert.equal(upsertArgs.create.eventType, 'user.onboarding.completed');
+  assert.deepEqual(upsertArgs.update, {});
 })().catch(error => {
   console.error(error);
   process.exitCode = 1;

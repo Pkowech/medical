@@ -754,7 +754,7 @@ export default function OnboardingPage() {
             <div className="w-full rounded-xl border border-border bg-muted/40 p-5 mb-8 text-left">
               <h3 className="font-semibold text-foreground">No exact match yet</h3>
               <p className="text-sm text-muted-foreground mt-1">
-                We couldn&apos;t find a published path for this combination. Browse the catalog to see all available learning paths.
+                We couldn&apos;t find a published path for this combination. You can browse all paths; only paths eligible for your career stage can be started.
               </p>
               <Link
                 href="/learning-paths"

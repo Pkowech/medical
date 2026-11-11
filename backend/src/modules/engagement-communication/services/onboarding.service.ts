@@ -240,7 +240,10 @@ export class OnboardingService {
     const normalizedField = healthcareField?.toLowerCase().replace(/[_-]/g, ' ').trim();
     const normalizedSpecialization = specialization?.toLowerCase().trim();
     const normalizedTargetExam = targetExam?.toLowerCase().trim();
-    const normalizedStage = careerStage?.toLowerCase().trim();
+    const normalizedStage = normalizeCareerStage(careerStage);
+    if (!normalizedStage) {
+      return [];
+    }
     const resultLimit = Number.isFinite(limit)
       ? Math.min(Math.max(Math.floor(limit), 1), 12)
       : 4;

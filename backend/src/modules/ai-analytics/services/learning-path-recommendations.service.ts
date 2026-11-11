@@ -12,6 +12,7 @@ import { ANALYTICS_CACHE_CONFIG } from './analytics-cache.constants';
 import { LearningPath } from '@prisma/client';
 import { normalizeCareerStage } from '#common/constants/career-stages';
 import { evaluateLearningPathEligibility } from '#common/utils/learning-path-eligibility';
+import { getRecommendationWindow } from '#common/utils/recommendation-limits';
 
 export interface RecommendationScore {
   pathId: string;
@@ -41,6 +42,7 @@ export class LearningPathRecommendationsService {
     userId: string,
     limit: number = 10,
   ): Promise<RecommendationScore[]> {
+    const window = getRecommendationWindow(limit, 10);
     try {
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
@@ -54,12 +56,12 @@ export class LearningPathRecommendationsService {
       const rustRecommendations =
         await this.learningAnalyticsService.getPathRecommendations(
           userId,
-          limit,
+          window.candidateLimit,
         );
 
       const recommendations = await this.enrichRustRecommendations(
         rustRecommendations,
-        limit,
+        window.resultLimit,
         careerStage,
       );
       return recommendations;
@@ -84,7 +86,7 @@ export class LearningPathRecommendationsService {
     limit: number,
     careerStage: string,
   ): Promise<RecommendationScore[]> {
-    const rankedRecommendations = rustRecs.slice(0, limit);
+    const rankedRecommendations = rustRecs;
     const pathIds = rankedRecommendations.map(
       (recommendation) => recommendation.pathId,
     );
@@ -120,7 +122,7 @@ export class LearningPathRecommendationsService {
           estimatedCompletionTime: path.estimatedDurationWeeks ?? undefined,
         },
       ];
-    });
+    }).slice(0, limit);
   }
 
   /**
@@ -142,9 +144,10 @@ export class LearningPathRecommendationsService {
     userId: string,
     limit: number = 5,
   ): Promise<RecommendationScore[]> {
+    const window = getRecommendationWindow(limit, 5);
     const cacheKey = `${ANALYTICS_CACHE_CONFIG.RECOMMENDATIONS.COLLABORATIVE(
       userId,
-      limit,
+      window.resultLimit,
     )}:enriched:v3`;
 
     try {
@@ -174,13 +177,13 @@ export class LearningPathRecommendationsService {
       const rustRecs =
         await this.learningAnalyticsService.getCollaborativeRecommendations(
           userId,
-          limit,
+          window.candidateLimit,
         );
 
       // Enrich with learning path data
       const recommendations = await this.enrichCollaborativeRecommendations(
         rustRecs,
-        limit,
+        window.resultLimit,
         careerStage,
       );
 
@@ -223,7 +226,7 @@ export class LearningPathRecommendationsService {
       include: {
         milestones: true,
       },
-      take: limit,
+      take: pathIds.length,
     });
 
     const pathsById = new Map(paths.map((path) => [path.id, path]));
@@ -248,7 +251,7 @@ export class LearningPathRecommendationsService {
             path.estimatedDurationWeeks ?? undefined,
         },
       ];
-    });
+    }).slice(0, limit);
   }
 
   /**
