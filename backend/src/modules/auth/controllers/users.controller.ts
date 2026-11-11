@@ -28,7 +28,7 @@ import {
   ApiBody,
 } from '@nestjs/swagger';
 import { ApiResponseWithData } from '#common/decorators/api-response-with-data.decorator';
-import { UsersService, UserWithRelations } from '../services/users.service';
+import { UsersService } from '../services/users.service';
 import { JwtAuthGuard } from '#modules/auth/guards/jwt-auth.guard';
 import { RoleGuard } from '#common/guards/roles.guard';
 import { Roles } from '#common/decorators/roles.decorator';
@@ -157,7 +157,7 @@ export class UsersController {
   @Get('achievements')
   @ApiOperation({ summary: 'Get current user achievements' })
   @ApiResponseWithData(HttpStatus.OK, AchievementDto)
-  async getAchievements(): Promise<ApiResponseDto<AchievementDto[]>> {
+  getAchievements(): ApiResponseDto<AchievementDto[]> {
     // Stubbed response until achievements module is fully developed
     return ApiResponseDto.success([], 'Achievements retrieved successfully');
   }
@@ -165,7 +165,7 @@ export class UsersController {
   @Get('achievement-summary')
   @ApiOperation({ summary: 'Get current user achievement statistics' })
   @ApiResponseWithData(HttpStatus.OK, AchievementStatsDto)
-  async getAchievementStats(): Promise<ApiResponseDto<AchievementStatsDto>> {
+  getAchievementStats(): ApiResponseDto<AchievementStatsDto> {
     // Stubbed response for frontend dashboard/achievements page
     const stats: AchievementStatsDto = {
       totalEarned: 0,
