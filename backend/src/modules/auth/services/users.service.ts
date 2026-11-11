@@ -229,7 +229,7 @@ export class UsersService {
     value: Prisma.JsonValue | null | undefined,
   ): Prisma.JsonObject {
     return value !== null && typeof value === 'object' && !Array.isArray(value)
-      ? (value as Prisma.JsonObject)
+      ? value
       : {};
   }
 
@@ -243,7 +243,7 @@ export class UsersService {
     fallback: T[number],
   ): T[number] {
     return typeof value === 'string' && allowed.includes(value)
-      ? (value as T[number])
+      ? value
       : fallback;
   }
 
@@ -328,7 +328,7 @@ export class UsersService {
         throw new NotFoundException(`Role '${roleName}' not found`);
       }
 
-      const user = (await this.prisma.user.create({
+      const user = await this.prisma.user.create({
         data: {
           email,
           username: finalUsername,
@@ -362,7 +362,7 @@ export class UsersService {
           },
         },
         select: userSelect,
-      })) as UserWithRelations;
+      });
 
       // Log what was saved to database
       this.logger.debug('User created with saved profile data:', {
@@ -412,7 +412,7 @@ export class UsersService {
 
     return {
       users: await Promise.all(
-        users.map((u) => this.mapUserToDto(u as UserWithRelations)),
+        users.map((u) => this.mapUserToDto(u)),
       ),
       pagination: {
         page,
@@ -446,7 +446,7 @@ export class UsersService {
     } else {
       this.logger.warn(`User NOT found in database for ID: ${id}`);
     }
-    return user as UserWithRelations | null;
+    return user;
   }
 
   async findByEmail(email: string): Promise<UserWithRelations | null> {
@@ -467,7 +467,7 @@ export class UsersService {
     }
 
     await this.setCache(user);
-    return user as UserWithRelations;
+    return user;
   }
 
   async findByUsername(username: string): Promise<UserWithRelations | null> {
@@ -488,7 +488,7 @@ export class UsersService {
     }
 
     await this.setCache(user);
-    return user as UserWithRelations;
+    return user;
   }
 
   async getUserProfile(userId: string): Promise<UserProfileResponseDto> {
@@ -544,7 +544,7 @@ export class UsersService {
       if (analyticsTimeout) clearTimeout(analyticsTimeout);
     }
 
-    const userDto = await this.mapUserToDto(user as UserWithRelations);
+    const userDto = await this.mapUserToDto(user);
     const profileData: UserProfileResponseDto = {
       ...userDto,
       totalCourses: analytics.coursesEnrolled,
@@ -656,14 +656,14 @@ export class UsersService {
       console.log(
         `[UsersService] Database updated, clearing cache for ${userId}`,
       );
-      await this.clearCache(existingUser as UserWithRelations);
-      await this.setCache(updatedUser as UserWithRelations);
+      await this.clearCache(existingUser);
+      await this.setCache(updatedUser);
 
       // Sync to global search index
       await this.searchSync.syncEntity('user', updatedUser.id);
 
       console.log(`[UsersService] updateProfile complete for ${userId}`);
-      return await this.mapUserToDto(updatedUser as UserWithRelations);
+      return await this.mapUserToDto(updatedUser);
     } catch (error) {
       if (this.isUsernameUniqueConstraintError(error)) {
         throw new ConflictException('User with this username already exists');
@@ -731,7 +731,7 @@ export class UsersService {
       select: userSelect,
     });
     if (existing) {
-      await this.clearCache(existing as UserWithRelations);
+      await this.clearCache(existing);
     }
 
     const url = cloudinaryUrl || (await this.fileStorage.getPresignedDownloadUrl(key, {
@@ -787,7 +787,7 @@ export class UsersService {
       return null;
     }
 
-    return user as UserWithRelations;
+    return user;
   }
 
   public async remove(id: string): Promise<void> {
@@ -843,9 +843,9 @@ export class UsersService {
       throw new NotFoundException(`User with ID ${id} not found`);
     }
 
-    await this.clearCache(user as UserWithRelations);
-    await this.setCache(updatedUser as UserWithRelations);
-    return await this.mapUserToDto(updatedUser as UserWithRelations);
+    await this.clearCache(user);
+    await this.setCache(updatedUser);
+    return await this.mapUserToDto(updatedUser);
   }
 
   private async setCache(user: UserWithRelations): Promise<void> {

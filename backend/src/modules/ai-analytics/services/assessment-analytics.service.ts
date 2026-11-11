@@ -436,7 +436,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
         this.prisma.quizAttempt.update({
           where: { id: attempt.id },
           data: {
-            answers: session.responses as Prisma.InputJsonValue,
+            answers: session.responses,
             score: session.finalScore,
             maxScore: 100,
             percentage: session.finalScore,
