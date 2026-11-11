@@ -166,10 +166,11 @@ export class RefreshTokenService {
         tokenData.userId,
         'unknown',
         'unknown',
-        { success: true, token: `${refreshToken.substring(0, 8)}...` },
+        { success: true, action: 'revoke' },
       );
     } catch (error: unknown) {
       this.logger.error(`Error revoking refresh token: ${String(error)}`);
+      throw error;
     }
   }
 

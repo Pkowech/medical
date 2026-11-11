@@ -1872,10 +1872,27 @@ export class QuizService {
             createdAt: attempt.completedAt ?? new Date(),
           },
         });
+        await writeApplicationOutboxEvent(tx, {
+          eventType: 'quiz.submitted',
+          aggregateId: attempt.id,
+          dedupeKey: `quiz-submitted:${attempt.id}`,
+          payload: {
+            userId,
+            quizId: quiz.id,
+            attemptId: attempt.id,
+            topicId,
+            score: scorePercentage,
+            isPassed: passed,
+            passingScore: 70,
+            bktUpdates: graded.responses.map(({ isCorrect }) => ({
+              skillId: topicId,
+              isCorrect,
+            })),
+            reviewAnswers,
+          },
+        });
         return { quiz, attemptId: attempt.id };
       });
-      await this.progressService.updateProgress(userId, topicQuiz.quiz.id);
-      await this.analyticsService.generateAnalytics(userId, topicQuiz.quiz.id);
       const recommendations =
         await this.recommendationService.recommendForAnswers(
           userId,
@@ -1886,15 +1903,6 @@ export class QuizService {
           },
           reviewAnswers,
         );
-      for (const answer of reviewAnswers) {
-        void this.analyticsService
-          .updateBktForAssessment(userId, topicId, answer.isCorrect)
-          .catch((error) =>
-            this.logger.warn(
-              `Could not update topic mastery for ${topicId}: ${String(error)}`,
-            ),
-          );
-      }
       let reviewCardsScheduled = 0;
       try {
         reviewCardsScheduled =

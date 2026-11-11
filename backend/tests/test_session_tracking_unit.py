@@ -13,6 +13,8 @@ const cache = new Map();
 const blacklisted = [];
 const service = Object.create(SessionTrackingService.prototype);
 service.maxSessions = { student: 3 };
+service.prefix = 'session:';
+service.userSessionsPrefix = 'userSessions:';
 service.prisma = {
   userSession: {
     findUnique: async () => null,
@@ -86,6 +88,8 @@ const { SessionTrackingService } =
 
 const revoked = [];
 const service = Object.create(SessionTrackingService.prototype);
+service.prefix = 'session:';
+service.userSessionsPrefix = 'userSessions:';
 service.prisma = {
   userSession: {
     findMany: async () => [{ id: 'session-1' }, { id: 'session-2' }],

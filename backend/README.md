@@ -207,6 +207,21 @@ The PostgreSQL pool remains capped at 3 connections per Node process by default;
 
 The successful-login audit events are written to a PostgreSQL transactional outbox with the login-state update, then materialized by a background worker. Apply the `20261106204500_login_audit_outbox` migration before deploying this code (`pnpm exec prisma migrate deploy` from `backend/`). Audit records may become visible a few seconds after the login response.
 
+### Application outbox
+
+Quiz submission, material upload/access, course and learning-path enrollment,
+onboarding completion, and study-session completion write their downstream
+events in the same PostgreSQL transaction as the source activity. The worker
+retries with exponential backoff, dead-letters after eight failed attempts, and
+keeps failed payloads available for replay. It runs independently of Redis.
+
+Apply the current Prisma migrations before deployment. Administrators can
+inspect events with `GET /admin/outbox/events?state=pending|processed|failed`
+and replay dead-lettered events with `POST /admin/outbox/events/:id/replay`.
+Prometheus exposes `application_outbox_events{state="pending|failed|stale"}`;
+`stale` counts pending events older than ten minutes. Error details stored in
+the outbox are restricted to error class names.
+
 ### Production smoke checklist
 
 - Open the signed-out landing page and use the Features and Courses navigation

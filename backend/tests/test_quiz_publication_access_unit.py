@@ -627,6 +627,7 @@ const { QuizService } =
 
 const service = Object.create(QuizService.prototype);
 service.prisma = {
+  quizAttempt: { findUnique: async () => null },
   quiz: {
     findFirst: async () => ({
       id: 'quiz-1',

@@ -63,6 +63,14 @@ const service = new RoleInitializationService(prisma);
 
   assert.deepEqual([...roles.keys()].sort(), Object.values(Role).sort());
   assert.ok(roles.has(Role.student));
+  assert.ok(rolePermissionKeys.has('role-student:permission-access_courses'));
+  assert.ok(rolePermissionKeys.has('role-student:permission-take_assessments'));
+  assert.ok(rolePermissionKeys.has('role-admin:permission-manage_system'));
+  assert.ok(!rolePermissionKeys.has('role-student:permission-manage_users'));
+  for (const grant of rolePermissionKeys) {
+    const permissionId = grant.slice(grant.indexOf(':') + 1);
+    assert.ok([...permissions.values()].some(permission => permission.id === permissionId));
+  }
 
   const studentRole = roles.get(Role.student);
   studentRole.description = 'Admin-managed description';

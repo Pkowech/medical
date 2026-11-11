@@ -329,7 +329,7 @@ export class TopicsService {
     const existing = await this.getTopicForManagement(id, userId);
     const [progressCount, skillStateCount, subtopicCount] = await Promise.all([
       this.prisma.progress.count({ where: { topicId: id } }),
-      this.prisma.userSkillState.count({ where: { topicId: id } }),
+      this.prisma.userSkillState.count({ where: { skillId: id } }),
       this.prisma.topic.count({ where: { parentTopicId: id } }),
     ]);
     if (progressCount > 0 || skillStateCount > 0 || subtopicCount > 0) {
