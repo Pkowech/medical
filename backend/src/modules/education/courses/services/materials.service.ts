@@ -491,8 +491,21 @@ export class MaterialsService {
                   { metadata: { path: ['shareWithCourse'], not: false } },
                   {
                     OR: [
-                      { course: { is: courseEnrollment } },
-                      { unit: { is: { course: { is: courseEnrollment } } } },
+                      {
+                        course: {
+                          is: { ...courseEnrollment, status: 'published' },
+                        },
+                      },
+                      {
+                        unit: {
+                          is: {
+                            isPublished: true,
+                            course: {
+                              is: { ...courseEnrollment, status: 'published' },
+                            },
+                          },
+                        },
+                      },
                       { course: { is: courseManagement } },
                       { unit: { is: { course: { is: courseManagement } } } },
                     ],
@@ -627,10 +640,12 @@ export class MaterialsService {
                     {
                       unit: {
                         course: {
+                          status: 'published',
                           enrollments: {
                             some: { userId, status: { in: ['active', 'completed'] } },
                           },
                         },
+                        isPublished: true,
                       },
                     },
                   ],
@@ -1358,13 +1373,26 @@ export class MaterialsService {
   }
 
   private async assertCanReadDriveMaterial(material: Material, userId: string): Promise<void> {
-    const courseId = material.courseId || (material.unitId
-      ? (await this.prisma.unit.findUnique({ where: { id: material.unitId }, select: { courseId: true } }))?.courseId
+    const topicUnit = !material.unitId && material.topicId
+      ? await this.prisma.topic.findUnique({
+          where: { id: material.topicId },
+          select: { unitId: true },
+        })
+      : null;
+    const placementUnitId = material.unitId || topicUnit?.unitId;
+    const courseId = material.courseId || (placementUnitId
+      ? (await this.prisma.unit.findUnique({ where: { id: placementUnitId }, select: { courseId: true } }))?.courseId
       : undefined);
     if (!courseId) throw new ForbiddenException('This Drive material is not attached to a course.');
 
-    const [course, instructorAssignment, enrollment, groupMemberships, roles] = await Promise.all([
-      this.prisma.course.findUnique({ where: { id: courseId }, select: { createdById: true } }),
+    const [course, unit, instructorAssignment, enrollment, groupMemberships, roles] = await Promise.all([
+      this.prisma.course.findUnique({ where: { id: courseId }, select: { createdById: true, status: true } }),
+      placementUnitId
+        ? this.prisma.unit.findUnique({
+            where: { id: placementUnitId },
+            select: { isPublished: true },
+          })
+        : Promise.resolve(null),
       this.prisma.courseInstructor.findUnique({
         where: { courseId_userId: { courseId, userId } },
         select: { id: true },
@@ -1398,6 +1426,13 @@ export class MaterialsService {
       if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return false;
       return (metadata as Record<string, unknown>).courseId === courseId;
     });
+    if (
+      !isAdmin &&
+      !isInstructor &&
+      (course?.status !== 'published' || (unit && !unit.isPublished))
+    ) {
+      throw new ForbiddenException('This course content is not published.');
+    }
     if (!isAdmin && !isInstructor && !(sharedWithCourse && (isEnrolled || isCourseGroupMember))) {
       throw new ForbiddenException('Enroll in this course to view its Drive materials.');
     }
@@ -1469,8 +1504,21 @@ export class MaterialsService {
           { metadata: { path: ['shareWithCourse'], not: false } },
           {
             OR: [
-              { course: enrolledCourse },
-              { unit: { course: enrolledCourse } },
+              {
+                course: {
+                  status: 'published',
+                  enrollments: enrolledCourse.enrollments,
+                },
+              },
+              {
+                unit: {
+                  isPublished: true,
+                  course: {
+                    status: 'published',
+                    enrollments: enrolledCourse.enrollments,
+                  },
+                },
+              },
             ],
           },
         ],
@@ -1981,13 +2029,35 @@ export class MaterialsService {
     }
   }
 
-  async getFileMetadata(fileId: string): Promise<File> {
+  async getFileMetadata(fileId: string, userId: string): Promise<File> {
     try {
       const file = await this.prisma.file.findUnique({
         where: { id: fileId },
       });
       if (!file) {
         throw new NotFoundException(`File with ID ${fileId} not found`);
+      }
+
+      const materials = await this.prisma.material.findMany({
+        where: { fileId },
+        include: { unit: true },
+      });
+      if (materials.length === 0) {
+        await this.assertCanUploadToPlatformLibrary(userId);
+      } else {
+        let canRead = false;
+        for (const material of materials) {
+          try {
+            await this.assertCanReadMaterial(material, userId);
+            canRead = true;
+            break;
+          } catch (error) {
+            if (!(error instanceof ForbiddenException)) throw error;
+          }
+        }
+        if (!canRead) {
+          throw new NotFoundException(`File with ID ${fileId} not found`);
+        }
       }
       return file;
     } catch (error) {
@@ -2115,8 +2185,23 @@ export class MaterialsService {
     }
   }
 
-  async findSharedMaterials(userId: string): Promise<MaterialShare[]> {
+  async findSharedMaterials(
+    userId: string,
+    requesterId: string,
+  ): Promise<MaterialShare[]> {
     try {
+      if (userId !== requesterId) {
+        const requesterRoles = await this.prisma.userRole.findMany({
+          where: { userId: requesterId },
+          select: { role: { select: { name: true } } },
+        });
+        if (
+          !requesterRoles.some(({ role }) => role.name === RoleName.admin)
+        ) {
+          throw new NotFoundException('Shared materials not found');
+        }
+      }
+
       const shares = await this.prisma.materialShare.findMany({
         where: { userId }, // userId represents the user with whom materials are shared
         include: {

@@ -306,11 +306,15 @@ export class CoursesController {
   @ApiOperation({ summary: 'Get course prerequisites' })
   @ApiResponse({ status: 200, description: 'Prerequisites retrieved' })
   @ApiResponse({ status: 404, description: 'Course not found' })
-  async getPrerequisites(@Param('id') courseId: string) {
+  async getPrerequisites(
+    @Param('id') courseId: string,
+    @Request() req: ExpressRequest,
+  ) {
     if (!this.isValidStringParam(courseId)) {
       throw new BadRequestException('Invalid course ID');
     }
-    return await this.coursesService.getPrerequisites(courseId);
+    const userId = this.isUserRequest(req) ? req.user.id : undefined;
+    return await this.coursesService.getPrerequisites(courseId, userId);
   }
 
   @Post(':id/enroll')
@@ -368,6 +372,7 @@ export class CoursesController {
   async assignInstructor(
     @Param('id') courseId: string,
     @Body('instructorId') instructorId: string,
+    @Request() req: ExpressRequest,
   ) {
     if (!this.isValidStringParam(courseId)) {
       throw new BadRequestException('Invalid course ID');
@@ -375,7 +380,14 @@ export class CoursesController {
     if (!this.isValidStringParam(instructorId)) {
       throw new BadRequestException('Invalid instructor ID');
     }
-    return await this.coursesService.assignInstructor(courseId, instructorId);
+    if (!this.isUserRequest(req)) {
+      throw new BadRequestException('Invalid user in request');
+    }
+    return await this.coursesService.assignInstructor(
+      courseId,
+      instructorId,
+      req.user.id,
+    );
   }
 
   @Get(':id/units/:unitId/topics/:topicId')

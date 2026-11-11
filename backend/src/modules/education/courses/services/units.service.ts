@@ -37,19 +37,139 @@ export class UnitsService {
     private readonly searchSync: GlobalSearchSyncService,
   ) {}
 
-  private async canManageUnit(courseOwnerId: string | null, userId: string): Promise<boolean> {
-    if (courseOwnerId === userId) return true;
-
+  private async getRoleNames(userId: string): Promise<string[]> {
     const userRoles = await this.prisma.userRole.findMany({
       where: { userId },
       include: { role: { select: { name: true } } },
     });
+    return userRoles.map(({ role }) => role.name);
+  }
 
-    return userRoles.some((userRole) => userRole.role.name === Role.admin);
+  private async canManageUnit(
+    courseOwnerId: string | null,
+    courseId: string,
+    userId: string,
+  ): Promise<boolean> {
+    const roles = await this.getRoleNames(userId);
+    if (roles.includes(Role.admin)) return true;
+    if (!roles.includes(Role.instructor)) return false;
+    if (courseOwnerId === userId) return true;
+
+    const assignment = await this.prisma.courseInstructor.findUnique({
+      where: { courseId_userId: { courseId, userId } },
+      select: { id: true },
+    });
+    return Boolean(assignment);
+  }
+
+  private async filterUnitMaterials(
+    unit: any,
+    userId: string | undefined,
+    canManage: boolean,
+  ): Promise<any> {
+    const sanitizeCourse = (course: any) => {
+      if (!course) return course;
+      const { createdById: _createdById, ...visibleCourse } = course;
+      return visibleCourse;
+    };
+    if (canManage) {
+      return { ...unit, course: sanitizeCourse(unit.course) };
+    }
+
+    const materialCollections = [
+      unit.materials ?? [],
+      ...(unit.topics ?? []).map((topic: any) => topic.materials ?? []),
+      ...(unit.course?.materials ? [unit.course.materials] : []),
+    ];
+    const materialIds = [
+      ...new Set(
+        materialCollections.flat().map((material: any) => material.id),
+      ),
+    ];
+    if (!userId || materialIds.length === 0) {
+      return {
+        ...unit,
+        course: sanitizeCourse(unit.course),
+        materials: [],
+        topics: (unit.topics ?? []).map((topic: any) => ({
+          ...topic,
+          materials: [],
+        })),
+        ...(unit.course?.materials ? { course: { ...unit.course, materials: [] } } : {}),
+      };
+    }
+
+    const [enrollment, shares] = await Promise.all([
+      this.prisma.courseEnrollment.findUnique({
+        where: { userId_courseId: { userId, courseId: unit.courseId } },
+        select: { status: true },
+      }),
+      this.prisma.materialShare.findMany({
+        where: { userId, materialId: { in: materialIds } },
+        select: { materialId: true },
+      }),
+    ]);
+    const isEnrolled =
+      enrollment?.status === 'active' || enrollment?.status === 'completed';
+    const sharedMaterialIds = new Set(
+      shares.map(({ materialId }) => materialId),
+    );
+    const canRead = (material: any) => {
+      const metadata =
+        material.metadata &&
+        typeof material.metadata === 'object' &&
+        !Array.isArray(material.metadata)
+          ? material.metadata
+          : {};
+      return (
+        material.userId === userId ||
+        sharedMaterialIds.has(material.id) ||
+        (isEnrolled && metadata.shareWithCourse !== false)
+      );
+    };
+    const sanitize = (material: any) => {
+      const { userId: _userId, metadata: _metadata, ...visibleMaterial } = material;
+      return visibleMaterial;
+    };
+    let collectionIndex = 0;
+    const materials = materialCollections[collectionIndex++]
+      .filter(canRead)
+      .map(sanitize);
+    const topics = (unit.topics ?? []).map((topic: any) => ({
+      ...topic,
+      materials: materialCollections[collectionIndex++]
+        .filter(canRead)
+        .map(sanitize),
+    }));
+    const courseMaterials = unit.course?.materials
+      ? materialCollections[collectionIndex].filter(canRead).map(sanitize)
+      : undefined;
+    return {
+      ...unit,
+      course: sanitizeCourse(unit.course),
+      materials,
+      topics,
+      ...(courseMaterials
+        ? { course: { ...unit.course, materials: courseMaterials } }
+        : {}),
+    };
   }
 
   async create(createUnitDto: CreateUnitDto, creatorId: string): Promise<Unit> {
     try {
+      const course = await this.prisma.course.findUnique({
+        where: { id: createUnitDto.courseId },
+        select: { id: true, createdById: true },
+      });
+      if (!course) {
+        throw new NotFoundException('Course not found');
+      }
+      if (!(await this.canManageUnit(course.createdById, course.id, creatorId))) {
+        throw new ForbiddenException(
+          'Only the course instructor or an admin can create units',
+        );
+      }
+
       const unit = await this.prisma.$transaction(async (prisma) => {
         let order = createUnitDto.order;
         if (!order) {
@@ -95,7 +215,12 @@ export class UnitsService {
           },
           include: {
             course: {
-              select: { id: true, title: true, status: true },
+              select: {
+                id: true,
+                title: true,
+                status: true,
+                createdById: true,
+              },
             },
             materials: {
               select: { id: true, title: true, type: true, fileId: true },
@@ -133,30 +258,35 @@ export class UnitsService {
     courseId?: string,
     userId?: string,
   ): Promise<UnitResponseDto[]> {
-    const cacheKey = cacheKeys.unitsAll(courseId ?? '', userId ?? '');
-    const cached = await this.redisService.get<string>(cacheKey);
-
-    if (cached) {
-      try {
-        this.logger.log('Units fetched from cache', { courseId, userId });
-        return JSON.parse(cached) as UnitResponseDto[];
-      } catch (err) {
-        this.logger.warn(`Corrupt cache for units list: ${cacheKey}`);
-        await this.redisService.del(cacheKey);
-      }
-    }
-
     try {
-      const where: Prisma.UnitWhereInput = {};
-      if (courseId) {
-        where.courseId = courseId;
+      const where: Prisma.UnitWhereInput = courseId ? { courseId } : {};
+      const roleNames = userId ? await this.getRoleNames(userId) : [];
+      if (!roleNames.includes(Role.admin)) {
+        const visibility: Prisma.UnitWhereInput[] = [
+          {
+            isPublished: true,
+            course: { is: { status: 'published' } },
+          },
+        ];
+        if (userId && roleNames.includes(Role.instructor)) {
+          visibility.push(
+            { course: { is: { createdById: userId } } },
+            { course: { is: { instructors: { some: { userId } } } } },
+          );
+        }
+        where.AND = [{ OR: visibility }];
       }
 
       const units = await this.prisma.unit.findMany({
         where,
         include: {
           course: {
-            select: { id: true, title: true, status: true },
+            select: {
+              id: true,
+              title: true,
+              status: true,
+              createdById: true,
+            },
           },
           materials: {
             select: {
@@ -165,6 +295,22 @@ export class UnitsService {
               type: true,
               fileId: true,
               file: { select: { key: true } },
+              userId: true,
+              metadata: true,
+            },
+          },
+          topics: {
+            include: {
+              materials: {
+                select: {
+                  id: true,
+                  title: true,
+                  type: true,
+                  fileId: true,
+                  userId: true,
+                  metadata: true,
+                },
+              },
             },
           },
         },
@@ -175,8 +321,6 @@ export class UnitsService {
         units.map(async (unit) => {
           let progressPercentage = 0;
           let isCompleted = false;
-          const materialsCount = unit.materials?.length || 0;
-
           if (userId && unit.courseId) {
             const progress = await this.prisma.progress.findFirst({
               where: {
@@ -198,22 +342,30 @@ export class UnitsService {
             }
           }
 
+          const canManage = Boolean(
+            userId &&
+              (await this.canManageUnit(
+                unit.course.createdById,
+                unit.courseId,
+                userId,
+              )),
+          );
+          const visibleUnit = await this.filterUnitMaterials(
+            unit,
+            userId,
+            canManage,
+          );
           return {
-            ...unit,
+            ...visibleUnit,
             title: unit.title ?? '',
             learningObjectives: JSON.stringify(unit.learningObjectives),
-            materialsCount,
+            materialsCount: visibleUnit.materials?.length || 0,
             progressPercentage,
             isCompleted,
           } as UnitResponseDto;
         }),
       );
 
-      await this.redisService.set(
-        cacheKey,
-        JSON.stringify(enhancedUnits),
-        this.CACHE_TTL,
-      );
       this.logger.log('Units fetched from database', {
         courseId,
         count: enhancedUnits.length,
@@ -338,19 +490,6 @@ export class UnitsService {
   }
 
   async findOne(id: string, userId?: string): Promise<UnitResponseDto> {
-    const cacheKey = cacheKeys.unitById(id);
-    const cached = await this.redisService.get<string>(cacheKey);
-
-    if (cached) {
-      try {
-        this.logger.log('Unit fetched from cache', { unitId: id, userId });
-        return JSON.parse(cached) as UnitResponseDto;
-      } catch (err) {
-        this.logger.warn(`Corrupt cache for unit ${id}`);
-        await this.redisService.del(cacheKey);
-      }
-    }
-
     try {
       const unit = await this.prisma.unit.findUnique({
         where: { id },
@@ -360,20 +499,42 @@ export class UnitsService {
               id: true,
               title: true,
               status: true,
+              createdById: true,
               materials: {
                 where: { unitId: null },
-                select: { id: true, title: true, type: true, fileId: true },
+                select: {
+                  id: true,
+                  title: true,
+                  type: true,
+                  fileId: true,
+                  userId: true,
+                  metadata: true,
+                },
               },
             },
           },
           materials: {
-            select: { id: true, title: true, type: true, fileId: true },
+            select: {
+              id: true,
+              title: true,
+              type: true,
+              fileId: true,
+              userId: true,
+              metadata: true,
+            },
             orderBy: { createdAt: 'asc' },
           },
           topics: {
             include: {
               materials: {
-                select: { id: true, title: true, type: true, fileId: true },
+                select: {
+                  id: true,
+                  title: true,
+                  type: true,
+                  fileId: true,
+                  userId: true,
+                  metadata: true,
+                },
               },
             },
             orderBy: { order: 'asc' },
@@ -383,6 +544,21 @@ export class UnitsService {
 
       if (!unit) {
         this.logger.warn('Unit not found', { unitId: id });
+        throw new NotFoundException(`Unit with ID ${id} not found`);
+      }
+
+      const canManage = Boolean(
+        userId &&
+          (await this.canManageUnit(
+            unit.course.createdById,
+            unit.courseId,
+            userId,
+          )),
+      );
+      if (
+        !canManage &&
+        (unit.course.status !== 'published' || !unit.isPublished)
+      ) {
         throw new NotFoundException(`Unit with ID ${id} not found`);
       }
 
@@ -409,21 +585,20 @@ export class UnitsService {
         ),
       ];
 
+      const visibleUnit = await this.filterUnitMaterials(
+        { ...unit, materials },
+        userId,
+        canManage,
+      );
       const result: UnitResponseDto = {
-        ...unit,
-        materials,
+        ...visibleUnit,
         title: unit.title ?? '',
         learningObjectives: JSON.stringify(unit.learningObjectives),
-        materialsCount: materials.length,
+        materialsCount: visibleUnit.materials?.length ?? 0,
         progressPercentage,
         isCompleted,
       };
 
-      await this.redisService.set(
-        cacheKey,
-        JSON.stringify(result),
-        this.CACHE_TTL,
-      );
       this.logger.log('Unit fetched from database', { unitId: id, userId });
       return result;
     } catch (error) {
@@ -452,7 +627,13 @@ export class UnitsService {
         throw new NotFoundException(`Unit with ID ${id} not found`);
       }
 
-      if (!(await this.canManageUnit(existingUnit.course.createdById, userId))) {
+      if (
+        !(await this.canManageUnit(
+          existingUnit.course.createdById,
+          existingUnit.courseId,
+          userId,
+        ))
+      ) {
         this.logger.warn('Unauthorized unit update attempt', {
           unitId: id,
           userId,
@@ -535,7 +716,13 @@ export class UnitsService {
         throw new NotFoundException(`Unit with ID ${id} not found`);
       }
 
-      if (!(await this.canManageUnit(existingUnit.course.createdById, userId))) {
+      if (
+        !(await this.canManageUnit(
+          existingUnit.course.createdById,
+          existingUnit.courseId,
+          userId,
+        ))
+      ) {
         this.logger.warn('Unauthorized unit deletion attempt', {
           unitId: id,
           userId,

@@ -469,8 +469,11 @@ export class MaterialsController {
   // Moving static and prefixed routes before parameterized routes to avoid conflicts
   @Get('shared/:userId')
   @ApiOperation({ summary: 'Get materials shared with user' })
-  async findSharedMaterials(@Param('userId') userId: string) {
-    return this.materialsService.findSharedMaterials(userId);
+  async findSharedMaterials(
+    @Param('userId') userId: string,
+    @GetUser() requester: PrismaUser,
+  ) {
+    return this.materialsService.findSharedMaterials(userId, requester.id);
   }
 
   @Get('unit/:unitId')
@@ -481,8 +484,11 @@ export class MaterialsController {
 
   @Get('files/:fileId/metadata')
   @ApiOperation({ summary: 'Get file metadata' })
-  async getFileMetadata(@Param('fileId') fileId: string) {
-    return this.materialsService.getFileMetadata(fileId);
+  async getFileMetadata(
+    @Param('fileId') fileId: string,
+    @GetUser() user: PrismaUser,
+  ) {
+    return this.materialsService.getFileMetadata(fileId, user.id);
   }
 
   @Get('local/search')

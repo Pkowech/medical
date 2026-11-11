@@ -27,47 +27,220 @@ type TopicWithTitle = Topic & { title: string };
 export class TopicsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  private async canManageCourse(courseOwnerId: string | null, userId: string) {
-    if (courseOwnerId === userId) return true;
+  private async canManageCourseById(
+    courseId: string,
+    courseOwnerId: string | null,
+    userId: string,
+  ) {
     const userRoles = await this.prisma.userRole.findMany({
       where: { userId },
       include: { role: { select: { name: true } } },
     });
-    return userRoles.some(userRole => userRole.role.name === Role.admin);
+    const roles = userRoles.map(({ role }) => role.name);
+    if (roles.includes(Role.admin)) return true;
+    if (!roles.includes(Role.instructor)) return false;
+    if (courseOwnerId === userId) return true;
+
+    const assignment = await this.prisma.courseInstructor.findUnique({
+      where: { courseId_userId: { courseId, userId } },
+      select: { id: true },
+    });
+    return Boolean(assignment);
   }
 
   private toResponse(topic: Topic): TopicWithTitle {
     return { ...topic, title: topic.name };
   }
 
+  private async toVisibleTopics(
+    topics: any[],
+    userId?: string,
+  ): Promise<TopicWithTitle[]> {
+    const roles = userId
+      ? (await this.prisma.userRole.findMany({
+          where: { userId },
+          include: { role: { select: { name: true } } },
+        })).map(({ role }) => role.name)
+      : [];
+    const courseIds = [
+      ...new Set(topics.map((topic) => topic.unit?.course?.id).filter(Boolean)),
+    ];
+    const materialIds = [
+      ...new Set(
+        topics.flatMap((topic) =>
+          (topic.materials ?? []).map((material: any) => material.id),
+        ),
+      ),
+    ];
+    const [enrollments, shares] = userId
+      ? await Promise.all([
+          this.prisma.courseEnrollment.findMany({
+            where: {
+              userId,
+              courseId: { in: courseIds },
+              status: { in: ['active', 'completed'] },
+            },
+            select: { courseId: true },
+          }),
+          this.prisma.materialShare.findMany({
+            where: { userId, materialId: { in: materialIds } },
+            select: { materialId: true },
+          }),
+        ])
+      : [[], []];
+    const enrolledCourseIds = new Set(
+      enrollments.map(({ courseId }) => courseId),
+    );
+    const sharedMaterialIds = new Set(
+      shares.map(({ materialId }) => materialId),
+    );
+
+    return topics.map((topic) => {
+      const { unit, ...topicData } = topic;
+      const course = unit?.course;
+      const canManage =
+        roles.includes(Role.admin) ||
+        (roles.includes(Role.instructor) &&
+          (course?.createdById === userId ||
+            course?.instructors?.some(
+              (instructor: { userId: string }) => instructor.userId === userId,
+            )));
+      const materials = canManage
+        ? topic.materials
+        : (topic.materials ?? []).filter((material: any) => {
+            const metadata =
+              material.metadata &&
+              typeof material.metadata === 'object' &&
+              !Array.isArray(material.metadata)
+                ? material.metadata
+                : {};
+            return (
+              material.userId === userId ||
+              sharedMaterialIds.has(material.id) ||
+              (enrolledCourseIds.has(course?.id) &&
+                metadata.shareWithCourse !== false)
+            );
+          });
+      return this.toResponse({ ...topicData, materials } as Topic);
+    });
+  }
+
   private async getTopicForManagement(id: string, userId: string) {
     const topic = await this.prisma.topic.findUnique({
       where: { id },
-      include: { unit: { include: { course: { select: { createdById: true } } } } },
+      include: {
+        unit: {
+          include: {
+            course: { select: { id: true, createdById: true } },
+          },
+        },
+      },
     });
     if (!topic) throw new NotFoundException(`Topic with ID ${id} not found`);
-    if (!(await this.canManageCourse(topic.unit.course.createdById, userId))) {
+    if (
+      !(await this.canManageCourseById(
+        topic.unit.course.id,
+        topic.unit.course.createdById,
+        userId,
+      ))
+    ) {
       throw new ForbiddenException('Only the course instructor or an admin can manage topics');
     }
     return topic;
   }
 
-  async findAll(unitId?: string): Promise<TopicWithTitle[]> {
+  async findAll(unitId?: string, userId?: string): Promise<TopicWithTitle[]> {
+    const roles = userId
+      ? (await this.prisma.userRole.findMany({
+          where: { userId },
+          include: { role: { select: { name: true } } },
+        })).map(({ role }) => role.name)
+      : [];
+    const where: Prisma.TopicWhereInput = unitId ? { unitId } : {};
+    if (!roles.includes(Role.admin)) {
+      const visibility: Prisma.TopicWhereInput[] = [
+        {
+          unit: {
+            is: {
+              isPublished: true,
+              course: { is: { status: 'published' } },
+            },
+          },
+        },
+      ];
+      if (userId && roles.includes(Role.instructor)) {
+        visibility.push(
+          { unit: { is: { course: { is: { createdById: userId } } } } },
+          {
+            unit: {
+              is: {
+                course: {
+                  is: { instructors: { some: { userId } } },
+                },
+              },
+            },
+          },
+        );
+      }
+      where.AND = [{ OR: visibility }];
+    }
+
     const topics = await this.prisma.topic.findMany({
-      where: unitId ? { unitId } : undefined,
-      include: { materials: true },
+      where,
+      include: {
+        materials: true,
+        unit: {
+          select: {
+            course: {
+              select: {
+                id: true,
+                createdById: true,
+                instructors: {
+                  where: { userId: userId ?? '' },
+                  select: { userId: true },
+                },
+              },
+            },
+          },
+        },
+      },
       orderBy: [{ unitId: 'asc' }, { order: 'asc' }],
     });
-    return topics.map(topic => this.toResponse(topic));
+    return this.toVisibleTopics(topics, userId);
   }
 
-  async findOne(id: string): Promise<TopicWithTitle> {
+  async findOne(id: string, userId: string): Promise<TopicWithTitle> {
     const topic = await this.prisma.topic.findUnique({
       where: { id },
-      include: { materials: true },
+      include: {
+        materials: true,
+        unit: {
+          include: {
+            course: {
+              select: {
+                id: true,
+                status: true,
+                createdById: true,
+                instructors: { where: { userId }, select: { userId: true } },
+              },
+            },
+          },
+        },
+      },
     });
     if (!topic) throw new NotFoundException(`Topic with ID ${id} not found`);
-    return this.toResponse(topic);
+    const canManage = await this.canManageCourseById(
+      topic.unit.course.id,
+      topic.unit.course.createdById,
+      userId,
+    );
+    if (
+      !canManage &&
+      (topic.unit.course.status !== 'published' || !topic.unit.isPublished)
+    ) {
+      throw new NotFoundException(`Topic with ID ${id} not found`);
+    }
+    return (await this.toVisibleTopics([topic], userId))[0];
   }
 
   async create(input: TopicMutationInput, userId: string): Promise<TopicWithTitle> {
@@ -79,10 +252,16 @@ export class TopicsService {
 
     const unit = await this.prisma.unit.findUnique({
       where: { id: unitId },
-      include: { course: { select: { createdById: true } } },
+      include: { course: { select: { id: true, createdById: true } } },
     });
     if (!unit) throw new NotFoundException(`Unit with ID ${unitId} not found`);
-    if (!(await this.canManageCourse(unit.course.createdById, userId))) {
+    if (
+      !(await this.canManageCourseById(
+        unit.course.id,
+        unit.course.createdById,
+        userId,
+      ))
+    ) {
       throw new ForbiddenException('Only the course instructor or an admin can manage topics');
     }
 
@@ -119,7 +298,7 @@ export class TopicsService {
   }
 
   async update(id: string, input: TopicMutationInput, userId: string): Promise<TopicWithTitle> {
-    const existing = await this.getTopicForManagement(id, userId);
+    await this.getTopicForManagement(id, userId);
     const name = input.name ?? input.title;
     if (name !== undefined && !name.trim()) {
       throw new BadRequestException('Topic title cannot be empty');

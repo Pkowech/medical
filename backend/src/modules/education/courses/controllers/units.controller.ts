@@ -9,6 +9,7 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  Query,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -34,8 +35,11 @@ export class UnitsController {
   @Get()
   @ApiOperation({ summary: 'Get all units' })
   @ApiResponse({ status: 200, description: 'Units retrieved successfully' })
-  async findAll() {
-    return await this.unitsService.findAll();
+  async findAll(
+    @GetUser() user: User,
+    @Query('courseId') courseId?: string,
+  ) {
+    return await this.unitsService.findAll(courseId, user.id);
   }
 
   @Get('recommendations/related')
@@ -50,11 +54,13 @@ export class UnitsController {
   @ApiOperation({ summary: 'Get unit by ID' })
   @ApiResponse({ status: 200, description: 'Unit found' })
   @ApiResponse({ status: 404, description: 'Unit not found' })
-  async findOne(@Param('id') id: string) {
-    return await this.unitsService.findOne(id);
+  async findOne(@Param('id') id: string, @GetUser() user: User) {
+    return await this.unitsService.findOne(id, user.id);
   }
 
   @Post()
+  @UseGuards(RoleGuard)
+  @Roles(Role.instructor, Role.admin)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new unit' })
   @ApiResponse({ status: 201, description: 'Unit created successfully' })

@@ -59,6 +59,69 @@ export class CoursesService {
     return !!cached && typeof cached === 'string';
   }
 
+  private async getRoleNames(userId: string): Promise<string[]> {
+    const userRoles = await this.prisma.userRole.findMany({
+      where: { userId },
+      include: { role: { select: { name: true } } },
+    });
+    return userRoles.map(({ role }) => role.name);
+  }
+
+  private async canManageCourse(
+    userId: string | undefined,
+    courseId: string,
+    courseOwnerId: string | null,
+  ): Promise<boolean> {
+    if (!userId) return false;
+    const roles = await this.getRoleNames(userId);
+    if (roles.includes(Role.admin)) return true;
+    if (!roles.includes(Role.instructor)) return false;
+    if (courseOwnerId === userId) return true;
+    const assignment = await this.prisma.courseInstructor.findUnique({
+      where: { courseId_userId: { courseId, userId } },
+      select: { id: true },
+    });
+    return Boolean(assignment);
+  }
+
+  private async filterMaterialCollections(
+    collections: any[][],
+    userId: string | undefined,
+    isEnrolled: boolean,
+  ): Promise<any[][]> {
+    if (!userId) return collections.map(() => []);
+    const materialIds = [
+      ...new Set(collections.flat().map((material) => material.id)),
+    ];
+    if (materialIds.length === 0) return collections;
+
+    const shares = await this.prisma.materialShare.findMany({
+      where: { userId, materialId: { in: materialIds } },
+      select: { materialId: true },
+    });
+    const sharedMaterialIds = new Set(shares.map(({ materialId }) => materialId));
+    const canRead = (material: any) => {
+      const metadata =
+        material.metadata &&
+        typeof material.metadata === 'object' &&
+        !Array.isArray(material.metadata)
+          ? material.metadata
+          : {};
+      return (
+        material.userId === userId ||
+        sharedMaterialIds.has(material.id) ||
+        (isEnrolled && metadata.shareWithCourse !== false)
+      );
+    };
+    return collections.map((materials) =>
+      materials.filter(canRead).map((material) => {
+        const { userId: _userId, metadata: _metadata, ...visibleMaterial } =
+          material;
+        return visibleMaterial;
+      }),
+    );
+  }
+
   async create(
     createCourseDto: CreateCourseDto,
     creatorId: string,
@@ -66,6 +129,16 @@ export class CoursesService {
     const logContext = { code: createCourseDto.code, creatorId };
 
     try {
+      const creatorRoles = await this.getRoleNames(creatorId);
+      if (
+        !creatorRoles.includes(Role.instructor) &&
+        !creatorRoles.includes(Role.admin)
+      ) {
+        throw new ForbiddenException(
+          'Only instructors or administrators can create courses',
+        );
+      }
+
       // Check if course code already exists
       if (createCourseDto.code) {
         const existingCourse = await this.prisma.course.findUnique({
@@ -201,41 +274,45 @@ export class CoursesService {
     } = searchDto;
     const skip = (page - 1) * limit;
 
+    const roleNames = userId ? await this.getRoleNames(userId) : [];
+    const isAdmin = roleNames.includes(Role.admin);
+    const canManageDrafts =
+      isAdmin || roleNames.includes(Role.instructor);
+    const effectiveStatus =
+      status !== CourseStatus.published && !canManageDrafts
+        ? CourseStatus.published
+        : status || CourseStatus.published;
+    const canUsePublicCache =
+      !userId && effectiveStatus === CourseStatus.published;
     const cacheKey = this.generateKey(
       'search',
       JSON.stringify({ searchDto, pagination }),
     );
-    try {
-      const cached = await this.redisService.get(cacheKey);
-      if (this.isValidCache(cached)) {
-        this.logger.log('Courses fetched from cache', { cacheKey });
-        const result = JSON.parse(cached);
-        
-        // Add enrollment status if userId is provided
-        if (userId && result.data && result.data.length > 0) {
-          const enrollments = await this.prisma.courseEnrollment.findMany({
-            where: {
-              userId,
-              courseId: { in: result.data.map((c: any) => c.id) },
-            },
-            select: { courseId: true },
-          });
-          const enrolledCourseIds = new Set(enrollments.map(e => e.courseId));
-          result.data.forEach((c: any) => {
-            c.isEnrolled = enrolledCourseIds.has(c.id);
-          });
+    if (canUsePublicCache) {
+      try {
+        const cached = await this.redisService.get(cacheKey);
+        if (this.isValidCache(cached)) {
+          this.logger.log('Courses fetched from cache', { cacheKey });
+          return JSON.parse(cached);
         }
-        
-        return result;
+      } catch (error) {
+        this.logger.warn('Redis get failed in findAll:', error);
       }
-    } catch (error) {
-      this.logger.warn('Redis get failed in findAll:', error);
     }
 
     try {
       // Use FTS (full-text search) if search term is provided (faster & ranked)
-      if (search && search.trim().length > 2) {
-        return await this.findAllWithFts(search, searchDto, pagination, userId);
+      if (
+        search &&
+        search.trim().length > 2 &&
+        !(canManageDrafts && effectiveStatus !== CourseStatus.published)
+      ) {
+        return await this.findAllWithFts(
+          search,
+          { ...searchDto, status: effectiveStatus },
+          pagination,
+          userId,
+        );
       }
 
       const whereConditions: Prisma.CourseWhereInput[] = [];
@@ -260,8 +337,20 @@ export class CoursesService {
         whereConditions.push({ difficulty });
       }
 
-      // Default to published courses if no status is explicitly provided
-      whereConditions.push({ status: status || CourseStatus.published });
+      whereConditions.push({ status: effectiveStatus });
+      if (
+        canManageDrafts &&
+        !isAdmin &&
+        effectiveStatus !== CourseStatus.published &&
+        userId
+      ) {
+        whereConditions.push({
+          OR: [
+            { createdById: userId },
+            { instructors: { some: { userId } } },
+          ],
+        });
+      }
 
 
       if (isFeatured !== undefined) {
@@ -317,16 +406,18 @@ export class CoursesService {
         },
       };
 
-      try {
-        await this.redisService.set(
-          cacheKey,
-          JSON.stringify(result, (_key, value) =>
-            typeof value === 'bigint' ? value.toString() : value,
-          ),
-          this.CACHE_TTL,
-        );
-      } catch (error) {
-        this.logger.warn('Redis set failed in findAll:', error);
+      if (canUsePublicCache) {
+        try {
+          await this.redisService.set(
+            cacheKey,
+            JSON.stringify(result, (_key, value) =>
+              typeof value === 'bigint' ? value.toString() : value,
+            ),
+            this.CACHE_TTL,
+          );
+        } catch (error) {
+          this.logger.warn('Redis set failed in findAll:', error);
+        }
       }
 
       // Add enrollment status if userId is provided (after caching result without user-specific data)
@@ -592,17 +683,6 @@ export class CoursesService {
   }
 
   async findOne(id: string, userId?: string): Promise<ExtendedCourse> {
-    const cacheKey = this.generateKey('id', id);
-    try {
-      const cached = await this.redisService.get(cacheKey);
-      if (this.isValidCache(cached)) {
-        this.logger.log('Course fetched from cache', { courseId: id });
-        return JSON.parse(cached) as ExtendedCourse;
-      }
-    } catch (error) {
-      this.logger.warn('Redis get failed in findOne:', error);
-    }
-
     try {
       const course = await this.prisma.course.findUnique({
         where: { id },
@@ -642,6 +722,15 @@ export class CoursesService {
         throw new NotFoundException(`Course with ID ${id} not found`);
       }
 
+      const canManage = await this.canManageCourse(
+        userId,
+        course.id,
+        course.createdById,
+      );
+      if (!canManage && course.status !== CourseStatus.published) {
+        throw new NotFoundException(`Course with ID ${id} not found`);
+      }
+
       let isEnrolled = false;
       let userProgress: {
         progressPercentage: number | null;
@@ -652,7 +741,9 @@ export class CoursesService {
         const enrollment = await this.prisma.courseEnrollment.findUnique({
           where: { userId_courseId: { userId, courseId: id } },
         });
-        isEnrolled = !!enrollment;
+        isEnrolled =
+          enrollment?.status === EnrollmentStatus.active ||
+          enrollment?.status === EnrollmentStatus.completed;
 
         if (isEnrolled && enrollment) {
           if (
@@ -665,6 +756,34 @@ export class CoursesService {
             };
           }
         }
+      }
+
+      let visibleCourse = course;
+      if (!canManage) {
+        const visibleUnits = course.units.filter((unit) => unit.isPublished);
+        const collections = [
+          course.materials,
+          ...visibleUnits.flatMap((unit) => [
+            unit.materials,
+            ...unit.topics.map((topic) => topic.materials),
+          ]),
+        ];
+        const filteredCollections = await this.filterMaterialCollections(
+          collections,
+          userId,
+          isEnrolled,
+        );
+        let collectionIndex = 0;
+        const materials = filteredCollections[collectionIndex++];
+        const units = visibleUnits.map((unit) => {
+          const unitMaterials = filteredCollections[collectionIndex++];
+          const topics = unit.topics.map((topic) => ({
+            ...topic,
+            materials: filteredCollections[collectionIndex++],
+          }));
+          return { ...unit, materials: unitMaterials, topics };
+        });
+        visibleCourse = { ...course, materials, units };
       }
 
       const normalizedPrereqs = (course.prerequisites || []).map((p) => ({
@@ -700,7 +819,7 @@ export class CoursesService {
         : undefined;
 
       const result: ExtendedCourse = {
-        ...course,
+        ...visibleCourse,
         isEnrolled,
         userProgress,
         prerequisites: normalizedPrereqs,
@@ -708,7 +827,6 @@ export class CoursesService {
         createdBy: normalizedCreatedBy,
       };
 
-      await this.setCache(result);
       this.logger.log('Course fetched from database', { courseId: id });
       return result;
     } catch (error) {
@@ -743,6 +861,11 @@ export class CoursesService {
       }
       const userRoles = user.userRoles.map((userRole) => userRole.role.name);
       const isAdmin = userRoles.includes(Role.admin);
+      if (!isAdmin && !userRoles.includes(Role.instructor)) {
+        throw new ForbiddenException(
+          'Only instructors or administrators can update courses',
+        );
+      }
 
       // Only the course creator or an admin can update the course
       if (existingCourse.createdById !== userId && !isAdmin) {
@@ -1082,14 +1205,14 @@ export class CoursesService {
     }
   }
 
-  async getPrerequisites(courseId: string) {
+  async getPrerequisites(courseId: string, userId?: string) {
     const course = await this.prisma.course.findUnique({
       where: { id: courseId },
       include: {
         prerequisites: {
           include: {
             prerequisite: {
-              select: { id: true, title: true, code: true },
+              select: { id: true, title: true, code: true, status: true },
             },
           },
         },
@@ -1100,20 +1223,35 @@ export class CoursesService {
       throw new NotFoundException('Course not found');
     }
 
+    const canManage = await this.canManageCourse(
+      userId,
+      course.id,
+      course.createdById,
+    );
+    if (!canManage && course.status !== CourseStatus.published) {
+      throw new NotFoundException('Course not found');
+    }
+    const prerequisites = canManage
+      ? course.prerequisites
+      : course.prerequisites.filter(
+          ({ prerequisite }) =>
+            prerequisite.status === CourseStatus.published,
+        );
+
     return {
-      courseIds: course.prerequisites.map((p) => p.prerequisite.id),
-      prerequisiteCourses: course.prerequisites.map((p) => ({
+      courseIds: prerequisites.map((p) => p.prerequisite.id),
+      prerequisiteCourses: prerequisites.map((p) => ({
         id: p.prerequisite.id,
         title: p.prerequisite.title || 'Untitled Course',
         code: p.prerequisite.code || '',
         type: p.type,
       })),
       skills: [], // TODO: Add skill prerequisites when supported by schema
-      description: course.prerequisites.some(
+      description: prerequisites.some(
         (p) => p.type === PrerequisiteType.required,
       )
         ? 'You must complete the following mandatory courses before enrolling:'
-        : course.prerequisites.length > 0
+        : prerequisites.length > 0
           ? 'We recommend completing the following courses for a better experience:'
           : 'No prerequisites required.',
     };
@@ -1551,8 +1689,9 @@ export class CoursesService {
   async assignInstructor(
     courseId: string,
     instructorId: string,
+    actorId: string,
   ): Promise<void> {
-    const logContext = { courseId, instructorId };
+    const logContext = { courseId, instructorId, actorId };
     this.logger.log('Attempting to assign instructor to course', logContext);
 
     try {
@@ -1565,6 +1704,14 @@ export class CoursesService {
           logContext,
         );
         throw new NotFoundException(`Course with ID ${courseId} not found`);
+      }
+
+      if (
+        !(await this.canManageCourse(actorId, course.id, course.createdById))
+      ) {
+        throw new ForbiddenException(
+          'Only this course’s instructor or an administrator can assign instructors',
+        );
       }
 
       const instructor = await this.prisma.user.findUnique({
@@ -1770,17 +1917,22 @@ export class CoursesService {
       // Verify the course exists
       const course = await this.prisma.course.findUnique({
         where: { id: courseId },
-        select: { id: true },
+        select: { id: true, status: true, createdById: true },
       });
 
       if (!course) {
         throw new NotFoundException(`Course with ID ${courseId} not found`);
       }
+      const canManage = await this.canManageCourse(
+        userId,
+        course.id,
+        course.createdById,
+      );
 
       // Verify the unit exists and belongs to the course
       const unit = await this.prisma.unit.findUnique({
         where: { id: unitId },
-        select: { id: true, courseId: true },
+        select: { id: true, courseId: true, isPublished: true },
       });
 
       if (!unit) {
@@ -1790,6 +1942,14 @@ export class CoursesService {
       if (unit.courseId !== courseId) {
         throw new NotFoundException(
           `Unit ${unitId} does not belong to course ${courseId}`,
+        );
+      }
+      if (
+        !canManage &&
+        (course.status !== CourseStatus.published || !unit.isPublished)
+      ) {
+        throw new NotFoundException(
+          `Topic ${topicId} is not available`,
         );
       }
 
@@ -1816,10 +1976,13 @@ export class CoursesService {
               description: true,
               duration: true,
               createdAt: true,
+              userId: true,
+              metadata: true,
             },
             orderBy: { createdAt: 'asc' },
           },
           quizzes: {
+            where: canManage ? undefined : { isPublished: true },
             select: {
               id: true,
               title: true,
@@ -1842,6 +2005,26 @@ export class CoursesService {
         throw new NotFoundException(
           `Topic ${topicId} does not belong to unit ${unitId}`,
         );
+      }
+
+      if (!canManage) {
+        const enrollment = userId
+          ? await this.prisma.courseEnrollment.findUnique({
+              where: { userId_courseId: { userId, courseId } },
+              select: { status: true },
+            })
+          : null;
+        const isEnrolled =
+          enrollment?.status === EnrollmentStatus.active ||
+          enrollment?.status === EnrollmentStatus.completed;
+        const [visibleMaterials] = await this.filterMaterialCollections(
+          [topic.materials],
+          userId,
+          isEnrolled,
+        );
+        topic.materials = visibleMaterials.map(
+          ({ userId: _userId, metadata: _metadata, ...material }) => material,
+        ) as typeof topic.materials;
       }
 
       if (userId) {

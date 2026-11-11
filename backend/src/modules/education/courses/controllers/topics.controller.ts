@@ -27,14 +27,14 @@ export class TopicsController {
 
   @Get()
   @ApiOperation({ summary: 'List topics, optionally filtered by unit' })
-  findAll(@Query('unitId') unitId?: string) {
-    return this.topicsService.findAll(unitId);
+  findAll(@GetUser() user: User, @Query('unitId') unitId?: string) {
+    return this.topicsService.findAll(unitId, user.id);
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Get a topic by ID' })
-  findOne(@Param('id') id: string) {
-    return this.topicsService.findOne(id);
+  findOne(@Param('id') id: string, @GetUser() user: User) {
+    return this.topicsService.findOne(id, user.id);
   }
 
   @Post()
