@@ -139,8 +139,11 @@ export class AssessmentAnalyticsService implements OnModuleInit {
     const cachedSession = await this.redisService.get<string>(cacheKey);
     if (cachedSession) {
       const session = JSON.parse(cachedSession) as AdaptiveQuizSession;
+      const safeQuestions = Array.isArray(session.questions)
+        ? session.questions
+        : [];
       const visibleQuestions = await Promise.all(
-        session.questions.map((question) =>
+        safeQuestions.map((question) =>
           this.isAdaptiveQuestionVisible(question.id, session),
         ),
       );
@@ -277,8 +280,11 @@ export class AssessmentAnalyticsService implements OnModuleInit {
       );
     }
     const session: AdaptiveQuizSession = JSON.parse(sessionData);
+    const safeQuestions = Array.isArray(session.questions)
+      ? session.questions
+      : [];
     const visibleQuestions = await Promise.all(
-      session.questions.map((question) =>
+      safeQuestions.map((question) =>
         this.isAdaptiveQuestionVisible(question.id, session),
       ),
     );
@@ -290,8 +296,11 @@ export class AssessmentAnalyticsService implements OnModuleInit {
     }
 
     try {
-      const currentQuestion = session.questions[
-        session.currentQuestionIndex
+      const currentQuestionIndex = Number.isInteger(session.currentQuestionIndex)
+        ? session.currentQuestionIndex
+        : 0;
+      const currentQuestion = safeQuestions[
+        currentQuestionIndex
       ] as AdaptiveQuestionWithOptions | undefined;
       if (!currentQuestion || currentQuestion.id !== dto.questionId) {
         throw new BadRequestException(
@@ -358,7 +367,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
       );
 
       // Advance question index
-      session.currentQuestionIndex++;
+      session.currentQuestionIndex = currentQuestionIndex + 1;
       const shouldContinue = this.shouldContinueQuiz(session);
       let nextQuestion: Question | undefined;
 
@@ -418,11 +427,12 @@ export class AssessmentAnalyticsService implements OnModuleInit {
 
   async finalizeSession(session: AdaptiveQuizSession): Promise<void> {
     try {
-      const correct = session.responses.filter((r) => r.isCorrect).length;
+      const responses = Array.isArray(session.responses)
+        ? session.responses
+        : [];
+      const correct = responses.filter((r) => r.isCorrect).length;
       session.finalScore =
-        session.responses.length > 0
-          ? (correct / session.responses.length) * 100
-          : 0;
+        responses.length > 0 ? (correct / responses.length) * 100 : 0;
 
       const attempt = await this.prisma.quizAttempt.findFirst({
         where: { id: session.sessionId, userId: session.userId },
@@ -440,19 +450,16 @@ export class AssessmentAnalyticsService implements OnModuleInit {
             score: session.finalScore,
             maxScore: 100,
             percentage: session.finalScore,
-            timeTaken: session.responses.reduce(
-              (sum, response) => sum + response.responseTime,
-              0,
-            ),
+            timeTaken: responses.reduce((sum, response) => sum + response.responseTime, 0),
             isPassed: session.finalScore >= 70,
             correctAnswers: correct,
-            totalQuestions: session.responses.length,
+            totalQuestions: responses.length,
             completedAt: new Date(),
           },
         }),
         this.prisma.quiz.update({
           where: { id: attempt.quizId },
-          data: { questionCount: session.responses.length },
+          data: { questionCount: responses.length },
         }),
       ]);
 
@@ -470,10 +477,17 @@ export class AssessmentAnalyticsService implements OnModuleInit {
   }
 
   private shouldContinueQuiz(session: AdaptiveQuizSession): boolean {
+    const responses = Array.isArray(session.responses) ? session.responses : [];
+    const currentConfidenceInterval =
+      typeof session.confidenceInterval === 'number'
+        ? session.confidenceInterval
+        : Number.POSITIVE_INFINITY;
+    const targetPrecision =
+      typeof session.targetPrecision === 'number' ? session.targetPrecision : 0;
+
     return (
-      session.responses.length < 20 &&
-      (session.responses.length < 5 ||
-        session.confidenceInterval > session.targetPrecision)
+      responses.length < 20 &&
+      (responses.length < 5 || currentConfidenceInterval > targetPrecision)
     );
   }
 
@@ -603,12 +617,17 @@ export class AssessmentAnalyticsService implements OnModuleInit {
     questionId: string,
     session: AdaptiveQuizSession,
   ): Prisma.QuestionWhereInput {
+    const seenQuestions = Array.isArray(session.questions)
+      ? session.questions.filter((question): question is Question => !!question)
+      : [];
+    const seenQuestionIds = seenQuestions
+      .map((question) => question.id)
+      .filter((id): id is string => Boolean(id) && id !== questionId);
+
     return {
       id: {
         equals: questionId,
-        notIn: session.questions
-          .map((question) => question.id)
-          .filter((id) => id !== questionId),
+        notIn: seenQuestionIds,
       },
       isActive: true,
       type: { in: [QuestionType.multiple_choice, QuestionType.true_false] },
@@ -643,11 +662,12 @@ export class AssessmentAnalyticsService implements OnModuleInit {
     questionId: string,
     session: AdaptiveQuizSession,
   ): Promise<boolean> {
+    const sessionQuestions = Array.isArray(session.questions)
+      ? session.questions
+      : [];
     const sessionWithoutQuestion = {
       ...session,
-      questions: session.questions.filter(
-        (question) => question.id !== questionId,
-      ),
+      questions: sessionQuestions.filter((question) => question.id !== questionId),
     };
     const question = await this.prisma.question.findFirst({
       where: this.getAdaptiveQuestionWhere(questionId, sessionWithoutQuestion),

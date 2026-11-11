@@ -430,3 +430,48 @@ service.prisma = {
 });
 """
     )
+
+
+def test_adaptive_session_handles_missing_question_and_response_data():
+    run_typescript(
+        r"""
+const assert = require('node:assert/strict');
+const { AssessmentAnalyticsService } =
+  require('./src/modules/ai-analytics/services/assessment-analytics.service.ts');
+
+const service = Object.create(AssessmentAnalyticsService.prototype);
+service.prisma = {
+  question: {
+    findFirst: async () => null,
+  },
+};
+
+(async () => {
+  const where = service.getAdaptiveQuestionWhere('question-1', {
+    courseId: 'course-1',
+  });
+  assert.equal(where.id.equals, 'question-1');
+  assert.deepEqual(where.id.notIn, []);
+
+  assert.equal(
+    service.shouldContinueQuiz({
+      responses: undefined,
+      confidenceInterval: 0.2,
+      targetPrecision: 0.3,
+    }),
+    true,
+  );
+
+  assert.equal(
+    await service.isAdaptiveQuestionVisible('question-1', {
+      questions: undefined,
+      courseId: 'course-1',
+    }),
+    false,
+  );
+})().catch(error => {
+  console.error(error);
+  process.exitCode = 1;
+});
+"""
+    )
