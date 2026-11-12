@@ -63,7 +63,13 @@ export class OnboardingService {
         ? user.yearOfExperience !== null
         : (user.careerStage === 'student' || user.careerStage === 'postgraduate') &&
           user.studyYear !== null;
-    const isCompleted = Boolean(user.healthcareField && user.careerStage && hasStageContext);
+    const profileIsComplete = Boolean(
+      user.healthcareField && user.careerStage && hasStageContext,
+    );
+    const isCompleted =
+      typeof preferences['onboardingCompleted'] === 'boolean'
+        ? preferences['onboardingCompleted']
+        : profileIsComplete;
 
     // Calculate completeness %
     const totalChecks = 6;
@@ -79,11 +85,8 @@ export class OnboardingService {
 
     // Fetch suggested starter paths
     const suggestedStarterPaths = await this.getSuggestedStarterPaths(
-      user.healthcareField,
-      user.specialization,
+      user.id,
       4,
-      user.careerStage,
-      targetExam,
     );
 
     return {
@@ -231,16 +234,38 @@ export class OnboardingService {
 
   /** Suggests published paths relevant to the learner's field and goals. */
   async getSuggestedStarterPaths(
-    healthcareField?: string | null,
-    specialization?: string | null,
+    userId: string,
     limit: number = 4,
-    careerStage?: string | null,
-    targetExam?: string | null,
   ) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        healthcareField: true,
+        specialization: true,
+        careerStage: true,
+        preferences: true,
+      },
+    });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const preferences =
+      user.preferences &&
+      typeof user.preferences === 'object' &&
+      !Array.isArray(user.preferences)
+        ? user.preferences
+        : {};
+    const targetExam =
+      typeof preferences['targetExam'] === 'string'
+        ? preferences['targetExam']
+        : null;
+    const healthcareField = user.healthcareField;
+    const specialization = user.specialization;
     const normalizedField = healthcareField?.toLowerCase().replace(/[_-]/g, ' ').trim();
     const normalizedSpecialization = specialization?.toLowerCase().trim();
     const normalizedTargetExam = targetExam?.toLowerCase().trim();
-    const normalizedStage = normalizeCareerStage(careerStage);
+    const normalizedStage = normalizeCareerStage(user.careerStage);
     if (!normalizedStage) {
       return [];
     }
@@ -272,7 +297,7 @@ export class OnboardingService {
       where: {
         status: 'published',
         OR: candidateConditions,
-        ...(normalizedStage ? { targetCareerStages: { has: normalizedStage } } : {}),
+        targetCareerStages: { has: normalizedStage },
       },
       select: {
         id: true,
@@ -297,7 +322,20 @@ export class OnboardingService {
     };
     const preferredTypes = stagePreferredTypes[normalizedStage ?? ''] ?? [];
 
+    const completedPaths = await this.prisma.learningPathProgress.findMany({
+      where: {
+        userId,
+        learningPathId: { in: candidates.map(path => path.id) },
+        status: ProgressStatus.completed,
+      },
+      select: { learningPathId: true },
+    });
+    const completedPathIds = new Set(
+      completedPaths.map(progress => progress.learningPathId),
+    );
+
     return candidates
+      .filter(path => !completedPathIds.has(path.id))
       .map(path => {
         const pathText = [
           path.title,

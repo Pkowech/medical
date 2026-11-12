@@ -258,8 +258,24 @@ export class LearningPathRecommendationsService {
    * Get trending paths.
    * Delegates to Rust gRPC service; returns empty array on failure.
    */
-  async getTrendingPaths(limit: number = 5): Promise<LearningPath[]> {
+  async getTrendingPaths(
+    limit: number = 5,
+    userId?: string,
+  ): Promise<LearningPath[]> {
     try {
+      const user = userId
+        ? await this.prisma.user.findUnique({
+            where: { id: userId },
+            select: { careerStage: true },
+          })
+        : null;
+      const careerStage = userId
+        ? normalizeCareerStage(user?.careerStage)
+        : null;
+      if (userId && !careerStage) {
+        return [];
+      }
+
       // Call Rust service via AI Analytics (gRPC)
       const rustTrendingPaths =
         await this.aiAnalyticsService.getTrendingPaths(limit);
@@ -275,11 +291,26 @@ export class LearningPathRecommendationsService {
         where: {
           id: { in: pathIds },
           status: 'published',
+          ...(careerStage
+            ? { targetCareerStages: { has: careerStage } }
+            : {}),
         },
-        take: limit,
       });
 
-      return paths;
+      const pathsById = new Map(paths.map((path) => [path.id, path]));
+      return pathIds
+        .flatMap((pathId) => {
+          const path = pathsById.get(pathId);
+          return path &&
+            (!careerStage ||
+              evaluateLearningPathEligibility(
+                path.targetCareerStages,
+                careerStage,
+              ).eligible)
+            ? [path]
+            : [];
+        })
+        .slice(0, limit);
     } catch (error) {
       this.logger.error(
         `Error getting trending paths: ${getErrorMessage(error)}`,

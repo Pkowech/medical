@@ -69,13 +69,16 @@ export class LearningPathProgressService {
 
     this.learningPathEligibilityService.assertEligible(learningPath, user);
 
-    const existing = await this.prisma.learningPathProgress.findFirst({
-      where: { userId, learningPathId: startDto.learningPathId },
+    const existing = await this.prisma.learningPathProgress.findUnique({
+      where: {
+        userId_learningPathId: {
+          userId,
+          learningPathId: startDto.learningPathId,
+        },
+      },
     });
     if (existing) {
-      throw new BadRequestException(
-        'User is already enrolled in this learning path',
-      );
+      return existing;
     }
 
     const { phaseProgress, moduleProgress } = this.createProgressStructure(
@@ -83,48 +86,70 @@ export class LearningPathProgressService {
     );
 
     const enrolledAt = new Date();
-    const progress = await this.prisma.$transaction(async transaction => {
-      const createdProgress = await transaction.learningPathProgress.create({
-        data: {
-          user: { connect: { id: userId } },
-          learningPath: { connect: { id: startDto.learningPathId } },
-          status: ProgressStatus.inProgress,
-          overallProgressPercentage: 0,
-          phaseProgress: phaseProgress as unknown as Prisma.JsonArray,
-          moduleProgress: moduleProgress as unknown as Prisma.JsonArray,
-          milestonesAchieved: [],
-          totalTimeSpentMinutes: 0,
-          startedAt: enrolledAt,
-          lastAccessedAt: enrolledAt,
-          streakDays: 0,
-          lastActivityDate: enrolledAt,
-          analytics: {
-            study_sessions: [],
-            performance_trends: [],
-            preferences: startDto.preferences
-              ? { ...startDto.preferences }
-              : {},
-            learning_velocity: {
-              modules_per_week: 0,
-              hours_per_week: 0,
-              consistency_score: 0,
+    let progress: LearningPathProgress;
+    try {
+      progress = await this.prisma.$transaction(async transaction => {
+        const createdProgress = await transaction.learningPathProgress.create({
+          data: {
+            user: { connect: { id: userId } },
+            learningPath: { connect: { id: startDto.learningPathId } },
+            status: ProgressStatus.inProgress,
+            overallProgressPercentage: 0,
+            phaseProgress: phaseProgress as unknown as Prisma.JsonArray,
+            moduleProgress: moduleProgress as unknown as Prisma.JsonArray,
+            milestonesAchieved: [],
+            totalTimeSpentMinutes: 0,
+            startedAt: enrolledAt,
+            lastAccessedAt: enrolledAt,
+            streakDays: 0,
+            lastActivityDate: enrolledAt,
+            analytics: {
+              study_sessions: [],
+              performance_trends: [],
+              preferences: startDto.preferences
+                ? { ...startDto.preferences }
+                : {},
+              learning_velocity: {
+                modules_per_week: 0,
+                hours_per_week: 0,
+                consistency_score: 0,
+              },
             },
           },
-        },
-      });
+        });
 
-      await writeApplicationOutboxEvent(transaction, {
-        eventType: 'learning-path.enrolled',
-        aggregateId: createdProgress.id,
-        dedupeKey: `learning-path-enrolled:${userId}:${startDto.learningPathId}`,
-        payload: {
-          userId,
-          pathId: startDto.learningPathId,
-          enrollmentData: { timestamp: enrolledAt.toISOString() },
-        },
+        await writeApplicationOutboxEvent(transaction, {
+          eventType: 'learning-path.enrolled',
+          aggregateId: createdProgress.id,
+          dedupeKey: `learning-path-enrolled:${userId}:${startDto.learningPathId}`,
+          payload: {
+            userId,
+            pathId: startDto.learningPathId,
+            enrollmentData: { timestamp: enrolledAt.toISOString() },
+          },
+        });
+        return createdProgress;
       });
-      return createdProgress;
-    });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        const concurrentEnrollment =
+          await this.prisma.learningPathProgress.findUnique({
+            where: {
+              userId_learningPathId: {
+                userId,
+                learningPathId: startDto.learningPathId,
+              },
+            },
+          });
+        if (concurrentEnrollment) {
+          return concurrentEnrollment;
+        }
+      }
+      throw error;
+    }
 
     // analytics (enrollment count)
     await this.updateLearningPathEnrollmentCount(startDto.learningPathId);

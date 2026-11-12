@@ -32,6 +32,8 @@ import { PeerProgress } from '#common/dto/progress.dto';
 import { getErrorMessage } from '#common/utils/error.utils';
 import { LearningAnalyticsService } from '../../../ai-analytics/services/learning-analytics.service';
 import { NotificationsService } from '#modules/engagement-communication/services/notifications.service';
+import { normalizeCareerStage } from '#common/constants/career-stages';
+import { evaluateLearningPathEligibility } from '#common/utils/learning-path-eligibility';
 
 @Injectable()
 export class LearningGoalsService {
@@ -1095,11 +1097,68 @@ export class LearningGoalsService {
       const trendingPaths =
         await this.learningAnalyticsService.getTrendingPaths(5);
 
-      // 4. Fetch Exam Mappings for all relevant topics to boost priority
+      const candidatePathIds = [
+        ...new Set([
+          ...peerRecs.map(recommendation => recommendation.item_id),
+          ...trendingPaths.map(path => path.path_id),
+        ]),
+      ];
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { careerStage: true },
+      });
+      const careerStage = normalizeCareerStage(user?.careerStage);
+      const candidatePaths = candidatePathIds.length
+        ? await this.prisma.learningPath.findMany({
+            where: { id: { in: candidatePathIds } },
+            select: { id: true, status: true, targetCareerStages: true },
+          })
+        : [];
+      const candidatePathsById = new Map(
+        candidatePaths.map(path => [path.id, path]),
+      );
+      const eligiblePathIds = new Set(
+        candidatePaths
+          .filter(
+            path =>
+              path.status === 'published' &&
+              careerStage !== null &&
+              evaluateLearningPathEligibility(
+                path.targetCareerStages,
+                careerStage,
+              ).eligible,
+          )
+          .map(path => path.id),
+      );
+      const completedPaths = eligiblePathIds.size
+        ? await this.prisma.learningPathProgress.findMany({
+            where: {
+              userId,
+              learningPathId: { in: [...eligiblePathIds] },
+              status: ProgressStatus.completed,
+            },
+            select: { learningPathId: true },
+          })
+        : [];
+      const completedPathIds = new Set(
+        completedPaths.map(progress => progress.learningPathId),
+      );
+      const recommendedPathIds = new Set(
+        [...eligiblePathIds].filter(id => !completedPathIds.has(id)),
+      );
+      const filteredPeerRecs = peerRecs.filter(recommendation => {
+        const path = candidatePathsById.get(recommendation.item_id);
+        return !path || recommendedPathIds.has(path.id);
+      });
+      const filteredTrendingPaths = trendingPaths.filter(path =>
+        recommendedPathIds.has(path.path_id),
+      );
+
+      // Fetch Exam Mappings for relevant topics to boost priority.
       const examMappings = await this.prisma.examMapping.findMany({
         where: {
           topicId: {
-            in: peerRecs.map((recommendation) => recommendation.item_id),
+            in: filteredPeerRecs.map(recommendation => recommendation.item_id),
           },
         },
         include: { topic: true },
@@ -1123,7 +1182,7 @@ export class LearningGoalsService {
       });
 
       // Add collaborative recommendations
-      peerRecs.forEach((rec) => {
+      filteredPeerRecs.forEach((rec) => {
         const mapping = mappingMap.get(rec.item_id);
         const stakeInfo = mapping
           ? ` - 🔥 High Stakes: ${mapping.examType}`
@@ -1143,7 +1202,7 @@ export class LearningGoalsService {
       });
 
       // Add trending paths (ignoring mappings for paths for now)
-      trendingPaths.forEach((path) => {
+      filteredTrendingPaths.forEach((path) => {
         recommendations.push({
           title: `Trending: Popular Learning Path`,
           description: `Master trending learning path: ${path.path_id}`,

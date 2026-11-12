@@ -33,11 +33,6 @@ mod inner {
         UserLearningSummaryResponse,
     };
 
-    use crate::modules::analytics::performance::bkt;
-    use crate::modules::analytics::performance::bkt::BKTParams;
-    // Needed for update_attempt_metrics which is still inline?
-    // Yes, update_attempt_metrics was left inline but without helpers.
-    // It uses bkt::update_p_known and BKTParams. So keep these.
     use crate::modules::analytics::spaced_repetition::analytics::SpacedRepetitionAnalytics;
 
     use sqlx::{Pool, Postgres};
@@ -67,6 +62,13 @@ mod inner {
             &self,
             _request: Request<HealthRequest>,
         ) -> Result<Response<HealthResponse>, Status> {
+            sqlx::query("SELECT 1")
+                .execute(&self.pool)
+                .await
+                .map_err(|error| {
+                    Status::unavailable(format!("Analytics database is unavailable: {error}"))
+                })?;
+
             Ok(Response::new(HealthResponse {
                 status: "ok".to_string(),
                 timestamp: chrono::Utc::now().to_rfc3339(),
@@ -123,110 +125,11 @@ mod inner {
 
         async fn update_attempt_metrics(
             &self,
-            request: Request<AttemptMetricsRequest>,
+            _request: Request<AttemptMetricsRequest>,
         ) -> Result<Response<UpdateAttemptMetricsResponse>, Status> {
-            let req = request.into_inner();
-            let user_id = req.user_id;
-            let attempt_id = req.attempt_id;
-            let is_correct = req.correct;
-            let skill_id = req.skill_id;
-            let score = req.score;
-
-            if user_id.is_empty() {
-                return Err(Status::invalid_argument("user_id cannot be empty"));
-            }
-
-            // Start transaction
-            let mut tx = self
-                .pool
-                .begin()
-                .await
-                .map_err(|e| Status::internal(format!("Failed to begin transaction: {}", e)))?;
-
-            // Update quiz_attempts table
-            if !attempt_id.is_empty() {
-                // Schema uses `correct_answers` and `total_questions` (integers) and `percentage` (float).
-                // Increment correct_answers when this response is correct, increment total_questions, and
-                // update percentage accordingly in a single statement to keep counts consistent.
-                sqlx::query(
-                "UPDATE quiz_attempts SET score = $1,
-                    correct_answers = COALESCE(correct_answers, 0) + (CASE WHEN $2 THEN 1 ELSE 0 END),
-                    total_questions = COALESCE(total_questions, 0) + 1,
-                    percentage = ((COALESCE(correct_answers, 0) + (CASE WHEN $2 THEN 1 ELSE 0 END))::float / (COALESCE(total_questions, 0) + 1)::float) * 100,
-                    completed_at = NOW()
-                 WHERE id = $3 AND user_id = $4"
-            )
-            .bind(score)
-            .bind(is_correct)
-            .bind(&attempt_id)
-            .bind(&user_id)
-            .execute(&mut *tx)
-            .await
-            .map_err(|e| Status::internal(format!("Failed to update attempt: {}", e)))?;
-            }
-
-            // Update BKT p_known for the skill
-            if !skill_id.is_empty() {
-                let current_p_known: Option<f64> = sqlx::query_scalar(
-                    "SELECT p_known FROM user_skill_states WHERE user_id = $1 AND skill_id = $2",
-                )
-                .bind(&user_id)
-                .bind(&skill_id)
-                .fetch_optional(&mut *tx)
-                .await
-                .map_err(|e| Status::internal(format!("Database query failed: {}", e)))?;
-
-                let p_known_prev = current_p_known.unwrap_or(BKTParams::default().p_init);
-                let params = BKTParams::default();
-                let p_known_new = bkt::update_p_known(p_known_prev, is_correct, &params);
-
-                // Try update first to avoid FK violation on insert when `skill_id` (topic) doesn't exist.
-                let update_res = sqlx::query(
-                    "UPDATE user_skill_states SET p_known = $3, last_updated = NOW(), attempts = user_skill_states.attempts + 1 WHERE user_id = $1 AND skill_id = $2"
-                )
-                .bind(&user_id)
-                .bind(&skill_id)
-                .bind(p_known_new)
-                .execute(&mut *tx)
-                .await
-                .map_err(|e| Status::internal(format!("Failed to update skill state: {}", e)))?;
-
-                if update_res.rows_affected() == 0 {
-                    // Only insert if the referenced skill/topic exists to respect FK constraint.
-                    let topic_exists: Option<String> =
-                        sqlx::query_scalar("SELECT id FROM topics WHERE id = $1")
-                            .bind(&skill_id)
-                            .fetch_optional(&mut *tx)
-                            .await
-                            .map_err(|e| {
-                                Status::internal(format!("Database query failed: {}", e))
-                            })?;
-
-                    if topic_exists.is_some() {
-                        sqlx::query(
-                            "INSERT INTO user_skill_states (user_id, skill_id, p_known, last_updated, attempts) VALUES ($1, $2, $3, NOW(), 1)"
-                        )
-                        .bind(&user_id)
-                        .bind(&skill_id)
-                        .bind(p_known_new)
-                        .execute(&mut *tx)
-                        .await
-                        .map_err(|e| Status::internal(format!("Failed to insert skill state: {}", e)))?;
-                    } else {
-                        // Skill doesn't exist in topics table; skip creating state to avoid FK violation.
-                    }
-                }
-            }
-
-            // Commit transaction
-            tx.commit()
-                .await
-                .map_err(|e| Status::internal(format!("Failed to commit transaction: {}", e)))?;
-
-            Ok(Response::new(UpdateAttemptMetricsResponse {
-                success: true,
-                message: "Attempt metrics updated successfully".to_string(),
-            }))
+            Err(Status::failed_precondition(
+                "UpdateAttemptMetrics is deprecated; NestJS owns academic attempt records. Use UpdateBkt for derived skill analytics.",
+            ))
         }
 
         async fn get_user_ability(
@@ -652,13 +555,13 @@ use tonic::{Request, Response, Status};
 
 #[cfg(not(feature = "ml"))]
 pub struct MyAnalyticsService {
-    _private: (),
+    pool: sqlx::Pool<sqlx::Postgres>,
 }
 
 #[cfg(not(feature = "ml"))]
 impl MyAnalyticsService {
-    pub fn new(_pool: sqlx::Pool<sqlx::Postgres>) -> Self {
-        Self { _private: () }
+    pub fn new(pool: sqlx::Pool<sqlx::Postgres>) -> Self {
+        Self { pool }
     }
 }
 
@@ -669,6 +572,13 @@ impl crate::analytics_proto::analytics_service_server::AnalyticsService for MyAn
         &self,
         _request: Request<HealthRequest>,
     ) -> Result<Response<HealthResponse>, Status> {
+        sqlx::query("SELECT 1")
+            .execute(&self.pool)
+            .await
+            .map_err(|error| {
+                Status::unavailable(format!("Analytics database is unavailable: {error}"))
+            })?;
+
         Ok(Response::new(HealthResponse {
             status: "ok".to_string(),
             timestamp: chrono::Utc::now().to_rfc3339(),

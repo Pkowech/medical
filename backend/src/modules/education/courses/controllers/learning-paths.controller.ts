@@ -88,8 +88,11 @@ export class LearningPathsController {
     status: 200,
     description: 'Trending paths with enrollment counts',
   })
-  async getTrendingPaths(@Query('limit') limit: number = 5) {
-    return await this.learningPathsService.getTrendingPaths(limit);
+  async getTrendingPaths(
+    @Request() req: AuthenticatedRequest,
+    @Query('limit') limit: number = 5,
+  ) {
+    return await this.learningPathsService.getTrendingPaths(limit, req.user.id);
   }
 
   @Get('discovery/collaborative')
@@ -192,8 +195,11 @@ export class LearningPathsController {
     status: 200,
     description: 'Trending paths retrieved successfully',
   })
-  async getTrendingLegacy(@Query('limit') limit?: number) {
-    return await this.recommendationsService.getTrendingPaths(limit);
+  async getTrendingLegacy(
+    @Request() req: AuthenticatedRequest,
+    @Query('limit') limit?: number,
+  ) {
+    return await this.recommendationsService.getTrendingPaths(limit, req.user.id);
   }
 
   // ==================== PROGRESS TRACKING ====================

@@ -123,6 +123,89 @@ const service = new LearningPathRecommendationsService(
     )
 
 
+def test_trending_paths_filter_by_user_stage_and_preserve_rust_order():
+    run_typescript(
+        r"""
+const assert = require('node:assert/strict');
+const { LearningPathRecommendationsService } =
+  require('./src/modules/ai-analytics/services/learning-path-recommendations.service.ts');
+
+const service = new LearningPathRecommendationsService(
+  {
+    user: { findUnique: async () => ({ careerStage: 'student' }) },
+    learningPath: {
+      findMany: async args => {
+        assert.deepEqual(args.where.targetCareerStages, { has: 'student' });
+        return [
+          { id: 'second', targetCareerStages: ['student'] },
+          { id: 'first', targetCareerStages: ['student'] },
+        ];
+      },
+    },
+  },
+  {},
+  { getTrendingPaths: async () => [
+    { path_id: 'first' },
+    { path_id: 'second' },
+  ] },
+  {},
+);
+
+(async () => {
+  const paths = await service.getTrendingPaths(2, 'user-1');
+  assert.deepEqual(paths.map(path => path.id), ['first', 'second']);
+})().catch(error => {
+  console.error(error);
+  process.exitCode = 1;
+});
+"""
+    )
+
+
+def test_learning_path_service_filters_trending_by_stored_career_stage():
+    run_typescript(
+        r"""
+const assert = require('node:assert/strict');
+const { LearningPathsService } =
+  require('./src/modules/education/courses/services/learning-paths.service.ts');
+
+const service = new LearningPathsService(
+  {
+    user: { findUnique: async () => ({ careerStage: 'student' }) },
+    learningPath: {
+      findMany: async args => {
+        assert.deepEqual(args.where.targetCareerStages, { has: 'student' });
+        return [
+          { id: 'second', targetCareerStages: ['student'] },
+          { id: 'first', targetCareerStages: ['student'] },
+        ];
+      },
+    },
+  },
+  {},
+  { getTrendingPaths: async () => [
+    { path_id: 'first' },
+    { path_id: 'second' },
+  ] },
+  {},
+  {
+    evaluate: (path, user) => ({
+      eligible: path.targetCareerStages.includes(user.careerStage),
+    }),
+  },
+);
+
+(async () => {
+  const paths = await service.getTrendingPaths(2, 'user-1');
+  assert.deepEqual(paths.map(path => path.id), ['first', 'second']);
+})().catch(error => {
+  console.error(error);
+  process.exitCode = 1;
+});
+"""
+    )
+
+
 def test_unified_recommendation_request_is_contextual_and_cached():
     run_typescript(
         r"""

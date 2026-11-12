@@ -63,18 +63,12 @@ export class OnboardingController {
     description: 'Starter pathways retrieved successfully',
   })
   async getStarterPaths(
-    @Query('field') field?: string,
-    @Query('specialization') specialization?: string,
+    @Request() req: AuthenticatedRequest,
     @Query('limit') limit?: string,
-    @Query('careerStage') careerStage?: string,
-    @Query('targetExam') targetExam?: string,
   ) {
     return this.onboardingService.getSuggestedStarterPaths(
-      field,
-      specialization,
+      req.user.id,
       Number(limit ?? 4),
-      careerStage,
-      targetExam,
     );
   }
 }

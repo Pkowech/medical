@@ -1566,6 +1566,15 @@ async fn health_check_handler() -> impl Responder {
     HttpResponse::Ok().json(serde_json::json!({"status": "ok"}))
 }
 
+async fn readiness_check_handler(pool: web::Data<Pool<Postgres>>) -> impl Responder {
+    match sqlx::query("SELECT 1").execute(pool.get_ref()).await {
+        Ok(_) => HttpResponse::Ok().json(serde_json::json!({"status": "ready"})),
+        Err(_) => {
+            HttpResponse::ServiceUnavailable().json(serde_json::json!({"status": "not_ready"}))
+        }
+    }
+}
+
 pub async fn run() -> std::io::Result<()> {
     dotenv().ok();
 
@@ -1648,6 +1657,7 @@ pub async fn run() -> std::io::Result<()> {
             .app_data(web::Data::new(pool.clone()))
             .wrap(crate::api::middleware::Auth)
             .service(web::resource("/health").route(web::get().to(health_check_handler)))
+            .service(web::resource("/ready").route(web::get().to(readiness_check_handler)))
             .service(web::resource("/metrics").route(web::get().to(prometheus_metrics_handler)));
 
         #[cfg(feature = "ml")]

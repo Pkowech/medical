@@ -9,6 +9,7 @@ import { Queue } from 'bullmq';
 import { getErrorMessage, getErrorStack } from '#common/utils/error.utils';
 import { RequestDeduplicationService } from './request-deduplication.service';
 import { AnalyticsService } from '#infrastructure/grpc/analytics.client';
+import type { HealthResponse } from '../../../generated/grpc/analytics';
 import {
   ANALYTICS_CACHE_CONFIG,
   ANALYTICS_METRICS_CONFIG,
@@ -228,6 +229,10 @@ export class AiAnalyticsService implements OnModuleInit {
       );
       throw error;
     }
+  }
+
+  async checkRustAnalyticsHealth(): Promise<HealthResponse> {
+    return this.callGrpc(this.analyticsServiceGrpc.getHealth({ message: '' }));
   }
 
   async trackEvent(

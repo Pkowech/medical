@@ -134,18 +134,6 @@ export class LearningService {
         );
       }
 
-      const existingProgress =
-        await this.prisma.learningPathProgress.findUnique({
-          where: { userId_learningPathId: { userId, learningPathId: pathId } },
-        });
-
-      if (existingProgress) {
-        this.logger.warn(
-          `User ${userId} already enrolled in learning path ${pathId}`,
-        );
-        return;
-      }
-
       await this.learningPathProgressService.startLearningPath(userId, {
         learningPathId: pathId,
       });

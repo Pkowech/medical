@@ -1,0 +1,1892 @@
+...FFF.F.FFFEEEEFFF                                                      [100%]
+=================================== ERRORS ====================================
+_ ERROR at setup of test_authenticated_frontend_analytics_requests_reach_backend_and_rust _
+
+self = <urllib.request.HTTPHandler object at 0x0000017125F6CAD0>
+http_class = <class 'http.client.HTTPConnection'>
+req = <urllib.request.Request object at 0x0000017125D1F9D0>, http_conn_args = {}
+host = 'localhost:3002'
+h = <http.client.HTTPConnection object at 0x0000017125F75590>
+headers = {'Connection': 'close', 'Content-Length': '310', 'Content-Type': 'application/json', 'Host': 'localhost:3002', ...}
+
+    def do_open(self, http_class, req, **http_conn_args):
+        """Return an HTTPResponse object for the request, using http_class.
+    
+        http_class must implement the HTTPConnection API from http.client.
+        """
+        host = req.host
+        if not host:
+            raise URLError('no host given')
+    
+        # will parse host:port
+        h = http_class(host, timeout=req.timeout, **http_conn_args)
+        h.set_debuglevel(self._debuglevel)
+    
+        headers = dict(req.unredirected_hdrs)
+        headers.update({k: v for k, v in req.headers.items()
+                        if k not in headers})
+    
+        # TODO(jhylton): Should this be redesigned to handle
+        # persistent connections?
+    
+        # We want to make an HTTP/1.1 request, but the addinfourl
+        # class isn't prepared to deal with a persistent connection.
+        # It will try to read all remaining data from the socket,
+        # which will block while the server waits for the next request.
+        # So make sure the connection gets closed after the (only)
+        # request.
+        headers["Connection"] = "close"
+        headers = {name.title(): val for name, val in headers.items()}
+    
+        if req._tunnel_host:
+            tunnel_headers = {}
+            proxy_auth_hdr = "Proxy-Authorization"
+            if proxy_auth_hdr in headers:
+                tunnel_headers[proxy_auth_hdr] = headers[proxy_auth_hdr]
+                # Proxy-Authorization should not be sent to origin
+                # server.
+                del headers[proxy_auth_hdr]
+            h.set_tunnel(req._tunnel_host, headers=tunnel_headers)
+    
+        try:
+            try:
+>               h.request(req.get_method(), req.selector, req.data, headers,
+                          encode_chunked=req.has_header('Transfer-encoding'))
+
+C:\Python313\Lib\urllib\request.py:1319: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Python313\Lib\http\client.py:1367: in request
+    self._send_request(method, url, body, headers, encode_chunked)
+C:\Python313\Lib\http\client.py:1413: in _send_request
+    self.endheaders(body, encode_chunked=encode_chunked)
+C:\Python313\Lib\http\client.py:1362: in endheaders
+    self._send_output(message_body, encode_chunked=encode_chunked)
+C:\Python313\Lib\http\client.py:1122: in _send_output
+    self.send(msg)
+C:\Python313\Lib\http\client.py:1066: in send
+    self.connect()
+C:\Python313\Lib\http\client.py:1032: in connect
+    self.sock = self._create_connection(
+C:\Python313\Lib\socket.py:868: in create_connection
+    raise exceptions[0]
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+address = ('localhost', 3002), timeout = 15, source_address = None
+
+    def create_connection(address, timeout=_GLOBAL_DEFAULT_TIMEOUT,
+                          source_address=None, *, all_errors=False):
+        """Connect to *address* and return the socket object.
+    
+        Convenience function.  Connect to *address* (a 2-tuple ``(host,
+        port)``) and return the socket object.  Passing the optional
+        *timeout* parameter will set the timeout on the socket instance
+        before attempting to connect.  If no *timeout* is supplied, the
+        global default timeout setting returned by :func:`getdefaulttimeout`
+        is used.  If *source_address* is set it must be a tuple of (host, port)
+        for the socket to bind as a source address before making the connection.
+        A host of '' or port 0 tells the OS to use the default. When a connection
+        cannot be created, raises the last error if *all_errors* is False,
+        and an ExceptionGroup of all errors if *all_errors* is True.
+        """
+    
+        host, port = address
+        exceptions = []
+        for res in getaddrinfo(host, port, 0, SOCK_STREAM):
+            af, socktype, proto, canonname, sa = res
+            sock = None
+            try:
+                sock = socket(af, socktype, proto)
+                if timeout is not _GLOBAL_DEFAULT_TIMEOUT:
+                    sock.settimeout(timeout)
+                if source_address:
+                    sock.bind(source_address)
+>               sock.connect(sa)
+E               ConnectionRefusedError: [WinError 10061] No connection could be made because the target machine actively refused it
+
+C:\Python313\Lib\socket.py:853: ConnectionRefusedError
+
+During handling of the above exception, another exception occurred:
+
+url = 'http://localhost:3002/v1/auth/register', method = 'POST'
+body = {'acceptTerms': True, 'confirmPassword': 'SmokeTest-Password-123!', 'email': 'frontend-smoke-3d86bff280af409a87487dcbf98f2eef@example.com', 'firstName': 'Frontend', ...}
+headers = None, follow_redirects = True
+
+    def request_status(
+        url: str,
+        method: str = "GET",
+        body: dict | None = None,
+        headers: dict[str, str] | None = None,
+        follow_redirects: bool = True,
+    ) -> tuple[int, bytes]:
+        encoded_body = json.dumps(body).encode("utf-8") if body is not None else None
+        request_headers = {"Content-Type": "application/json", **(headers or {})}
+        request = Request(
+            url,
+            data=encoded_body,
+            method=method,
+            headers=request_headers,
+        )
+        try:
+            if follow_redirects:
+>               response_context = urlopen(request, timeout=15)
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+frontend\tests\test_learning_journey.py:225: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Python313\Lib\urllib\request.py:189: in urlopen
+    return opener.open(url, data, timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Python313\Lib\urllib\request.py:489: in open
+    response = self._open(req, data)
+               ^^^^^^^^^^^^^^^^^^^^^
+C:\Python313\Lib\urllib\request.py:506: in _open
+    result = self._call_chain(self.handle_open, protocol, protocol +
+C:\Python313\Lib\urllib\request.py:466: in _call_chain
+    result = func(*args)
+             ^^^^^^^^^^^
+C:\Python313\Lib\urllib\request.py:1348: in http_open
+    return self.do_open(http.client.HTTPConnection, req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <urllib.request.HTTPHandler object at 0x0000017125F6CAD0>
+http_class = <class 'http.client.HTTPConnection'>
+req = <urllib.request.Request object at 0x0000017125D1F9D0>, http_conn_args = {}
+host = 'localhost:3002'
+h = <http.client.HTTPConnection object at 0x0000017125F75590>
+headers = {'Connection': 'close', 'Content-Length': '310', 'Content-Type': 'application/json', 'Host': 'localhost:3002', ...}
+
+    def do_open(self, http_class, req, **http_conn_args):
+        """Return an HTTPResponse object for the request, using http_class.
+    
+        http_class must implement the HTTPConnection API from http.client.
+        """
+        host = req.host
+        if not host:
+            raise URLError('no host given')
+    
+        # will parse host:port
+        h = http_class(host, timeout=req.timeout, **http_conn_args)
+        h.set_debuglevel(self._debuglevel)
+    
+        headers = dict(req.unredirected_hdrs)
+        headers.update({k: v for k, v in req.headers.items()
+                        if k not in headers})
+    
+        # TODO(jhylton): Should this be redesigned to handle
+        # persistent connections?
+    
+        # We want to make an HTTP/1.1 request, but the addinfourl
+        # class isn't prepared to deal with a persistent connection.
+        # It will try to read all remaining data from the socket,
+        # which will block while the server waits for the next request.
+        # So make sure the connection gets closed after the (only)
+        # request.
+        headers["Connection"] = "close"
+        headers = {name.title(): val for name, val in headers.items()}
+    
+        if req._tunnel_host:
+            tunnel_headers = {}
+            proxy_auth_hdr = "Proxy-Authorization"
+            if proxy_auth_hdr in headers:
+                tunnel_headers[proxy_auth_hdr] = headers[proxy_auth_hdr]
+                # Proxy-Authorization should not be sent to origin
+                # server.
+                del headers[proxy_auth_hdr]
+            h.set_tunnel(req._tunnel_host, headers=tunnel_headers)
+    
+        try:
+            try:
+                h.request(req.get_method(), req.selector, req.data, headers,
+                          encode_chunked=req.has_header('Transfer-encoding'))
+            except OSError as err: # timeout error
+>               raise URLError(err)
+E               urllib.error.URLError: <urlopen error [WinError 10061] No connection could be made because the target machine actively refused it>
+
+C:\Python313\Lib\urllib\request.py:1322: URLError
+
+During handling of the above exception, another exception occurred:
+
+    @pytest.fixture(scope="session")
+    def smoke_auth_headers() -> dict[str, str]:
+        base_url = configured_backend_base_url()
+>       return register_smoke_user(base_url)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+frontend\tests\test_learning_journey.py:269: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+frontend\tests\test_learning_journey.py:245: in register_smoke_user
+    status, body = request_status(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+url = 'http://localhost:3002/v1/auth/register', method = 'POST'
+body = {'acceptTerms': True, 'confirmPassword': 'SmokeTest-Password-123!', 'email': 'frontend-smoke-3d86bff280af409a87487dcbf98f2eef@example.com', 'firstName': 'Frontend', ...}
+headers = None, follow_redirects = True
+
+    def request_status(
+        url: str,
+        method: str = "GET",
+        body: dict | None = None,
+        headers: dict[str, str] | None = None,
+        follow_redirects: bool = True,
+    ) -> tuple[int, bytes]:
+        encoded_body = json.dumps(body).encode("utf-8") if body is not None else None
+        request_headers = {"Content-Type": "application/json", **(headers or {})}
+        request = Request(
+            url,
+            data=encoded_body,
+            method=method,
+            headers=request_headers,
+        )
+        try:
+            if follow_redirects:
+                response_context = urlopen(request, timeout=15)
+            else:
+                class NoRedirectHandler(HTTPRedirectHandler):
+                    def redirect_request(self, req, fp, code, msg, response_headers, new_url):
+                        return None
+    
+                response_context = build_opener(NoRedirectHandler).open(request, timeout=15)
+            with response_context as response:
+                return response.status, response.read()
+        except HTTPError as response:
+            return response.code, response.read()
+        except TimeoutError as error:
+            pytest.fail(f"Timed out requesting {url}: {error}")
+        except URLError as error:
+>           pytest.fail(f"Live service is unavailable at {url}: {error.reason}")
+E           Failed: Live service is unavailable at http://localhost:3002/v1/auth/register: [WinError 10061] No connection could be made because the target machine actively refused it
+
+frontend\tests\test_learning_journey.py:239: Failed
+________ ERROR at setup of test_frontend_course_requests_reach_backend ________
+
+self = <urllib.request.HTTPHandler object at 0x0000017125F6CAD0>
+http_class = <class 'http.client.HTTPConnection'>
+req = <urllib.request.Request object at 0x0000017125D1F9D0>, http_conn_args = {}
+host = 'localhost:3002'
+h = <http.client.HTTPConnection object at 0x0000017125F75590>
+headers = {'Connection': 'close', 'Content-Length': '310', 'Content-Type': 'application/json', 'Host': 'localhost:3002', ...}
+
+    def do_open(self, http_class, req, **http_conn_args):
+        """Return an HTTPResponse object for the request, using http_class.
+    
+        http_class must implement the HTTPConnection API from http.client.
+        """
+        host = req.host
+        if not host:
+            raise URLError('no host given')
+    
+        # will parse host:port
+        h = http_class(host, timeout=req.timeout, **http_conn_args)
+        h.set_debuglevel(self._debuglevel)
+    
+        headers = dict(req.unredirected_hdrs)
+        headers.update({k: v for k, v in req.headers.items()
+                        if k not in headers})
+    
+        # TODO(jhylton): Should this be redesigned to handle
+        # persistent connections?
+    
+        # We want to make an HTTP/1.1 request, but the addinfourl
+        # class isn't prepared to deal with a persistent connection.
+        # It will try to read all remaining data from the socket,
+        # which will block while the server waits for the next request.
+        # So make sure the connection gets closed after the (only)
+        # request.
+        headers["Connection"] = "close"
+        headers = {name.title(): val for name, val in headers.items()}
+    
+        if req._tunnel_host:
+            tunnel_headers = {}
+            proxy_auth_hdr = "Proxy-Authorization"
+            if proxy_auth_hdr in headers:
+                tunnel_headers[proxy_auth_hdr] = headers[proxy_auth_hdr]
+                # Proxy-Authorization should not be sent to origin
+                # server.
+                del headers[proxy_auth_hdr]
+            h.set_tunnel(req._tunnel_host, headers=tunnel_headers)
+    
+        try:
+            try:
+>               h.request(req.get_method(), req.selector, req.data, headers,
+                          encode_chunked=req.has_header('Transfer-encoding'))
+
+C:\Python313\Lib\urllib\request.py:1319: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Python313\Lib\http\client.py:1367: in request
+    self._send_request(method, url, body, headers, encode_chunked)
+C:\Python313\Lib\http\client.py:1413: in _send_request
+    self.endheaders(body, encode_chunked=encode_chunked)
+C:\Python313\Lib\http\client.py:1362: in endheaders
+    self._send_output(message_body, encode_chunked=encode_chunked)
+C:\Python313\Lib\http\client.py:1122: in _send_output
+    self.send(msg)
+C:\Python313\Lib\http\client.py:1066: in send
+    self.connect()
+C:\Python313\Lib\http\client.py:1032: in connect
+    self.sock = self._create_connection(
+C:\Python313\Lib\socket.py:868: in create_connection
+    raise exceptions[0]
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+address = ('localhost', 3002), timeout = 15, source_address = None
+
+    def create_connection(address, timeout=_GLOBAL_DEFAULT_TIMEOUT,
+                          source_address=None, *, all_errors=False):
+        """Connect to *address* and return the socket object.
+    
+        Convenience function.  Connect to *address* (a 2-tuple ``(host,
+        port)``) and return the socket object.  Passing the optional
+        *timeout* parameter will set the timeout on the socket instance
+        before attempting to connect.  If no *timeout* is supplied, the
+        global default timeout setting returned by :func:`getdefaulttimeout`
+        is used.  If *source_address* is set it must be a tuple of (host, port)
+        for the socket to bind as a source address before making the connection.
+        A host of '' or port 0 tells the OS to use the default. When a connection
+        cannot be created, raises the last error if *all_errors* is False,
+        and an ExceptionGroup of all errors if *all_errors* is True.
+        """
+    
+        host, port = address
+        exceptions = []
+        for res in getaddrinfo(host, port, 0, SOCK_STREAM):
+            af, socktype, proto, canonname, sa = res
+            sock = None
+            try:
+                sock = socket(af, socktype, proto)
+                if timeout is not _GLOBAL_DEFAULT_TIMEOUT:
+                    sock.settimeout(timeout)
+                if source_address:
+                    sock.bind(source_address)
+>               sock.connect(sa)
+E               ConnectionRefusedError: [WinError 10061] No connection could be made because the target machine actively refused it
+
+C:\Python313\Lib\socket.py:853: ConnectionRefusedError
+
+During handling of the above exception, another exception occurred:
+
+url = 'http://localhost:3002/v1/auth/register', method = 'POST'
+body = {'acceptTerms': True, 'confirmPassword': 'SmokeTest-Password-123!', 'email': 'frontend-smoke-3d86bff280af409a87487dcbf98f2eef@example.com', 'firstName': 'Frontend', ...}
+headers = None, follow_redirects = True
+
+    def request_status(
+        url: str,
+        method: str = "GET",
+        body: dict | None = None,
+        headers: dict[str, str] | None = None,
+        follow_redirects: bool = True,
+    ) -> tuple[int, bytes]:
+        encoded_body = json.dumps(body).encode("utf-8") if body is not None else None
+        request_headers = {"Content-Type": "application/json", **(headers or {})}
+        request = Request(
+            url,
+            data=encoded_body,
+            method=method,
+            headers=request_headers,
+        )
+        try:
+            if follow_redirects:
+>               response_context = urlopen(request, timeout=15)
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+frontend\tests\test_learning_journey.py:225: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Python313\Lib\urllib\request.py:189: in urlopen
+    return opener.open(url, data, timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Python313\Lib\urllib\request.py:489: in open
+    response = self._open(req, data)
+               ^^^^^^^^^^^^^^^^^^^^^
+C:\Python313\Lib\urllib\request.py:506: in _open
+    result = self._call_chain(self.handle_open, protocol, protocol +
+C:\Python313\Lib\urllib\request.py:466: in _call_chain
+    result = func(*args)
+             ^^^^^^^^^^^
+C:\Python313\Lib\urllib\request.py:1348: in http_open
+    return self.do_open(http.client.HTTPConnection, req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <urllib.request.HTTPHandler object at 0x0000017125F6CAD0>
+http_class = <class 'http.client.HTTPConnection'>
+req = <urllib.request.Request object at 0x0000017125D1F9D0>, http_conn_args = {}
+host = 'localhost:3002'
+h = <http.client.HTTPConnection object at 0x0000017125F75590>
+headers = {'Connection': 'close', 'Content-Length': '310', 'Content-Type': 'application/json', 'Host': 'localhost:3002', ...}
+
+    def do_open(self, http_class, req, **http_conn_args):
+        """Return an HTTPResponse object for the request, using http_class.
+    
+        http_class must implement the HTTPConnection API from http.client.
+        """
+        host = req.host
+        if not host:
+            raise URLError('no host given')
+    
+        # will parse host:port
+        h = http_class(host, timeout=req.timeout, **http_conn_args)
+        h.set_debuglevel(self._debuglevel)
+    
+        headers = dict(req.unredirected_hdrs)
+        headers.update({k: v for k, v in req.headers.items()
+                        if k not in headers})
+    
+        # TODO(jhylton): Should this be redesigned to handle
+        # persistent connections?
+    
+        # We want to make an HTTP/1.1 request, but the addinfourl
+        # class isn't prepared to deal with a persistent connection.
+        # It will try to read all remaining data from the socket,
+        # which will block while the server waits for the next request.
+        # So make sure the connection gets closed after the (only)
+        # request.
+        headers["Connection"] = "close"
+        headers = {name.title(): val for name, val in headers.items()}
+    
+        if req._tunnel_host:
+            tunnel_headers = {}
+            proxy_auth_hdr = "Proxy-Authorization"
+            if proxy_auth_hdr in headers:
+                tunnel_headers[proxy_auth_hdr] = headers[proxy_auth_hdr]
+                # Proxy-Authorization should not be sent to origin
+                # server.
+                del headers[proxy_auth_hdr]
+            h.set_tunnel(req._tunnel_host, headers=tunnel_headers)
+    
+        try:
+            try:
+                h.request(req.get_method(), req.selector, req.data, headers,
+                          encode_chunked=req.has_header('Transfer-encoding'))
+            except OSError as err: # timeout error
+>               raise URLError(err)
+E               urllib.error.URLError: <urlopen error [WinError 10061] No connection could be made because the target machine actively refused it>
+
+C:\Python313\Lib\urllib\request.py:1322: URLError
+
+During handling of the above exception, another exception occurred:
+
+    @pytest.fixture(scope="session")
+    def smoke_auth_headers() -> dict[str, str]:
+        base_url = configured_backend_base_url()
+>       return register_smoke_user(base_url)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+frontend\tests\test_learning_journey.py:269: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+frontend\tests\test_learning_journey.py:245: in register_smoke_user
+    status, body = request_status(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+url = 'http://localhost:3002/v1/auth/register', method = 'POST'
+body = {'acceptTerms': True, 'confirmPassword': 'SmokeTest-Password-123!', 'email': 'frontend-smoke-3d86bff280af409a87487dcbf98f2eef@example.com', 'firstName': 'Frontend', ...}
+headers = None, follow_redirects = True
+
+    def request_status(
+        url: str,
+        method: str = "GET",
+        body: dict | None = None,
+        headers: dict[str, str] | None = None,
+        follow_redirects: bool = True,
+    ) -> tuple[int, bytes]:
+        encoded_body = json.dumps(body).encode("utf-8") if body is not None else None
+        request_headers = {"Content-Type": "application/json", **(headers or {})}
+        request = Request(
+            url,
+            data=encoded_body,
+            method=method,
+            headers=request_headers,
+        )
+        try:
+            if follow_redirects:
+                response_context = urlopen(request, timeout=15)
+            else:
+                class NoRedirectHandler(HTTPRedirectHandler):
+                    def redirect_request(self, req, fp, code, msg, response_headers, new_url):
+                        return None
+    
+                response_context = build_opener(NoRedirectHandler).open(request, timeout=15)
+            with response_context as response:
+                return response.status, response.read()
+        except HTTPError as response:
+            return response.code, response.read()
+        except TimeoutError as error:
+            pytest.fail(f"Timed out requesting {url}: {error}")
+        except URLError as error:
+>           pytest.fail(f"Live service is unavailable at {url}: {error.reason}")
+E           Failed: Live service is unavailable at http://localhost:3002/v1/auth/register: [WinError 10061] No connection could be made because the target machine actively refused it
+
+frontend\tests\test_learning_journey.py:239: Failed
+_______ ERROR at setup of test_frontend_material_requests_reach_backend _______
+
+self = <urllib.request.HTTPHandler object at 0x0000017125F6CAD0>
+http_class = <class 'http.client.HTTPConnection'>
+req = <urllib.request.Request object at 0x0000017125D1F9D0>, http_conn_args = {}
+host = 'localhost:3002'
+h = <http.client.HTTPConnection object at 0x0000017125F75590>
+headers = {'Connection': 'close', 'Content-Length': '310', 'Content-Type': 'application/json', 'Host': 'localhost:3002', ...}
+
+    def do_open(self, http_class, req, **http_conn_args):
+        """Return an HTTPResponse object for the request, using http_class.
+    
+        http_class must implement the HTTPConnection API from http.client.
+        """
+        host = req.host
+        if not host:
+            raise URLError('no host given')
+    
+        # will parse host:port
+        h = http_class(host, timeout=req.timeout, **http_conn_args)
+        h.set_debuglevel(self._debuglevel)
+    
+        headers = dict(req.unredirected_hdrs)
+        headers.update({k: v for k, v in req.headers.items()
+                        if k not in headers})
+    
+        # TODO(jhylton): Should this be redesigned to handle
+        # persistent connections?
+    
+        # We want to make an HTTP/1.1 request, but the addinfourl
+        # class isn't prepared to deal with a persistent connection.
+        # It will try to read all remaining data from the socket,
+        # which will block while the server waits for the next request.
+        # So make sure the connection gets closed after the (only)
+        # request.
+        headers["Connection"] = "close"
+        headers = {name.title(): val for name, val in headers.items()}
+    
+        if req._tunnel_host:
+            tunnel_headers = {}
+            proxy_auth_hdr = "Proxy-Authorization"
+            if proxy_auth_hdr in headers:
+                tunnel_headers[proxy_auth_hdr] = headers[proxy_auth_hdr]
+                # Proxy-Authorization should not be sent to origin
+                # server.
+                del headers[proxy_auth_hdr]
+            h.set_tunnel(req._tunnel_host, headers=tunnel_headers)
+    
+        try:
+            try:
+>               h.request(req.get_method(), req.selector, req.data, headers,
+                          encode_chunked=req.has_header('Transfer-encoding'))
+
+C:\Python313\Lib\urllib\request.py:1319: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Python313\Lib\http\client.py:1367: in request
+    self._send_request(method, url, body, headers, encode_chunked)
+C:\Python313\Lib\http\client.py:1413: in _send_request
+    self.endheaders(body, encode_chunked=encode_chunked)
+C:\Python313\Lib\http\client.py:1362: in endheaders
+    self._send_output(message_body, encode_chunked=encode_chunked)
+C:\Python313\Lib\http\client.py:1122: in _send_output
+    self.send(msg)
+C:\Python313\Lib\http\client.py:1066: in send
+    self.connect()
+C:\Python313\Lib\http\client.py:1032: in connect
+    self.sock = self._create_connection(
+C:\Python313\Lib\socket.py:868: in create_connection
+    raise exceptions[0]
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+address = ('localhost', 3002), timeout = 15, source_address = None
+
+    def create_connection(address, timeout=_GLOBAL_DEFAULT_TIMEOUT,
+                          source_address=None, *, all_errors=False):
+        """Connect to *address* and return the socket object.
+    
+        Convenience function.  Connect to *address* (a 2-tuple ``(host,
+        port)``) and return the socket object.  Passing the optional
+        *timeout* parameter will set the timeout on the socket instance
+        before attempting to connect.  If no *timeout* is supplied, the
+        global default timeout setting returned by :func:`getdefaulttimeout`
+        is used.  If *source_address* is set it must be a tuple of (host, port)
+        for the socket to bind as a source address before making the connection.
+        A host of '' or port 0 tells the OS to use the default. When a connection
+        cannot be created, raises the last error if *all_errors* is False,
+        and an ExceptionGroup of all errors if *all_errors* is True.
+        """
+    
+        host, port = address
+        exceptions = []
+        for res in getaddrinfo(host, port, 0, SOCK_STREAM):
+            af, socktype, proto, canonname, sa = res
+            sock = None
+            try:
+                sock = socket(af, socktype, proto)
+                if timeout is not _GLOBAL_DEFAULT_TIMEOUT:
+                    sock.settimeout(timeout)
+                if source_address:
+                    sock.bind(source_address)
+>               sock.connect(sa)
+E               ConnectionRefusedError: [WinError 10061] No connection could be made because the target machine actively refused it
+
+C:\Python313\Lib\socket.py:853: ConnectionRefusedError
+
+During handling of the above exception, another exception occurred:
+
+url = 'http://localhost:3002/v1/auth/register', method = 'POST'
+body = {'acceptTerms': True, 'confirmPassword': 'SmokeTest-Password-123!', 'email': 'frontend-smoke-3d86bff280af409a87487dcbf98f2eef@example.com', 'firstName': 'Frontend', ...}
+headers = None, follow_redirects = True
+
+    def request_status(
+        url: str,
+        method: str = "GET",
+        body: dict | None = None,
+        headers: dict[str, str] | None = None,
+        follow_redirects: bool = True,
+    ) -> tuple[int, bytes]:
+        encoded_body = json.dumps(body).encode("utf-8") if body is not None else None
+        request_headers = {"Content-Type": "application/json", **(headers or {})}
+        request = Request(
+            url,
+            data=encoded_body,
+            method=method,
+            headers=request_headers,
+        )
+        try:
+            if follow_redirects:
+>               response_context = urlopen(request, timeout=15)
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+frontend\tests\test_learning_journey.py:225: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Python313\Lib\urllib\request.py:189: in urlopen
+    return opener.open(url, data, timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Python313\Lib\urllib\request.py:489: in open
+    response = self._open(req, data)
+               ^^^^^^^^^^^^^^^^^^^^^
+C:\Python313\Lib\urllib\request.py:506: in _open
+    result = self._call_chain(self.handle_open, protocol, protocol +
+C:\Python313\Lib\urllib\request.py:466: in _call_chain
+    result = func(*args)
+             ^^^^^^^^^^^
+C:\Python313\Lib\urllib\request.py:1348: in http_open
+    return self.do_open(http.client.HTTPConnection, req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <urllib.request.HTTPHandler object at 0x0000017125F6CAD0>
+http_class = <class 'http.client.HTTPConnection'>
+req = <urllib.request.Request object at 0x0000017125D1F9D0>, http_conn_args = {}
+host = 'localhost:3002'
+h = <http.client.HTTPConnection object at 0x0000017125F75590>
+headers = {'Connection': 'close', 'Content-Length': '310', 'Content-Type': 'application/json', 'Host': 'localhost:3002', ...}
+
+    def do_open(self, http_class, req, **http_conn_args):
+        """Return an HTTPResponse object for the request, using http_class.
+    
+        http_class must implement the HTTPConnection API from http.client.
+        """
+        host = req.host
+        if not host:
+            raise URLError('no host given')
+    
+        # will parse host:port
+        h = http_class(host, timeout=req.timeout, **http_conn_args)
+        h.set_debuglevel(self._debuglevel)
+    
+        headers = dict(req.unredirected_hdrs)
+        headers.update({k: v for k, v in req.headers.items()
+                        if k not in headers})
+    
+        # TODO(jhylton): Should this be redesigned to handle
+        # persistent connections?
+    
+        # We want to make an HTTP/1.1 request, but the addinfourl
+        # class isn't prepared to deal with a persistent connection.
+        # It will try to read all remaining data from the socket,
+        # which will block while the server waits for the next request.
+        # So make sure the connection gets closed after the (only)
+        # request.
+        headers["Connection"] = "close"
+        headers = {name.title(): val for name, val in headers.items()}
+    
+        if req._tunnel_host:
+            tunnel_headers = {}
+            proxy_auth_hdr = "Proxy-Authorization"
+            if proxy_auth_hdr in headers:
+                tunnel_headers[proxy_auth_hdr] = headers[proxy_auth_hdr]
+                # Proxy-Authorization should not be sent to origin
+                # server.
+                del headers[proxy_auth_hdr]
+            h.set_tunnel(req._tunnel_host, headers=tunnel_headers)
+    
+        try:
+            try:
+                h.request(req.get_method(), req.selector, req.data, headers,
+                          encode_chunked=req.has_header('Transfer-encoding'))
+            except OSError as err: # timeout error
+>               raise URLError(err)
+E               urllib.error.URLError: <urlopen error [WinError 10061] No connection could be made because the target machine actively refused it>
+
+C:\Python313\Lib\urllib\request.py:1322: URLError
+
+During handling of the above exception, another exception occurred:
+
+    @pytest.fixture(scope="session")
+    def smoke_auth_headers() -> dict[str, str]:
+        base_url = configured_backend_base_url()
+>       return register_smoke_user(base_url)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+frontend\tests\test_learning_journey.py:269: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+frontend\tests\test_learning_journey.py:245: in register_smoke_user
+    status, body = request_status(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+url = 'http://localhost:3002/v1/auth/register', method = 'POST'
+body = {'acceptTerms': True, 'confirmPassword': 'SmokeTest-Password-123!', 'email': 'frontend-smoke-3d86bff280af409a87487dcbf98f2eef@example.com', 'firstName': 'Frontend', ...}
+headers = None, follow_redirects = True
+
+    def request_status(
+        url: str,
+        method: str = "GET",
+        body: dict | None = None,
+        headers: dict[str, str] | None = None,
+        follow_redirects: bool = True,
+    ) -> tuple[int, bytes]:
+        encoded_body = json.dumps(body).encode("utf-8") if body is not None else None
+        request_headers = {"Content-Type": "application/json", **(headers or {})}
+        request = Request(
+            url,
+            data=encoded_body,
+            method=method,
+            headers=request_headers,
+        )
+        try:
+            if follow_redirects:
+                response_context = urlopen(request, timeout=15)
+            else:
+                class NoRedirectHandler(HTTPRedirectHandler):
+                    def redirect_request(self, req, fp, code, msg, response_headers, new_url):
+                        return None
+    
+                response_context = build_opener(NoRedirectHandler).open(request, timeout=15)
+            with response_context as response:
+                return response.status, response.read()
+        except HTTPError as response:
+            return response.code, response.read()
+        except TimeoutError as error:
+            pytest.fail(f"Timed out requesting {url}: {error}")
+        except URLError as error:
+>           pytest.fail(f"Live service is unavailable at {url}: {error.reason}")
+E           Failed: Live service is unavailable at http://localhost:3002/v1/auth/register: [WinError 10061] No connection could be made because the target machine actively refused it
+
+frontend\tests\test_learning_journey.py:239: Failed
+__ ERROR at setup of test_frontend_learning_requests_reach_backend_and_rust ___
+
+self = <urllib.request.HTTPHandler object at 0x0000017125F6CAD0>
+http_class = <class 'http.client.HTTPConnection'>
+req = <urllib.request.Request object at 0x0000017125D1F9D0>, http_conn_args = {}
+host = 'localhost:3002'
+h = <http.client.HTTPConnection object at 0x0000017125F75590>
+headers = {'Connection': 'close', 'Content-Length': '310', 'Content-Type': 'application/json', 'Host': 'localhost:3002', ...}
+
+    def do_open(self, http_class, req, **http_conn_args):
+        """Return an HTTPResponse object for the request, using http_class.
+    
+        http_class must implement the HTTPConnection API from http.client.
+        """
+        host = req.host
+        if not host:
+            raise URLError('no host given')
+    
+        # will parse host:port
+        h = http_class(host, timeout=req.timeout, **http_conn_args)
+        h.set_debuglevel(self._debuglevel)
+    
+        headers = dict(req.unredirected_hdrs)
+        headers.update({k: v for k, v in req.headers.items()
+                        if k not in headers})
+    
+        # TODO(jhylton): Should this be redesigned to handle
+        # persistent connections?
+    
+        # We want to make an HTTP/1.1 request, but the addinfourl
+        # class isn't prepared to deal with a persistent connection.
+        # It will try to read all remaining data from the socket,
+        # which will block while the server waits for the next request.
+        # So make sure the connection gets closed after the (only)
+        # request.
+        headers["Connection"] = "close"
+        headers = {name.title(): val for name, val in headers.items()}
+    
+        if req._tunnel_host:
+            tunnel_headers = {}
+            proxy_auth_hdr = "Proxy-Authorization"
+            if proxy_auth_hdr in headers:
+                tunnel_headers[proxy_auth_hdr] = headers[proxy_auth_hdr]
+                # Proxy-Authorization should not be sent to origin
+                # server.
+                del headers[proxy_auth_hdr]
+            h.set_tunnel(req._tunnel_host, headers=tunnel_headers)
+    
+        try:
+            try:
+>               h.request(req.get_method(), req.selector, req.data, headers,
+                          encode_chunked=req.has_header('Transfer-encoding'))
+
+C:\Python313\Lib\urllib\request.py:1319: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Python313\Lib\http\client.py:1367: in request
+    self._send_request(method, url, body, headers, encode_chunked)
+C:\Python313\Lib\http\client.py:1413: in _send_request
+    self.endheaders(body, encode_chunked=encode_chunked)
+C:\Python313\Lib\http\client.py:1362: in endheaders
+    self._send_output(message_body, encode_chunked=encode_chunked)
+C:\Python313\Lib\http\client.py:1122: in _send_output
+    self.send(msg)
+C:\Python313\Lib\http\client.py:1066: in send
+    self.connect()
+C:\Python313\Lib\http\client.py:1032: in connect
+    self.sock = self._create_connection(
+C:\Python313\Lib\socket.py:868: in create_connection
+    raise exceptions[0]
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+address = ('localhost', 3002), timeout = 15, source_address = None
+
+    def create_connection(address, timeout=_GLOBAL_DEFAULT_TIMEOUT,
+                          source_address=None, *, all_errors=False):
+        """Connect to *address* and return the socket object.
+    
+        Convenience function.  Connect to *address* (a 2-tuple ``(host,
+        port)``) and return the socket object.  Passing the optional
+        *timeout* parameter will set the timeout on the socket instance
+        before attempting to connect.  If no *timeout* is supplied, the
+        global default timeout setting returned by :func:`getdefaulttimeout`
+        is used.  If *source_address* is set it must be a tuple of (host, port)
+        for the socket to bind as a source address before making the connection.
+        A host of '' or port 0 tells the OS to use the default. When a connection
+        cannot be created, raises the last error if *all_errors* is False,
+        and an ExceptionGroup of all errors if *all_errors* is True.
+        """
+    
+        host, port = address
+        exceptions = []
+        for res in getaddrinfo(host, port, 0, SOCK_STREAM):
+            af, socktype, proto, canonname, sa = res
+            sock = None
+            try:
+                sock = socket(af, socktype, proto)
+                if timeout is not _GLOBAL_DEFAULT_TIMEOUT:
+                    sock.settimeout(timeout)
+                if source_address:
+                    sock.bind(source_address)
+>               sock.connect(sa)
+E               ConnectionRefusedError: [WinError 10061] No connection could be made because the target machine actively refused it
+
+C:\Python313\Lib\socket.py:853: ConnectionRefusedError
+
+During handling of the above exception, another exception occurred:
+
+url = 'http://localhost:3002/v1/auth/register', method = 'POST'
+body = {'acceptTerms': True, 'confirmPassword': 'SmokeTest-Password-123!', 'email': 'frontend-smoke-3d86bff280af409a87487dcbf98f2eef@example.com', 'firstName': 'Frontend', ...}
+headers = None, follow_redirects = True
+
+    def request_status(
+        url: str,
+        method: str = "GET",
+        body: dict | None = None,
+        headers: dict[str, str] | None = None,
+        follow_redirects: bool = True,
+    ) -> tuple[int, bytes]:
+        encoded_body = json.dumps(body).encode("utf-8") if body is not None else None
+        request_headers = {"Content-Type": "application/json", **(headers or {})}
+        request = Request(
+            url,
+            data=encoded_body,
+            method=method,
+            headers=request_headers,
+        )
+        try:
+            if follow_redirects:
+>               response_context = urlopen(request, timeout=15)
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+frontend\tests\test_learning_journey.py:225: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Python313\Lib\urllib\request.py:189: in urlopen
+    return opener.open(url, data, timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Python313\Lib\urllib\request.py:489: in open
+    response = self._open(req, data)
+               ^^^^^^^^^^^^^^^^^^^^^
+C:\Python313\Lib\urllib\request.py:506: in _open
+    result = self._call_chain(self.handle_open, protocol, protocol +
+C:\Python313\Lib\urllib\request.py:466: in _call_chain
+    result = func(*args)
+             ^^^^^^^^^^^
+C:\Python313\Lib\urllib\request.py:1348: in http_open
+    return self.do_open(http.client.HTTPConnection, req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <urllib.request.HTTPHandler object at 0x0000017125F6CAD0>
+http_class = <class 'http.client.HTTPConnection'>
+req = <urllib.request.Request object at 0x0000017125D1F9D0>, http_conn_args = {}
+host = 'localhost:3002'
+h = <http.client.HTTPConnection object at 0x0000017125F75590>
+headers = {'Connection': 'close', 'Content-Length': '310', 'Content-Type': 'application/json', 'Host': 'localhost:3002', ...}
+
+    def do_open(self, http_class, req, **http_conn_args):
+        """Return an HTTPResponse object for the request, using http_class.
+    
+        http_class must implement the HTTPConnection API from http.client.
+        """
+        host = req.host
+        if not host:
+            raise URLError('no host given')
+    
+        # will parse host:port
+        h = http_class(host, timeout=req.timeout, **http_conn_args)
+        h.set_debuglevel(self._debuglevel)
+    
+        headers = dict(req.unredirected_hdrs)
+        headers.update({k: v for k, v in req.headers.items()
+                        if k not in headers})
+    
+        # TODO(jhylton): Should this be redesigned to handle
+        # persistent connections?
+    
+        # We want to make an HTTP/1.1 request, but the addinfourl
+        # class isn't prepared to deal with a persistent connection.
+        # It will try to read all remaining data from the socket,
+        # which will block while the server waits for the next request.
+        # So make sure the connection gets closed after the (only)
+        # request.
+        headers["Connection"] = "close"
+        headers = {name.title(): val for name, val in headers.items()}
+    
+        if req._tunnel_host:
+            tunnel_headers = {}
+            proxy_auth_hdr = "Proxy-Authorization"
+            if proxy_auth_hdr in headers:
+                tunnel_headers[proxy_auth_hdr] = headers[proxy_auth_hdr]
+                # Proxy-Authorization should not be sent to origin
+                # server.
+                del headers[proxy_auth_hdr]
+            h.set_tunnel(req._tunnel_host, headers=tunnel_headers)
+    
+        try:
+            try:
+                h.request(req.get_method(), req.selector, req.data, headers,
+                          encode_chunked=req.has_header('Transfer-encoding'))
+            except OSError as err: # timeout error
+>               raise URLError(err)
+E               urllib.error.URLError: <urlopen error [WinError 10061] No connection could be made because the target machine actively refused it>
+
+C:\Python313\Lib\urllib\request.py:1322: URLError
+
+During handling of the above exception, another exception occurred:
+
+    @pytest.fixture(scope="session")
+    def smoke_auth_headers() -> dict[str, str]:
+        base_url = configured_backend_base_url()
+>       return register_smoke_user(base_url)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+frontend\tests\test_learning_journey.py:269: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+frontend\tests\test_learning_journey.py:245: in register_smoke_user
+    status, body = request_status(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+url = 'http://localhost:3002/v1/auth/register', method = 'POST'
+body = {'acceptTerms': True, 'confirmPassword': 'SmokeTest-Password-123!', 'email': 'frontend-smoke-3d86bff280af409a87487dcbf98f2eef@example.com', 'firstName': 'Frontend', ...}
+headers = None, follow_redirects = True
+
+    def request_status(
+        url: str,
+        method: str = "GET",
+        body: dict | None = None,
+        headers: dict[str, str] | None = None,
+        follow_redirects: bool = True,
+    ) -> tuple[int, bytes]:
+        encoded_body = json.dumps(body).encode("utf-8") if body is not None else None
+        request_headers = {"Content-Type": "application/json", **(headers or {})}
+        request = Request(
+            url,
+            data=encoded_body,
+            method=method,
+            headers=request_headers,
+        )
+        try:
+            if follow_redirects:
+                response_context = urlopen(request, timeout=15)
+            else:
+                class NoRedirectHandler(HTTPRedirectHandler):
+                    def redirect_request(self, req, fp, code, msg, response_headers, new_url):
+                        return None
+    
+                response_context = build_opener(NoRedirectHandler).open(request, timeout=15)
+            with response_context as response:
+                return response.status, response.read()
+        except HTTPError as response:
+            return response.code, response.read()
+        except TimeoutError as error:
+            pytest.fail(f"Timed out requesting {url}: {error}")
+        except URLError as error:
+>           pytest.fail(f"Live service is unavailable at {url}: {error.reason}")
+E           Failed: Live service is unavailable at http://localhost:3002/v1/auth/register: [WinError 10061] No connection could be made because the target machine actively refused it
+
+frontend\tests\test_learning_journey.py:239: Failed
+================================== FAILURES ===================================
+____ test_new_learner_has_course_discovery_and_learning_path_entry_points _____
+
+    def test_new_learner_has_course_discovery_and_learning_path_entry_points():
+        courses = read_frontend("src/features/courses/components/courses-dashboard.tsx")
+        learning_paths = read_frontend("src/app/(app)/learning-paths/LearningPathsClient.tsx")
+    
+>       assert "You haven't enrolled in any courses yet." in courses
+E       assert "You haven't enrolled in any courses yet." in '\'use client\';\n\nimport React, { useState, useEffect } from \'react\';\nimport { useRouter } from \'next/navigation...w-4" />\n          </button>\n        )}\n      </div>\n    </article>\n  );\n};\n\nexport default CoursesDashboard;\n'
+
+frontend\tests\test_learning_journey.py:97: AssertionError
+_ test_real_quiz_questions_are_loaded_from_unit_or_topic_endpoint_without_answer_keys _
+
+    def test_real_quiz_questions_are_loaded_from_unit_or_topic_endpoint_without_answer_keys():
+        quiz_service = read_frontend("src/features/assessment/services/quiz.ts")
+        quiz_panel = read_frontend("src/features/courses/components/QuizPanel.tsx")
+        backend_quiz = read_backend("src/modules/education/assessment/services/quiz.service.ts")
+    
+        question_loader = quiz_service.split("async getQuestionsForLesson", 1)[1].split(
+            "async submitAnswer", 1
+        )[0]
+        assert "${this.baseUrl}/${scope}/${lessonId}" in question_loader
+        assert "getDemoRapidReviewQuestions" not in question_loader
+        assert "result.correct" in quiz_panel
+        assert "option.isCorrect" not in quiz_panel
+        assert "question_text: question.text" in read_frontend(
+            "src/shared/hooks/useQuiz.ts"
+        )
+        assert "option.id" in read_frontend("src/app/(app)/quiz/[unitId]/page.tsx")
+    
+        for method_name in ("getQuestionsByUnit", "getQuestionsByTopic"):
+            query = backend_quiz.split(f"async {method_name}", 1)[1].split(
+                "@ApiOperation", 1
+            )[0]
+            assert "select: { id: true, text: true, order: true }" in query
+            assert "isCorrect" not in query
+    
+        unit_loader = backend_quiz.split("async getQuestionsByUnit", 1)[1].split(
+            "@ApiOperation", 1
+        )[0]
+        assert "this.prisma.quiz.findFirst" in unit_loader
+        assert "where: { unitId, topicId: null, isPublished: true }" in unit_loader
+>       assert "quiz.questions.map(({ question }) => question)" in unit_loader
+E       AssertionError: assert 'quiz.questions.map(({ question }) => question)' in '(unitId: string): Promise<PublicQuizQuestion[]> {\n    await this.assertPublishedUnit(unitId);\n\n    const quizVersi...   }\n\n    return quiz.questions.map(({ question }) =>\n      this.toPublicQuizQuestion(question),\n    );\n  }\n\n  '
+
+frontend\tests\test_learning_journey.py:132: AssertionError
+__ test_quiz_submission_accepts_quiz_ids_and_resolves_published_unit_quizzes __
+
+    def test_quiz_submission_accepts_quiz_ids_and_resolves_published_unit_quizzes():
+        quiz_service = read_backend(
+            "src/modules/education/assessment/services/quiz.service.ts"
+        )
+        submit = quiz_service.split("async submitQuiz(", 1)[1].split(
+            "@ApiOperation({ summary: 'Submit a topic-level quiz'", 1
+        )[0]
+    
+>       assert "this.prisma.quiz.findUnique" in submit
+E       AssertionError: assert 'this.prisma.quiz.findUnique' in '\n    userId: string,\n    unitId: string,\n    attemptId: string,\n    answers: QuizAnswerDto[],\n  ): Promise<\n   ...mpts.some((attempt) => attempt.isPassed),\n      lastAttemptedAt: attempts[0]?.completedAt ?? null,\n    };\n  }\n\n  '
+
+frontend\tests\test_learning_journey.py:145: AssertionError
+__________ test_quiz_completion_records_activity_and_calls_analytics __________
+
+    def test_quiz_completion_records_activity_and_calls_analytics():
+        quiz_service = read_backend("src/modules/education/assessment/services/quiz.service.ts")
+    
+        assert "await tx.userActivity.create" in quiz_service
+        assert "type: UserActivityType.QUIZ_ATTEMPT" in quiz_service
+>       assert "await this.analyticsService.generateAnalytics(userId, activeQuiz.id)" in quiz_service
+E       assert 'await this.analyticsService.generateAnalytics(userId, activeQuiz.id)' in "import {\n  Injectable,\n  Logger,\n  NotFoundException,\n  BadRequestException,\n  ConflictException,\n} from '@nest....QUIZ_ATTEMPT,\n        details: { questionId, correct },\n        createdAt: new Date(),\n      },\n    });\n  }\n}\n"
+
+frontend\tests\test_learning_journey.py:172: AssertionError
+_________ test_material_progress_and_streak_share_user_activity_dates _________
+
+    def test_material_progress_and_streak_share_user_activity_dates():
+        progress_service = read_backend("src/modules/education/courses/services/progress.service.ts")
+    
+        assert "type: UserActivityType.LEARNING" in progress_service
+        assert "async getUserStreaks(userId" in progress_service
+        assert "createdAt: {" in progress_service
+>       assert "toDateString()" in progress_service
+E       AssertionError: assert 'toDateString()' in 'import {\n  Injectable,\n  Logger,\n  NotFoundException,\n  ConflictException,\n  ForbiddenException,\n  BadRequestEx...\n        error,\n      );\n      return { competence: 0, decayFactor: 1, daysSinceLastPractice: 0 };\n    }\n  }\n}\n'
+
+frontend\tests\test_learning_journey.py:205: AssertionError
+_ test_registration_and_profile_setup_routes_render_or_require_authentication _
+
+self = <urllib.request.HTTPHandler object at 0x0000017125F6CAD0>
+http_class = <class 'http.client.HTTPConnection'>
+req = <urllib.request.Request object at 0x0000017125F6C590>, http_conn_args = {}
+host = 'localhost:3000'
+h = <http.client.HTTPConnection object at 0x0000017125F6D550>
+headers = {'Connection': 'close', 'Content-Type': 'application/json', 'Host': 'localhost:3000', 'User-Agent': 'Python-urllib/3.13'}
+
+    def do_open(self, http_class, req, **http_conn_args):
+        """Return an HTTPResponse object for the request, using http_class.
+    
+        http_class must implement the HTTPConnection API from http.client.
+        """
+        host = req.host
+        if not host:
+            raise URLError('no host given')
+    
+        # will parse host:port
+        h = http_class(host, timeout=req.timeout, **http_conn_args)
+        h.set_debuglevel(self._debuglevel)
+    
+        headers = dict(req.unredirected_hdrs)
+        headers.update({k: v for k, v in req.headers.items()
+                        if k not in headers})
+    
+        # TODO(jhylton): Should this be redesigned to handle
+        # persistent connections?
+    
+        # We want to make an HTTP/1.1 request, but the addinfourl
+        # class isn't prepared to deal with a persistent connection.
+        # It will try to read all remaining data from the socket,
+        # which will block while the server waits for the next request.
+        # So make sure the connection gets closed after the (only)
+        # request.
+        headers["Connection"] = "close"
+        headers = {name.title(): val for name, val in headers.items()}
+    
+        if req._tunnel_host:
+            tunnel_headers = {}
+            proxy_auth_hdr = "Proxy-Authorization"
+            if proxy_auth_hdr in headers:
+                tunnel_headers[proxy_auth_hdr] = headers[proxy_auth_hdr]
+                # Proxy-Authorization should not be sent to origin
+                # server.
+                del headers[proxy_auth_hdr]
+            h.set_tunnel(req._tunnel_host, headers=tunnel_headers)
+    
+        try:
+            try:
+>               h.request(req.get_method(), req.selector, req.data, headers,
+                          encode_chunked=req.has_header('Transfer-encoding'))
+
+C:\Python313\Lib\urllib\request.py:1319: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Python313\Lib\http\client.py:1367: in request
+    self._send_request(method, url, body, headers, encode_chunked)
+C:\Python313\Lib\http\client.py:1413: in _send_request
+    self.endheaders(body, encode_chunked=encode_chunked)
+C:\Python313\Lib\http\client.py:1362: in endheaders
+    self._send_output(message_body, encode_chunked=encode_chunked)
+C:\Python313\Lib\http\client.py:1122: in _send_output
+    self.send(msg)
+C:\Python313\Lib\http\client.py:1066: in send
+    self.connect()
+C:\Python313\Lib\http\client.py:1032: in connect
+    self.sock = self._create_connection(
+C:\Python313\Lib\socket.py:868: in create_connection
+    raise exceptions[0]
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+address = ('localhost', 3000), timeout = 15, source_address = None
+
+    def create_connection(address, timeout=_GLOBAL_DEFAULT_TIMEOUT,
+                          source_address=None, *, all_errors=False):
+        """Connect to *address* and return the socket object.
+    
+        Convenience function.  Connect to *address* (a 2-tuple ``(host,
+        port)``) and return the socket object.  Passing the optional
+        *timeout* parameter will set the timeout on the socket instance
+        before attempting to connect.  If no *timeout* is supplied, the
+        global default timeout setting returned by :func:`getdefaulttimeout`
+        is used.  If *source_address* is set it must be a tuple of (host, port)
+        for the socket to bind as a source address before making the connection.
+        A host of '' or port 0 tells the OS to use the default. When a connection
+        cannot be created, raises the last error if *all_errors* is False,
+        and an ExceptionGroup of all errors if *all_errors* is True.
+        """
+    
+        host, port = address
+        exceptions = []
+        for res in getaddrinfo(host, port, 0, SOCK_STREAM):
+            af, socktype, proto, canonname, sa = res
+            sock = None
+            try:
+                sock = socket(af, socktype, proto)
+                if timeout is not _GLOBAL_DEFAULT_TIMEOUT:
+                    sock.settimeout(timeout)
+                if source_address:
+                    sock.bind(source_address)
+>               sock.connect(sa)
+E               ConnectionRefusedError: [WinError 10061] No connection could be made because the target machine actively refused it
+
+C:\Python313\Lib\socket.py:853: ConnectionRefusedError
+
+During handling of the above exception, another exception occurred:
+
+url = 'http://localhost:3000/register', method = 'GET', body = None
+headers = None, follow_redirects = True
+
+    def request_status(
+        url: str,
+        method: str = "GET",
+        body: dict | None = None,
+        headers: dict[str, str] | None = None,
+        follow_redirects: bool = True,
+    ) -> tuple[int, bytes]:
+        encoded_body = json.dumps(body).encode("utf-8") if body is not None else None
+        request_headers = {"Content-Type": "application/json", **(headers or {})}
+        request = Request(
+            url,
+            data=encoded_body,
+            method=method,
+            headers=request_headers,
+        )
+        try:
+            if follow_redirects:
+>               response_context = urlopen(request, timeout=15)
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+frontend\tests\test_learning_journey.py:225: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Python313\Lib\urllib\request.py:189: in urlopen
+    return opener.open(url, data, timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Python313\Lib\urllib\request.py:489: in open
+    response = self._open(req, data)
+               ^^^^^^^^^^^^^^^^^^^^^
+C:\Python313\Lib\urllib\request.py:506: in _open
+    result = self._call_chain(self.handle_open, protocol, protocol +
+C:\Python313\Lib\urllib\request.py:466: in _call_chain
+    result = func(*args)
+             ^^^^^^^^^^^
+C:\Python313\Lib\urllib\request.py:1348: in http_open
+    return self.do_open(http.client.HTTPConnection, req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <urllib.request.HTTPHandler object at 0x0000017125F6CAD0>
+http_class = <class 'http.client.HTTPConnection'>
+req = <urllib.request.Request object at 0x0000017125F6C590>, http_conn_args = {}
+host = 'localhost:3000'
+h = <http.client.HTTPConnection object at 0x0000017125F6D550>
+headers = {'Connection': 'close', 'Content-Type': 'application/json', 'Host': 'localhost:3000', 'User-Agent': 'Python-urllib/3.13'}
+
+    def do_open(self, http_class, req, **http_conn_args):
+        """Return an HTTPResponse object for the request, using http_class.
+    
+        http_class must implement the HTTPConnection API from http.client.
+        """
+        host = req.host
+        if not host:
+            raise URLError('no host given')
+    
+        # will parse host:port
+        h = http_class(host, timeout=req.timeout, **http_conn_args)
+        h.set_debuglevel(self._debuglevel)
+    
+        headers = dict(req.unredirected_hdrs)
+        headers.update({k: v for k, v in req.headers.items()
+                        if k not in headers})
+    
+        # TODO(jhylton): Should this be redesigned to handle
+        # persistent connections?
+    
+        # We want to make an HTTP/1.1 request, but the addinfourl
+        # class isn't prepared to deal with a persistent connection.
+        # It will try to read all remaining data from the socket,
+        # which will block while the server waits for the next request.
+        # So make sure the connection gets closed after the (only)
+        # request.
+        headers["Connection"] = "close"
+        headers = {name.title(): val for name, val in headers.items()}
+    
+        if req._tunnel_host:
+            tunnel_headers = {}
+            proxy_auth_hdr = "Proxy-Authorization"
+            if proxy_auth_hdr in headers:
+                tunnel_headers[proxy_auth_hdr] = headers[proxy_auth_hdr]
+                # Proxy-Authorization should not be sent to origin
+                # server.
+                del headers[proxy_auth_hdr]
+            h.set_tunnel(req._tunnel_host, headers=tunnel_headers)
+    
+        try:
+            try:
+                h.request(req.get_method(), req.selector, req.data, headers,
+                          encode_chunked=req.has_header('Transfer-encoding'))
+            except OSError as err: # timeout error
+>               raise URLError(err)
+E               urllib.error.URLError: <urlopen error [WinError 10061] No connection could be made because the target machine actively refused it>
+
+C:\Python313\Lib\urllib\request.py:1322: URLError
+
+During handling of the above exception, another exception occurred:
+
+    def test_registration_and_profile_setup_routes_render_or_require_authentication():
+        base_url = configured_service_url(
+            "FRONTEND_BASE_URL",
+            "FRONTEND_URL",
+            default="http://localhost:3000",
+        )
+    
+        for path in ("/register", "/login?callbackUrl=%2Ffinish-setup"):
+>           status, _ = request_status(f"{base_url}{path}")
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+frontend\tests\test_learning_journey.py:287: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+url = 'http://localhost:3000/register', method = 'GET', body = None
+headers = None, follow_redirects = True
+
+    def request_status(
+        url: str,
+        method: str = "GET",
+        body: dict | None = None,
+        headers: dict[str, str] | None = None,
+        follow_redirects: bool = True,
+    ) -> tuple[int, bytes]:
+        encoded_body = json.dumps(body).encode("utf-8") if body is not None else None
+        request_headers = {"Content-Type": "application/json", **(headers or {})}
+        request = Request(
+            url,
+            data=encoded_body,
+            method=method,
+            headers=request_headers,
+        )
+        try:
+            if follow_redirects:
+                response_context = urlopen(request, timeout=15)
+            else:
+                class NoRedirectHandler(HTTPRedirectHandler):
+                    def redirect_request(self, req, fp, code, msg, response_headers, new_url):
+                        return None
+    
+                response_context = build_opener(NoRedirectHandler).open(request, timeout=15)
+            with response_context as response:
+                return response.status, response.read()
+        except HTTPError as response:
+            return response.code, response.read()
+        except TimeoutError as error:
+            pytest.fail(f"Timed out requesting {url}: {error}")
+        except URLError as error:
+>           pytest.fail(f"Live service is unavailable at {url}: {error.reason}")
+E           Failed: Live service is unavailable at http://localhost:3000/register: [WinError 10061] No connection could be made because the target machine actively refused it
+
+frontend\tests\test_learning_journey.py:239: Failed
+_______ test_backend_auth_and_learning_routes_are_present_and_protected _______
+
+self = <urllib.request.HTTPHandler object at 0x0000017125F6CAD0>
+http_class = <class 'http.client.HTTPConnection'>
+req = <urllib.request.Request object at 0x0000017125F75310>, http_conn_args = {}
+host = 'localhost:3002'
+h = <http.client.HTTPConnection object at 0x0000017125F756D0>
+headers = {'Connection': 'close', 'Content-Length': '2', 'Content-Type': 'application/json', 'Host': 'localhost:3002', ...}
+
+    def do_open(self, http_class, req, **http_conn_args):
+        """Return an HTTPResponse object for the request, using http_class.
+    
+        http_class must implement the HTTPConnection API from http.client.
+        """
+        host = req.host
+        if not host:
+            raise URLError('no host given')
+    
+        # will parse host:port
+        h = http_class(host, timeout=req.timeout, **http_conn_args)
+        h.set_debuglevel(self._debuglevel)
+    
+        headers = dict(req.unredirected_hdrs)
+        headers.update({k: v for k, v in req.headers.items()
+                        if k not in headers})
+    
+        # TODO(jhylton): Should this be redesigned to handle
+        # persistent connections?
+    
+        # We want to make an HTTP/1.1 request, but the addinfourl
+        # class isn't prepared to deal with a persistent connection.
+        # It will try to read all remaining data from the socket,
+        # which will block while the server waits for the next request.
+        # So make sure the connection gets closed after the (only)
+        # request.
+        headers["Connection"] = "close"
+        headers = {name.title(): val for name, val in headers.items()}
+    
+        if req._tunnel_host:
+            tunnel_headers = {}
+            proxy_auth_hdr = "Proxy-Authorization"
+            if proxy_auth_hdr in headers:
+                tunnel_headers[proxy_auth_hdr] = headers[proxy_auth_hdr]
+                # Proxy-Authorization should not be sent to origin
+                # server.
+                del headers[proxy_auth_hdr]
+            h.set_tunnel(req._tunnel_host, headers=tunnel_headers)
+    
+        try:
+            try:
+>               h.request(req.get_method(), req.selector, req.data, headers,
+                          encode_chunked=req.has_header('Transfer-encoding'))
+
+C:\Python313\Lib\urllib\request.py:1319: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Python313\Lib\http\client.py:1367: in request
+    self._send_request(method, url, body, headers, encode_chunked)
+C:\Python313\Lib\http\client.py:1413: in _send_request
+    self.endheaders(body, encode_chunked=encode_chunked)
+C:\Python313\Lib\http\client.py:1362: in endheaders
+    self._send_output(message_body, encode_chunked=encode_chunked)
+C:\Python313\Lib\http\client.py:1122: in _send_output
+    self.send(msg)
+C:\Python313\Lib\http\client.py:1066: in send
+    self.connect()
+C:\Python313\Lib\http\client.py:1032: in connect
+    self.sock = self._create_connection(
+C:\Python313\Lib\socket.py:868: in create_connection
+    raise exceptions[0]
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+address = ('localhost', 3002), timeout = 15, source_address = None
+
+    def create_connection(address, timeout=_GLOBAL_DEFAULT_TIMEOUT,
+                          source_address=None, *, all_errors=False):
+        """Connect to *address* and return the socket object.
+    
+        Convenience function.  Connect to *address* (a 2-tuple ``(host,
+        port)``) and return the socket object.  Passing the optional
+        *timeout* parameter will set the timeout on the socket instance
+        before attempting to connect.  If no *timeout* is supplied, the
+        global default timeout setting returned by :func:`getdefaulttimeout`
+        is used.  If *source_address* is set it must be a tuple of (host, port)
+        for the socket to bind as a source address before making the connection.
+        A host of '' or port 0 tells the OS to use the default. When a connection
+        cannot be created, raises the last error if *all_errors* is False,
+        and an ExceptionGroup of all errors if *all_errors* is True.
+        """
+    
+        host, port = address
+        exceptions = []
+        for res in getaddrinfo(host, port, 0, SOCK_STREAM):
+            af, socktype, proto, canonname, sa = res
+            sock = None
+            try:
+                sock = socket(af, socktype, proto)
+                if timeout is not _GLOBAL_DEFAULT_TIMEOUT:
+                    sock.settimeout(timeout)
+                if source_address:
+                    sock.bind(source_address)
+>               sock.connect(sa)
+E               ConnectionRefusedError: [WinError 10061] No connection could be made because the target machine actively refused it
+
+C:\Python313\Lib\socket.py:853: ConnectionRefusedError
+
+During handling of the above exception, another exception occurred:
+
+url = 'http://localhost:3002/v1/auth/login', method = 'POST', body = {}
+headers = None, follow_redirects = True
+
+    def request_status(
+        url: str,
+        method: str = "GET",
+        body: dict | None = None,
+        headers: dict[str, str] | None = None,
+        follow_redirects: bool = True,
+    ) -> tuple[int, bytes]:
+        encoded_body = json.dumps(body).encode("utf-8") if body is not None else None
+        request_headers = {"Content-Type": "application/json", **(headers or {})}
+        request = Request(
+            url,
+            data=encoded_body,
+            method=method,
+            headers=request_headers,
+        )
+        try:
+            if follow_redirects:
+>               response_context = urlopen(request, timeout=15)
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+frontend\tests\test_learning_journey.py:225: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Python313\Lib\urllib\request.py:189: in urlopen
+    return opener.open(url, data, timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Python313\Lib\urllib\request.py:489: in open
+    response = self._open(req, data)
+               ^^^^^^^^^^^^^^^^^^^^^
+C:\Python313\Lib\urllib\request.py:506: in _open
+    result = self._call_chain(self.handle_open, protocol, protocol +
+C:\Python313\Lib\urllib\request.py:466: in _call_chain
+    result = func(*args)
+             ^^^^^^^^^^^
+C:\Python313\Lib\urllib\request.py:1348: in http_open
+    return self.do_open(http.client.HTTPConnection, req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <urllib.request.HTTPHandler object at 0x0000017125F6CAD0>
+http_class = <class 'http.client.HTTPConnection'>
+req = <urllib.request.Request object at 0x0000017125F75310>, http_conn_args = {}
+host = 'localhost:3002'
+h = <http.client.HTTPConnection object at 0x0000017125F756D0>
+headers = {'Connection': 'close', 'Content-Length': '2', 'Content-Type': 'application/json', 'Host': 'localhost:3002', ...}
+
+    def do_open(self, http_class, req, **http_conn_args):
+        """Return an HTTPResponse object for the request, using http_class.
+    
+        http_class must implement the HTTPConnection API from http.client.
+        """
+        host = req.host
+        if not host:
+            raise URLError('no host given')
+    
+        # will parse host:port
+        h = http_class(host, timeout=req.timeout, **http_conn_args)
+        h.set_debuglevel(self._debuglevel)
+    
+        headers = dict(req.unredirected_hdrs)
+        headers.update({k: v for k, v in req.headers.items()
+                        if k not in headers})
+    
+        # TODO(jhylton): Should this be redesigned to handle
+        # persistent connections?
+    
+        # We want to make an HTTP/1.1 request, but the addinfourl
+        # class isn't prepared to deal with a persistent connection.
+        # It will try to read all remaining data from the socket,
+        # which will block while the server waits for the next request.
+        # So make sure the connection gets closed after the (only)
+        # request.
+        headers["Connection"] = "close"
+        headers = {name.title(): val for name, val in headers.items()}
+    
+        if req._tunnel_host:
+            tunnel_headers = {}
+            proxy_auth_hdr = "Proxy-Authorization"
+            if proxy_auth_hdr in headers:
+                tunnel_headers[proxy_auth_hdr] = headers[proxy_auth_hdr]
+                # Proxy-Authorization should not be sent to origin
+                # server.
+                del headers[proxy_auth_hdr]
+            h.set_tunnel(req._tunnel_host, headers=tunnel_headers)
+    
+        try:
+            try:
+                h.request(req.get_method(), req.selector, req.data, headers,
+                          encode_chunked=req.has_header('Transfer-encoding'))
+            except OSError as err: # timeout error
+>               raise URLError(err)
+E               urllib.error.URLError: <urlopen error [WinError 10061] No connection could be made because the target machine actively refused it>
+
+C:\Python313\Lib\urllib\request.py:1322: URLError
+
+During handling of the above exception, another exception occurred:
+
+    def test_backend_auth_and_learning_routes_are_present_and_protected():
+        base_url = configured_backend_base_url()
+    
+>       login_status, _ = request_status(
+            f"{base_url}/auth/login", method="POST", body={}
+        )
+
+frontend\tests\test_learning_journey.py:298: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+url = 'http://localhost:3002/v1/auth/login', method = 'POST', body = {}
+headers = None, follow_redirects = True
+
+    def request_status(
+        url: str,
+        method: str = "GET",
+        body: dict | None = None,
+        headers: dict[str, str] | None = None,
+        follow_redirects: bool = True,
+    ) -> tuple[int, bytes]:
+        encoded_body = json.dumps(body).encode("utf-8") if body is not None else None
+        request_headers = {"Content-Type": "application/json", **(headers or {})}
+        request = Request(
+            url,
+            data=encoded_body,
+            method=method,
+            headers=request_headers,
+        )
+        try:
+            if follow_redirects:
+                response_context = urlopen(request, timeout=15)
+            else:
+                class NoRedirectHandler(HTTPRedirectHandler):
+                    def redirect_request(self, req, fp, code, msg, response_headers, new_url):
+                        return None
+    
+                response_context = build_opener(NoRedirectHandler).open(request, timeout=15)
+            with response_context as response:
+                return response.status, response.read()
+        except HTTPError as response:
+            return response.code, response.read()
+        except TimeoutError as error:
+            pytest.fail(f"Timed out requesting {url}: {error}")
+        except URLError as error:
+>           pytest.fail(f"Live service is unavailable at {url}: {error.reason}")
+E           Failed: Live service is unavailable at http://localhost:3002/v1/auth/login: [WinError 10061] No connection could be made because the target machine actively refused it
+
+frontend\tests\test_learning_journey.py:239: Failed
+_________________________ test_analytics_grpc_health __________________________
+
+    def test_analytics_grpc_health():
+        import grpc
+        import sys
+    
+        sys.path.insert(0, str(BACKEND_ROOT / "tests"))
+        import grpc_utils
+    
+        grpc_utils._load_stubs()
+        target = configured_service_url(
+            "ANALYTICS_GRPC_URL",
+            "RUST_ANALYTICS_GRPC_URL",
+            "ANALYTICS_GRPC_TARGET",
+            default="localhost:50051",
+        )
+        channel = grpc.insecure_channel(target)
+        try:
+>           response = grpc_utils.AnalyticsServiceStub(channel).GetHealth(
+                grpc_utils.HealthRequest(), metadata=analytics_grpc_metadata(), timeout=5
+            )
+
+frontend\tests\test_learning_journey.py:402: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+..\AppData\Roaming\Python\Python313\site-packages\grpc\_channel.py:1166: in __call__
+    return _end_unary_response_blocking(state, call, False, None)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+state = <grpc._channel._RPCState object at 0x000001712775A3C0>
+call = <grpc._cython.cygrpc.SegregatedCall object at 0x0000017125F88C80>
+with_call = False, deadline = None
+
+    def _end_unary_response_blocking(
+        state: _RPCState,
+        call: cygrpc.SegregatedCall,
+        with_call: bool,
+        deadline: Optional[float],
+    ) -> Union[ResponseType, Tuple[ResponseType, grpc.Call]]:
+        if state.code is grpc.StatusCode.OK:
+            if with_call:
+                rendezvous = _MultiThreadedRendezvous(state, call, None, deadline)
+                return state.response, rendezvous
+            return state.response
+>       raise _InactiveRpcError(state)  # pytype: disable=not-instantiable
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       grpc._channel._InactiveRpcError: <_InactiveRpcError of RPC that terminated with:
+E       	status = StatusCode.DEADLINE_EXCEEDED
+E       	details = "Deadline Exceeded"
+E       	debug_error_string = "UNKNOWN:Error received from peer  {grpc_message:"Deadline Exceeded", grpc_status:4}"
+E       >
+
+..\AppData\Roaming\Python\Python313\site-packages\grpc\_channel.py:996: _InactiveRpcError
+
+During handling of the above exception, another exception occurred:
+
+    def test_analytics_grpc_health():
+        import grpc
+        import sys
+    
+        sys.path.insert(0, str(BACKEND_ROOT / "tests"))
+        import grpc_utils
+    
+        grpc_utils._load_stubs()
+        target = configured_service_url(
+            "ANALYTICS_GRPC_URL",
+            "RUST_ANALYTICS_GRPC_URL",
+            "ANALYTICS_GRPC_TARGET",
+            default="localhost:50051",
+        )
+        channel = grpc.insecure_channel(target)
+        try:
+            response = grpc_utils.AnalyticsServiceStub(channel).GetHealth(
+                grpc_utils.HealthRequest(), metadata=analytics_grpc_metadata(), timeout=5
+            )
+        except grpc.RpcError as error:
+>           pytest.fail(f"Analytics gRPC GetHealth failed: {error.code().name}")
+E           Failed: Analytics gRPC GetHealth failed: DEADLINE_EXCEEDED
+
+frontend\tests\test_learning_journey.py:406: Failed
+_____________________ test_analytics_grpc_recommendations _____________________
+
+    def test_analytics_grpc_recommendations():
+        import grpc
+        import sys
+    
+        sys.path.insert(0, str(BACKEND_ROOT / "tests"))
+        import analytics_pb2
+        import grpc_utils
+    
+        grpc_utils._load_stubs()
+        target = configured_service_url(
+            "ANALYTICS_GRPC_URL",
+            "RUST_ANALYTICS_GRPC_URL",
+            "ANALYTICS_GRPC_TARGET",
+            default="localhost:50051",
+        )
+        channel = grpc.insecure_channel(target)
+        try:
+>           response = grpc_utils.AnalyticsServiceStub(channel).GetRecommendations(
+                analytics_pb2.GetRecommendationsRequest(
+                    user_id=f"frontend-smoke-{uuid.uuid4().hex}"
+                ),
+                metadata=analytics_grpc_metadata(),
+                timeout=10,
+            )
+
+frontend\tests\test_learning_journey.py:430: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+..\AppData\Roaming\Python\Python313\site-packages\grpc\_channel.py:1166: in __call__
+    return _end_unary_response_blocking(state, call, False, None)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+state = <grpc._channel._RPCState object at 0x000001712774F110>
+call = <grpc._cython.cygrpc.SegregatedCall object at 0x0000017125F60200>
+with_call = False, deadline = None
+
+    def _end_unary_response_blocking(
+        state: _RPCState,
+        call: cygrpc.SegregatedCall,
+        with_call: bool,
+        deadline: Optional[float],
+    ) -> Union[ResponseType, Tuple[ResponseType, grpc.Call]]:
+        if state.code is grpc.StatusCode.OK:
+            if with_call:
+                rendezvous = _MultiThreadedRendezvous(state, call, None, deadline)
+                return state.response, rendezvous
+            return state.response
+>       raise _InactiveRpcError(state)  # pytype: disable=not-instantiable
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       grpc._channel._InactiveRpcError: <_InactiveRpcError of RPC that terminated with:
+E       	status = StatusCode.DEADLINE_EXCEEDED
+E       	details = "Deadline Exceeded"
+E       	debug_error_string = "UNKNOWN:Error received from peer  {grpc_status:4, grpc_message:"Deadline Exceeded"}"
+E       >
+
+..\AppData\Roaming\Python\Python313\site-packages\grpc\_channel.py:996: _InactiveRpcError
+
+During handling of the above exception, another exception occurred:
+
+    def test_analytics_grpc_recommendations():
+        import grpc
+        import sys
+    
+        sys.path.insert(0, str(BACKEND_ROOT / "tests"))
+        import analytics_pb2
+        import grpc_utils
+    
+        grpc_utils._load_stubs()
+        target = configured_service_url(
+            "ANALYTICS_GRPC_URL",
+            "RUST_ANALYTICS_GRPC_URL",
+            "ANALYTICS_GRPC_TARGET",
+            default="localhost:50051",
+        )
+        channel = grpc.insecure_channel(target)
+        try:
+            response = grpc_utils.AnalyticsServiceStub(channel).GetRecommendations(
+                analytics_pb2.GetRecommendationsRequest(
+                    user_id=f"frontend-smoke-{uuid.uuid4().hex}"
+                ),
+                metadata=analytics_grpc_metadata(),
+                timeout=10,
+            )
+        except grpc.RpcError as error:
+>           pytest.fail(f"Analytics gRPC GetRecommendations failed: {error.code().name}: {error.details()}")
+E           Failed: Analytics gRPC GetRecommendations failed: DEADLINE_EXCEEDED: Deadline Exceeded
+
+frontend\tests\test_learning_journey.py:438: Failed
+_ test_analytics_grpc_learning_summary_uses_submitted_data_without_db_writes __
+
+    def test_analytics_grpc_learning_summary_uses_submitted_data_without_db_writes():
+        import grpc
+        import sys
+    
+        sys.path.insert(0, str(BACKEND_ROOT / "tests"))
+        import analytics_pb2
+        import grpc_utils
+    
+        grpc_utils._load_stubs()
+        target = configured_service_url(
+            "ANALYTICS_GRPC_URL",
+            "RUST_ANALYTICS_GRPC_URL",
+            "ANALYTICS_GRPC_TARGET",
+            default="localhost:50051",
+        )
+        channel = grpc.insecure_channel(target)
+        stub = grpc_utils.AnalyticsServiceStub(channel)
+        user_id = "pytest-read-only-analytics"
+        metadata = analytics_grpc_metadata()
+    
+        try:
+>           response = stub.GetUserLearningSummary(
+                analytics_pb2.GetUserLearningSummaryRequest(
+                    user_id=user_id,
+                    study_sessions=[
+                        analytics_pb2.StudySession(
+                            user_id=user_id,
+                            duration=30,
+                            topic="pytest",
+                            score=80,
+                        )
+                    ],
+                    quiz_attempts=[
+                        analytics_pb2.QuizAttempt(
+                            user_id=user_id,
+                            percentage=90,
+                            category="pytest",
+                        )
+                    ],
+                ),
+                timeout=5,
+                metadata=metadata,
+            )
+
+frontend\tests\test_learning_journey.py:467: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+..\AppData\Roaming\Python\Python313\site-packages\grpc\_channel.py:1166: in __call__
+    return _end_unary_response_blocking(state, call, False, None)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+state = <grpc._channel._RPCState object at 0x000001712731BCE0>
+call = <grpc._cython.cygrpc.SegregatedCall object at 0x000001712786F640>
+with_call = False, deadline = None
+
+    def _end_unary_response_blocking(
+        state: _RPCState,
+        call: cygrpc.SegregatedCall,
+        with_call: bool,
+        deadline: Optional[float],
+    ) -> Union[ResponseType, Tuple[ResponseType, grpc.Call]]:
+        if state.code is grpc.StatusCode.OK:
+            if with_call:
+                rendezvous = _MultiThreadedRendezvous(state, call, None, deadline)
+                return state.response, rendezvous
+            return state.response
+>       raise _InactiveRpcError(state)  # pytype: disable=not-instantiable
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       grpc._channel._InactiveRpcError: <_InactiveRpcError of RPC that terminated with:
+E       	status = StatusCode.DEADLINE_EXCEEDED
+E       	details = "Deadline Exceeded"
+E       	debug_error_string = "UNKNOWN:Error received from peer  {grpc_status:4, grpc_message:"Deadline Exceeded"}"
+E       >
+
+..\AppData\Roaming\Python\Python313\site-packages\grpc\_channel.py:996: _InactiveRpcError
+=========================== short test summary info ===========================
+FAILED frontend/tests/test_learning_journey.py::test_new_learner_has_course_discovery_and_learning_path_entry_points
+FAILED frontend/tests/test_learning_journey.py::test_real_quiz_questions_are_loaded_from_unit_or_topic_endpoint_without_answer_keys
+FAILED frontend/tests/test_learning_journey.py::test_quiz_submission_accepts_quiz_ids_and_resolves_published_unit_quizzes
+FAILED frontend/tests/test_learning_journey.py::test_quiz_completion_records_activity_and_calls_analytics
+FAILED frontend/tests/test_learning_journey.py::test_material_progress_and_streak_share_user_activity_dates
+FAILED frontend/tests/test_learning_journey.py::test_registration_and_profile_setup_routes_render_or_require_authentication
+FAILED frontend/tests/test_learning_journey.py::test_backend_auth_and_learning_routes_are_present_and_protected
+FAILED frontend/tests/test_learning_journey.py::test_analytics_grpc_health - ...
+FAILED frontend/tests/test_learning_journey.py::test_analytics_grpc_recommendations
+FAILED frontend/tests/test_learning_journey.py::test_analytics_grpc_learning_summary_uses_submitted_data_without_db_writes
+ERROR frontend/tests/test_learning_journey.py::test_authenticated_frontend_analytics_requests_reach_backend_and_rust
+ERROR frontend/tests/test_learning_journey.py::test_frontend_course_requests_reach_backend
+ERROR frontend/tests/test_learning_journey.py::test_frontend_material_requests_reach_backend
+ERROR frontend/tests/test_learning_journey.py::test_frontend_learning_requests_reach_backend_and_rust
+10 failed, 5 passed, 4 errors in 40.28s

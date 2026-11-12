@@ -52,13 +52,12 @@ export class IntegrationHealthService {
 
       // Check 2: Rust gRPC Connection (via AI Analytics)
       try {
-        // Try to get recommendations - this tests Rust connectivity
-        if (userId) {
-          const testRec = await this.aiAnalyticsService.getRecommendationsAI(userId);
-          status.rustGrpcConnection = Array.isArray(testRec);
-        } else {
-          // Just verify service is available
-          status.rustGrpcConnection = !!this.aiAnalyticsService;
+        const health = await this.aiAnalyticsService.checkRustAnalyticsHealth();
+        status.rustGrpcConnection = health.status === 'ok';
+        if (!status.rustGrpcConnection) {
+          status.errors.push(
+            `Rust gRPC health check returned status: ${health.status || 'empty'}`,
+          );
         }
       } catch (err) {
         status.errors.push(`Rust gRPC error: ${getErrorMessage(err)}`);

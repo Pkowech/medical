@@ -103,30 +103,6 @@ pub async fn get_user_courses(
         .collect())
 }
 
-/// Update course progress percentage
-///
-/// # Arguments
-/// * `pool` - Database connection pool
-/// * `course_progress_id` - Course progress record ID
-/// * `progress_percentage` - New progress percentage (0-100)
-pub async fn update_course_progress(
-    pool: &Pool<Postgres>,
-    course_progress_id: &str,
-    progress_percentage: i32,
-) -> Result<u64, sqlx::Error> {
-    let result = sqlx::query(
-        "UPDATE course_enrollments
-            SET progress_percentage = $1
-            WHERE id = $2",
-    )
-    .bind(progress_percentage)
-    .bind(course_progress_id)
-    .execute(pool)
-    .await?;
-
-    Ok(result.rows_affected())
-}
-
 /// Fetch user's recent study activity
 ///
 /// # Arguments

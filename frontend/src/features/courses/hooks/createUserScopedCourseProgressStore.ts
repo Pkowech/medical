@@ -51,6 +51,32 @@ export function createUserScopedCourseProgressStore(storageName: string) {
           persist(stateCreator, {
             name: `${storageName}:${encodeURIComponent(userId)}`,
             version: 1,
+            migrate: (persistedState: unknown) => {
+              if (!persistedState || typeof persistedState !== 'object') {
+                return {
+                  progress: {},
+                  bookmarks: [],
+                  notes: {},
+                } as CourseProgressState;
+              }
+
+              const state = persistedState as Partial<CourseProgressState>;
+              return {
+                ...state,
+                progress: state.progress && typeof state.progress === 'object' ? state.progress : {},
+                bookmarks: Array.isArray(state.bookmarks)
+                  ? state.bookmarks.filter(
+                      (bookmark): bookmark is string => typeof bookmark === 'string',
+                    )
+                  : [],
+                notes: state.notes && typeof state.notes === 'object' ? state.notes : {},
+              } as CourseProgressState;
+            },
+            partialize: state => ({
+              progress: state.progress,
+              bookmarks: state.bookmarks,
+              notes: state.notes,
+            }),
           }),
         )
       : createStore<CourseProgressState>()(stateCreator);

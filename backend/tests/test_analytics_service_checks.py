@@ -56,12 +56,79 @@ def test_rust_analytics_grpc_metrics_refresh():
 
 
 @pytest.mark.integration
+@pytest.mark.grpc
+def test_rust_analytics_grpc_health_reports_ready():
+    target = _rust_grpc_target()
+    api_key = _required_env("RUST_ANALYTICS_API_KEY")
+    grpc = pytest.importorskip("grpc")
+    try:
+        import analytics_pb2
+        import analytics_pb2_grpc
+    except (ImportError, RuntimeError) as error:
+        pytest.skip(f"Generated gRPC helpers are unavailable: {error}")
+
+    channel = grpc.insecure_channel(target)
+    try:
+        stub = analytics_pb2_grpc.AnalyticsServiceStub(channel)
+        response = stub.GetHealth(
+            analytics_pb2.HealthRequest(),
+            metadata=(("x-api-key", api_key),),
+            timeout=5,
+        )
+        assert response.status == "ok"
+        assert response.timestamp
+    finally:
+        channel.close()
+
+
+@pytest.mark.integration
+@pytest.mark.grpc
+def test_rust_analytics_cannot_update_authoritative_quiz_attempts():
+    target = _rust_grpc_target()
+    api_key = _required_env("RUST_ANALYTICS_API_KEY")
+    grpc = pytest.importorskip("grpc")
+    try:
+        import analytics_pb2
+        import analytics_pb2_grpc
+    except (ImportError, RuntimeError) as error:
+        pytest.skip(f"Generated gRPC helpers are unavailable: {error}")
+
+    channel = grpc.insecure_channel(target)
+    try:
+        stub = analytics_pb2_grpc.AnalyticsServiceStub(channel)
+        with pytest.raises(grpc.RpcError) as error:
+            stub.UpdateAttemptMetrics(
+                analytics_pb2.AttemptMetricsRequest(
+                    attempt_id="attempt-1",
+                    user_id="user-1",
+                    correct=True,
+                    skill_id="topic-1",
+                    score=100,
+                ),
+                metadata=(("x-api-key", api_key),),
+                timeout=5,
+            )
+        assert error.value.code() == grpc.StatusCode.FAILED_PRECONDITION
+    finally:
+        channel.close()
+
+
+@pytest.mark.integration
 @pytest.mark.http
 def test_rust_analytics_health_endpoint():
     base_url = _required_env("RUST_ANALYTICS_URL").rstrip("/") + "/"
     response = _http_get(urljoin(base_url, "health"))
     assert response.status_code == 200
     assert response.json().get("status") == "ok"
+
+
+@pytest.mark.integration
+@pytest.mark.http
+def test_rust_analytics_readiness_endpoint():
+    base_url = _required_env("RUST_ANALYTICS_URL").rstrip("/") + "/"
+    response = _http_get(urljoin(base_url, "ready"))
+    assert response.status_code == 200
+    assert response.json().get("status") == "ready"
 
 
 @pytest.mark.integration

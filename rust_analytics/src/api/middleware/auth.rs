@@ -93,7 +93,7 @@ where
         let path = req.path().to_string();
 
         // Allow unauthenticated health checks
-        if path == "/health" {
+        if path == "/health" || path == "/ready" {
             let fut = self.service.call(req);
             return Box::pin(async move { fut.await.map(|res| res.map_into_left_body()) });
         }

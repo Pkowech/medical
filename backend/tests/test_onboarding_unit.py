@@ -110,26 +110,28 @@ const examPath = {
 };
 
 let query;
+let profile = {
+  healthcareField: 'pharmacy',
+  specialization: 'Clinical Pharmacy',
+  careerStage: 'student',
+  preferences: {},
+};
 let candidates = [fieldPath, specialtyPath];
 const service = new OnboardingService(
   {
+    user: { findUnique: async () => profile },
     learningPath: {
       findMany: async args => {
         query = args;
         return candidates;
       },
     },
+    learningPathProgress: { findMany: async () => [] },
   },
-  {},
 );
 
 (async () => {
-  const specialtyFirst = await service.getSuggestedStarterPaths(
-    'pharmacy',
-    'Clinical Pharmacy',
-    4,
-    'student',
-  );
+  const specialtyFirst = await service.getSuggestedStarterPaths('user-1', 4);
   assert.deepEqual(
     specialtyFirst.map(path => path.id),
     ['specialty-path', 'field-path'],
@@ -138,13 +140,8 @@ const service = new OnboardingService(
   assert.deepEqual(query.where.targetCareerStages, { has: 'student' });
 
   candidates = [specialtyPath, examPath];
-  const examFirst = await service.getSuggestedStarterPaths(
-    'pharmacy',
-    'Clinical Pharmacy',
-    4,
-    'student',
-    'Board Exam',
-  );
+  profile = { ...profile, preferences: { targetExam: 'Board Exam' } };
+  const examFirst = await service.getSuggestedStarterPaths('user-1', 4);
   assert.deepEqual(
     examFirst.map(path => path.id),
     ['exam-path', 'specialty-path'],
@@ -167,23 +164,26 @@ const { OnboardingService } =
 let queryCount = 0;
 const service = new OnboardingService(
   {
+    user: {
+      findUnique: async () => ({
+        healthcareField: 'physiotherapy',
+        specialization: null,
+        careerStage: 'professional',
+        preferences: {},
+      }),
+    },
     learningPath: {
       findMany: async () => {
         queryCount++;
         return [];
       },
     },
+    learningPathProgress: { findMany: async () => [] },
   },
-  {},
 );
 
 (async () => {
-  const paths = await service.getSuggestedStarterPaths(
-    'physiotherapy',
-    undefined,
-    4,
-    'professional',
-  );
+  const paths = await service.getSuggestedStarterPaths('user-1', 4);
   assert.deepEqual(paths, []);
   assert.equal(queryCount, 1);
 })().catch(error => {
@@ -426,6 +426,52 @@ const service = new LearningPathProgressService(
     )
 
 
+def test_learning_path_enrollment_is_idempotent_and_rechecks_eligibility():
+    run_typescript(
+        r"""
+const assert = require('node:assert/strict');
+const { LearningPathProgressService } =
+  require('./src/modules/education/courses/services/learning-path-progress.service.ts');
+
+const existingProgress = { id: 'progress-1' };
+let eligibilityChecks = 0;
+const service = new LearningPathProgressService(
+  {
+    user: { findUnique: async () => ({ id: 'user-1', careerStage: 'student' }) },
+    learningPath: {
+      findUnique: async () => ({
+        id: 'path-1',
+        status: 'published',
+        targetCareerStages: ['student'],
+      }),
+    },
+    learningPathProgress: {
+      findUnique: async () => existingProgress,
+      create: async () => {
+        throw new Error('Existing enrollment must not create progress again');
+      },
+    },
+  },
+  {},
+  {
+    assertEligible: () => { eligibilityChecks++; },
+  },
+);
+
+(async () => {
+  const first = await service.startLearningPath('user-1', { learningPathId: 'path-1' });
+  const second = await service.startLearningPath('user-1', { learningPathId: 'path-1' });
+  assert.equal(first, existingProgress);
+  assert.equal(second, existingProgress);
+  assert.equal(eligibilityChecks, 2);
+})().catch(error => {
+  console.error(error);
+  process.exitCode = 1;
+});
+"""
+    )
+
+
 def test_published_paths_require_target_career_stages():
     run_typescript(
         r"""
@@ -542,6 +588,7 @@ const prisma = {
     }),
   },
   learningPath: { findMany: async () => [] },
+  learningPathProgress: { findMany: async () => [] },
 };
 const service = new OnboardingService(prisma);
 

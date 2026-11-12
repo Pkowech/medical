@@ -482,15 +482,6 @@ export class LearningPathsService {
         throw new BadRequestException('Learning path is not available for enrollment');
       }
 
-      const existingProgress = await this.prisma.learningPathProgress.findUnique({
-        where: { userId_learningPathId: { userId, learningPathId: pathId } },
-      });
-
-      if (existingProgress) {
-        this.logger.warn(`User ${userId} already enrolled in learning path ${pathId}`);
-        return;
-      }
-
       await this.learningPathProgressService.startLearningPath(userId, {
         learningPathId: pathId,
       });
@@ -994,7 +985,22 @@ export class LearningPathsService {
    * Get trending learning paths across the system
    * Uses learning-analytics service for system-wide insights
    */
-  async getTrendingPaths(limit: number = 5): Promise<LearningPath[]> {
+  async getTrendingPaths(limit: number = 5, userId?: string): Promise<LearningPath[]> {
+    const user = userId
+      ? await this.prisma.user.findUnique({
+          where: { id: userId },
+          select: { careerStage: true },
+        })
+      : null;
+    const careerStage = normalizeCareerStage(user?.careerStage);
+    if (!careerStage) {
+      return [];
+    }
+    const eligibilityFilter: Prisma.LearningPathWhereInput = {
+      status: LearningPathStatus.published,
+      targetCareerStages: { has: careerStage },
+    };
+
     try {
       // Get trending paths from analytics service (system-wide)
       const trendingInfo =
@@ -1003,7 +1009,7 @@ export class LearningPathsService {
       if (trendingInfo.length === 0) {
         // Fallback to recently published paths
         return await this.prisma.learningPath.findMany({
-          where: { status: 'published' },
+          where: eligibilityFilter,
           include: { _count: { select: { progress: true } } },
           orderBy: { createdAt: 'desc' },
           take: limit,
@@ -1011,19 +1017,33 @@ export class LearningPathsService {
       }
 
       const pathIds = trendingInfo.map((t) => t.path_id);
-      return await this.prisma.learningPath.findMany({
+      const paths = await this.prisma.learningPath.findMany({
         where: {
           id: { in: pathIds },
-          status: 'published',
+          ...eligibilityFilter,
         },
         include: { _count: { select: { progress: true } } },
-        take: limit,
       });
+      const pathsById = new Map(paths.map((path) => [path.id, path]));
+      return pathIds
+        .flatMap((pathId) => {
+          const path = pathsById.get(pathId);
+          return (
+            path &&
+            this.learningPathEligibilityService.evaluate(path, { careerStage })
+              .eligible
+          )
+            ? [path]
+            : [];
+        })
+        .slice(0, limit);
     } catch (error) {
       this.logger.warn('Error getting trending paths:', error);
-      // Graceful fallback to recently published paths
       return await this.prisma.learningPath.findMany({
-        where: { status: 'published' },
+        where: {
+          status: LearningPathStatus.published,
+          targetCareerStages: { has: careerStage },
+        },
         include: { _count: { select: { progress: true } } },
         orderBy: { createdAt: 'desc' },
         take: limit,
