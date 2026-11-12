@@ -75,6 +75,14 @@ function positiveInteger(value: unknown, label: string): number {
   return Number(value);
 }
 
+function requiredSlug(value: unknown, label: string): string {
+  const slug = requiredString(value, label, 255);
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
+    throw new Error(`${label} must be a lowercase, hyphen-separated stable slug.`);
+  }
+  return slug;
+}
+
 function unique(values: string[], label: string): void {
   if (new Set(values).size !== values.length) {
     throw new Error(`${label} values must be unique within their parent.`);
@@ -84,6 +92,9 @@ function unique(values: string[], label: string): void {
 export function validateCatalogue(value: unknown): CatalogueImport {
   if (!isRecord(value) || value.schemaVersion !== 1 || !Array.isArray(value.courses)) {
     throw new Error('Catalogue must use schemaVersion 1 and contain a courses array.');
+  }
+  if (value.courses.length === 0) {
+    throw new Error('Catalogue must contain at least one course.');
   }
 
   const courses = value.courses.map((courseValue, courseIndex) => {
@@ -109,7 +120,7 @@ export function validateCatalogue(value: unknown): CatalogueImport {
           throw new Error(`${topicLabel} must be an object.`);
         }
         return {
-          slug: requiredString(topicValue.slug, `${topicLabel}.slug`, 255),
+          slug: requiredSlug(topicValue.slug, `${topicLabel}.slug`),
           name: requiredString(topicValue.name, `${topicLabel}.name`),
           description: requiredString(
             topicValue.description,
@@ -124,10 +135,13 @@ export function validateCatalogue(value: unknown): CatalogueImport {
         };
       });
 
+      if (topics.length === 0) {
+        throw new Error(`${unitLabel} must contain at least one topic.`);
+      }
       unique(topics.map(({ slug }) => slug), `${unitLabel}.topics.slug`);
       unique(topics.map(({ order }) => String(order)), `${unitLabel}.topics.order`);
       return {
-        slug: requiredString(unitValue.slug, `${unitLabel}.slug`, 255),
+        slug: requiredSlug(unitValue.slug, `${unitLabel}.slug`),
         name: requiredString(unitValue.name, `${unitLabel}.name`),
         title: requiredString(unitValue.title, `${unitLabel}.title`),
         description: requiredString(
@@ -144,6 +158,9 @@ export function validateCatalogue(value: unknown): CatalogueImport {
       };
     });
 
+    if (units.length === 0) {
+      throw new Error(`${label} must contain at least one unit.`);
+    }
     unique(units.map(({ slug }) => slug), `${label}.units.slug`);
     unique(units.map(({ order }) => String(order)), `${label}.units.order`);
     return {

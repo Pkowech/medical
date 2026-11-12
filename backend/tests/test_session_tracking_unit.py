@@ -123,3 +123,36 @@ service.auditLogService = { log: async () => undefined };
 });
 """
     )
+
+
+def test_revoke_all_refresh_tokens_works_without_a_redis_client_handle():
+    run_typescript(
+        r"""
+const assert = require('node:assert/strict');
+const { RefreshTokenService } =
+  require('./src/modules/auth/services/refresh-token.service.ts');
+
+const deleted = [];
+const service = Object.create(RefreshTokenService.prototype);
+service.userTokensPrefix = 'user_tokens:';
+service.redisService = {
+  getSetMembers: async key => {
+    assert.equal(key, 'user_tokens:user-1');
+    return ['refresh_token:first', 'refresh_token:second'];
+  },
+  del: async key => { deleted.push(key); },
+};
+
+(async () => {
+  await service.revokeAllUserTokens('user-1');
+  assert.deepEqual(deleted.sort(), [
+    'refresh_token:first',
+    'refresh_token:second',
+    'user_tokens:user-1',
+  ]);
+})().catch(error => {
+  console.error(error);
+  process.exitCode = 1;
+});
+"""
+    )

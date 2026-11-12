@@ -115,6 +115,7 @@ process.env.NODE_ENV = 'production';
 for (const seedPath of [
   './prisma/seeds/seed.ts',
   './prisma/seeds/courses.seed.ts',
+  './prisma/seeds/learning-paths.seed.ts',
   './prisma/seeds/seed_roles.ts',
 ]) {
   assert.throws(

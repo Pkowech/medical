@@ -153,13 +153,7 @@ export class RefreshTokenService {
       const userTokensKey = `${this.userTokensPrefix}${tokenData.userId}`;
 
       await this.redisService.del(tokenKey);
-      if (this.redisService.client) {
-        await this.redisService.client.srem(userTokensKey, tokenKey);
-      } else {
-        this.logger.warn(
-          'Redis client not available; skipping srem for user tokens',
-        );
-      }
+      await this.redisService.removeFromSet(userTokensKey, tokenKey);
 
       await this.auditLogService.log(
         securityEventTypes.tokenRevoked,
@@ -176,16 +170,8 @@ export class RefreshTokenService {
 
   async revokeAllUserTokens(userId: string): Promise<void> {
     const userTokensKey = `${this.userTokensPrefix}${userId}`;
-    if (this.redisService.client) {
-      const tokenKeys = await this.redisService.client.smembers(userTokensKey);
-      if (tokenKeys && tokenKeys.length > 0) {
-        await this.redisService.client.del(...tokenKeys);
-      }
-    } else {
-      this.logger.warn(
-        'Redis client not available; skipping revokeAllUserTokens client ops',
-      );
-    }
+    const tokenKeys = await this.redisService.getSetMembers(userTokensKey);
+    await Promise.all(tokenKeys.map((tokenKey) => this.redisService.del(tokenKey)));
     await this.redisService.del(userTokensKey);
   }
 

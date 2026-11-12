@@ -682,7 +682,12 @@ export class QuizService {
     pagination: { page?: number; limit?: number },
     filters?: { unitId?: string; topicId?: string; isPublished?: boolean },
   ) {
-    const cacheKey = `quizzes:${JSON.stringify({ pagination, filters })}`;
+    const { page = 1, limit = 10 } = pagination;
+    const normalizedPagination = { page, limit };
+    const cacheKey = `quizzes:${JSON.stringify({
+      pagination: normalizedPagination,
+      filters,
+    })}`;
     const cachedResult = await this.redisService.get(cacheKey);
     if (cachedResult) {
       try {
@@ -696,7 +701,6 @@ export class QuizService {
       }
     }
 
-    const { page = 1, limit = 10 } = pagination;
     const skip = (page - 1) * limit;
 
     const where: any = {
@@ -807,6 +811,7 @@ export class QuizService {
       where: { id },
       include: {
         questions: {
+          where: { question: { isActive: true } },
           include: { question: true },
           orderBy: { order: 'asc' },
         },

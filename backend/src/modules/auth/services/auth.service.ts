@@ -462,6 +462,14 @@ export class AuthService {
       throw new UnauthorizedException('User not found');
     }
 
+    if (!user.isActive) {
+      throw new UnauthorizedException(ErrorMessages.user.inactive);
+    }
+
+    if (user.isLocked && user.lockedUntil && user.lockedUntil > new Date()) {
+      throw new UnauthorizedException('Account is locked.');
+    }
+
     this.logger.debug(`User validated successfully: ${user.id} (${user.email})`);
 
     const primaryRole = user.userRoles.reduce(

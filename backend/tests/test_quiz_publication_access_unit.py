@@ -244,6 +244,41 @@ service.logger = { log: () => undefined, warn: () => undefined };
     )
 
 
+def test_quiz_list_cache_separates_pages_and_normalizes_defaults():
+    run_typescript(
+        r"""
+const assert = require('node:assert/strict');
+const { QuizService } =
+  require('./src/modules/education/assessment/services/quiz.service.ts');
+
+const cacheKeys = [];
+const service = Object.create(QuizService.prototype);
+service.prisma = {
+  quiz: {
+    findMany: async () => [],
+    count: async () => 0,
+  },
+};
+service.redisService = {
+  get: async key => { cacheKeys.push(key); return null; },
+  set: async () => undefined,
+};
+service.logger = { log: () => undefined, warn: () => undefined };
+
+(async () => {
+  await service.findMany({ page: 1, limit: 10 }, { isPublished: true });
+  await service.findMany({ page: 2, limit: 10 }, { isPublished: true });
+  await service.findMany({}, { isPublished: true });
+  assert.notEqual(cacheKeys[0], cacheKeys[1]);
+  assert.equal(cacheKeys[0], cacheKeys[2]);
+})().catch(error => {
+  console.error(error);
+  process.exitCode = 1;
+});
+"""
+    )
+
+
 def test_quiz_unpublish_invalidates_discovery_and_list_caches():
     run_typescript(
         r"""
@@ -436,16 +471,21 @@ const { InstructorOverrideService } =
   require('./src/modules/education/courses/services/instructor-override.service.ts');
 
 const patterns = [];
+const deletedKeys = [];
 const service = Object.create(InstructorOverrideService.prototype);
 service.prisma = {
   question: {
-    findUnique: async () => ({ unitId: 'unit-1', topicIds: ['topic-1'] }),
+    findUnique: async () => ({
+      unitId: 'unit-1',
+      topicIds: ['topic-1'],
+      quizQuestions: [{ quizId: 'quiz-1' }],
+    }),
     update: async () => undefined,
   },
   instructorOverride: { create: async () => undefined },
 };
 service.redisService = {
-  del: async () => undefined,
+  del: async key => { deletedKeys.push(key); },
   delPattern: async pattern => { patterns.push(pattern); },
 };
 service.notifyAffectedStudents = async () => undefined;
@@ -459,8 +499,45 @@ service.logger = { log: () => undefined };
   });
   assert.ok(patterns.includes('unit:*:questions:v3:*'));
   assert.ok(patterns.includes('topic:*:questions:v3:*'));
-  assert.ok(patterns.includes('quizzes:*'));
-  assert.ok(patterns.includes('quiz:*'));
+  assert.ok(deletedKeys.includes('unit_quiz:unit-1'));
+  assert.ok(deletedKeys.includes('quiz:quiz-1'));
+})().catch(error => {
+  console.error(error);
+  process.exitCode = 1;
+});
+"""
+    )
+
+
+def test_quiz_details_exclude_inactive_questions():
+    run_typescript(
+        r"""
+const assert = require('node:assert/strict');
+const { QuizService } =
+  require('./src/modules/education/assessment/services/quiz.service.ts');
+
+let query;
+const quiz = { id: 'quiz-1', questions: [] };
+const service = Object.create(QuizService.prototype);
+service.prisma = {
+  quiz: {
+    findUnique: async args => {
+      query = args;
+      return quiz;
+    },
+  },
+};
+service.redisService = {
+  get: async () => null,
+  set: async () => undefined,
+};
+service.logger = { log: () => undefined };
+
+(async () => {
+  assert.equal(await service.findById('quiz-1'), quiz);
+  assert.deepEqual(query.include.questions.where, {
+    question: { isActive: true },
+  });
 })().catch(error => {
   console.error(error);
   process.exitCode = 1;

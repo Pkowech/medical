@@ -30,7 +30,11 @@ export class InstructorOverrideService {
   async applyOverride(dto: ApplyOverrideDto): Promise<void> {
     const question = await this.prisma.question.findUnique({
       where: { id: dto.questionId },
-      select: { unitId: true, topicIds: true },
+      select: {
+        unitId: true,
+        topicIds: true,
+        quizQuestions: { select: { quizId: true } },
+      },
     });
 
     // Log the override
@@ -94,6 +98,9 @@ export class InstructorOverrideService {
         : []),
       ...(question?.topicIds ?? []).map((topicId) =>
         this.redisService.del(`topic:${topicId}:questions:v2`),
+      ),
+      ...(question?.quizQuestions ?? []).map(({ quizId }) =>
+        this.redisService.del(`quiz:${quizId}`),
       ),
     ]);
 

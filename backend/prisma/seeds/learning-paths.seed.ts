@@ -14,6 +14,12 @@ import {
 } from '@prisma/client';
 import { createSeedPrisma } from './seed-db';
 
+if (process.env.NODE_ENV === 'production') {
+  throw new Error(
+    'The demonstration learning-path seed is disabled in production. Use the reviewed catalogue import process.',
+  );
+}
+
 const { pool: _pool, prisma } = createSeedPrisma();
 
 export async function seedLearningPaths() {
