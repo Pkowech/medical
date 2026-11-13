@@ -11,6 +11,7 @@ import { CourseForm } from '@/features/courses/components/CourseForm';
 import { UnitForm } from '@/features/courses/components/UnitForm';
 import { TopicForm } from '@/features/courses/components/TopicForm';
 import { AdminCourseList } from '@/features/courses/components/AdminCourseList';
+import { InstructorLearningPathManager } from '@/features/courses/components/InstructorLearningPathManager';
 import { Button } from '@/shared/components/ui/button';
 
 type FormMode = 'none' | 'course' | 'unit' | 'topic';
@@ -43,6 +44,7 @@ export function InstructorCourseManager({ instructorId }: { instructorId: string
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [formContext, setFormContext] = useState<FormContext>({ mode: 'none' });
+  const [activeWorkspace, setActiveWorkspace] = useState<'courses' | 'paths'>('courses');
 
   const fetchCourses = async () => {
     try {
@@ -213,56 +215,99 @@ export function InstructorCourseManager({ instructorId }: { instructorId: string
       <div className="flex flex-wrap items-end justify-between gap-4 border-b border-border pb-5">
         <div>
           <p className="text-sm font-medium text-primary">Instructor workspace</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight">Course management</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Manage your courses, units, and topics.</p>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight">
+            {activeWorkspace === 'courses' ? 'Course management' : 'Learning path builder'}
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {activeWorkspace === 'courses'
+              ? 'Manage your courses, units, and topics.'
+              : 'Organize your published courses into structured learning paths.'}
+          </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => router.push('/study-planner/materials/upload')}>
-            <Upload className="mr-2 h-4 w-4" /> Upload material
-          </Button>
-          <Button onClick={() => setFormContext({ mode: 'course' })}>
-            <PlusCircle className="mr-2 h-4 w-4" /> Create course
-          </Button>
-        </div>
+        {activeWorkspace === 'courses' && (
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => router.push('/study-planner/materials/upload')}>
+              <Upload className="mr-2 h-4 w-4" /> Upload material
+            </Button>
+            <Button onClick={() => setFormContext({ mode: 'course' })}>
+              <PlusCircle className="mr-2 h-4 w-4" /> Create course
+            </Button>
+          </div>
+        )}
       </div>
 
       {successMessage && <div role="status" className="rounded-md border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">{successMessage}</div>}
       {error && <div role="alert" className="flex items-center gap-2 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"><AlertCircle className="h-4 w-4 shrink-0" />{error}</div>}
 
-      {formContext.mode === 'course' && (
-        <CourseForm course={formContext.course || null} onSave={handleSaveCourse} onCancel={() => setFormContext({ mode: 'none' })} />
-      )}
-      {formContext.mode === 'unit' && formContext.course && (
-        <UnitForm unit={formContext.unit || null} courseId={formContext.course.id} onSave={handleSaveUnit} onCancel={() => setFormContext({ mode: 'none' })} />
-      )}
-      {formContext.mode === 'topic' && formContext.unit && (
-        <TopicForm topic={formContext.topic || null} unitId={formContext.unit.id} onSave={handleSaveTopic} onCancel={() => setFormContext({ mode: 'none' })} />
-      )}
+      <div className="inline-flex rounded-xl border border-border bg-muted p-1" role="group" aria-label="Instructor workspace">
+        <button
+          type="button"
+          aria-pressed={activeWorkspace === 'courses'}
+          onClick={() => setActiveWorkspace('courses')}
+          className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+            activeWorkspace === 'courses' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          Courses
+        </button>
+        <button
+          type="button"
+          aria-pressed={activeWorkspace === 'paths'}
+          onClick={() => {
+            setActiveWorkspace('paths');
+            setFormContext({ mode: 'none' });
+          }}
+          className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+            activeWorkspace === 'paths' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          Learning paths
+        </button>
+      </div>
 
-      {formContext.mode === 'none' && (
-        <AdminCourseList
+      {activeWorkspace === 'paths' ? (
+        <InstructorLearningPathManager
+          instructorId={instructorId}
           courses={courses}
-          loadingCourseIds={loadingCourseIds}
-          onExpandCourse={loadCourseDetails}
-          onEdit={course => setFormContext({ mode: 'course', course })}
-          onDelete={handleDeleteCourse}
-          canDeleteCourse={false}
-          onAddUnit={course => setFormContext({ mode: 'unit', course })}
-          onEditUnit={(unit, courseId) => {
-            const course = courses.find(item => item.id === courseId);
-            if (course) setFormContext({ mode: 'unit', course, unit });
-          }}
-          onDeleteUnit={handleDeleteUnit}
-          onAddTopic={(unit, courseId) => {
-            const course = courses.find(item => item.id === courseId);
-            if (course) setFormContext({ mode: 'topic', course, unit });
-          }}
-          onEditTopic={(topic, unitId) => {
-            const unit = courses.flatMap(course => course.units || []).find(item => item.id === unitId);
-            if (unit) setFormContext({ mode: 'topic', unit, topic });
-          }}
-          onDeleteTopic={handleDeleteTopic}
+          onOpenCourses={() => setActiveWorkspace('courses')}
         />
+      ) : (
+        <>
+          {formContext.mode === 'course' && (
+            <CourseForm course={formContext.course || null} onSave={handleSaveCourse} onCancel={() => setFormContext({ mode: 'none' })} />
+          )}
+          {formContext.mode === 'unit' && formContext.course && (
+            <UnitForm unit={formContext.unit || null} courseId={formContext.course.id} onSave={handleSaveUnit} onCancel={() => setFormContext({ mode: 'none' })} />
+          )}
+          {formContext.mode === 'topic' && formContext.unit && (
+            <TopicForm topic={formContext.topic || null} unitId={formContext.unit.id} onSave={handleSaveTopic} onCancel={() => setFormContext({ mode: 'none' })} />
+          )}
+          {formContext.mode === 'none' && (
+            <AdminCourseList
+              courses={courses}
+              loadingCourseIds={loadingCourseIds}
+              onExpandCourse={loadCourseDetails}
+              onEdit={course => setFormContext({ mode: 'course', course })}
+              onDelete={handleDeleteCourse}
+              canDeleteCourse={false}
+              onAddUnit={course => setFormContext({ mode: 'unit', course })}
+              onEditUnit={(unit, courseId) => {
+                const course = courses.find(item => item.id === courseId);
+                if (course) setFormContext({ mode: 'unit', course, unit });
+              }}
+              onDeleteUnit={handleDeleteUnit}
+              onAddTopic={(unit, courseId) => {
+                const course = courses.find(item => item.id === courseId);
+                if (course) setFormContext({ mode: 'topic', course, unit });
+              }}
+              onEditTopic={(topic, unitId) => {
+                const unit = courses.flatMap(course => course.units || []).find(item => item.id === unitId);
+                if (unit) setFormContext({ mode: 'topic', unit, topic });
+              }}
+              onDeleteTopic={handleDeleteTopic}
+            />
+          )}
+        </>
       )}
     </div>
   );

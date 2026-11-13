@@ -45,6 +45,15 @@ const FIELD_ASSESSMENT_KEYWORDS: Record<string, string[]> = {
   allied_health: ['allied health'],
 };
 
+const getAssessmentSearchText = (assessment: Assessment): string =>
+  [
+    assessment.title,
+    assessment.description,
+    assessment.category,
+    assessment.courseTitle ?? '',
+    assessment.unitTitle ?? '',
+  ].join(' ').toLowerCase();
+
 const getPathCourseIds = (path: LearningPathProgress): string[] => {
   const courseIds = (path.learningPath.courses ?? []).flatMap(course =>
     course && typeof course.id === 'string' ? [course.id] : [],
@@ -91,7 +100,8 @@ export function AssessmentDashboard() {
   const activeCourseIds = new Set(activeCourses.map(course => course.id));
   const fieldLabel = healthcareFieldLabel(session?.user?.healthcareField);
   const specialization = session?.user?.specialization?.trim();
-  const isExplicitSearch = searchQuery.trim().length > 0;
+  const normalizedSearchQuery = searchQuery.trim().toLowerCase();
+  const isExplicitSearch = normalizedSearchQuery.length > 0;
   const fieldKeywords = [
     ...(session?.user?.healthcareField
       ? FIELD_ASSESSMENT_KEYWORDS[session.user.healthcareField.toLowerCase()] ?? []
@@ -109,13 +119,7 @@ export function AssessmentDashboard() {
     );
     if (matchingPath) return `Learning path · ${matchingPath.learningPath.title}`;
 
-    const searchableText = [
-      assessment.title,
-      assessment.description,
-      assessment.category,
-      assessment.courseTitle ?? '',
-      assessment.unitTitle ?? '',
-    ].join(' ').toLowerCase();
+    const searchableText = getAssessmentSearchText(assessment);
     if (fieldKeywords.some(keyword => searchableText.includes(keyword))) {
       return `Matches ${specialization || fieldLabel || 'your field'}`;
     }
@@ -129,13 +133,7 @@ export function AssessmentDashboard() {
     }
     if (pathCourseIds.has(assessment.courseId ?? '')) return true;
 
-    const searchableText = [
-      assessment.title,
-      assessment.description,
-      assessment.category,
-      assessment.courseTitle ?? '',
-      assessment.unitTitle ?? '',
-    ].join(' ').toLowerCase();
+    const searchableText = getAssessmentSearchText(assessment);
     return fieldKeywords.some(keyword => searchableText.includes(keyword));
   });
   const visibleAssessments = isExplicitSearch ? assessments : relevantAssessments;
@@ -144,12 +142,7 @@ export function AssessmentDashboard() {
   const filteredAssessments = visibleAssessments.filter(assessment => {
     const matchesCategory = selectedCategory === 'All' || assessment.category.toLowerCase() === selectedCategory.toLowerCase();
     const matchesType = selectedType === 'All' || assessment.type.toLowerCase() === selectedType.toLowerCase();
-    const matchesSearch =
-      assessment.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      assessment.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      assessment.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      assessment.courseTitle?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      assessment.unitTitle?.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = getAssessmentSearchText(assessment).includes(normalizedSearchQuery);
     return matchesCategory && matchesType && matchesSearch;
   });
 
