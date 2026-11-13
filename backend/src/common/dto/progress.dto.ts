@@ -24,7 +24,6 @@ import {
   Progress,
   Prisma,
   LearningPathMilestone,
-  Quiz,
 } from '@prisma/client';
 import { PathStructureDto } from '../dto/learning-paths.dto';
 import { EngagementMetrics, PerformanceMetrics, ProgressTrend } from './base';
@@ -744,7 +743,7 @@ export interface PeerProgress {
   courseId?: string;
   name?: string;
   avatar?: string | null;
-  progress: number | { percent: number; lastActive: Date | null | any };
+  progress: number | { percent: number; lastActive: Date | null };
   lastUpdated?: Date | bigint;
   metadata?: Record<string, any>;
 }
