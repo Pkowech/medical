@@ -61,6 +61,7 @@ export interface CourseEnrollment {
   id: string;
   userId: string;
   courseId: string;
+  course?: Course;
   status: 'active' | 'completed' | 'paused' | 'dropped';
   enrolledAt: string;
   completedAt?: string;

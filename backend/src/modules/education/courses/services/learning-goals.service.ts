@@ -520,6 +520,7 @@ export class LearningGoalsService {
         data: {
           title: updateDto.title,
           description: updateDto.description,
+          type: updateDto.type,
           category: updateDto.category,
           priority: updateDto.priority
             ? this.mapPriorityToNumber(updateDto.priority)
@@ -542,6 +543,8 @@ export class LearningGoalsService {
             milestones: updateDto.milestones,
             targetCriteria: updateDto.targetCriteria,
             progressTracking: updateDto.progressTracking,
+            smartCriteria: updateDto.smartCriteria,
+            reminderSettings: updateDto.reminderSettings,
           },
         },
         include: {

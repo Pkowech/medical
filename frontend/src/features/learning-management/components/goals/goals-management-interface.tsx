@@ -70,6 +70,7 @@ export const GoalsManagementInterface: React.FC = () => {
   });
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [recommendationToAccept, setRecommendationToAccept] = useState<Partial<LearningGoal> | null>(null);
+  const [goalToEdit, setGoalToEdit] = useState<LearningGoal | null>(null);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -405,7 +406,17 @@ export const GoalsManagementInterface: React.FC = () => {
           {/* Actions */}
           <div className="flex items-center justify-between">
             <div className="flex space-x-2">
-              <button type="button" title="Edit goal" aria-label="Edit goal" className="p-2 text-muted-foreground hover:text-indigo-600 transition-colors">
+              <button
+                type="button"
+                title="Edit goal"
+                aria-label="Edit goal"
+                onClick={() => {
+                  setGoalToEdit(goal);
+                  setRecommendationToAccept(null);
+                  setShowCreateModal(true);
+                }}
+                className="p-2 text-muted-foreground hover:text-indigo-600 transition-colors"
+              >
                 <Edit className="w-4 h-4" />
               </button>
               <button type="button" title="Delete goal" aria-label="Delete goal" className="p-2 text-muted-foreground hover:text-red-600 transition-colors">
@@ -628,12 +639,13 @@ export const GoalsManagementInterface: React.FC = () => {
         onClose={() => {
           setShowCreateModal(false);
           setRecommendationToAccept(null);
+          setGoalToEdit(null);
         }}
         onGoalCreated={() => {
           fetchGoals();
           fetchAnalytics();
         } }
-        initialData={recommendationToAccept || undefined}
+        initialData={goalToEdit || recommendationToAccept || undefined}
       />
     </div>
   );

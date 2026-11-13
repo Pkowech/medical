@@ -501,10 +501,11 @@ export const LearningPathInterface: React.FC = () => {
   });
 
   return (
-    <div className="min-h-screen bg-background text-foreground px-4 md:px-6 py-8">
+    <div className="min-h-full bg-[#f8f9fa] p-4 text-foreground dark:bg-background md:p-6">
       <div className="max-w-7xl mx-auto space-y-5">
         <div className="flex flex-col justify-between gap-3 rounded-2xl border border-border bg-card p-3 sm:flex-row sm:items-center sm:p-4">
           <div
+            role="group"
             aria-label="Learning pathway views"
             className="grid w-full items-center gap-1 rounded-full bg-muted p-1 sm:w-fit sm:grid-cols-3"
           >

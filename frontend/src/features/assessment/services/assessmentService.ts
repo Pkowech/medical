@@ -10,6 +10,10 @@ export interface Assessment {
   questionCount: number;
   timeLimitMinutes?: number;
   passingScore: number;
+  unitId?: string;
+  unitTitle?: string;
+  courseId?: string;
+  courseTitle?: string;
 }
 
 interface QuizListResponse {
@@ -21,7 +25,11 @@ interface QuizListResponse {
     questionCount: number;
     isAdaptive: boolean;
     passingScore: number | null;
-    unit: { name: string; course: { name: string } | null } | null;
+    unit: {
+      id: string;
+      name: string;
+      course: { id: string; name: string } | null;
+    } | null;
   }>;
 }
 
@@ -54,6 +62,10 @@ export const fetchAssessments = async (): Promise<Assessment[]> => {
     questionCount: quiz.questionCount,
     timeLimitMinutes: quiz.timeLimit ?? undefined,
     passingScore: quiz.passingScore ?? 0,
+    unitId: quiz.unit?.id,
+    unitTitle: quiz.unit?.name,
+    courseId: quiz.unit?.course?.id,
+    courseTitle: quiz.unit?.course?.name,
   }));
 };
 

@@ -16,11 +16,14 @@ import { GoalCreationWizardProps, SMARTSuggestions, LearningGoal } from '@/share
 import { formatDateOnly } from '@/shared/utils/date-only';
 
 type Milestone = {
+  id?: string;
   title: string;
   description?: string;
   targetDate?: string;
   targetValue?: number;
   order?: number;
+  completed?: boolean;
+  completedAt?: string;
 };
 
 export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
@@ -56,35 +59,77 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
     milestones: [] as Milestone[],
     reminderSettings: {
       enabled: true,
-      frequency: 'daily' as const,
+      frequency: 'daily' as 'daily' | 'weekly' | 'custom',
       time: '09:00',
     },
     progressTracking: {
       autoTracking: false,
       manualUpdates: true,
       dataSources: [] as string[],
-      updateFrequency: 'manual' as const,
+      updateFrequency: 'manual' as 'real_time' | 'daily' | 'weekly' | 'manual',
     },
     dependsOnGoalId: '',
-    status: 'active', // Important: status must be lowercase 'active'
   });
 
   const [availableGoals, setAvailableGoals] = useState<LearningGoal[]>([]);
 
   useEffect(() => {
     if (isOpen && initialData) {
-      const targetValue = initialData.targetCriteria?.targetValue;
+      setCurrentStep(1);
+      const metadata = initialData.metadata;
+      const storedTargetCriteria =
+        initialData.targetCriteria ??
+        (metadata?.targetCriteria as LearningGoal['targetCriteria'] | undefined);
+      const storedMilestones =
+        initialData.milestones ??
+        (metadata?.milestones as LearningGoal['milestones'] | undefined);
+      const storedReminderSettings =
+        initialData.reminderSettings ??
+        (metadata?.reminderSettings as typeof goalData.reminderSettings | undefined);
+      const storedProgressTracking =
+        initialData.progressTracking ??
+        (metadata?.progressTracking as typeof goalData.progressTracking | undefined);
+      const storedSmartCriteria =
+        initialData.smartCriteria ??
+        (metadata?.smartCriteria as typeof goalData.smartCriteria | undefined);
+      const targetValue = storedTargetCriteria?.targetValue;
+      const priority = String(initialData.priority ?? '');
+      const normalizedPriority = ['low', 'medium', 'high', 'critical'].includes(priority)
+        ? priority
+        : ({ 1: 'low', 2: 'medium', 3: 'high' } as Record<string, string>)[priority] || 'medium';
+      const toDateInput = (date?: string) => date?.slice(0, 10) || '';
+
       setGoalData(prev => ({
         ...prev,
-        ...initialData,
+        title: initialData.title ?? prev.title,
+        description: initialData.description ?? prev.description,
+        type: initialData.type ?? prev.type,
+        category: initialData.category ?? prev.category,
+        priority: normalizedPriority,
+        startDate: toDateInput(initialData.startDate) || prev.startDate,
+        targetDate: toDateInput(initialData.targetDate) || prev.targetDate,
         targetCriteria: {
           ...prev.targetCriteria,
-          ...(initialData.targetCriteria || {}),
+          ...(storedTargetCriteria || {}),
           targetValue: typeof targetValue === 'string' ? parseFloat(targetValue) : targetValue || 0,
         },
         smartCriteria: {
           ...prev.smartCriteria,
-        }
+          ...(storedSmartCriteria || {}),
+        },
+        milestones: (storedMilestones || []).map(milestone => ({
+          ...milestone,
+          targetDate: toDateInput(milestone.targetDate),
+        })),
+        reminderSettings: {
+          ...prev.reminderSettings,
+          ...(storedReminderSettings || {}),
+        },
+        progressTracking: {
+          ...prev.progressTracking,
+          ...(storedProgressTracking || {}),
+        },
+        dependsOnGoalId: initialData.dependsOnGoalId ?? prev.dependsOnGoalId,
       }));
     } else if (!isOpen) {
       resetForm();
@@ -168,15 +213,17 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
       case 1:
         if (!goalData.title.trim()) newErrors.title = 'Title is required';
         if (!goalData.description.trim()) newErrors.description = 'Description is required';
-        if (!goalData.targetCriteria.targetValue)
+        if (!initialData?.id && !goalData.targetCriteria.targetValue)
           newErrors.targetValue = 'Target value is required';
         break;
 
       case 2:
-        if (!goalData.smartCriteria.specific.trim())
-          newErrors.specific = 'Specific criteria is required';
-        if (!goalData.smartCriteria.measurable.trim())
-          newErrors.measurable = 'Measurable criteria is required';
+        if (!initialData?.id) {
+          if (!goalData.smartCriteria.specific.trim())
+            newErrors.specific = 'Specific criteria is required';
+          if (!goalData.smartCriteria.measurable.trim())
+            newErrors.measurable = 'Measurable criteria is required';
+        }
         break;
 
       case 3:
@@ -204,7 +251,7 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
     setCurrentStep(prev => Math.max(prev - 1, 1));
   };
 
-  const createGoal = async () => {
+  const saveGoal = async () => {
     if (!validateStep(currentStep)) return;
 
     try {
@@ -215,18 +262,28 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
         ...goalData,
         startDate: `${goalData.startDate}T00:00:00.000Z`,
         targetDate: `${goalData.targetDate}T00:00:00.000Z`,
-        status: 'active',
         courseId: orUndefined(goalData.courseId),
         learningPathId: orUndefined(goalData.learningPathId),
         dependsOnGoalId: orUndefined(goalData.dependsOnGoalId),
       };
-      await apiService.post(`/learning-goals`, payload);
+      if (initialData?.id) {
+        const updatePayload = { ...payload };
+        if (goalData.category === initialData.category) {
+          Reflect.deleteProperty(updatePayload, 'category');
+        }
+        if (goalData.type === initialData.type) {
+          Reflect.deleteProperty(updatePayload, 'type');
+        }
+        await apiService.put(`/learning-goals/${initialData.id}`, updatePayload);
+      } else {
+        await apiService.post(`/learning-goals`, { ...payload, status: 'active' });
+      }
 
       onGoalCreated();
       onClose();
       resetForm();
     } catch (err: unknown) {
-      const message = getErrorMessage(err) || 'Failed to create goal';
+      const message = getErrorMessage(err) || `Failed to ${initialData?.id ? 'update' : 'create'} goal`;
       setErrors({ general: message });
     } finally {
       setLoading(false);
@@ -271,7 +328,6 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
         updateFrequency: 'manual' as const,
       },
       dependsOnGoalId: '',
-      status: 'active',
     });
     setErrors({});
     setSmartSuggestions(null);
@@ -346,6 +402,23 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
             className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             title="Goal Category"
           >
+            {![
+              'study_time',
+              'course_completion',
+              'assessment_score',
+              'skill_mastery',
+              'streak_maintenance',
+              'learning_path',
+              'clinical_cases',
+              'personal',
+              'academic',
+              'professional',
+              'custom',
+            ].includes(goalData.category) && (
+              <option value={goalData.category}>
+                {goalData.category.replaceAll('_', ' ')}
+              </option>
+            )}
             <option value="study_time">Study Time</option>
             <option value="course_completion">Course Completion</option>
             <option value="assessment_score">Assessment Score</option>
@@ -383,6 +456,9 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
             className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             title="Goal Type"
           >
+            {!['shortTerm', 'longTerm', 'recurring', 'custom'].includes(goalData.type) && (
+              <option value={goalData.type}>{goalData.type}</option>
+            )}
             <option value="shortTerm">Short-Term</option>
             <option value="longTerm">Long-Term</option>
             <option value="recurring">Recurring</option>
@@ -919,7 +995,9 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
 
         <div className="relative z-10 inline-block w-full max-w-4xl p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-card shadow-xl rounded-2xl">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-foreground">Create Learning Goal</h2>
+            <h2 className="text-2xl font-bold text-foreground">
+              {initialData?.id ? 'Edit Learning Goal' : 'Create Learning Goal'}
+            </h2>
             <button
               onClick={onClose}
               className="p-2 text-muted-foreground hover:text-muted-foreground transition-colors"
@@ -1005,7 +1083,7 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
                 </button>
               ) : (
                 <button
-                  onClick={createGoal}
+                  onClick={saveGoal}
                   disabled={loading}
                   className="flex items-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
                 >
@@ -1014,7 +1092,7 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
                   ) : (
                     <CheckCircle className="w-4 h-4" />
                   )}
-                  <span>Create Goal</span>
+                  <span>{initialData?.id ? 'Save Changes' : 'Create Goal'}</span>
                 </button>
               )}
             </div>

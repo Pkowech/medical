@@ -29,14 +29,54 @@ import { useAssessments } from '@/features/assessment/hooks/useAssessments';
 import { AdaptiveQuiz } from '@/features/assessment/components/adaptiveQuiz/AdaptiveQuiz';
 import { PerformanceAnalyticsContent } from '@/features/assessment/components/PerformanceAnalytics';
 import type { Assessment } from '@/features/assessment/services/assessmentService';
+import type { LearningPathProgress } from '@/shared/types/learningInterface';
+import { healthcareFieldLabel } from '@/shared/utils/healthcareProfile';
+
+const FIELD_ASSESSMENT_KEYWORDS: Record<string, string[]> = {
+  medicine: ['medicine', 'medical', 'physician', 'clinical'],
+  nursing: ['nursing', 'nurse', 'patient care'],
+  pharmacy: ['pharmacy', 'pharmacology', 'pharmaceutical', 'pharmaceutics', 'pharmacognosy'],
+  dentistry: ['dentistry', 'dental', 'oral health'],
+  physiotherapy: ['physiotherapy', 'physical therapy', 'rehabilitation'],
+  occupational_therapy: ['occupational therapy'],
+  medical_laboratory: ['medical laboratory', 'laboratory science', 'pathology'],
+  radiography: ['radiography', 'radiology', 'medical imaging'],
+  public_health: ['public health', 'epidemiology'],
+  allied_health: ['allied health'],
+};
+
+const getPathCourseIds = (path: LearningPathProgress): string[] => {
+  const courseIds = (path.learningPath.courses ?? []).flatMap(course =>
+    course && typeof course.id === 'string' ? [course.id] : [],
+  );
+  const phases = path.learningPath.pathStructure?.phases ?? path.learningPath.phases ?? [];
+  const moduleCourseIds = phases.flatMap(phase =>
+    phase.modules.flatMap(module =>
+      module.type === 'course' && module.resourceId ? [module.resourceId] : [],
+    ),
+  );
+  return [...courseIds, ...moduleCourseIds];
+};
+
+const getPathAssessmentIds = (path: LearningPathProgress): string[] => {
+  const phases = path.learningPath.pathStructure?.phases ?? path.learningPath.phases ?? [];
+  return phases.flatMap(phase =>
+    phase.modules.flatMap(module =>
+      module.type === 'assessment' && module.resourceId ? [module.resourceId] : [],
+    ),
+  );
+};
 
 export function AssessmentDashboard() {
   const { data: session } = useSession();
   const {
     assessments,
+    activeCourses,
+    activePaths,
     summary,
     history,
     historyError,
+    contextError,
     loading,
     refreshAssessments,
   } = useAssessments();
@@ -46,15 +86,70 @@ export function AssessmentDashboard() {
   const [selectedType, setSelectedType] = useState<string>('All');
   const [isAdaptiveActive, setIsAdaptiveActive] = useState(false);
 
-  const categories = ['All', ...new Set(assessments.map(assessment => assessment.category))];
+  const pathCourseIds = new Set(activePaths.flatMap(getPathCourseIds));
+  const pathAssessmentIds = new Set(activePaths.flatMap(getPathAssessmentIds));
+  const activeCourseIds = new Set(activeCourses.map(course => course.id));
+  const fieldLabel = healthcareFieldLabel(session?.user?.healthcareField);
+  const specialization = session?.user?.specialization?.trim();
+  const isExplicitSearch = searchQuery.trim().length > 0;
+  const fieldKeywords = [
+    ...(session?.user?.healthcareField
+      ? FIELD_ASSESSMENT_KEYWORDS[session.user.healthcareField.toLowerCase()] ?? []
+      : []),
+    ...(specialization ? [specialization.toLowerCase()] : []),
+  ];
 
-  const filteredAssessments = assessments.filter(assessment => {
+  const getRelevanceLabel = (assessment: Assessment): string | null => {
+    const enrolledCourse = activeCourses.find(course => course.id === assessment.courseId);
+    if (enrolledCourse) return `Active course · ${enrolledCourse.title}`;
+
+    const matchingPath = activePaths.find(path =>
+      getPathCourseIds(path).includes(assessment.courseId ?? '') ||
+      getPathAssessmentIds(path).includes(assessment.id),
+    );
+    if (matchingPath) return `Learning path · ${matchingPath.learningPath.title}`;
+
+    const searchableText = [
+      assessment.title,
+      assessment.description,
+      assessment.category,
+      assessment.courseTitle ?? '',
+      assessment.unitTitle ?? '',
+    ].join(' ').toLowerCase();
+    if (fieldKeywords.some(keyword => searchableText.includes(keyword))) {
+      return `Matches ${specialization || fieldLabel || 'your field'}`;
+    }
+
+    return null;
+  };
+
+  const relevantAssessments = assessments.filter(assessment => {
+    if (activeCourseIds.has(assessment.courseId ?? '') || pathAssessmentIds.has(assessment.id)) {
+      return true;
+    }
+    if (pathCourseIds.has(assessment.courseId ?? '')) return true;
+
+    const searchableText = [
+      assessment.title,
+      assessment.description,
+      assessment.category,
+      assessment.courseTitle ?? '',
+      assessment.unitTitle ?? '',
+    ].join(' ').toLowerCase();
+    return fieldKeywords.some(keyword => searchableText.includes(keyword));
+  });
+  const visibleAssessments = isExplicitSearch ? assessments : relevantAssessments;
+  const categories = ['All', ...new Set(visibleAssessments.map(assessment => assessment.category))];
+
+  const filteredAssessments = visibleAssessments.filter(assessment => {
     const matchesCategory = selectedCategory === 'All' || assessment.category.toLowerCase() === selectedCategory.toLowerCase();
     const matchesType = selectedType === 'All' || assessment.type.toLowerCase() === selectedType.toLowerCase();
     const matchesSearch =
       assessment.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       assessment.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      assessment.category.toLowerCase().includes(searchQuery.toLowerCase());
+      assessment.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      assessment.courseTitle?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      assessment.unitTitle?.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCategory && matchesType && matchesSearch;
   });
 
@@ -186,6 +281,26 @@ export function AssessmentDashboard() {
 
         {/* Tab 1: Available Assessments */}
         <TabsContent value="assessments" className="space-y-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-foreground">
+                {isExplicitSearch
+                  ? 'Search results across published assessments'
+                  : 'Assessments matched to your active courses, learning paths, and field'}
+              </p>
+              {(fieldLabel || specialization) && (
+                <p className="text-xs text-muted-foreground">
+                  Learning focus: {[specialization, fieldLabel].filter(Boolean).join(' · ')}
+                </p>
+              )}
+            </div>
+          </div>
+          {contextError && (
+            <p className="text-sm text-amber-700 dark:text-amber-400" role="status">
+              Some enrollment data could not be loaded, so personalized results may be incomplete.
+            </p>
+          )}
+
           {/* Filters & Search */}
           <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between">
             <div className="relative flex-1 max-w-md">
@@ -194,7 +309,7 @@ export function AssessmentDashboard() {
                 type="text"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                placeholder="Search assessments, topics, specialties..."
+                placeholder="Search all assessments by title, topic, course, or specialty..."
                 className="w-full pl-9 pr-4 py-2 text-sm rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-blue-500/20"
               />
             </div>
@@ -226,9 +341,13 @@ export function AssessmentDashboard() {
             <Card className="text-center p-12">
               <CardContent className="space-y-4">
                 <AlertTriangle className="h-10 w-10 text-muted-foreground mx-auto" />
-                <h3 className="text-lg font-semibold text-foreground">No assessments found</h3>
+                <h3 className="text-lg font-semibold text-foreground">
+                  {isExplicitSearch ? 'No matching assessments found' : 'No matching assessments yet'}
+                </h3>
                 <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                  No medical assessments match your current search and category filters. Try resetting the filters.
+                  {isExplicitSearch
+                    ? 'No published assessments match your search and category filters. Try another search or reset the filters.'
+                    : 'There are no assessments linked to your active courses or learning paths that match your field yet. Search by topic, course, or specialty to find another assessment.'}
                 </p>
                 <Button
                   variant="outline"
@@ -257,6 +376,11 @@ export function AssessmentDashboard() {
                       <span className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
                         {assessment.category}
                       </span>
+                      {getRelevanceLabel(assessment) && (
+                        <Badge variant="outline" className="mt-1 block w-fit text-[10px]">
+                          {getRelevanceLabel(assessment)}
+                        </Badge>
+                      )}
                       <CardTitle className="text-lg font-bold text-foreground mt-1 line-clamp-2">
                         {assessment.title}
                       </CardTitle>

@@ -11,6 +11,7 @@ export interface LearningGoal {
     targetValue: number | string;
     currentValue?: number | string;
     unit?: string;
+    measurementMethod?: string;
   };
   startDate: string;
   targetDate: string;
@@ -23,7 +24,21 @@ export interface LearningGoal {
     targetValue: number;
     completed: boolean;
     targetDate: string;
+    description?: string;
+    order?: number;
   }[];
+  smartCriteria?: SMARTSuggestions;
+  reminderSettings?: {
+    enabled: boolean;
+    frequency: 'daily' | 'weekly' | 'custom';
+    time?: string;
+  };
+  progressTracking?: {
+    autoTracking: boolean;
+    manualUpdates: boolean;
+    dataSources: string[];
+    updateFrequency: 'real_time' | 'daily' | 'weekly' | 'manual';
+  };
   learningPath?: {
     id: string;
     title: string;

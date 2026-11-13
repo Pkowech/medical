@@ -768,7 +768,11 @@ export class QuizService {
           isPublished: true,
           createdAt: true,
           unit: {
-            select: { name: true, course: { select: { name: true } } },
+            select: {
+              id: true,
+              name: true,
+              course: { select: { id: true, name: true } },
+            },
           },
           _count: {
             select: { attempts: true },

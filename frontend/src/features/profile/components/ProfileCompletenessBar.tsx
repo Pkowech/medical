@@ -27,7 +27,13 @@ function calculateCompleteness(profile: LocalUserProfile): {
     { label: 'Location', filled: Boolean(profile.location?.trim()), required: false },
     { label: 'Healthcare field', filled: Boolean(profile.healthcareField?.trim()), required: false },
     { label: 'Career stage', filled: Boolean(profile.careerStage), required: false },
-    { label: 'Specialization', filled: Boolean(profile.specialization?.trim()), required: false },
+    ...(profile.careerStage === 'student'
+      ? []
+      : [{
+          label: 'Specialization',
+          filled: Boolean(profile.specialization?.trim()),
+          required: false,
+        }]),
     ...(profile.careerStage === 'student' || profile.careerStage === 'postgraduate'
       ? [{
           label: profile.careerStage === 'postgraduate' ? 'Training year' : 'Year of study',
