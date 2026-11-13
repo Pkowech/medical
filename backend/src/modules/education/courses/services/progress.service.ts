@@ -27,6 +27,7 @@ import { AiAnalyticsService } from '#modules/ai-analytics/services/ai-analytics.
 import { CourseAnalyticsService } from '#modules/ai-analytics/services/course-analytics.service';
 import { LearningAnalyticsService } from '#modules/ai-analytics/services/learning-analytics.service';
 import { calculateLearningStreaks } from '../utils/learning-streak';
+import { getReadinessSignal } from '../types/mastery.types';
 import {
   UserProgressDetails,
   OverallProgress,
@@ -949,6 +950,9 @@ export class ProgressService {
             masteryUnlocked: quizScores.masteryUnlocked === true,
             nextTopicUnlocked: quizScores.nextTopicUnlocked === true,
             failedAttempts: Number(quizScores.failedAttempts ?? 0),
+            readinessSignal: getReadinessSignal(
+              Number(quizScores.bestScore ?? quizScores.lastScore ?? 0),
+            ),
           };
         },
       );

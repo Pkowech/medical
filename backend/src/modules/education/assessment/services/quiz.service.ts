@@ -12,6 +12,10 @@ import { AssessmentProgressService } from './assessment-progress.service';
 import { AssessmentAnalyticsService } from '#modules/ai-analytics/services/assessment-analytics.service';
 import { MasteryGateService } from '../../courses/services/mastery-gate.service';
 import {
+  DEFAULT_MASTERY_PASSING_THRESHOLD,
+  type GateDecision,
+} from '../../courses/types/mastery.types';
+import {
   Option,
   Question,
   Quiz,
@@ -1793,6 +1797,7 @@ export class QuizService {
     masteryUnlocked: boolean;
     nextTopicUnlocked: boolean;
     nextTopicId?: string;
+    gateDecision?: GateDecision;
     reviewCardsScheduled: number;
     recommendations: QuizPerformanceRecommendations;
   }> {
@@ -1859,7 +1864,7 @@ export class QuizService {
         })),
       );
       const scorePercentage = graded.percentage;
-      const passed = scorePercentage >= 70;
+      const passed = scorePercentage >= DEFAULT_MASTERY_PASSING_THRESHOLD;
       let topicQuiz: { quiz: Pick<Quiz, 'id'>; attemptId: string };
       try {
         topicQuiz = await this.prisma.$transaction(async (tx) => {
@@ -1945,7 +1950,7 @@ export class QuizService {
               topicId,
               score: scorePercentage,
               isPassed: passed,
-              passingScore: 70,
+              passingScore: DEFAULT_MASTERY_PASSING_THRESHOLD,
               bktUpdates: graded.responses.map(({ isCorrect }) => ({
                 skillId: topicId,
                 isCorrect,
@@ -2030,6 +2035,7 @@ export class QuizService {
         masteryUnlocked: mastery.masteryUnlocked,
         nextTopicUnlocked: mastery.nextTopicUnlocked,
         nextTopicId: mastery.nextTopicId,
+        gateDecision: mastery.gateDecision,
         reviewCardsScheduled,
         recommendations,
       };

@@ -26,6 +26,11 @@ import { toast } from 'sonner';
 import { useCourseStudySession } from '@/features/learning-management/study/components/CourseStudySessionProvider';
 import { v4 as uuidv4 } from 'uuid';
 import { offlineService } from '@/lib/core/offline/offlineService';
+import {
+  TOPIC_MASTERY_PASSING_SCORE,
+  type GateDecision,
+} from '@/shared/types/mastery.types';
+import { MasteryReadinessPanel } from './MasteryReadinessPanel';
 
 interface QuizOption {
   id: string;
@@ -56,6 +61,7 @@ interface TopicQuizProps {
     masteryUnlocked: boolean;
     nextTopicUnlocked: boolean;
     nextTopicId?: string;
+    gateDecision?: GateDecision;
   }) => void | Promise<void>;
   onNextTopic?: (topicId: string) => void;
 }
@@ -79,6 +85,7 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
   const [score, setScore] = useState(0);
   const [feedback, setFeedback] = useState<string>('');
   const [nextTopicId, setNextTopicId] = useState<string | undefined>();
+  const [gateDecision, setGateDecision] = useState<GateDecision | undefined>();
   const [isOffline, setIsOffline] = useState(false);
   const [isProvisional, setIsProvisional] = useState(false);
   const [attemptId, setAttemptId] = useState(() => uuidv4());
@@ -91,6 +98,7 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
     setScore(0);
     setFeedback('');
     setNextTopicId(undefined);
+    setGateDecision(undefined);
     setIsProvisional(false);
     setAttemptId(uuidv4());
   }, []);
@@ -244,6 +252,7 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
         masteryUnlocked: boolean;
         nextTopicUnlocked: boolean;
         nextTopicId?: string;
+        gateDecision?: GateDecision;
       }>(
         `/quizzes/topic/${topicId}/submit`,
         { responses },
@@ -254,6 +263,7 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
       setScore(result?.score || 0);
       setFeedback(result?.feedback || '');
       setNextTopicId(result?.nextTopicId);
+      setGateDecision(result?.gateDecision);
       setQuizCompleted(true);
       recordCourseActivity('quiz', courseId, topicId, result.score);
 
@@ -265,6 +275,7 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
             masteryUnlocked: result.masteryUnlocked,
             nextTopicUnlocked: result.nextTopicUnlocked,
             nextTopicId: result.nextTopicId,
+            gateDecision: result.gateDecision,
           });
         } catch (progressError) {
           console.error('Topic quiz was submitted, but follow-up updates failed:', progressError);
@@ -341,13 +352,13 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
             ) : (
               <div className="space-y-6">
                 <div className="text-center space-y-4">
-                  <div className={`text-5xl font-bold ${score >= 70 ? 'text-green-600' : 'text-orange-600'}`}>
+                  <div className={`text-5xl font-bold ${score >= TOPIC_MASTERY_PASSING_SCORE ? 'text-green-600' : 'text-orange-600'}`}>
                     {score}%
                   </div>
                   <p className="text-muted-foreground dark:text-muted-foreground">
                     {score >= 90
                       ? '🎉 Excellent! You mastered this topic!'
-                      : score >= 70
+                      : score >= TOPIC_MASTERY_PASSING_SCORE
                         ? '👍 Good job! You understand the key concepts.'
                         : '📚 Keep practicing! Review the materials and try again.'}
                   </p>
@@ -359,6 +370,8 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
                     <p className="text-muted-foreground dark:text-muted-foreground text-sm">{feedback}</p>
                   </div>
                 )}
+
+                {gateDecision && <MasteryReadinessPanel decision={gateDecision} />}
 
                 <div className="flex gap-3">
                   <Button variant="outline" onClick={onClose} className="flex-1">

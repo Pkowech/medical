@@ -10,9 +10,11 @@ import { RedisService } from '#infrastructure/redis/redis.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { getErrorMessage } from '#common/utils/error.utils';
 import {
-  ReadinessSignal,
-  MasteryStatus,
-  QuizCompletionResult,
+  DEFAULT_MASTERY_PASSING_THRESHOLD,
+  getReadinessSignal,
+  type ReadinessSignal,
+  type MasteryStatus,
+  type QuizCompletionResult,
 } from '../types/mastery.types';
 import { EnrollmentStatus, Prisma, ProgressStatus } from '@prisma/client';
 import { PrescriptiveAnalyticsService } from '../../../ai-analytics/services/prescriptive-analytics.service';
@@ -24,7 +26,7 @@ export const MAX_ACTIVE_UNITS = 36;
 @Injectable()
 export class MasteryGateService {
   private readonly logger = new Logger(MasteryGateService.name);
-  private readonly PASSING_THRESHOLD = 70; // Default passing threshold percentage
+  private readonly PASSING_THRESHOLD = DEFAULT_MASTERY_PASSING_THRESHOLD;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -61,12 +63,8 @@ export class MasteryGateService {
       const assessmentScore = Number(
         quizScores.bestScore ?? quizScores.lastScore ?? 0,
       );
-      let readinessSignal: ReadinessSignal = 'NOT_READY';
-      if (assessmentScore >= this.PASSING_THRESHOLD) {
-        readinessSignal = 'SAFE';
-      } else if (assessmentScore >= 50) {
-        readinessSignal = 'BORDERLINE';
-      }
+      const readinessSignal: ReadinessSignal =
+        getReadinessSignal(assessmentScore);
 
       return {
         userId,

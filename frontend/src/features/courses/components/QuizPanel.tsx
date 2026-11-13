@@ -11,6 +11,8 @@ import { URLS } from '@/lib/urls';
 import { CheckCircle, XCircle, AlertCircle, RefreshCw, Send } from 'lucide-react';
 import { useCourseStudySession } from '@/features/learning-management/study/components/CourseStudySessionProvider';
 import { v4 as uuidv4 } from 'uuid';
+import { TOPIC_MASTERY_PASSING_SCORE, type GateDecision } from '@/shared/types/mastery.types';
+import { MasteryReadinessPanel } from './MasteryReadinessPanel';
 
 interface Question {
   id: string;
@@ -64,6 +66,7 @@ export const QuizPanel = ({
     masteryUnlocked?: boolean;
     nextTopicUnlocked?: boolean;
     nextTopicId?: string;
+    gateDecision?: GateDecision;
     recommendations?: QuizPerformanceRecommendations;
   } | null>(null);
 
@@ -161,10 +164,12 @@ export const QuizPanel = ({
         masteryUnlocked: boolean;
         nextTopicUnlocked: boolean;
         nextTopicId?: string;
+        gateDecision?: GateDecision;
         recommendations?: QuizPerformanceRecommendations;
       } = {
         score: Math.round((score / questions.length) * 100),
-        passed: score / questions.length >= 0.7,
+        passed:
+          score / questions.length >= TOPIC_MASTERY_PASSING_SCORE / 100,
         masteryUnlocked: false,
         nextTopicUnlocked: false,
       };
@@ -285,7 +290,10 @@ export const QuizPanel = ({
 
   if (quizComplete) {
     const scorePercentage = finalResult?.score ?? Math.round((score / questions.length) * 100);
-    const passed = finalResult?.passed ?? scorePercentage >= (scope === 'topic' ? 70 : 80);
+    const passed =
+      finalResult?.passed ??
+      scorePercentage >=
+        (scope === 'topic' ? TOPIC_MASTERY_PASSING_SCORE : 80);
     return (
       <div className="bg-card/80 dark:bg-card/50 backdrop-blur-sm rounded-xl p-8 shadow-sm border border-border dark:border-border/50 text-center animate-in fade-in zoom-in duration-500 motion-reduce:animate-none">
         <div
@@ -316,9 +324,15 @@ export const QuizPanel = ({
         ) : (
           <div className="bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800/30 p-4 rounded-lg mb-8">
             <p className="text-red-800 dark:text-red-300 font-medium">
-              You did not reach the 70% passing score. Review the material and try again.
+              {scope === 'topic'
+                ? `You did not reach the ${TOPIC_MASTERY_PASSING_SCORE}% passing score. Review the material and try again.`
+                : 'You did not reach the required passing score. Review the material and try again.'}
             </p>
           </div>
+        )}
+
+        {scope === 'topic' && finalResult?.gateDecision && (
+          <MasteryReadinessPanel decision={finalResult.gateDecision} />
         )}
 
         {finalResult?.nextTopicUnlocked && (

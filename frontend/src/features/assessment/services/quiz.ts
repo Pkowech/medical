@@ -1,4 +1,5 @@
 import { apiService } from '@/features/auth/services/apiClient';
+import type { GateDecision } from '@/shared/types/mastery.types';
 
 export interface TopicQuizSubmission {
   score: number;
@@ -7,6 +8,7 @@ export interface TopicQuizSubmission {
   masteryUnlocked: boolean;
   nextTopicUnlocked: boolean;
   nextTopicId?: string;
+  gateDecision?: GateDecision;
   recommendations?: QuizPerformanceRecommendations;
 }
 

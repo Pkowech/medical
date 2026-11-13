@@ -18,6 +18,7 @@ import { URLS } from '@/lib/urls';
 import { useEffect, useRef } from 'react';
 import { VideoPlayer } from './VideoPlayer';
 import type { CourseContentProps } from '@/shared/types/courseInterface';
+import { TOPIC_MASTERY_PASSING_SCORE } from '@/shared/types/mastery.types';
 
 export const CourseContent = ({
   currentLesson: lesson,
@@ -36,7 +37,7 @@ export const CourseContent = ({
   isNextTopicLocked = false,
   materials = [],
   openMaterial,
-  masteryPassingScore = 80,
+  masteryPassingScore = TOPIC_MASTERY_PASSING_SCORE,
 }: CourseContentProps) => {
   const { trackAction, XAPI_VERBS } = useXapi();
   const lastLessonId = useRef<string | number | null>(null);

@@ -33,6 +33,7 @@ import { MaterialPreviewModal } from '@/features/courses/components/MaterialPrev
 import { TopicForm } from '@/features/courses/components/TopicForm';
 import { topicService } from '@/features/courses/services/topicService';
 import type { Topic } from '@/shared/types/courseInterface';
+import { TOPIC_MASTERY_PASSING_SCORE } from '@/shared/types/mastery.types';
 import { Button } from '@/shared/components/ui/button';
 import { Dialog, DialogContent } from '@/shared/components/ui/dialog';
 import progressService, {
@@ -747,7 +748,7 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
                   isNextTopicLocked={isNextTopicLocked}
                   materials={materialsForCurrentTopic as unknown as Material[]}
                   openMaterial={openMaterial}
-                  masteryPassingScore={70}
+                  masteryPassingScore={TOPIC_MASTERY_PASSING_SCORE}
                 />
 
               </>

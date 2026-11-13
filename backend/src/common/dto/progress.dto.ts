@@ -468,6 +468,7 @@ export interface UserProgressDetails extends CourseProgress {
       masteryUnlocked: boolean;
       nextTopicUnlocked: boolean;
       failedAttempts: number;
+      readinessSignal: 'SAFE' | 'BORDERLINE' | 'NOT_READY';
     }
   >;
   materialProgress: Array<{
