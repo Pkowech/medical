@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { BookOpen, CheckCircle, Clock3, Plus, Sparkles, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { fetchAssessments, type Assessment } from '@/features/assessment/services/assessmentService';
 import type { Course } from '@/shared/types/courseInterface';
 import {
   learningPathService,
@@ -32,6 +33,7 @@ interface PathPhaseDraft {
   title: string;
   description: string;
   courseId: string;
+  assessmentId: string;
   milestone: string;
 }
 
@@ -46,6 +48,7 @@ const createPhaseDraft = (): PathPhaseDraft => ({
   title: '',
   description: '',
   courseId: '',
+  assessmentId: '',
   milestone: '',
 });
 
@@ -83,6 +86,9 @@ export function InstructorLearningPathManager({
   onOpenCourses,
 }: InstructorLearningPathManagerProps) {
   const [paths, setPaths] = useState<InstructorLearningPath[]>([]);
+  const [assessments, setAssessments] = useState<Assessment[]>([]);
+  const [assessmentsError, setAssessmentsError] = useState('');
+  const [assessmentsLoading, setAssessmentsLoading] = useState(true);
   const [pathListLoading, setPathListLoading] = useState(true);
   const [pathListError, setPathListError] = useState('');
   const [pathFormError, setPathFormError] = useState('');
@@ -108,6 +114,27 @@ export function InstructorLearningPathManager({
   useEffect(() => {
     void loadPaths();
   }, [instructorId]);
+
+  useEffect(() => {
+    let active = true;
+    fetchAssessments()
+      .then(items => {
+        if (active) setAssessments(items);
+      })
+      .catch(error => {
+        console.error('Failed to load published assessments for path builder:', error);
+        if (active) {
+          setAssessmentsError(getErrorMessage(error, 'Published assessments could not be loaded.'));
+        }
+      })
+      .finally(() => {
+        if (active) setAssessmentsLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const updatePhase = (phaseId: string, updates: Partial<PathPhaseDraft>) => {
     setForm(current => ({
@@ -140,6 +167,18 @@ export function InstructorLearningPathManager({
     }
     if (form.phases.some(phase => !phase.title.trim() || !phase.courseId)) {
       setPathFormError('Give every phase a title and select a published course.');
+      return null;
+    }
+    if (
+      form.phases.some(phase =>
+        phase.assessmentId &&
+        !assessments.some(assessment =>
+          assessment.id === phase.assessmentId &&
+          (!assessment.courseId || assessment.courseId === phase.courseId),
+        ),
+      )
+    ) {
+      setPathFormError('A selected assessment is not available for its course. Choose another assessment.');
       return null;
     }
 
@@ -183,6 +222,18 @@ export function InstructorLearningPathManager({
           const modules: CreateLearningPathPayload['pathStructure']['phases'][number]['modules'] = [
             courseModule,
           ];
+          const assessment = assessments.find(item => item.id === phase.assessmentId);
+          if (assessment) {
+            modules.push({
+              id: crypto.randomUUID(),
+              type: 'assessment',
+              resourceId: assessment.id,
+              title: assessment.title,
+              description: assessment.description,
+              order: modules.length + 1,
+              required: true,
+            });
+          }
           if (phase.milestone.trim()) {
             modules.push({
               id: crypto.randomUUID(),
@@ -190,7 +241,7 @@ export function InstructorLearningPathManager({
               resourceId: crypto.randomUUID(),
               title: phase.milestone.trim(),
               description: '',
-              order: 2,
+              order: modules.length + 1,
               required: true,
             });
           }
@@ -412,7 +463,7 @@ export function InstructorLearningPathManager({
                 <div>
                   <h3 className="text-sm font-semibold">Path phases</h3>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Each phase adds a course and its units/topics to the path.
+                    Add a course and its units/topics, plus an optional published assessment and checkpoint.
                   </p>
                 </div>
                 <button
@@ -464,7 +515,10 @@ export function InstructorLearningPathManager({
                       <select
                         id={`phase-course-${phase.id}`}
                         value={phase.courseId}
-                        onChange={event => updatePhase(phase.id, { courseId: event.target.value })}
+                        onChange={event => updatePhase(phase.id, {
+                          courseId: event.target.value,
+                          assessmentId: '',
+                        })}
                         required
                         className="h-9 w-full rounded-lg border border-input bg-card px-3 text-sm"
                       >
@@ -475,6 +529,38 @@ export function InstructorLearningPathManager({
                           </option>
                         ))}
                       </select>
+                    </div>
+                    <div>
+                      <label htmlFor={`phase-assessment-${phase.id}`} className="mb-1 block text-xs font-medium">
+                        Assessment <span className="font-normal text-muted-foreground">(optional)</span>
+                      </label>
+                      <select
+                        id={`phase-assessment-${phase.id}`}
+                        value={phase.assessmentId}
+                        onChange={event => updatePhase(phase.id, { assessmentId: event.target.value })}
+                        disabled={!phase.courseId || assessmentsLoading || Boolean(assessmentsError)}
+                        className="h-9 w-full rounded-lg border border-input bg-card px-3 text-sm disabled:opacity-60"
+                      >
+                        <option value="">
+                          {assessmentsLoading
+                            ? 'Loading assessments…'
+                            : assessmentsError
+                              ? 'Assessments unavailable'
+                              : 'No assessment'}
+                        </option>
+                        {assessments
+                          .filter(assessment =>
+                            !assessment.courseId || assessment.courseId === phase.courseId,
+                          )
+                          .map(assessment => (
+                            <option key={assessment.id} value={assessment.id}>
+                              {assessment.title}
+                            </option>
+                          ))}
+                      </select>
+                      {assessmentsError && (
+                        <p className="mt-1 text-xs text-destructive">{assessmentsError}</p>
+                      )}
                     </div>
                     <div className="sm:col-span-2">
                       <label htmlFor={`phase-description-${phase.id}`} className="mb-1 block text-xs font-medium">

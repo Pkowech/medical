@@ -25,6 +25,7 @@ interface QuizListResponse {
     questionCount: number;
     isAdaptive: boolean;
     passingScore: number | null;
+    category: { name: string } | null;
     unit: {
       id: string;
       name: string;
@@ -58,7 +59,7 @@ export const fetchAssessments = async (): Promise<Assessment[]> => {
     title: quiz.title,
     description: quiz.description ?? '',
     type: quiz.isAdaptive ? 'adaptive' : 'quiz',
-    category: quiz.unit?.course?.name ?? quiz.unit?.name ?? 'General',
+    category: quiz.category?.name ?? 'General',
     questionCount: quiz.questionCount,
     timeLimitMinutes: quiz.timeLimit ?? undefined,
     passingScore: quiz.passingScore ?? 0,

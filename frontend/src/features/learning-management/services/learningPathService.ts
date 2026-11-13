@@ -25,7 +25,7 @@ export interface CreateLearningPathPayload {
       order: number;
       modules: Array<{
         id: string;
-        type: 'course' | 'milestone';
+        type: 'course' | 'assessment' | 'milestone';
         resourceId: string;
         title: string;
         description?: string;

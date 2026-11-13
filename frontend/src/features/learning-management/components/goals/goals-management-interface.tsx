@@ -250,6 +250,16 @@ export const GoalsManagementInterface: React.FC = () => {
 
   const renderGoalCard = (goal: LearningGoal) => {
     const daysRemaining = daysUntilDateOnly(goal.targetDate);
+    const rawProgressPercentage = Number(goal.progressPercentage);
+    const progressPercentage = Number.isFinite(rawProgressPercentage)
+      ? Math.min(100, Math.max(0, rawProgressPercentage))
+      : 0;
+    const learningPathId =
+      goal.learningPathId ??
+      goal.learningPath?.id ??
+      (typeof goal.metadata?.learningPathId === 'string'
+        ? goal.metadata.learningPathId
+        : undefined);
     const isOverdue =
       daysRemaining !== null && daysRemaining < 0 && goal.status === 'active';
     const isDueSoon =
@@ -293,9 +303,9 @@ export const GoalsManagementInterface: React.FC = () => {
                     {(goal.metadata as any).targetExam}
                   </span>
                 )}
-                {goal.metadata && typeof goal.metadata === 'object' && (goal.metadata as any).learningPathId && (
+                {learningPathId && (
                   <Link
-                    href={`/learning-paths/${(goal.metadata as any).learningPathId}`}
+                    href={`/learning-paths/${learningPathId}`}
                     onClick={(e) => e.stopPropagation()}
                     className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 hover:bg-indigo-200 dark:bg-indigo-950/50 dark:text-indigo-300 dark:hover:bg-indigo-900/50 transition-colors"
                   >
@@ -328,14 +338,14 @@ export const GoalsManagementInterface: React.FC = () => {
           <div className="mb-4">
             <div className="flex items-center justify-between text-sm text-muted-foreground mb-1">
               <span>Progress</span>
-              <span>{Math.round(goal.progressPercentage)}%</span>
+              <span>{Math.round(progressPercentage)}%</span>
             </div>
             <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
               <div
                 className={`h-full rounded-full transition-all duration-500 ease-out ${
                   goal.status === 'completed' ? 'bg-emerald-500' : 'bg-indigo-600'
                 }`}
-                style={{ width: `${Math.min(100, Math.max(0, goal.progressPercentage))}%` }}
+                style={{ width: `${progressPercentage}%` }}
               />
             </div>
           </div>
@@ -622,11 +632,7 @@ export const GoalsManagementInterface: React.FC = () => {
                 description: rec.description,
                 category: rec.category,
                 type: rec.type,
-                targetCriteria: {
-                  type: 'numeric',
-                  targetValue: 10, // Default target
-                  unit: 'units'
-                }
+                learningPathId: rec.category === 'learning_path' ? rec.relatedId : undefined,
               });
               setShowCreateModal(true);
             }} 

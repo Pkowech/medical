@@ -3,7 +3,6 @@ import {
   GraduationCap,
   Route,
   Brain,
-  FileText,
   Calendar,
   Target,
   Users,
@@ -88,26 +87,6 @@ const navigationConfig: NavigationItem[] = [
     label: 'Study Planner',
     href: '/study-planner',
     icon: Calendar,
-    children: [
-      {
-        id: 'schedule',
-        label: 'Schedule',
-        href: '/study-planner/schedule',
-        icon: Clock,
-      },
-      {
-        id: 'goals',
-        label: 'Goals',
-        href: '/study-planner/goals',
-        icon: Target,
-      },
-      {
-        id: 'materials',
-        label: 'Study Materials',
-        href: '/study-planner/materials',
-        icon: FileText,
-      },
-    ],
   },
   {
     id: 'progress-tracking',

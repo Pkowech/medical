@@ -767,6 +767,7 @@ export class QuizService {
           passingScore: true,
           isPublished: true,
           createdAt: true,
+          category: { select: { name: true } },
           unit: {
             select: {
               id: true,

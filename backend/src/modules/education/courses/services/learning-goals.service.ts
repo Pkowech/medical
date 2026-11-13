@@ -1125,7 +1125,13 @@ export class LearningGoalsService {
       const candidatePaths = candidatePathIds.length
         ? await this.prisma.learningPath.findMany({
             where: { id: { in: candidatePathIds } },
-            select: { id: true, status: true, targetCareerStages: true },
+            select: {
+              id: true,
+              title: true,
+              description: true,
+              status: true,
+              targetCareerStages: true,
+            },
           })
         : [];
       const candidatePathsById = new Map(
@@ -1212,16 +1218,20 @@ export class LearningGoalsService {
         });
       });
 
+      const pathRecommendations = new Map<string, RecommendedGoalDto>();
+
       // Add collaborative recommendations
       filteredPeerRecs.forEach((rec) => {
         const mapping = mappingMap.get(rec.item_id);
+        const path = candidatePathsById.get(rec.item_id);
+        if (!path) return;
         const stakeInfo = mapping
           ? ` - 🔥 High Stakes: ${mapping.examType}`
           : '';
 
-        recommendations.push({
-          title: `Peer Recommendation: ${rec.item_id}`,
-          description: `Join peers learning similar content based on your profile`,
+        pathRecommendations.set(rec.item_id, {
+          title: path.title,
+          description: path.description?.trim() || '',
           category: GoalCategory.learning_path,
           type: GoalType.longTerm,
           recommendationReason: `${rec.reason} (${(rec.score * 100).toFixed(0)}% match)${stakeInfo}`,
@@ -1232,18 +1242,35 @@ export class LearningGoalsService {
         });
       });
 
-      // Add trending paths (ignoring mappings for paths for now)
+      // Add trending paths without duplicating paths already recommended by peers.
       filteredTrendingPaths.forEach((path) => {
-        recommendations.push({
-          title: `Trending: Popular Learning Path`,
-          description: `Master trending learning path: ${path.path_id}`,
+        const learningPath = candidatePathsById.get(path.path_id);
+        if (!learningPath) return;
+
+        const enrollmentReason = path.enrollments > 0
+          ? `${path.enrollments} enrollment${path.enrollments === 1 ? '' : 's'}`
+          : '';
+        const existingRecommendation = pathRecommendations.get(path.path_id);
+
+        if (existingRecommendation) {
+          if (enrollmentReason) {
+            existingRecommendation.recommendationReason += ` · ${enrollmentReason}`;
+          }
+          return;
+        }
+
+        pathRecommendations.set(path.path_id, {
+          title: learningPath.title,
+          description: learningPath.description?.trim() || '',
           category: GoalCategory.learning_path,
           type: GoalType.longTerm,
-          recommendationReason: `${path.enrollments} users are currently learning this path`,
+          recommendationReason: enrollmentReason,
           recommendationSource: GoalRecommendationSource.PERFORMANCE_ANALYTICS,
           relatedId: path.path_id,
         });
       });
+
+      recommendations.push(...pathRecommendations.values());
 
       // Order by exam stake (highest first)
       recommendations.sort((a, b) => (b.examStake || 0) - (a.examStake || 0));

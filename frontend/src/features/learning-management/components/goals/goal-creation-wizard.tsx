@@ -105,6 +105,7 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
         description: initialData.description ?? prev.description,
         type: initialData.type ?? prev.type,
         category: initialData.category ?? prev.category,
+        learningPathId: initialData.learningPathId ?? prev.learningPathId,
         priority: normalizedPriority,
         startDate: toDateInput(initialData.startDate) || prev.startDate,
         targetDate: toDateInput(initialData.targetDate) || prev.targetDate,

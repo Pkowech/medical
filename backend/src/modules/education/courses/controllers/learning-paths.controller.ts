@@ -19,6 +19,9 @@ import {
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '#modules/auth/guards/jwt-auth.guard';
+import { RoleGuard } from '#common/guards/roles.guard';
+import { Roles } from '#common/decorators/roles.decorator';
+import { Role } from '#modules/auth/constants/role.constants';
 import { LearningPathsService } from '../services/learning-paths.service';
 import { LearningPathProgressService } from '../services/learning-path-progress.service';
 import { LearningPathRecommendationsService } from '#modules/ai-analytics/services/learning-path-recommendations.service';
@@ -46,6 +49,8 @@ export class LearningPathsController {
 
   // ==================== CRUD Operations ====================
   @Post()
+  @UseGuards(RoleGuard)
+  @Roles(Role.instructor, Role.admin)
   @ApiOperation({ summary: 'Create a new learning path' })
   @ApiResponse({
     status: 201,

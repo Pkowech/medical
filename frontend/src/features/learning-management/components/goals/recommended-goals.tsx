@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/shared/components/ui/button';
 import { Card, CardContent } from '@/shared/components/ui/card';
 import { Badge } from '@/shared/components/ui/badge';
@@ -26,26 +26,24 @@ const RecommendedGoals: React.FC<RecommendedGoalsProps> = ({ onAccept }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchRecommendations = async () => {
-      try {
-        setLoading(true);
-        const response = await apiService.get<RecommendedGoalsResponse>('/learning-goals/recommendations');
-        // response is ApiResponse<RecommendedGoalsResponse>
-        // the actual recommendations are in response.data.recommendations
-        const data = response.data;
-        const recs = data?.recommendations ?? [];
-        setRecommendations(recs);
-      } catch (err) {
-        console.error('Failed to fetch recommendations:', err);
-        setError(err instanceof Error ? err.message : 'An unknown error occurred');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchRecommendations();
+  const fetchRecommendations = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await apiService.get<RecommendedGoalsResponse>('/learning-goals/recommendations');
+      setRecommendations(response.data?.recommendations ?? []);
+    } catch (err) {
+      console.error('Failed to fetch recommendations:', err);
+      setRecommendations([]);
+      setError(err instanceof Error ? err.message : 'An unknown error occurred');
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void fetchRecommendations();
+  }, [fetchRecommendations]);
 
   const getCategoryIcon = (category: string) => {
     switch (category.toLowerCase()) {
@@ -83,7 +81,7 @@ const RecommendedGoals: React.FC<RecommendedGoalsProps> = ({ onAccept }) => {
       <Card className="border-destructive/30 bg-destructive/10 text-destructive">
         <CardContent className="p-4 text-center">
           <p className="text-sm text-red-600">Failed to load recommendations</p>
-          <Button variant="ghost" size="sm" onClick={() => window.location.reload()} className="mt-2 text-red-700 hover:text-red-800 hover:bg-red-100">
+          <Button variant="ghost" size="sm" onClick={() => void fetchRecommendations()} className="mt-2 text-red-700 hover:text-red-800 hover:bg-red-100">
             Retry
           </Button>
         </CardContent>
@@ -92,7 +90,14 @@ const RecommendedGoals: React.FC<RecommendedGoalsProps> = ({ onAccept }) => {
   }
 
   if (recommendations.length === 0) {
-    return null;
+    return (
+      <Card className="border-border bg-card text-card-foreground">
+        <CardContent className="p-5">
+          <h2 className="font-semibold">Recommended Goals</h2>
+          <p className="mt-1 text-sm text-muted-foreground">No recommendations are available yet.</p>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
@@ -103,14 +108,14 @@ const RecommendedGoals: React.FC<RecommendedGoalsProps> = ({ onAccept }) => {
           Recommended Goals
         </h2>
         <Badge variant="outline" className="bg-secondary text-secondary-foreground border-border">
-          AI Powered
+          Learning analytics
         </Badge>
       </div>
 
       <div className="grid grid-cols-1 gap-4">
         {recommendations.map((rec, index) => (
           <Card 
-            key={index} 
+            key={`${rec.category}:${rec.relatedId ?? rec.title}:${index}`}
             className="group hover:shadow-lg transition-all duration-300 border border-border overflow-hidden bg-card text-card-foreground"
           >
             <CardContent className="p-5">
@@ -121,7 +126,9 @@ const RecommendedGoals: React.FC<RecommendedGoalsProps> = ({ onAccept }) => {
                   </div>
                   <div className="space-y-1">
                     <h3 className="font-bold text-foreground group-hover:text-primary transition-colors">{rec.title}</h3>
-                    <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">{rec.description}</p>
+                    {rec.description && (
+                      <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">{rec.description}</p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -140,7 +147,7 @@ const RecommendedGoals: React.FC<RecommendedGoalsProps> = ({ onAccept }) => {
 
               <div className="mt-5 flex items-center justify-between pt-4 border-t border-inherit">
                 <span className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">
-                  Source: {rec.recommendationSource}
+                  Source: {rec.recommendationSource.replace(/_/g, ' ')}
                 </span>
                 <Button 
                   size="sm" 

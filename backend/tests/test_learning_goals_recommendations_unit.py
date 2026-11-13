@@ -9,9 +9,10 @@ const { LearningGoalsService } =
   require('./src/modules/education/courses/services/learning-goals.service.ts');
 
 const paths = [
-  { id: 'eligible-path', status: 'published', targetCareerStages: ['student'] },
-  { id: 'ineligible-path', status: 'published', targetCareerStages: ['professional'] },
-  { id: 'completed-path', status: 'published', targetCareerStages: ['student'] },
+  { id: 'eligible-path', title: 'Eligible Path', description: 'Learn relevant topics.', status: 'published', targetCareerStages: ['student'] },
+  { id: 'zero-enrollment-path', title: 'New Path', description: 'Build foundational skills.', status: 'published', targetCareerStages: ['student'] },
+  { id: 'ineligible-path', title: 'Ineligible Path', status: 'published', targetCareerStages: ['professional'] },
+  { id: 'completed-path', title: 'Completed Path', status: 'published', targetCareerStages: ['student'] },
 ];
 const service = new LearningGoalsService(
   {
@@ -34,6 +35,7 @@ const service = new LearningGoalsService(
     getTrendingPaths: async () => [
       { path_id: 'ineligible-path', enrollments: 20 },
       { path_id: 'eligible-path', enrollments: 10 },
+      { path_id: 'zero-enrollment-path', enrollments: 0 },
       { path_id: 'completed-path', enrollments: 5 },
     ],
   },
@@ -43,7 +45,11 @@ const service = new LearningGoalsService(
 (async () => {
   const { recommendations } = await service.getRecommendedGoals('user-1');
   const relatedIds = recommendations.map(recommendation => recommendation.relatedId);
-  assert.deepEqual(relatedIds, ['eligible-path', 'topic-1', 'eligible-path']);
+  assert.deepEqual(relatedIds, ['eligible-path', 'zero-enrollment-path']);
+  assert.equal(recommendations[0].title, 'Eligible Path');
+  assert.match(recommendations[0].recommendationReason, /10 enrollments/);
+  assert.equal(recommendations[1].title, 'New Path');
+  assert.equal(recommendations[1].recommendationReason, '');
 })().catch(error => {
   console.error(error);
   process.exitCode = 1;

@@ -1,6 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
-import { BookOpen, CalendarDays, Target } from 'lucide-react';
+import { BookOpen, CalendarDays, ChevronRight, Target, Upload } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import ProgressBar from '@/shared/components/ui/ProgressBar';
@@ -153,22 +153,64 @@ export const StudyDashboard: React.FC = () => {
 
   return (
     <div className="min-w-0 space-y-4 bg-background/50 dark:bg-card/50">
-      <nav aria-label="Study planner shortcuts" className="grid grid-cols-3 gap-2 sm:gap-3">
-        {[
-          { href: '/study-planner/schedule', label: 'Schedule', icon: CalendarDays },
-          { href: '/study-planner/goals', label: 'Goals', icon: Target },
-          { href: '/study-planner/materials', label: 'Study materials', icon: BookOpen },
-        ].map(({ href, label, icon: Icon }) => (
-          <Link
-            key={href}
-            href={href}
-            className="flex min-h-20 flex-col items-center justify-center gap-2 rounded-xl border border-border bg-card/80 p-3 text-center text-xs font-semibold text-muted-foreground shadow-sm transition-colors hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-border dark:bg-card/70 dark:text-muted-foreground dark:hover:bg-card"
-          >
-            <Icon aria-hidden="true" className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-            <span>{label}</span>
-          </Link>
-        ))}
-      </nav>
+      <section aria-labelledby="study-planner-actions" className="space-y-3">
+        <div>
+          <h2 id="study-planner-actions" className="text-lg font-semibold text-foreground">
+            Plan your studies
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Schedule focused sessions, keep goals on track, and organize your resources.
+          </p>
+        </div>
+        <nav aria-label="Study planner tools" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {[
+            {
+              href: '/study-planner/schedule',
+              label: 'Schedule',
+              description: 'Plan study sessions, classes, and exams.',
+              action: 'View schedule',
+              icon: CalendarDays,
+            },
+            {
+              href: '/study-planner/goals',
+              label: 'Goals',
+              description: 'Set learning targets and track progress.',
+              action: 'Manage goals',
+              icon: Target,
+            },
+            {
+              href: '/study-planner/materials',
+              label: 'Study materials',
+              description: 'Browse your saved study resources.',
+              action: 'Browse materials',
+              icon: BookOpen,
+            },
+            {
+              href: '/study-planner/materials/upload',
+              label: 'Upload materials',
+              description: 'Add notes and files to your library.',
+              action: 'Upload a file',
+              icon: Upload,
+            },
+          ].map(({ href, label, description, action, icon: Icon }) => (
+            <Link
+              key={href}
+              href={href}
+              className="group flex min-h-36 flex-col rounded-xl border border-border bg-card/80 p-4 shadow-sm transition-colors hover:border-blue-300 hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-border dark:bg-card/70 dark:hover:border-blue-800 dark:hover:bg-card"
+            >
+              <span className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300">
+                <Icon aria-hidden="true" className="h-5 w-5" />
+              </span>
+              <span className="font-semibold text-foreground">{label}</span>
+              <span className="mt-1 flex-1 text-sm text-muted-foreground">{description}</span>
+              <span className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-blue-700 dark:text-blue-300">
+                {action}
+                <ChevronRight aria-hidden="true" className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+              </span>
+            </Link>
+          ))}
+        </nav>
+      </section>
 
       {/* AI-Generated Practice Quizzes */}
       {autoQuizzesError && (
