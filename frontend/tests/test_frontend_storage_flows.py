@@ -42,23 +42,24 @@ def test_app_and_learning_progress_stores_persist_only_intended_state():
     app_store = read_frontend("src/core/stores/index.ts")
     course_store = read_frontend("src/features/courses/hooks/useCourseProgressStore.ts")
     unit_store = read_frontend("src/features/courses/hooks/useUnitProgressStore.ts")
+    scoped_progress_store = read_frontend(
+        "src/features/courses/hooks/createUserScopedCourseProgressStore.ts"
+    )
 
     assert "name: 'app-storage'" in app_store
     assert "partialize: state =>" in app_store
     assert "user: state.user" in app_store
     assert "settings: state.settings" in app_store
     assert "theme: state.theme" in app_store
-    assert "name: 'course-progress-storage'" in course_store
-    assert "name: 'unit-progress-storage'" in unit_store
+    assert "createUserScopedCourseProgressStore('course-progress-storage')" in course_store
+    assert "createUserScopedCourseProgressStore('unit-progress-storage')" in unit_store
 
-    for source in (course_store, unit_store):
-        assert "version: 1" in source
-        assert "migrate: (persistedState: unknown)" in source
-        assert "Array.isArray(bookmarks)" in source
-        assert "Object.keys(bookmarks" in source
-        assert "markLessonComplete" in source
-        assert "toggleBookmark" in source
-        assert "saveNote" in source
+    assert "version: 2" in scoped_progress_store
+    assert "migrate: migrateCourseProgress" in scoped_progress_store
+    assert "partialize: state =>" in scoped_progress_store
+    assert "markLessonComplete" in scoped_progress_store
+    assert "toggleBookmark" in scoped_progress_store
+    assert "saveNote" in scoped_progress_store
 
 
 def test_search_history_storage_covers_crud_deduplication_and_limits():
@@ -134,7 +135,7 @@ def test_material_progress_does_not_queue_permanent_api_errors():
     assert "status !== 501" in api_client
     assert "offlineSync.addToQueue" not in tracker
     assert "offlineProgressSync.addToQueue" not in close_handler
-    assert "Could not refresh learning data after saving material progress" in close_handler
+    assert "Could not refresh learning data after material progress changed" in close_handler
 
 
 def test_offline_replay_only_queues_allowlisted_learning_posts_not_admin_deletes():
@@ -267,6 +268,23 @@ def test_recommendation_session_cache_is_invalidated_before_refresh():
     assert "JSON.stringify(freshRecommendations)" in integration
 
 
+def test_quiz_assessment_does_not_complete_reading_progress():
+    integration = read_frontend(
+        "src/features/learning-management/services/quizProgressIntegration.ts"
+    )
+    topic_viewer = read_frontend("src/features/courses/components/TopicViewer.tsx")
+    topic_quiz = read_frontend("src/features/courses/components/TopicQuiz.tsx")
+    quiz_completion = topic_viewer.split(
+        "const handleTopicQuizComplete", 1
+    )[1].split("const handleGoBack", 1)[0]
+
+    assert "updateContentProgress" not in integration
+    assert "quizScores" not in integration
+    assert "progressService.updateContentProgress" not in quiz_completion
+    assert "markLessonComplete(topicId)" not in quiz_completion
+    assert "'X-Idempotency-Key': attemptId" in topic_quiz
+
+
 def test_pwa_caches_only_static_assets_and_public_resources():
     config = read_frontend("next.config.js")
     strategies = config.split("const getPWACacheStrategies = () => [", 1)[1].split(
@@ -317,7 +335,9 @@ def test_user_progress_requests_use_authenticated_progress_service():
 
     assert "getAllProgressData: userId is required" in progress
     assert "localStorage.getItem('userId')" not in progress
-    assert "await api.post<void>('/progress/sync'" in progress
+    assert "await api.post<void>(" in progress
+    assert "'/progress/sync'" in progress
+    assert "'X-Idempotency-Key': idempotencyKey" in progress
     assert "isOfflineQueuedError(error)" in progress
     assert "isOfflineQueuedError(error)" in unit_layout
     assert "isOfflineQueuedError(error)" in topic_viewer

@@ -27,6 +27,11 @@ import {
 } from 'lucide-react';
 import { getInstructorDisplayName } from '@/lib/utils';
 import {
+  formatDateOnly,
+  getUtcDateKey,
+  shiftUtcDateKey,
+} from '@/shared/utils/date-only';
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -80,6 +85,7 @@ interface RoadmapDeadline {
   id: string;
   title: string;
   dueDate: string;
+  completed?: boolean;
   courseId?: string;
   unitId?: string;
   priority?: string;
@@ -90,6 +96,7 @@ interface RoadmapDueItem {
   title: string;
   dueDate: string;
   progressPercentage?: number;
+  deadlineId?: string;
 }
 
 interface RoadmapTopicSelection {
@@ -665,12 +672,9 @@ export default function MaterialsDashboard() {
   });
   const matchingPathIds = new Set(matchingLearningPaths.map(progress => progress.learningPath.id));
   const now = new Date();
-  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const dueSoonLimit = new Date(startOfToday);
-  dueSoonLimit.setDate(dueSoonLimit.getDate() + 7);
-  dueSoonLimit.setHours(23, 59, 59, 999);
-  const overdueLimit = new Date(startOfToday);
-  overdueLimit.setDate(overdueLimit.getDate() - 7);
+  const todayKey = new Date().toISOString().slice(0, 10);
+  const dueSoonLimit = shiftUtcDateKey(todayKey, 7);
+  const overdueLimit = shiftUtcDateKey(todayKey, -7);
   const dueSoonGoals = activeGoals.filter(goal => {
     if (goal.status !== 'active') return false;
     const courseMatches =
@@ -679,29 +683,30 @@ export default function MaterialsDashboard() {
       || goal.relatedCourse === selectedCourseId;
     const goalPathId = goal.learningPath?.id ?? goal.learningPathId ?? goal.relatedLearningPath;
     const pathMatches = Boolean(goalPathId && matchingPathIds.has(goalPathId));
-    const dueDate = new Date(
-      /^\d{4}-\d{2}-\d{2}$/.test(goal.targetDate)
-        ? `${goal.targetDate}T00:00:00`
-        : goal.targetDate,
-    );
+    const dueDateKey = getUtcDateKey(goal.targetDate);
     return (courseMatches || pathMatches)
-      && !Number.isNaN(dueDate.getTime())
-      && dueDate >= overdueLimit
-      && dueDate <= dueSoonLimit;
+      && dueDateKey !== null
+      && dueDateKey >= overdueLimit
+      && dueDateKey <= dueSoonLimit;
   }).sort((first, second) =>
-    new Date(first.targetDate).getTime() - new Date(second.targetDate).getTime(),
+    (getUtcDateKey(first.targetDate) ?? '').localeCompare(
+      getUtcDateKey(second.targetDate) ?? '',
+    ),
   );
   const courseUnitIds = new Set(courseUnits.map(unit => String(unit.id)));
   const dueSoonDeadlines = courseDeadlines.filter(deadline => {
-    const date = new Date(deadline.dueDate);
+    const dateKey = getUtcDateKey(deadline.dueDate);
     const isForCourse = deadline.courseId === selectedCourseId
       || Boolean(deadline.unitId && courseUnitIds.has(deadline.unitId));
-    return isForCourse
-      && !Number.isNaN(date.getTime())
-      && date >= overdueLimit
-      && date <= dueSoonLimit;
+    return !deadline.completed
+      && isForCourse
+      && dateKey !== null
+      && dateKey >= overdueLimit
+      && dateKey <= dueSoonLimit;
   }).sort((first, second) =>
-    new Date(first.dueDate).getTime() - new Date(second.dueDate).getTime(),
+    (getUtcDateKey(first.dueDate) ?? '').localeCompare(
+      getUtcDateKey(second.dueDate) ?? '',
+    ),
   );
   const dueSoonItems: RoadmapDueItem[] = [
     ...dueSoonGoals.map(goal => ({
@@ -714,9 +719,12 @@ export default function MaterialsDashboard() {
       id: `deadline:${deadline.id}`,
       title: deadline.title,
       dueDate: deadline.dueDate,
+      deadlineId: deadline.id,
     })),
   ].sort((first, second) =>
-    new Date(first.dueDate).getTime() - new Date(second.dueDate).getTime(),
+    (getUtcDateKey(first.dueDate) ?? '').localeCompare(
+      getUtcDateKey(second.dueDate) ?? '',
+    ),
   );
   const courseStudySessions = upcomingStudySessions.filter(event =>
     event.description?.includes(`[courseId:${selectedCourseId}]`)
@@ -1026,18 +1034,39 @@ export default function MaterialsDashboard() {
                   ) : dueSoonItems.length > 0 ? (
                     <ul className="mt-3 space-y-3">
                       {dueSoonItems.slice(0, 5).map(item => {
-                        const dueDate = new Date(
-                              /^\d{4}-\d{2}-\d{2}$/.test(item.dueDate)
-                                ? `${item.dueDate}T00:00:00`
-                                : item.dueDate,
-                            );
+                        const dueDateKey = getUtcDateKey(item.dueDate);
                         return (
                           <li key={item.id} className="border-t border-border pt-3 first:border-0 first:pt-0 dark:border-border">
-                            <p className="text-sm font-medium text-foreground dark:text-foreground">{item.title}</p>
-                            <p className="mt-1 text-xs text-muted-foreground dark:text-muted-foreground">
-                              {dueDate < startOfToday ? 'Overdue since' : 'Due'} {dueDate.toLocaleDateString()}
-                              {typeof item.progressPercentage === 'number' && ` · ${Math.round(item.progressPercentage)}% complete`}
-                            </p>
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <p className="text-sm font-medium text-foreground dark:text-foreground">{item.title}</p>
+                                <p className="mt-1 text-xs text-muted-foreground dark:text-muted-foreground">
+                                  {dueDateKey && dueDateKey < todayKey ? 'Overdue since' : 'Due'}{' '}
+                                  {dueDateKey ? formatDateOnly(item.dueDate) : 'Date unavailable'}
+                                  {typeof item.progressPercentage === 'number' && ` · ${Math.round(item.progressPercentage)}% complete`}
+                                </p>
+                              </div>
+                              {item.deadlineId && (
+                                <button
+                                  type="button"
+                                  className="text-xs font-medium text-primary hover:underline"
+                                  onClick={async () => {
+                                    try {
+                                      await apiService.patch(
+                                        `/deadlines/${item.deadlineId}`,
+                                        { completed: true },
+                                      );
+                                      await refetchDeadlines();
+                                      toast.success('Deadline marked complete.');
+                                    } catch {
+                                      toast.error('Could not update this deadline.');
+                                    }
+                                  }}
+                                >
+                                  Mark complete
+                                </button>
+                              )}
+                            </div>
                           </li>
                         );
                       })}

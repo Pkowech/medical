@@ -612,16 +612,18 @@ const progressService = {
   async updateUnitProgress(
     unitId: string,
     status: 'notStarted' | 'inProgress' | 'completed' | 'failed',
+    expectedRevision: number,
     completionPercentage?: number,
     timeSpentMinutes?: number,
     notes?: string,
-    quizScores?: QuizScores
+    quizScores?: QuizScores,
   ): Promise<void> {
     await this.updateContentProgress({
       unitId,
       status,
       progressPercentage: completionPercentage,
       timeSpentMinutes,
+      expectedRevision,
       notes,
       quizScores,
     });
@@ -635,9 +637,10 @@ const progressService = {
     status: 'notStarted' | 'inProgress' | 'completed' | 'failed';
     progressPercentage?: number;
     timeSpentMinutes?: number;
+    expectedRevision: number;
     notes?: string;
     quizScores?: QuizScores;
-  }): Promise<void> {
+  }, idempotencyKey = crypto.randomUUID()): Promise<void> {
     if (!progress.topicId && !progress.materialId) {
       throw new Error('Progress updates require a topic or material ID.');
     }
@@ -651,7 +654,7 @@ const progressService = {
         {
           headers: {
             'X-Client-Timestamp': `${getClientTimestamp()}`, // Milliseconds for conflict resolution
-            'X-Idempotency-Key': crypto.randomUUID(),
+            'X-Idempotency-Key': idempotencyKey,
           },
         }
       );
@@ -886,5 +889,19 @@ const progressService = {
     return enriched;
   },
 };
+
+export function isProgressConflict(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const candidate = error as {
+    response?: { status?: number };
+    status?: number;
+    rawResponse?: { statusCode?: number };
+  };
+  return (
+    candidate.response?.status === 409 ||
+    candidate.status === 409 ||
+    candidate.rawResponse?.statusCode === 409
+  );
+}
 
 export default progressService;

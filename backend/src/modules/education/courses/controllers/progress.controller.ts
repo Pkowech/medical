@@ -50,6 +50,21 @@ export class ProgressController {
     return BigInt(value);
   }
 
+  private parseExpectedRevision(value?: string): number {
+    if (value === undefined || !/^\d+$/.test(value)) {
+      throw new BadRequestException(
+        'X-Expected-Revision is required and must be a non-negative integer.',
+      );
+    }
+    const revision = Number(value);
+    if (!Number.isSafeInteger(revision)) {
+      throw new BadRequestException(
+        'X-Expected-Revision must be a safe integer.',
+      );
+    }
+    return revision;
+  }
+
   private assertCanReadUserProgress(
     currentUser: User,
     requestedUserId: string,
@@ -266,13 +281,32 @@ export class ProgressController {
     @Request() req: any,
     @Headers('X-Client-Timestamp') clientTimestampHeader?: string,
     @Headers('X-Idempotency-Key') idempotencyKey?: string,
+    @Headers('X-Expected-Revision') expectedRevisionHeader?: string,
   ) {
     const clientTimestamp = this.parseClientTimestamp(clientTimestampHeader);
+    if (clientTimestamp === undefined) {
+      throw new BadRequestException(
+        'X-Client-Timestamp is required for material progress updates.',
+      );
+    }
+    if (
+      typeof idempotencyKey !== 'string' ||
+      idempotencyKey.trim().length === 0 ||
+      idempotencyKey.length > 200
+    ) {
+      throw new BadRequestException(
+        'X-Idempotency-Key is required and must be at most 200 characters.',
+      );
+    }
+    const expectedRevision = this.parseExpectedRevision(
+      expectedRevisionHeader,
+    );
     return this.progressService.markMaterialAsRead(
       req.user.id,
       materialId,
       clientTimestamp,
       idempotencyKey,
+      expectedRevision,
     );
   }
 
@@ -345,6 +379,32 @@ export class ProgressController {
     @Headers('X-Idempotency-Key') idempotencyKeyHeader?: string,
   ) {
     const clientTimestamp = this.parseClientTimestamp(clientTimestampHeader);
+    if (clientTimestamp === undefined) {
+      throw new BadRequestException(
+        'X-Client-Timestamp is required for progress synchronization.',
+      );
+    }
+
+    const idempotencyKey =
+      idempotencyKeyHeader ?? progress?.idempotencyKey;
+    if (
+      typeof idempotencyKey !== 'string' ||
+      idempotencyKey.trim().length === 0 ||
+      idempotencyKey.length > 200
+    ) {
+      throw new BadRequestException(
+        'X-Idempotency-Key is required and must be at most 200 characters.',
+      );
+    }
+    const expectedRevision = progress?.expectedRevision;
+    if (
+      !Number.isSafeInteger(expectedRevision) ||
+      expectedRevision < 0
+    ) {
+      throw new BadRequestException(
+        'expectedRevision is required and must be a non-negative safe integer.',
+      );
+    }
 
     if (
       progress.courseId ||
@@ -358,7 +418,8 @@ export class ProgressController {
         progressPercentage: progress.progressPercentage ?? 100,
         timeSpent: progress.timeSpentMinutes ?? progress.timeSpent ?? 0,
         clientTimestamp,
-        idempotencyKey: idempotencyKeyHeader ?? progress.idempotencyKey,
+        idempotencyKey,
+        expectedRevision,
       });
     }
     return { success: true, count: 0 };

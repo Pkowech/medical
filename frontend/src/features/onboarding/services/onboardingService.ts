@@ -6,8 +6,8 @@ export interface CompleteOnboardingPayload {
   studyYear?: number;
   yearOfExperience?: number;
   specialization?: string;
-  institution?: string;
-  targetExam?: string;
+  institution?: string | null;
+  targetExam?: string | null;
   focusTopics?: string[];
   dailyGoalMinutes?: number;
 }

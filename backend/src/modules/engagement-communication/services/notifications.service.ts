@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from '#infrastructure/prisma/prisma.service';
-import { NotificationPriority } from '@prisma/client';
+import { Notification, NotificationPriority } from '@prisma/client';
 import { PushNotificationsService } from './push-notifications.service';
 
 @Injectable()
@@ -53,17 +53,37 @@ export class NotificationsService {
     metadata?: any,
     priority: NotificationPriority = NotificationPriority.low,
     sendViaPush = true,
+    sourceKey?: string,
   ) {
     // UX-001: Check throttle
     const canSend = await this.checkThrottleLimit(userId, priority);
 
-    if (!canSend) {
+    let notification: Notification;
+    if (sourceKey) {
+      const result = await this.prisma.notification.createMany({
+        data: {
+          userId,
+          sourceKey,
+          message: content,
+          type: type || 'info',
+          metadata: metadata || {},
+          priority,
+          throttled: !canSend,
+          sentViaPush: false,
+        },
+        skipDuplicates: true,
+      });
+      notification = await this.prisma.notification.findUniqueOrThrow({
+        where: { sourceKey },
+      });
+      if (result.count === 0) return notification;
+    } else if (!canSend) {
       this.logger.warn(
         `Notification throttled for user ${userId}, priority: ${priority}`,
       );
 
       // Still create notification but mark as throttled
-      return await this.prisma.notification.create({
+      notification = await this.prisma.notification.create({
         data: {
           userId,
           message: content,
@@ -74,19 +94,21 @@ export class NotificationsService {
           sentViaPush: false,
         },
       });
+    } else {
+      notification = await this.prisma.notification.create({
+        data: {
+          userId,
+          message: content,
+          type: type || 'info',
+          metadata: metadata || {},
+          priority,
+          throttled: false,
+          sentViaPush: false,
+        },
+      });
     }
 
-    const notification = await this.prisma.notification.create({
-      data: {
-        userId,
-        message: content,
-        type: type || 'info',
-        metadata: metadata || {},
-        priority,
-        throttled: false,
-        sentViaPush: false,
-      },
-    });
+    if (!canSend) return notification;
 
     if (sendViaPush) {
       const title =

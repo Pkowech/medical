@@ -112,7 +112,7 @@ impl EngagementService {
                         ELSE 'night'
                     END AS period,
                     COUNT(*)::bigint AS session_count,
-                    COALESCE(SUM(COALESCE(duration, FLOOR(EXTRACT(EPOCH FROM (end_time - start_time)) / 60)::int)), 0)::bigint AS duration_minutes
+                    COALESCE(SUM(duration), 0)::bigint AS duration_minutes
              FROM study_sessions
              WHERE user_id = $1
                AND is_valid = TRUE
@@ -150,7 +150,7 @@ impl EngagementService {
                     COALESCE(MAX(session_minutes), 0)::double precision AS longest_session,
                     COALESCE(MIN(session_minutes), 0)::double precision AS shortest_session
              FROM (
-                 SELECT COALESCE(duration, FLOOR(EXTRACT(EPOCH FROM (end_time - start_time)) / 60)::int) AS session_minutes
+                 SELECT duration AS session_minutes
                  FROM study_sessions
                  WHERE user_id = $1
                    AND is_valid = TRUE

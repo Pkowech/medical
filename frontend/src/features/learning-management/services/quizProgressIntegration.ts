@@ -4,9 +4,7 @@
  */
 
 import { toast } from 'sonner';
-import progressService from '@/features/learning-management/services/progressService';
 import { learningPathService } from '@/features/learning-management/services/learningPathService';
-import { isOfflineQueuedError } from '@/lib/core/offline/offlineQueuedError';
 import type { QuizCompletionEvent } from '@/shared/types/assessmentInterface';
 
 class QuizProgressIntegrationService {
@@ -48,8 +46,7 @@ class QuizProgressIntegrationService {
   }
 
   /**
-   * Handle quiz completion with full event chain:
-   * Quiz → Progress Sync → Mastery Calculation → Recommendation Refresh
+   * Handle follow-up work after the backend has persisted a quiz attempt.
    */
   async handleQuizCompletion(quizEvent: QuizCompletionEvent): Promise<void> {
     const eventKey = `quiz-${quizEvent.topicId}-${quizEvent.userId}`;
@@ -62,24 +59,21 @@ class QuizProgressIntegrationService {
     return new Promise((resolve) => {
       const timer = setTimeout(async () => {
         try {
-          // Step 1: Sync quiz completion to backend progress
-          console.warn('[Integration] Step 1: Syncing quiz completion to progress service...');
-          await this.syncQuizToProgress(quizEvent);
-          this.emit('progress-synced', quizEvent);
+          this.emit('assessment-recorded', quizEvent);
 
-          // Step 2: Update spaced repetition flashcards for weak areas
-          console.warn('[Integration] Step 2: Updating spaced repetition scheduling...');
+          // Update spaced repetition flashcards for weak areas.
+          console.warn('[Integration] Updating spaced repetition scheduling...');
           await this.updateSpacedRepetition(quizEvent);
           this.emit('spaced-repetition-updated', quizEvent);
 
-          // Step 3: Refresh recommendations based on new mastery data
-          console.warn('[Integration] Step 3: Refreshing recommendations...');
+          // Refresh recommendations based on new assessment evidence.
+          console.warn('[Integration] Refreshing recommendations...');
           await this.refreshRecommendations(quizEvent.userId);
           this.emit('recommendations-refreshed', quizEvent);
 
-          // Step 4: Create flashcards for review if score is below threshold
+          // Create flashcards for review if score is below threshold.
           if (quizEvent.score < 80) {
-            console.warn('[Integration] Step 4: Creating review flashcards for weak areas...');
+            console.warn('[Integration] Creating review flashcards for weak areas...');
             await this.createReviewFlashcards(quizEvent);
             this.emit('flashcards-created', quizEvent);
           }
@@ -97,26 +91,6 @@ class QuizProgressIntegrationService {
 
       this.debounceTimers.set(eventKey, timer);
     });
-  }
-
-  /**
-   * Step 1: Sync quiz results to progress tracking
-   */
-  private async syncQuizToProgress(event: QuizCompletionEvent): Promise<void> {
-    try {
-      await progressService.updateContentProgress({
-        topicId: event.topicId,
-        status: event.score >= 70 ? 'completed' : 'inProgress',
-        progressPercentage: event.score,
-        timeSpentMinutes: 0,
-        notes: `Quiz completed with score: ${event.score}%`,
-        quizScores: { [event.topicId]: event.score },
-      });
-    } catch (error) {
-      if (isOfflineQueuedError(error)) return;
-      console.error('Error syncing quiz to progress:', error);
-      throw error;
-    }
   }
 
   /**

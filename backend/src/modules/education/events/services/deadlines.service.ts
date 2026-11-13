@@ -2,7 +2,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '#infrastructure/prisma/prisma.service';
 import { CreateDeadlineDto, UpdateDeadlineDto } from '../dto/create-deadline.dto';
-import { Deadline } from '@prisma/client';
+import { Deadline, Prisma } from '@prisma/client';
 
 @Injectable()
 export class DeadlinesService {
@@ -28,9 +28,28 @@ export class DeadlinesService {
   }
 
   async findAll(userId: string): Promise<Deadline[]> {
-    return this.prisma.deadline.findMany({
+    const deadlines = await this.prisma.deadline.findMany({
       where: { userId },
       orderBy: { dueDate: 'asc' },
+    });
+    const generatedUnits = new Set<string>();
+
+    return deadlines.filter((deadline) => {
+      const metadata = deadline.metadata;
+      if (
+        !deadline.unitId ||
+        !metadata ||
+        typeof metadata !== 'object' ||
+        Array.isArray(metadata) ||
+        metadata.type !== 'auto_generated'
+      ) {
+        return true;
+      }
+
+      const key = `${deadline.courseId ?? ''}:${deadline.unitId}`;
+      if (generatedUnits.has(key)) return false;
+      generatedUnits.add(key);
+      return true;
     });
   }
 
@@ -76,8 +95,8 @@ export class DeadlinesService {
   }
 
   /**
-   * Automatically generates deadlines for all units in a course.
-   * Spaced out by 7 days starting from today.
+   * Automatically generates one deadline per unit. Repeated calls leave
+   * existing generated dates unchanged.
    */
   async autoGenerateCourseDeadlines(
     userId: string,
@@ -90,31 +109,56 @@ export class DeadlinesService {
 
     if (units.length === 0) return 0;
 
-    const startDate = new Date();
-    const createdDeadlines = [];
+    const now = new Date();
+    const startDate = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+    );
+    const unitIds = units.map((unit) => unit.id);
+    const existingDeadlines = await this.prisma.deadline.findMany({
+      where: { userId, courseId, unitId: { in: unitIds } },
+      select: { courseId: true, unitId: true, metadata: true },
+    });
+    const existingGeneratedUnitIds = new Set(
+      existingDeadlines
+        .filter((deadline) => {
+          const metadata = deadline.metadata;
+          return (
+            metadata !== null &&
+            typeof metadata === 'object' &&
+            !Array.isArray(metadata) &&
+            metadata.type === 'auto_generated'
+          );
+        })
+        .map((deadline) => deadline.unitId)
+        .filter((unitId): unitId is string => unitId !== null),
+    );
 
+    const deadlinesToCreate: Prisma.DeadlineCreateManyInput[] = [];
     for (let i = 0; i < units.length; i++) {
       const unit = units[i];
-      const dueDate = new Date(startDate);
-      dueDate.setDate(dueDate.getDate() + (i + 1) * 7); // 1 week per unit
+      if (existingGeneratedUnitIds.has(unit.id)) continue;
 
-      createdDeadlines.push(
-        this.prisma.deadline.create({
-          data: {
-            userId,
-            courseId,
-            unitId: unit.id,
-            title: `Complete Unit: ${unit.title || unit.name}`,
-            description: `Auto-generated deadline for completing the unit within the recommended timeframe.`,
-            dueDate,
-            priority: i === 0 ? 'high' : 'medium',
-            metadata: { type: 'auto_generated' },
-          },
-        }),
-      );
+      const dueDate = new Date(startDate);
+      dueDate.setUTCDate(dueDate.getUTCDate() + (i + 1) * 7);
+      deadlinesToCreate.push({
+        sourceKey: `auto-course-deadline:${userId}:${courseId}:${unit.id}`,
+        userId,
+        courseId,
+        unitId: unit.id,
+        title: `Complete Unit: ${unit.title || unit.name}`,
+        description:
+          'Auto-generated deadline for completing the unit within the recommended timeframe.',
+        dueDate,
+        priority: i === 0 ? 'high' : 'medium',
+        metadata: { type: 'auto_generated' },
+      });
     }
 
-    const results = await Promise.all(createdDeadlines);
-    return results.length;
+    if (!deadlinesToCreate.length) return 0;
+    const result = await this.prisma.deadline.createMany({
+      data: deadlinesToCreate,
+      skipDuplicates: true,
+    });
+    return result.count;
   }
 }

@@ -410,9 +410,10 @@ export class FlashcardsService {
           include: { options: true },
         });
         if (!question) {
-          throw new NotFoundException(
-            `Question ${answer.questionId} not found for topic ${topicId}`,
+          this.logger.warn(
+            `Skipping flashcard review for question ${answer.questionId}; it is not mapped to topic ${topicId ?? 'all topics'}.`,
           );
+          continue;
         }
         const sourceKey = attemptId
           ? `quiz-review:${attemptId}:${answer.questionId}`

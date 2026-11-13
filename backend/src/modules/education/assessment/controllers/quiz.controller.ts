@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Body,
+  Headers,
   Param,
   UseGuards,
   Query,
@@ -118,12 +119,14 @@ export class QuizController {
   async submitTopicQuiz(
     @Request() req: any,
     @Param('topicId') topicId: string,
+    @Headers('x-idempotency-key') idempotencyKey: string | undefined,
     @Body() body: any,
   ) {
     const userId = req.user.id;
     return this.quizService.submitTopicQuiz(
       userId,
       topicId,
+      idempotencyKey,
       body.responses || [],
     );
   }

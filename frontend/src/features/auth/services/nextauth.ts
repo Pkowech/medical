@@ -273,7 +273,9 @@ async function exchangeGoogleCredential(
     isEmailVerified: authUser.isEmailVerified === true,
     mfaSetupRequired: authUser.mfaSetupRequired === true,
     careerStage:
-      authUser.careerStage === 'student' || authUser.careerStage === 'professional'
+      authUser.careerStage === 'student' ||
+      authUser.careerStage === 'postgraduate' ||
+      authUser.careerStage === 'professional'
         ? authUser.careerStage
         : null,
     healthcareField:
@@ -487,7 +489,9 @@ export const authOptions: NextAuthOptions = {
             isEmailVerified: (user?.isEmailVerified as boolean) || false,
             mfaSetupRequired: user?.mfaSetupRequired === true,
             careerStage:
-              user?.careerStage === 'student' || user?.careerStage === 'professional'
+              user?.careerStage === 'student' ||
+              user?.careerStage === 'postgraduate' ||
+              user?.careerStage === 'professional'
                 ? user.careerStage
                 : null,
             healthcareField:
@@ -623,6 +627,7 @@ export const authOptions: NextAuthOptions = {
         const updatedUser = session.user;
         if (
           updatedUser.careerStage === 'student' ||
+          updatedUser.careerStage === 'postgraduate' ||
           updatedUser.careerStage === 'professional' ||
           updatedUser.careerStage === null
         ) {
@@ -792,7 +797,9 @@ export const authOptions: NextAuthOptions = {
       session.user.firstName = (token.firstName as string) || '';
       session.user.lastName = (token.lastName as string) || '';
       session.user.careerStage =
-        token.careerStage === 'student' || token.careerStage === 'professional'
+        token.careerStage === 'student' ||
+        token.careerStage === 'postgraduate' ||
+        token.careerStage === 'professional'
           ? token.careerStage
           : null;
       session.user.healthcareField =

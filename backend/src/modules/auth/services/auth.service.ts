@@ -891,7 +891,6 @@ export class AuthService {
       firstName,
       lastName,
       username,
-      role: providedRole,
       acceptTerms,
       bio,
       location,
@@ -925,7 +924,7 @@ export class AuthService {
         lastName,
         username,
         acceptTerms,
-        role: providedRole || Role.student, // Default enforced
+        role: Role.student,
         // Optional profile fields - only include if provided
         ...(bio && { bio }),
         ...(location && { location }),

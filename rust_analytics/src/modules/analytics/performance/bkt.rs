@@ -64,6 +64,7 @@ pub fn predict_next_correct(p_known: f64, params: &BKTParams) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::Value;
 
     #[test]
     fn next_answer_probability_depends_on_estimated_knowledge() {
@@ -74,5 +75,20 @@ mod tests {
         assert!((low_knowledge - params.p_guess).abs() < f64::EPSILON);
         assert!((high_knowledge - (1.0 - params.p_slip)).abs() < f64::EPSILON);
         assert!(high_knowledge > low_knowledge);
+    }
+
+    #[test]
+    fn mastery_estimate_matches_shared_student_evidence() {
+        let fixture: Value = serde_json::from_str(include_str!(
+            "../../../../../shared_fixtures/learning-activity-history.json"
+        ))
+        .expect("shared learning activity fixture must be valid JSON");
+        let mastery = &fixture["mastery"];
+        let mut p_known = mastery["initialPKnown"].as_f64().unwrap();
+        for evidence in mastery["evidence"].as_array().unwrap() {
+            p_known = update_p_known(p_known, evidence.as_bool().unwrap(), &BKTParams::default());
+        }
+        let expected = mastery["expectedPKnown"].as_f64().unwrap();
+        assert!((p_known - expected).abs() < 1e-12);
     }
 }

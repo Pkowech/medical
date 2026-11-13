@@ -107,11 +107,16 @@ class ProgressTrackingTests:
             "status": "inProgress",
             "progressPercentage": 35,
             "timeSpentMinutes": 4,
+            "expectedRevision": 0,
         }
         saved_response = recipient.session.post(
             f"{self.BASE_URL}/progress/sync",
             json=progress_payload,
-            headers=recipient.get_headers(),
+            headers={
+                **recipient.get_headers(),
+                "X-Client-Timestamp": str(int(time.time() * 1000)),
+                "X-Idempotency-Key": f"shared-material-progress-{int(time.time() * 1000)}",
+            },
             timeout=self.TIMEOUT,
         )
         assert saved_response.status_code == 200, saved_response.text
@@ -119,7 +124,11 @@ class ProgressTrackingTests:
         denied_response = unauthorized.session.post(
             f"{self.BASE_URL}/progress/sync",
             json=progress_payload,
-            headers=unauthorized.get_headers(),
+            headers={
+                **unauthorized.get_headers(),
+                "X-Client-Timestamp": str(int(time.time() * 1000)),
+                "X-Idempotency-Key": f"unauthorized-progress-{int(time.time() * 1000)}",
+            },
             timeout=self.TIMEOUT,
         )
         assert denied_response.status_code == 403, denied_response.text
@@ -130,8 +139,13 @@ class ProgressTrackingTests:
                 "courseId": course_id,
                 "status": "inProgress",
                 "progressPercentage": 10,
+                "expectedRevision": 0,
             },
-            headers=recipient.get_headers(),
+            headers={
+                **recipient.get_headers(),
+                "X-Client-Timestamp": str(int(time.time() * 1000)),
+                "X-Idempotency-Key": f"course-only-progress-{int(time.time() * 1000)}",
+            },
             timeout=self.TIMEOUT,
         )
         assert course_only_response.status_code == 404, course_only_response.text

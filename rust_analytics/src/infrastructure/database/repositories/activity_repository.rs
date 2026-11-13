@@ -49,22 +49,34 @@ impl ActivityRepository for PostgresActivityRepository {
         &self,
         user_id: &str,
     ) -> Result<(i32, i32), AnalyticsError> {
-        let total: i64 =
-            sqlx::query_scalar("SELECT COUNT(*) FROM course_enrollments WHERE user_id = $1")
-                .bind(user_id)
-                .fetch_one(&*self.pool)
-                .await
-                .unwrap_or(0);
-
-        let completed: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM course_enrollments WHERE user_id = $1 AND status::text = 'completed'"
+        let (total, completed): (i64, i64) = sqlx::query_as(
+            r#"
+            SELECT
+                COUNT(*)::bigint,
+                COUNT(*) FILTER (
+                    WHERE COALESCE(progress_percentage, 0) >= 100
+                )::bigint
+            FROM course_enrollments
+            WHERE user_id = $1
+            "#,
         )
         .bind(user_id)
         .fetch_one(&*self.pool)
         .await
-        .unwrap_or(0);
+        .map_err(|error| {
+            AnalyticsError::DatabaseError(format!(
+                "Failed to fetch course completion stats: {error}"
+            ))
+        })?;
 
-        Ok((total as i32, completed as i32))
+        let total = i32::try_from(total).map_err(|error| {
+            AnalyticsError::DatabaseError(format!("Course count exceeds i32: {error}"))
+        })?;
+        let completed = i32::try_from(completed).map_err(|error| {
+            AnalyticsError::DatabaseError(format!("Completed course count exceeds i32: {error}"))
+        })?;
+
+        Ok((total, completed))
     }
 
     async fn get_learning_path_completion_stats(

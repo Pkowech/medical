@@ -4,6 +4,7 @@ import progressService from '@/features/learning-management/services/progressSer
 import { isOfflineQueuedError } from '@/lib/core/offline/offlineQueuedError';
 import { useXapi } from '@/lib/xapi/useXapi';
 import { URLS } from '@/lib/urls';
+import { useAuthStore } from '@/features/auth/store/useAuthStore';
 
 type Options = {
   materialId?: string;
@@ -27,6 +28,7 @@ export default function useMaterialProgressTracker(options: Options) {
     computePercent,
     intervalMs = 60000,
   } = options;
+  const userId = useAuthStore(state => state.user?.id);
   const [isTracking, setIsTracking] = useState(false);
   const intervalRef = useRef<number | null>(null);
   const isTrackingRef = useRef(false);
@@ -37,6 +39,8 @@ export default function useMaterialProgressTracker(options: Options) {
   const activeElapsedMsRef = useRef(0);
   const lastTickAtRef = useRef<number | null>(null);
   const lastReportedMinutesRef = useRef(0);
+  const progressRevisionRef = useRef(0);
+  const progressRevisionLoadRef = useRef<Promise<void>>(Promise.resolve());
   const sendInFlightRef = useRef<Promise<void> | null>(null);
   const isCompletedRef = useRef(false);
   const isCompletingRef = useRef(false);
@@ -44,6 +48,28 @@ export default function useMaterialProgressTracker(options: Options) {
   const [currentPercent, setCurrentPercent] = useState<number>(0);
 
   const { trackAction, XAPI_VERBS } = useXapi();
+
+  useEffect(() => {
+    if (!userId || (!materialId && !topicId)) return;
+    progressRevisionLoadRef.current = progressService
+      .getUserProgress(userId)
+      .then(rows => {
+        const row = rows.find(
+          progress =>
+            progress.materialId === (materialId ?? null) &&
+            progress.topicId === (topicId ?? null) &&
+            progress.unitId === (unitId ?? null) &&
+            progress.courseId === (courseId ?? null),
+        );
+        progressRevisionRef.current =
+          typeof row?.revision === 'number' && Number.isSafeInteger(row.revision)
+            ? row.revision
+            : 0;
+      })
+      .catch(error => {
+        console.warn('Could not load material progress revision:', error);
+      });
+  }, [courseId, materialId, topicId, unitId, userId]);
 
   useEffect(() => {
     const resetActiveClock = () => {
@@ -63,6 +89,7 @@ export default function useMaterialProgressTracker(options: Options) {
       }
 
       const now = Date.now();
+      await progressRevisionLoadRef.current;
       // Throttling: Ensure at least 15s between syncs even for significant deltas
       if (
         percent >= 100 &&
@@ -96,6 +123,7 @@ export default function useMaterialProgressTracker(options: Options) {
               status: percent >= 100 ? 'completed' : 'inProgress',
               progressPercentage: percent,
               timeSpentMinutes: unreportedMinutes,
+              expectedRevision: progressRevisionRef.current,
             });
             progressSaved = true;
           } catch (err) {
@@ -107,6 +135,7 @@ export default function useMaterialProgressTracker(options: Options) {
             }
           }
           if (progressSaved) {
+            progressRevisionRef.current += 1;
             lastReportedMinutesRef.current = elapsedMinutes;
           }
         }

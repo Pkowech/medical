@@ -83,7 +83,7 @@ export class CompleteOnboardingDto {
   @IsOptional()
   @MaxLength(120)
   @IsString()
-  institution?: string;
+  institution?: string | null;
 
   @ApiPropertyOptional({
     example: 'Pharmacy & Poisons Board Stage II',
@@ -92,7 +92,7 @@ export class CompleteOnboardingDto {
   @IsOptional()
   @MaxLength(120)
   @IsString()
-  targetExam?: string;
+  targetExam?: string | null;
 
   @ApiPropertyOptional({
     example: ['Neurological Disorders', 'Pharmacotherapy', 'Ward Rounds'],

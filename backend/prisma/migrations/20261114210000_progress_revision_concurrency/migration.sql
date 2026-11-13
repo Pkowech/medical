@@ -1,0 +1,2 @@
+ALTER TABLE "topic_progress"
+ADD COLUMN "revision" INTEGER NOT NULL DEFAULT 0;

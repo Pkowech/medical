@@ -1,0 +1,55 @@
+{
+  "userId": "student-1",
+  "now": "2026-11-14T12:00:00.000Z",
+  "qualifyingTypes": [
+    "LEARNING",
+    "quiz_attempt",
+    "study_session",
+    "flashcard_review",
+    "flashcard_session"
+  ],
+  "activities": [
+    {
+      "type": "LEARNING",
+      "createdAt": "2026-11-14T00:05:00.000Z"
+    },
+    {
+      "type": "quiz_attempt",
+      "createdAt": "2026-11-13T23:55:00.000Z"
+    },
+    {
+      "type": "flashcard_review",
+      "createdAt": "2026-11-12T12:00:00.000Z"
+    },
+    {
+      "type": "study_session",
+      "createdAt": "2026-11-10T08:00:00.000Z"
+    },
+    {
+      "type": "LEARNING",
+      "createdAt": "2026-11-09T10:00:00.000Z"
+    },
+    {
+      "type": "quiz_attempt",
+      "createdAt": "2026-11-08T11:00:00.000Z"
+    },
+    {
+      "type": "flashcard_session",
+      "createdAt": "2026-11-07T12:00:00.000Z"
+    },
+    {
+      "type": "login",
+      "createdAt": "2026-11-11T19:00:00.000Z"
+    }
+  ],
+  "expected": {
+    "currentStreak": 3,
+    "longestStreak": 4
+  },
+  "mastery": {
+    "skillId": "topic-1",
+    "initialPKnown": 0.4,
+    "evidence": [true, false, true],
+    "expectedPKnown": 0.7998370340191484
+  }
+}

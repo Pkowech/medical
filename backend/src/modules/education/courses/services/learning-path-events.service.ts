@@ -46,52 +46,6 @@ export class LearningPathEventsService {
     });
   }
 
-  private async createGoalScheduleEvent(
-    userId: string,
-    goalId: string,
-    title: string,
-    targetDate?: Date | string | null,
-    metadata?: Prisma.JsonObject | null,
-  ): Promise<void> {
-    if (!targetDate) {
-      return;
-    }
-
-    const existing = await this.resolveGoalScheduleEvent(userId, goalId);
-    if (existing) {
-      return;
-    }
-
-    const eventDate = new Date(targetDate);
-    const startDate = new Date(eventDate);
-    startDate.setHours(9, 0, 0, 0);
-    const endDate = new Date(eventDate);
-    endDate.setHours(10, 0, 0, 0);
-
-    const milestoneId = metadata?.milestoneId as string | undefined;
-    const learningPathId = metadata?.learningPathId as string | undefined;
-
-    await this.prisma.scheduleEvent.create({
-      data: {
-        userId,
-        title: `Goal: ${title}`,
-        description: `Target date for goal: ${title}`,
-        date: startDate,
-        endDate,
-        type: milestoneId ? 'milestone' : 'goal',
-        status: 'pending',
-        category: 'academic',
-        metadata: {
-          goalId,
-          createdFromGoal: true,
-          goalTitle: title,
-          ...(milestoneId ? { milestoneId, learningPathMilestone: true } : {}),
-          ...(learningPathId ? { learningPathId } : {}),
-        },
-      },
-    });
-  }
-
   @OnEvent('course.progress.updated')
   async handleCourseProgressUpdated(payload: {
     userId: string;
@@ -239,36 +193,6 @@ export class LearningPathEventsService {
         getErrorStack(error),
       );
       throw error;
-    }
-  }
-
-  @OnEvent('learning-goal.created')
-  async handleGoalCreated(payload: {
-    userId: string;
-    goalId: string;
-    data: {
-      title: string;
-      targetDate?: Date | string | null;
-      metadata?: Prisma.JsonObject | null;
-    };
-  }) {
-    this.logger.log(
-      `Handling goal creation for user ${payload.userId}, goal ${payload.goalId}`,
-    );
-
-    try {
-      await this.createGoalScheduleEvent(
-        payload.userId,
-        payload.goalId,
-        payload.data.title,
-        payload.data.targetDate,
-        payload.data.metadata ?? null,
-      );
-    } catch (error) {
-      this.logger.error(
-        `Error handling goal creation: ${getErrorMessage(error)}`,
-        getErrorStack(error),
-      );
     }
   }
 

@@ -5,6 +5,7 @@ import {
   OnModuleInit,
   NotFoundException,
   BadRequestException,
+  ConflictException,
 } from '@nestjs/common';
 import { ClientGrpc } from '@nestjs/microservices';
 import { RedisService } from '#infrastructure/redis/redis.service';
@@ -27,6 +28,7 @@ import {
   ANALYTICS_METRICS_CONFIG,
 } from './analytics-cache.constants';
 import { PrismaService } from '#infrastructure/prisma/prisma.service';
+import { writeApplicationOutboxEvent } from '#infrastructure/outbox/application-outbox-event';
 import { PredictionValidatorService } from './prediction-validator.service';
 import { LearningAnalyticsService } from './learning-analytics.service';
 import { QuizUtils } from '#common/utils/quiz.utils';
@@ -37,9 +39,40 @@ import {
   Prisma,
   QuestionCategory,
   QuestionType,
+  UserActivityType,
 } from '@prisma/client';
 
 type AdaptiveQuestionWithOptions = Question & { options: Option[] };
+
+function isAdaptiveQuizSession(value: unknown): value is AdaptiveQuizSession {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const session = value as Record<string, unknown>;
+  return (
+    typeof session.sessionId === 'string' &&
+    typeof session.userId === 'string' &&
+    Array.isArray(session.questions) &&
+    session.questions.every(
+      question =>
+        Boolean(question) &&
+        typeof question === 'object' &&
+        typeof (question as Record<string, unknown>).id === 'string',
+    ) &&
+    Array.isArray(session.responses) &&
+    session.responses.every(
+      response =>
+        Boolean(response) &&
+        typeof response === 'object' &&
+        typeof (response as Record<string, unknown>).questionId === 'string',
+    ) &&
+    typeof session.currentQuestionIndex === 'number' &&
+    typeof session.userAbility === 'number' &&
+    typeof session.confidenceInterval === 'number' &&
+    typeof session.targetPrecision === 'number' &&
+    typeof session.isComplete === 'boolean' &&
+    typeof session.finalScore === 'number' &&
+    Array.isArray(session.recommendations)
+  );
+}
 
 /**
  * AssessmentAnalyticsService
@@ -91,6 +124,60 @@ export class AssessmentAnalyticsService implements OnModuleInit {
     );
   }
 
+  private parseAdaptiveSession(value: Prisma.JsonValue | null): AdaptiveQuizSession | undefined {
+    return isAdaptiveQuizSession(value) ? value : undefined;
+  }
+
+  private async cacheAdaptiveSession(session: AdaptiveQuizSession): Promise<void> {
+    try {
+      const key = ANALYTICS_CACHE_CONFIG.ASSESSMENT.ADAPTIVE_SESSION(
+        session.userId,
+        session.sessionId,
+      );
+      await this.redisService.set(key, JSON.stringify(session), 30 * 60);
+    } catch (error) {
+      this.logger.warn(
+        `Could not cache adaptive quiz session ${session.sessionId}: ${getErrorMessage(error)}`,
+      );
+    }
+  }
+
+  private async enqueueAdaptiveBktUpdates(
+    transaction: Prisma.TransactionClient,
+    session: AdaptiveQuizSession,
+    question: AdaptiveQuestionWithOptions,
+    isCorrect: boolean,
+  ): Promise<void> {
+    for (const skillId of question.topicIds) {
+      const eventId = `adaptive-quiz:${session.sessionId}:${question.id}:${skillId}`;
+      await writeApplicationOutboxEvent(transaction, {
+        eventType: 'adaptive-answer.submitted',
+        aggregateId: session.sessionId,
+        dedupeKey: eventId,
+        payload: {
+          userId: session.userId,
+          skillId,
+          isCorrect,
+          eventId,
+        },
+      });
+    }
+  }
+
+  private async loadAdaptiveSession(
+    userId: string,
+    sessionId: string,
+  ): Promise<AdaptiveQuizSession | undefined> {
+    const attempt = await this.prisma.quizAttempt.findFirst({
+      where: { id: sessionId, userId },
+      select: { adaptiveState: true },
+    });
+    const session = this.parseAdaptiveSession(attempt?.adaptiveState ?? null);
+    return session?.userId === userId && session.sessionId === sessionId
+      ? session
+      : undefined;
+  }
+
   // ----------------- Adaptive quiz helpers (migrated from AdaptiveQuizAnalyticsService) -----------------
 
   async startAdaptiveQuiz(
@@ -135,10 +222,22 @@ export class AssessmentAnalyticsService implements OnModuleInit {
     );
     const dedupKey = ANALYTICS_CACHE_CONFIG.DEDUP(cacheKey);
 
-    // Check cache first
-    const cachedSession = await this.redisService.get<string>(cacheKey);
-    if (cachedSession) {
-      const session = JSON.parse(cachedSession) as AdaptiveQuizSession;
+    const activeAttempts = await this.prisma.quizAttempt.findMany({
+      where: { userId, completedAt: null, quiz: { isAdaptive: true } },
+      orderBy: { startedAt: 'desc' },
+      take: 50,
+      select: { adaptiveState: true },
+    });
+    for (const attempt of activeAttempts) {
+      const session = this.parseAdaptiveSession(attempt.adaptiveState);
+      if (
+        !session ||
+        session.isComplete ||
+        session.courseId !== courseId ||
+        session.unitId !== unitId
+      ) {
+        continue;
+      }
       const safeQuestions = Array.isArray(session.questions)
         ? session.questions
         : [];
@@ -148,18 +247,13 @@ export class AssessmentAnalyticsService implements OnModuleInit {
         ),
       );
       if (visibleQuestions.every(Boolean)) {
-        this.logger.log(`Retrieved cached session for user ${userId}`);
+        this.logger.log(`Resuming persisted adaptive session for user ${userId}`);
+        await this.cacheAdaptiveSession(session);
         return session;
       }
-      await Promise.all([
-        this.redisService.del(cacheKey),
-        this.redisService.del(
-          ANALYTICS_CACHE_CONFIG.ASSESSMENT.ADAPTIVE_SESSION(
-            userId,
-            session.sessionId,
-          ),
-        ),
-      ]);
+      throw new NotFoundException(
+        'The active adaptive quiz is no longer available for its content scope.',
+      );
     }
 
     return await this.requestDeduplicationService.executeWithDedup(
@@ -226,17 +320,12 @@ export class AssessmentAnalyticsService implements OnModuleInit {
               startedAt: new Date(),
               totalQuestions: 0,
               answers: [],
+              adaptiveState: JSON.parse(JSON.stringify(session)),
             },
           });
         });
 
-        const sessionCacheKey =
-          ANALYTICS_CACHE_CONFIG.ASSESSMENT.ADAPTIVE_SESSION(userId, sessionId);
-        await this.redisService.set(
-          sessionCacheKey,
-          JSON.stringify(session),
-          30 * 60,
-        );
+        await this.cacheAdaptiveSession(session);
 
         await this.performanceMetrics.recordMetric({
           endpoint: ANALYTICS_METRICS_CONFIG.ENDPOINTS.ASSESSMENT,
@@ -269,17 +358,12 @@ export class AssessmentAnalyticsService implements OnModuleInit {
     session: AdaptiveQuizSession;
   }> {
     const startTime = Date.now();
-    const sessionCacheKey = ANALYTICS_CACHE_CONFIG.ASSESSMENT.ADAPTIVE_SESSION(
-      dto.userId,
-      sessionId,
-    );
-    const sessionData = await this.redisService.get<string>(sessionCacheKey);
-    if (!sessionData) {
-      throw new Error(
+    const session = await this.loadAdaptiveSession(dto.userId, sessionId);
+    if (!session) {
+      throw new NotFoundException(
         `Quiz session ${sessionId} not found for user ${dto.userId}`,
       );
     }
-    const session: AdaptiveQuizSession = JSON.parse(sessionData);
     const safeQuestions = Array.isArray(session.questions)
       ? session.questions
       : [];
@@ -289,13 +373,44 @@ export class AssessmentAnalyticsService implements OnModuleInit {
       ),
     );
     if (!visibleQuestions.every(Boolean)) {
-      await this.redisService.del(sessionCacheKey);
       throw new NotFoundException(
         'This adaptive quiz is no longer available for its content scope',
       );
     }
 
     try {
+      const priorResponse = session.responses.find(
+        (response) => response.questionId === dto.questionId,
+      );
+      if (priorResponse) {
+        if (priorResponse.selectedOptionId !== dto.answerData) {
+          throw new ConflictException(
+            'This adaptive question has already been answered',
+          );
+        }
+        const answeredQuestion = safeQuestions.find(
+          (question) => question.id === dto.questionId,
+        );
+        if (!answeredQuestion) {
+          throw new NotFoundException(
+            'The answered question is no longer available',
+          );
+        }
+        const nextQuestion = session.isComplete
+          ? undefined
+          : (safeQuestions[session.currentQuestionIndex] as
+              | Question
+              | undefined);
+        await this.cacheAdaptiveSession(session);
+        return {
+          isCorrect: priorResponse.isCorrect,
+          explanation: answeredQuestion.explanation || '',
+          nextQuestion,
+          isComplete: session.isComplete,
+          session,
+        };
+      }
+
       const currentQuestionIndex = Number.isInteger(session.currentQuestionIndex)
         ? session.currentQuestionIndex
         : 0;
@@ -316,61 +431,44 @@ export class AssessmentAnalyticsService implements OnModuleInit {
           'The selected option does not belong to the current question',
         );
       }
+      const selectedOptionId = dto.answerData;
       const gradingResult = QuizUtils.gradeAnswer(
         currentQuestion,
-        dto.answerData,
+        selectedOptionId,
       );
 
-      session.responses.push({
-        questionId: dto.questionId,
-        isCorrect: gradingResult.isCorrect,
-        responseTime: dto.timeSpentSeconds ?? 0,
-        confidence,
-      });
-
-      // Update ability estimate using IRT
-      session.userAbility = QuizUtils.updateUserAbility(
-        session.userAbility,
-        {
-          difficultyIndex: currentQuestion.difficultyIndex || 0,
-          discrimination: currentQuestion.discrimination || 1,
-          guessing: currentQuestion.guessing || 0.25,
-        },
-        gradingResult.isCorrect,
-      );
-
-      session.confidenceInterval = QuizUtils.updateConfidenceInterval(
-        session.confidenceInterval,
-        currentQuestion.discrimination || 1,
-      );
-
-      // Persist response
-      await this.prisma.userResponse.create({
-        data: {
-          userId: session.userId,
-          questionId: dto.questionId,
-          attemptId: session.sessionId,
-          answer: dto.answerData ?? Prisma.JsonNull,
-          isCorrect: gradingResult.isCorrect,
-          responseTime: dto.timeSpentSeconds ?? 0,
-          createdAt: new Date(),
-        },
-      });
-      await Promise.all(
-        currentQuestion.topicIds.map((topicId) =>
-          this.updateBktForAssessment(
-            session.userId,
-            topicId,
-            gradingResult.isCorrect,
-          ),
+      const responseTime = dto.timeSpentSeconds ?? 0;
+      const nextSession: AdaptiveQuizSession = {
+        ...session,
+        questions: [...safeQuestions],
+        responses: [
+          ...session.responses,
+          {
+            questionId: dto.questionId,
+            isCorrect: gradingResult.isCorrect,
+            responseTime,
+            confidence,
+            selectedOptionId,
+          },
+        ],
+        userAbility: QuizUtils.updateUserAbility(
+          session.userAbility,
+          {
+            difficultyIndex: currentQuestion.difficultyIndex || 0,
+            discrimination: currentQuestion.discrimination || 1,
+            guessing: currentQuestion.guessing || 0.25,
+          },
+          gradingResult.isCorrect,
         ),
-      );
+        confidenceInterval: QuizUtils.updateConfidenceInterval(
+          session.confidenceInterval,
+          currentQuestion.discrimination || 1,
+        ),
+        currentQuestionIndex: currentQuestionIndex + 1,
+      };
 
-      // Advance question index
-      session.currentQuestionIndex = currentQuestionIndex + 1;
-      const shouldContinue = this.shouldContinueQuiz(session);
+      const shouldContinue = this.shouldContinueQuiz(nextSession);
       let nextQuestion: Question | undefined;
-
       if (shouldContinue) {
         const grpcResp = await this.callGrpcWithTimeout(
           this.analyticsServiceGrpc.getNextAdaptiveQuestion({
@@ -385,37 +483,175 @@ export class AssessmentAnalyticsService implements OnModuleInit {
           nextQuestion =
             (await this.findAdaptiveQuestion(
               grpcResp.questionId,
-              session,
+              nextSession,
             )) || undefined;
         }
-        await this.performanceMetrics.recordMetric({
-          endpoint: ANALYTICS_METRICS_CONFIG.ENDPOINTS.ASSESSMENT,
-          method: 'submitAnswer/getNextAdaptiveQuestion',
-          provider: ANALYTICS_METRICS_CONFIG.PROVIDERS.GRPC,
-          userId: session.userId,
-          responseTimeMs: Date.now() - startTime,
-          cacheHit: false,
-          success: true,
-          timestamp: new Date(),
-        });
-        if (!nextQuestion) session.isComplete = true;
-        else session.questions.push(nextQuestion);
+        void this.performanceMetrics
+          .recordMetric({
+            endpoint: ANALYTICS_METRICS_CONFIG.ENDPOINTS.ASSESSMENT,
+            method: 'submitAnswer/getNextAdaptiveQuestion',
+            provider: ANALYTICS_METRICS_CONFIG.PROVIDERS.GRPC,
+            userId: session.userId,
+            responseTimeMs: Date.now() - startTime,
+            cacheHit: false,
+            success: true,
+            timestamp: new Date(),
+          })
+          .catch(error =>
+            this.logger.warn(
+              `Could not record adaptive quiz metric: ${getErrorMessage(error)}`,
+            ),
+          );
+        if (!nextQuestion) nextSession.isComplete = true;
+        else nextSession.questions.push(nextQuestion);
       } else {
-        session.isComplete = true;
+        nextSession.isComplete = true;
       }
 
-      const cacheKey = ANALYTICS_CACHE_CONFIG.ASSESSMENT.ADAPTIVE_SESSION(
-        session.userId,
-        sessionId,
-      );
-      await this.redisService.set(cacheKey, JSON.stringify(session), 30 * 60);
+      const responseWhere = {
+        userId: session.userId,
+        questionId: dto.questionId,
+        attemptId: session.sessionId,
+      };
+      const responseSelect = {
+        answer: true,
+        isCorrect: true,
+        responseTime: true,
+      } satisfies Prisma.UserResponseSelect;
+      let committed: {
+        session: AdaptiveQuizSession;
+        isCorrect: boolean;
+      };
+      try {
+        committed = await this.prisma.$transaction(
+          async tx => {
+            const attempt = await tx.quizAttempt.findFirst({
+              where: {
+                id: session.sessionId,
+                userId: session.userId,
+                completedAt: null,
+              },
+              select: { adaptiveState: true },
+            });
+            const currentSession = this.parseAdaptiveSession(
+              attempt?.adaptiveState ?? null,
+            );
+            if (!currentSession) {
+              throw new NotFoundException(
+                `Quiz session ${session.sessionId} has no durable state`,
+              );
+            }
+
+            const existingResponse = await tx.userResponse.findFirst({
+              where: responseWhere,
+              select: responseSelect,
+            });
+            if (existingResponse) {
+              if (existingResponse.answer !== selectedOptionId) {
+                throw new ConflictException(
+                  'This adaptive question has already been answered',
+                );
+              }
+              const prior = currentSession.responses.find(
+                response => response.questionId === dto.questionId,
+              );
+              if (prior) {
+                return {
+                  session: currentSession,
+                  isCorrect: prior.isCorrect,
+                };
+              }
+            } else if (
+              currentSession.currentQuestionIndex !== currentQuestionIndex ||
+              currentSession.questions[currentQuestionIndex]?.id !== dto.questionId
+            ) {
+              throw new ConflictException(
+                'The adaptive quiz advanced on another request. Reload the session.',
+              );
+            }
+
+            const persistedResponse =
+              existingResponse ??
+              (await tx.userResponse.create({
+                data: {
+                  ...responseWhere,
+                  answer: selectedOptionId,
+                  isCorrect: gradingResult.isCorrect,
+                  responseTime,
+                  createdAt: new Date(),
+                },
+                select: responseSelect,
+              }));
+            if (persistedResponse.answer !== selectedOptionId) {
+              throw new ConflictException(
+                'This adaptive question has already been answered',
+              );
+            }
+
+            await tx.quizAttempt.update({
+              where: { id: session.sessionId },
+              data: {
+                adaptiveState: JSON.parse(JSON.stringify(nextSession)),
+              },
+            });
+            await this.enqueueAdaptiveBktUpdates(
+              tx,
+              nextSession,
+              currentQuestion,
+              persistedResponse.isCorrect,
+            );
+            return {
+              session: nextSession,
+              isCorrect: persistedResponse.isCorrect,
+            };
+          },
+          { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+        );
+      } catch (error) {
+        const isSerializationConflict =
+          error &&
+          typeof error === 'object' &&
+          'code' in error &&
+          error.code === 'P2034';
+        if (!isSerializationConflict) throw error;
+
+        const latestSession = await this.loadAdaptiveSession(
+          session.userId,
+          session.sessionId,
+        );
+        const concurrentResponse = latestSession?.responses.find(
+          response => response.questionId === dto.questionId,
+        );
+        if (
+          !latestSession ||
+          !concurrentResponse ||
+          concurrentResponse.selectedOptionId !== selectedOptionId
+        ) {
+          throw new ConflictException(
+            'The adaptive quiz changed concurrently. Reload the session.',
+          );
+        }
+        committed = {
+          session: latestSession,
+          isCorrect: concurrentResponse.isCorrect,
+        };
+      }
+      const committedSession = committed.session;
+      const isCorrect = committed.isCorrect;
+
+      await this.cacheAdaptiveSession(committedSession);
+      const resolvedNextQuestion = committedSession.isComplete
+        ? undefined
+        : (committedSession.questions[
+            committedSession.currentQuestionIndex
+          ] as Question | undefined);
 
       return {
-        isCorrect: gradingResult.isCorrect,
+        isCorrect,
         explanation: currentQuestion.explanation || '',
-        nextQuestion,
-        isComplete: session.isComplete,
-        session,
+        nextQuestion: resolvedNextQuestion,
+        isComplete: committedSession.isComplete,
+        session: committedSession,
       };
     } catch (error) {
       this.logger.error(
@@ -427,48 +663,101 @@ export class AssessmentAnalyticsService implements OnModuleInit {
 
   async finalizeSession(session: AdaptiveQuizSession): Promise<void> {
     try {
-      const responses = Array.isArray(session.responses)
-        ? session.responses
-        : [];
-      const correct = responses.filter((r) => r.isCorrect).length;
-      session.finalScore =
-        responses.length > 0 ? (correct / responses.length) * 100 : 0;
+      await this.prisma.$transaction(
+        async tx => {
+          const attempt = await tx.quizAttempt.findFirst({
+            where: { id: session.sessionId, userId: session.userId },
+            select: {
+              id: true,
+              quizId: true,
+              completedAt: true,
+              adaptiveState: true,
+            },
+          });
+          if (!attempt) {
+            throw new NotFoundException(
+              `Adaptive quiz attempt ${session.sessionId} was not found`,
+            );
+          }
+          if (attempt.completedAt) return;
 
-      const attempt = await this.prisma.quizAttempt.findFirst({
-        where: { id: session.sessionId, userId: session.userId },
-        select: { id: true, quizId: true, startedAt: true },
-      });
-      if (!attempt) {
-        throw new Error(`Adaptive quiz attempt ${session.sessionId} was not found`);
-      }
+          const persistedSession = this.parseAdaptiveSession(
+            attempt.adaptiveState,
+          );
+          if (!persistedSession) {
+            throw new ConflictException(
+              'The adaptive quiz has no durable session state to finalize.',
+            );
+          }
+          if (!persistedSession.isComplete) {
+            throw new ConflictException(
+              'The adaptive quiz cannot be finalized before its last answer.',
+            );
+          }
 
-      await this.prisma.$transaction([
-        this.prisma.quizAttempt.update({
-          where: { id: attempt.id },
-          data: {
-            answers: session.responses,
-            score: session.finalScore,
-            maxScore: 100,
-            percentage: session.finalScore,
-            timeTaken: responses.reduce((sum, response) => sum + response.responseTime, 0),
-            isPassed: session.finalScore >= 70,
-            correctAnswers: correct,
-            totalQuestions: responses.length,
-            completedAt: new Date(),
-          },
-        }),
-        this.prisma.quiz.update({
-          where: { id: attempt.quizId },
-          data: { questionCount: responses.length },
-        }),
-      ]);
+          const responses = persistedSession.responses;
+          const correct = responses.filter(response => response.isCorrect).length;
+          const finalScore =
+            responses.length > 0 ? (correct / responses.length) * 100 : 0;
+          const completedAt = new Date();
 
-      const sessionCacheKey =
-        ANALYTICS_CACHE_CONFIG.ASSESSMENT.ADAPTIVE_SESSION(
-          session.userId,
-          session.sessionId,
+          await tx.quizAttempt.update({
+            where: { id: attempt.id },
+            data: {
+              answers: responses,
+              score: finalScore,
+              maxScore: 100,
+              percentage: finalScore,
+              timeTaken: responses.reduce(
+                (sum, response) => sum + response.responseTime,
+                0,
+              ),
+              isPassed: finalScore >= 70,
+              correctAnswers: correct,
+              totalQuestions: responses.length,
+              completedAt,
+              adaptiveState: Prisma.DbNull,
+            },
+          });
+          await tx.quiz.update({
+            where: { id: attempt.quizId },
+            data: { questionCount: responses.length },
+          });
+          await tx.userActivity.createMany({
+            data: [
+              {
+                userId: session.userId,
+                sourceKey: `quiz-attempt:${attempt.id}`,
+                type: UserActivityType.QUIZ_ATTEMPT,
+                description: 'Completed adaptive quiz',
+                details: {
+                  quizAttemptId: attempt.id,
+                  score: finalScore,
+                  correctAnswers: correct,
+                  totalQuestions: responses.length,
+                  occurredAt: completedAt.toISOString(),
+                },
+                createdAt: completedAt,
+              },
+            ],
+            skipDuplicates: true,
+          });
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+
+      try {
+        await this.redisService.del(
+          ANALYTICS_CACHE_CONFIG.ASSESSMENT.ADAPTIVE_SESSION(
+            session.userId,
+            session.sessionId,
+          ),
         );
-      await this.redisService.del(sessionCacheKey);
+      } catch (error) {
+        this.logger.warn(
+          `Could not clear cached adaptive quiz session ${session.sessionId}: ${getErrorMessage(error)}`,
+        );
+      }
       this.logger.log(`Finalized session ${session.sessionId}`);
     } catch (error) {
       this.logger.error(`Error finalizing session: ${getErrorMessage(error)}`);
@@ -495,12 +784,9 @@ export class AssessmentAnalyticsService implements OnModuleInit {
     userId: string,
     sessionId: string,
   ): Promise<AdaptiveQuizSession | undefined> {
-    const sessionCacheKey = ANALYTICS_CACHE_CONFIG.ASSESSMENT.ADAPTIVE_SESSION(
-      userId,
-      sessionId,
-    );
-    const data = await this.redisService.get<string>(sessionCacheKey);
-    return data ? JSON.parse(data) : undefined;
+    const session = await this.loadAdaptiveSession(userId, sessionId);
+    if (session) await this.cacheAdaptiveSession(session);
+    return session;
   }
 
   async invalidateUserProfile(userId: string): Promise<void> {
@@ -1091,41 +1377,6 @@ export class AssessmentAnalyticsService implements OnModuleInit {
   /**
    * @deprecated Uses the legacy generic analytics_events ingestion pipeline.
    */
-  async trackAssessmentSubmission(
-    userId: string,
-    assessmentId: string,
-    _score: number,
-    isCorrect: boolean,
-  ): Promise<void> {
-    try {
-      // Proxy event to Rust
-      await this.callGrpc(
-        this.analyticsServiceGrpc.batchTrackEvents({
-          userId: userId,
-          events: [
-            {
-              eventType: 'assessment_submission',
-              data: {},
-              timestamp: new Date().toISOString(),
-              sessionId: '',
-              duration: 0,
-            },
-          ],
-        }),
-      );
-
-      // Update BKT asynchronously via gRPC
-      await this.updateBktForAssessment(userId, assessmentId, isCorrect);
-    } catch (error) {
-      this.logger.warn(
-        `Failed to proxy assessment submission to Rust: ${getErrorMessage(
-          error,
-        )}`,
-      );
-      throw error;
-    }
-  }
-
   // ==================== ASSESSMENT DOMAIN METHODS ====================
 
   /**

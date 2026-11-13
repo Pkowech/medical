@@ -2,7 +2,50 @@ import { createStore, type StateCreator, type StoreApi } from 'zustand/vanilla';
 import { persist } from 'zustand/middleware';
 import { useStore } from 'zustand';
 import { useAuthStore } from '@/features/auth/store/useAuthStore';
-import type { CourseProgressState } from '@/shared/types/courseInterface';
+import type { CourseProgressState, Note } from '@/shared/types/courseInterface';
+
+type PersistedCourseProgressState = Pick<CourseProgressState, 'progress' | 'bookmarks' | 'notes'>;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isNote(value: unknown): value is Note {
+  return (
+    isRecord(value) &&
+    typeof value.id === 'string' &&
+    typeof value.text === 'string' &&
+    typeof value.timestamp === 'string'
+  );
+}
+
+function migrateCourseProgress(persistedState: unknown): PersistedCourseProgressState {
+  const state = isRecord(persistedState) ? persistedState : {};
+  const progress: Record<string, boolean> = {};
+  if (isRecord(state.progress)) {
+    for (const [lessonKey, completed] of Object.entries(state.progress)) {
+      if (typeof completed === 'boolean') progress[lessonKey] = completed;
+    }
+  }
+
+  const bookmarks = Array.isArray(state.bookmarks)
+    ? [
+        ...new Set(
+          state.bookmarks.filter((bookmark): bookmark is string => typeof bookmark === 'string')
+        ),
+      ]
+    : [];
+  const notes: Record<string, Note[]> = {};
+  if (isRecord(state.notes)) {
+    for (const [lessonKey, lessonNotes] of Object.entries(state.notes)) {
+      if (Array.isArray(lessonNotes)) {
+        notes[lessonKey] = lessonNotes.filter(isNote);
+      }
+    }
+  }
+
+  return { progress, bookmarks, notes };
+}
 
 function createProgressState(): StateCreator<CourseProgressState> {
   return (set, get) => ({
@@ -50,34 +93,14 @@ export function createUserScopedCourseProgressStore(storageName: string) {
       ? createStore<CourseProgressState>()(
           persist(stateCreator, {
             name: `${storageName}:${encodeURIComponent(userId)}`,
-            version: 1,
-            migrate: (persistedState: unknown) => {
-              if (!persistedState || typeof persistedState !== 'object') {
-                return {
-                  progress: {},
-                  bookmarks: [],
-                  notes: {},
-                } as CourseProgressState;
-              }
-
-              const state = persistedState as Partial<CourseProgressState>;
-              return {
-                ...state,
-                progress: state.progress && typeof state.progress === 'object' ? state.progress : {},
-                bookmarks: Array.isArray(state.bookmarks)
-                  ? state.bookmarks.filter(
-                      (bookmark): bookmark is string => typeof bookmark === 'string',
-                    )
-                  : [],
-                notes: state.notes && typeof state.notes === 'object' ? state.notes : {},
-              } as CourseProgressState;
-            },
+            version: 2,
+            migrate: migrateCourseProgress,
             partialize: state => ({
               progress: state.progress,
               bookmarks: state.bookmarks,
               notes: state.notes,
             }),
-          }),
+          })
         )
       : createStore<CourseProgressState>()(stateCreator);
     stores.set(storeKey, store);

@@ -471,7 +471,7 @@ export const CoursesDashboard = () => {
                 </div>
                 <h3 className="text-center text-xl font-bold text-foreground dark:text-foreground">
                   {activeTab === 'enrolled'
-                    ? "You're not enrolled in any classes yet"
+                    ? "You haven't enrolled in any courses yet."
                     : filters.searchTerm || filters.category
                       ? 'No classes match your filters'
                       : 'No classes available yet'}

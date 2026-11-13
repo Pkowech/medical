@@ -6,6 +6,7 @@ import type { SyncQueueItem } from '@/lib/core/offline/db';
 
 export type ProgressQueueItem = {
   id?: number | string;
+  idempotencyKey?: string;
   unitId?: string | null;
   topicId?: string | null;
   courseId?: string | null;
@@ -14,6 +15,7 @@ export type ProgressQueueItem = {
   page?: number | null;
   timeSpentMinutes?: number | null;
   status?: string | null;
+  expectedRevision?: number;
   createdAt?: string;
   lastUpdated?: number;
   xapiStatement?: Record<string, unknown> | null;
@@ -80,6 +82,7 @@ async function migrateLegacyQueue(): Promise<void> {
             status: legacyItem.status || 'inProgress',
             progressPercentage: legacyItem.percent,
             timeSpentMinutes: legacyItem.timeSpentMinutes,
+            expectedRevision: legacyItem.expectedRevision ?? 0,
             page: legacyItem.page,
           },
         };
@@ -167,10 +170,12 @@ export async function addToQueue(item: ProgressQueueItem): Promise<void> {
         status: item.status || 'inProgress',
         progressPercentage: item.percent,
         timeSpentMinutes: item.timeSpentMinutes,
+        expectedRevision: item.expectedRevision ?? 0,
         page: item.page,
       },
       commonHeaders,
       item.lastUpdated ?? createdAt,
+      item.idempotencyKey,
     );
   }
 
@@ -181,6 +186,7 @@ export async function addToQueue(item: ProgressQueueItem): Promise<void> {
       item.xapiStatement,
       commonHeaders,
       item.lastUpdated ?? createdAt,
+      item.idempotencyKey,
     );
   }
 }
@@ -203,6 +209,8 @@ export async function getAllQueueItems(): Promise<ProgressQueueItem[]> {
         timeSpentMinutes:
           typeof body?.timeSpentMinutes === 'number' ? body.timeSpentMinutes : undefined,
         status: typeof body?.status === 'string' ? body.status : undefined,
+        expectedRevision:
+          typeof body?.expectedRevision === 'number' ? body.expectedRevision : 0,
         lastUpdated: item.lastUpdated,
         syncStatus: item.status,
         lastError: item.lastError,

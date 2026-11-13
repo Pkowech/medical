@@ -280,10 +280,9 @@ impl LearningService {
         let total_time: i64 = sqlx::query_scalar(
             "SELECT COALESCE(SUM(ss.duration), 0)
              FROM study_sessions ss
-             LEFT JOIN topics t ON t.id = ss.topic_id
-             LEFT JOIN materials m ON m.id = ss.material_id
-             JOIN units u ON u.id = COALESCE(t.unit_id, m.unit_id)
-             WHERE ss.user_id = $1",
+             WHERE ss.user_id = $1
+               AND ss.is_valid = true
+               AND ss.end_time IS NOT NULL",
         )
         .bind(&user_id)
         .fetch_one(&self.pool)

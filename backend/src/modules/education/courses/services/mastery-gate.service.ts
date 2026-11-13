@@ -92,8 +92,7 @@ export class MasteryGateService {
   async onQuizComplete(
     userId: string,
     topicId: string,
-    isPassed: boolean,
-    score: number,
+    attemptId: string,
     passingThreshold?: number,
   ): Promise<QuizCompletionResult> {
     const threshold = passingThreshold ?? this.PASSING_THRESHOLD;
@@ -105,6 +104,33 @@ export class MasteryGateService {
       });
       if (!topic) {
         throw new Error(`Topic ${topicId} was not found while recording quiz mastery`);
+      }
+
+      const topicAttempts = await this.prisma.quizAttempt.findMany({
+        where: {
+          userId,
+          completedAt: { not: null },
+          quiz: {
+            is: {
+              OR: [{ topicId }, { topicPracticeForId: topicId }],
+            },
+          },
+        },
+        orderBy: [{ completedAt: 'desc' }, { id: 'asc' }],
+        select: {
+          id: true,
+          percentage: true,
+          isPassed: true,
+          completedAt: true,
+        },
+      });
+      const currentAttempt = topicAttempts.find(
+        (attempt) => attempt.id === attemptId,
+      );
+      if (!currentAttempt?.completedAt) {
+        throw new Error(
+          `Completed quiz attempt ${attemptId} was not found for user ${userId} and topic ${topicId}`,
+        );
       }
 
       // Get or create progress record
@@ -132,21 +158,45 @@ export class MasteryGateService {
       }
 
       const previousQuizScores = (progress.quizScores as Record<string, unknown> | null) ?? {};
-      const attempts = Number(previousQuizScores.attempts ?? 0) + 1;
-      const failedAttempts = Number(previousQuizScores.failedAttempts ?? 0);
+      let failedAttempts = 0;
+      for (const attempt of topicAttempts) {
+        if (attempt.isPassed) break;
+        failedAttempts += 1;
+      }
+      const latestAttempt = topicAttempts[0] ?? currentAttempt;
+      const latestScore = latestAttempt.percentage;
+      const bestScore = Math.max(
+        Number(previousQuizScores.bestScore ?? 0),
+        ...topicAttempts.map((attempt) => attempt.percentage),
+      );
+      const passedAt =
+        [...topicAttempts]
+          .reverse()
+          .find((attempt) => attempt.isPassed)
+          ?.completedAt?.toISOString() ??
+        (typeof previousQuizScores.passedAt === 'string'
+          ? previousQuizScores.passedAt
+          : undefined);
+      const lastAttemptAt = latestAttempt.completedAt?.toISOString();
+      const attemptTimestamp = currentAttempt.completedAt;
+      const masteryUnlocked =
+        previousQuizScores.masteryUnlocked === true ||
+        topicAttempts.some((attempt) => attempt.isPassed);
+      const nextTopicUnlocked =
+        previousQuizScores.nextTopicUnlocked === true;
 
-      if (isPassed) {
+      if (currentAttempt.isPassed) {
         // Quiz passed - unlock mastery
-        const updateData: any = {
-          lastUpdated: BigInt(Date.now()),
+        const updateData = {
+          lastUpdated: BigInt(attemptTimestamp.getTime()),
           quizScores: {
             ...previousQuizScores,
-            attempts,
-            failedAttempts: 0,
+            attempts: topicAttempts.length,
+            failedAttempts,
             masteryUnlocked: true,
-            lastScore: score,
-            bestScore: Math.max(Number(previousQuizScores.bestScore ?? 0), score),
-            passedAt: new Date().toISOString(),
+            lastScore: latestScore,
+            bestScore,
+            passedAt,
           },
           unitId: topic.unitId,
           courseId: topic.unit.courseId,
@@ -163,8 +213,11 @@ export class MasteryGateService {
           actor: { userId },
           verb: 'passed',
           object: { type: 'topic', id: topicId },
-          result: { score: { scaled: score / 100 }, success: true },
-          timestamp: new Date().toISOString(),
+          result: {
+            score: { scaled: currentAttempt.percentage / 100 },
+            success: true,
+          },
+          timestamp: attemptTimestamp.toISOString(),
         });
 
         // Evaluate prescriptive analytics gate (BKT p_known)
@@ -173,7 +226,7 @@ export class MasteryGateService {
           topicId,
         );
 
-        let message = `Congratulations! You've mastered this topic with a score of ${score}%.`;
+        let message = `Congratulations! You've mastered this topic with a score of ${currentAttempt.percentage}%.`;
 
         // The assessment pass owns curriculum unlocks; BKT is a recommendation signal.
         const nextTopicResult = await this.unlockNextTopic(userId, topicId);
@@ -203,31 +256,28 @@ export class MasteryGateService {
         return {
           topicId,
           masteryUnlocked: true,
-          failedAttempts: 0,
+          failedAttempts,
           nextTopicUnlocked,
           nextTopicId,
           message,
           gateDecision,
         };
       } else {
-        const newFailedAttempts = failedAttempts + 1;
-        const masteryUnlocked = previousQuizScores.masteryUnlocked === true;
-        const nextTopicUnlocked =
-          previousQuizScores.nextTopicUnlocked === true;
-
-        const updateData: any = {
+        const updateData = {
           quizScores: {
             ...previousQuizScores,
-            attempts,
-            failedAttempts: newFailedAttempts,
+            attempts: topicAttempts.length,
+            failedAttempts,
             masteryUnlocked,
             nextTopicUnlocked,
-            lastScore: score,
-            lastAttemptAt: new Date().toISOString(),
+            lastScore: latestScore,
+            bestScore,
+            ...(passedAt ? { passedAt } : {}),
+            lastAttemptAt,
           },
           unitId: topic.unitId,
           courseId: topic.unit.courseId,
-          lastUpdated: BigInt(Date.now()),
+          lastUpdated: BigInt(attemptTimestamp.getTime()),
         };
 
         await this.prisma.progress.update({
@@ -241,22 +291,25 @@ export class MasteryGateService {
           actor: { userId },
           verb: 'failed',
           object: { type: 'topic', id: topicId },
-          result: { score: { scaled: score / 100 }, success: false },
-          timestamp: new Date().toISOString(),
+          result: {
+            score: { scaled: currentAttempt.percentage / 100 },
+            success: false,
+          },
+          timestamp: attemptTimestamp.toISOString(),
         });
 
         this.logger.log(
-          `User ${userId} failed quiz for topic ${topicId} with score ${score}% (attempt ${newFailedAttempts})`,
+          `User ${userId} failed quiz for topic ${topicId} with score ${currentAttempt.percentage}% (attempt ${failedAttempts})`,
         );
 
         return {
           topicId,
           masteryUnlocked,
-          failedAttempts: newFailedAttempts,
+          failedAttempts,
           nextTopicUnlocked,
           message: masteryUnlocked
-            ? `You scored ${score}%. Your previously earned mastery and topic unlock remain in place.`
-            : `You scored ${score}%, but need ${threshold}% to pass. Review the material and try again. Attempt ${newFailedAttempts}.`,
+            ? `You scored ${currentAttempt.percentage}%. Your previously earned mastery and topic unlock remain in place.`
+            : `You scored ${currentAttempt.percentage}%, but need ${threshold}% to pass. Review the material and try again. Attempt ${failedAttempts}.`,
         };
       }
     } catch (error) {

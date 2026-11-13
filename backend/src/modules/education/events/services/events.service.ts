@@ -42,7 +42,7 @@ export class EventsService {
   }
 
   async findAll(userId: string): Promise<ScheduleEvent[]> {
-    return this.prisma.scheduleEvent.findMany({
+    const events = await this.prisma.scheduleEvent.findMany({
       where: {
         OR: [
           { userId },
@@ -50,6 +50,16 @@ export class EventsService {
         ],
       },
       orderBy: { date: 'asc' },
+    });
+
+    return events.filter((event) => {
+      const metadata = event.metadata;
+      return !(
+        metadata &&
+        typeof metadata === 'object' &&
+        !Array.isArray(metadata) &&
+        ('goalId' in metadata || metadata.createdFromGoal === true)
+      );
     });
   }
 

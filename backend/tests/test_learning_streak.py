@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from ts_runtime import run_typescript
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 
@@ -75,6 +76,7 @@ def test_quiz_attempts_are_included_in_user_streaks() -> None:
     probe = r'''import { ProgressService } from "./src/modules/education/courses/services/progress.service.ts";
 const service = Object.create(ProgressService.prototype);
 let queriedTypes: string[] = [];
+service.logger = { debug() {}, error() {} };
 service.prisma = {
   userActivity: {
     findMany: async ({ where }: { where: { type: { in: string[] } } }) => {
@@ -104,3 +106,50 @@ service.prisma = {
     assert "LEARNING" in result["queriedTypes"]
     assert "LOGIN" not in result["queriedTypes"]
     assert result["streaks"]["currentStreak"] == 1
+
+
+def test_backend_streak_matches_shared_utc_activity_history() -> None:
+    fixture_path = BACKEND_DIR.parent / "shared_fixtures" / "learning-activity-history.json"
+    fixture = json.loads(fixture_path.read_text(encoding="utf-8"))
+    run_typescript(
+        f"""
+const assert = require('node:assert/strict');
+const {{ ProgressService }} =
+  require('./src/modules/education/courses/services/progress.service.ts');
+const fixture = {json.dumps(fixture)};
+const service = Object.create(ProgressService.prototype);
+const expectedDbTypes = [
+  'LEARNING',
+  'QUIZ_ATTEMPT',
+  'STUDY_SESSION',
+  'FLASHCARD_REVIEW',
+  'FLASHCARD_SESSION',
+];
+service.logger = {{ debug: () => {{}}, error: () => {{}} }};
+service.prisma = {{
+  userActivity: {{
+    findMany: async ({{ where }}) => {{
+      assert.deepEqual(where.type.in, expectedDbTypes);
+      const allowed = new Set(fixture.qualifyingTypes);
+      return fixture.activities
+        .filter(activity => allowed.has(activity.type))
+        .map(activity => ({{ createdAt: new Date(activity.createdAt) }}));
+    }},
+  }},
+}};
+
+(async () => {{
+  const result = await service.getUserStreaks(
+    fixture.userId,
+    new Date(fixture.now),
+  );
+  assert.deepEqual(
+    {{ currentStreak: result.currentStreak, longestStreak: result.longestStreak }},
+    fixture.expected,
+  );
+}})().catch(error => {{
+  console.error(error);
+  process.exitCode = 1;
+}});
+"""
+    )

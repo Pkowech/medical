@@ -113,7 +113,10 @@ impl CourseRepository for PostgresCourseRepository {
                     LEFT JOIN topics t ON t.id = ss.topic_id
                     LEFT JOIN materials m ON m.id = ss.material_id
                     JOIN units u ON u.id = COALESCE(t.unit_id, m.unit_id)
-                    WHERE ss.user_id = $1 AND u.course_id = $2
+                    WHERE ss.user_id = $1
+                      AND u.course_id = $2
+                      AND ss.is_valid = true
+                      AND ss.end_time IS NOT NULL
                 ), 0) as total_time,
                 COALESCE(AVG(progress_percentage), 0.0) as avg_progress
             FROM course_enrollments

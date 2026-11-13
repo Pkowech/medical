@@ -17,6 +17,7 @@ export default function ProfilePage() {
   const [profileError, setProfileError] = useState<string | null>(null);
 
   const [profile, setProfile] = useState<LocalUserProfile>({
+    username: '',
     firstName: '',
     lastName: '',
     email: '',
@@ -48,6 +49,7 @@ export default function ProfilePage() {
 
           setProfile({
             id: userProfile.id,
+            username: userProfile.username || session.user.username || '',
             // Use profile data, fallback to session, then empty string
             firstName: userProfile.firstName || (session.user as { firstName?: string }).firstName || '',
             lastName: userProfile.lastName || (session.user as { lastName?: string }).lastName || '',
@@ -109,6 +111,11 @@ export default function ProfilePage() {
           <div>
             <h1 className="text-3xl font-bold text-foreground dark:text-foreground capitalize">{getDisplayName()}</h1>
             <p className="text-muted-foreground dark:text-muted-foreground">{profile.email}</p>
+            {profile.username && (
+              <p className="text-sm text-muted-foreground dark:text-muted-foreground">
+                @{profile.username}
+              </p>
+            )}
           </div>
         </div>
         <Button onClick={() => router.push('/profile/edit')} className="w-full md:w-auto">
@@ -201,6 +208,12 @@ export default function ProfilePage() {
                 <p className="text-base font-medium text-foreground dark:text-muted-foreground">{profile.email}</p>
               </div>
               <div>
+                <p className="text-xs font-semibold text-muted-foreground dark:text-muted-foreground uppercase tracking-wider">Username</p>
+                <p className="text-base font-medium text-foreground dark:text-muted-foreground">
+                  {profile.username ? `@${profile.username}` : 'Not set'}
+                </p>
+              </div>
+              <div>
                 <p className="text-xs font-semibold text-muted-foreground dark:text-muted-foreground uppercase tracking-wider">Phone Number</p>
                 <p className="text-base font-medium text-foreground dark:text-muted-foreground">{profile.phoneNumber || 'Not set'}</p>
               </div>
@@ -238,6 +251,8 @@ export default function ProfilePage() {
                 <p className="text-base font-medium text-foreground dark:text-muted-foreground">
                   {profile.careerStage === 'student'
                     ? 'Student or trainee'
+                    : profile.careerStage === 'postgraduate'
+                      ? 'Postgraduate / resident / trainee'
                     : profile.careerStage === 'professional'
                       ? 'Healthcare professional'
                       : 'Not set'}
@@ -249,10 +264,12 @@ export default function ProfilePage() {
               </div>
               <div>
                 <p className="text-xs font-semibold text-muted-foreground dark:text-muted-foreground uppercase tracking-wider">
-                  {profile.careerStage === 'student' ? 'Year of study' : 'Professional experience'}
+                  {profile.careerStage === 'student' || profile.careerStage === 'postgraduate'
+                    ? profile.careerStage === 'postgraduate' ? 'Training year' : 'Year of study'
+                    : 'Professional experience'}
                 </p>
                 <p className="text-base font-medium text-foreground dark:text-muted-foreground">
-                  {profile.careerStage === 'student'
+                  {profile.careerStage === 'student' || profile.careerStage === 'postgraduate'
                     ? profile.studyYear ? `Year ${profile.studyYear}` : 'Not set'
                     : profile.careerStage === 'professional' &&
                         profile.yearOfExperience !== null &&

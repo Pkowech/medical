@@ -59,6 +59,7 @@ export interface Progress {
   createdAt: string; // ISO 8601
   updatedAt: string; // ISO 8601
   lastUpdated?: number; // Milliseconds since epoch for offline conflict resolution
+  revision: number; // Server-issued optimistic concurrency version
 
   // **Version Management**
   materialVersion?: number;
@@ -104,6 +105,7 @@ export interface UnitProgress {
  */
 export interface TopicProgress {
   topicId: string;
+  revision?: number;
   title?: string;
   isCompleted: boolean;
   status?: string;
@@ -120,6 +122,7 @@ export interface MaterialProgressSummary {
   topicId: string | null;
   isCompleted: boolean;
   progressPercentage: number;
+  revision: number;
 }
 
 /**

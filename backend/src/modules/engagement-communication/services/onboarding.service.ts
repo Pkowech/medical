@@ -160,8 +160,12 @@ export class OnboardingService {
         ...existingPreferences,
         onboardingCompleted: true,
         onboardingCompletedAt,
-        institution: dto.institution?.trim() || null,
-        targetExam: dto.targetExam?.trim() || null,
+        ...(dto.institution !== undefined && {
+          institution: dto.institution?.trim() || null,
+        }),
+        ...(dto.targetExam !== undefined && {
+          targetExam: dto.targetExam?.trim() || null,
+        }),
         ...(dto.focusTopics ? { focusTopics: dto.focusTopics } : {}),
         ...(dto.dailyGoalMinutes ? { dailyGoalMinutes: dto.dailyGoalMinutes } : {}),
       };

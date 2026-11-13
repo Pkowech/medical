@@ -1,6 +1,7 @@
 import { apiService } from '@/features/auth/services/apiClient';
 import { flashcardApi } from '@/features/assessment/services/flashcardApi';
 import type { ScheduleEvent } from '@/shared/types/studyInterface';
+import { getUtcDateKey } from '@/shared/utils/date-only';
 export type { ScheduleEvent as Event };
 export type { ScheduleEvent };
 
@@ -40,6 +41,17 @@ const parseDate = (dateVal: unknown): Date | null => {
   return isNaN(d.getTime()) ? null : d;
 };
 
+const parseCalendarDate = (dateVal: unknown): Date | null => {
+  if (typeof dateVal === 'string' || dateVal instanceof Date) {
+    const dateKey = getUtcDateKey(dateVal);
+    if (dateKey) {
+      const [year, month, day] = dateKey.split('-').map(Number);
+      return new Date(year, month - 1, day, 12);
+    }
+  }
+  return parseDate(dateVal);
+};
+
 const safeString = (val: unknown, fallback = ''): string => {
   if (val == null) return fallback;
   if (typeof val === 'string') return val;
@@ -68,7 +80,22 @@ const scheduleService = {
       console.error(`Error fetching ${sourceNames[index]}:`, result.reason);
       return [`${sourceNames[index]} could not be loaded.`];
     });
-    const allEvents = results.flatMap(result => result.status === 'fulfilled' ? result.value : []);
+    const goalEvents =
+      results[2].status === 'fulfilled' ? results[2].value : [];
+    const goalEventKeys = new Set(
+      goalEvents.map(
+        event => `${event.title}:${event.date.toISOString().slice(0, 10)}`,
+      ),
+    );
+    const allEvents = results.flatMap((result, index) => {
+      if (result.status !== 'fulfilled') return [];
+      if (index !== 0) return result.value;
+      return result.value.filter(event => {
+        if (event.goalId) return false;
+        const key = `${event.title}:${event.date.toISOString().slice(0, 10)}`;
+        return event.type !== 'goal' || !goalEventKeys.has(key);
+      });
+    });
 
     const seen = new Set<string>();
     const events = allEvents.filter(event => {
@@ -124,7 +151,7 @@ const scheduleService = {
       return data
         .map((deadline: unknown) => {
           const d = deadline as { [k: string]: unknown };
-          const parsedDate = parseDate(d.dueDate ?? d.date);
+          const parsedDate = parseCalendarDate(d.dueDate ?? d.date);
           if (!parsedDate) return null;
 
           if (_startDate && parsedDate < _startDate) return null;
@@ -167,7 +194,12 @@ const scheduleService = {
           const parsedDate = parseDate(dateRaw);
           if (!parsedDate) return null;
 
-          const metadata = (s.metadata as { completed?: unknown }) || {};
+          const metadata =
+            s.metadata &&
+            typeof s.metadata === 'object' &&
+            !Array.isArray(s.metadata)
+              ? (s.metadata as Record<string, unknown>)
+              : {};
 
           return {
             id: safeString(s.id),
@@ -178,7 +210,8 @@ const scheduleService = {
             type: safeString(s.type, 'study'),
             location: safeString(s.location, ''),
             instructor: (typeof s.instructor === 'string' ? s.instructor : null),
-            completed: !!metadata.completed,
+            completed: !!s.completed || !!metadata.completed,
+            goalId: typeof metadata.goalId === 'string' ? metadata.goalId : undefined,
           } as ScheduleEvent;
         })
         .filter(Boolean) as ScheduleEvent[];
@@ -236,8 +269,11 @@ const scheduleService = {
       return data
         .map((goal: unknown) => {
           const g = goal as { [k: string]: unknown };
-          const parsedDate = parseDate(g.targetDate ?? g.startDate);
+          const parsedDate = parseCalendarDate(g.targetDate);
           if (!parsedDate) return null;
+          if (['completed', 'cancelled', 'dropped', 'skipped'].includes(safeString(g.status))) {
+            return null;
+          }
 
           if (_startDate && parsedDate < _startDate) return null;
           if (_endDate && parsedDate > _endDate) return null;

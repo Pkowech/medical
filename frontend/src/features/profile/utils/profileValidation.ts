@@ -1,4 +1,5 @@
 import type { LocalUserProfile, ValidationResult } from '@/shared/types/profileInterface';
+import { usernameSchema } from '@/lib/auth/validations';
 
 /**
  * Validate a single profile field
@@ -8,6 +9,15 @@ export function validateField(name: string, value: string): string[] {
   const errors: string[] = [];
 
   switch (name) {
+    case 'username': {
+      if (value.trim()) {
+        const validation = usernameSchema.safeParse(value.trim().toLowerCase());
+        if (!validation.success) {
+          errors.push(validation.error.issues[0]?.message ?? 'Please enter a valid username');
+        }
+      }
+      break;
+    }
     case 'firstName':
     case 'lastName': {
       if (!value.trim()) {

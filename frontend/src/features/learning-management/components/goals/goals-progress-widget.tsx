@@ -16,6 +16,7 @@ import { LearningGoal, GoalAnalytics } from '@/shared/types/learningGoalsInterfa
 import { apiService } from '@/features/auth/services/apiClient';
 import progressService from '../../services/progressService';
 import { useAuthStore } from '@/features/auth/store/useAuthStore';
+import { daysUntilDateOnly } from '@/shared/utils/date-only';
 
 export const GoalsProgressWidget: React.FC = () => {
   const { user } = useAuthStore();
@@ -112,14 +113,8 @@ export const GoalsProgressWidget: React.FC = () => {
     }
   };
 
-  const getDaysRemaining = (targetDate: string) => {
-    const target = new Date(targetDate);
-    const now = new Date();
-    const diffTime = target.getTime() - now.getTime();
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  };
-
-  const formatDaysRemaining = (days: number) => {
+  const formatDaysRemaining = (days: number | null) => {
+    if (days === null) return 'Date unavailable';
     if (days < 0) return `${Math.abs(days)} days overdue`;
     if (days === 0) return 'Due today';
     if (days === 1) return 'Due tomorrow';
@@ -196,9 +191,12 @@ export const GoalsProgressWidget: React.FC = () => {
       ) : (
         <div className="space-y-4">
           {goals.map(goal => {
-            const daysRemaining = getDaysRemaining(goal.targetDate);
-            const isOverdue = daysRemaining < 0;
-            const isDueSoon = daysRemaining <= 7 && daysRemaining >= 0;
+            const daysRemaining = daysUntilDateOnly(goal.targetDate);
+            const isOverdue = daysRemaining !== null && daysRemaining < 0;
+            const isDueSoon =
+              daysRemaining !== null &&
+              daysRemaining <= 7 &&
+              daysRemaining >= 0;
 
             return (
               <div

@@ -35,7 +35,9 @@ import { topicService } from '@/features/courses/services/topicService';
 import type { Topic } from '@/shared/types/courseInterface';
 import { Button } from '@/shared/components/ui/button';
 import { Dialog, DialogContent } from '@/shared/components/ui/dialog';
-import progressService from '@/features/learning-management/services/progressService';
+import progressService, {
+  isProgressConflict,
+} from '@/features/learning-management/services/progressService';
 import offlineProgressSync from '@/features/learning-management/services/offlineProgressSync';
 import { isOfflineQueuedError } from '@/lib/core/offline/offlineQueuedError';
 import { toast } from 'sonner';
@@ -110,6 +112,7 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
   // ── Local state ────────────────────────────────────────────────────────
   const [offlineMode, setOfflineMode] = useState(false);
   const [isAddTopicOpen, setIsAddTopicOpen] = useState(false);
+  const [progressRevision, setProgressRevision] = useState<number>();
   const selectedMaterialId = searchParams.get('materialId');
   const hasSelectedTopic = Boolean(selectedTopicId);
   const { user } = useAuth();
@@ -222,6 +225,10 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
   };
 
   const typedCurrentTopic = getCurrentTopic() as unknown as Lesson & { resources?: Material[] };
+  useEffect(() => {
+    setProgressRevision(typedCurrentTopic?.progressRevision ?? 0);
+  }, [typedCurrentTopic?.id, typedCurrentTopic?.progressRevision]);
+
   // ── Page header sync ───────────────────────────────────────────────────
   useEffect(() => {
     if (unitData?.title) {
@@ -294,14 +301,26 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
       topicId: String(typedCurrentTopic.id),
       status: nextStatus,
       progressPercentage,
+      expectedRevision:
+        progressRevision ?? typedCurrentTopic.progressRevision ?? 0,
     };
+    const idempotencyKey = crypto.randomUUID();
 
     try {
-      await progressService.updateContentProgress(update);
+      await progressService.updateContentProgress(update, idempotencyKey);
     } catch (error) {
       if (isOfflineQueuedError(error)) {
+        setProgressRevision(update.expectedRevision + 1);
         toggleLessonComplete(key);
         toast.info('Topic progress saved offline and will sync when connected.');
+        return;
+      }
+      if (isProgressConflict(error)) {
+        await Promise.all([refreshLearningCaches(), refetchUnit()]).catch(
+          refreshError =>
+            console.error('Failed to refresh conflicted topic progress:', refreshError),
+        );
+        toast.error('Progress changed elsewhere. Refresh and retry.');
         return;
       }
       console.error('Failed to update topic progress:', error);
@@ -312,7 +331,10 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
           topicId: update.topicId,
           percent: progressPercentage,
           status: isComplete ? 'notStarted' : 'completed',
+          expectedRevision: update.expectedRevision,
+          idempotencyKey,
         });
+        setProgressRevision(update.expectedRevision + 1);
         toggleLessonComplete(key);
         toast.info('Topic progress saved offline and will sync when connected.');
         return;
@@ -324,6 +346,7 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
     }
 
     toggleLessonComplete(key);
+    setProgressRevision(update.expectedRevision + 1);
     await Promise.all([refreshLearningCaches(), refetchUnit()]).catch(error => {
       console.error('Failed to refresh topic progress after saving:', error);
     });

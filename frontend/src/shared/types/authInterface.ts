@@ -30,7 +30,6 @@ export interface AuthFormData {
   lastName: string;
   password: string;
   confirmPassword: string;
-  role: string;
   acceptTerms: boolean;
   // Optional profile fields
   phoneNumber?: string;
@@ -167,7 +166,6 @@ export interface RegisterDTO extends AuthRequestBase {
   username: string;
   confirmPassword: string;
   acceptTerms: boolean;
-  role?: UserRole;
   // Optional profile fields
   phoneNumber?: string;
   bio?: string;

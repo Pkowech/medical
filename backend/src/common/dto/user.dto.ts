@@ -23,6 +23,7 @@ import {
 import { BaseUserResponseDto } from './base';
 import { Transform, Type } from 'class-transformer';
 import { RoleName } from '@prisma/client';
+import { CAREER_STAGES } from '#common/constants/career-stages';
 
 // Define role type for DTO schema generation (avoids Prisma circular imports in Swagger)
 type RoleType = 'student' | 'moderator' | 'instructor' | 'admin';
@@ -240,10 +241,10 @@ export class CreateUserDto {
 
   @ApiPropertyOptional({
     description: 'Healthcare learning or professional stage',
-    enum: ['student', 'professional'],
+    enum: CAREER_STAGES,
   })
   @IsOptional()
-  @IsIn(['student', 'professional'])
+  @IsIn(CAREER_STAGES)
   careerStage?: string | null;
 
   @ApiPropertyOptional({ description: 'Healthcare field or profession' })
@@ -292,10 +293,10 @@ export class UpdateUserDto extends PartialType(CreateUserDto) {
 
   @ApiPropertyOptional({
     description: 'Healthcare learning or professional stage',
-    enum: ['student', 'professional'],
+    enum: CAREER_STAGES,
   })
   @IsOptional()
-  @IsIn(['student', 'professional'])
+  @IsIn(CAREER_STAGES)
   careerStage?: string | null;
 
   @ApiPropertyOptional({ description: 'Healthcare field or profession' })
@@ -676,16 +677,6 @@ export class RegisterDto {
     message: 'You must accept the terms and conditions',
   })
   acceptTerms!: boolean;
-
-  @ApiProperty({
-    description: 'User role',
-    enum: ['student', 'moderator', 'instructor', 'admin'],
-    default: 'student',
-    required: false,
-  })
-  @IsEnum(RoleStrings, { message: 'Invalid role' })
-  @IsOptional()
-  role?: RoleType = 'student';
 
   @ApiProperty({ description: 'Profile picture URL', required: false })
   @IsString()

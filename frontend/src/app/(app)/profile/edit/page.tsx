@@ -51,6 +51,7 @@ export default function EditProfilePage() {
   const router = useRouter();
 
   const [profile, setProfile] = useState<LocalUserProfile>({
+    username: '',
     firstName: '',
     lastName: '',
     email: '',
@@ -94,6 +95,7 @@ export default function EditProfilePage() {
           
           const fetchedProfile: LocalUserProfile = {
             id: userProfile.id,
+            username: userProfile.username || session.user.username || '',
             firstName: userProfile.firstName || (session.user as { firstName?: string }).firstName || '',
             lastName: userProfile.lastName || (session.user as { lastName?: string }).lastName || '',
             email: userProfile.email || session.user.email || '',
@@ -215,14 +217,20 @@ export default function EditProfilePage() {
       // Note: profileImage is already saved server-side by uploadProfileImage;
       // we only include the stored key/url, not a raw data URL.
       const updatePayload = {
+        ...(profile.username?.trim() && {
+          username: profile.username.trim().toLowerCase(),
+        }),
         firstName: profile.firstName,
         lastName: profile.lastName,
-        bio: profile.bio || undefined,
-        location: profile.location || undefined,
-        phoneNumber: profile.phoneNumber || undefined,
+        bio: profile.bio,
+        location: profile.location,
+        phoneNumber: profile.phoneNumber,
         careerStage: profile.careerStage || null,
         healthcareField: profile.healthcareField || null,
-        studyYear: profile.careerStage === 'student' ? profile.studyYear : null,
+        studyYear:
+          profile.careerStage === 'student' || profile.careerStage === 'postgraduate'
+            ? profile.studyYear
+            : null,
         specialization: profile.specialization || null,
         yearOfExperience:
           profile.careerStage === 'professional' ? profile.yearOfExperience : null,
@@ -232,9 +240,15 @@ export default function EditProfilePage() {
       await updateSession({
         user: {
           ...session.user,
+          ...(profile.username?.trim() && {
+            username: profile.username.trim().toLowerCase(),
+          }),
           careerStage: profile.careerStage || null,
           healthcareField: profile.healthcareField || null,
-          studyYear: profile.careerStage === 'student' ? profile.studyYear : null,
+          studyYear:
+            profile.careerStage === 'student' || profile.careerStage === 'postgraduate'
+              ? profile.studyYear
+              : null,
           yearOfExperience:
             profile.careerStage === 'professional' ? profile.yearOfExperience : null,
           specialization: profile.specialization || null,
@@ -447,6 +461,19 @@ export default function EditProfilePage() {
               />
             </div>
 
+            <div>
+              <FormFieldWithValidation
+                label="Username"
+                name="username"
+                value={profile.username || ''}
+                onChange={handleChange}
+                placeholder="Choose a username"
+                errors={fieldErrors.username}
+                helpText="Your unique sign-in name. Leave blank to keep your current username."
+                isValid={validationState.username}
+              />
+            </div>
+
             {/* Email (Read-only) */}
             <div>
               <FormFieldWithValidation
@@ -532,6 +559,7 @@ export default function EditProfilePage() {
               >
                 <option value="">Not set</option>
                 <option value="student">Student or trainee</option>
+                <option value="postgraduate">Postgraduate / resident / trainee</option>
                 <option value="professional">Qualified professional</option>
               </select>
             </div>
@@ -562,10 +590,10 @@ export default function EditProfilePage() {
               />
             </div>
 
-            {profile.careerStage === 'student' && (
+            {(profile.careerStage === 'student' || profile.careerStage === 'postgraduate') && (
               <div>
                 <label htmlFor="studyYear" className="mb-2 block text-sm font-medium text-muted-foreground dark:text-muted-foreground">
-                  Current year of study
+                  {profile.careerStage === 'postgraduate' ? 'Training year' : 'Current year of study'}
                 </label>
                 <select
                   id="studyYear"

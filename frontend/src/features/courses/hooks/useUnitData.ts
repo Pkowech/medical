@@ -99,6 +99,7 @@ const normalizeUnitToChapters = (
           masteryUnlocked,
           nextTopicUnlocked,
           failedAttempts: progress?.failedAttempts ?? 0,
+          progressRevision: progress?.revision ?? 0,
           readingProgressPercentage,
           materialProgress,
           // Attach topic-level materials directly on the lesson so CourseContent

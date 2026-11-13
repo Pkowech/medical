@@ -28,7 +28,10 @@ pub async fn get_course_progress(
                     LEFT JOIN topics t ON t.id = ss.topic_id
                     LEFT JOIN materials m ON m.id = ss.material_id
                     JOIN units u ON u.id = COALESCE(t.unit_id, m.unit_id)
-                    WHERE ss.user_id = ce.user_id AND u.course_id = ce.course_id
+                    WHERE ss.user_id = ce.user_id
+                      AND u.course_id = ce.course_id
+                      AND ss.is_valid = true
+                      AND ss.end_time IS NOT NULL
                 ), 0), 2147483647)::int AS time_spent,
                 ROUND(COALESCE(ce.progress_percentage, 0))::int AS progress_percentage,
                 COALESCE(ce.completed_units, 0) AS completed_units,

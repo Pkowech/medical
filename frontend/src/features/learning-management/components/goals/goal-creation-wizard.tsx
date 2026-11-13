@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { apiService } from '@/features/auth/services/apiClient';
 import { GoalCreationWizardProps, SMARTSuggestions, LearningGoal } from '@/shared/types/learningGoalsInterface';
+import { formatDateOnly } from '@/shared/utils/date-only';
 
 type Milestone = {
   title: string;
@@ -180,7 +181,10 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
 
       case 3:
         if (!goalData.targetDate) newErrors.targetDate = 'Target date is required';
-        if (new Date(goalData.targetDate) <= new Date(goalData.startDate)) {
+        if (
+          goalData.targetDate &&
+          goalData.targetDate <= goalData.startDate
+        ) {
           newErrors.targetDate = 'Target date must be after start date';
         }
         break;
@@ -209,32 +213,14 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
       const orUndefined = (v?: string) => (v && v.trim() !== '' ? v : undefined);
       const payload = {
         ...goalData,
-        startDate: new Date(goalData.startDate).toISOString(),
-        targetDate: new Date(goalData.targetDate).toISOString(),
+        startDate: `${goalData.startDate}T00:00:00.000Z`,
+        targetDate: `${goalData.targetDate}T00:00:00.000Z`,
         status: 'active',
         courseId: orUndefined(goalData.courseId),
         learningPathId: orUndefined(goalData.learningPathId),
         dependsOnGoalId: orUndefined(goalData.dependsOnGoalId),
       };
       await apiService.post(`/learning-goals`, payload);
-
-      // Create a schedule event for the goal so it appears on the calendar
-      if (goalData.targetDate) {
-        try {
-          const targetDate = new Date(goalData.targetDate);
-          await apiService.post('/events', {
-            title: `Goal: ${goalData.title}`,
-            description: goalData.description || '',
-            date: targetDate.toISOString(),
-            endDate: targetDate.toISOString(),
-            type: 'goal',
-            location: goalData.category || 'Personal',
-          });
-        } catch {
-          // Non-fatal: goal was still created successfully
-          console.warn('Could not create calendar event for goal');
-        }
-      }
 
       onGoalCreated();
       onClose();
@@ -876,7 +862,7 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
 
             <div>
               <h5 className="font-medium text-muted-foreground">Deadline</h5>
-              <p className="text-foreground">{new Date(goalData.targetDate).toLocaleDateString()}</p>
+              <p className="text-foreground">{formatDateOnly(goalData.targetDate)}</p>
             </div>
           </div>
 

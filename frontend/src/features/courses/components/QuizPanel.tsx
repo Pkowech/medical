@@ -67,25 +67,26 @@ export const QuizPanel = ({
     recommendations?: QuizPerformanceRecommendations;
   } | null>(null);
 
-  useEffect(() => {
-    const fetchQuestions = async () => {
-      if (!lessonId) {
-        setIsLoading(false);
-        return;
-      }
-      setIsLoading(true);
-      try {
-        const data = await quizService.getQuestionsForLesson(lessonId, scope);
-        setQuestions(data as Question[]);
-      } catch (error) {
-        setLoadError(error instanceof Error ? error.message : 'Failed to load quiz questions.');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchQuestions();
+  const fetchQuestions = React.useCallback(async () => {
+    if (!lessonId) {
+      setIsLoading(false);
+      return;
+    }
+    setIsLoading(true);
+    setLoadError(null);
+    try {
+      const data = await quizService.getQuestionsForLesson(lessonId, scope);
+      setQuestions(data as Question[]);
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : 'Failed to load quiz questions.');
+    } finally {
+      setIsLoading(false);
+    }
   }, [lessonId, scope]);
+
+  useEffect(() => {
+    void fetchQuestions();
+  }, [fetchQuestions]);
 
   const handleOptionSelect = (optionId: string) => {
     if (isSubmitted) return;
@@ -94,6 +95,11 @@ export const QuizPanel = ({
 
   const handleSubmit = async () => {
     if (!selectedOption || isSubmitted || isSubmitting) return;
+
+    if (!questions.length) {
+      setSubmissionError('No quiz questions are available yet.');
+      return;
+    }
 
     const currentQuestion = questions[currentQuestionIndex];
     const selected = currentQuestion.options.find(option => option.id === selectedOption);
@@ -132,6 +138,11 @@ export const QuizPanel = ({
   };
 
   const handleNext = async () => {
+    if (!questions.length) {
+      setSubmissionError('No quiz questions are available yet.');
+      return;
+    }
+
     if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex(prev => prev + 1);
       setSelectedOption(null);
@@ -246,8 +257,20 @@ export const QuizPanel = ({
 
   if (loadError) {
     return (
-      <div role="alert" className="p-6 text-center text-red-600">
-        {loadError}
+      <div role="alert" className="p-6 rounded-xl border border-red-200 bg-red-50 text-red-700">
+        <p className="font-medium mb-3">We couldn’t load this quiz.</p>
+        <p className="mb-4">{loadError}</p>
+        <button
+          type="button"
+          onClick={() => {
+            setLoadError(null);
+            void fetchQuestions();
+          }}
+          className="inline-flex items-center gap-2 rounded-md bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-500"
+        >
+          <RefreshCw className="h-4 w-4" />
+          Retry
+        </button>
       </div>
     );
   }

@@ -81,6 +81,11 @@ export class ProgressService {
         'Client timestamp must be valid milliseconds.',
       );
     }
+    if (milliseconds > Date.now() + 5 * 60 * 1000) {
+      throw new BadRequestException(
+        'Client timestamp cannot be more than five minutes in the future.',
+      );
+    }
     return occurredAt;
   }
 
@@ -211,6 +216,7 @@ export class ProgressService {
         timeSpent,
         clientTimestamp,
         idempotencyKey,
+        expectedRevision,
       } = updateDto;
       const progressValue = Number.isFinite(progressPercentage)
         ? Math.max(0, Math.min(100, Math.floor(progressPercentage ?? 0)))
@@ -272,6 +278,36 @@ export class ProgressService {
           }
         }
 
+        const canonicalProgressWhere = {
+          userId,
+          materialId: materialId ?? null,
+          topicId: topicId ?? null,
+          unitId: unitId ?? null,
+          courseId: courseId ?? null,
+        };
+        const existingProgress =
+          topicId || materialId
+            ? await tx.progress.findFirst({ where: canonicalProgressWhere })
+            : null;
+        const currentRevision = existingProgress?.revision ?? 0;
+        if (
+          expectedRevision !== undefined &&
+          expectedRevision !== currentRevision
+        ) {
+          throw new ConflictException({
+            message:
+              'Progress changed on another device. Refresh before retrying.',
+            expectedRevision,
+            currentRevision,
+          });
+        }
+        const nextRevision = currentRevision + 1;
+        if (nextRevision > 2_147_483_647) {
+          throw new ConflictException(
+            'Progress revision limit reached. Contact support.',
+          );
+        }
+
         // Material progress - only if material exists
         if (materialId) {
           // Validate material exists
@@ -284,22 +320,15 @@ export class ProgressService {
               `Material ${materialId} not found, skipping progress creation`,
             );
           } else {
-            // Check for conflict if clientTimestamp provided
-            if (clientTimestamp !== undefined) {
-              const existing = await tx.progress.findFirst({
-                where: { userId, materialId },
-              });
-
-              if (existing && existing.lastUpdated > clientTimestamp) {
-                throw new ConflictException(
-                  'Server has newer data. Please refresh and retry.',
-                );
-              }
-            }
-
             const isCompleted = status === ProgressStatus.completed;
             const existing = await tx.progress.findFirst({
-              where: { userId, materialId },
+              where: {
+                userId,
+                materialId,
+                topicId: null,
+                unitId: null,
+                courseId: null,
+              },
             });
 
             const now = new Date();
@@ -328,6 +357,7 @@ export class ProgressService {
                   completionPercentage: materialProgressPercentage,
                   lastAccessedAt: now,
                   lastUpdated: currentTimestamp,
+                  revision: existing.revision + 1,
                 },
               });
             } else {
@@ -342,6 +372,7 @@ export class ProgressService {
                   completionPercentage: isCompleted ? 100 : progressValue,
                   lastAccessedAt: now,
                   lastUpdated: currentTimestamp,
+                  revision: 1,
                 },
               });
             }
@@ -405,18 +436,6 @@ export class ProgressService {
 
           // Use findFirst + update/create instead of upsert because upsert doesn't
           // support null values in composite unique constraint lookups
-          const findWhere: any = {
-            userId,
-            materialId: materialId ?? null,
-            topicId: topicId ?? null,
-            unitId: unitId ?? null,
-            courseId: courseId ?? null,
-          };
-
-          const existingProgress = await tx.progress.findFirst({
-            where: findWhere,
-          });
-
           // NOTE: `timeSpent` is intentionally NOT included in this shared object.
           // Prisma's `{ increment: N }` write operator is only valid inside
           // update()/upsert().update — passing it to create() throws a
@@ -448,6 +467,7 @@ export class ProgressService {
             completedAt: isCompleted
               ? (existingProgress?.completedAt ?? now)
               : null,
+            revision: nextRevision,
           };
 
           if (existingProgress) {
@@ -461,11 +481,7 @@ export class ProgressService {
           } else {
             await tx.progress.create({
               data: {
-                userId,
-                topicId: topicId ?? null,
-                materialId: materialId ?? null,
-                unitId: unitId ?? null,
-                courseId: courseId ?? null,
+                ...canonicalProgressWhere,
                 ...baseData,
                 timeSpent: timeSpentDelta,
               },
@@ -487,6 +503,7 @@ export class ProgressService {
               userId,
               courseId,
               progressPercentage: Math.round(courseProgress.percentage),
+              progressRevision: nextRevision,
               completedUnits: courseProgress.completedUnits,
               status:
                 courseProgress.percentage >= 100
@@ -582,6 +599,11 @@ export class ProgressService {
 
       return updatedCourseProgress;
     } catch (error: any) {
+      if (error?.code === 'P2034') {
+        throw new ConflictException(
+          'Progress changed concurrently. Refresh before retrying.',
+        );
+      }
       handleServiceError(error, this.logger, 'updateProgress');
       return null;
     }
@@ -592,6 +614,7 @@ export class ProgressService {
     materialId: string,
     clientTimestamp?: bigint,
     idempotencyKey?: string,
+    expectedRevision?: number,
   ): Promise<Progress | undefined> {
     try {
       const material = await this.prisma.material.findUnique({
@@ -619,57 +642,8 @@ export class ProgressService {
       const occurredAt = this.getOccurrenceTime(clientTimestamp);
 
       let materialProgress: Progress | undefined;
+      let duplicateRequest = false;
       await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-        const whereData = {
-          userId,
-          materialId,
-          topicId: topicId ?? null,
-          unitId: material.unitId,
-          courseId: courseId ?? null,
-        };
-        const existingProgress = await tx.progress.findFirst({
-          where: whereData,
-        });
-
-        // Check for conflict if clientTimestamp provided
-        if (clientTimestamp !== undefined) {
-          if (
-            existingProgress &&
-            existingProgress.lastUpdated > clientTimestamp
-          ) {
-            throw new ConflictException(
-              'Server has newer data. Please refresh and retry.',
-            );
-          }
-        }
-
-        const now = new Date();
-        const currentTimestamp = BigInt(occurredAt.getTime());
-
-        const progressData = {
-          isCompleted: true,
-          completedAt: now,
-          lastUpdated: currentTimestamp,
-          status: ProgressStatus.completed,
-          progressPercentage: 100,
-          completionPercentage: 100,
-          lastAccessedAt: now,
-        };
-
-        materialProgress = existingProgress
-          ? await tx.progress.update({
-              where: { id: existingProgress.id },
-              data: progressData,
-            })
-          : await tx.progress.create({
-              data: {
-                ...whereData,
-                ...progressData,
-              },
-            });
-
-        // Unit and Course progress updates are removed here as they are now derived aggregates.
-
         const activityData = {
           userId,
           ...(idempotencyKey
@@ -689,15 +663,87 @@ export class ProgressService {
           createdAt: occurredAt,
         };
         if (idempotencyKey) {
-          await tx.userActivity.createMany({
+          const activity = await tx.userActivity.createMany({
             data: [activityData],
             skipDuplicates: true,
           });
+          if (activity.count === 0) {
+            duplicateRequest = true;
+            materialProgress =
+              (await tx.progress.findFirst({
+                where: {
+                  userId,
+                  materialId,
+                  topicId: topicId ?? null,
+                  unitId: material.unitId,
+                  courseId: courseId ?? null,
+                },
+              })) ?? undefined;
+            return;
+          }
         } else {
           await tx.userActivity.create({ data: activityData });
         }
-      });
 
+        const whereData = {
+          userId,
+          materialId,
+          topicId: topicId ?? null,
+          unitId: material.unitId,
+          courseId: courseId ?? null,
+        };
+        const existingProgress = await tx.progress.findFirst({
+          where: whereData,
+        });
+
+        if (
+          expectedRevision !== undefined &&
+          expectedRevision !== (existingProgress?.revision ?? 0)
+        ) {
+          throw new ConflictException({
+            message:
+              'Progress changed on another device. Refresh before retrying.',
+            expectedRevision,
+            currentRevision: existingProgress?.revision ?? 0,
+          });
+        }
+
+        const nextRevision = (existingProgress?.revision ?? 0) + 1;
+        if (nextRevision > 2_147_483_647) {
+          throw new ConflictException(
+            'Progress revision limit reached. Contact support.',
+          );
+        }
+        const now = new Date();
+
+        const progressData = {
+          isCompleted: true,
+          completedAt: now,
+          status: ProgressStatus.completed,
+          progressPercentage: 100,
+          completionPercentage: 100,
+          lastAccessedAt: now,
+          lastUpdated: BigInt(occurredAt.getTime()),
+          revision: nextRevision,
+        };
+
+        materialProgress = existingProgress
+          ? await tx.progress.update({
+              where: { id: existingProgress.id },
+              data: progressData,
+            })
+          : await tx.progress.create({
+              data: {
+                ...whereData,
+                ...progressData,
+              },
+            });
+
+        // Unit and Course progress updates are removed here as they are now derived aggregates.
+
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+
+      if (duplicateRequest) return materialProgress;
       this.events.emit('progress.updated', {
         userId,
         materialId,
@@ -745,6 +791,16 @@ export class ProgressService {
 
       return materialProgress;
     } catch (error) {
+      if (
+        error &&
+        typeof error === 'object' &&
+        'code' in error &&
+        error.code === 'P2034'
+      ) {
+        throw new ConflictException(
+          'Progress changed concurrently. Refresh before retrying.',
+        );
+      }
       handleServiceError(error, this.logger, 'markMaterialAsRead');
       return undefined;
     }
@@ -914,6 +970,9 @@ export class ProgressService {
             existing?.progressPercentage ?? 0,
             Math.min(100, Math.max(0, progress.progressPercentage)),
           ),
+          revision: progress.topicId
+            ? progress.revision
+            : (existing?.revision ?? progress.revision),
         });
       }
 
@@ -1322,7 +1381,7 @@ export class ProgressService {
         where: {
           userId,
           isValid: true,
-          endTime: { gte: startDate, lt: endDate },
+          endTime: { gte: startDate, lt: endDate, not: null },
         },
         select: { duration: true, endTime: true },
       }),
@@ -1410,7 +1469,13 @@ export class ProgressService {
       const [units, topicProgressRows, unitProgressRows] = await Promise.all([
         this.prisma.unit.findMany({
           where: { courseId },
-          select: { id: true, topics: { select: { id: true } } },
+          select: {
+            id: true,
+            topics: {
+              where: { status: 'published' },
+              select: { id: true, isMandatory: true },
+            },
+          },
         }),
         this.prisma.progress.findMany({
           where: { userId, courseId, topicId: { not: null }, materialId: null },
@@ -1474,7 +1539,11 @@ export class ProgressService {
       let completedUnits = 0;
       for (const unit of units) {
         const unitProgress = unitProgressById.get(unit.id);
-        const topicPercentages = unit.topics.map(
+        const mandatoryTopics = unit.topics.filter((topic) => topic.isMandatory);
+        const requiredTopics = mandatoryTopics.length
+          ? mandatoryTopics
+          : unit.topics;
+        const topicPercentages = requiredTopics.map(
           (topic) => topicProgressById.get(topic.id) ?? 0,
         );
         const topicPercentage = topicPercentages.length
@@ -1868,7 +1937,10 @@ export class ProgressService {
   /**
    * Get user streak information (current and longest)
    */
-  async getUserStreaks(userId: string): Promise<{
+  async getUserStreaks(
+    userId: string,
+    now: Date = new Date(),
+  ): Promise<{
     userId: string;
     currentStreak: number;
     longestStreak: number;
@@ -1902,8 +1974,13 @@ export class ProgressService {
       }
 
       const lastActivityDate = learningActivities[0].createdAt;
+      const lastActivityDateLabel = lastActivityDate?.toDateString();
+      this.logger.debug(
+        `User ${userId} last activity label: ${lastActivityDateLabel ?? 'n/a'}`,
+      );
       const { currentStreak, longestStreak } = calculateLearningStreaks(
         learningActivities.map((activity) => activity.createdAt),
+        now,
       );
 
       return {

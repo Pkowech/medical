@@ -26,6 +26,10 @@ import { usePageHeader } from '@/core/providers/HeaderContext';
 import RecommendedGoals from './recommended-goals';
 import { GoalCreationWizard } from './goal-creation-wizard';
 import { StatCard } from '@/shared/components/ui/StatCard';
+import {
+  daysUntilDateOnly,
+  formatDateOnly,
+} from '@/shared/utils/date-only';
 
 const getProgressBarWidth = (percentage: number): string => {
   if (percentage === 0) return 'w-0';
@@ -203,13 +207,6 @@ export const GoalsManagementInterface: React.FC = () => {
     }
   };
 
-  const getDaysRemaining = (targetDate: string) => {
-    const target = new Date(targetDate);
-    const now = new Date();
-    const diffTime = target.getTime() - now.getTime();
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  };
-
   const renderAnalyticsCards = () => {
     if (!analytics) return null;
 
@@ -248,9 +245,14 @@ export const GoalsManagementInterface: React.FC = () => {
   };
 
   const renderGoalCard = (goal: LearningGoal) => {
-    const daysRemaining = getDaysRemaining(goal.targetDate);
-    const isOverdue = daysRemaining < 0 && goal.status === 'active';
-    const isDueSoon = daysRemaining <= 7 && daysRemaining >= 0 && goal.status === 'active';
+    const daysRemaining = daysUntilDateOnly(goal.targetDate);
+    const isOverdue =
+      daysRemaining !== null && daysRemaining < 0 && goal.status === 'active';
+    const isDueSoon =
+      daysRemaining !== null &&
+      daysRemaining <= 7 &&
+      daysRemaining >= 0 &&
+      goal.status === 'active';
 
     return (
       <div
@@ -380,7 +382,7 @@ export const GoalsManagementInterface: React.FC = () => {
           <div className="flex items-center justify-between text-sm text-muted-foreground mb-4">
             <div className="flex items-center space-x-1">
               <Calendar className="w-4 h-4" />
-              <span>Due {new Date(goal.targetDate).toLocaleDateString()}</span>
+              <span>Due {formatDateOnly(goal.targetDate)}</span>
             </div>
 
             <div

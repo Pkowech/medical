@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { AuthForm } from '@/features/auth/components/AuthForm';
 import { FormField } from '@/features/auth/components/FormField';
 import { AuthFormData } from '@/shared/types/authInterface';
-import { Role } from '@/shared/enums/role.enum';
 import { useToast } from '@/shared/components/ui/use-toast';
 import { useAuthStore } from '@/features/auth/store/useAuthStore';
 import { useAuth } from '@/features/auth/hooks/useAuth';
@@ -33,7 +32,6 @@ export default function RegisterPage() {
     username: '',
     password: '',
     confirmPassword: '',
-    role: 'student',
     acceptTerms: false,
   });
 
@@ -61,7 +59,6 @@ export default function RegisterPage() {
         firstName: validationResult.data.firstName,
         lastName: validationResult.data.lastName,
         username: validationResult.data.username,
-        role: Role.student,
         confirmPassword: validationResult.data.confirmPassword,
         acceptTerms: validationResult.data.acceptTerms,
       });

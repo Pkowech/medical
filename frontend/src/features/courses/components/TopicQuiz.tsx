@@ -83,9 +83,24 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
   const [isProvisional, setIsProvisional] = useState(false);
   const [attemptId, setAttemptId] = useState(() => uuidv4());
 
+  const resetQuizState = React.useCallback(() => {
+    setQuestions([]);
+    setCurrentQuestionIndex(0);
+    setSelectedAnswers({});
+    setQuizCompleted(false);
+    setScore(0);
+    setFeedback('');
+    setNextTopicId(undefined);
+    setIsProvisional(false);
+    setAttemptId(uuidv4());
+  }, []);
+
   React.useEffect(() => {
-    if (isOpen) recordCourseActivity('reading', courseId, topicId);
-  }, [courseId, isOpen, recordCourseActivity, topicId]);
+    if (!isOpen) return;
+    resetQuizState();
+    recordCourseActivity('reading', courseId, topicId);
+    void loadQuizQuestions();
+  }, [courseId, isOpen, recordCourseActivity, resetQuizState, topicId, userId]);
 
   React.useEffect(() => {
     const updateConnection = () => setIsOffline(!navigator.onLine);
@@ -97,13 +112,6 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
       window.removeEventListener('offline', updateConnection);
     };
   }, []);
-
-  // Load quiz questions
-  React.useEffect(() => {
-    if (isOpen && questions.length === 0) {
-      loadQuizQuestions();
-    }
-  }, [isOpen, userId, topicId]);
 
   const loadQuizQuestions = async () => {
     try {
@@ -161,10 +169,12 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
   };
 
   const currentQuestion = questions[currentQuestionIndex];
-  const progress = ((currentQuestionIndex + 1) / questions.length) * 100;
-  const hasCurrentAnswer = Boolean(selectedAnswers[currentQuestion?.id]?.length);
+  const progress = questions.length > 0 ? ((currentQuestionIndex + 1) / questions.length) * 100 : 0;
+  const hasCurrentAnswer = Boolean(currentQuestion && selectedAnswers[currentQuestion.id]?.length);
 
   const handleAnswerSelect = (optionId: string, isMultiSelect: boolean) => {
+    if (!currentQuestion) return;
+
     const current = selectedAnswers[currentQuestion.id] || [];
     const updatedAnswers = isMultiSelect
       ? {
@@ -194,6 +204,11 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
   };
 
   const handleSubmitQuiz = async () => {
+    if (!questions.length || !hasCurrentAnswer) {
+      toast.error('Select at least one answer before submitting.');
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       const responses = Object.entries(selectedAnswers).map(([qId, answers]) => ({
@@ -231,7 +246,8 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
         nextTopicId?: string;
       }>(
         `/quizzes/topic/${topicId}/submit`,
-        { responses }
+        { responses },
+        { headers: { 'X-Idempotency-Key': attemptId } },
       );
 
       const result = response.data;
@@ -251,8 +267,8 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
             nextTopicId: result.nextTopicId,
           });
         } catch (progressError) {
-          console.error('Topic quiz was submitted, but progress sync failed:', progressError);
-          toast.error('Quiz submitted, but topic progress could not be saved.');
+          console.error('Topic quiz was submitted, but follow-up updates failed:', progressError);
+          toast.error('Quiz submitted, but follow-up data could not be refreshed.');
         }
       }
 

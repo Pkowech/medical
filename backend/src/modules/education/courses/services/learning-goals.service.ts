@@ -498,6 +498,12 @@ export class LearningGoalsService {
       }
     }
 
+    const targetDateChanged =
+      updateDto.targetDate !== undefined &&
+      (updateDto.targetDate
+        ? new Date(updateDto.targetDate).getTime()
+        : null) !== (goal.targetDate?.getTime() ?? null);
+
     // GOAL-005: Cascade deadline changes
     if (updateDto.targetDate && goal.targetDate) {
       const oldDate = new Date(goal.targetDate);
@@ -529,6 +535,8 @@ export class LearningGoalsService {
           materialId: updateDto.materialId,
           learningPathId: updateDto.learningPathId,
           blockedReason: updateDto.blockedReason, // GOAL-005
+          escalationLevel: targetDateChanged ? 0 : undefined,
+          lastEscalatedAt: targetDateChanged ? null : undefined,
           metadata: {
             ...((goal.metadata as Prisma.JsonObject) || {}),
             milestones: updateDto.milestones,
@@ -1101,6 +1109,9 @@ export class LearningGoalsService {
         ...new Set([
           ...peerRecs.map(recommendation => recommendation.item_id),
           ...trendingPaths.map(path => path.path_id),
+          ...studyRecs
+            .map(recommendation => recommendation.resourceId)
+            .filter((id): id is string => typeof id === 'string'),
         ]),
       ];
       const user = await this.prisma.user.findUnique({
@@ -1130,29 +1141,46 @@ export class LearningGoalsService {
           )
           .map(path => path.id),
       );
-      const completedPaths = eligiblePathIds.size
-        ? await this.prisma.learningPathProgress.findMany({
-            where: {
-              userId,
-              learningPathId: { in: [...eligiblePathIds] },
-              status: ProgressStatus.completed,
-            },
-            select: { learningPathId: true },
-          })
-        : [];
+      const [completedPaths, completedPathGoals] = eligiblePathIds.size
+        ? await Promise.all([
+            this.prisma.learningPathProgress.findMany({
+              where: {
+                userId,
+                learningPathId: { in: [...eligiblePathIds] },
+                status: ProgressStatus.completed,
+              },
+              select: { learningPathId: true },
+            }),
+            this.prisma.learningGoal.findMany({
+              where: {
+                userId,
+                learningPathId: { in: [...eligiblePathIds] },
+                status: ProgressStatus.completed,
+              },
+              select: { learningPathId: true },
+            }),
+          ])
+        : [[], []];
       const completedPathIds = new Set(
-        completedPaths.map(progress => progress.learningPathId),
+        [...completedPaths, ...completedPathGoals].map(
+          progress => progress.learningPathId,
+        ).filter((id): id is string => typeof id === 'string'),
       );
       const recommendedPathIds = new Set(
         [...eligiblePathIds].filter(id => !completedPathIds.has(id)),
       );
-      const filteredPeerRecs = peerRecs.filter(recommendation => {
-        const path = candidatePathsById.get(recommendation.item_id);
-        return !path || recommendedPathIds.has(path.id);
-      });
+      const filteredPeerRecs = peerRecs.filter(recommendation =>
+        recommendedPathIds.has(recommendation.item_id),
+      );
       const filteredTrendingPaths = trendingPaths.filter(path =>
         recommendedPathIds.has(path.path_id),
       );
+      const filteredStudyRecs = studyRecs.filter(recommendation => {
+        const resourceId = recommendation.resourceId;
+        if (typeof resourceId !== 'string') return true;
+        const path = candidatePathsById.get(resourceId);
+        return !path || recommendedPathIds.has(path.id);
+      });
 
       // Fetch Exam Mappings for relevant topics to boost priority.
       const examMappings = await this.prisma.examMapping.findMany({
@@ -1169,7 +1197,7 @@ export class LearningGoalsService {
       const recommendations: RecommendedGoalDto[] = [];
 
       // Add recommendations returned by Rust analytics
-      studyRecs.forEach((rec) => {
+      filteredStudyRecs.forEach((rec) => {
         recommendations.push({
           title: rec.recommendation,
           description: `Estimated study time: ${rec.estimatedTimeHours} hours`,
@@ -1270,6 +1298,8 @@ export class LearningGoalsService {
           where: { id: dep.id },
           data: {
             targetDate: newDepDeadline,
+            escalationLevel: 0,
+            lastEscalatedAt: null,
             metadata: {
               ...((dep.metadata as Prisma.JsonObject) || {}),
               extensionReason: `Parent goal ${parentGoal.title} extended by ${daysExtended} days`,

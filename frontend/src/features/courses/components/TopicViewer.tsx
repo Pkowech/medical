@@ -21,7 +21,9 @@ import { useSession } from 'next-auth/react';
 import { apiService } from '@/features/auth/services/apiClient';
 import { topicService, Topic } from '@/features/courses/services/topicService';
 import materialService from '@/features/courses/services/materialService';
-import progressService from '@/features/learning-management/services/progressService';
+import progressService, {
+  isProgressConflict,
+} from '@/features/learning-management/services/progressService';
 import offlineProgressSync from '@/features/learning-management/services/offlineProgressSync';
 import { Material, MaterialType } from '@/shared/types/materialInterface';
 import { usePageHeader } from '@/core/providers/HeaderContext';
@@ -185,6 +187,7 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
   const router = useRouter();
   const queryClient = useQueryClient();
   const userId = useAuthStore(state => state.user?.id);
+  const [progressRevision, setProgressRevision] = useState(0);
   const { data: session } = useSession();
   const { setHeader } = usePageHeader();
   const { toggleBookmark, bookmarks, markLessonComplete, progress, notes, saveNote } =
@@ -208,6 +211,28 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
       queryClient.invalidateQueries({ queryKey: ['courses'] }),
       queryClient.invalidateQueries({ queryKey: ['unit'] }),
     ]);
+  };
+
+  const progressRevisionStorageKey = `progressRevision:${userId}:${courseId}:${unitId}:${topicId}`;
+  const refreshProgressRevision = async (): Promise<number> => {
+    if (!userId) return 0;
+    const progressRows = await progressService.getUserProgress(userId);
+    const row = progressRows.find(
+      progress =>
+        progress.topicId === topicId &&
+        progress.materialId == null &&
+        progress.unitId === unitId &&
+        progress.courseId === courseId,
+    );
+    const revision =
+      typeof row?.revision === 'number' && Number.isSafeInteger(row.revision)
+        ? row.revision
+        : 0;
+    setProgressRevision(revision);
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(progressRevisionStorageKey, String(revision));
+    }
+    return revision;
   };
 
   const [topic, setTopic] = useState<Topic | null>(null);
@@ -269,6 +294,24 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
         setLoadError(null);
         const topicData = await topicService.getTopicById(courseId, unitId, topicId);
         setTopic(topicData);
+        if (userId) {
+          if (navigator.onLine) {
+            try {
+              await refreshProgressRevision();
+            } catch (progressError) {
+              console.warn('Could not refresh topic progress revision:', progressError);
+            }
+          } else {
+            const cachedRevision = Number(
+              window.localStorage.getItem(progressRevisionStorageKey),
+            );
+            setProgressRevision(
+              Number.isSafeInteger(cachedRevision) && cachedRevision >= 0
+                ? cachedRevision
+                : 0,
+            );
+          }
+        }
         let currentMaterials: Material[] = [];
         let currentMaterialsComplete = true;
 
@@ -542,6 +585,7 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
 
   const handleMarkComplete = async () => {
     setIsMarkingComplete(true);
+    const idempotencyKey = crypto.randomUUID();
     try {
       await progressService.updateContentProgress({
         courseId,
@@ -549,14 +593,35 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
         topicId,
         status: 'completed',
         progressPercentage: 100,
-      });
+        expectedRevision: progressRevision,
+      }, idempotencyKey);
+      setProgressRevision(progressRevision + 1);
+      window.localStorage.setItem(
+        progressRevisionStorageKey,
+        String(progressRevision + 1),
+      );
       await refreshLearningCaches();
       markLessonComplete(topicId);
       toast.success('Topic marked as complete!');
     } catch (error) {
       if (isOfflineQueuedError(error)) {
+        setProgressRevision(progressRevision + 1);
+        window.localStorage.setItem(
+          progressRevisionStorageKey,
+          String(progressRevision + 1),
+        );
         markLessonComplete(topicId);
         toast.info('Topic completion saved offline and will sync when connected.');
+        return;
+      }
+      if (isProgressConflict(error)) {
+        await Promise.all([
+          refreshLearningCaches(),
+          refreshProgressRevision(),
+        ]).catch(refreshError =>
+          console.error('Failed to refresh conflicted topic progress:', refreshError),
+        );
+        toast.error('Progress changed elsewhere. Refresh and retry.');
         return;
       }
       console.error('Error saving topic completion:', error);
@@ -567,7 +632,14 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
           topicId,
           percent: 100,
           status: 'completed',
+          expectedRevision: progressRevision,
+          idempotencyKey,
         });
+        setProgressRevision(progressRevision + 1);
+        window.localStorage.setItem(
+          progressRevisionStorageKey,
+          String(progressRevision + 1),
+        );
         markLessonComplete(topicId);
         toast.info('Topic completion saved offline and will sync when connected.');
       } catch (queueError) {
@@ -587,16 +659,8 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
       toast.error(`You scored ${result.score}%. At least 70% is required to pass.`);
       return;
     }
-    await progressService.updateContentProgress({
-      courseId,
-      unitId,
-      topicId,
-      status: 'completed',
-      progressPercentage: 100,
-    });
     await refreshLearningCaches();
-    markLessonComplete(topicId);
-    toast.success(`Topic mastered with ${result.score}%`);
+    toast.success(`Topic assessment passed with ${result.score}%`);
   };
 
   const handleGoBack = () => {

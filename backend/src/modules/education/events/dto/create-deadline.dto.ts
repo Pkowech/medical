@@ -5,6 +5,7 @@ import {
   IsDateString,
   IsNotEmpty,
   IsEnum,
+  IsBoolean,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -67,6 +68,11 @@ export class UpdateDeadlineDto {
   @IsDateString()
   @IsOptional()
   dueDate?: string;
+
+  @ApiPropertyOptional({ description: 'Whether this deadline has been completed' })
+  @IsBoolean()
+  @IsOptional()
+  completed?: boolean;
 
   @ApiPropertyOptional({
     description: 'Priority level: low, medium, high',

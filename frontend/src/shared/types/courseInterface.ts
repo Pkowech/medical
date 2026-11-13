@@ -140,6 +140,7 @@ export interface Lesson extends Omit<BaseEntity, 'id'> {
   type: 'video' | 'interactive' | 'text' | 'quiz' | 'assignment';
   duration: string;
   content: { video?: string; transcript?: string; interactive?: boolean; text?: string };
+  progressRevision?: number;
   isCompleted?: boolean;
   masteryUnlocked?: boolean;
   nextTopicUnlocked?: boolean;

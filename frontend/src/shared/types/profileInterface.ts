@@ -141,6 +141,7 @@ export interface UserProfileDisplay extends UserProfileResponse {
  */
 export interface LocalUserProfile {
   id?: string;
+  username?: string;
   firstName: string;
   lastName: string;
   email: string;
@@ -166,6 +167,7 @@ export interface LocalUserProfile {
  * All fields optional to support partial updates
  */
 export interface ProfileUpdateRequest {
+  username?: string;
   firstName?: string;
   lastName?: string;
   phoneNumber?: string;

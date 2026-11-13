@@ -129,6 +129,14 @@ export class UpdateProgressDto {
   @IsString()
   @MaxLength(200)
   idempotencyKey?: string;
+
+  @ApiPropertyOptional({
+    description: 'Server-issued revision of the progress record being updated',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  expectedRevision?: number;
 }
 
 export class ProgressUpdateDto extends UpdateProgressDto {
@@ -467,6 +475,7 @@ export interface UserProgressDetails extends CourseProgress {
     topicId: string | null;
     isCompleted: boolean;
     progressPercentage: number;
+    revision: number;
   }>;
 }
 

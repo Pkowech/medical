@@ -34,12 +34,12 @@ pub async fn get_user_engagement(
 
     let today = Utc::now().date_naive();
     let activity_days = sqlx::query_scalar::<_, NaiveDate>(&format!(
-        "SELECT DISTINCT created_at::date
+        "SELECT DISTINCT (created_at AT TIME ZONE 'UTC')::date
          FROM user_activities
          WHERE user_id = $1
            AND type::text IN ({QUALIFYING_ACTIVITY_TYPES})
-           AND created_at::date >= $2
-         ORDER BY created_at::date DESC
+           AND (created_at AT TIME ZONE 'UTC')::date >= $2
+         ORDER BY (created_at AT TIME ZONE 'UTC')::date DESC
          LIMIT 366"
     ))
     .bind(user_id)
@@ -96,7 +96,8 @@ fn calculate_daily_streak(activity_days: &[NaiveDate], today: NaiveDate) -> i32 
 #[cfg(test)]
 mod tests {
     use super::calculate_daily_streak;
-    use chrono::NaiveDate;
+    use chrono::{DateTime, NaiveDate, Utc};
+    use serde_json::Value;
 
     fn day(day: u32) -> NaiveDate {
         NaiveDate::from_ymd_opt(2026, 11, day).unwrap()
@@ -116,5 +117,43 @@ mod tests {
         assert_eq!(calculate_daily_streak(&[day(12), day(10)], day(12)), 1);
         assert_eq!(calculate_daily_streak(&[], day(12)), 0);
         assert_eq!(calculate_daily_streak(&[day(10)], day(12)), 0);
+    }
+
+    #[test]
+    fn matches_the_shared_utc_activity_history() {
+        let fixture: Value = serde_json::from_str(include_str!(
+            "../../../../../shared_fixtures/learning-activity-history.json"
+        ))
+        .expect("shared learning activity fixture must be valid JSON");
+        let qualifying_types: Vec<&str> = fixture["qualifyingTypes"]
+            .as_array()
+            .expect("qualifying activity types")
+            .iter()
+            .map(|activity_type| activity_type.as_str().expect("activity type"))
+            .collect();
+        let activity_days: Vec<NaiveDate> = fixture["activities"]
+            .as_array()
+            .expect("activities")
+            .iter()
+            .filter(|activity| {
+                qualifying_types.contains(&activity["type"].as_str().expect("activity type"))
+            })
+            .map(|activity| {
+                DateTime::parse_from_rfc3339(
+                    activity["createdAt"].as_str().expect("activity timestamp"),
+                )
+                .expect("valid activity timestamp")
+                .with_timezone(&Utc)
+                .date_naive()
+            })
+            .collect();
+        let today = DateTime::parse_from_rfc3339(fixture["now"].as_str().expect("test timestamp"))
+            .expect("valid test timestamp")
+            .with_timezone(&Utc)
+            .date_naive();
+        assert_eq!(
+            calculate_daily_streak(&activity_days, today),
+            fixture["expected"]["currentStreak"].as_i64().unwrap() as i32
+        );
     }
 }

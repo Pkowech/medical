@@ -39,6 +39,23 @@ interface UserSettings {
   allowMessages: boolean;
 }
 
+const DEFAULT_USER_SETTINGS: UserSettings = {
+  email: '',
+  theme: 'system',
+  emailNotifications: true,
+  pushNotifications: false,
+  weeklyDigest: true,
+  loginNotifications: true,
+  language: 'en',
+  timezone: 'Africa/Nairobi',
+  showProgress: true,
+  profileVisibility: 'public',
+  showEmail: false,
+  showPhone: false,
+  showLocation: false,
+  allowMessages: true,
+};
+
 export default function SettingsPage() {
   const { isLoading, session } = useRequireAuth();
   const { update: updateSession } = useSession();
@@ -48,6 +65,7 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [settingsLoadFailed, setSettingsLoadFailed] = useState(false);
+  const [settingsRetryCount, setSettingsRetryCount] = useState(0);
   const [saveMessage, setSaveMessage] = useState('');
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: '',
@@ -61,25 +79,14 @@ export default function SettingsPage() {
   const [savingUsername, setSavingUsername] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
 
-  const [settings, setSettings] = useState<UserSettings>({
-    email: '',
-    theme: 'system',
-    emailNotifications: true,
-    pushNotifications: false,
-    weeklyDigest: true,
-    loginNotifications: true,
-    language: 'en',
-    timezone: 'Africa/Nairobi',
-    showProgress: true,
-    profileVisibility: 'public',
-    showEmail: false,
-    showPhone: false,
-    showLocation: false,
-    allowMessages: true,
-  });
+  const [settings, setSettings] = useState<UserSettings>(DEFAULT_USER_SETTINGS);
+  const [savedSettings, setSavedSettings] = useState<UserSettings>(DEFAULT_USER_SETTINGS);
+  const hasUnsavedChanges = JSON.stringify(settings) !== JSON.stringify(savedSettings);
 
   useEffect(() => {
     const fetchSettings = async () => {
+      setInitialLoading(true);
+      setSettingsLoadFailed(false);
       try {
         const response = await apiService.get<Settings>('/users/settings');
         const profileVisibility = response.data.privacy?.profileVisibility;
@@ -104,10 +111,10 @@ export default function SettingsPage() {
           showLocation: response.data.privacy?.showLocation ?? false,
           allowMessages: response.data.privacy?.allowMessages ?? true,
         };
-        setUsername(response.data.username || session?.user?.username || '');
+        setUsername(response.data.username || '');
         setSettings(loadedSettings);
+        setSavedSettings(loadedSettings);
         setTheme(loadedSettings.theme);
-        setSettingsLoadFailed(false);
       } catch (error) {
         console.error('Error loading settings:', error);
         toast.error('Failed to load settings');
@@ -117,14 +124,34 @@ export default function SettingsPage() {
       }
     };
 
-    if (session) {
+    if (session?.user?.id) {
       fetchSettings();
     }
-  }, [session, setTheme]);
+  }, [session?.user?.id, setTheme, settingsRetryCount]);
+
+  useEffect(() => {
+    if (!hasUnsavedChanges) return;
+
+    const warnBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+
+    window.addEventListener('beforeunload', warnBeforeUnload);
+    return () => window.removeEventListener('beforeunload', warnBeforeUnload);
+  }, [hasUnsavedChanges]);
 
   const handleThemeChange = (theme: 'light' | 'dark' | 'system') => {
     setSettings(prev => ({ ...prev, theme }));
+    setSaveMessage('');
     setTheme(theme);
+  };
+
+  const handleDiscardChanges = () => {
+    setSettings(savedSettings);
+    setSaveMessage('');
+    setTheme(savedSettings.theme);
+    toast.info('Unsaved changes discarded.');
   };
 
   const handleChangePassword = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -210,10 +237,12 @@ export default function SettingsPage() {
     key: keyof Omit<UserSettings, 'email' | 'theme' | 'language' | 'timezone' | 'profileVisibility'>
   ) => {
     setSettings(prev => ({ ...prev, [key]: !prev[key] }));
+    setSaveMessage('');
   };
 
   const handleInputChange = (field: string, value: string | boolean) => {
     setSettings(prev => ({ ...prev, [field]: value }));
+    setSaveMessage('');
   };
 
   const handleSaveSettings = async () => {
@@ -244,6 +273,7 @@ export default function SettingsPage() {
           allowMessages: settings.allowMessages,
         },
       });
+      setSavedSettings(settings);
       toast.success('Settings updated successfully');
       setSaveMessage('Settings saved successfully');
       setTimeout(() => setSaveMessage(''), 3000);
@@ -267,13 +297,86 @@ export default function SettingsPage() {
   return (
     <AppErrorBoundary>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div>
           <h1 className="text-3xl font-bold">Settings</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Manage your account, preferences, notifications, and privacy.
+          </p>
         </div>
 
-        <div className="grid grid-cols-1 gap-6">
+        {settingsLoadFailed && (
+          <div
+            role="alert"
+            className="flex flex-col gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4 sm:flex-row sm:items-center sm:justify-between"
+          >
+            <p className="text-sm text-destructive">
+              Settings could not be loaded. Retry before saving so existing preferences are not overwritten.
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setSettingsRetryCount(count => count + 1)}
+            >
+              Retry
+            </Button>
+          </div>
+        )}
+
+        <div className="flex flex-col gap-4 rounded-lg border bg-card/95 p-4 shadow-sm backdrop-blur lg:sticky lg:top-4 lg:z-20 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-medium">
+              {hasUnsavedChanges ? 'Unsaved changes' : 'All changes saved'}
+            </p>
+            {saveMessage && !hasUnsavedChanges && (
+              <p role="status" className="mt-1 text-xs text-muted-foreground">
+                {saveMessage}
+              </p>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleDiscardChanges}
+              disabled={!hasUnsavedChanges || saving}
+            >
+              Discard changes
+            </Button>
+            <Button
+              type="button"
+              onClick={handleSaveSettings}
+              disabled={saving || settingsLoadFailed || !hasUnsavedChanges}
+            >
+              {saving ? 'Saving...' : 'Save changes'}
+            </Button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[200px_minmax(0,1fr)]">
+          <nav
+            aria-label="Settings sections"
+            className="flex flex-wrap gap-2 self-start lg:sticky lg:top-28 lg:flex-col"
+          >
+            {[
+              ['account-settings', 'Account'],
+              ['appearance-settings', 'Appearance'],
+              ['notification-settings', 'Notifications'],
+              ['security-settings', 'Security'],
+              ['privacy-settings', 'Privacy'],
+            ].map(([id, label]) => (
+              <a
+                key={id}
+                href={`#${id}`}
+                className="rounded-md border px-3 py-2 text-sm text-muted-foreground transition-colors hover:border-primary/40 hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                {label}
+              </a>
+            ))}
+          </nav>
+
+          <div className="grid grid-cols-1 gap-6">
           {/* Profile Section */}
-          <Card>
+          <Card id="account-settings" className="scroll-mt-28">
             <CardHeader>
               <CardTitle className="flex items-center">
                 <User className="h-5 w-5 mr-2" />
@@ -330,7 +433,7 @@ export default function SettingsPage() {
                   )}
                 </div>
 
-                <Button variant="secondary" size="sm" onClick={() => router.push('/profile')}>
+                <Button variant="secondary" size="sm" onClick={() => router.push('/profile/edit')}>
                   Edit Profile
                 </Button>
               </div>
@@ -359,7 +462,7 @@ export default function SettingsPage() {
           </Card>
 
           {/* Appearance Section */}
-          <Card>
+          <Card id="appearance-settings" className="scroll-mt-28">
             <CardHeader>
               <CardTitle className="flex items-center">
                 <Sun className="h-5 w-5 mr-2" />
@@ -451,7 +554,7 @@ export default function SettingsPage() {
           </Card>
 
           {/* Notifications Section */}
-          <Card>
+          <Card id="notification-settings" className="scroll-mt-28">
             <CardHeader>
               <CardTitle className="flex items-center">
                 <Bell className="h-5 w-5 mr-2" />
@@ -475,9 +578,10 @@ export default function SettingsPage() {
 
                 <PushNotificationSettings
                   enabled={settings.pushNotifications}
-                  onEnabledChange={enabled =>
-                    setSettings(previous => ({ ...previous, pushNotifications: enabled }))
-                  }
+                  onEnabledChange={enabled => {
+                    setSettings(previous => ({ ...previous, pushNotifications: enabled }));
+                    setSaveMessage('');
+                  }}
                 />
 
                 <div className="flex items-center justify-between">
@@ -510,7 +614,7 @@ export default function SettingsPage() {
           </Card>
 
           {/* Security Section */}
-          <Card id="security">
+          <Card id="security-settings" className="scroll-mt-28">
             <CardHeader>
               <CardTitle className="flex items-center">
                 <Shield className="h-5 w-5 mr-2" />
@@ -585,6 +689,17 @@ export default function SettingsPage() {
                   </Button>
                 </form>
 
+                <div className="border-t pt-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => router.push('/profile/sessions')}
+                  >
+                    Manage active sessions
+                  </Button>
+                </div>
+
               </div>
             </CardContent>
           </Card>
@@ -610,7 +725,7 @@ export default function SettingsPage() {
           </Card>
 
           {/* Privacy Section */}
-          <Card>
+          <Card id="privacy-settings" className="scroll-mt-28">
             <CardHeader>
               <CardTitle className="flex items-center">
                 <Globe className="h-5 w-5 mr-2" />
@@ -688,34 +803,7 @@ export default function SettingsPage() {
               </div>
             </CardContent>
           </Card>
-        </div>
-
-        <div className="flex justify-end">
-          {settingsLoadFailed && (
-            <p role="alert" className="mr-4 py-2 text-sm text-red-700">
-              Settings could not be loaded. Reload the page before saving to avoid overwriting
-              existing preferences.
-            </p>
-          )}
-          {saveMessage && (
-            <div
-              className={`mr-4 py-2 px-4 rounded-md ${
-                saveMessage.includes('Error')
-                  ? 'bg-red-100 text-red-700'
-                  : 'bg-green-100 text-green-700'
-              }`}
-            >
-              {saveMessage}
-            </div>
-          )}
-          <Button
-            variant="default"
-            onClick={handleSaveSettings}
-            disabled={saving || settingsLoadFailed}
-            className={saving ? 'opacity-50 cursor-not-allowed' : ''}
-          >
-            {saving ? 'Saving...' : 'Save Settings'}
-          </Button>
+          </div>
         </div>
       </div>
     </AppErrorBoundary>

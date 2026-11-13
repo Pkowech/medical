@@ -88,48 +88,113 @@ export default function OnboardingPage() {
     weekly: '315',
   });
   const [loading, setLoading] = useState(false);
+  const [statusLoading, setStatusLoading] = useState(true);
+  const [statusLoadError, setStatusLoadError] = useState<string | null>(null);
+  const [statusRetryCount, setStatusRetryCount] = useState(0);
   const [tourIndex, setTourIndex] = useState(0);
   const [finished, setFinished] = useState(false);
   const [completedStatus, setCompletedStatus] = useState<OnboardingStatusResponse | null>(null);
 
   useEffect(() => {
-    if (user) {
-      const knownField = healthcareFields.find(
-        field =>
-          field.value === user.healthcareField ||
-          field.label.toLowerCase() === user.healthcareField?.toLowerCase(),
-      );
-      const userPrefs = (user.preferences as Record<string, unknown>) || {};
-      const savedDailyGoal =
-        typeof userPrefs.dailyGoalMinutes === 'number'
-          ? Math.min(240, Math.max(15, Math.round(userPrefs.dailyGoalMinutes / 15) * 15))
-          : 45;
+    if (!user) return;
 
-      setProfile(p => ({
-        ...p,
-        name: user.fullName || `${user.firstName || ''} ${user.lastName || ''}`.trim(),
-        careerStage: (user.careerStage as CareerStage) || '',
-        healthcareField: user.healthcareField
-          ? knownField ? knownField.value : 'other'
-          : '',
-        otherHealthcareField: user.healthcareField && !knownField
-          ? user.healthcareField
-          : '',
-        studyYear: user.studyYear ? String(user.studyYear) : '',
-        yearsExperience:
-          user.yearOfExperience !== null && user.yearOfExperience !== undefined
-            ? String(user.yearOfExperience)
+    let active = true;
+    const loadStatus = async () => {
+      setStatusLoading(true);
+      setStatusLoadError(null);
+      try {
+        const status = await onboardingService.getStatus();
+        if (!active) return;
+
+        const savedProfile = status.profile;
+        const userPrefs = (user.preferences as Record<string, unknown>) || {};
+        const savedField =
+          savedProfile?.healthcareField !== undefined
+            ? savedProfile.healthcareField
+            : user.healthcareField;
+        const savedStage =
+          savedProfile?.careerStage !== undefined
+            ? savedProfile.careerStage
+            : user.careerStage;
+        const knownField = healthcareFields.find(
+          field =>
+            field.value === savedField ||
+            field.label.toLowerCase() === savedField?.toLowerCase(),
+        );
+        const savedDailyGoal =
+          typeof savedProfile?.dailyGoalMinutes === 'number'
+            ? savedProfile.dailyGoalMinutes
+            : typeof userPrefs.dailyGoalMinutes === 'number'
+              ? userPrefs.dailyGoalMinutes
+              : 45;
+        const studyYear =
+          savedProfile?.studyYear !== undefined
+            ? savedProfile.studyYear
+            : user.studyYear;
+        const yearOfExperience =
+          savedProfile?.yearOfExperience !== undefined
+            ? savedProfile.yearOfExperience
+            : user.yearOfExperience;
+        const specialization =
+          savedProfile?.specialization !== undefined
+            ? savedProfile.specialization
+            : user.specialization;
+        const institution =
+          typeof savedProfile?.institution === 'string'
+            ? savedProfile.institution
+            : typeof userPrefs.institution === 'string'
+              ? userPrefs.institution
+              : '';
+        const targetExam =
+          typeof savedProfile?.targetExam === 'string'
+            ? savedProfile.targetExam
+            : typeof userPrefs.targetExam === 'string'
+              ? userPrefs.targetExam
+              : '';
+
+        setProfile(p => ({
+          ...p,
+          name: user.fullName || `${user.firstName || ''} ${user.lastName || ''}`.trim(),
+          careerStage:
+            savedStage === 'student' ||
+            savedStage === 'postgraduate' ||
+            savedStage === 'professional'
+              ? savedStage
+              : '',
+          healthcareField: savedField
+            ? knownField ? knownField.value : 'other'
             : '',
-        specialty: user.specialization || '',
-        institution: typeof userPrefs.institution === 'string' ? userPrefs.institution : '',
-        targetExam: typeof userPrefs.targetExam === 'string' ? userPrefs.targetExam : '',
-      }));
-      setGoals({
-        daily: String(savedDailyGoal),
-        weekly: String(savedDailyGoal * 7),
-      });
-    }
-  }, [user]);
+          otherHealthcareField: savedField && !knownField
+            ? savedField
+            : '',
+          studyYear: studyYear != null ? String(studyYear) : '',
+          yearsExperience:
+            yearOfExperience !== null && yearOfExperience !== undefined
+              ? String(yearOfExperience)
+              : '',
+          specialty: specialization || '',
+          institution,
+          targetExam,
+        }));
+        setGoals({
+          daily: String(savedDailyGoal),
+          weekly: String(savedDailyGoal * 7),
+        });
+      } catch (error) {
+        console.error('[Onboarding] Could not load saved profile:', error);
+        if (active) {
+          setStatusLoadError('Could not load your saved onboarding details. Please retry before continuing.');
+        }
+      } finally {
+        if (active) setStatusLoading(false);
+      }
+    };
+
+    void loadStatus();
+    return () => {
+      active = false;
+    };
+  }, [user, statusRetryCount]);
 
   const handleSkip = () => {
     toast.info('You can update your healthcare profile anytime from Profile Settings.');
@@ -184,8 +249,8 @@ export default function OnboardingPage() {
         studyYear,
         yearOfExperience: yearsExperience,
         specialization: profile.specialty.trim() || undefined,
-        institution: profile.institution.trim() || undefined,
-        targetExam: profile.targetExam.trim() || undefined,
+        institution: profile.institution.trim() || null,
+        targetExam: profile.targetExam.trim() || null,
         dailyGoalMinutes: parseInt(goals.daily, 10),
       });
 
@@ -234,6 +299,28 @@ export default function OnboardingPage() {
 
   const nextStep = () => setStep(s => s + 1);
   const prevStep = () => setStep(s => s - 1);
+
+  if (user && statusLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
+
+  if (user && statusLoadError) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-background p-6 text-center">
+        <p className="text-muted-foreground">{statusLoadError}</p>
+        <Button onClick={() => setStatusRetryCount(count => count + 1)}>
+          Retry
+        </Button>
+        <Button variant="ghost" onClick={() => router.push('/dashboard')}>
+          Return to dashboard
+        </Button>
+      </div>
+    );
+  }
 
   if (!user && step > 0) {
     return (

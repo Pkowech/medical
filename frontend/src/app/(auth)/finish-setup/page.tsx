@@ -14,9 +14,9 @@ import { User as UserIcon, CheckCircle2 } from 'lucide-react';
 import type { User } from '@/shared/types';
 
 interface FinishSetupData {
-  phoneNumber?: string;
-  bio?: string;
-  location?: string;
+  phoneNumber: string;
+  bio: string;
+  location: string;
 }
 
 export default function FinishSetupPage() {
@@ -108,12 +108,18 @@ export default function FinishSetupPage() {
 
     setIsLoading(true);
     try {
-      // Only send fields that have values
-      const updateData: Partial<FinishSetupData> = {};
-      if (formData.phoneNumber) updateData.phoneNumber = formData.phoneNumber;
-      if (formData.bio) updateData.bio = formData.bio;
-      if (formData.location) updateData.location = formData.location;
-      await userService.updateUserProfile(session.user.id, updateData as Partial<User>);
+      const updateData: Partial<User> = fetchError
+        ? {
+            ...(formData.phoneNumber && { phoneNumber: formData.phoneNumber }),
+            ...(formData.bio && { bio: formData.bio }),
+            ...(formData.location && { location: formData.location }),
+          }
+        : {
+            phoneNumber: formData.phoneNumber,
+            bio: formData.bio,
+            location: formData.location,
+          };
+      await userService.updateUserProfile(session.user.id, updateData);
 
       toast({
         title: 'Success!',

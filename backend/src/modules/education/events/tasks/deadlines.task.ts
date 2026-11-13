@@ -16,25 +16,31 @@ export class DeadlinesTask {
   /**
    * Runs every day at midnight to check for deadlines due in 24 and 48 hours.
    */
-  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
+  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT, { timeZone: 'UTC' })
   async checkUpcomingDeadlines() {
     this.logger.log('Checking for upcoming deadlines...');
 
     const now = new Date();
-    const oneDayLater = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-    const twoDaysLater = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+    const utcToday = Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate(),
+    );
+    const oneDayLater = new Date(utcToday + 24 * 60 * 60 * 1000);
+    const twoDaysLater = new Date(utcToday + 48 * 60 * 60 * 1000);
 
-    // 1. Check for deadlines due in exactly 1 day (approximated to the day)
+    // Send calendar-day reminders for deadlines due tomorrow and in two days.
     await this.notifyForWindow(
       oneDayLater,
-      'due in 24 hours',
+      'due tomorrow',
+      'tomorrow',
       NotificationPriority.high,
     );
 
-    // 2. Check for deadlines due in exactly 2 days
     await this.notifyForWindow(
       twoDaysLater,
-      'due in 48 hours',
+      'due in 2 days',
+      'two-days',
       NotificationPriority.low,
     );
 
@@ -44,15 +50,22 @@ export class DeadlinesTask {
   private async notifyForWindow(
     targetDate: Date,
     timeframe: string,
+    reminderKey: string,
     priority: NotificationPriority,
   ) {
-    const startOfDay = new Date(targetDate);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(targetDate);
-    endOfDay.setHours(23, 59, 59, 999);
+    const startOfDay = new Date(
+      Date.UTC(
+        targetDate.getUTCFullYear(),
+        targetDate.getUTCMonth(),
+        targetDate.getUTCDate(),
+      ),
+    );
+    const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000);
+    endOfDay.setUTCMilliseconds(endOfDay.getUTCMilliseconds() - 1);
 
     const deadlines = await this.prisma.deadline.findMany({
       where: {
+        completed: false,
         dueDate: {
           gte: startOfDay,
           lte: endOfDay,
@@ -78,6 +91,7 @@ export class DeadlinesTask {
           { deadlineId: deadline.id, courseId: deadline.courseId },
           priority,
           true, // Send via push if possible
+          `deadline:${deadline.id}:${deadline.dueDate.toISOString()}:${reminderKey}`,
         );
         this.logger.debug(`Sent reminder for deadline ${deadline.id} to user ${deadline.userId}`);
       } catch (error) {

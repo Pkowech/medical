@@ -34,6 +34,61 @@ const { CompleteOnboardingDto } =
     )
 
 
+def test_registration_dto_rejects_client_supplied_roles():
+    run_typescript(
+        r"""
+const assert = require('node:assert/strict');
+const { plainToInstance } = require('class-transformer');
+const { validate } = require('class-validator');
+const { RegisterDto } = require('./src/common/dto/user.dto.ts');
+
+(async () => {
+  const registration = plainToInstance(RegisterDto, {
+    firstName: 'Ada',
+    lastName: 'Lovelace',
+    email: 'ada@example.com',
+    username: 'ada',
+    password: 'StrongPass123!',
+    confirmPassword: 'StrongPass123!',
+    acceptTerms: true,
+    role: 'admin',
+  });
+  const errors = await validate(registration, {
+    whitelist: true,
+    forbidNonWhitelisted: true,
+  });
+  assert(errors.some(error => error.property === 'role'));
+})().catch(error => {
+  console.error(error);
+  process.exitCode = 1;
+});
+"""
+    )
+
+
+def test_profile_dto_accepts_postgraduate_stage():
+    run_typescript(
+        r"""
+const assert = require('node:assert/strict');
+const { plainToInstance } = require('class-transformer');
+const { validate } = require('class-validator');
+const { UpdateUserDto } = require('./src/common/dto/user.dto.ts');
+
+(async () => {
+  const profile = plainToInstance(UpdateUserDto, {
+    careerStage: 'postgraduate',
+    studyYear: 2,
+  });
+  const errors = await validate(profile);
+  assert.deepEqual(errors, []);
+})().catch(error => {
+  console.error(error);
+  process.exitCode = 1;
+});
+"""
+    )
+
+
 def test_onboarding_service_rejects_stage_inappropriate_profile_fields():
     run_typescript(
         r"""
@@ -616,6 +671,72 @@ const service = new OnboardingService(prisma);
     outboxUpserts[0].where.dedupeKey,
   );
   assert.match(outboxUpserts[0].where.dedupeKey, /^[a-f0-9]{64}$/);
+})().catch(error => {
+  console.error(error);
+  process.exitCode = 1;
+});
+"""
+    )
+
+
+def test_onboarding_preserves_optional_preferences_when_omitted_and_clears_explicitly():
+    run_typescript(
+        r"""
+const assert = require('node:assert/strict');
+const { OnboardingService } =
+  require('./src/modules/engagement-communication/services/onboarding.service.ts');
+
+let storedPreferences = {
+  institution: 'Kenyatta University',
+  targetExam: 'Board Exam',
+  dailyGoalMinutes: 60,
+};
+const prisma = {
+  $transaction: async callback => callback({
+    user: {
+      findUnique: async () => ({ id: 'user-1', preferences: storedPreferences }),
+      update: async ({ data }) => {
+        storedPreferences = data.preferences;
+      },
+    },
+    learningGoal: { count: async () => 1 },
+    userActivity: { upsert: async () => ({}) },
+    applicationOutboxEvent: { upsert: async () => ({}) },
+  }),
+  user: {
+    findUnique: async () => ({
+      id: 'user-1',
+      healthcareField: 'pharmacy',
+      careerStage: 'student',
+      studyYear: 2,
+      yearOfExperience: null,
+      specialization: null,
+      preferences: storedPreferences,
+    }),
+  },
+  learningPath: { findMany: async () => [] },
+  learningPathProgress: { findMany: async () => [] },
+};
+const service = new OnboardingService(prisma);
+
+(async () => {
+  const base = {
+    healthcareField: 'pharmacy',
+    careerStage: 'student',
+    studyYear: 2,
+  };
+  await service.completeOnboarding('user-1', base);
+  assert.equal(storedPreferences.institution, 'Kenyatta University');
+  assert.equal(storedPreferences.targetExam, 'Board Exam');
+  assert.equal(storedPreferences.dailyGoalMinutes, 60);
+
+  await service.completeOnboarding('user-1', {
+    ...base,
+    institution: '',
+    targetExam: '',
+  });
+  assert.equal(storedPreferences.institution, null);
+  assert.equal(storedPreferences.targetExam, null);
 })().catch(error => {
   console.error(error);
   process.exitCode = 1;

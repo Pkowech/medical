@@ -1,0 +1,100 @@
+{
+  "userId": "student-1",
+  "courseId": "course-1",
+  "units": [
+    {
+      "id": "unit-mandatory",
+      "topics": [
+        {
+          "id": "mandatory-topic",
+          "status": "published",
+          "isMandatory": true
+        },
+        {
+          "id": "optional-topic",
+          "status": "published",
+          "isMandatory": false
+        },
+        {
+          "id": "unpublished-mandatory",
+          "status": "draft",
+          "isMandatory": true
+        }
+      ]
+    },
+    {
+      "id": "unit-no-mandatory",
+      "topics": [
+        {
+          "id": "completed-topic",
+          "status": "published",
+          "isMandatory": false
+        },
+        {
+          "id": "untouched-topic",
+          "status": "published",
+          "isMandatory": false
+        }
+      ]
+    },
+    {
+      "id": "unit-empty-partial",
+      "topics": []
+    },
+    {
+      "id": "unit-empty-completed",
+      "topics": []
+    }
+  ],
+  "topicProgress": [
+    {
+      "topicId": "mandatory-topic",
+      "isCompleted": false,
+      "status": "inProgress",
+      "progressPercentage": 80
+    },
+    {
+      "topicId": "optional-topic",
+      "isCompleted": true,
+      "status": "completed",
+      "progressPercentage": 100
+    },
+    {
+      "topicId": "unpublished-mandatory",
+      "isCompleted": true,
+      "status": "completed",
+      "progressPercentage": 100
+    },
+    {
+      "topicId": "completed-topic",
+      "isCompleted": true,
+      "status": "completed",
+      "progressPercentage": 100
+    },
+    {
+      "topicId": "untouched-topic",
+      "isCompleted": false,
+      "status": "notStarted",
+      "progressPercentage": 0
+    }
+  ],
+  "unitProgress": [
+    {
+      "unitId": "unit-empty-partial",
+      "isCompleted": false,
+      "status": "inProgress",
+      "progressPercentage": 35
+    },
+    {
+      "unitId": "unit-empty-completed",
+      "isCompleted": true,
+      "status": "completed",
+      "progressPercentage": 60
+    }
+  ],
+  "expected": {
+    "percentage": 66,
+    "completedUnits": 1,
+    "totalUnits": 4
+  }
+}

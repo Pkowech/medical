@@ -716,6 +716,7 @@ export class AdaptiveQuizSessionDto {
     isCorrect: boolean;
     responseTime: number;
     confidence: number;
+    selectedOptionId?: string;
   }>;
 
   @ApiProperty()

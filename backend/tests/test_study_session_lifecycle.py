@@ -118,13 +118,15 @@ let savedSession;
 service.prisma = {
   studySession: {
     findFirst: async () => session,
+    findUniqueOrThrow: async () => savedSession,
   },
   $transaction: async callback => callback({
     studySession: {
-      update: async ({ data }) => {
+      updateMany: async ({ data }) => {
         savedSession = { ...session, ...data };
-        return savedSession;
+        return { count: 1 };
       },
+      findUniqueOrThrow: async () => savedSession,
     },
     userActivity: { upsert: async () => ({}) },
     applicationOutboxEvent: { upsert: async () => ({}) },
@@ -148,6 +150,169 @@ service.logger = { log: () => {} };
   assert.equal(result.isValid, true);
   assert.equal(savedSession.duration, 5);
   assert.equal('progress' in service.prisma, false);
+})().catch(error => {
+  console.error(error);
+  process.exitCode = 1;
+});
+"""
+    )
+
+
+def test_missing_client_active_duration_never_falls_back_to_wall_time():
+    run_typescript(
+        r"""
+const assert = require('node:assert/strict');
+const { StudyService } =
+  require('./src/modules/education/courses/services/study.service.ts');
+const service = Object.create(StudyService.prototype);
+const session = {
+  id: 'session-interrupted',
+  userId: 'user-1',
+  startTime: new Date(Date.now() - 60 * 60 * 1000),
+  topicId: null,
+  materialId: null,
+  topic: null,
+};
+let savedSession;
+service.prisma = {
+  studySession: {
+    findFirst: async () => session,
+    findUniqueOrThrow: async () => savedSession,
+  },
+  $transaction: async callback => callback({
+    studySession: {
+      updateMany: async ({ data }) => {
+        savedSession = { ...session, ...data };
+        return { count: 1 };
+      },
+      findUniqueOrThrow: async () => savedSession,
+    },
+    applicationOutboxEvent: { upsert: async () => ({}) },
+  }),
+};
+service.progressService = { invalidateUserProgressCache: async () => {} };
+
+(async () => {
+  await service.endStudySession('user-1', session.id, []);
+  assert.equal(savedSession.duration, 0);
+  assert.equal(savedSession.isValid, false);
+  assert.match(savedSession.invalidReason, /too short/i);
+})().catch(error => {
+  console.error(error);
+  process.exitCode = 1;
+});
+"""
+    )
+
+
+def test_interrupted_sessions_expire_with_zero_duration():
+    run_typescript(
+        r"""
+const assert = require('node:assert/strict');
+const { StudyService } =
+  require('./src/modules/education/courses/services/study.service.ts');
+const service = Object.create(StudyService.prototype);
+let query;
+service.prisma = {
+  studySession: {
+    updateMany: async options => {
+      query = options;
+      return { count: 2 };
+    },
+  },
+};
+service.logger = { warn: () => {} };
+
+(async () => {
+  const before = Date.now();
+  await service.expireInterruptedSessions();
+  const after = Date.now();
+  assert.equal(query.where.endTime, null);
+  assert.ok(
+    query.where.startTime.lte.getTime() >= before - 24 * 60 * 60 * 1000,
+  );
+  assert.ok(
+    query.where.startTime.lte.getTime() <= after - 24 * 60 * 60 * 1000,
+  );
+  assert.equal(query.data.duration, 0);
+  assert.equal(query.data.isValid, false);
+  assert.match(query.data.invalidReason, /24 hours/i);
+})().catch(error => {
+  console.error(error);
+  process.exitCode = 1;
+});
+"""
+    )
+
+
+def test_expired_session_cannot_be_completed_later():
+    run_typescript(
+        r"""
+const assert = require('node:assert/strict');
+const { StudyService } =
+  require('./src/modules/education/courses/services/study.service.ts');
+const service = Object.create(StudyService.prototype);
+const session = {
+  id: 'expired-session',
+  userId: 'user-1',
+  startTime: new Date(Date.now() - 25 * 60 * 60 * 1000),
+  endTime: null,
+};
+let currentSession = session;
+let expiryUpdate;
+service.prisma = {
+  studySession: {
+    findFirst: async () => session,
+    updateMany: async options => {
+      expiryUpdate = options;
+      currentSession = {
+        ...session,
+        ...options.data,
+      };
+      return { count: 1 };
+    },
+  },
+};
+service.logger = { warn: () => {} };
+
+(async () => {
+  await assert.rejects(
+    service.endStudySession('user-1', session.id, [], undefined, 600),
+    /expired after 24 hours/i,
+  );
+  assert.equal(expiryUpdate.where.userId, 'user-1');
+  assert.equal(currentSession.duration, 0);
+  assert.equal(currentSession.isValid, false);
+})().catch(error => {
+  console.error(error);
+  process.exitCode = 1;
+});
+"""
+    )
+
+
+def test_course_session_list_filters_by_course_scope():
+    run_typescript(
+        r"""
+const assert = require('node:assert/strict');
+const { StudyService } =
+  require('./src/modules/education/courses/services/study.service.ts');
+const service = Object.create(StudyService.prototype);
+let query;
+service.prisma = {
+  studySession: {
+    findMany: async options => {
+      query = options;
+      return [];
+    },
+  },
+};
+
+(async () => {
+  await service.getUserSessions('user-1', { courseId: 'course-1' });
+  assert.equal(query.where.userId, 'user-1');
+  assert.equal(query.where.OR.length, 3);
+  assert.equal(query.take, 50);
 })().catch(error => {
   console.error(error);
   process.exitCode = 1;

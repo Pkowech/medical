@@ -319,7 +319,7 @@ class SyncService {
             clearTimeout(timeout);
           }
 
-          if (response.ok || response.status === 409) {
+          if (response.ok) {
             if (response.ok && item.type === 'offline_practice_submission') {
               const receipt = (await response.clone().json()) as {
                 attemptId?: unknown;
@@ -344,7 +344,7 @@ class SyncService {
                 });
               }
             }
-            // Success or server-newer conflict: dequeue and record last success.
+            // Successful requests are removed only after the server confirms the write.
             await db.delete(SYNC_STORE_NAME, item.id);
             await this.recordLastSync(db);
             syncedActivity = true;
@@ -368,13 +368,17 @@ class SyncService {
           ) {
             // 404/400 are treated as unrecoverable errors for the queue.
             // (e.g. endpoint renamed/removed, or data is invalid for current schema)
+            const conflictMessage =
+              response.status === 409
+                ? 'Progress changed on another device. Refresh and resubmit this update.'
+                : `${response.status} Client Error - Payload or Endpoint invalid`;
             console.error(
-              `❌ Unrecoverable error ${response.status} for item ${item.id} - skipping to avoid queue blockage`
+              `❌ Unrecoverable error ${response.status} for item ${item.id} - keeping it for review`
             );
             await db.put(SYNC_STORE_NAME, {
               ...item,
               status: 'failed',
-              lastError: `${response.status} Client Error - Payload or Endpoint invalid`,
+              lastError: conflictMessage,
               nextAttemptAt: undefined,
             });
             await this.updateOfflinePracticeAttempt(

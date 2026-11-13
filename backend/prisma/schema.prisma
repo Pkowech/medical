@@ -231,6 +231,7 @@ model QuizAttempt {
   totalQuestions Int            @default(0) @map("total_questions")
   answers        Json?
   feedback       Json?
+  adaptiveState  Json?          @map("adaptive_state")
   createdAt      DateTime       @default(now()) @map("created_at")
   quiz           Quiz           @relation(fields: [quizId], references: [id])
   user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -1200,6 +1201,7 @@ model Progress {
   createdAt            DateTime       @default(now()) @map("created_at")
   updatedAt            DateTime       @updatedAt @map("updated_at")
   lastUpdated          BigInt         @default(0) @map("last_updated")
+  revision             Int            @default(0)
   course               Course?        @relation(fields: [courseId], references: [id], onDelete: Cascade)
   material             Material?      @relation(fields: [materialId], references: [id], onDelete: Cascade)
   topic                Topic?         @relation(fields: [topicId], references: [id], onDelete: Cascade)
@@ -1845,6 +1847,7 @@ model DirectMessage {
 model Notification {
   id          String               @id @default(uuid())
   userId      String               @map("user_id")
+  sourceKey   String?              @unique @map("source_key")
   message     String
   type        String?              @db.VarChar(50)
   read        Boolean              @default(false)
@@ -2035,9 +2038,11 @@ model Rubric {
 
 model Deadline {
   id          String   @id @default(uuid())
+  sourceKey   String?  @unique @map("source_key")
   title       String
   description String?
   dueDate     DateTime @map("due_date")
+  completed   Boolean  @default(false)
   priority    String?  @db.VarChar(50)
   courseId    String?  @map("course_id")
   unitId      String?  @map("unit_id")

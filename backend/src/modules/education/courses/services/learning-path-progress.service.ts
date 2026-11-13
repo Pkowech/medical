@@ -63,12 +63,6 @@ export class LearningPathProgressService {
       throw new NotFoundException('Learning path not found');
     }
 
-    if (learningPath.status !== LearningPathStatus.published) {
-      throw new BadRequestException('Learning path is not available for enrollment');
-    }
-
-    this.learningPathEligibilityService.assertEligible(learningPath, user);
-
     const existing = await this.prisma.learningPathProgress.findUnique({
       where: {
         userId_learningPathId: {
@@ -80,6 +74,12 @@ export class LearningPathProgressService {
     if (existing) {
       return existing;
     }
+
+    if (learningPath.status !== LearningPathStatus.published) {
+      throw new BadRequestException('Learning path is not available for enrollment');
+    }
+
+    this.learningPathEligibilityService.assertEligible(learningPath, user);
 
     const { phaseProgress, moduleProgress } = this.createProgressStructure(
       learningPath.phases,

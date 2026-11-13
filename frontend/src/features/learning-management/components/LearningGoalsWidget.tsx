@@ -18,6 +18,7 @@ import { learningGoalsService, LearningGoal, GoalStats } from '@/features/learni
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { formatDateOnly } from '@/shared/utils/date-only';
 
 export const LearningGoalsWidget = () => {
   const { data: session } = useSession();
@@ -215,7 +216,7 @@ export const LearningGoalsWidget = () => {
                     <Clock className="w-3 h-3" />
                     <span>
                       Due:{' '}
-                      {new Date(goal.targetDate).toLocaleDateString('en-US', {
+                      {formatDateOnly(goal.targetDate, {
                         month: 'short',
                         day: 'numeric',
                       })}

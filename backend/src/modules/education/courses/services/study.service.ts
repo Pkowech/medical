@@ -13,6 +13,11 @@ import { StudyAnalyticsService } from '#modules/ai-analytics/services/study-anal
 import { LearningAnalyticsService } from '#modules/ai-analytics/services/learning-analytics.service';
 import { LearningRecommendation, StudyActivity, StudyStats } from '#common/dto';
 import { writeApplicationOutboxEvent } from '#infrastructure/outbox/application-outbox-event';
+import { Cron, CronExpression } from '@nestjs/schedule';
+
+const INTERRUPTED_SESSION_TTL_MS = 24 * 60 * 60 * 1000;
+const INTERRUPTED_SESSION_REASON =
+  'Session expired after 24 hours without completion';
 
 @Injectable()
 export class StudyService {
@@ -195,6 +200,38 @@ export class StudyService {
     });
   }
 
+  @Cron(CronExpression.EVERY_10_MINUTES)
+  async expireInterruptedSessions(): Promise<void> {
+    const now = new Date();
+    const result = await this.reconcileInterruptedSessions(now);
+    if (result.count > 0) {
+      this.logger.warn(
+        `Expired ${result.count} interrupted study session(s)`,
+      );
+    }
+  }
+
+  private reconcileInterruptedSessions(
+    now: Date,
+    userId?: string,
+  ): Promise<{ count: number }> {
+    return this.prisma.studySession.updateMany({
+      where: {
+        ...(userId ? { userId } : {}),
+        endTime: null,
+        startTime: {
+          lte: new Date(now.getTime() - INTERRUPTED_SESSION_TTL_MS),
+        },
+      },
+      data: {
+        endTime: now,
+        duration: 0,
+        isValid: false,
+        invalidReason: INTERRUPTED_SESSION_REASON,
+      },
+    });
+  }
+
   private async getNextTopicForCourse(
     userId: string,
     courseId: string,
@@ -260,16 +297,18 @@ export class StudyService {
     }
 
     const endTime = new Date();
+    const expirationCutoff = new Date(
+      endTime.getTime() - INTERRUPTED_SESSION_TTL_MS,
+    );
+    if (session.startTime <= expirationCutoff) {
+      await this.reconcileInterruptedSessions(endTime, userId);
+      throw new BadRequestException(INTERRUPTED_SESSION_REASON);
+    }
+
     const wallDurationSeconds = Math.max(
       0,
       (endTime.getTime() - session.startTime.getTime()) / 1000,
     );
-    const activeDurationSeconds =
-      typeof durationSeconds === 'number' && Number.isFinite(durationSeconds)
-        ? Math.min(Math.max(0, durationSeconds), wallDurationSeconds)
-        : wallDurationSeconds;
-    const duration = Math.round(activeDurationSeconds / 60);
-
     const intentionalPauseSeconds =
       typeof pausedDurationSeconds === 'number' &&
       Number.isFinite(pausedDurationSeconds)
@@ -279,6 +318,12 @@ export class StudyService {
       0,
       wallDurationSeconds - intentionalPauseSeconds,
     );
+    const activeDurationSeconds =
+      typeof durationSeconds === 'number' && Number.isFinite(durationSeconds)
+        ? Math.min(Math.max(0, durationSeconds), unpausedDurationSeconds)
+        : 0;
+    const duration = Math.round(activeDurationSeconds / 60);
+
     const focusScore =
       unpausedDurationSeconds > 0
         ? Math.min(
@@ -345,8 +390,13 @@ export class StudyService {
       .map((activity) => activity.metadata?.caseId)
       .filter((id): id is string => typeof id === 'string');
     const endedSession = await this.prisma.$transaction(async (tx) => {
-      const updatedSession = await tx.studySession.update({
-        where: { id: sessionId },
+      const updateResult = await tx.studySession.updateMany({
+        where: {
+          id: sessionId,
+          userId,
+          endTime: null,
+          startTime: { gt: expirationCutoff },
+        },
         data: {
           endTime,
           duration,
@@ -358,6 +408,10 @@ export class StudyService {
           learningGain,
           quizAttemptIds,
         },
+      });
+      if (updateResult.count === 0) return null;
+      const updatedSession = await tx.studySession.findUniqueOrThrow({
+        where: { id: sessionId },
       });
 
       if (isValid) {
@@ -398,6 +452,16 @@ export class StudyService {
 
       return updatedSession;
     });
+    if (!endedSession) {
+      await this.reconcileInterruptedSessions(endTime, userId);
+      const currentSession = await this.prisma.studySession.findUniqueOrThrow({
+        where: { id: sessionId },
+      });
+      if (currentSession.invalidReason === INTERRUPTED_SESSION_REASON) {
+        throw new BadRequestException(INTERRUPTED_SESSION_REASON);
+      }
+      return currentSession;
+    }
     await this.progressService.invalidateUserProgressCache(userId);
     return endedSession;
   }
@@ -498,6 +562,22 @@ export class StudyService {
     },
   ): Promise<StudySession[]> {
     const where: any = { userId };
+
+    if (options?.courseId) {
+      where.OR = [
+        { topic: { is: { unit: { is: { courseId: options.courseId } } } } },
+        { material: { is: { unit: { is: { courseId: options.courseId } } } } },
+        {
+          material: {
+            is: {
+              topic: {
+                is: { unit: { is: { courseId: options.courseId } } },
+              },
+            },
+          },
+        },
+      ];
+    }
 
     if (options?.startDate || options?.endDate) {
       where.startTime = {};
@@ -608,13 +688,17 @@ export class StudyService {
   }
 
   async getDeadlines(userId: string) {
-    const today = new Date();
+    const now = new Date();
+    const utcStartOfToday = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+    );
 
     // 1. Fetch system deadlines (Exams, Assignments)
     const systemDeadlines = await this.prisma.deadline.findMany({
       where: {
         userId,
-        dueDate: { gte: today },
+        completed: false,
+        dueDate: { gte: utcStartOfToday },
       },
       include: {
         course: { select: { title: true } },
@@ -625,8 +709,10 @@ export class StudyService {
     const goalDeadlines = await this.prisma.learningGoal.findMany({
       where: {
         userId,
-        targetDate: { gte: today },
-        status: { not: 'completed' },
+        targetDate: { gte: utcStartOfToday },
+        status: {
+          notIn: ['completed', 'skipped', 'dropped', 'reviewed'],
+        },
       },
       include: {
         course: { select: { title: true } },
@@ -637,13 +723,35 @@ export class StudyService {
     const scheduleEvents = await this.prisma.scheduleEvent.findMany({
       where: {
         userId,
-        date: { gte: today },
+        date: { gte: now },
         status: { notIn: ['completed', 'cancelled'] },
         completed: false,
       },
       include: {
         course: { select: { title: true } },
       },
+    });
+    const canonicalGoalEventKeys = new Set(
+      goalDeadlines.map(
+        (goal) =>
+          `Goal: ${goal.title}:${goal.targetDate?.toISOString().slice(0, 10)}`,
+      ),
+    );
+    const visibleScheduleEvents = scheduleEvents.filter((event) => {
+      const metadata = event.metadata;
+      if (
+        metadata &&
+        typeof metadata === 'object' &&
+        !Array.isArray(metadata) &&
+        ('goalId' in metadata || metadata.createdFromGoal === true)
+      ) {
+        return false;
+      }
+
+      const eventKey = `${event.title}:${event.date.toISOString().slice(0, 10)}`;
+      return (
+        event.type !== 'goal' || !canonicalGoalEventKeys.has(eventKey)
+      );
     });
 
     // 3. Normalize and Merge
@@ -666,7 +774,7 @@ export class StudyService {
         course: g.course?.title || 'General Learning',
         priority: g.priority ? String(g.priority) : 'medium',
       })),
-      ...scheduleEvents.map((e) => ({
+      ...visibleScheduleEvents.map((e) => ({
         id: e.id,
         title: e.title,
         dueDate: e.date,

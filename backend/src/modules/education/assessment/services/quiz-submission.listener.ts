@@ -17,6 +17,26 @@ type QuizSubmittedEvent = {
   reviewAnswers: Array<{ questionId: string; isCorrect: boolean }>;
 };
 
+type AdaptiveAnswerSubmittedEvent = {
+  userId: string;
+  skillId: string;
+  isCorrect: boolean;
+  eventId: string;
+};
+
+function isAdaptiveAnswerSubmittedEvent(
+  value: unknown,
+): value is AdaptiveAnswerSubmittedEvent {
+  if (!value || typeof value !== 'object') return false;
+  const event = value as Partial<AdaptiveAnswerSubmittedEvent>;
+  return (
+    typeof event.userId === 'string' &&
+    typeof event.skillId === 'string' &&
+    typeof event.isCorrect === 'boolean' &&
+    typeof event.eventId === 'string'
+  );
+}
+
 function isQuizSubmittedEvent(value: unknown): value is QuizSubmittedEvent {
   if (!value || typeof value !== 'object') {
     return false;
@@ -62,35 +82,68 @@ export class QuizSubmissionListener {
       throw new Error('Invalid quiz.submitted event payload');
     }
 
-    await this.progressService.updateProgress(payload.userId, payload.quizId);
-    await this.analyticsService.generateAnalytics(payload.userId, payload.quizId);
+    try {
+      await this.progressService.updateProgress(payload.userId, payload.quizId);
+      await this.analyticsService.generateAnalytics(payload.userId, payload.quizId);
 
-    if (payload.topicId) {
-      await this.masteryGateService.onQuizComplete(
-        payload.userId,
-        payload.topicId,
-        payload.isPassed,
-        payload.score,
-        payload.passingScore,
+      if (payload.topicId) {
+        await this.masteryGateService.onQuizComplete(
+          payload.userId,
+          payload.topicId,
+          payload.attemptId,
+          payload.passingScore,
+        );
+      }
+
+      for (const [index, update] of payload.bktUpdates.entries()) {
+        await this.analyticsService.updateBktForAssessment(
+          payload.userId,
+          update.skillId,
+          update.isCorrect,
+          `quiz-attempt:${payload.attemptId}:bkt:${index}`,
+        );
+      }
+
+      if (payload.reviewAnswers.length > 0) {
+        await this.flashcardsService.recordTopicQuizReviews(
+          payload.userId,
+          payload.topicId,
+          payload.reviewAnswers,
+          payload.attemptId,
+        );
+      }
+
+      this.logger.log(
+        `Post-submission effects completed for attempt ${payload.attemptId}`,
       );
+    } catch (error) {
+      this.logger.error(
+        `Quiz submission follow-up failed for attempt ${payload.attemptId}`,
+        error instanceof Error ? error.stack : error,
+      );
+      throw error;
+    }
+  }
+
+  @OnEvent('adaptive-answer.submitted', { async: true })
+  async handleAdaptiveAnswer(payload: unknown): Promise<void> {
+    if (!isAdaptiveAnswerSubmittedEvent(payload)) {
+      throw new Error('Invalid adaptive-answer.submitted event payload');
     }
 
-    for (const [index, update] of payload.bktUpdates.entries()) {
+    try {
       await this.analyticsService.updateBktForAssessment(
         payload.userId,
-        update.skillId,
-        update.isCorrect,
-        `quiz-attempt:${payload.attemptId}:bkt:${index}`,
+        payload.skillId,
+        payload.isCorrect,
+        payload.eventId,
       );
+    } catch (error) {
+      this.logger.error(
+        `Adaptive answer update failed for user ${payload.userId}`,
+        error instanceof Error ? error.stack : error,
+      );
+      throw error;
     }
-
-    await this.flashcardsService.recordTopicQuizReviews(
-      payload.userId,
-      payload.topicId,
-      payload.reviewAnswers,
-      payload.attemptId,
-    );
-
-    this.logger.log(`Post-submission effects completed for attempt ${payload.attemptId}`);
   }
 }
