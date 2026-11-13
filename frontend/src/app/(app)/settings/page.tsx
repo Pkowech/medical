@@ -297,13 +297,6 @@ export default function SettingsPage() {
   return (
     <AppErrorBoundary>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Settings</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Manage your account, preferences, notifications, and privacy.
-          </p>
-        </div>
-
         {settingsLoadFailed && (
           <div
             role="alert"
@@ -433,7 +426,12 @@ export default function SettingsPage() {
                   )}
                 </div>
 
-                <Button variant="secondary" size="sm" onClick={() => router.push('/profile/edit')}>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => router.push('/profile/edit')}
+                >
                   Edit Profile
                 </Button>
               </div>

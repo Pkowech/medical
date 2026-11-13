@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/shared/components/ui/button';
@@ -71,6 +71,7 @@ export default function OnboardingPage() {
   const router = useRouter();
   const { data: session, update: updateSession } = useSession();
   const { user, setUser } = useAuthStore();
+  const completedOnboardingThisVisit = useRef(false);
   const [step, setStep] = useState(0);
   const [profile, setProfile] = useState({
     name: '',
@@ -94,6 +95,7 @@ export default function OnboardingPage() {
   const [tourIndex, setTourIndex] = useState(0);
   const [finished, setFinished] = useState(false);
   const [completedStatus, setCompletedStatus] = useState<OnboardingStatusResponse | null>(null);
+  const [redirectingToDashboard, setRedirectingToDashboard] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -105,6 +107,11 @@ export default function OnboardingPage() {
       try {
         const status = await onboardingService.getStatus();
         if (!active) return;
+        if (status.isCompleted && !completedOnboardingThisVisit.current) {
+          setRedirectingToDashboard(true);
+          router.replace('/dashboard');
+          return;
+        }
 
         const savedProfile = status.profile;
         const userPrefs = (user.preferences as Record<string, unknown>) || {};
@@ -194,7 +201,7 @@ export default function OnboardingPage() {
     return () => {
       active = false;
     };
-  }, [user, statusRetryCount]);
+  }, [router, user, statusRetryCount]);
 
   const handleSkip = () => {
     toast.info('You can update your healthcare profile anytime from Profile Settings.');
@@ -254,6 +261,7 @@ export default function OnboardingPage() {
         dailyGoalMinutes: parseInt(goals.daily, 10),
       });
 
+      completedOnboardingThisVisit.current = true;
       setCompletedStatus(result);
 
       // Update local auth store
@@ -300,7 +308,7 @@ export default function OnboardingPage() {
   const nextStep = () => setStep(s => s + 1);
   const prevStep = () => setStep(s => s - 1);
 
-  if (user && statusLoading) {
+  if (user && (statusLoading || redirectingToDashboard)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-blue-600" />

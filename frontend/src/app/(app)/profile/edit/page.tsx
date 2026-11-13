@@ -19,6 +19,14 @@ import {
 import { useUnsavedChanges } from '@/features/profile/hooks/useUnsavedChanges';
 import type { LocalUserProfile } from '@/shared/types/profileInterface';
 import { healthcareFieldLabel } from '@/shared/utils/healthcareProfile';
+import { onboardingService } from '@/features/onboarding/services/onboardingService';
+
+type EditableProfile = LocalUserProfile & {
+  institution: string;
+  targetExam: string;
+  dailyGoalMinutes: number;
+  focusTopicsText: string;
+};
 
 interface ValidationError {
   field?: string;
@@ -50,7 +58,7 @@ export default function EditProfilePage() {
   const { update: updateSession } = useSession();
   const router = useRouter();
 
-  const [profile, setProfile] = useState<LocalUserProfile>({
+  const [profile, setProfile] = useState<EditableProfile>({
     username: '',
     firstName: '',
     lastName: '',
@@ -64,6 +72,10 @@ export default function EditProfilePage() {
     location: '',
     phoneNumber: '',
     profileImage: undefined,
+    institution: '',
+    targetExam: '',
+    dailyGoalMinutes: 45,
+    focusTopicsText: '',
   });
 
   const [isSaving, setIsSaving] = useState(false);
@@ -74,6 +86,7 @@ export default function EditProfilePage() {
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [validationState, setValidationState] = useState<Record<string, boolean>>({});
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
+  const [preferencesLoaded, setPreferencesLoaded] = useState(false);
 
   // Track unsaved changes
   const { hasUnsavedChanges, markAsSaved, reset } = useUnsavedChanges(profile, !isLoadingProfile);
@@ -84,8 +97,6 @@ export default function EditProfilePage() {
       if (session?.user?.id) {
         try {
           const userProfile = await userService.getUserProfile(session.user.id);
-          
-
 
           if (!userProfile) {
             setSaveMessage('Profile data not found');
@@ -93,7 +104,7 @@ export default function EditProfilePage() {
             return;
           }
           
-          const fetchedProfile: LocalUserProfile = {
+          const fetchedProfile: EditableProfile = {
             id: userProfile.id,
             username: userProfile.username || session.user.username || '',
             firstName: userProfile.firstName || (session.user as { firstName?: string }).firstName || '',
@@ -110,6 +121,10 @@ export default function EditProfilePage() {
             profileImage: userProfile.profileImage && userProfile.profileImage.trim() !== ''
               ? userProfile.profileImage
               : (session.user.image && session.user.image.trim() !== '' ? session.user.image : undefined),
+            institution: '',
+            targetExam: '',
+            dailyGoalMinutes: 45,
+            focusTopicsText: '',
           };
           
           setProfile(fetchedProfile);
@@ -118,16 +133,52 @@ export default function EditProfilePage() {
               ? fetchedProfile.profileImage
               : (session.user.image && session.user.image.trim() !== '' ? session.user.image : null)
           );
-          setIsLoadingProfile(false);
+
+          try {
+            const onboardingStatus = await onboardingService.getStatus();
+            const onboardingProfile = onboardingStatus.profile;
+            const sessionPreferences = (
+              session.user as typeof session.user & { preferences?: Record<string, unknown> }
+            ).preferences || {};
+            const focusTopics = Array.isArray(onboardingProfile?.focusTopics)
+              ? onboardingProfile.focusTopics
+              : Array.isArray(sessionPreferences.focusTopics)
+                ? sessionPreferences.focusTopics.filter(
+                    (topic): topic is string => typeof topic === 'string',
+                  )
+                : [];
+            setProfile(previous => ({
+              ...previous,
+              institution:
+                onboardingProfile?.institution ??
+                (typeof sessionPreferences.institution === 'string'
+                  ? sessionPreferences.institution
+                  : ''),
+              targetExam:
+                onboardingProfile?.targetExam ??
+                (typeof sessionPreferences.targetExam === 'string'
+                  ? sessionPreferences.targetExam
+                  : ''),
+              dailyGoalMinutes:
+                onboardingProfile?.dailyGoalMinutes ??
+                (typeof sessionPreferences.dailyGoalMinutes === 'number'
+                  ? sessionPreferences.dailyGoalMinutes
+                  : 45),
+              focusTopicsText: focusTopics.join('\n'),
+            }));
+            setPreferencesLoaded(true);
+          } catch (error) {
+            console.error('Error fetching learning preferences:', error);
+            setSaveMessage('Learning preferences could not be loaded. Profile details are still available.');
+          }
         } catch (error: unknown) {
           console.error('Error fetching profile:', error);
           setSaveMessage(`Error fetching profile: ${error instanceof Error ? error.message : 'Unknown error'}`);
-          setIsLoadingProfile(false);
         }
       } else {
         console.warn('No session user ID available');
-        setIsLoadingProfile(false);
       }
+      setIsLoadingProfile(false);
     };
 
     fetchProfile();
@@ -234,6 +285,17 @@ export default function EditProfilePage() {
         specialization: profile.specialization || null,
         yearOfExperience:
           profile.careerStage === 'professional' ? profile.yearOfExperience : null,
+        ...(preferencesLoaded && {
+          preferences: {
+            institution: profile.institution.trim(),
+            targetExam: profile.targetExam.trim(),
+            dailyGoalMinutes: profile.dailyGoalMinutes,
+            focusTopics: profile.focusTopicsText
+              .split(/\r?\n/)
+              .map(topic => topic.trim())
+              .filter(Boolean),
+          },
+        }),
       };
 
       await userService.updateUserProfile(session.user.id, updatePayload);
@@ -252,6 +314,20 @@ export default function EditProfilePage() {
           yearOfExperience:
             profile.careerStage === 'professional' ? profile.yearOfExperience : null,
           specialization: profile.specialization || null,
+          ...(preferencesLoaded && {
+            preferences: {
+              ...(
+                session.user as typeof session.user & { preferences?: Record<string, unknown> }
+              ).preferences,
+              institution: profile.institution.trim(),
+              targetExam: profile.targetExam.trim(),
+              dailyGoalMinutes: profile.dailyGoalMinutes,
+              focusTopics: profile.focusTopicsText
+                .split(/\r?\n/)
+                .map(topic => topic.trim())
+                .filter(Boolean),
+            },
+          }),
         },
       });
 
@@ -650,6 +726,96 @@ export default function EditProfilePage() {
                 />
               </div>
             )}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="bg-card/80 dark:bg-card/50 backdrop-blur-sm border-border dark:border-border/50">
+        <CardHeader>
+          <CardTitle className="text-foreground dark:text-foreground flex items-center gap-2">
+            <Award className="h-5 w-5 text-blue-500" />
+            Learning Goals & Preferences
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {!preferencesLoaded && (
+            <p className="mb-4 text-sm text-muted-foreground" role="status">
+              Learning preferences could not be loaded. Saving this form will leave them unchanged.
+            </p>
+          )}
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+            <div>
+              <FormFieldWithValidation
+                label="Institution, school, or hospital"
+                name="institution"
+                value={profile.institution}
+                onChange={handleChange}
+                placeholder="e.g., Kenyatta University"
+                maxLength={120}
+                disabled={!preferencesLoaded}
+                helpText="Optional • helps tailor learning recommendations"
+              />
+            </div>
+            <div>
+              <FormFieldWithValidation
+                label="Target exam, board, or milestone"
+                name="targetExam"
+                value={profile.targetExam}
+                onChange={handleChange}
+                placeholder="e.g., NCLEX-RN, USMLE Step 1"
+                maxLength={120}
+                disabled={!preferencesLoaded}
+                helpText="Optional • used to match relevant learning paths"
+              />
+            </div>
+            <div>
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <label htmlFor="dailyGoalMinutes" className="text-sm font-medium text-muted-foreground">
+                  Daily study goal
+                </label>
+                <span className="text-sm font-semibold text-foreground">
+                  {profile.dailyGoalMinutes} minutes / day
+                </span>
+              </div>
+              <input
+                id="dailyGoalMinutes"
+                name="dailyGoalMinutes"
+                type="range"
+                min="15"
+                max="240"
+                step="15"
+                value={profile.dailyGoalMinutes}
+                disabled={!preferencesLoaded}
+                onChange={event =>
+                  setProfile(previous => ({
+                    ...previous,
+                    dailyGoalMinutes: Number(event.target.value),
+                  }))
+                }
+                className="w-full accent-blue-600"
+                aria-label="Daily study goal in minutes"
+              />
+            </div>
+            <div>
+              <label htmlFor="focusTopicsText" className="mb-2 block text-sm font-medium text-muted-foreground">
+                Priority learning topics
+              </label>
+              <textarea
+                id="focusTopicsText"
+                value={profile.focusTopicsText}
+                disabled={!preferencesLoaded}
+                onChange={event =>
+                  setProfile(previous => ({
+                    ...previous,
+                    focusTopicsText: event.target.value,
+                  }))
+                }
+                rows={3}
+                placeholder={'One topic per line, e.g.\nPharmacotherapy\nClinical skills'}
+                className="w-full rounded-lg border border-border bg-card px-3 py-2 text-foreground"
+              />
+              <p className="mt-1 text-xs text-muted-foreground">Optional • enter one topic per line</p>
+            </div>
           </div>
         </CardContent>
       </Card>
