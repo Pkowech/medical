@@ -18,14 +18,10 @@ import {
 } from '@/features/profile/utils/profileValidation';
 import { useUnsavedChanges } from '@/features/profile/hooks/useUnsavedChanges';
 import type { LocalUserProfile } from '@/shared/types/profileInterface';
-import { healthcareFieldLabel } from '@/shared/utils/healthcareProfile';
-import { onboardingService } from '@/features/onboarding/services/onboardingService';
+import { healthcareFields } from '@/shared/utils/healthcareProfile';
 
 type EditableProfile = LocalUserProfile & {
-  institution: string;
-  targetExam: string;
-  dailyGoalMinutes: number;
-  focusTopicsText: string;
+  otherHealthcareField: string;
 };
 
 interface ValidationError {
@@ -66,16 +62,13 @@ export default function EditProfilePage() {
     bio: '',
     careerStage: '',
     healthcareField: '',
+    otherHealthcareField: '',
     studyYear: null,
     specialization: '',
     yearOfExperience: null,
     location: '',
     phoneNumber: '',
     profileImage: undefined,
-    institution: '',
-    targetExam: '',
-    dailyGoalMinutes: 45,
-    focusTopicsText: '',
   });
 
   const [isSaving, setIsSaving] = useState(false);
@@ -86,7 +79,6 @@ export default function EditProfilePage() {
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [validationState, setValidationState] = useState<Record<string, boolean>>({});
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
-  const [preferencesLoaded, setPreferencesLoaded] = useState(false);
 
   // Track unsaved changes
   const { hasUnsavedChanges, markAsSaved, reset } = useUnsavedChanges(profile, !isLoadingProfile);
@@ -103,6 +95,13 @@ export default function EditProfilePage() {
             setIsLoadingProfile(false);
             return;
           }
+
+          const savedHealthcareField = userProfile.healthcareField || '';
+          const matchedHealthcareField = healthcareFields.find(
+            field =>
+              field.value === savedHealthcareField.toLowerCase() ||
+              field.label.toLowerCase() === savedHealthcareField.toLowerCase(),
+          );
           
           const fetchedProfile: EditableProfile = {
             id: userProfile.id,
@@ -112,7 +111,9 @@ export default function EditProfilePage() {
             email: userProfile.email || session.user.email || '',
             bio: userProfile.bio || '',
             careerStage: userProfile.careerStage || '',
-            healthcareField: userProfile.healthcareField || '',
+            healthcareField: matchedHealthcareField?.value || (savedHealthcareField ? 'other' : ''),
+            otherHealthcareField:
+              savedHealthcareField && !matchedHealthcareField ? savedHealthcareField : '',
             studyYear: userProfile.studyYear ?? null,
             specialization: userProfile.specialization || '',
             yearOfExperience: userProfile.yearOfExperience ?? null,
@@ -121,10 +122,6 @@ export default function EditProfilePage() {
             profileImage: userProfile.profileImage && userProfile.profileImage.trim() !== ''
               ? userProfile.profileImage
               : (session.user.image && session.user.image.trim() !== '' ? session.user.image : undefined),
-            institution: '',
-            targetExam: '',
-            dailyGoalMinutes: 45,
-            focusTopicsText: '',
           };
           
           setProfile(fetchedProfile);
@@ -134,43 +131,6 @@ export default function EditProfilePage() {
               : (session.user.image && session.user.image.trim() !== '' ? session.user.image : null)
           );
 
-          try {
-            const onboardingStatus = await onboardingService.getStatus();
-            const onboardingProfile = onboardingStatus.profile;
-            const sessionPreferences = (
-              session.user as typeof session.user & { preferences?: Record<string, unknown> }
-            ).preferences || {};
-            const focusTopics = Array.isArray(onboardingProfile?.focusTopics)
-              ? onboardingProfile.focusTopics
-              : Array.isArray(sessionPreferences.focusTopics)
-                ? sessionPreferences.focusTopics.filter(
-                    (topic): topic is string => typeof topic === 'string',
-                  )
-                : [];
-            setProfile(previous => ({
-              ...previous,
-              institution:
-                onboardingProfile?.institution ??
-                (typeof sessionPreferences.institution === 'string'
-                  ? sessionPreferences.institution
-                  : ''),
-              targetExam:
-                onboardingProfile?.targetExam ??
-                (typeof sessionPreferences.targetExam === 'string'
-                  ? sessionPreferences.targetExam
-                  : ''),
-              dailyGoalMinutes:
-                onboardingProfile?.dailyGoalMinutes ??
-                (typeof sessionPreferences.dailyGoalMinutes === 'number'
-                  ? sessionPreferences.dailyGoalMinutes
-                  : 45),
-              focusTopicsText: focusTopics.join('\n'),
-            }));
-            setPreferencesLoaded(true);
-          } catch (error) {
-            console.error('Error fetching learning preferences:', error);
-            setSaveMessage('Learning preferences could not be loaded. Profile details are still available.');
-          }
         } catch (error: unknown) {
           console.error('Error fetching profile:', error);
           setSaveMessage(`Error fetching profile: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -249,11 +209,22 @@ export default function EditProfilePage() {
   const handleSaveProfile = async () => {
     // First validate the entire profile
     const validation = validateProfile(profile);
-    if (!validation.isValid) {
-      setFieldErrors(validation.errors);
+    const errors = { ...validation.errors };
+    const missingOtherHealthcareField =
+      profile.healthcareField === 'other' && !profile.otherHealthcareField.trim();
+    if (missingOtherHealthcareField) {
+      errors.otherHealthcareField = ['Please specify your healthcare field.'];
+    }
+    if (!validation.isValid || missingOtherHealthcareField) {
+      setFieldErrors(errors);
       setSaveMessage('Please fix the errors below');
       return;
     }
+
+    const healthcareFieldValue =
+      profile.healthcareField === 'other'
+        ? profile.otherHealthcareField.trim()
+        : profile.healthcareField;
 
     setIsSaving(true);
     setSaveMessage('');
@@ -277,7 +248,7 @@ export default function EditProfilePage() {
         location: profile.location,
         phoneNumber: profile.phoneNumber,
         careerStage: profile.careerStage || null,
-        healthcareField: profile.healthcareField || null,
+        healthcareField: healthcareFieldValue || null,
         studyYear:
           profile.careerStage === 'student' || profile.careerStage === 'postgraduate'
             ? profile.studyYear
@@ -285,17 +256,6 @@ export default function EditProfilePage() {
         specialization: profile.specialization || null,
         yearOfExperience:
           profile.careerStage === 'professional' ? profile.yearOfExperience : null,
-        ...(preferencesLoaded && {
-          preferences: {
-            institution: profile.institution.trim(),
-            targetExam: profile.targetExam.trim(),
-            dailyGoalMinutes: profile.dailyGoalMinutes,
-            focusTopics: profile.focusTopicsText
-              .split(/\r?\n/)
-              .map(topic => topic.trim())
-              .filter(Boolean),
-          },
-        }),
       };
 
       await userService.updateUserProfile(session.user.id, updatePayload);
@@ -306,7 +266,7 @@ export default function EditProfilePage() {
             username: profile.username.trim().toLowerCase(),
           }),
           careerStage: profile.careerStage || null,
-          healthcareField: profile.healthcareField || null,
+          healthcareField: healthcareFieldValue || null,
           studyYear:
             profile.careerStage === 'student' || profile.careerStage === 'postgraduate'
               ? profile.studyYear
@@ -314,20 +274,6 @@ export default function EditProfilePage() {
           yearOfExperience:
             profile.careerStage === 'professional' ? profile.yearOfExperience : null,
           specialization: profile.specialization || null,
-          ...(preferencesLoaded && {
-            preferences: {
-              ...(
-                session.user as typeof session.user & { preferences?: Record<string, unknown> }
-              ).preferences,
-              institution: profile.institution.trim(),
-              targetExam: profile.targetExam.trim(),
-              dailyGoalMinutes: profile.dailyGoalMinutes,
-              focusTopics: profile.focusTopicsText
-                .split(/\r?\n/)
-                .map(topic => topic.trim())
-                .filter(Boolean),
-            },
-          }),
         },
       });
 
@@ -397,6 +343,11 @@ export default function EditProfilePage() {
       </div>
     );
   }
+
+  const maxStudyYear = Math.max(
+    profile.careerStage === 'postgraduate' ? 5 : 6,
+    profile.studyYear ?? 0,
+  );
 
   return (
     <div className="container mx-auto px-4 py-8 bg-background/50 dark:bg-card/50 min-h-screen space-y-6">
@@ -641,17 +592,47 @@ export default function EditProfilePage() {
             </div>
 
             <div>
-              <FormFieldWithValidation
-                label="Healthcare field"
+              <label htmlFor="healthcareField" className="mb-2 block text-sm font-medium text-muted-foreground dark:text-muted-foreground">
+                Healthcare discipline
+              </label>
+              <select
+                id="healthcareField"
                 name="healthcareField"
-                value={healthcareFieldLabel(profile.healthcareField)}
+                value={profile.healthcareField}
                 onChange={handleChange}
-                placeholder="e.g., Nursing, Pharmacy, Medicine"
-                errors={fieldErrors.healthcareField}
-                helpText="Optional • the healthcare discipline you study or work in"
-                isValid={validationState.healthcareField}
-              />
+                aria-invalid={Boolean(fieldErrors.healthcareField)}
+                className="w-full rounded-lg border border-border bg-card px-3 py-2 text-foreground dark:border-border dark:bg-card dark:text-foreground"
+              >
+                <option value="">Select your field</option>
+                {healthcareFields.map(field => (
+                  <option key={field.value} value={field.value}>
+                    {field.label}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Choose from the same healthcare disciplines used during onboarding.
+              </p>
+              {fieldErrors.healthcareField?.map(error => (
+                <p key={error} className="mt-1 text-xs text-destructive">{error}</p>
+              ))}
             </div>
+
+            {profile.healthcareField === 'other' && (
+              <div>
+                <FormFieldWithValidation
+                  label="Specify your healthcare discipline"
+                  name="otherHealthcareField"
+                  value={profile.otherHealthcareField}
+                  onChange={handleChange}
+                  placeholder="e.g., Clinical Nutrition, Optometry"
+                  maxLength={80}
+                  required
+                  errors={fieldErrors.otherHealthcareField}
+                  helpText="Enter the discipline you selected as Other"
+                />
+              </div>
+            )}
 
             <div>
               <FormFieldWithValidation
@@ -684,8 +665,10 @@ export default function EditProfilePage() {
                   className="w-full rounded-lg border border-border bg-card px-3 py-2 text-foreground dark:border-border dark:bg-card dark:text-foreground"
                 >
                   <option value="">Not set</option>
-                  {Array.from({ length: 12 }, (_, index) => index + 1).map(year => (
-                    <option key={year} value={year}>Year {year}</option>
+                  {Array.from({ length: maxStudyYear }, (_, index) => index + 1).map(year => (
+                    <option key={year} value={year}>
+                      {profile.careerStage === 'postgraduate' ? `Training Year ${year}` : `Year ${year}`}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -726,96 +709,6 @@ export default function EditProfilePage() {
                 />
               </div>
             )}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="bg-card/80 dark:bg-card/50 backdrop-blur-sm border-border dark:border-border/50">
-        <CardHeader>
-          <CardTitle className="text-foreground dark:text-foreground flex items-center gap-2">
-            <Award className="h-5 w-5 text-blue-500" />
-            Learning Goals & Preferences
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {!preferencesLoaded && (
-            <p className="mb-4 text-sm text-muted-foreground" role="status">
-              Learning preferences could not be loaded. Saving this form will leave them unchanged.
-            </p>
-          )}
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-            <div>
-              <FormFieldWithValidation
-                label="Institution, school, or hospital"
-                name="institution"
-                value={profile.institution}
-                onChange={handleChange}
-                placeholder="e.g., Kenyatta University"
-                maxLength={120}
-                disabled={!preferencesLoaded}
-                helpText="Optional • helps tailor learning recommendations"
-              />
-            </div>
-            <div>
-              <FormFieldWithValidation
-                label="Target exam, board, or milestone"
-                name="targetExam"
-                value={profile.targetExam}
-                onChange={handleChange}
-                placeholder="e.g., NCLEX-RN, USMLE Step 1"
-                maxLength={120}
-                disabled={!preferencesLoaded}
-                helpText="Optional • used to match relevant learning paths"
-              />
-            </div>
-            <div>
-              <div className="mb-2 flex items-center justify-between gap-3">
-                <label htmlFor="dailyGoalMinutes" className="text-sm font-medium text-muted-foreground">
-                  Daily study goal
-                </label>
-                <span className="text-sm font-semibold text-foreground">
-                  {profile.dailyGoalMinutes} minutes / day
-                </span>
-              </div>
-              <input
-                id="dailyGoalMinutes"
-                name="dailyGoalMinutes"
-                type="range"
-                min="15"
-                max="240"
-                step="15"
-                value={profile.dailyGoalMinutes}
-                disabled={!preferencesLoaded}
-                onChange={event =>
-                  setProfile(previous => ({
-                    ...previous,
-                    dailyGoalMinutes: Number(event.target.value),
-                  }))
-                }
-                className="w-full accent-blue-600"
-                aria-label="Daily study goal in minutes"
-              />
-            </div>
-            <div>
-              <label htmlFor="focusTopicsText" className="mb-2 block text-sm font-medium text-muted-foreground">
-                Priority learning topics
-              </label>
-              <textarea
-                id="focusTopicsText"
-                value={profile.focusTopicsText}
-                disabled={!preferencesLoaded}
-                onChange={event =>
-                  setProfile(previous => ({
-                    ...previous,
-                    focusTopicsText: event.target.value,
-                  }))
-                }
-                rows={3}
-                placeholder={'One topic per line, e.g.\nPharmacotherapy\nClinical skills'}
-                className="w-full rounded-lg border border-border bg-card px-3 py-2 text-foreground"
-              />
-              <p className="mt-1 text-xs text-muted-foreground">Optional • enter one topic per line</p>
-            </div>
           </div>
         </CardContent>
       </Card>

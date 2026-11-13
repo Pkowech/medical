@@ -32,11 +32,13 @@ export const GoalsProgressWidget: React.FC = () => {
 
   const fetchGoals = async () => {
     try {
-      // Fetch goals with either active status or no status filter but let's use the explicit GoalStatus string "active"
-      // Wait, learning-goals.dto.ts allows status: GoalStatus. But wait, we can just use status=active or simply fetch all and filter. The validation in GoalFiltersDto expects GoalStatus enum which contains 'active'.
-      const response = await apiService.get<LearningGoal[]>(`/learning-goals?status=active`);
+      const response = await apiService.get<LearningGoal[]>(`/learning-goals`);
       if (response.success && Array.isArray(response.data)) {
-        setGoals(response.data.slice(0, 3));
+        setGoals(
+          response.data
+            .filter(goal => ['active', 'inProgress', 'notStarted'].includes(goal.status))
+            .slice(0, 3),
+        );
       } else {
         setGoals([]);
       }

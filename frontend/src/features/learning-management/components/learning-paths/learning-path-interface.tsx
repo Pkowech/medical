@@ -16,11 +16,14 @@ import {
   AlertCircle,
   Activity,
   Zap,
+  X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import api from '@/features/auth/services/apiClient';
 import { LearningPath, LearningPathProgress } from '@/shared/types';
 import { learningPathService } from '@/features/learning-management/services/learningPathService';
+import { userService } from '@/features/profile/services/userService';
+import { healthcareFieldLabel } from '@/shared/utils/healthcareProfile';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils/cn';
 
@@ -44,29 +47,6 @@ const toPhaseStatus = (value: unknown, fallback: PhaseStatus = 'notStarted'): Ph
 
 const toModuleStatus = (value: unknown, fallback: ModuleStatus = 'notStarted'): ModuleStatus =>
   (MODULE_STATUSES as readonly unknown[]).includes(value) ? (value as ModuleStatus) : fallback;
-
-interface InlineStatCardProps {
-  icon: React.ElementType;
-  title: string;
-  value: string | number;
-  subtitle?: string;
-  accent?: string;
-}
-
-const StatCard: React.FC<InlineStatCardProps> = ({ icon: Icon, title, value, subtitle, accent = 'text-indigo-500' }) => (
-  <div className="relative flex flex-col gap-3 bg-card text-card-foreground border border-border rounded-2xl p-5 overflow-hidden group hover:border-primary/30 transition-colors">
-    {/* faint corner accent */}
-    <div className={cn('absolute -top-6 -right-6 w-20 h-20 rounded-full opacity-10 dark:opacity-20', accent.replace('text-', 'bg-'))} />
-    <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center shrink-0', accent.replace('text-', 'bg-') + '/10 dark:' + accent.replace('text-', 'bg-') + '/20')}>
-      <Icon className={cn('w-4 h-4', accent)} strokeWidth={1.75} />
-    </div>
-    <div>
-      <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground mb-0.5">{title}</p>
-      <p className="text-2xl font-bold text-foreground tabular-nums">{value}</p>
-      <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>
-    </div>
-  </div>
-);
 
 /* ─────────────────────────────── Difficulty Badge ─────────────────────── */
 const difficultyMap: Record<string, { label: string; className: string }> = {
@@ -238,16 +218,6 @@ const PathCard: React.FC<PathCardProps> = ({ path, isEnrolled, progress, onEnrol
 };
 
 /* ─────────────────────────────── Section Header ───────────────────────── */
-const SectionHeader: React.FC<{ icon: React.ElementType; iconClass: string; title: string; children?: React.ReactNode }> = ({ icon: Icon, iconClass, title, children }) => (
-  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-    <h2 className="flex items-center gap-2.5 text-xl font-bold text-foreground">
-      <Icon className={cn('w-5 h-5', iconClass)} strokeWidth={1.75} />
-      {title}
-    </h2>
-    {children}
-  </div>
-);
-
 /* ─────────────────────────────── Empty State ───────────────────────────── */
 const EmptyState: React.FC<{ icon: React.ElementType; title: string; body: string }> = ({ icon: Icon, title, body }) => (
   <div className="flex flex-col items-center justify-center py-16 text-center border border-dashed border-border rounded-2xl bg-muted/50">
@@ -267,17 +237,40 @@ export const LearningPathInterface: React.FC = () => {
   const [recommendedPaths, setRecommendedPaths] = useState<LearningPath[]>([]);
   const [userProgress, setUserProgress] = useState<LearningPathProgress[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState({ searchTerm: '', difficulty: '', status: 'all', category: '', specialization: '' });
+  const [activeTab, setActiveTab] = useState<'enrolled' | 'discover' | 'recommended'>('enrolled');
+  const [profileFieldLoaded, setProfileFieldLoaded] = useState(false);
+  const [profileHealthcareField, setProfileHealthcareField] = useState<string | null>(null);
+  const [searchInput, setSearchInput] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [specializationFilter, setSpecializationFilter] = useState('');
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const specParam = params.get('specialization');
-    if (specParam) setFilters(prev => ({ ...prev, specialization: specParam }));
+    if (specParam) setSpecializationFilter(specParam);
     setHeader({ title: 'Learning Paths', description: 'Master your medical career with structured curriculums', icon: '📚' });
     return () => setHeader(null);
   }, [setHeader]);
 
-  useEffect(() => { fetchData(); }, [filters]);
+  useEffect(() => {
+    const fetchProfileField = async () => {
+      try {
+        const profile = await userService.getMyProfile();
+        setProfileHealthcareField(profile.healthcareField?.trim() || null);
+      } catch (error) {
+        console.error('Failed to load healthcare field for learning paths:', error);
+        toast.error('Could not load your healthcare field. Search to explore all pathways.');
+      } finally {
+        setProfileFieldLoaded(true);
+      }
+    };
+
+    void fetchProfileField();
+  }, []);
+
+  useEffect(() => {
+    if (profileFieldLoaded) void fetchData();
+  }, [profileFieldLoaded, profileHealthcareField, searchTerm, specializationFilter]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -354,12 +347,19 @@ export const LearningPathInterface: React.FC = () => {
   };
 
   const fetchLearningPaths = async () => {
+    if (!searchTerm && !profileHealthcareField) {
+      setLearningPaths([]);
+      return;
+    }
+
     try {
       const q = new URLSearchParams();
-      if (filters.searchTerm) q.append('search', filters.searchTerm);
-      if (filters.difficulty) q.append('difficulty', filters.difficulty);
-      if (filters.category) q.append('category', filters.category);
-      if (filters.specialization) q.append('specialization', filters.specialization);
+      if (searchTerm) {
+        q.append('search', searchTerm);
+      } else {
+        q.append('healthcareField', profileHealthcareField ?? '');
+        if (specializationFilter) q.append('specialization', specializationFilter);
+      }
       q.append('status', 'published');
       const res = await api.get<Record<string, unknown> | unknown[]>(`/learning-paths?${q}`);
       const raw = (res.data && typeof res.data === 'object' && !Array.isArray(res.data))
@@ -470,29 +470,26 @@ export const LearningPathInterface: React.FC = () => {
     }
   };
 
-  const handleSearch = (e: React.FormEvent) => { e.preventDefault(); fetchLearningPaths(); };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-10 h-10 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin" />
-          <p className="text-sm text-muted-foreground font-medium tracking-wide">Loading paths…</p>
-        </div>
-      </div>
-    );
-  }
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    setSearchTerm(searchInput.trim());
+    setActiveTab('discover');
+  };
 
   const enrolledPaths: PathCardData[] = userProgress.map(p => ({ ...p.learningPath, isEnrolled: true, progress: p }));
-  const inProgress = userProgress.filter(p => p.status === 'inProgress').length;
-  const completed  = userProgress.filter(p => p.status === 'completed').length;
-
-  const scoredModules = userProgress.flatMap(p => p.moduleProgress || []).filter(m => typeof m.bestScore === 'number' && m.bestScore > 0);
-  const avgScore = scoredModules.length > 0
-    ? `${Math.round(scoredModules.reduce((acc, m) => acc + (m.bestScore || 0), 0) / scoredModules.length)}%`
-    : userProgress.length > 0
-    ? `${Math.round(userProgress.reduce((acc, p) => acc + (p.overallProgressPercentage || 0), 0) / userProgress.length)}%`
-    : 'N/A';
+  const normalizedProfileField = profileHealthcareField?.toLowerCase().replace(/[_-]/g, ' ');
+  const relevantRecommendedPaths = normalizedProfileField
+    ? recommendedPaths.filter(path =>
+        [path.category, path.specialization].some(value =>
+          value?.toLowerCase().replace(/[_-]/g, ' ').includes(normalizedProfileField),
+        ),
+      )
+    : [];
+  const pathwayTabs = [
+    { id: 'enrolled', label: 'Mine', icon: BookOpen },
+    { id: 'discover', label: 'Discover', icon: Search },
+    { id: 'recommended', label: 'For You', icon: Star },
+  ] as const;
 
   const cardProps = (path: PathCardData) => ({
     path,
@@ -505,126 +502,225 @@ export const LearningPathInterface: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-background text-foreground px-4 md:px-6 py-8">
-      <div className="max-w-7xl mx-auto space-y-12">
+      <div className="max-w-7xl mx-auto space-y-5">
+        <div className="flex flex-col justify-between gap-3 rounded-2xl border border-border bg-card p-3 sm:flex-row sm:items-center sm:p-4">
+          <div
+            aria-label="Learning pathway views"
+            className="grid w-full items-center gap-1 rounded-full bg-muted p-1 sm:w-fit sm:grid-cols-3"
+          >
+            {pathwayTabs.map(tab => {
+              const Icon = tab.icon;
+              const selected = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => {
+                    setActiveTab(tab.id);
+                    if (tab.id !== 'discover') {
+                      setSearchInput('');
+                      setSearchTerm('');
+                    }
+                  }}
+                  className={cn(
+                    'inline-flex h-10 items-center justify-center gap-2 rounded-full px-4 text-sm font-semibold transition-colors',
+                    selected
+                      ? 'bg-background text-indigo-700 shadow-sm dark:bg-card dark:text-indigo-300'
+                      : 'text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  <Icon aria-hidden="true" className="h-4 w-4" />
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
 
-        {/* ── Stats ── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard icon={BookOpen}     title="Active Paths" value={inProgress}    subtitle="Currently enrolled"   accent="text-indigo-500" />
-          <StatCard icon={CheckCircle}  title="Completed"    value={completed}     subtitle="Paths finished"        accent="text-emerald-500" />
-          <StatCard icon={TrendingUp}   title="In Progress"  value={inProgress}    subtitle="Keep going"            accent="text-violet-500" />
-          <StatCard icon={Sparkles}     title="Avg Score"    value={avgScore}      subtitle={scoredModules.length > 0 ? 'Across assessments' : 'Overall progress avg'} accent="text-amber-500" />
+          <form onSubmit={handleSearch} className="relative w-full sm:max-w-xl">
+            <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <label htmlFor="learning-path-search" className="sr-only">Search all learning pathways</label>
+            <input
+              id="learning-path-search"
+              type="text"
+              placeholder="Search pathways"
+              value={searchInput}
+              onChange={e => setSearchInput(e.target.value)}
+              className="h-11 w-full rounded-full border border-border bg-background py-2.5 pl-10 pr-11 text-sm text-foreground outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-950"
+            />
+            {searchInput && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchInput('');
+                  setSearchTerm('');
+                }}
+                aria-label="Clear search"
+                className="absolute right-1 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              >
+                <X aria-hidden="true" className="h-4 w-4" />
+              </button>
+            )}
+          </form>
         </div>
 
-        {/* ── Active Pathways ── */}
-        <section className="space-y-5">
-          <SectionHeader icon={BookOpen} iconClass="text-indigo-500" title="Active Pathways" />
-          {enrolledPaths.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {enrolledPaths.map(p => <PathCard key={`enrolled-${p.id}`} {...cardProps(p)} />)}
-            </div>
-          ) : (
-            <EmptyState
-              icon={BookOpen}
-              title="No active paths yet"
-              body="Browse the catalog below to start your first specialization."
-            />
-          )}
-        </section>
-
-        <hr className="border-border" />
-
-        {/* ── Recommended ── */}
-        {recommendedPaths.length > 0 && (
-          <>
-            <section className="space-y-5">
-              <SectionHeader icon={Sparkles} iconClass="text-amber-500" title="Recommended for You" />
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                {recommendedPaths.map(p => <PathCard key={`rec-${p.id}`} {...cardProps(p)} />)}
-              </div>
-            </section>
-            <hr className="border-border" />
-          </>
+        {activeTab === 'discover' && (
+          <p className="flex flex-wrap items-center gap-2 px-1 text-sm text-muted-foreground">
+            {searchTerm ? (
+              <>
+                <span>Searching all fields for</span>
+                <span className="font-semibold text-foreground">&ldquo;{searchTerm}&rdquo;</span>
+              </>
+            ) : profileHealthcareField ? (
+              <>
+                <span>Showing pathways for</span>
+                <span className="rounded-full border border-indigo-500/20 bg-indigo-500/10 px-3 py-1 text-xs font-semibold text-indigo-700 dark:text-indigo-300">
+                  {healthcareFieldLabel(profileHealthcareField)}
+                </span>
+                <span>Search to explore other fields.</span>
+              </>
+            ) : (
+              <span>Search to explore pathways across all healthcare fields.</span>
+            )}
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchInput('');
+                  setSearchTerm('');
+                }}
+                className="font-medium text-indigo-600 underline-offset-4 hover:underline dark:text-indigo-300"
+              >
+                Clear search
+              </button>
+            )}
+          </p>
         )}
 
-        {/* ── Discover ── */}
-        <section className="space-y-5">
-          <SectionHeader icon={TrendingUp} iconClass="text-blue-500" title="Discover Pathways">
-            <form onSubmit={handleSearch} className="flex gap-2 w-full sm:w-auto sm:max-w-sm">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-                <input
-                  type="text"
-                  placeholder="Search paths…"
-                  value={filters.searchTerm}
-                  onChange={e => setFilters({ ...filters, searchTerm: e.target.value })}
-                  className="w-full pl-9 pr-3 h-9 text-sm rounded-xl border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all"
-                />
+        {loading ? (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3" role="status" aria-label="Loading pathways">
+            {Array.from({ length: 3 }, (_, index) => (
+              <div key={index} className="rounded-xl border border-border bg-card p-3">
+                <div className="h-24 animate-pulse rounded-lg bg-muted" />
+                <div className="mt-4 space-y-3">
+                  <div className="h-3 w-1/3 animate-pulse rounded bg-muted" />
+                  <div className="h-4 w-4/5 animate-pulse rounded bg-muted" />
+                  <div className="h-10 animate-pulse rounded-lg bg-muted" />
+                </div>
               </div>
-              <button
-                type="submit"
-                className="h-9 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition-colors"
-              >
-                Search
-              </button>
-            </form>
-          </SectionHeader>
-
-          {/* Discipline / Specialization filter */}
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-semibold text-muted-foreground mr-1 uppercase tracking-wider">Discipline:</span>
-            {[
-              { id: '', label: 'All Fields' },
-              { id: 'pharmacy', label: 'Pharmacy' },
-              { id: 'nursing', label: 'Nursing' },
-              { id: 'medicine', label: 'Medicine' },
-              { id: 'alliedHealth', label: 'Allied Health' },
-            ].map(f => (
-              <button
-                key={`field-${f.id}`}
-                onClick={() => setFilters({ ...filters, category: f.id, specialization: '' })}
-                className={cn(
-                  'px-3.5 h-8 rounded-full text-xs font-semibold uppercase tracking-wider transition-colors',
-                  filters.category === f.id && !filters.specialization
-                    ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/20'
-                    : 'bg-card border border-border text-muted-foreground hover:border-primary/30'
-                )}
-              >
-                {f.label}
-              </button>
             ))}
           </div>
+        ) : activeTab === 'enrolled' ? (
+          <div className="space-y-6">
+            <section className="space-y-4">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-lg font-semibold text-foreground">My Pathways</h2>
+                <span className="text-sm font-medium text-muted-foreground" aria-live="polite">
+                  {enrolledPaths.length} enrolled
+                </span>
+              </div>
+              {enrolledPaths.length > 0 ? (
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  {enrolledPaths.map(path => <PathCard key={`enrolled-${path.id}`} {...cardProps(path)} />)}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center rounded-3xl border-2 border-dashed border-border bg-card px-5 py-10">
+                  <div className="mb-4 rounded-full bg-indigo-50 p-4 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300">
+                    <BookOpen aria-hidden="true" className="h-9 w-9" />
+                  </div>
+                  <h3 className="text-center text-xl font-bold text-foreground">You haven&apos;t enrolled in any pathways yet.</h3>
+                  <p className="mt-2 max-w-xs text-center text-sm text-muted-foreground">
+                    Explore pathways matched to your healthcare field and find a good next step.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('discover')}
+                    className="mt-5 inline-flex h-11 items-center gap-2 rounded-xl bg-indigo-700 px-5 font-semibold text-white transition-colors hover:bg-indigo-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+                  >
+                    Explore Pathways
+                    <TrendingUp aria-hidden="true" className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
+            </section>
 
-          {/* Difficulty filter */}
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-semibold text-muted-foreground mr-1 uppercase tracking-wider">Level:</span>
-            {['', 'beginner', 'intermediate', 'advanced', 'expert'].map(d => (
-              <button
-                key={d}
-                onClick={() => setFilters({ ...filters, difficulty: d })}
-                className={cn(
-                  'px-3.5 h-8 rounded-full text-xs font-semibold uppercase tracking-wider transition-colors',
-                  filters.difficulty === d
-                    ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-500/20'
-                    : 'bg-card border border-border text-muted-foreground hover:border-primary/30'
+            {enrolledPaths.length === 0 && (
+              <section aria-labelledby="suggested-pathways-title" className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <h3 id="suggested-pathways-title" className="text-base font-semibold text-foreground">Suggested pathways</h3>
+                  {learningPaths.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('discover')}
+                      className="text-sm font-semibold text-indigo-700 hover:underline dark:text-indigo-300"
+                    >
+                      View all
+                    </button>
+                  )}
+                </div>
+                {learningPaths.length > 0 ? (
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                    {learningPaths.slice(0, 3).map(path => <PathCard key={`suggested-${path.id}`} {...cardProps(path)} />)}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    {profileHealthcareField
+                      ? `New ${healthcareFieldLabel(profileHealthcareField)} pathways will appear here as they become available.`
+                      : 'Add a healthcare field to your profile to see suggested pathways here.'}
+                  </p>
                 )}
-              >
-                {d || 'All Levels'}
-              </button>
-            ))}
+              </section>
+            )}
           </div>
-
-          {learningPaths.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {learningPaths.map(p => <PathCard key={p.id} {...cardProps(p)} />)}
+        ) : activeTab === 'recommended' ? (
+          <section className="space-y-4">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-lg font-semibold text-foreground">Recommended for You</h2>
+              <span className="text-sm font-medium text-muted-foreground" aria-live="polite">
+                {relevantRecommendedPaths.length} pathways
+              </span>
             </div>
-          ) : (
-            <EmptyState
-              icon={AlertCircle}
-              title="No paths found"
-              body="Try adjusting your filters or search terms."
-            />
-          )}
-        </section>
+            {relevantRecommendedPaths.length > 0 ? (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                {relevantRecommendedPaths.map(path => <PathCard key={`rec-${path.id}`} {...cardProps(path)} />)}
+              </div>
+            ) : (
+              <EmptyState
+                icon={Sparkles}
+                title="No recommendations yet"
+                body="Keep learning and we’ll surface pathways that fit your healthcare field."
+              />
+            )}
+          </section>
+        ) : (
+          <section className="space-y-4">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-lg font-semibold text-foreground">
+                {searchTerm ? 'Search results' : 'Discover pathways'}
+              </h2>
+              <span className="text-sm font-medium text-muted-foreground" aria-live="polite">
+                {learningPaths.length} pathways
+              </span>
+            </div>
+            {learningPaths.length > 0 ? (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                {learningPaths.map(path => <PathCard key={path.id} {...cardProps(path)} />)}
+              </div>
+            ) : (
+              <EmptyState
+                icon={searchTerm ? AlertCircle : Search}
+                title={searchTerm ? 'No matching pathways' : profileHealthcareField ? 'No pathways in your field yet' : 'Find a pathway that fits'}
+                body={
+                  searchTerm
+                    ? `We couldn't find pathways matching "${searchTerm}". Try another search.`
+                    : profileHealthcareField
+                      ? `There are no published pathways for ${healthcareFieldLabel(profileHealthcareField)} right now. Search to explore other fields.`
+                      : 'Search by specialty, topic, or pathway name to explore the catalog.'
+                }
+              />
+            )}
+          </section>
+        )}
 
       </div>
     </div>

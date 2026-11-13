@@ -25,6 +25,7 @@ import { useAuthStore } from '@/features/auth/store/useAuthStore';
 import { usePageHeader } from '@/core/providers/HeaderContext';
 import RecommendedGoals from './recommended-goals';
 import { GoalCreationWizard } from './goal-creation-wizard';
+import { StudyPreferencesPanel } from './study-preferences-panel';
 import { StatCard } from '@/shared/components/ui/StatCard';
 import {
   daysUntilDateOnly,
@@ -82,9 +83,7 @@ export const GoalsManagementInterface: React.FC = () => {
       const queryParams = new URLSearchParams();
 
       // Add status filter based on active tab
-      if (activeTab === 'active') {
-        queryParams.append('status', 'active');
-      } else if (activeTab === 'completed') {
+      if (activeTab === 'completed') {
         queryParams.append('status', 'completed');
       }
 
@@ -108,7 +107,11 @@ export const GoalsManagementInterface: React.FC = () => {
       } else {
         data = [];
       }
-      setGoals(data); 
+      setGoals(
+        activeTab === 'active'
+          ? data.filter(goal => ['active', 'inProgress', 'notStarted'].includes(goal.status))
+          : data,
+      );
     } catch (error) {
       console.error('Error fetching goals:', error);
     } finally {
@@ -525,11 +528,13 @@ export const GoalsManagementInterface: React.FC = () => {
         </button>
       </div>
 
+      <StudyPreferencesPanel />
+
       {renderAnalyticsCards()}
 
       <div className="flex items-center space-x-2 bg-muted p-1.5 rounded-2xl mb-10 w-fit border border-border shadow-xs backdrop-blur-md">
         {( [
-          { id: 'active', label: 'In Progress', count: analytics?.activeGoals },
+          { id: 'active', label: 'Active & Planned', count: undefined },
           { id: 'completed', label: 'Archived', count: analytics?.completedGoals },
           { id: 'all', label: 'Overview', count: analytics?.totalGoals },
         ] as const).map((tab) => (

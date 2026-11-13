@@ -711,7 +711,7 @@ const MedicalEducationDashboard = () => {
                     } else if (deadline.courseId) {
                       router.push(`/courses/${deadline.courseId}`);
                     } else if (deadline.type === 'goal') {
-                      router.push('/learning-paths');
+                      router.push('/study-planner/goals');
                     } else {
                       router.push('/study-planner/schedule');
                     }

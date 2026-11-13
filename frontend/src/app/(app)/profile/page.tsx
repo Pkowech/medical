@@ -2,16 +2,11 @@
 
 import React, { useEffect, useState } from 'react';
 import Image from 'next/image';
-import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Button } from '@/shared/components/ui/button';
-import { User, Edit, Award, Clock, Settings, BookOpen, TrendingUp, Target, ArrowRight } from 'lucide-react';
+import { User, Edit, Award, Clock, Settings, BookOpen, TrendingUp, Target } from 'lucide-react';
 import useRequireAuth from '@/features/auth/hooks/useRequireAuth'; // Keep this for session management
 import { userService } from '@/features/profile/services/userService';
-import {
-  onboardingService,
-  type OnboardingStatusResponse,
-} from '@/features/onboarding/services/onboardingService';
 import { useRouter } from 'next/navigation';
 import { ProfileCompletenessBar } from '@/features/profile/components/ProfileCompletenessBar';
 import type { LocalUserProfile } from '@/shared/types/profileInterface';
@@ -20,8 +15,6 @@ import { healthcareFieldLabel } from '@/shared/utils/healthcareProfile';
 export default function ProfilePage() {
   const { isLoading, session } = useRequireAuth();
   const [profileError, setProfileError] = useState<string | null>(null);
-  const [onboardingStatus, setOnboardingStatus] = useState<OnboardingStatusResponse | null>(null);
-  const [onboardingError, setOnboardingError] = useState<string | null>(null);
 
   const [profile, setProfile] = useState<LocalUserProfile>({
     username: '',
@@ -88,25 +81,6 @@ export default function ProfilePage() {
 
     fetchProfile();
   }, [session]);
-
-  useEffect(() => {
-    if (!session?.user?.id) return;
-
-    let active = true;
-    onboardingService
-      .getStatus()
-      .then(status => {
-        if (active) setOnboardingStatus(status);
-      })
-      .catch(error => {
-        console.error('Error fetching onboarding preferences:', error);
-        if (active) setOnboardingError('Learning preferences are temporarily unavailable.');
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [session?.user?.id]);
 
   if (isLoading) {
     return (
@@ -305,129 +279,6 @@ export default function ProfilePage() {
                 </p>
               </div>
             </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-3">
-        <Card className="bg-card/80 dark:bg-card/50 backdrop-blur-sm border-border dark:border-border/50 lg:col-span-1">
-          <CardHeader>
-            <CardTitle className="flex items-center text-foreground dark:text-foreground">
-              <Target className="h-5 w-5 mr-3 text-blue-500" />
-              Learning Goals
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            {onboardingError ? (
-              <p className="text-sm text-destructive" role="alert">{onboardingError}</p>
-            ) : !onboardingStatus ? (
-              <p className="text-sm text-muted-foreground" role="status">Loading learning goals…</p>
-            ) : (
-              <>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Institution</p>
-                  <p className="mt-1 text-sm font-medium text-foreground">
-                    {onboardingStatus.profile?.institution || 'Not set'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Target exam or milestone</p>
-                  <p className="mt-1 text-sm font-medium text-foreground">
-                    {onboardingStatus.profile?.targetExam || 'Not set'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Daily study goal</p>
-                  <p className="mt-1 text-sm font-medium text-foreground">
-                    {onboardingStatus.profile?.dailyGoalMinutes
-                      ? `${onboardingStatus.profile.dailyGoalMinutes} minutes`
-                      : 'Not set'}
-                  </p>
-                </div>
-                {(onboardingStatus.profile?.focusTopics?.length ?? 0) > 0 && (
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Priority topics</p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {onboardingStatus.profile?.focusTopics?.map(topic => (
-                        <span
-                          key={topic}
-                          className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
-                        >
-                          {topic}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => router.push('/profile/edit')}
-            >
-              Edit learning preferences
-            </Button>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-card/80 dark:bg-card/50 backdrop-blur-sm border-border dark:border-border/50 lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="flex items-center text-foreground dark:text-foreground">
-              <BookOpen className="h-5 w-5 mr-3 text-purple-500" />
-              Recommended Learning Paths
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {onboardingError ? (
-              <p className="text-sm text-destructive" role="alert">{onboardingError}</p>
-            ) : !onboardingStatus ? (
-              <p className="text-sm text-muted-foreground" role="status">Finding paths for your profile…</p>
-            ) : onboardingStatus.suggestedStarterPaths?.length ? (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {onboardingStatus.suggestedStarterPaths.map(path => (
-                  <Link
-                    key={path.id}
-                    href={`/learning-paths/${path.id}`}
-                    className="rounded-xl border border-border bg-muted/40 p-4 transition-colors hover:border-blue-500/50 hover:bg-muted/80"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <h3 className="font-semibold text-foreground">{path.title}</h3>
-                      {path.estimatedDurationWeeks != null && (
-                        <span className="shrink-0 text-xs text-muted-foreground">
-                          {path.estimatedDurationWeeks} weeks
-                        </span>
-                      )}
-                    </div>
-                    {path.description && (
-                      <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{path.description}</p>
-                    )}
-                    <span className="mt-3 inline-flex items-center text-sm font-medium text-blue-600 dark:text-blue-400">
-                      Explore path <ArrowRight className="ml-1 h-4 w-4" />
-                    </span>
-                  </Link>
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-xl border border-border bg-muted/40 p-5">
-                <p className="text-sm text-muted-foreground">
-                  Complete your healthcare profile to get learning paths matched to your discipline and stage.
-                </p>
-                <Button
-                  variant="link"
-                  className="mt-2 h-auto p-0"
-                  onClick={() => router.push('/profile/edit')}
-                >
-                  Update profile <ArrowRight className="ml-1 h-4 w-4" />
-                </Button>
-              </div>
-            )}
-            <Link
-              href="/learning-paths"
-              className="mt-4 inline-flex items-center text-sm font-medium text-blue-600 hover:underline dark:text-blue-400"
-            >
-              Browse all learning paths <ArrowRight className="ml-1 h-4 w-4" />
-            </Link>
           </CardContent>
         </Card>
       </div>
