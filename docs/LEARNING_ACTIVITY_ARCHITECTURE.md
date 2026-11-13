@@ -83,7 +83,9 @@ it is not authoritative score history. Score analytics read completed
   records terminal failures for inspection/replay. Consumers must be
   idempotent. Adaptive answer checkpoints and their BKT outbox records are
   committed together; Rust unavailability does not lose the answer or
-  checkpoint.
+  checkpoint. Quiz mastery attempt totals are derived from completed
+  `QuizAttempt` rows rather than incremented per outbox delivery, so retries do
+  not inflate them.
 
 ## Progress, sessions, streaks, and mastery
 
@@ -135,9 +137,10 @@ and is not copied into topic progress.
 The application now requires expected revisions for progress writes, persists
 adaptive quiz checkpoints in `quiz_attempts`, and enqueues adaptive BKT updates
 through the outbox. Shared fixtures exercise backend course aggregation,
-streaks, mastery projection, and Rust streak/BKT logic. These tests are
-calculation-level checks; they do not prove database-query/schema parity or a
-production student's end-to-end dashboard parity.
+streaks, mastery projection and outbox replay, and Rust streak/BKT logic.
+These tests are calculation-level checks; they do not prove
+database-query/schema parity or a production student's end-to-end dashboard
+parity.
 
 Still required before claiming end-to-end parity or retiring legacy pipelines:
 

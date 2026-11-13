@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import progressService from '@/features/learning-management/services/progressService';
+import progressService, {
+  isProgressConflict,
+} from '@/features/learning-management/services/progressService';
 import { isOfflineQueuedError } from '@/lib/core/offline/offlineQueuedError';
 import { useXapi } from '@/lib/xapi/useXapi';
 import { URLS } from '@/lib/urls';
@@ -41,6 +43,7 @@ export default function useMaterialProgressTracker(options: Options) {
   const lastReportedMinutesRef = useRef(0);
   const progressRevisionRef = useRef(0);
   const progressRevisionLoadRef = useRef<Promise<void>>(Promise.resolve());
+  const progressConflictRef = useRef(false);
   const sendInFlightRef = useRef<Promise<void> | null>(null);
   const isCompletedRef = useRef(false);
   const isCompletingRef = useRef(false);
@@ -51,7 +54,10 @@ export default function useMaterialProgressTracker(options: Options) {
 
   useEffect(() => {
     if (!userId || (!materialId && !topicId)) return;
-    progressRevisionLoadRef.current = progressService
+    let active = true;
+    progressRevisionRef.current = 0;
+    progressConflictRef.current = false;
+    const revisionLoad = progressService
       .getUserProgress(userId)
       .then(rows => {
         const row = rows.find(
@@ -61,14 +67,22 @@ export default function useMaterialProgressTracker(options: Options) {
             progress.unitId === (unitId ?? null) &&
             progress.courseId === (courseId ?? null),
         );
-        progressRevisionRef.current =
-          typeof row?.revision === 'number' && Number.isSafeInteger(row.revision)
-            ? row.revision
-            : 0;
+        if (active) {
+          progressRevisionRef.current =
+            typeof row?.revision === 'number' && Number.isSafeInteger(row.revision)
+              ? row.revision
+              : 0;
+        }
       })
       .catch(error => {
-        console.warn('Could not load material progress revision:', error);
+        if (active) {
+          console.warn('Could not load material progress revision:', error);
+        }
       });
+    progressRevisionLoadRef.current = revisionLoad;
+    return () => {
+      active = false;
+    };
   }, [courseId, materialId, topicId, unitId, userId]);
 
   useEffect(() => {
@@ -87,6 +101,7 @@ export default function useMaterialProgressTracker(options: Options) {
       while (sendInFlightRef.current) {
         await sendInFlightRef.current;
       }
+      if (progressConflictRef.current) return false;
 
       const now = Date.now();
       await progressRevisionLoadRef.current;
@@ -129,6 +144,12 @@ export default function useMaterialProgressTracker(options: Options) {
           } catch (err) {
             if (isOfflineQueuedError(err)) {
               progressSaved = true;
+            } else if (isProgressConflict(err)) {
+              progressConflictRef.current = true;
+              console.error('Material progress changed on another device', err);
+              toast.error(
+                'Progress changed elsewhere. Refresh this page before saving again.',
+              );
             } else {
               console.error('Failed to send material progress', err);
               toast.error('Material progress could not be saved.');
@@ -238,9 +259,9 @@ export default function useMaterialProgressTracker(options: Options) {
       const isTimeForSync = now - lastSyncTimeRef.current >= intervalMs;
 
       if (isNewlyCompleted || isSignificantDelta || isTimeForSync) {
-        await sendProgress(p, elapsedMin);
+        const progressSaved = await sendProgress(p, elapsedMin);
 
-        if (isNewlyCompleted) {
+        if (isNewlyCompleted && progressSaved) {
           toast.success('Material completed!', {
             icon: '✅',
             duration: 3000,

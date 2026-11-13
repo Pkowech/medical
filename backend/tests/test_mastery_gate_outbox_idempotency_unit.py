@@ -25,6 +25,8 @@ const topicAttempts = [
 ];
 let progress = {
   id: 'progress-1',
+  unitId: 'unit-1',
+  courseId: 'course-1',
   quizScores: { attempts: 9, failedAttempts: 7, masteryUnlocked: false },
 };
 const updates = [];

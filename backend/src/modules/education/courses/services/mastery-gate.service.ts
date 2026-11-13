@@ -250,7 +250,7 @@ export class MasteryGateService {
         await this.clearProgressCache(userId, topic.unit.courseId);
 
         this.logger.log(
-          `User ${userId} passed quiz for topic ${topicId} with score ${score}%. Gate: ${gateDecision.canProceed ? 'OPEN' : 'BLOCKED'} (pKnown: ${gateDecision.pKnown})`,
+          `User ${userId} passed quiz for topic ${topicId} with score ${currentAttempt.percentage}%. Gate: ${gateDecision.canProceed ? 'OPEN' : 'BLOCKED'} (pKnown: ${gateDecision.pKnown})`,
         );
 
         return {

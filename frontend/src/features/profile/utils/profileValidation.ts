@@ -86,6 +86,7 @@ export function validateProfile(profile: LocalUserProfile): ValidationResult {
   const errors: Record<string, string[]> = {};
 
   const fieldsToValidate: [string, string][] = [
+    ['username', profile.username || ''],
     ['firstName', profile.firstName],
     ['lastName', profile.lastName],
     ['bio', profile.bio || ''],
