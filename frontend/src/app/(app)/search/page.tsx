@@ -12,10 +12,7 @@ export default function SearchPage() {
 
   return (
     <ProtectedRoute>
-      <div className="container mx-auto p-4">
-        <h1 className="text-3xl font-bold mb-6">Search Results for "{query}"</h1>
-        <SearchResults initialQuery={query} initialFilter={filter} />
-      </div>
+      <SearchResults initialQuery={query} initialFilter={filter} />
     </ProtectedRoute>
   );
 }

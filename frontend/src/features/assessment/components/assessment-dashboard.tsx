@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import {
@@ -28,7 +28,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui
 import { useAssessments } from '@/features/assessment/hooks/useAssessments';
 import { AdaptiveQuiz } from '@/features/assessment/components/adaptiveQuiz/AdaptiveQuiz';
 import { PerformanceAnalyticsContent } from '@/features/assessment/components/PerformanceAnalytics';
-import type { Assessment } from '@/features/assessment/services/assessmentService';
+import {
+  fetchAssessments,
+  type Assessment,
+} from '@/features/assessment/services/assessmentService';
 import type { LearningPathProgress } from '@/shared/types/learningInterface';
 import { healthcareFieldLabel } from '@/shared/utils/healthcareProfile';
 
@@ -94,6 +97,12 @@ export function AssessmentDashboard() {
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [selectedType, setSelectedType] = useState<string>('All');
   const [isAdaptiveActive, setIsAdaptiveActive] = useState(false);
+  const [searchRetryKey, setSearchRetryKey] = useState(0);
+  const [searchResult, setSearchResult] = useState<{
+    query: string;
+    assessments: Assessment[];
+    error: boolean;
+  } | null>(null);
 
   const pathCourseIds = new Set(activePaths.flatMap(getPathCourseIds));
   const pathAssessmentIds = new Set(activePaths.flatMap(getPathAssessmentIds));
@@ -102,6 +111,41 @@ export function AssessmentDashboard() {
   const specialization = session?.user?.specialization?.trim();
   const normalizedSearchQuery = searchQuery.trim().toLowerCase();
   const isExplicitSearch = normalizedSearchQuery.length > 0;
+  useEffect(() => {
+    if (!normalizedSearchQuery) return;
+
+    let isCurrentSearch = true;
+    const timer = window.setTimeout(() => {
+      void fetchAssessments(normalizedSearchQuery)
+        .then(results => {
+          if (isCurrentSearch) {
+            setSearchResult({
+              query: normalizedSearchQuery,
+              assessments: results,
+              error: false,
+            });
+          }
+        })
+        .catch(error => {
+          console.error('Failed to search assessments:', error);
+          if (isCurrentSearch) {
+            setSearchResult({
+              query: normalizedSearchQuery,
+              assessments: [],
+              error: true,
+            });
+          }
+        });
+    }, 300);
+
+    return () => {
+      isCurrentSearch = false;
+      window.clearTimeout(timer);
+    };
+  }, [normalizedSearchQuery, searchRetryKey]);
+
+  const currentSearchResult =
+    searchResult?.query === normalizedSearchQuery ? searchResult : null;
   const fieldKeywords = [
     ...(session?.user?.healthcareField
       ? FIELD_ASSESSMENT_KEYWORDS[session.user.healthcareField.toLowerCase()] ?? []
@@ -110,8 +154,11 @@ export function AssessmentDashboard() {
   ];
 
   const getRelevanceLabel = (assessment: Assessment): string | null => {
+    if (isExplicitSearch && assessment.courseTitle) {
+      return `Course · ${assessment.courseTitle}`;
+    }
     const enrolledCourse = activeCourses.find(course => course.id === assessment.courseId);
-    if (enrolledCourse) return `Active course · ${enrolledCourse.title}`;
+    if (enrolledCourse) return 'Active course';
 
     const matchingPath = activePaths.find(path =>
       getPathCourseIds(path).includes(assessment.courseId ?? '') ||
@@ -136,14 +183,15 @@ export function AssessmentDashboard() {
     const searchableText = getAssessmentSearchText(assessment);
     return fieldKeywords.some(keyword => searchableText.includes(keyword));
   });
-  const visibleAssessments = isExplicitSearch ? assessments : relevantAssessments;
+  const visibleAssessments = isExplicitSearch
+    ? currentSearchResult?.assessments ?? []
+    : relevantAssessments;
   const categories = ['All', ...new Set(visibleAssessments.map(assessment => assessment.category))];
 
   const filteredAssessments = visibleAssessments.filter(assessment => {
     const matchesCategory = selectedCategory === 'All' || assessment.category.toLowerCase() === selectedCategory.toLowerCase();
     const matchesType = selectedType === 'All' || assessment.type.toLowerCase() === selectedType.toLowerCase();
-    const matchesSearch = getAssessmentSearchText(assessment).includes(normalizedSearchQuery);
-    return matchesCategory && matchesType && matchesSearch;
+    return matchesCategory && matchesType;
   });
 
   const getTypeBadge = (type: Assessment['type']) => {
@@ -301,7 +349,11 @@ export function AssessmentDashboard() {
               <input
                 type="text"
                 value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
+                onChange={e => {
+                  setSearchQuery(e.target.value);
+                  setSearchResult(null);
+                  setSelectedCategory('All');
+                }}
                 placeholder="Search all assessments by title, topic, course, or specialty..."
                 className="w-full pl-9 pr-4 py-2 text-sm rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-blue-500/20"
               />
@@ -326,7 +378,7 @@ export function AssessmentDashboard() {
           </div>
 
           {/* Assessment Cards Grid */}
-          {loading ? (
+          {loading || (isExplicitSearch && !currentSearchResult) ? (
             <div className="flex justify-center items-center py-16">
               <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500" />
             </div>
@@ -335,17 +387,35 @@ export function AssessmentDashboard() {
               <CardContent className="space-y-4">
                 <AlertTriangle className="h-10 w-10 text-muted-foreground mx-auto" />
                 <h3 className="text-lg font-semibold text-foreground">
-                  {isExplicitSearch ? 'No matching assessments found' : 'No matching assessments yet'}
+                  {currentSearchResult?.error
+                    ? 'Assessment search unavailable'
+                    : isExplicitSearch
+                      ? 'No matching assessments found'
+                      : 'No matching assessments yet'}
                 </h3>
                 <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                  {isExplicitSearch
-                    ? 'No published assessments match your search and category filters. Try another search or reset the filters.'
-                    : 'There are no assessments linked to your active courses or learning paths that match your field yet. Search by topic, course, or specialty to find another assessment.'}
+                  {currentSearchResult?.error
+                    ? 'The assessment search could not be completed. Please try again.'
+                    : isExplicitSearch
+                      ? 'No published assessments match your search and category filters. Try another search or reset the filters.'
+                      : 'There are no assessments linked to your active courses or learning paths that match your field yet. Search by topic, course, or specialty to find another assessment.'}
                 </p>
+                {currentSearchResult?.error && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setSearchResult(null);
+                      setSearchRetryKey(value => value + 1);
+                    }}
+                  >
+                    Retry search
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   onClick={() => {
                     setSearchQuery('');
+                    setSearchResult(null);
                     setSelectedCategory('All');
                     setSelectedType('All');
                   }}

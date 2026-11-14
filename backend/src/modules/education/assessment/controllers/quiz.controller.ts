@@ -14,7 +14,12 @@ import {
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
-import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiOperation,
+  ApiTags,
+  ApiBearerAuth,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { QuizService } from '../services/quiz.service';
 import { WeaknessOrchestrationService } from '../services/weakness-orchestration.service';
 import { JwtAuthGuard } from '#modules/auth/guards/jwt-auth.guard';
@@ -45,8 +50,18 @@ export class QuizController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'List published quizzes' })
-  async findMany(@Query('page') page?: string, @Query('limit') limit?: string) {
+  @ApiOperation({ summary: 'List and search published quizzes' })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    description:
+      'Search quiz titles, descriptions, categories, topics, units, and courses',
+  })
+  async findMany(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+  ) {
     return this.quizService.findMany(
       {
         page: Math.max(1, Number.parseInt(page ?? '1', 10) || 1),
@@ -55,7 +70,7 @@ export class QuizController {
           Math.max(1, Number.parseInt(limit ?? '100', 10) || 100),
         ),
       },
-      { isPublished: true },
+      { isPublished: true, search: search?.trim() || undefined },
     );
   }
 

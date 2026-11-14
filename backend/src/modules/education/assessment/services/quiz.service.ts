@@ -684,7 +684,12 @@ export class QuizService {
   @ApiResponse({ status: 200, description: 'List of quizzes with pagination' })
   async findMany(
     pagination: { page?: number; limit?: number },
-    filters?: { unitId?: string; topicId?: string; isPublished?: boolean },
+    filters?: {
+      unitId?: string;
+      topicId?: string;
+      isPublished?: boolean;
+      search?: string;
+    },
   ) {
     const { page = 1, limit = 10 } = pagination;
     const normalizedPagination = { page, limit };
@@ -749,6 +754,66 @@ export class QuizService {
     }
     if (filters?.isPublished !== undefined) {
       where.isPublished = filters.isPublished;
+    }
+    const searchTerms = filters?.search
+      ?.trim()
+      .split(/\s+/)
+      .filter(Boolean);
+    if (searchTerms?.length) {
+      where.AND.push(
+        ...searchTerms.map((term) => {
+          const containsTerm = { contains: term, mode: 'insensitive' as const };
+          return {
+            OR: [
+              { title: containsTerm },
+              { description: containsTerm },
+              { category: { is: { name: containsTerm } } },
+              {
+                unit: {
+                  is: {
+                    OR: [
+                      { name: containsTerm },
+                      { title: containsTerm },
+                      { description: containsTerm },
+                    ],
+                  },
+                },
+              },
+              {
+                unit: {
+                  is: {
+                    course: {
+                      is: {
+                        OR: [
+                          { name: containsTerm },
+                          { title: containsTerm },
+                          { code: containsTerm },
+                          { description: containsTerm },
+                          {
+                            category: {
+                              is: { name: containsTerm },
+                            },
+                          },
+                        ],
+                      },
+                    },
+                  },
+                },
+              },
+              {
+                topic: {
+                  is: {
+                    OR: [
+                      { title: containsTerm },
+                      { description: containsTerm },
+                    ],
+                  },
+                },
+              },
+            ],
+          };
+        }),
+      );
     }
 
     const [quizzes, total] = await Promise.all([

@@ -3,9 +3,10 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useSearch } from '@/features/search/hooks/useSearch';
 import Link from 'next/link';
-import { AlertCircle, RotateCcw, Zap } from 'lucide-react';
+import { AlertCircle, RotateCcw, Search as SearchIcon, X } from 'lucide-react';
 import { formatSearchMetrics, getRelevanceLevel, getRelevanceColorClasses, isRetryableError } from '@/features/search/utils/searchUtils';
 import { sanitizeHtml } from '@/lib/utils/sanitizeHtml';
+import { SEARCH_CONFIG } from '@/features/search/config/searchConfig';
 
 interface SearchResultsProps {
   initialQuery?: string;
@@ -17,6 +18,7 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
   initialFilter = 'all',
 }) => {
   const [query, setQuery] = useState(initialQuery);
+  const [debouncedQuery, setDebouncedQuery] = useState(initialQuery);
   const [filter, setFilter] = useState(initialFilter);
   const [page, setPage] = useState(1);
   const limit = 20;
@@ -24,6 +26,9 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
   const itemRefs = useRef<Array<HTMLAnchorElement | null>>([]);
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
   const isRetryable = error && isRetryableError(error.code);
+  const isDebouncing = query.trim() !== debouncedQuery.trim();
+  const isSearchPending = isDebouncing || loading;
+  const queryIsLongEnough = query.trim().length >= SEARCH_CONFIG.MIN_QUERY_LENGTH;
 
   // Clear item refs when results change
   useEffect(() => {
@@ -31,8 +36,17 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
   }, [results]);
 
   useEffect(() => {
-    search(query, filter, page, limit);
-  }, [query, filter, page, search]);
+    const timeout = setTimeout(() => setDebouncedQuery(query), SEARCH_CONFIG.DEBOUNCE_MS);
+    return () => clearTimeout(timeout);
+  }, [query]);
+
+  useEffect(() => {
+    search(debouncedQuery, filter, page, limit);
+  }, [debouncedQuery, filter, page, search]);
+
+  useEffect(() => {
+    setFocusedIndex(null);
+  }, [query, filter, page]);
 
   // Keyboard navigation: focus management
   const focusItem = useCallback((index: number) => {
@@ -63,38 +77,40 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-foreground mb-2">Medical Search</h1>
-        <p className="text-muted-foreground italic">Access your structured curriculum with professional-grade intelligence.</p>
+    <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+      <div className="mb-7">
+        <h1 className="mb-2 text-3xl font-bold tracking-tight text-foreground">Search</h1>
+        <p className="text-muted-foreground">Find courses, learning materials, topics, and more.</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-4">
         {/* Sidebar Facets */}
-        <div className="lg:col-span-1 space-y-6">
-          <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
-            <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-4">Categories</h3>
-            <div className="space-y-1">
+        <aside aria-label="Search filters" className="space-y-5 lg:col-span-1">
+          <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+            <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Filter by type</h2>
+            <div className="flex gap-2 overflow-x-auto pb-1 lg:flex-col lg:overflow-visible lg:pb-0">
               {['all', 'course', 'unit', 'topic', 'material', 'quiz', 'case', 'user'].map((f) => (
                 <button
                   key={f}
+                  type="button"
+                  aria-pressed={filter === f}
                   onClick={() => {
                     setFilter(f);
                     setPage(1);
                   }}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-all ${
-                    filter === f 
-                      ? 'bg-blue-50 text-blue-700 font-semibold' 
-                      : 'text-muted-foreground hover:bg-background hover:text-foreground'
+                  className={`flex min-h-10 shrink-0 items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 lg:w-full ${
+                    filter === f
+                      ? 'bg-blue-50 font-semibold text-blue-700 dark:bg-blue-950/40 dark:text-blue-300'
+                      : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                   }`}
                 >
                   <span className="capitalize">{f === 'all' ? 'All Results' : f.replace('_', ' ')}</span>
                   {f === 'all' ? (
-                    <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded-md font-bold">{total}</span>
+                    <span className="rounded-md bg-muted px-1.5 py-0.5 text-xs font-semibold tabular-nums">{total}</span>
                   ) : (
                     facets[f] !== undefined && (
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold ${
-                        filter === f ? 'bg-blue-200 text-blue-800' : 'bg-muted text-muted-foreground'
+                      <span className={`rounded-md px-1.5 py-0.5 text-xs font-semibold tabular-nums ${
+                        filter === f ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' : 'bg-muted text-muted-foreground'
                       }`}>
                         {facets[f]}
                       </span>
@@ -105,45 +121,55 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
             </div>
           </div>
 
-          <div className="bg-blue-600 rounded-2xl p-6 text-white shadow-lg shadow-blue-200">
-            <h4 className="font-bold mb-2">Medical Intelligence</h4>
-            <p className="text-xs text-blue-100 leading-relaxed">
-              Our search uses Bayesian logic and medical synonym expansion to ensure you find exactly what you need, even if terms differ.
-            </p>
-          </div>
-        </div>
+        </aside>
 
         {/* Search Content */}
-        <div className="lg:col-span-3">
-          <div className="relative mb-6">
+        <section aria-label="Search results" className="min-w-0 lg:col-span-3">
+          <div className="relative mb-5">
+            <SearchIcon aria-hidden="true" className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
             <input
               id="search-input"
               type="text"
               value={query}
+              maxLength={SEARCH_CONFIG.MAX_QUERY_LENGTH}
+              aria-label="Search courses, materials, subjects, and more"
               onChange={e => {
                 setQuery(e.target.value);
                 setPage(1);
               }}
               onKeyDown={handleInputKeyDown}
-              placeholder="Search for courses, materials, subjects..."
-              className="w-full px-6 py-4 text-lg rounded-2xl border-none shadow-sm ring-1 ring-ring focus:ring-2 focus:ring-blue-500 transition-all bg-card"
+              placeholder="Search courses, materials, subjects..."
+              className="min-h-14 w-full rounded-xl border border-input bg-card py-3 pl-12 pr-12 text-base text-foreground shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
             />
-            {loading && (
-              <div className="absolute right-4 top-1/2 -translate-y-1/2">
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+            {query && (
+              <button
+                type="button"
+                onClick={() => {
+                  setQuery('');
+                  setPage(1);
+                }}
+                aria-label="Clear search"
+                className="absolute right-3 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+              >
+                <X aria-hidden="true" className="h-4 w-4" />
+              </button>
+            )}
+            {isSearchPending && queryIsLongEnough && (
+              <div className="sr-only" role="status" aria-live="polite">
+                Searching...
               </div>
             )}
           </div>
 
-          {expandedQuery && expandedQuery !== query && (
-            <div className="mb-6 px-4 py-3 bg-indigo-50 rounded-xl border border-indigo-100 flex items-center gap-3">
-              <div className="bg-indigo-100 p-1.5 rounded-lg">
+          {expandedQuery && expandedQuery !== debouncedQuery && (
+            <div className="mb-5 flex items-center gap-3 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 dark:border-indigo-900 dark:bg-indigo-950/30">
+              <div className="rounded-lg bg-indigo-100 p-1.5 dark:bg-indigo-900/60">
                 <svg className="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
               <span className="text-sm text-indigo-800">
-                Expanded search: <span className="font-semibold italic text-indigo-900">{expandedQuery}</span>
+                Expanded search: <span className="font-semibold italic text-indigo-900 dark:text-indigo-200">{expandedQuery}</span>
               </span>
             </div>
           )}
@@ -168,26 +194,45 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
             </div>
           )}
 
-          <div className="mb-4 flex justify-between items-center px-2">
-            <div className="text-sm text-muted-foreground">
-              Found <span className="font-bold text-foreground">{total}</span> results
-              {metrics?.totalTime && (
-                <span className="ml-3 text-muted-foreground">
-                  ({formatSearchMetrics(metrics.totalTime).display})
+          {query && (
+            <div className="mb-4 flex min-h-6 items-center justify-between gap-3 text-sm text-muted-foreground" aria-live="polite">
+              <p>
+                {isSearchPending ? (
+                  'Searching...'
+                ) : queryIsLongEnough ? (
+                  <>
+                    {total === 0 ? 'No results' : `Showing ${results.length} of ${total} results`}
+                    {metrics?.totalTime ? <span className="ml-2">· {formatSearchMetrics(metrics.totalTime).display}</span> : null}
+                  </>
+                ) : (
+                  `Enter at least ${SEARCH_CONFIG.MIN_QUERY_LENGTH} characters to search.`
+                )}
+              </p>
+              {query.length >= SEARCH_CONFIG.MAX_QUERY_LENGTH - 20 && (
+                <span className="shrink-0 text-xs tabular-nums">
+                  {query.length}/{SEARCH_CONFIG.MAX_QUERY_LENGTH}
                 </span>
               )}
             </div>
-          </div>
+          )}
 
           <div className="space-y-4" onKeyDown={handleListKeyDown}>
-            {results.map((r, idx) => {
+            {!query && (
+              <div className="rounded-xl border border-dashed border-border bg-card/50 px-6 py-14 text-center">
+                <SearchIcon aria-hidden="true" className="mx-auto mb-4 h-9 w-9 text-muted-foreground/60" />
+                <h2 className="mb-1 text-lg font-semibold text-foreground">Start searching</h2>
+                <p className="text-sm text-muted-foreground">Search across courses, materials, topics, and clinical cases.</p>
+              </div>
+            )}
+
+            {queryIsLongEnough && !isSearchPending && results.map((r, idx) => {
               let href = `/profile/${r.id}`;
               if (r.type === 'course') href = `/courses/${r.id}`;
               else if (r.type === 'material') href = `/materials/${r.id}`;
               else if (r.type === 'unit') href = `/units/${r.id}`;
               else if (r.type === 'topic') href = `/topics/${r.id}`;
               else if (r.type === 'quiz') href = '/assessment';
-              else if (r.type === 'case') href = `/clinical-cases/${r.id}`;
+              else if (r.type === 'case' || r.type === 'clinical_case') href = `/clinical-cases/${r.id}`;
 
               const relevanceLevel = getRelevanceLevel(r.relevance);
               const relevanceColors = getRelevanceColorClasses(r.relevance);
@@ -195,12 +240,12 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
               return (
                 <div 
                   key={`${r.type}-${r.id}`} 
-                  className={`group relative bg-card p-6 rounded-2xl shadow-sm border hover:shadow-md hover:border-blue-100 transition-all ${relevanceColors.border || 'border-border'}`}
+                  className={`group relative rounded-xl border bg-card p-5 shadow-sm transition hover:border-blue-300 hover:shadow-md ${relevanceColors.border || 'border-border'}`}
                 >
                   <Link 
                     ref={el => { if (el) itemRefs.current[idx] = el; }}
                     href={href} 
-                    className="flex flex-col gap-2"
+                    className="flex flex-col gap-2 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                     aria-label={`${r.title} - ${r.type}`}
                   >
                     <div className="flex items-start justify-between gap-4">
@@ -247,17 +292,30 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
               );
             })}
 
-            {results.length === 0 && !loading && !error && (
-              <div className="text-center py-20 bg-background rounded-3xl border-2 border-dashed border-border">
-                <Zap className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                <div className="text-muted-foreground mb-2">No matches found for your query.</div>
-                <p className="text-sm text-muted-foreground">Try broadening your search or using medical terminology.</p>
+            {isSearchPending && queryIsLongEnough && (
+              <div className="rounded-xl border border-border bg-card px-6 py-12 text-center" role="status" aria-live="polite">
+                <div className="mx-auto mb-3 h-6 w-6 animate-spin rounded-full border-2 border-muted border-t-blue-600" />
+                <p className="text-sm text-muted-foreground">Searching your learning library...</p>
+              </div>
+            )}
+
+            {queryIsLongEnough && results.length === 0 && !isSearchPending && !error && (
+              <div className="rounded-xl border border-dashed border-border bg-card/50 px-6 py-14 text-center">
+                <SearchIcon aria-hidden="true" className="mx-auto mb-4 h-9 w-9 text-muted-foreground/60" />
+                <h2 className="mb-1 text-lg font-semibold text-foreground">No results found</h2>
+                <p className="text-sm text-muted-foreground">Try a different term, check your spelling, or choose another type.</p>
+              </div>
+            )}
+
+            {!queryIsLongEnough && query.length > 0 && (
+              <div className="rounded-xl border border-dashed border-border bg-card/50 px-6 py-10 text-center">
+                <p className="text-sm text-muted-foreground">Keep typing to search. Enter at least {SEARCH_CONFIG.MIN_QUERY_LENGTH} characters.</p>
               </div>
             )}
           </div>
 
           {/* Pagination */}
-          {total > limit && (
+          {queryIsLongEnough && !isSearchPending && total > limit && (
             <div className="mt-4 flex items-center justify-between">
               <div className="text-sm text-muted-foreground">
                 Showing page {page} of {Math.ceil(total / limit)}

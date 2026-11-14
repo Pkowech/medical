@@ -9,10 +9,32 @@ const { LearningGoalsService } =
   require('./src/modules/education/courses/services/learning-goals.service.ts');
 
 const paths = [
-  { id: 'eligible-path', title: 'Eligible Path', description: 'Learn relevant topics.', status: 'published', targetCareerStages: ['student'] },
-  { id: 'zero-enrollment-path', title: 'New Path', description: 'Build foundational skills.', status: 'published', targetCareerStages: ['student'] },
-  { id: 'ineligible-path', title: 'Ineligible Path', status: 'published', targetCareerStages: ['professional'] },
-  { id: 'completed-path', title: 'Completed Path', status: 'published', targetCareerStages: ['student'] },
+  {
+    id: 'eligible-path',
+    title: 'Eligible Path',
+    description: 'Learn relevant topics.',
+    status: 'published',
+    targetCareerStages: ['student'],
+  },
+  {
+    id: 'zero-enrollment-path',
+    title: 'New Path',
+    description: 'Build foundational skills.',
+    status: 'published',
+    targetCareerStages: ['student'],
+  },
+  {
+    id: 'ineligible-path',
+    title: 'Ineligible Path',
+    status: 'published',
+    targetCareerStages: ['professional'],
+  },
+  {
+    id: 'completed-path',
+    title: 'Completed Path',
+    status: 'published',
+    targetCareerStages: ['student'],
+  },
 ];
 const service = new LearningGoalsService(
   {
@@ -21,6 +43,7 @@ const service = new LearningGoalsService(
     learningPathProgress: {
       findMany: async () => [{ learningPathId: 'completed-path' }],
     },
+    learningGoal: { findMany: async () => [] },
     examMapping: { findMany: async () => [] },
   },
   {},

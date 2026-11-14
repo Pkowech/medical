@@ -49,9 +49,13 @@ export interface AssessmentHistory {
   }>;
 }
 
-export const fetchAssessments = async (): Promise<Assessment[]> => {
+export const fetchAssessments = async (search?: string): Promise<Assessment[]> => {
   const response = await apiService.get<QuizListResponse>('/quizzes', {
-    params: { page: 1, limit: 100 },
+    params: {
+      page: 1,
+      limit: 100,
+      ...(search?.trim() ? { search: search.trim() } : {}),
+    },
   });
 
   return response.data.data.map(quiz => ({
@@ -59,7 +63,7 @@ export const fetchAssessments = async (): Promise<Assessment[]> => {
     title: quiz.title,
     description: quiz.description ?? '',
     type: quiz.isAdaptive ? 'adaptive' : 'quiz',
-    category: quiz.category?.name ?? 'General',
+    category: quiz.category?.name ?? 'Uncategorized',
     questionCount: quiz.questionCount,
     timeLimitMinutes: quiz.timeLimit ?? undefined,
     passingScore: quiz.passingScore ?? 0,
