@@ -194,6 +194,8 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
 
   React.useEffect(() => {
     setIsReportOpen(false);
+    setReportIssue('incorrect');
+    setReportDescription('');
     setReportNotice(null);
     setReportError(null);
   }, [currentQuestion?.id]);
