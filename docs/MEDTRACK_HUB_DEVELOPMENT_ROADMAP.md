@@ -9,11 +9,13 @@ This roadmap is being actively trimmed. Items that are already implemented or do
 - [x] The PWA foundation exists and should be preserved while behavior is being verified rather than replaced.
 - [x] The architecture no longer treats `analytics_events` as the canonical source of learning truth.
 - [x] Phase 2 assessment integrity is implemented and covered by focused regressions; the scoring backfill migration still requires deployment validation in Phase 1.
+- [x] Study-session validity uses unrounded active seconds with a five-minute minimum; expired sessions close as invalid, and invalid sessions create no learning activity or outbox event.
+- [x] Legacy learning-progress updates require content identifiers, idempotency, client time, and an expected revision; course enrollment and topic/material associations are validated.
+- [x] Rust user-level course statistics derive from published topic/unit progress; shared fixtures cover aggregation and zero-progress status mapping.
 
 ## In progress / still active
 - [ ] Confirm the canonical ownership model is enforced in code, not just documented.
 - [ ] Verify all publication, authorization, and cache invalidation paths for catalogue content.
-- [ ] Reconcile interrupted study sessions and duration rules.
 - [ ] Complete the durable outbox pattern for post-quiz processing and critical events.
 - [ ] Validate end-to-end learning progress, streak, and mastery parity.
 - [ ] Finish the reliable onboarding and learning-path journey.
@@ -46,12 +48,11 @@ This roadmap is being actively trimmed. Items that are already implemented or do
 - [x] Confirm assessment results persist across retries and disconnects.
 
 # 3. Phase 3 — Unify learning activity
-- [ ] Finalize canonical domain ownership for progress, quiz attempts, sessions, and activity projections.
+- [ ] Enforce the documented canonical ownership model across all remaining learning writes and readers.
 - [ ] Remove or formally deprecate dormant event pipelines.
-- [ ] Enforce source IDs, idempotency keys, and duplicate handling.
-- [ ] Reconcile interrupted sessions and study-day logic.
-- [ ] Align progress, streak, and mastery calculation rules across NestJS and Rust.
-- [ ] Persist durable outbox events for post-submission processing.
+- [ ] Complete source-ID, idempotency-key, and duplicate handling for every remaining legacy and internal learning writer.
+- [ ] Complete progress, streak, and mastery parity across NestJS and Rust, including database-backed student-history validation.
+- [ ] Complete durable outbox coverage for all critical post-submission effects and verify retry/terminal-failure handling.
 
 # 4. Phase 4 — Complete academic lifecycle
 - [ ] Verify course, unit, topic, and material publication logic.

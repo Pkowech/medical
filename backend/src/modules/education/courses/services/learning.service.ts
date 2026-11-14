@@ -369,6 +369,11 @@ export class LearningService {
         'moduleId is required when updating learning-path progress; path progress is derived from its modules',
       );
     }
+    if (!data.idempotencyKey || data.clientTimestamp === undefined) {
+      throw new BadRequestException(
+        'Learning-path progress updates require an idempotency key and client timestamp.',
+      );
+    }
 
     const pathProgress = await this.learningPathProgressService.updateProgress(
       userId,
@@ -384,6 +389,8 @@ export class LearningService {
         timeSpentMinutes:
           data.progressData.timeSpentMinutes ?? data.progressData.timeSpent,
         score: data.progressData.score,
+        idempotencyKey: data.idempotencyKey,
+        clientTimestamp: data.clientTimestamp,
       },
     );
 

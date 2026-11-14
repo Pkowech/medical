@@ -71,7 +71,7 @@ export interface DriveFolderImportResult {
 }
 
 const materialService = {
-  async getMaterials(filters?: { unitId?: string; type?: string }): Promise<Material[]> {
+  async getMaterials(filters?: { unitId?: string; topicId?: string; type?: string }): Promise<Material[]> {
     const response = await apiService.get<Material[]>('/materials', {
       params: filters,
     });
@@ -281,6 +281,7 @@ const materialService = {
     courseId?: string;
     description?: string;
     type?: string;
+    shareWithCourse?: boolean;
   }): Promise<Material> {
     const response = await apiService.post<Material>('/materials/attach', dto);
     return response.data;

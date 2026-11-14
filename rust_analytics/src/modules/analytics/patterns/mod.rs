@@ -42,7 +42,48 @@ pub async fn analyze_learning_patterns(
     pool: &Pool<Postgres>,
 ) -> Result<PatternAnalysisResult, String> {
     let events_result = sqlx::query(
-        "SELECT event_type, timestamp, duration FROM analytics_events WHERE user_id = $1 ORDER BY timestamp DESC LIMIT 100"
+        r#"
+        SELECT event_type, timestamp, duration
+        FROM (
+            SELECT
+                'study_session'::text AS event_type,
+                start_time AS timestamp,
+                duration
+            FROM study_sessions
+            WHERE user_id = $1
+              AND is_valid = TRUE
+              AND end_time IS NOT NULL
+
+            UNION ALL
+
+            SELECT
+                'quiz_attempt'::text AS event_type,
+                completed_at AS timestamp,
+                NULL::integer AS duration
+            FROM quiz_attempts
+            WHERE user_id = $1
+              AND completed_at IS NOT NULL
+
+            UNION ALL
+
+            SELECT
+                'material_access'::text AS event_type,
+                last_accessed_at AS timestamp,
+                NULL::integer AS duration
+            FROM (
+                SELECT DISTINCT ON (COALESCE(material_id, topic_id))
+                    material_id,
+                    topic_id,
+                    last_accessed_at
+                FROM topic_progress
+                WHERE user_id = $1
+                  AND (material_id IS NOT NULL OR topic_id IS NOT NULL)
+                ORDER BY COALESCE(material_id, topic_id), last_accessed_at DESC
+            ) content_progress
+        ) learning_events
+        ORDER BY timestamp DESC
+        LIMIT 100
+        "#,
     )
     .bind(user_id)
     .fetch_all(pool)

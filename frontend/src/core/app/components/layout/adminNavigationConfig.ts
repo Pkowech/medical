@@ -2,18 +2,15 @@ import {
   AlertCircle,
   BarChart3,
   Clock,
-  FileText,
   GraduationCap,
   LayoutDashboard,
-  Library,
   LockKeyhole,
   Settings,
   Shield,
   Users,
 } from 'lucide-react';
-import type { NavigationItem } from '@/shared/types/navigationInterface';
 
-const adminNavigationConfig: NavigationItem[] = [
+const adminNavigationConfig = [
   {
     id: 'dashboard',
     label: 'Dashboard',
@@ -36,24 +33,6 @@ const adminNavigationConfig: NavigationItem[] = [
         label: 'Users',
         href: '/admin/users',
         icon: Users,
-      },
-      {
-        id: 'content',
-        label: 'Courses & Content',
-        href: '/admin/content',
-        icon: Library,
-      },
-      {
-        id: 'upload-materials',
-        label: 'Upload Materials',
-        href: '/admin/materials/upload',
-        icon: FileText,
-      },
-      {
-        id: 'quiz-authoring',
-        label: 'Quiz Authoring',
-        href: '/admin/assessment/quizzes',
-        icon: FileText,
       },
     ],
   },
@@ -100,15 +79,6 @@ const adminNavigationConfig: NavigationItem[] = [
     label: 'Settings',
     href: '/admin/settings',
     icon: Settings,
-  },
-];
-
-export const instructorAssessmentNavigationConfig: NavigationItem[] = [
-  {
-    id: 'quiz-authoring',
-    label: 'Quiz Authoring',
-    href: '/admin/assessment/quizzes',
-    icon: FileText,
   },
 ];
 

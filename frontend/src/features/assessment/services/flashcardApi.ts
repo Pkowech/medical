@@ -97,12 +97,17 @@ class FlashcardApiService {
     return response.data as ScheduledReview[];
   }
 
-  async updateCard(cardId: string, quality: number): Promise<UserFlashcardProgress> {
+  async updateCard(
+    cardId: string,
+    quality: number,
+    idempotencyKey = crypto.randomUUID(),
+  ): Promise<UserFlashcardProgress> {
     if (quality < 1 || quality > 5) {
       throw new Error('Quality must be between 1 and 5');
     }
     const response = await api.post(`/flashcards/update/${cardId}`, {
       quality,
+      idempotencyKey,
     });
     return response.data as UserFlashcardProgress;
   }

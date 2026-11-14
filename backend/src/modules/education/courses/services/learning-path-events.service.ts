@@ -68,6 +68,7 @@ export class LearningPathEventsService {
         `Error handling course progress update: ${getErrorMessage(error)}`,
         getErrorStack(error),
       );
+      throw error;
     }
   }
 
@@ -91,19 +92,27 @@ export class LearningPathEventsService {
   async handleLearningPathCompleted(payload: {
     userId: string;
     learningPathId: string;
-    completionData: { completedAt?: Date | null };
+    completionData: { completedAt?: Date | string | null };
   }) {
     try {
+      const completionTimestamp = payload.completionData.completedAt;
+      const completedAt =
+        completionTimestamp instanceof Date
+          ? completionTimestamp
+          : completionTimestamp
+            ? new Date(completionTimestamp)
+            : new Date();
       await this.integrationService.syncLearningPathCompletion(
         payload.userId,
         payload.learningPathId,
-        payload.completionData.completedAt ?? new Date(),
+        completedAt,
       );
     } catch (error) {
       this.logger.error(
         `Error syncing goals for completed learning path ${payload.learningPathId}: ${getErrorMessage(error)}`,
         getErrorStack(error),
       );
+      throw error;
     }
   }
 
@@ -124,6 +133,7 @@ export class LearningPathEventsService {
         `Error syncing goals for learning path ${payload.learningPathId}: ${getErrorMessage(error)}`,
         getErrorStack(error),
       );
+      throw error;
     }
   }
 
@@ -154,6 +164,7 @@ export class LearningPathEventsService {
         `Error handling course completion: ${getErrorMessage(error)}`,
         getErrorStack(error),
       );
+      throw error;
     }
   }
 
@@ -258,7 +269,7 @@ export class LearningPathEventsService {
     userId: string;
     pathId: string;
     milestoneId: string;
-    achievedAt?: Date;
+    achievedAt?: Date | string;
   }) {
     this.logger.log(
       `Handling milestone achievement for user ${payload.userId}, milestone ${payload.milestoneId}`,
@@ -276,6 +287,10 @@ export class LearningPathEventsService {
       );
 
       if (milestoneEvent) {
+        const achievedAt =
+          payload.achievedAt instanceof Date
+            ? payload.achievedAt
+            : new Date(payload.achievedAt ?? Date.now());
         await this.prisma.scheduleEvent.update({
           where: { id: milestoneEvent.id },
           data: {
@@ -283,7 +298,7 @@ export class LearningPathEventsService {
             status: 'completed',
             metadata: {
               ...(milestoneEvent.metadata as Prisma.JsonObject | null),
-              achievedAt: (payload.achievedAt ?? new Date()).toISOString(),
+              achievedAt: achievedAt.toISOString(),
             },
           },
         });
@@ -293,6 +308,7 @@ export class LearningPathEventsService {
         `Error handling milestone achievement: ${getErrorMessage(error)}`,
         getErrorStack(error),
       );
+      throw error;
     }
   }
 
@@ -346,6 +362,7 @@ export class LearningPathEventsService {
   async handleStudySession(payload: {
     userId: string;
     sessionData: {
+      studySessionId?: string;
       durationMinutes: number;
       materialsCovered: string[];
       coursesCovered: string[];
@@ -357,6 +374,9 @@ export class LearningPathEventsService {
 
     try {
       const { sessionData } = payload;
+      const sourceId = sessionData.studySessionId
+        ? `study-session:${sessionData.studySessionId}`
+        : undefined;
 
       for (const courseId of sessionData.coursesCovered || []) {
         await this.integrationService.syncCourseProgress(
@@ -367,6 +387,7 @@ export class LearningPathEventsService {
             completedItems: 0,
             totalItems: 0,
             percentage: 0,
+            sourceId,
           },
         );
       }
@@ -381,6 +402,7 @@ export class LearningPathEventsService {
             completedItems: 1,
             totalItems: 1,
             percentage: 100,
+            sourceId,
           },
         );
       }
@@ -395,6 +417,7 @@ export class LearningPathEventsService {
             completedItems: 1,
             totalItems: 1,
             percentage: 100,
+            sourceId,
           },
         );
       }

@@ -11,6 +11,7 @@ import {
   Request,
   HttpStatus,
   HttpCode,
+  BadRequestException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -27,10 +28,10 @@ import { LearningPathProgressService } from '../services/learning-path-progress.
 import { LearningPathRecommendationsService } from '#modules/ai-analytics/services/learning-path-recommendations.service';
 import {
   CreateLearningPathDto,
+  LearningPathUpdateDto,
   UpdateLearningPathDto,
   LearningPathFiltersDto,
 } from '../../../../common/dto/learning-paths.dto';
-import { ProgressUpdateDto } from '../../../../common/dto/progress.dto';
 import { LearningPathCategory } from '@prisma/client';
 import { LearningAnalyticsService } from '#modules/ai-analytics/services/learning-analytics.service';
 import type { AuthenticatedRequest } from '#common/dto/user.dto';
@@ -237,16 +238,29 @@ export class LearningPathsController {
   }
 
   @Post(':id/progress')
-  @ApiOperation({ summary: 'Update progress on a learning path' })
+  @ApiOperation({
+    summary: 'Update progress on a learning path',
+    description:
+      'Requires a stable idempotencyKey in the request body so retried progress updates are applied once.',
+  })
   @ApiResponse({
     status: 200,
     description: 'Progress updated successfully',
   })
   async updateProgress(
     @Param('id') pathId: string,
-    @Body() progressUpdate: ProgressUpdateDto,
+    @Body() progressUpdate: LearningPathUpdateDto,
     @Request() req: AuthenticatedRequest,
   ) {
+    if (
+      typeof progressUpdate.idempotencyKey !== 'string' ||
+      progressUpdate.idempotencyKey.trim().length === 0 ||
+      progressUpdate.idempotencyKey.length > 200
+    ) {
+      throw new BadRequestException(
+        'idempotencyKey is required and must be at most 200 characters.',
+      );
+    }
     await this.learningPathsService.findOne(pathId, req.user.id);
     return await this.progressService.updateProgress(
       req.user.id,

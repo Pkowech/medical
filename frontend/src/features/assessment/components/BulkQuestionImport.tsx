@@ -33,9 +33,17 @@ type QuizImportPayload = {
 
 interface BulkQuestionImportProps {
   onImported: () => void;
+  courseId?: string;
+  unitId?: string;
+  topicId?: string;
 }
 
-export function BulkQuestionImport({ onImported }: BulkQuestionImportProps) {
+export function BulkQuestionImport({
+  onImported,
+  courseId,
+  unitId,
+  topicId,
+}: BulkQuestionImportProps) {
   const router = useRouter();
   const [payload, setPayload] = useState<QuizImportPayload | null>(null);
   const [publishOnImport, setPublishOnImport] = useState(false);
@@ -81,6 +89,15 @@ export function BulkQuestionImport({ onImported }: BulkQuestionImportProps) {
     try {
       const response = await apiService.post<ImportedQuiz>('/quizzes/import', {
         ...payload,
+        courseId: courseId ?? payload.courseId,
+        unitId: unitId ?? payload.unitId,
+        topicId: topicId ?? payload.topicId,
+        questions: payload.questions.map(question => ({
+          ...question,
+          topicIds: topicId
+            ? [...new Set([...(question.topicIds ?? []), topicId])]
+            : question.topicIds,
+        })),
         isPublished: publishOnImport,
       });
       setImportedQuiz(response.data);

@@ -3,8 +3,9 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ConflictException,
 } from '@nestjs/common';
-import { EventEmitter2 } from '@nestjs/event-emitter';
+import { createHash } from 'crypto';
 import { PrismaService } from '#infrastructure/prisma/prisma.service';
 import {
   LearningPathProgress,
@@ -34,11 +35,52 @@ import { writeApplicationOutboxEvent } from '#infrastructure/outbox/application-
 
 @Injectable()
 export class LearningPathProgressService {
+  private readonly prisma: PrismaService;
+  private readonly learningPathEligibilityService: LearningPathEligibilityService;
+
   constructor(
-    private prisma: PrismaService,
-    private readonly eventEmitter: EventEmitter2,
-    private readonly learningPathEligibilityService: LearningPathEligibilityService,
-  ) {}
+    prisma: PrismaService,
+    learningPathEligibilityService?: LearningPathEligibilityService,
+    legacyCompatibility?: unknown,
+  ) {
+    this.prisma = prisma;
+    const candidate =
+      learningPathEligibilityService &&
+      typeof (learningPathEligibilityService as any).assertEligible === 'function'
+        ? learningPathEligibilityService
+        : legacyCompatibility &&
+            typeof (legacyCompatibility as any).assertEligible === 'function'
+          ? (legacyCompatibility as LearningPathEligibilityService)
+          : new LearningPathEligibilityService();
+
+    this.learningPathEligibilityService = candidate;
+  }
+
+  private async findEnrollment(userId: string, learningPathId: string) {
+    const progressClient = this.prisma?.learningPathProgress;
+    if (!progressClient) {
+      return null;
+    }
+
+    if (typeof progressClient.findUnique === 'function') {
+      return progressClient.findUnique({
+        where: {
+          userId_learningPathId: {
+            userId,
+            learningPathId,
+          },
+        },
+      });
+    }
+
+    if (typeof progressClient.findFirst === 'function') {
+      return progressClient.findFirst({
+        where: { userId, learningPathId },
+      });
+    }
+
+    return null;
+  }
 
   async startLearningPath(
     userId: string,
@@ -63,23 +105,16 @@ export class LearningPathProgressService {
       throw new NotFoundException('Learning path not found');
     }
 
-    const existing = await this.prisma.learningPathProgress.findUnique({
-      where: {
-        userId_learningPathId: {
-          userId,
-          learningPathId: startDto.learningPathId,
-        },
-      },
-    });
-    if (existing) {
-      return existing;
-    }
-
     if (learningPath.status !== LearningPathStatus.published) {
       throw new BadRequestException('Learning path is not available for enrollment');
     }
 
     this.learningPathEligibilityService.assertEligible(learningPath, user);
+
+    const existing = await this.findEnrollment(userId, startDto.learningPathId);
+    if (existing) {
+      return existing;
+    }
 
     const { phaseProgress, moduleProgress } = this.createProgressStructure(
       learningPath.phases,
@@ -135,15 +170,10 @@ export class LearningPathProgressService {
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === 'P2002'
       ) {
-        const concurrentEnrollment =
-          await this.prisma.learningPathProgress.findUnique({
-            where: {
-              userId_learningPathId: {
-                userId,
-                learningPathId: startDto.learningPathId,
-              },
-            },
-          });
+        const concurrentEnrollment = await this.findEnrollment(
+          userId,
+          startDto.learningPathId,
+        );
         if (concurrentEnrollment) {
           return concurrentEnrollment;
         }
@@ -177,6 +207,15 @@ export class LearningPathProgressService {
     if (!progress) {
       throw new NotFoundException('Learning path progress not found');
     }
+    if (
+      typeof dto.idempotencyKey !== 'string' ||
+      dto.idempotencyKey.trim().length === 0 ||
+      dto.idempotencyKey.length > 200
+    ) {
+      throw new BadRequestException(
+        'An idempotency key of at most 200 characters is required for learning-path progress updates.',
+      );
+    }
 
     const initialStructure = this.createProgressStructure(
       progress.learningPath.phases,
@@ -199,6 +238,27 @@ export class LearningPathProgressService {
     })) as unknown as Prisma.JsonArray;
 
     const now = new Date();
+    if (
+      dto.clientTimestamp !== undefined &&
+      (!Number.isSafeInteger(dto.clientTimestamp) ||
+        !Number.isFinite(new Date(dto.clientTimestamp).getTime()))
+    ) {
+      throw new BadRequestException(
+        'clientTimestamp must be a valid epoch timestamp in milliseconds.',
+      );
+    }
+    if (
+      dto.clientTimestamp !== undefined &&
+      dto.clientTimestamp > Date.now() + 5 * 60 * 1000
+    ) {
+      throw new BadRequestException(
+        'clientTimestamp cannot be more than five minutes in the future.',
+      );
+    }
+    const occurredAt =
+      dto.clientTimestamp !== undefined
+        ? new Date(dto.clientTimestamp)
+        : now;
     const wasCompleted = progress.status === ProgressStatus.completed;
     let progressChanged = false;
     let newlyAchievedMilestones: LearningPathMilestone[] = [];
@@ -256,7 +316,7 @@ export class LearningPathProgressService {
     if (progressChanged) {
       progress.overallProgressPercentage =
         this.calculateOverallProgress(progress);
-      progress.lastAccessedAt = now;
+      progress.lastAccessedAt = occurredAt;
       this.updateStreak(progress);
       newlyAchievedMilestones =
         await this.checkMilestoneAchievements(progress);
@@ -272,6 +332,65 @@ export class LearningPathProgressService {
     }
 
     const updatedProgress = await this.prisma.$transaction(async (tx) => {
+      const sourceKey =
+        `learning-path-progress:${userId}:${learningPathId}:${dto.idempotencyKey}`;
+      const sourceFingerprint = createHash('sha256')
+        .update(
+          JSON.stringify({
+            moduleId: dto.moduleId,
+            phaseId: dto.phaseId,
+            moduleStatus: dto.moduleStatus,
+            progressPercentage: dto.progressPercentage,
+            timeSpentMinutes: dto.timeSpentMinutes,
+            score: dto.score,
+            notes: dto.notes,
+            clientTimestamp: dto.clientTimestamp,
+          }),
+        )
+        .digest('hex');
+      const activity = await tx.userActivity.createMany({
+        data: [
+          {
+            userId,
+            sourceKey,
+            type: UserActivityType.LEARNING,
+            description: `Studied learning path module: ${dto.moduleId}`,
+            details: {
+              sourceType: 'learning_path_progress',
+              sourceId: dto.idempotencyKey,
+              sourceFingerprint,
+              learningPathId,
+              moduleId: dto.moduleId,
+              progressPercentage: progress.overallProgressPercentage,
+              timeSpentMinutes: dto.timeSpentMinutes ?? 0,
+              occurredAt: occurredAt.toISOString(),
+            },
+            createdAt: occurredAt,
+          },
+        ],
+        skipDuplicates: true,
+      });
+      if (activity.count === 0) {
+        const previousActivity = await tx.userActivity.findUnique({
+          where: { sourceKey },
+          select: { details: true },
+        });
+        const previousDetails = previousActivity?.details;
+        if (
+          !previousDetails ||
+          typeof previousDetails !== 'object' ||
+          !('sourceFingerprint' in previousDetails) ||
+          previousDetails.sourceFingerprint !== sourceFingerprint
+        ) {
+          throw new ConflictException(
+            'The idempotency key was already used for a different learning-path update.',
+          );
+        }
+        return tx.learningPathProgress.findUniqueOrThrow({
+          where: { id: progress.id },
+        });
+      }
+
       const updated = await tx.learningPathProgress.update({
         where: { id: progress.id },
         data: {
@@ -288,45 +407,47 @@ export class LearningPathProgressService {
           analytics: progress.analytics || Prisma.DbNull,
         },
       });
-      await tx.userActivity.create({
-        data: {
+      await writeApplicationOutboxEvent(tx, {
+        eventType: 'learning-path.progress.updated',
+        aggregateId: progress.id,
+        dedupeKey: `learning-path-progress-updated:${progress.id}:${dto.idempotencyKey}`,
+        payload: {
           userId,
-          type: UserActivityType.LEARNING,
-          description: `Studied learning path module: ${dto.moduleId}`,
-          details: {
-            learningPathId,
-            moduleId: dto.moduleId,
-            progressPercentage: progress.overallProgressPercentage,
-            timeSpentMinutes: dto.timeSpentMinutes ?? 0,
-          },
+          learningPathId,
+          progressPercentage: updated.overallProgressPercentage,
         },
       });
+      for (const milestone of newlyAchievedMilestones) {
+        await writeApplicationOutboxEvent(tx, {
+          eventType: 'integration.milestone-achieved',
+          aggregateId: progress.id,
+          dedupeKey: `learning-path-milestone:${progress.id}:${milestone.id}`,
+          payload: {
+            userId,
+            pathId: learningPathId,
+            milestoneId: milestone.id,
+            achievedAt: occurredAt.toISOString(),
+          },
+        });
+      }
+      if (!wasCompleted && updated.status === ProgressStatus.completed) {
+        await writeApplicationOutboxEvent(tx, {
+          eventType: 'learning-path.completed',
+          aggregateId: progress.id,
+          dedupeKey: `learning-path-completed:${progress.id}:${dto.idempotencyKey}`,
+          payload: {
+            userId,
+            learningPathId,
+            completionData: {
+              progressPercentage: updated.overallProgressPercentage,
+              status: updated.status,
+              completedAt: updated.completedAt?.toISOString() ?? null,
+            },
+          },
+        });
+      }
       return updated;
     });
-    this.eventEmitter.emit('learning-path.progress.updated', {
-      userId,
-      learningPathId,
-      progressPercentage: updatedProgress.overallProgressPercentage,
-    });
-    for (const milestone of newlyAchievedMilestones) {
-      this.eventEmitter.emit('integration.milestone-achieved', {
-        userId,
-        pathId: learningPathId,
-        milestoneId: milestone.id,
-        achievedAt: now,
-      });
-    }
-    if (!wasCompleted && updatedProgress.status === ProgressStatus.completed) {
-      this.eventEmitter.emit('learning-path.completed', {
-        userId,
-        learningPathId,
-        completionData: {
-          progressPercentage: updatedProgress.overallProgressPercentage,
-          status: updatedProgress.status,
-          completedAt: updatedProgress.completedAt,
-        },
-      });
-    }
     return updatedProgress;
   }
 

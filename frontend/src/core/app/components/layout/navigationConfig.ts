@@ -155,6 +155,18 @@ const navigationConfig: NavigationItem[] = [
     icon: GraduationCap,
   },
   {
+    id: 'quiz-authoring',
+    label: 'Quiz Authoring',
+    href: '/instructor/quiz-authoring',
+    icon: Target,
+  },
+  {
+    id: 'moderator-dashboard',
+    label: 'Moderator',
+    href: '/moderator',
+    icon: Shield,
+  },
+  {
     id: 'admin-dashboard',
     label: 'Admin',
     href: '/admin',

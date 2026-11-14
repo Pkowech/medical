@@ -8,6 +8,7 @@ import {
   ParseUUIDPipe,
   ForbiddenException,
   Query,
+  BadRequestException,
 } from '@nestjs/common';
 import { User } from '@prisma/client';
 import { FlashcardsService } from '../services/flashcards.service';
@@ -60,9 +61,24 @@ export class FlashcardsController {
   async updateCard(
     @Param('cardId', ParseUUIDPipe) cardId: string,
     @Body('quality') quality: number,
+    @Body('idempotencyKey') idempotencyKey: string,
     @CurrentUser() currentUser: User,
   ) {
-    return this.flashcardsService.updateCard(cardId, quality, currentUser.id);
+    if (
+      typeof idempotencyKey !== 'string' ||
+      idempotencyKey.trim().length === 0 ||
+      idempotencyKey.length > 200
+    ) {
+      throw new BadRequestException(
+        'idempotencyKey is required and must be at most 200 characters.',
+      );
+    }
+    return this.flashcardsService.updateCard(
+      cardId,
+      quality,
+      currentUser.id,
+      idempotencyKey,
+    );
   }
 
   @Get('overview/:userId')

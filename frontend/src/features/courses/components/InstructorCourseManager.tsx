@@ -173,17 +173,18 @@ export function InstructorCourseManager({ instructorId }: { instructorId: string
             : item),
         })));
         setSuccessMessage('Topic updated successfully.');
+        setFormContext({ mode: 'none' });
       } else {
         const newTopic = await topicService.createTopic(unit.id, topicData);
-        setCourses(current => current.map(course => ({
+        setCourses(current => current.map(course => course.id === formContext.course?.id ? ({
           ...course,
           units: course.units?.map(item => item.id === unit.id
             ? { ...item, topics: [...(item.topics || []), newTopic] }
             : item),
-        })));
-        setSuccessMessage('Topic created successfully.');
+        }) : course));
+        setFormContext({ mode: 'topic', course: formContext.course, unit, topic: newTopic });
+        setSuccessMessage('Topic created. You can now add its assessment and materials.');
       }
-      setFormContext({ mode: 'none' });
     } catch (saveError) {
       setError(getErrorMessage(saveError, 'Failed to save topic.'));
     }
@@ -226,7 +227,7 @@ export function InstructorCourseManager({ instructorId }: { instructorId: string
         </div>
         {activeWorkspace === 'courses' && (
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => router.push('/study-planner/materials/upload')}>
+            <Button variant="outline" onClick={() => router.push('/instructor/materials')}>
               <Upload className="mr-2 h-4 w-4" /> Upload material
             </Button>
             <Button onClick={() => setFormContext({ mode: 'course' })}>
@@ -280,7 +281,13 @@ export function InstructorCourseManager({ instructorId }: { instructorId: string
             <UnitForm unit={formContext.unit || null} courseId={formContext.course.id} onSave={handleSaveUnit} onCancel={() => setFormContext({ mode: 'none' })} />
           )}
           {formContext.mode === 'topic' && formContext.unit && (
-            <TopicForm topic={formContext.topic || null} unitId={formContext.unit.id} onSave={handleSaveTopic} onCancel={() => setFormContext({ mode: 'none' })} />
+            <TopicForm
+              topic={formContext.topic || null}
+              courseId={formContext.course?.id}
+              unitId={formContext.unit.id}
+              onSave={handleSaveTopic}
+              onCancel={() => setFormContext({ mode: 'none' })}
+            />
           )}
           {formContext.mode === 'none' && (
             <AdminCourseList

@@ -28,11 +28,11 @@ import { CourseAnalyticsService } from '#modules/ai-analytics/services/course-an
 import { LearningAnalyticsService } from '#modules/ai-analytics/services/learning-analytics.service';
 import { calculateLearningStreaks } from '../utils/learning-streak';
 import { getReadinessSignal } from '../types/mastery.types';
+import { writeApplicationOutboxEvent } from '#infrastructure/outbox/application-outbox-event';
 import {
   UserProgressDetails,
   OverallProgress,
   CourseProgress,
-  PrismaClientLike,
   UserStats,
   LearningActivityDetails,
 } from '#common/dto';
@@ -234,6 +234,16 @@ export class ProgressService {
         : 0;
       const occurredAt = this.getOccurrenceTime(clientTimestamp);
 
+      if (
+        typeof idempotencyKey !== 'string' ||
+        idempotencyKey.trim().length === 0 ||
+        idempotencyKey.length > 200
+      ) {
+        throw new BadRequestException(
+          'An idempotency key of at most 200 characters is required for content progress updates.',
+        );
+      }
+
       if (materialId) {
         await this.authorizeMaterialProgress(userId, materialId, {
           courseId,
@@ -292,38 +302,61 @@ export class ProgressService {
 
       let updatedCourseProgress: any = null;
       let duplicateRequest = false;
-      const sourceKey = idempotencyKey
-        ? `progress-sync:${userId}:${idempotencyKey}`
-        : undefined;
+      const sourceKey = `progress-sync:${userId}:${idempotencyKey}`;
+      const sourceFingerprint = JSON.stringify({
+        courseId: courseId ?? null,
+        unitId: unitId ?? null,
+        materialId: materialId ?? null,
+        topicId: topicId ?? null,
+        status: status ?? null,
+        progressPercentage: progressValue,
+        timeSpentMinutes: timeSpentDelta,
+        expectedRevision: expectedRevision ?? null,
+        occurredAt: occurredAt.toISOString(),
+      });
 
       await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-        if (sourceKey) {
-          const activity = await tx.userActivity.createMany({
-            data: [
-              {
-                userId,
-                sourceKey,
-                type: UserActivityType.LEARNING,
-                description: 'Synced learning progress',
-                details: {
-                  sourceType: 'progress_sync',
-                  sourceId: idempotencyKey,
-                  courseId,
-                  unitId,
-                  materialId,
-                  topicId,
-                  timeSpentMinutes: timeSpentDelta,
-                  occurredAt: occurredAt.toISOString(),
-                },
-                createdAt: occurredAt,
+        const activity = await tx.userActivity.createMany({
+          data: [
+            {
+              userId,
+              sourceKey,
+              type: UserActivityType.LEARNING,
+              description: 'Synced learning progress',
+              details: {
+                sourceType: 'progress_sync',
+                sourceId: idempotencyKey,
+                courseId,
+                unitId,
+                materialId,
+                topicId,
+                timeSpentMinutes: timeSpentDelta,
+                occurredAt: occurredAt.toISOString(),
+                sourceFingerprint,
               },
-            ],
-            skipDuplicates: true,
+              createdAt: occurredAt,
+            },
+          ],
+          skipDuplicates: true,
+        });
+        if (activity.count === 0) {
+          const previousActivity = await tx.userActivity.findUnique({
+            where: { sourceKey },
+            select: { details: true },
           });
-          if (activity.count === 0) {
-            duplicateRequest = true;
-            return;
+          const previousDetails = previousActivity?.details;
+          if (
+            !previousDetails ||
+            typeof previousDetails !== 'object' ||
+            !('sourceFingerprint' in previousDetails) ||
+            previousDetails.sourceFingerprint !== sourceFingerprint
+          ) {
+            throw new ConflictException(
+              'The idempotency key was already used for a different progress update.',
+            );
           }
+          duplicateRequest = true;
+          return;
         }
 
         const canonicalProgressWhere = {
@@ -557,30 +590,28 @@ export class ProgressService {
               timeSpent: 0,
               lastAccessedAt: new Date(),
             };
+            const progressData = {
+              progressPercentage: updatedCourseProgress.progressPercentage,
+              timeSpentMinutes: timeSpentDelta,
+              status: updatedCourseProgress.status,
+              completed:
+                updatedCourseProgress.status === ProgressStatus.completed,
+              timestamp: occurredAt.toISOString(),
+              sourceId: idempotencyKey,
+            };
+            await writeApplicationOutboxEvent(tx, {
+              eventType: progressData.completed
+                ? 'course.completed'
+                : 'course.progress.updated',
+              aggregateId: `${userId}:${courseId}`,
+              dedupeKey: `course-progress:sync:${userId}:${courseId}:${idempotencyKey}`,
+              payload: progressData.completed
+                ? { userId, courseId, completionData: progressData }
+                : { userId, courseId, progressData },
+            });
           }
         }
 
-        // Activity
-        if (!sourceKey) {
-          await tx.userActivity.create({
-            data: {
-              userId,
-              type: UserActivityType.LEARNING,
-              description: `Studied ${materialId ? 'material' : unitId ? 'unit' : topicId ? 'topic' : 'course'}: ${timeSpentDelta} minutes`,
-              details: {
-                courseId,
-                unitId,
-                materialId,
-                topicId,
-                timeSpent: timeSpentDelta,
-                studyTimeDeltaMinutes: timeSpentDelta,
-                progressPercentage: progressValue,
-                occurredAt: occurredAt.toISOString(),
-              },
-              createdAt: occurredAt,
-            },
-          });
-        }
       });
 
       if (duplicateRequest) return updatedCourseProgress;
@@ -593,31 +624,6 @@ export class ProgressService {
         materialId,
         topicId,
       });
-
-      if (courseId && updatedCourseProgress) {
-        const courseProgressPercentage =
-          updatedCourseProgress.progressPercentage;
-        const progressData = {
-          progressPercentage: courseProgressPercentage,
-          timeSpentMinutes: timeSpentDelta,
-          status: updatedCourseProgress.status,
-          completed: updatedCourseProgress.status === ProgressStatus.completed,
-          timestamp: new Date(),
-        };
-        if (progressData.completed) {
-          this.events.emit('course.completed', {
-            userId,
-            courseId,
-            completionData: progressData,
-          });
-        } else {
-          this.events.emit('course.progress.updated', {
-            userId,
-            courseId,
-            progressData,
-          });
-        }
-      }
 
       // Track analytics event (fire and forget)
       this.aiAnalyticsService
@@ -662,6 +668,15 @@ export class ProgressService {
     expectedRevision?: number,
   ): Promise<Progress | undefined> {
     try {
+      if (
+        typeof idempotencyKey !== 'string' ||
+        idempotencyKey.trim().length === 0 ||
+        idempotencyKey.length > 200
+      ) {
+        throw new BadRequestException(
+          'An idempotency key of at most 200 characters is required for material progress updates.',
+        );
+      }
       const material = await this.prisma.material.findUnique({
         where: { id: materialId },
         select: { id: true, unitId: true, topicId: true },
@@ -683,22 +698,36 @@ export class ProgressService {
       }
 
       const courseId = unit.courseId;
-      const topicId = material.topicId;
+      const topicId = material.topicId ?? undefined;
+      await this.authorizeMaterialProgress(userId, materialId, {
+        courseId,
+        unitId: material.unitId ?? undefined,
+        topicId: topicId ?? undefined,
+      });
+      if (clientTimestamp === undefined) {
+        throw new BadRequestException(
+          'A client timestamp is required for material progress updates.',
+        );
+      }
       const occurredAt = this.getOccurrenceTime(clientTimestamp);
+      const sourceFingerprint = JSON.stringify({
+        materialId,
+        occurredAt: occurredAt.toISOString(),
+        expectedRevision: expectedRevision ?? null,
+      });
 
       let materialProgress: Progress | undefined;
       let duplicateRequest = false;
       await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         const activityData = {
           userId,
-          ...(idempotencyKey
-            ? { sourceKey: `material-read:${userId}:${idempotencyKey}` }
-            : {}),
+          sourceKey: `material-read:${userId}:${idempotencyKey}`,
           type: UserActivityType.LEARNING,
           description: `Marked material as read: ${materialId}`,
           details: {
             sourceType: 'material_read',
-            sourceId: idempotencyKey ?? materialId,
+            sourceId: idempotencyKey,
+            sourceFingerprint,
             occurredAt: occurredAt.toISOString(),
             materialId,
             unitId: material.unitId,
@@ -707,27 +736,38 @@ export class ProgressService {
           },
           createdAt: occurredAt,
         };
-        if (idempotencyKey) {
-          const activity = await tx.userActivity.createMany({
-            data: [activityData],
-            skipDuplicates: true,
+        const activity = await tx.userActivity.createMany({
+          data: [activityData],
+          skipDuplicates: true,
+        });
+        if (activity.count === 0) {
+          const previousActivity = await tx.userActivity.findUnique({
+            where: { sourceKey: activityData.sourceKey },
+            select: { details: true },
           });
-          if (activity.count === 0) {
-            duplicateRequest = true;
-            materialProgress =
-              (await tx.progress.findFirst({
-                where: {
-                  userId,
-                  materialId,
-                  topicId: topicId ?? null,
-                  unitId: material.unitId,
-                  courseId: courseId ?? null,
-                },
-              })) ?? undefined;
-            return;
+          const previousDetails = previousActivity?.details;
+          if (
+            !previousDetails ||
+            typeof previousDetails !== 'object' ||
+            !('sourceFingerprint' in previousDetails) ||
+            previousDetails.sourceFingerprint !== sourceFingerprint
+          ) {
+            throw new ConflictException(
+              'The idempotency key was already used for a different material update.',
+            );
           }
-        } else {
-          await tx.userActivity.create({ data: activityData });
+          duplicateRequest = true;
+          materialProgress =
+            (await tx.progress.findFirst({
+              where: {
+                userId,
+                materialId,
+                topicId: topicId ?? null,
+                unitId: material.unitId,
+                courseId: courseId ?? null,
+              },
+            })) ?? undefined;
+          return;
         }
 
         const whereData = {
@@ -784,7 +824,33 @@ export class ProgressService {
               },
             });
 
-        // Unit and Course progress updates are removed here as they are now derived aggregates.
+        const courseProgress = await this.calculateCourseProgress(
+          userId,
+          courseId,
+          tx,
+        );
+        if (courseProgress) {
+          const progressData = {
+            progressPercentage: Math.round(courseProgress.percentage),
+            timeSpentMinutes: 0,
+            status: getProgressStatus(courseProgress.percentage),
+            completed:
+              getProgressStatus(courseProgress.percentage) ===
+              ProgressStatus.completed,
+            timestamp: occurredAt.toISOString(),
+            sourceId: idempotencyKey,
+          };
+          await writeApplicationOutboxEvent(tx, {
+            eventType: progressData.completed
+              ? 'course.completed'
+              : 'course.progress.updated',
+            aggregateId: `${userId}:${courseId}`,
+            dedupeKey: `course-progress:material-read:${userId}:${courseId}:${idempotencyKey}`,
+            payload: progressData.completed
+              ? { userId, courseId, completionData: progressData }
+              : { userId, courseId, progressData },
+          });
+        }
 
       }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
@@ -797,37 +863,9 @@ export class ProgressService {
         courseId,
         status: ProgressStatus.completed,
         progressPercentage: 100,
-        occurredAt: new Date(),
+        occurredAt,
       });
       await this.clearCache(userId, courseId);
-      const courseProgress = await this.calculateCourseProgress(
-        userId,
-        courseId,
-      );
-      if (courseProgress) {
-        const status = getProgressStatus(courseProgress.percentage);
-        const isCompleted = status === ProgressStatus.completed;
-        const progressData = {
-          progressPercentage: Math.round(courseProgress.percentage),
-          timeSpentMinutes: 0,
-          status,
-          completed: isCompleted,
-          timestamp: new Date(),
-        };
-        if (isCompleted) {
-          this.events.emit('course.completed', {
-            userId,
-            courseId,
-            completionData: progressData,
-          });
-        } else {
-          this.events.emit('course.progress.updated', {
-            userId,
-            courseId,
-            progressData,
-          });
-        }
-      }
       this.logger.log('Material marked as read successfully', {
         userId,
         materialId,
@@ -1499,13 +1537,14 @@ export class ProgressService {
   private async calculateCourseProgressFromDatabase(
     userId: string,
     courseId: string,
+    client: Pick<Prisma.TransactionClient, 'unit' | 'progress'> = this.prisma,
   ): Promise<
     | { percentage: number; completedUnits: number; totalUnits: number }
     | undefined
   > {
     try {
       const [units, topicProgressRows, unitProgressRows] = await Promise.all([
-        this.prisma.unit.findMany({
+        client.unit.findMany({
           where: { courseId },
           select: {
             id: true,
@@ -1515,7 +1554,7 @@ export class ProgressService {
             },
           },
         }),
-        this.prisma.progress.findMany({
+        client.progress.findMany({
           where: { userId, courseId, topicId: { not: null }, materialId: null },
           select: {
             topicId: true,
@@ -1524,7 +1563,7 @@ export class ProgressService {
             status: true,
           },
         }),
-        this.prisma.progress.findMany({
+        client.progress.findMany({
           where: {
             userId,
             courseId,
@@ -1613,6 +1652,9 @@ export class ProgressService {
         totalUnits,
       };
     } catch (error) {
+      if (client !== this.prisma) {
+        throw error;
+      }
       this.logger.warn(
         'Failed to derive course progress locally; gRPC remains unavailable',
         { userId, courseId, error: getErrorMessage(error) },
@@ -1624,11 +1666,19 @@ export class ProgressService {
   async calculateCourseProgress(
     userId: string,
     courseId: string,
-    _client?: Prisma.TransactionClient | PrismaClientLike,
+    client?: Prisma.TransactionClient,
   ): Promise<
     | { percentage: number; completedUnits: number; totalUnits: number }
     | undefined
   > {
+    if (client) {
+      return this.calculateCourseProgressFromDatabase(
+        userId,
+        courseId,
+        client,
+      );
+    }
+
     try {
       // Prefer the Rust analytics gRPC service; if it is unavailable, fall back
       // to the local database so progress endpoints remain usable during outages.

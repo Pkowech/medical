@@ -61,6 +61,41 @@ export class QuestionFlagService {
     });
   }
 
+  async getModerationQueue() {
+    const questions = await this.prisma.question.findMany({
+      where: { questionFlags: { some: {} } },
+      orderBy: { updatedAt: 'desc' },
+      take: 100,
+      select: {
+        id: true,
+        text: true,
+        category: true,
+        difficulty: true,
+        isActive: true,
+        updatedAt: true,
+        _count: { select: { questionFlags: true } },
+        course: { select: { id: true, title: true } },
+        unit: { select: { id: true, title: true } },
+        questionFlags: {
+          orderBy: { createdAt: 'desc' },
+          take: 20,
+          select: {
+            id: true,
+            issueType: true,
+            description: true,
+            createdAt: true,
+          },
+        },
+      },
+    });
+
+    return questions.map(({ questionFlags, _count, ...question }) => ({
+      ...question,
+      flags: questionFlags,
+      flagCount: _count.questionFlags,
+    }));
+  }
+
   /**
    * If 5+ flags share the same issue for a question, notify instructors.
    */

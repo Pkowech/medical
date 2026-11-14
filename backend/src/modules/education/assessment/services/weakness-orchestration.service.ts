@@ -10,6 +10,7 @@ import { PrismaService } from '#infrastructure/prisma/prisma.service';
 import { WeaknessChainService } from '#modules/ai-analytics/services/weakness-chain.service';
 import { QuizGenerationService, WeaknessChain } from './quiz-generation.service';
 import { NotificationsService } from '#modules/engagement-communication/services/notifications.service';
+import { writeApplicationOutboxEvent } from '#infrastructure/outbox/application-outbox-event';
 
 interface AssessmentCompleteEvent {
   userId: string;
@@ -27,7 +28,7 @@ interface AutoQuizCompleteEvent {
   quizId: string;
   score: number;
   maxScore: number;
-  timestamp: Date;
+  timestamp: Date | string;
 }
 
 @Injectable()
@@ -96,6 +97,8 @@ export class WeaknessOrchestrationService {
               actionUrl: `/quiz/${quiz.id}`,
             },
             NotificationPriority.high,
+            true,
+            `auto-quiz-generated:${userId}:${quiz.id}`,
           );
 
           // 4. Store relationship for tracking
@@ -147,10 +150,9 @@ export class WeaknessOrchestrationService {
       });
 
       if (!autoQuizRecord) {
-        this.logger.warn(
-          `No auto-quiz record found for quiz ${quizId}. Skipping feedback.`,
+        throw new NotFoundException(
+          `No auto-quiz record found for quiz ${quizId}.`,
         );
-        return;
       }
 
       // 2. Get old pKnown (before weakness was detected)
@@ -189,6 +191,8 @@ export class WeaknessOrchestrationService {
           actionUrl: `/progress`,
         },
         NotificationPriority.high,
+        true,
+        `auto-quiz-mastery-improved:${userId}:${quizId}`,
       );
 
       // 5. Emit event for downstream processing if needed
@@ -207,6 +211,7 @@ export class WeaknessOrchestrationService {
         `Error in onAutoQuizComplete: ${error instanceof Error ? error.message : String(error)}`,
         error instanceof Error ? error.stack : undefined,
       );
+      throw error;
     }
   }
 
@@ -252,9 +257,11 @@ export class WeaknessOrchestrationService {
       await tx.userActivity.create({
         data: {
           userId,
+          sourceKey: `auto-quiz:${userId}:${quizId}`,
           type: UserActivityType.QUIZ_ATTEMPT,
           description: 'Completed AI-generated quiz',
           details: {
+            sourceId: `auto-quiz:${userId}:${quizId}`,
             quizId,
             score,
             maxScore,
@@ -263,18 +270,20 @@ export class WeaknessOrchestrationService {
           createdAt: completedAt,
         },
       });
+      await writeApplicationOutboxEvent(tx, {
+        eventType: 'auto-quiz.completed',
+        aggregateId: `auto-quiz:${userId}:${quizId}`,
+        dedupeKey: `auto-quiz-completed:manual:${userId}:${quizId}`,
+        payload: {
+          userId,
+          quizId,
+          score,
+          maxScore,
+          timestamp: completedAt.toISOString(),
+        },
+      });
       return true;
     });
-
-    if (recorded) {
-      this.eventEmitter.emit('auto-quiz.completed', {
-        userId,
-        quizId,
-        score,
-        maxScore,
-        timestamp: completedAt,
-      });
-    }
 
     return { success: true, alreadyCompleted: !recorded };
   }

@@ -1011,6 +1011,7 @@ export class MaterialsService {
     userId: string;
     description?: string;
     type?: MaterialType;
+    shareWithCourse?: boolean;
   }): Promise<Material> {
     const courseId = dto.courseId?.trim();
     const unitId = dto.unitId?.trim();
@@ -1050,7 +1051,12 @@ export class MaterialsService {
         userId: dto.userId,
         category: source.category,
         difficulty: source.difficulty,
-        metadata: (source.metadata as any) ?? {},
+        metadata: {
+          ...((source.metadata as Record<string, unknown> | null) ?? {}),
+          ...(dto.shareWithCourse === undefined
+            ? {}
+            : { shareWithCourse: dto.shareWithCourse }),
+        },
       },
       include: {
         file: true,
@@ -2101,6 +2107,9 @@ export class MaterialsService {
     lastPage?: number;
     unitId?: string;
     userId?: string;
+    clientTimestamp: number;
+    idempotencyKey: string;
+    expectedRevision: number;
   }) {
     try {
       const {
@@ -2111,9 +2120,30 @@ export class MaterialsService {
         lastPage,
         unitId,
         userId,
+        clientTimestamp,
+        idempotencyKey,
+        expectedRevision,
       } = opts;
       if (!userId) {
         throw new BadRequestException('userId is required');
+      }
+      if (
+        !Number.isSafeInteger(clientTimestamp) ||
+        !Number.isFinite(new Date(clientTimestamp).getTime())
+      ) {
+        throw new BadRequestException(
+          'A valid client timestamp is required for local material progress.',
+        );
+      }
+      if (!idempotencyKey || idempotencyKey.length > 200) {
+        throw new BadRequestException(
+          'A valid idempotency key is required for local material progress.',
+        );
+      }
+      if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0) {
+        throw new BadRequestException(
+          'A non-negative expectedRevision is required for local material progress.',
+        );
       }
       let materialId = providedMaterialId;
       // Try to resolve by hash if materialId not provided
@@ -2134,34 +2164,53 @@ export class MaterialsService {
         Math.round((timeSpentSeconds || 0) / 60),
       );
 
-      // If provided with a unitId, update unit progress
-      if (unitId) {
-        await this.progressService.updateUnitMaterialTopicProgress(userId, {
-          unitId,
-          status:
-            percent >= 100
-              ? ProgressStatus.completed
-              : ProgressStatus.inProgress,
-          progressPercentage: Math.max(0, Math.min(100, percent)),
-          timeSpent: elapsedMinutes,
-        } as any);
-      } else if (materialId) {
-        // If we only have a materialId
-        if (percent >= 100) {
-          await this.progressService.markMaterialAsRead(userId, materialId);
-        } else {
-          // update partial progress for the material (topic/unit-less case)
-          await this.progressService.updateUnitMaterialTopicProgress(userId, {
-            materialId,
-            status: ProgressStatus.inProgress,
-            progressPercentage: Math.max(0, Math.min(100, percent)),
-            timeSpent: elapsedMinutes,
-          } as any);
-        }
-      } else {
+      if (!materialId) {
         throw new NotFoundException(
           'Material not found for provided hash or id',
         );
+      }
+
+      const material = await this.prisma.material.findUnique({
+        where: { id: materialId },
+        select: {
+          id: true,
+          courseId: true,
+          unitId: true,
+          topicId: true,
+          unit: { select: { courseId: true } },
+        },
+      });
+      if (!material) {
+        throw new NotFoundException('Material not found');
+      }
+      if (unitId && material.unitId !== unitId) {
+        throw new BadRequestException(
+          'The supplied unit does not contain this material.',
+        );
+      }
+
+      const occurredAt = BigInt(clientTimestamp);
+      if (percent >= 100) {
+        await this.progressService.markMaterialAsRead(
+          userId,
+          materialId,
+          occurredAt,
+          idempotencyKey,
+          expectedRevision,
+        );
+      } else {
+        await this.progressService.updateUnitMaterialTopicProgress(userId, {
+          courseId: material.courseId ?? material.unit?.courseId ?? undefined,
+          materialId,
+          unitId: material.unitId ?? undefined,
+          topicId: material.topicId ?? undefined,
+          status: ProgressStatus.inProgress,
+          progressPercentage: Math.max(0, Math.min(100, percent)),
+          timeSpent: elapsedMinutes,
+          clientTimestamp,
+          idempotencyKey,
+          expectedRevision,
+        });
       }
 
       // Emit view event for analytics (lastPage if provided)
@@ -2170,7 +2219,7 @@ export class MaterialsService {
           materialId,
           userId,
           page: lastPage,
-          timestamp: new Date(),
+          timestamp: new Date(clientTimestamp),
         });
       }
 

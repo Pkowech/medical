@@ -28,13 +28,19 @@ async function createService() {
   };
   const calls = { update: [] };
   const activityKeys = new Set();
+  const activityDetails = new Map();
   const tx = {
     userActivity: {
       createMany: async ({ data }) => {
         const key = data[0].sourceKey;
         if (activityKeys.has(key)) return { count: 0 };
         activityKeys.add(key);
+        activityDetails.set(key, data[0].details);
         return { count: 1 };
+      },
+      findUnique: async ({ where }) => {
+        const details = activityDetails.get(where.sourceKey);
+        return details ? { details } : null;
       },
       create: async () => ({}),
     },
@@ -52,19 +58,29 @@ async function createService() {
   };
   const service = Object.create(ProgressService.prototype);
   service.prisma = {
+    topic: { findUnique: async () => ({ id: 'topic-1' }) },
     $transaction: async callback => {
       const previousActivityKeys = new Set(activityKeys);
+      const previousActivityDetails = new Map(activityDetails);
       try {
         return await callback(tx);
       } catch (error) {
         activityKeys.clear();
         previousActivityKeys.forEach(key => activityKeys.add(key));
+        activityDetails.clear();
+        previousActivityDetails.forEach((value, key) =>
+          activityDetails.set(key, value),
+        );
         throw error;
       }
     },
   };
   service.redisService = { del: async () => {} };
-  service.logger = { log: () => {}, warn: () => {}, error: () => {} };
+  service.logger = {
+    log: () => {},
+    warn: () => {},
+    error: message => console.error(message),
+  };
   service.aiAnalyticsService = { trackEvent: async () => {} };
   service.events = { emit: () => {} };
   return { service, calls, existing };
@@ -77,6 +93,7 @@ async function createService() {
       topicId: 'topic-1',
       status: ProgressStatus.notStarted,
       progressPercentage: 0,
+      clientTimestamp: 1760000000000,
       expectedRevision: 6,
       idempotencyKey: 'stale-reset',
     }),
@@ -89,6 +106,7 @@ async function createService() {
     topicId: 'topic-1',
     status: ProgressStatus.notStarted,
     progressPercentage: 0,
+    clientTimestamp: 1760000000000,
     expectedRevision: 7,
     idempotencyKey: 'newer-reset',
   });
@@ -101,6 +119,7 @@ async function createService() {
     topicId: 'topic-1',
     status: ProgressStatus.inProgress,
     progressPercentage: 20,
+    clientTimestamp: 1760000000000,
     expectedRevision: 7,
     idempotencyKey: 'stale-offline-study',
   }).then(
@@ -111,6 +130,7 @@ async function createService() {
     topicId: 'topic-1',
     status: ProgressStatus.inProgress,
     progressPercentage: 20,
+    clientTimestamp: 1760000000000,
     expectedRevision: 8,
     idempotencyKey: 'post-reset-study',
   });
@@ -124,6 +144,7 @@ async function createService() {
     topicId: 'topic-1',
     status: ProgressStatus.notStarted,
     progressPercentage: 0,
+    clientTimestamp: 1760000000000,
     expectedRevision: 7,
     idempotencyKey: 'first-device-reset',
   });
@@ -132,6 +153,7 @@ async function createService() {
       topicId: 'topic-1',
       status: ProgressStatus.completed,
       progressPercentage: 100,
+      clientTimestamp: 1760000000000,
       expectedRevision: 7,
       idempotencyKey: 'second-device-reset',
     }),
@@ -144,6 +166,7 @@ async function createService() {
     topicId: 'topic-1',
     status: ProgressStatus.completed,
     progressPercentage: 100,
+    clientTimestamp: 1760000000000,
     expectedRevision: 7,
     idempotencyKey: 'same-request',
   });
@@ -151,6 +174,7 @@ async function createService() {
     topicId: 'topic-1',
     status: ProgressStatus.completed,
     progressPercentage: 100,
+    clientTimestamp: 1760000000000,
     expectedRevision: 7,
     idempotencyKey: 'same-request',
   });

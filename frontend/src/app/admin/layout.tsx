@@ -9,9 +9,7 @@ import { LoadingSpinner } from '@/shared/components/ui/loading-spinner';
 import { LayoutProvider } from '@/core/providers/LayoutContext';
 import { useLayoutStore } from '@/core/stores/useLayoutStore';
 import { usePathname } from 'next/navigation';
-import adminNavigationConfig, {
-  instructorAssessmentNavigationConfig,
-} from '@/core/app/components/layout/adminNavigationConfig';
+import adminNavigationConfig from '@/core/app/components/layout/adminNavigationConfig';
 import { DashboardLayout } from '@/core/app/components/layout/DashboardLayout';
 import { CourseStudySessionProvider } from '@/features/learning-management/study/components/CourseStudySessionProvider';
 
@@ -27,11 +25,7 @@ const AdminLayoutContent: React.FC<AdminLayoutProps> = ({ children }) => {
 
   const userRoles = getSafeRoles(user?.roles ?? user?.role ?? [], [Role.guest]);
   const isAdmin = user?.role === Role.admin || userRoles.includes(Role.admin);
-  const isInstructor =
-    user?.role === Role.instructor || userRoles.includes(Role.instructor);
-  const canAccessAuthoring =
-    isInstructor && pathname.startsWith('/admin/assessment/quizzes');
-  const canAccessAdminArea = isAdmin || canAccessAuthoring;
+  const canAccessAdminArea = isAdmin;
 
   // Check authentication and admin status
   useEffect(() => {
@@ -67,11 +61,7 @@ const AdminLayoutContent: React.FC<AdminLayoutProps> = ({ children }) => {
     <AppErrorBoundary>
       <CourseStudySessionProvider>
         <DashboardLayout
-          navigationItems={
-            isAdmin
-              ? adminNavigationConfig
-              : instructorAssessmentNavigationConfig
-          }
+          navigationItems={adminNavigationConfig}
           user={user ?? null}
           isLoading={authLoading}
         >

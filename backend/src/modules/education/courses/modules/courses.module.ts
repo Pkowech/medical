@@ -34,6 +34,7 @@ import { InstructorOverrideService } from '../services/instructor-override.servi
 import { SyncService } from '../services/sync.service';
 
 import { NotesController } from '../controllers/notes.controller';
+import { QuestionFlagsController } from '../controllers/question-flags.controller';
 import { NotesService } from '../services/notes.service';
 
 @Module({
@@ -52,6 +53,7 @@ import { NotesService } from '../services/notes.service';
     StudyGroupsController,
     XapiHealthController,
     NotesController,
+    QuestionFlagsController,
   ],
   providers: [
     CoursesService,

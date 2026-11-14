@@ -443,6 +443,7 @@ export class StudyService {
           payload: {
             userId: session.userId,
             sessionData: {
+              studySessionId: session.id,
               durationMinutes: duration,
               materialsCovered,
               coursesCovered: courseId ? [courseId] : [],

@@ -159,6 +159,7 @@ export class LearningPathIntegrationService {
               progressPercentage: 100,
               status: 'completed',
               timestamp: completedAt,
+              sourceId: `unit:${unitId}:${completedAt.toISOString()}`,
               completedItems: 1,
               totalItems: 1,
               percentage: 100,
@@ -834,6 +835,11 @@ export class LearningPathIntegrationService {
         completedItems,
         totalItems,
         percentage,
+        sourceId: progressData.sourceId
+          ? `course:${courseId}:${progressData.sourceId}`
+          : progressData.timestamp
+            ? `course:${courseId}:${progressData.timestamp.toISOString()}`
+            : undefined,
       };
 
       await this.updateModuleProgress(pathProgress, updateData);
@@ -875,7 +881,12 @@ export class LearningPathIntegrationService {
         score: attemptData.score,
         timestamp: attemptData.timestamp
           ? new Date(attemptData.timestamp)
-          : new Date(),
+          : undefined,
+        sourceId:
+          attemptData.sourceId ??
+          (attemptData.timestamp
+            ? `assessment:${assessmentId}:${attemptData.timestamp.toISOString()}`
+            : undefined),
         completedItems,
         totalItems,
         percentage,
@@ -913,6 +924,11 @@ export class LearningPathIntegrationService {
         timeSpentMinutes: attemptData.timeSpentMinutes || 0,
         status: attemptData.completed ? 'completed' : 'inProgress',
         score: attemptData.score,
+        sourceId:
+          attemptData.sourceId ??
+          (attemptData.timestamp
+            ? `clinical-case:${caseId}:${attemptData.timestamp.toISOString()}`
+            : undefined),
         completedItems,
         totalItems,
         percentage,
@@ -960,10 +976,20 @@ export class LearningPathIntegrationService {
     updateData: ModuleProgressUpdate,
   ): Promise<void> {
     try {
+      if (!updateData.sourceId) {
+        throw new BadRequestException(
+          `A stable source ID is required to sync module ${updateData.moduleId}.`,
+        );
+      }
       await this.pathProgressService.updateProgress(
         pathProgress.userId,
         pathProgress.learningPathId,
-        { ...updateData, moduleStatus: updateData.status },
+        {
+          ...updateData,
+          moduleStatus: updateData.status,
+          idempotencyKey: `learning-path-module:${updateData.moduleId}:${updateData.sourceId}`,
+          clientTimestamp: updateData.timestamp?.getTime(),
+        },
       );
 
       this.logger.debug(
@@ -975,6 +1001,7 @@ export class LearningPathIntegrationService {
         pathId: pathProgress.learningPathId,
         moduleId: updateData.moduleId,
       });
+      throw error;
     }
   }
 

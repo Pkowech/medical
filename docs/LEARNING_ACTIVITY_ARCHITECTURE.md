@@ -64,8 +64,9 @@ it is not authoritative score history. Score analytics read completed
   claim and progress mutation share a database transaction. The regular quiz
   and topic-quiz submission endpoints use their stable attempt IDs and replay
   only matching answers. Topic-quiz retries with a missing or malformed
-  `X-Idempotency-Key` are rejected. Legacy progress clients that omit a key
-  still need request-level idempotency before all retries are safe.
+  `X-Idempotency-Key` are rejected. Legacy progress clients must provide the
+  required idempotency key, client timestamp, and expected revision; incomplete
+  requests are rejected rather than applied without retry protection.
 - `topic_progress.revision` is the server-owned conflict version. A write must
   include the revision it read; accepted writes increment it, while stale
   revisions return a conflict and require clients to refresh and reconcile.
@@ -142,7 +143,11 @@ The legacy learning-progress route requires content identifiers, an idempotency
 key, a client timestamp, and the expected revision. Rust user-level course
 statistics now derive from published topic/unit progress rather than enrollment
 progress snapshots. Reducing a completed goal's progress reopens it and clears
-its completion timestamp. Learning-path discovery hides drafts from other users.
+its completion timestamp. Content and learning-path progress, local material
+reads, xAPI reconciliation, flashcard reviews, and auto-quiz completion now use
+stable source keys; their required follow-up effects are written to the
+transactional outbox where applicable. Learning-path discovery hides drafts
+from other users.
 These tests are calculation-level checks; they do not prove
 database-query/schema parity or a production student's end-to-end dashboard
 parity.

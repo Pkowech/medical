@@ -1,11 +1,16 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
 import { createHash } from 'crypto';
 import { PrismaService } from '#infrastructure/prisma/prisma.service';
 import { MetricsService } from '#infrastructure/metrics/metrics.service';
 import { handleServiceError } from '#common/utils/error.utils';
 import { ProgressService } from './progress.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { UserActivityType } from '@prisma/client';
 
 type XapiRecord = Record<string, unknown>;
 
@@ -45,12 +50,16 @@ export class XapiService {
         : new Date();
 
       // Extract a stable xAPI statement id (if present) for idempotency
-      let statementId =
+      const rawStatementId =
         statement?.id ||
         statement?.statementId ||
         statement?.statement_id ||
         statement?.raw?.id ||
         undefined;
+      let statementId =
+        typeof rawStatementId === 'string' && rawStatementId.trim()
+          ? rawStatementId.trim()
+          : undefined;
 
       // If no explicit id, compute a canonical SHA-256 of the statement as a fallback
       if (!statementId) {
@@ -71,26 +80,26 @@ export class XapiService {
         }
       }
 
-      if (statementId) {
-        const existing = await this.prisma.xapiStatement.findUnique({
-          where: { statementId } as any,
-        });
-        if (existing) {
-          this.metrics.duplicatesDetected++;
-          this.metricsService.recordXapiDuplicate();
-          // update derived rate gauge
-          this.metricsService.updateXapiDuplicateRate(
-            this.metrics.totalStatementsProcessed,
-            this.metrics.duplicatesDetected,
-          );
-          this.logger.debug(
-            'Duplicate xAPI statement detected; returning existing',
-            { statementId, duplicateCount: this.metrics.duplicatesDetected },
-          );
-          // Emit duplicate detection event for monitoring
-          this.events.emit('xapi.duplicate.detected', { statementId, userId });
-          return existing;
-        }
+      if (userId && this.isLearningVerb(verb) && !statementId) {
+        throw new BadRequestException(
+          'A stable xAPI statement ID is required for learning progress.',
+        );
+      }
+
+      const idempotencyKey = statementId
+        ? `xapi:${createHash('sha256').update(statementId).digest('hex')}`
+        : undefined;
+      let created;
+      let duplicate = false;
+      let existing = statementId
+        ? await this.prisma.xapiStatement.findUnique({
+            where: { statementId } as any,
+          })
+        : null;
+      if (existing) {
+        this.assertSameStatementOwnerAndContent(existing, userId, statement);
+        duplicate = true;
+        this.recordDuplicateStatement(statementId!, userId);
       }
 
       const objectId =
@@ -109,52 +118,59 @@ export class XapiService {
       const contextCourseId = this.getContextId(context, 'course-id');
       const contextUnitId = this.getContextId(context, 'unit-id');
 
-      let created;
-      try {
-        created = await this.prisma.xapiStatement.create({
-          data: {
-            userId: userId || undefined,
-            materialId: materialId || undefined,
-            statementId: statementId || undefined,
-            verb: typeof verb === 'string' ? verb : JSON.stringify(verb),
-            actor: actor || undefined,
-            object: object || undefined,
-            result: result || undefined,
-            context: context || undefined,
-            raw: statement,
-            occurredAt,
-          },
-        });
-      } catch (error: any) {
-        // Handle unique constraint violation (P2002) for race conditions
-        if (error.code === 'P2002' && statementId) {
-          this.logger.log(
-            'Race condition detected for statementId, retrieving existing record',
-            { statementId },
-          );
-          const existing = await this.prisma.xapiStatement.findUnique({
-            where: { statementId } as any,
+      if (existing) {
+        created = existing;
+      } else {
+        try {
+          created = await this.prisma.xapiStatement.create({
+            data: {
+              userId: userId || undefined,
+              materialId: materialId || undefined,
+              statementId: statementId || undefined,
+              verb: typeof verb === 'string' ? verb : JSON.stringify(verb),
+              actor: actor || undefined,
+              object: object || undefined,
+              result: result || undefined,
+              context: context || undefined,
+              raw: statement,
+              occurredAt,
+            },
           });
-          if (existing) {
-            return existing;
+        } catch (error: any) {
+          if (error.code === 'P2002' && statementId) {
+            existing = await this.prisma.xapiStatement.findUnique({
+              where: { statementId } as any,
+            });
+            if (existing) {
+              this.assertSameStatementOwnerAndContent(existing, userId, statement);
+              created = existing;
+              duplicate = true;
+              this.recordDuplicateStatement(statementId, userId);
+            } else {
+              throw error;
+            }
+          } else {
+            throw error;
           }
         }
-        throw error;
       }
 
       if (userId && this.isLearningVerb(verb)) {
         await this.recordLearningProgress({
           userId,
           verb,
-          materialId,
+          materialId: existing?.materialId ?? materialId,
           courseId: contextCourseId,
           unitId: contextUnitId,
           result,
+          idempotencyKey: idempotencyKey!,
+          occurredAt: existing?.occurredAt ?? occurredAt,
         });
       }
 
-      // fire analytics hook
-      this.events.emit('xapi.statement.created', { id: created.id, userId });
+      if (!duplicate) {
+        this.events.emit('xapi.statement.created', { id: created.id, userId });
+      }
 
       return created;
     } catch (error) {
@@ -221,6 +237,40 @@ export class XapiService {
     ].includes(verb);
   }
 
+  private assertSameStatementOwnerAndContent(
+    existing: { userId: string | null; raw: unknown },
+    userId: string | undefined,
+    statement: unknown,
+  ): void {
+    if (existing.userId !== (userId ?? null)) {
+      throw new ForbiddenException(
+        'The xAPI statement ID is already associated with another user.',
+      );
+    }
+    if (this.canonicalize(existing.raw) !== this.canonicalize(statement)) {
+      throw new ConflictException(
+        'The xAPI statement ID was already used with different statement content.',
+      );
+    }
+  }
+
+  private recordDuplicateStatement(
+    statementId: string,
+    userId: string | undefined,
+  ): void {
+    this.metrics.duplicatesDetected++;
+    this.metricsService.recordXapiDuplicate();
+    this.metricsService.updateXapiDuplicateRate(
+      this.metrics.totalStatementsProcessed,
+      this.metrics.duplicatesDetected,
+    );
+    this.logger.debug('Duplicate xAPI statement detected', {
+      statementId,
+      duplicateCount: this.metrics.duplicatesDetected,
+    });
+    this.events.emit('xapi.duplicate.detected', { statementId, userId });
+  }
+
   private async recordLearningProgress(input: {
     userId: string;
     verb: string;
@@ -228,8 +278,19 @@ export class XapiService {
     courseId?: string;
     unitId?: string;
     result?: XapiRecord;
+    idempotencyKey: string;
+    occurredAt: Date;
   }): Promise<void> {
-    const { userId, verb, materialId, courseId, unitId, result } = input;
+    const {
+      userId,
+      verb,
+      materialId,
+      courseId,
+      unitId,
+      result,
+      idempotencyKey,
+      occurredAt,
+    } = input;
     const material = materialId
       ? await this.prisma.material.findUnique({
           where: { id: materialId },
@@ -267,7 +328,12 @@ export class XapiService {
         (typeof progressValue === 'number' && progressValue >= 100);
 
       if (verb === 'experienced' || verb === 'played') {
-        await this.progressService.markMaterialAsRead(userId, material.id);
+        await this.progressService.markMaterialAsRead(
+          userId,
+          material.id,
+          BigInt(occurredAt.getTime()),
+          idempotencyKey,
+        );
         return;
       }
 
@@ -286,50 +352,10 @@ export class XapiService {
         status: isComplete ? 'completed' : 'inProgress',
         progressPercentage,
         timeSpent: 0,
+        clientTimestamp: occurredAt.getTime(),
+        idempotencyKey,
       });
-      return;
     }
-
-    if (resolvedCourseId) {
-      const extensions = result?.['extensions'];
-      const progressValue = this.getContextValue(
-        { extensions },
-        'progress',
-      );
-      const numericProgress =
-        typeof progressValue === 'number'
-          ? progressValue
-          : progressValue === undefined
-            ? undefined
-            : Number(progressValue);
-      const isComplete =
-        ['completed', 'passed'].includes(verb) ||
-        result?.['completion'] === true;
-      await this.progressService.updateUnitMaterialTopicProgress(userId, {
-        courseId: resolvedCourseId,
-        status: isComplete ? 'completed' : 'inProgress',
-        progressPercentage: isComplete
-          ? 100
-          : numericProgress !== undefined && Number.isFinite(numericProgress)
-            ? Math.min(100, Math.max(0, numericProgress))
-            : 0,
-        timeSpent: 0,
-      });
-      return;
-    }
-
-    await this.prisma.userActivity.create({
-      data: {
-        userId,
-        type: UserActivityType.LEARNING,
-        description: `xAPI learning activity: ${verb}`,
-        details: {
-          source: 'xapi',
-          verb,
-          materialId,
-        },
-      },
-    });
   }
 
   // Health check: return current duplicate detection metrics

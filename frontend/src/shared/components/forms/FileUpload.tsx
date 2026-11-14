@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useId } from 'react';
 import { Button } from '@/shared/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Upload, X, File, Check } from 'lucide-react';
@@ -10,13 +10,22 @@ interface FileUploadProps {
   onUploadComplete?: (material: unknown) => void;
   allowedFileTypes?: string[];
   maxFileSizeMB?: number;
+  courseId?: string;
+  unitId?: string;
+  topicId?: string;
+  shareWithCourse?: boolean;
 }
 
 export default function FileUpload({
   onUploadComplete,
   allowedFileTypes = ['.pdf', '.doc', '.docx', '.txt', '.md', '.jpg', '.jpeg', '.png'],
   maxFileSizeMB = 10,
+  courseId,
+  unitId,
+  topicId,
+  shareWithCourse,
 }: FileUploadProps) {
+  const inputId = useId();
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -128,6 +137,12 @@ export default function FileUpload({
       formData.append('file', file);
       formData.append('title', title);
       formData.append('description', description);
+      if (courseId) formData.append('courseId', courseId);
+      if (unitId) formData.append('unitId', unitId);
+      if (topicId) formData.append('topicId', topicId);
+      if (shareWithCourse !== undefined) {
+        formData.append('shareWithCourse', String(shareWithCourse));
+      }
 
       // Upload to the real API endpoint
       try {
@@ -237,6 +252,7 @@ export default function FileUpload({
                 <div className="flex items-center justify-center">
                   {getFileIcon()}
                   <button
+                    type="button"
                     onClick={handleRemoveFile}
                     className="ml-2 text-muted-foreground hover:text-red-500"
                     title="Remove file"
@@ -255,12 +271,12 @@ export default function FileUpload({
           {/* Form Fields */}
           <div className="space-y-4">
             <div>
-              <label htmlFor="title" className="block text-sm font-medium text-muted-foreground mb-1">
+              <label htmlFor={`${inputId}-title`} className="block text-sm font-medium text-muted-foreground mb-1">
                 Title
               </label>
               <input
                 type="text"
-                id="title"
+                id={`${inputId}-title`}
                 value={title}
                 onChange={e => setTitle(e.target.value)}
                 className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -270,11 +286,11 @@ export default function FileUpload({
             </div>
 
             <div>
-              <label htmlFor="description" className="block text-sm font-medium text-muted-foreground mb-1">
+              <label htmlFor={`${inputId}-description`} className="block text-sm font-medium text-muted-foreground mb-1">
                 Description (optional)
               </label>
               <textarea
-                id="description"
+                id={`${inputId}-description`}
                 value={description}
                 onChange={e => setDescription(e.target.value)}
                 className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -312,6 +328,7 @@ export default function FileUpload({
           {/* Upload Button */}
           <div className="flex justify-end">
             <Button
+              type="button"
               variant="default"
               onClick={handleUpload}
               disabled={!file || isUploading || !title.trim()}

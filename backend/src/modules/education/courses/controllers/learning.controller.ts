@@ -101,9 +101,14 @@ export class LearningController {
     @Headers('X-Idempotency-Key') idempotencyKey?: string,
     @Headers('X-Expected-Revision') expectedRevisionHeader?: string,
   ) {
-    if (!data.courseId || (!data.topicId && !data.materialId)) {
+    if (data.courseId && !data.topicId && !data.materialId) {
       throw new BadRequestException(
         'Course progress is derived. Provide an enrolled course and a topic or material to update.',
+      );
+    }
+    if (!data.courseId && (!data.learningPathId || !data.moduleId)) {
+      throw new BadRequestException(
+        'A learning path and module are required to update path progress.',
       );
     }
 

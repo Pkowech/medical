@@ -5,6 +5,7 @@ import {
   IsOptional,
   IsArray,
   IsNumber,
+  IsInt,
   IsEnum,
   IsIn,
   IsObject,
@@ -12,6 +13,7 @@ import {
   Max,
   IsDate,
   IsBoolean,
+  MaxLength,
 } from 'class-validator';
 import {
   LearningPathCategory,
@@ -392,6 +394,22 @@ export class LearningPathStartDto {
 }
 
 export class LearningPathUpdateDto {
+  @ApiPropertyOptional({
+    description: 'Stable key used to deduplicate retried progress updates',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  idempotencyKey?: string;
+
+  @ApiPropertyOptional({
+    description: 'Client-side timestamp in milliseconds',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  clientTimestamp?: number;
+
   @ApiPropertyOptional({
     description: 'Phase ID (when updating module progress)',
   })

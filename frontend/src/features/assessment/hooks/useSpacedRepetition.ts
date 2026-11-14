@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   flashcardApi,
   type CardStats,
@@ -15,6 +15,11 @@ export function useSpacedRepetition(
   const [stats, setStats] = useState<CardStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const pendingReview = useRef<{
+    cardId: string;
+    quality: number;
+    idempotencyKey: string;
+  } | null>(null);
 
   const loadDueCards = useCallback(async () => {
     if (!userId) {
@@ -50,9 +55,25 @@ export function useSpacedRepetition(
     if (!currentCard) return false;
 
     setError(null);
+    if (
+      pendingReview.current?.cardId !== currentCard.id ||
+      pendingReview.current.quality !== quality
+    ) {
+      pendingReview.current = {
+        cardId: currentCard.id,
+        quality,
+        idempotencyKey: crypto.randomUUID(),
+      };
+    }
+
     try {
-      await flashcardApi.updateCard(currentCard.id, quality);
+      await flashcardApi.updateCard(
+        currentCard.id,
+        quality,
+        pendingReview.current.idempotencyKey,
+      );
       await loadDueCards();
+      pendingReview.current = null;
       return true;
     } catch (err) {
       setError(err instanceof Error ? err : new Error('Failed to update review card'));

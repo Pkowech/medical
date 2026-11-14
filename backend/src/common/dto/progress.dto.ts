@@ -76,9 +76,10 @@ export class CreateProgressDto {
 }
 
 export class UpdateProgressDto {
-  @ApiProperty({ description: 'Course ID' })
+  @ApiPropertyOptional({ description: 'Course ID' })
+  @IsOptional()
   @IsString()
-  courseId!: string;
+  courseId?: string;
 
   @ApiPropertyOptional({ description: 'Unit ID' })
   @IsOptional()
@@ -613,6 +614,7 @@ export interface ProgressData {
   passed?: boolean;
   status?: 'notStarted' | 'inProgress' | 'completed' | 'failed';
   timestamp?: Date;
+  sourceId?: string;
   metadata?: Record<string, any>;
 }
 

@@ -3,6 +3,7 @@ import {
   Logger,
   NotFoundException,
   BadRequestException,
+  ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from '../../../../infrastructure/prisma/prisma.service';
 import { RedisService } from '../../../../infrastructure/redis/redis.service';
@@ -318,34 +319,76 @@ export class FlashcardsService {
     userFlashcardProgressId: string,
     quality: number,
     userId: string,
+    idempotencyKey: string,
   ): Promise<UserFlashcardProgress> {
     if (quality < 1 || quality > 5) {
       throw new BadRequestException('Quality must be between 1 and 5');
     }
-
-    const userProgress = await this.prisma.userFlashcardProgress.findFirst({
-      where: { id: userFlashcardProgressId, userId },
-      include: { flashcard: true },
-    });
-
-    if (!userProgress) {
-      throw new NotFoundException('User flashcard progress not found');
+    if (
+      typeof idempotencyKey !== 'string' ||
+      idempotencyKey.trim().length === 0 ||
+      idempotencyKey.length > 200
+    ) {
+      throw new BadRequestException(
+        'An idempotency key of at most 200 characters is required.',
+      );
     }
-
-    // Use SM-2 algorithm to calculate new values
-    const sm2Card = {
-      easeFactor: userProgress.easeFactor,
-      interval: userProgress.interval,
-      repetitions: userProgress.repetitions,
-      correctStreak: userProgress.correctStreak,
-      lastReviewDate: userProgress.lastReview || new Date(),
-      nextReviewDate: userProgress.nextReview,
-    };
-
-    const result = this.sm2Algorithm.reviewCard(sm2Card, quality);
 
     const reviewedAt = new Date();
     const updatedUserProgress = await this.prisma.$transaction(async (tx) => {
+      const userProgress = await tx.userFlashcardProgress.findFirst({
+        where: { id: userFlashcardProgressId, userId },
+      });
+      if (!userProgress) {
+        throw new NotFoundException('User flashcard progress not found');
+      }
+
+      const sourceKey = `flashcard-review:${userId}:${idempotencyKey}`;
+      const sourceFingerprint = JSON.stringify({
+        userFlashcardProgressId,
+        quality,
+      });
+      const activity = await tx.userActivity.createMany({
+        data: [
+          {
+            userId,
+            sourceKey,
+            type: UserActivityType.FLASHCARD_REVIEW,
+            description: 'Reviewed a flashcard',
+            details: { sourceFingerprint },
+            createdAt: reviewedAt,
+          },
+        ],
+        skipDuplicates: true,
+      });
+      if (activity.count === 0) {
+        const existingActivity = await tx.userActivity.findUnique({
+          where: { sourceKey },
+          select: { details: true },
+        });
+        const details = existingActivity?.details;
+        if (
+          !details ||
+          typeof details !== 'object' ||
+          !('sourceFingerprint' in details) ||
+          details.sourceFingerprint !== sourceFingerprint
+        ) {
+          throw new ConflictException(
+            'The idempotency key was already used for a different flashcard review.',
+          );
+        }
+        return userProgress;
+      }
+
+      const sm2Card = {
+        easeFactor: userProgress.easeFactor,
+        interval: userProgress.interval,
+        repetitions: userProgress.repetitions,
+        correctStreak: userProgress.correctStreak,
+        lastReviewDate: userProgress.lastReview || new Date(),
+        nextReviewDate: userProgress.nextReview,
+      };
+      const result = this.sm2Algorithm.reviewCard(sm2Card, quality);
       const progress = await tx.userFlashcardProgress.update({
         where: { id: userFlashcardProgressId },
         data: {
@@ -364,21 +407,19 @@ export class FlashcardsService {
           flashcardId: userProgress.flashcardId,
           passed: quality >= 3,
           attemptedAt: reviewedAt,
+          sourceKey,
         },
       });
 
-      await tx.userActivity.create({
+      await tx.userActivity.update({
+        where: { sourceKey },
         data: {
-          userId,
-          sourceKey: `flashcard-result:${flashcardResult.id}`,
-          type: UserActivityType.FLASHCARD_REVIEW,
-          description: 'Reviewed a flashcard',
           details: {
             sourceId: flashcardResult.id,
+            sourceFingerprint,
             flashcardId: userProgress.flashcardId,
             passed: quality >= 3,
           },
-          createdAt: reviewedAt,
         },
       });
 
@@ -386,9 +427,9 @@ export class FlashcardsService {
     });
 
     // Invalidate Redis cache keys
-    await this.redisService.del(`due_flashcards:${userProgress.userId}`);
+    await this.redisService.del(`due_flashcards:${userId}`);
     this.logger.log(
-      `Updated user flashcard progress ${userFlashcardProgressId} with quality ${quality}, next review in ${result.updated.interval} days`,
+      `Updated user flashcard progress ${userFlashcardProgressId} with quality ${quality}, next review in ${updatedUserProgress.interval} days`,
     );
     return updatedUserProgress;
   }
@@ -397,10 +438,11 @@ export class FlashcardsService {
     userId: string,
     topicId: string | null,
     answers: Array<{ questionId: string; isCorrect: boolean }>,
-    attemptId?: string,
+    attemptId: string,
   ): Promise<number> {
     const now = new Date();
     const scheduledCount = await this.prisma.$transaction(async (tx) => {
+      let scheduled = 0;
       for (const answer of answers) {
         const question = await tx.question.findFirst({
           where: {
@@ -415,13 +457,8 @@ export class FlashcardsService {
           );
           continue;
         }
-        const sourceKey = attemptId
-          ? `quiz-review:${attemptId}:${answer.questionId}`
-          : undefined;
-        if (
-          sourceKey &&
-          (await tx.flashcardResult.findUnique({ where: { sourceKey } }))
-        ) {
+        const sourceKey = `quiz-review:${attemptId}:${answer.questionId}`;
+        if (await tx.flashcardResult.findUnique({ where: { sourceKey } })) {
           continue;
         }
 
@@ -492,8 +529,9 @@ export class FlashcardsService {
             attemptedAt: now,
           },
         });
+        scheduled += 1;
       }
-      return answers.length;
+      return scheduled;
     });
 
     await this.redisService.del(`due_flashcards:${userId}`);

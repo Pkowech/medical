@@ -11,6 +11,7 @@ import {
   UseGuards,
   HttpCode,
   Query,
+  Headers,
   BadRequestException,
   Res,
   StreamableFile,
@@ -405,6 +406,7 @@ export class MaterialsController {
         },
         courseId: { type: 'string', description: 'Required course placement.' },
         type: { type: 'string' },
+        shareWithCourse: { type: 'boolean' },
       },
       required: ['sourceMaterialId', 'title', 'courseId'],
     },
@@ -417,6 +419,7 @@ export class MaterialsController {
     @Body('courseId') courseId?: string,
     @Body('description') description?: string,
     @Body('type') type?: MaterialType,
+    @Body('shareWithCourse') shareWithCourse?: boolean,
     @GetUser() user?: PrismaUser,
   ) {
     if (!sourceMaterialId) {
@@ -430,6 +433,7 @@ export class MaterialsController {
       courseId,
       description,
       type,
+      shareWithCourse,
       userId: user?.id || '',
     });
   }
@@ -565,7 +569,6 @@ export class MaterialsController {
   }
 
   @Get('local/search')
-  @Public()
   @ApiOperation({
     summary: 'Search files in local PHARMACY directory (dev mode only)',
   })
@@ -578,7 +581,6 @@ export class MaterialsController {
   }
 
   @Get('local/browse')
-  @Public()
   @ApiOperation({ summary: 'Browse local directory (dev mode only)' })
   @ApiQuery({
     name: 'path',
@@ -590,7 +592,6 @@ export class MaterialsController {
   }
 
   @Get('local/file')
-  @Public()
   @ApiOperation({ summary: 'Get file from local storage (dev mode only)' })
   @ApiQuery({ name: 'path', required: true, description: 'File path' })
   async getLocalFile(
@@ -614,7 +615,6 @@ export class MaterialsController {
   }
 
   @Get('local/download')
-  @Public()
   @ApiOperation({ summary: 'Download file from local storage (dev mode only)' })
   @ApiQuery({ name: 'path', required: true, description: 'File path' })
   async downloadLocalFile(
@@ -872,10 +872,41 @@ export class MaterialsController {
     @Body('timeSpentSeconds') timeSpentSeconds?: number,
     @Body('lastPage') lastPage?: number,
     @Body('unitId') unitId?: string,
+    @Body('expectedRevision') expectedRevision?: number,
+    @Headers('X-Client-Timestamp') clientTimestampHeader?: string,
+    @Headers('X-Idempotency-Key') idempotencyKey?: string,
     @GetUser() user?: PrismaUser,
   ) {
     if (!hash && !materialId) {
       throw new BadRequestException('hash or materialId is required');
+    }
+    const clientTimestamp =
+      typeof clientTimestampHeader === 'string' &&
+      /^\d+$/.test(clientTimestampHeader)
+        ? Number(clientTimestampHeader)
+        : NaN;
+    if (!Number.isSafeInteger(clientTimestamp)) {
+      throw new BadRequestException(
+        'X-Client-Timestamp is required and must be epoch milliseconds.',
+      );
+    }
+    if (
+      typeof idempotencyKey !== 'string' ||
+      idempotencyKey.trim().length === 0 ||
+      idempotencyKey.length > 200
+    ) {
+      throw new BadRequestException(
+        'X-Idempotency-Key is required and must be at most 200 characters.',
+      );
+    }
+    if (
+      typeof expectedRevision !== 'number' ||
+      !Number.isSafeInteger(expectedRevision) ||
+      expectedRevision < 0
+    ) {
+      throw new BadRequestException(
+        'expectedRevision is required and must be a non-negative safe integer.',
+      );
     }
     // Normalize inputs
     const payload = {
@@ -886,6 +917,9 @@ export class MaterialsController {
       lastPage,
       unitId,
       userId: user?.id,
+      clientTimestamp,
+      idempotencyKey,
+      expectedRevision,
     };
     return this.materialsService.registerLocalProgress(payload);
   }

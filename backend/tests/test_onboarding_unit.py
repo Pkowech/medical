@@ -363,7 +363,6 @@ const service = new LearningPathsService(
       ];
     },
   },
-  {},
   new LearningPathEligibilityService(),
 );
 
@@ -507,7 +506,6 @@ const service = new LearningPathProgressService(
       },
     },
   },
-  {},
   {
     assertEligible: () => { eligibilityChecks++; },
   },

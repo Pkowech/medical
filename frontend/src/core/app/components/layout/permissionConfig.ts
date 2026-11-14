@@ -13,6 +13,8 @@ export const navigationPermissions = {
     'community',
     'admin-dashboard',
     'instructor-dashboard',
+    'moderator-dashboard',
+    'quiz-authoring',
     'profile',
   ],
   [Role.instructor]: [
@@ -26,6 +28,7 @@ export const navigationPermissions = {
     'achievements',
     'community',
     'instructor-dashboard',
+    'quiz-authoring',
     'profile',
   ],
   [Role.student]: [
@@ -50,6 +53,7 @@ export const navigationPermissions = {
     'progress-tracking',
     'achievements',
     'community',
+    'moderator-dashboard',
     'profile',
   ],
   [Role.guest]: ['courses', 'community'],

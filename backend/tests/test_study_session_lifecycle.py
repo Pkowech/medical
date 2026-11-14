@@ -452,7 +452,15 @@ let createdProgress;
 let createdActivities = [];
 service.prisma = {
   material: {
-    findUnique: async () => ({ id: 'material-1', unitId: 'unit-1', topicId: 'topic-1' }),
+    findUnique: async () => ({
+      id: 'material-1',
+      userId: 'user-1',
+      courseId: 'course-1',
+      unitId: 'unit-1',
+      topicId: 'topic-1',
+      metadata: {},
+      unit: { courseId: 'course-1' },
+    }),
   },
   unit: {
     findUnique: async () => ({ id: 'unit-1', courseId: 'course-1' }),
@@ -509,16 +517,23 @@ const { ProgressService } =
   require('./src/modules/education/courses/services/progress.service.ts');
 const service = Object.create(ProgressService.prototype);
 const sourceKeys = new Set();
+const activityDetails = new Map();
 let progressCreates = 0;
 let analyticsEvents = 0;
 service.prisma = {
+  topic: { findUnique: async () => ({ id: 'topic-1' }) },
   $transaction: async callback => callback({
     userActivity: {
       createMany: async ({ data }) => {
         const [activity] = data;
         if (sourceKeys.has(activity.sourceKey)) return { count: 0 };
         sourceKeys.add(activity.sourceKey);
+        activityDetails.set(activity.sourceKey, activity.details);
         return { count: 1 };
+      },
+      findUnique: async ({ where }) => {
+        const details = activityDetails.get(where.sourceKey);
+        return details ? { details } : null;
       },
     },
     topic: { findUnique: async () => ({ id: 'topic-1' }) },
@@ -534,7 +549,7 @@ service.prisma = {
 
 (async () => {
   service.clearCache = async () => {};
-  service.logger = { log: () => {} };
+  service.logger = { log: () => {}, error: message => console.error(message) };
   service.aiAnalyticsService = {
     trackEvent: async () => { analyticsEvents += 1; },
   };
@@ -542,6 +557,7 @@ service.prisma = {
     topicId: 'topic-1',
     timeSpent: 12,
     idempotencyKey: 'offline-item-1',
+    clientTimestamp: 1760000000000,
   };
   await service.updateUnitMaterialTopicProgress('user-1', update);
   await service.updateUnitMaterialTopicProgress('user-1', update);
