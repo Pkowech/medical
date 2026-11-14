@@ -35,26 +35,10 @@ import { writeApplicationOutboxEvent } from '#infrastructure/outbox/application-
 
 @Injectable()
 export class LearningPathProgressService {
-  private readonly prisma: PrismaService;
-  private readonly learningPathEligibilityService: LearningPathEligibilityService;
-
   constructor(
-    prisma: PrismaService,
-    learningPathEligibilityService?: LearningPathEligibilityService,
-    legacyCompatibility?: unknown,
-  ) {
-    this.prisma = prisma;
-    const candidate =
-      learningPathEligibilityService &&
-      typeof (learningPathEligibilityService as any).assertEligible === 'function'
-        ? learningPathEligibilityService
-        : legacyCompatibility &&
-            typeof (legacyCompatibility as any).assertEligible === 'function'
-          ? (legacyCompatibility as LearningPathEligibilityService)
-          : new LearningPathEligibilityService();
-
-    this.learningPathEligibilityService = candidate;
-  }
+    private readonly prisma: PrismaService,
+    private readonly learningPathEligibilityService: LearningPathEligibilityService,
+  ) {}
 
   private async findEnrollment(userId: string, learningPathId: string) {
     const progressClient = this.prisma?.learningPathProgress;

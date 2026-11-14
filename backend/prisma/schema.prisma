@@ -40,6 +40,7 @@ model Question {
   flashcards          Flashcard[]
   instructorOverrides InstructorOverride[]
   questionFlags       QuestionFlag[]
+  questionModerationCase QuestionModerationCase?
   options             Option[]
   course              Course?              @relation(fields: [courseId], references: [id])
   unit                Unit?                @relation(fields: [unitId], references: [id])
@@ -395,6 +396,8 @@ model User {
   predictionAudits               PredictionAudit[]
   predictionValidations          PredictionValidation[]
   questionFlags                  QuestionFlag[]
+  questionModerationCasesAssigned QuestionModerationCase[] @relation("QuestionModerationAssignee")
+  questionModerationEvents       QuestionModerationEvent[] @relation("QuestionModerationActor")
   quizAttempts                   QuizAttempt[]
   offlinePracticeAttempts        OfflinePracticeAttempt[]
   recommendations                Recommendation[]
@@ -2179,6 +2182,43 @@ model QuestionFlag {
   @@map("question_flags")
 }
 
+model QuestionModerationCase {
+  id                   String                    @id @default(uuid())
+  questionId           String                    @unique @map("question_id")
+  status               QuestionModerationStatus  @default(open)
+  assignedModeratorId  String?                   @map("assigned_moderator_id")
+  resolution           String?                   @db.VarChar(50)
+  resolutionNote       String?                   @map("resolution_note") @db.Text
+  openedAt             DateTime                  @default(now()) @map("opened_at")
+  closedAt             DateTime?                 @map("closed_at")
+  createdAt            DateTime                  @default(now()) @map("created_at")
+  updatedAt            DateTime                  @updatedAt @map("updated_at")
+  question             Question                  @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  assignedModerator    User?                     @relation("QuestionModerationAssignee", fields: [assignedModeratorId], references: [id], onDelete: SetNull)
+  events               QuestionModerationEvent[]
+
+  @@index([status, updatedAt])
+  @@index([assignedModeratorId, status])
+  @@map("question_moderation_cases")
+}
+
+model QuestionModerationEvent {
+  id          String                    @id @default(uuid())
+  caseId      String                    @map("case_id")
+  actorId     String?                   @map("actor_id")
+  action      String                    @db.VarChar(30)
+  fromStatus  QuestionModerationStatus? @map("from_status")
+  toStatus    QuestionModerationStatus  @map("to_status")
+  reason      String?                   @db.Text
+  createdAt   DateTime                  @default(now()) @map("created_at")
+  moderationCase QuestionModerationCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  actor       User?                     @relation("QuestionModerationActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([caseId, createdAt])
+  @@index([actorId, createdAt])
+  @@map("question_moderation_events")
+}
+
 model PredictionAudit {
   id             String   @id @default(uuid())
   userId         String   @map("user_id")
@@ -2398,6 +2438,13 @@ enum AcademicReviewDecision {
 enum AcademicReportStatus {
   open
   reviewing
+  resolved
+  dismissed
+}
+
+enum QuestionModerationStatus {
+  open
+  in_review
   resolved
   dismissed
 }

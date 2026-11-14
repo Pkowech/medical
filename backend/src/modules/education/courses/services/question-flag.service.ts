@@ -1,21 +1,24 @@
-// FEED-001: Student Question Flagging
-// Allows students to flag problematic quiz questions. Auto-flags to instructor when 5+ flags share the same issue.
-
-import { Injectable, Logger } from '@nestjs/common';
-import { NotificationPriority } from '@prisma/client';
+import {
+  ConflictException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
+import {
+  NotificationPriority,
+  QuestionModerationStatus,
+} from '@prisma/client';
 import { PrismaService } from '#infrastructure/prisma/prisma.service';
 import { getErrorMessage } from '#common/utils/error.utils';
-
-export type FlagIssueType =
-  | 'ambiguous'
-  | 'incorrect'
-  | 'outdated'
-  | 'inappropriate';
+import type {
+  DecideQuestionModerationDto,
+  QuestionFlagIssue,
+} from '../dto/question-flag.dto';
 
 export interface CreateFlagDto {
   questionId: string;
   userId: string;
-  issue: FlagIssueType;
+  issue: QuestionFlagIssue;
   description?: string;
 }
 
@@ -27,31 +30,109 @@ export class QuestionFlagService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  async createFlag(dto: CreateFlagDto): Promise<void> {
-    // Prevent duplicate flags from same user on same question with same issue
-    const existing = await this.prisma.questionFlag.findFirst({
-      where: {
-        questionId: dto.questionId,
-        userId: dto.userId,
-        issueType: dto.issue,
-      },
+  async createFlag(dto: CreateFlagDto) {
+    const questionExists = await this.prisma.question.findUnique({
+      where: { id: dto.questionId },
+      select: { id: true },
     });
 
-    if (existing) {
-      return;
+    if (!questionExists) {
+      throw new NotFoundException('Question not found.');
     }
 
-    await this.prisma.questionFlag.create({
-      data: {
-        questionId: dto.questionId,
-        userId: dto.userId,
-        issueType: dto.issue,
-        description: dto.description,
-      },
+    const created = await this.prisma.$transaction(async transaction => {
+      const existing = await transaction.questionFlag.findFirst({
+        where: {
+          questionId: dto.questionId,
+          userId: dto.userId,
+          issueType: dto.issue,
+        },
+        select: { id: true },
+      });
+
+      if (existing) {
+        return false;
+      }
+
+      await transaction.questionFlag.create({
+        data: {
+          questionId: dto.questionId,
+          userId: dto.userId,
+          issueType: dto.issue,
+          description: dto.description,
+        },
+      });
+
+      let moderationCase = await transaction.questionModerationCase.findUnique({
+        where: { questionId: dto.questionId },
+        select: { id: true, status: true },
+      });
+
+      if (!moderationCase) {
+        moderationCase = await transaction.questionModerationCase.upsert({
+          where: { questionId: dto.questionId },
+          create: { questionId: dto.questionId },
+          update: {},
+          select: { id: true, status: true },
+        });
+
+        const openedEvent = await transaction.questionModerationEvent.findFirst({
+          where: { caseId: moderationCase.id, action: 'opened' },
+          select: { id: true },
+        });
+
+        if (!openedEvent) {
+          await transaction.questionModerationEvent.create({
+            data: {
+              caseId: moderationCase.id,
+              actorId: dto.userId,
+              action: 'opened',
+              toStatus: QuestionModerationStatus.open,
+              reason: 'Learner report submitted.',
+            },
+          });
+        }
+      } else if (
+        moderationCase.status === QuestionModerationStatus.resolved ||
+        moderationCase.status === QuestionModerationStatus.dismissed
+      ) {
+        const reopenResult = await transaction.questionModerationCase.updateMany({
+          where: {
+            id: moderationCase.id,
+            status: moderationCase.status,
+          },
+          data: {
+            status: QuestionModerationStatus.open,
+            assignedModeratorId: null,
+            resolution: null,
+            resolutionNote: null,
+            openedAt: new Date(),
+            closedAt: null,
+          },
+        });
+
+        if (reopenResult.count === 1) {
+          await transaction.questionModerationEvent.create({
+            data: {
+              caseId: moderationCase.id,
+              actorId: dto.userId,
+              action: 'reopened',
+              fromStatus: moderationCase.status,
+              toStatus: QuestionModerationStatus.open,
+              reason: 'A new learner report reopened this question.',
+            },
+          });
+        }
+      }
+
+      return true;
     });
 
-    // Check if auto-flag threshold reached
-    await this.checkAutoFlag(dto.questionId, dto.issue);
+    if (created) {
+      await this.checkAutoFlag(dto.questionId, dto.issue);
+    }
+
+    return { duplicate: !created };
   }
 
   async getFlagsForQuestion(questionId: string) {
@@ -61,39 +142,204 @@ export class QuestionFlagService {
     });
   }
 
-  async getModerationQueue() {
-    const questions = await this.prisma.question.findMany({
-      where: { questionFlags: { some: {} } },
-      orderBy: { updatedAt: 'desc' },
+  async getModerationQueue(
+    status?: QuestionModerationStatus,
+    includeClosed = false,
+  ) {
+    const cases = await this.prisma.questionModerationCase.findMany({
+      where: status
+        ? { status }
+        : includeClosed
+          ? undefined
+          : {
+              status: {
+                in: [
+                  QuestionModerationStatus.open,
+                  QuestionModerationStatus.in_review,
+                ],
+              },
+            },
+      orderBy: [{ openedAt: 'asc' }],
       take: 100,
-      select: {
-        id: true,
-        text: true,
-        category: true,
-        difficulty: true,
-        isActive: true,
-        updatedAt: true,
-        _count: { select: { questionFlags: true } },
-        course: { select: { id: true, title: true } },
-        unit: { select: { id: true, title: true } },
-        questionFlags: {
-          orderBy: { createdAt: 'desc' },
-          take: 20,
+      include: {
+        question: {
           select: {
             id: true,
-            issueType: true,
-            description: true,
-            createdAt: true,
+            text: true,
+            category: true,
+            difficulty: true,
+            isActive: true,
+            updatedAt: true,
+            course: { select: { id: true, title: true } },
+            unit: { select: { id: true, title: true } },
+            questionFlags: {
+              orderBy: { createdAt: 'desc' },
+              take: 50,
+              select: {
+                id: true,
+                issueType: true,
+                description: true,
+                createdAt: true,
+              },
+            },
+            _count: { select: { questionFlags: true } },
+          },
+        },
+        assignedModerator: {
+          select: { id: true, firstName: true, lastName: true, email: true },
+        },
+        events: {
+          orderBy: { createdAt: 'desc' },
+          take: 20,
+          include: {
+            actor: { select: { id: true, firstName: true, lastName: true } },
           },
         },
       },
     });
 
-    return questions.map(({ questionFlags, _count, ...question }) => ({
-      ...question,
-      flags: questionFlags,
-      flagCount: _count.questionFlags,
+    return cases.map(({ question, ...moderationCase }) => ({
+      ...moderationCase,
+      question: {
+        ...question,
+        flags: question.questionFlags,
+        flagCount: question._count.questionFlags,
+      },
     }));
+  }
+
+  async claimCase(questionId: string, moderatorId: string) {
+    return this.prisma.$transaction(async transaction => {
+      const moderationCase = await transaction.questionModerationCase.findUnique({
+        where: { questionId },
+      });
+
+      if (!moderationCase) {
+        throw new NotFoundException('Moderation case not found.');
+      }
+
+      if (
+        moderationCase.status !== QuestionModerationStatus.open &&
+        moderationCase.status !== QuestionModerationStatus.in_review
+      ) {
+        throw new ConflictException('This moderation case is already closed.');
+      }
+
+      if (
+        moderationCase.status === QuestionModerationStatus.in_review &&
+        moderationCase.assignedModeratorId !== moderatorId
+      ) {
+        throw new ConflictException('This case is assigned to another moderator.');
+      }
+
+      if (moderationCase.status === QuestionModerationStatus.in_review) {
+        return moderationCase;
+      }
+
+      const claimResult = await transaction.questionModerationCase.updateMany({
+        where: {
+          id: moderationCase.id,
+          status: QuestionModerationStatus.open,
+        },
+        data: {
+          status: QuestionModerationStatus.in_review,
+          assignedModeratorId: moderatorId,
+        },
+      });
+
+      if (claimResult.count !== 1) {
+        throw new ConflictException('This case was claimed by another moderator.');
+      }
+
+      await transaction.questionModerationEvent.create({
+        data: {
+          caseId: moderationCase.id,
+          actorId: moderatorId,
+          action: 'claimed',
+          fromStatus: moderationCase.status,
+          toStatus: QuestionModerationStatus.in_review,
+        },
+      });
+
+      return transaction.questionModerationCase.findUniqueOrThrow({
+        where: { id: moderationCase.id },
+      });
+    });
+  }
+
+  async decideCase(
+    questionId: string,
+    moderatorId: string,
+    decision: DecideQuestionModerationDto,
+  ) {
+    return this.prisma.$transaction(async transaction => {
+      const moderationCase = await transaction.questionModerationCase.findUnique({
+        where: { questionId },
+      });
+
+      if (!moderationCase) {
+        throw new NotFoundException('Moderation case not found.');
+      }
+
+      if (moderationCase.status !== QuestionModerationStatus.in_review) {
+        throw new ConflictException('Claim the case before recording a decision.');
+      }
+
+      if (moderationCase.assignedModeratorId !== moderatorId) {
+        throw new ConflictException('Only the assigned moderator can decide this case.');
+      }
+
+      if (decision.status === 'resolved' && !decision.resolution) {
+        throw new ConflictException('A resolution category is required.');
+      }
+
+      const status =
+        decision.status === 'resolved'
+          ? QuestionModerationStatus.resolved
+          : QuestionModerationStatus.dismissed;
+      const decisionResult = await transaction.questionModerationCase.updateMany({
+        where: {
+          id: moderationCase.id,
+          status: QuestionModerationStatus.in_review,
+          assignedModeratorId: moderatorId,
+        },
+        data: {
+          status,
+          resolution: decision.resolution ?? 'dismissed',
+          resolutionNote: decision.reason,
+          closedAt: new Date(),
+        },
+      });
+
+      if (decisionResult.count !== 1) {
+        throw new ConflictException('This case changed before the decision was saved.');
+      }
+
+      if (
+        decision.status === 'resolved' &&
+        decision.resolution === 'question_withdrawn'
+      ) {
+        await transaction.question.update({
+          where: { id: questionId },
+          data: { isActive: false },
+        });
+      }
+
+      await transaction.questionModerationEvent.create({
+        data: {
+          caseId: moderationCase.id,
+          actorId: moderatorId,
+          action: decision.status,
+          fromStatus: moderationCase.status,
+          toStatus: status,
+          reason: decision.reason,
+        },
+      });
+
+      return transaction.questionModerationCase.findUniqueOrThrow({
+        where: { id: moderationCase.id },
+      });
+    });
   }
 
   /**
@@ -101,7 +347,7 @@ export class QuestionFlagService {
    */
   private async checkAutoFlag(
     questionId: string,
-    issue: FlagIssueType,
+    issue: QuestionFlagIssue,
   ): Promise<void> {
     try {
       const count = await this.prisma.questionFlag.count({
@@ -121,7 +367,6 @@ export class QuestionFlagService {
         return;
       }
 
-      // Find instructors of the course this question belongs to
       const instructors = question.courseId
         ? await this.prisma.courseInstructor.findMany({
             where: { courseId: question.courseId },
@@ -136,7 +381,7 @@ export class QuestionFlagService {
         await this.prisma.notification.create({
           data: {
             userId: instructor.userId,
-            message: `⚠️ Question flagged ${count}x for "${issue}": "${preview}...". Please review.`,
+            message: `Question flagged ${count}x for "${issue}": "${preview}...". Please review.`,
             type: 'question_flag_alert',
             priority: NotificationPriority.high,
             metadata: { questionId, issue, flagCount: count },

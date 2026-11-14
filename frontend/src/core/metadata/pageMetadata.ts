@@ -206,7 +206,7 @@ export const pageMetadata: RouteMetadata[] = [
   {
     path: '/instructor',
     title: 'Instructor Dashboard',
-    description: 'Manage teaching activities and course resources.',
+    description: 'Manage courses, assessments, teaching resources, and learner reviews in one workspace.',
   },
   {
     path: '/learning-paths',
@@ -306,7 +306,7 @@ export const pageMetadata: RouteMetadata[] = [
   {
     path: '/study-planner',
     title: 'Study Planner',
-    description: 'Organize study sessions, materials, and learning goals.',
+    description: 'Plan focused study sessions, track learning goals, and organize materials to stay on top of your progress.',
   },
   {
     path: '/study-planner/goals',

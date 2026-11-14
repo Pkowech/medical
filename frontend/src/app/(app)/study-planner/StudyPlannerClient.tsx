@@ -10,7 +10,7 @@ export default function StudyPlannerClient() {
   React.useEffect(() => {
     setHeader({
       title: 'Study Planner',
-      description: 'Your personalized study dashboard and progress tracker.',
+      description: 'Plan focused study sessions, track learning goals, and organize materials to stay on top of your progress.',
     });
 
     return () => setHeader(null);

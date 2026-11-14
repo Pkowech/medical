@@ -10,8 +10,7 @@ import { usePermissions } from '@/features/auth/hooks/usePermissions';
 import { courseService } from '@/features/courses/services/courseService';
 import { materialService } from '@/features/courses/services/materialService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
-import { Button } from '@/shared/components/ui/button';
-import { BookOpen, CheckCircle2, ClipboardList, FileText, Layers3, PlusCircle, Upload } from 'lucide-react';
+import { BookOpen, CheckCircle2, ChevronRight, ClipboardList, FileText, Layers3 } from 'lucide-react';
 import Link from 'next/link';
 
 export default function InstructorDashboardPage() {
@@ -126,51 +125,74 @@ export default function InstructorDashboardPage() {
   }
 
   return (
-    <div className="space-y-6 p-1">
-      <div className="flex flex-col gap-4 rounded-xl border border-border bg-muted/30 p-4 md:flex-row md:items-center md:justify-between">
+    <div className="space-y-6">
+      <section aria-labelledby="instructor-tools" className="space-y-3">
         <div>
-          <p className="text-sm font-medium text-primary">Instructor dashboard</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight">Content and curriculum governance</h1>
+          <h2 id="instructor-tools" className="text-lg font-semibold text-foreground">Teaching tools</h2>
+          <p className="text-sm text-muted-foreground">Create assessments and organize your teaching resources.</p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button asChild variant="outline">
-            <Link href="/instructor/materials">
-              <Upload className="mr-2 h-4 w-4" /> Upload material
+        <nav aria-label="Instructor tools" className="grid gap-3 sm:grid-cols-2">
+          {[
+            {
+              href: '/instructor/quiz-authoring',
+              label: 'Quiz authoring',
+              description: 'Create and review assessments for your learners.',
+              action: 'Open quiz authoring',
+              icon: ClipboardList,
+            },
+            {
+              href: '/instructor/materials',
+              label: 'Teaching materials',
+              description: 'Upload and manage course resources.',
+              action: 'Browse materials',
+              icon: FileText,
+            },
+          ].map(({ href, label, description, action, icon: Icon }) => (
+            <Link
+              key={href}
+              href={href}
+              className="group flex min-h-36 flex-col rounded-xl border border-border bg-card/80 p-4 shadow-sm transition-colors hover:border-blue-300 hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:bg-card/70 dark:hover:border-blue-800 dark:hover:bg-card"
+            >
+              <span className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300">
+                <Icon aria-hidden="true" className="h-5 w-5" />
+              </span>
+              <span className="font-semibold text-foreground">{label}</span>
+              <span className="mt-1 flex-1 text-sm text-muted-foreground">{description}</span>
+              <span className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-blue-700 dark:text-blue-300">
+                {action}
+                <ChevronRight aria-hidden="true" className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+              </span>
             </Link>
-          </Button>
-          <Button asChild variant="outline">
-            <Link href="/instructor/quiz-authoring">
-              <ClipboardList className="mr-2 h-4 w-4" /> Quiz authoring
-            </Link>
-          </Button>
-          <Button asChild>
-            <Link href="/instructor/content">
-              <PlusCircle className="mr-2 h-4 w-4" /> Manage content
-            </Link>
-          </Button>
-        </div>
-      </div>
+          ))}
+        </nav>
+      </section>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {overviewCards.map(({ title, value, description, icon: Icon, tone, href }) => (
-          <Link key={title} href={href} className="block">
-            <Card className="h-full transition-colors hover:border-primary/40">
-              <CardHeader className="pb-2">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
-                  <div className={`rounded-lg bg-muted p-2 ${tone}`}>
-                    <Icon className="h-4 w-4" />
+      <section aria-labelledby="instructor-overview" className="space-y-3">
+        <div>
+          <h2 id="instructor-overview" className="text-lg font-semibold text-foreground">Teaching overview</h2>
+          <p className="text-sm text-muted-foreground">A quick look at your courses, resources, and review queue.</p>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+          {overviewCards.map(({ title, value, description, icon: Icon, tone, href }) => (
+            <Link key={title} href={href} className="block">
+              <Card className="h-full border-border bg-card/80 shadow-sm backdrop-blur-sm transition-colors hover:border-primary/40 dark:border-border/50 dark:bg-card/50">
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
+                    <div className={`rounded-lg bg-blue-50 p-2 ${tone} dark:bg-blue-950/50`}>
+                      <Icon className="h-4 w-4" />
+                    </div>
                   </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-semibold tracking-tight">{value}</div>
-                <p className="mt-2 text-xs text-muted-foreground">{description}</p>
-              </CardContent>
-            </Card>
-          </Link>
-        ))}
-      </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-semibold tracking-tight">{value}</div>
+                  <p className="mt-2 text-xs text-muted-foreground">{description}</p>
+                </CardContent>
+              </Card>
+            </Link>
+          ))}
+        </div>
+      </section>
 
       <InstructorCourseManager instructorId={user.id} />
     </div>

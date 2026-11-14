@@ -20,9 +20,11 @@ import {
   Brain,
   Award,
   ArrowRight,
+  Flag,
 } from 'lucide-react';
 import { apiService } from '@/features/auth/services/apiClient';
 import { toast } from 'sonner';
+import { Textarea } from '@/shared/components/ui/textarea';
 import { useCourseStudySession } from '@/features/learning-management/study/components/CourseStudySessionProvider';
 import { v4 as uuidv4 } from 'uuid';
 import { offlineService } from '@/lib/core/offline/offlineService';
@@ -89,6 +91,12 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
   const [isOffline, setIsOffline] = useState(false);
   const [isProvisional, setIsProvisional] = useState(false);
   const [attemptId, setAttemptId] = useState(() => uuidv4());
+  const [isReportOpen, setIsReportOpen] = useState(false);
+  const [reportIssue, setReportIssue] = useState('incorrect');
+  const [reportDescription, setReportDescription] = useState('');
+  const [isReporting, setIsReporting] = useState(false);
+  const [reportNotice, setReportNotice] = useState<string | null>(null);
+  const [reportError, setReportError] = useState<string | null>(null);
 
   const resetQuizState = React.useCallback(() => {
     setQuestions([]);
@@ -101,6 +109,10 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
     setGateDecision(undefined);
     setIsProvisional(false);
     setAttemptId(uuidv4());
+    setIsReportOpen(false);
+    setReportDescription('');
+    setReportNotice(null);
+    setReportError(null);
   }, []);
 
   React.useEffect(() => {
@@ -179,6 +191,37 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
   const currentQuestion = questions[currentQuestionIndex];
   const progress = questions.length > 0 ? ((currentQuestionIndex + 1) / questions.length) * 100 : 0;
   const hasCurrentAnswer = Boolean(currentQuestion && selectedAnswers[currentQuestion.id]?.length);
+
+  React.useEffect(() => {
+    setIsReportOpen(false);
+    setReportNotice(null);
+    setReportError(null);
+  }, [currentQuestion?.id]);
+
+  const submitQuestionReport = async () => {
+    if (!currentQuestion || isOffline) return;
+
+    setIsReporting(true);
+    setReportError(null);
+    try {
+      const response = await apiService.post<{ duplicate: boolean }>('/question-flags', {
+        questionId: currentQuestion.id,
+        issue: reportIssue,
+        description: reportDescription.trim() || undefined,
+      });
+      setIsReportOpen(false);
+      setReportDescription('');
+      setReportNotice(
+        response.data.duplicate
+          ? 'You have already submitted this report.'
+          : 'Thanks. Your report has been sent to the moderation team.',
+      );
+    } catch (error) {
+      setReportError(error instanceof Error ? error.message : 'Your report could not be submitted.');
+    } finally {
+      setIsReporting(false);
+    }
+  };
 
   const handleAnswerSelect = (optionId: string, isMultiSelect: boolean) => {
     if (!currentQuestion) return;
@@ -450,6 +493,63 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
             <div className="flex gap-2">
               <Badge variant="secondary">{currentQuestion.difficulty}</Badge>
               <Badge variant="outline">{currentQuestion.points} points</Badge>
+            </div>
+
+            <div className="space-y-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={isOffline}
+                onClick={() => {
+                  setIsReportOpen(open => !open);
+                  setReportError(null);
+                  setReportNotice(null);
+                }}
+              >
+                <Flag className="mr-2 h-4 w-4" />
+                Report question
+              </Button>
+              {reportNotice && <p className="text-sm text-green-700" role="status">{reportNotice}</p>}
+              {isOffline && (
+                <p className="text-xs text-muted-foreground">Connect to the internet to report a question.</p>
+              )}
+              {isReportOpen && (
+                <div className="space-y-3 rounded-md border border-border p-3">
+                  <label className="block space-y-1 text-sm">
+                    <span className="font-medium">What is the issue?</span>
+                    <select
+                      className="w-full rounded-md border border-input bg-background px-3 py-2"
+                      value={reportIssue}
+                      onChange={event => setReportIssue(event.target.value)}
+                    >
+                      <option value="incorrect">Incorrect answer or content</option>
+                      <option value="ambiguous">Ambiguous wording</option>
+                      <option value="outdated">Outdated information</option>
+                      <option value="inappropriate">Inappropriate content</option>
+                    </select>
+                  </label>
+                  <label className="block space-y-1 text-sm">
+                    <span className="font-medium">Additional details (optional)</span>
+                    <Textarea
+                      value={reportDescription}
+                      onChange={event => setReportDescription(event.target.value)}
+                      maxLength={2000}
+                      rows={3}
+                      placeholder="Describe what should be reviewed."
+                    />
+                  </label>
+                  {reportError && <p className="text-sm text-destructive" role="alert">{reportError}</p>}
+                  <div className="flex justify-end gap-2">
+                    <Button type="button" variant="outline" onClick={() => setIsReportOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button type="button" onClick={submitQuestionReport} disabled={isReporting || isOffline}>
+                      {isReporting ? 'Sending…' : 'Submit report'}
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Options */}
