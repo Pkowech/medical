@@ -42,6 +42,16 @@ export interface QuizPerformanceRecommendations {
   }>;
 }
 
+export interface StartedQuizAttempt {
+  attemptId: string;
+  startedAt: string;
+  questionIds: string[];
+  answers: Array<{ questionId: string; selectedOption: string | null }>;
+  timeLimit: number | null;
+  expiresAt: string | null;
+  showResults: boolean;
+}
+
 class QuizService {
   private readonly baseUrl = '/quizzes';
 
@@ -53,32 +63,43 @@ class QuizService {
     return response.data;
   }
 
+  async startQuizAttempt(
+    quizOrUnitId: string | number,
+    attemptId: string
+  ): Promise<StartedQuizAttempt> {
+    const response = await apiService.post<StartedQuizAttempt>(
+      `${this.baseUrl}/${quizOrUnitId}/start`,
+      { attemptId }
+    );
+    return response.data;
+  }
+
   async submitAnswer(
+    attemptId: string,
     questionId: string,
     selectedOptionId: string
-  ): Promise<{ correct: boolean; explanation?: string }> {
-    const response = await apiService.post<{
-      correct: boolean;
-      explanation?: string;
-    }>(`${this.baseUrl}/submit`, {
-      questionId,
-      selectedOptionIds: [selectedOptionId],
-    });
+  ): Promise<{ saved: true }> {
+    const response = await apiService.post<{ saved: true }>(
+      `${this.baseUrl}/attempts/${attemptId}/answers`,
+      { questionId, selectedOption: selectedOptionId }
+    );
     return response.data;
   }
 
   async submitUnitQuiz(
     unitId: string | number,
     attemptId: string,
-    answers: Array<{ questionId: string; selectedOption: string }>
+    answers: Array<{ questionId: string; selectedOption: string | null }>
   ): Promise<{
-    percentage: number;
-    isPassed: boolean;
+    percentage?: number;
+    isPassed?: boolean;
+    resultsAvailable?: boolean;
     recommendations?: QuizPerformanceRecommendations;
   }> {
     const response = await apiService.post<{
-      percentage: number;
-      isPassed: boolean;
+      percentage?: number;
+      isPassed?: boolean;
+      resultsAvailable?: boolean;
       recommendations?: QuizPerformanceRecommendations;
     }>(`${this.baseUrl}/submit?type=full`, { unitId, attemptId, answers });
     return response.data;

@@ -48,6 +48,62 @@ type PublicQuizQuestion = Omit<
   options: Array<Pick<Option, 'id' | 'text' | 'order'>>;
 };
 
+type StoredQuizAnswer = {
+  questionId: string;
+  selectedOption: unknown;
+};
+
+type QuizAttemptStartResult = {
+  attemptId: string;
+  startedAt: Date;
+  questionIds: string[];
+  answers: StoredQuizAnswer[];
+  timeLimit: number | null;
+  expiresAt: Date | null;
+  showResults: boolean;
+};
+
+function parseStoredQuizAnswers(value: unknown): StoredQuizAnswer[] {
+  if (!Array.isArray(value)) {
+    throw new ConflictException('Stored quiz answers are invalid');
+  }
+
+  const answers = value.map((entry) => {
+    if (
+      !entry ||
+      typeof entry !== 'object' ||
+      Array.isArray(entry) ||
+      typeof entry.questionId !== 'string' ||
+      !('selectedOption' in entry)
+    ) {
+      throw new ConflictException('Stored quiz answers are invalid');
+    }
+    return {
+      questionId: entry.questionId,
+      selectedOption: entry.selectedOption,
+    };
+  });
+
+  if (
+    new Set(answers.map(({ questionId }) => questionId)).size !==
+    answers.length
+  ) {
+    throw new ConflictException('Stored quiz answers are invalid');
+  }
+  return answers;
+}
+
+function isAttemptPastDeadline(
+  startedAt: Date,
+  timeLimit: number | null,
+  now = new Date(),
+): boolean {
+  return (
+    timeLimit !== null &&
+    now.getTime() >= startedAt.getTime() + timeLimit * 60_000
+  );
+}
+
 function canonicalizeOptionResponses(value: unknown): string {
   if (!Array.isArray(value)) {
     throw new ConflictException('Stored quiz responses are invalid');
@@ -244,7 +300,11 @@ export class QuizService {
     }
 
     const quiz = await this.prisma.$transaction(async (tx) => {
-      const questionRecords: Array<{ questionId: string; order: number }> = [];
+      const questionRecords: Array<{
+        questionId: string;
+        order: number;
+        points: number;
+      }> = [];
       for (const [index, question] of preparedQuestions.entries()) {
         const createdQuestion = await tx.question.create({
           data: {
@@ -275,6 +335,7 @@ export class QuizService {
         questionRecords.push({
           questionId: createdQuestion.id,
           order: index + 1,
+          points: question.points ?? 1,
         });
       }
 
@@ -282,9 +343,21 @@ export class QuizService {
         data: {
           title: data.title,
           description: data.description,
+          instructions: data.instructions,
+          timeLimit: data.timeLimit,
           unitId,
           topicId,
+          maxAttempts: data.maxAttempts ?? 3,
           passingScore: data.passingScore ?? 70,
+          shuffleQuestions: data.shuffleQuestions ?? false,
+          showResults: data.showResults ?? true,
+          availableFrom: data.availableFrom
+            ? new Date(data.availableFrom)
+            : undefined,
+          availableUntil: data.availableUntil
+            ? new Date(data.availableUntil)
+            : undefined,
+          expiresAt: data.expiresAt ? new Date(data.expiresAt) : undefined,
           isPublished: data.isPublished ?? false,
           publishedAt: data.isPublished ? new Date() : null,
           createdBy: creatorId,
@@ -320,6 +393,7 @@ export class QuizService {
   ): Promise<void> {
     await Promise.all([
       this.redisService.delPattern('questions:*'),
+      this.redisService.delPattern('adaptive_quiz_questions:*'),
       this.redisService.delPattern('quizzes:*'),
       this.redisService.delPattern('unit:*:questions:v2'),
       this.redisService.delPattern('unit:*:questions:v3:*'),
@@ -509,8 +583,16 @@ export class QuizService {
   private async ensureTopicPracticeQuiz(
     tx: Prisma.TransactionClient,
     topic: { id: string; name: string; unitId: string },
-    questions: Array<{ id: string }>,
+    questions: Array<{ id: string; points: number }>,
   ): Promise<Quiz> {
+    const existingQuiz = await tx.quiz.findUnique({
+      where: { topicPracticeForId: topic.id },
+      include: { _count: { select: { attempts: true } } },
+    });
+    if (existingQuiz && existingQuiz._count.attempts > 0) {
+      return existingQuiz;
+    }
+
     const quiz = await tx.quiz.upsert({
       where: { topicPracticeForId: topic.id },
       create: {
@@ -529,6 +611,7 @@ export class QuizService {
           create: questions.map((question, order) => ({
             questionId: question.id,
             order,
+            points: question.points,
           })),
         },
       },
@@ -558,6 +641,7 @@ export class QuizService {
           quizId: quiz.id,
           questionId: question.id,
           order,
+          points: question.points,
         })),
       });
     }
@@ -634,21 +718,48 @@ export class QuizService {
         data: {
           title: data.title || 'Untitled Quiz',
           description: data.description,
+          instructions: data.instructions,
+          timeLimit: data.timeLimit,
           unitId: data.unitId,
           topicId: data.topicId,
           maxAttempts: data.maxAttempts || 3,
           passingScore: data.passingScore || 70,
+          shuffleQuestions: data.shuffleQuestions ?? false,
+          showResults: data.showResults ?? true,
+          availableFrom: data.availableFrom
+            ? new Date(data.availableFrom)
+            : undefined,
+          availableUntil: data.availableUntil
+            ? new Date(data.availableUntil)
+            : undefined,
+          expiresAt: data.expiresAt ? new Date(data.expiresAt) : undefined,
           isPublished: data.isPublished || false,
           createdBy: creatorId,
         },
       });
 
       if (data.questions && data.questions.length > 0) {
+        const questions = await tx.question.findMany({
+          where: { id: { in: data.questions } },
+          select: { id: true, points: true },
+        });
+        if (questions.length !== data.questions.length) {
+          throw new BadRequestException(
+            'One or more quiz questions could not be found',
+          );
+        }
+        const pointsByQuestionId = new Map(
+          questions.map(({ id: questionId, points }) => [
+            questionId,
+            points,
+          ]),
+        );
         await tx.quizQuestion.createMany({
           data: data.questions.map((qId, index) => ({
             quizId: createdQuiz.id,
             questionId: qId,
             order: index + 1,
+            points: pointsByQuestionId.get(qId) ?? 1,
           })),
         });
       }
@@ -925,13 +1036,41 @@ export class QuizService {
     }
 
     const quiz = await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT id FROM quizzes WHERE id = ${id} FOR UPDATE
+      `;
+      const attempts = await tx.quizAttempt.count({
+        where: { quizId: id },
+      });
+      if (attempts > 0) {
+        throw new ConflictException(
+          'A quiz with recorded attempts is immutable; create a new quiz version instead',
+        );
+      }
+
       if (data.questions) {
+        const questions = await tx.question.findMany({
+          where: { id: { in: data.questions } },
+          select: { id: true, points: true },
+        });
+        if (questions.length !== data.questions.length) {
+          throw new BadRequestException(
+            'One or more quiz questions could not be found',
+          );
+        }
+        const pointsByQuestionId = new Map(
+          questions.map(({ id: questionId, points }) => [
+            questionId,
+            points,
+          ]),
+        );
         await tx.quizQuestion.deleteMany({ where: { quizId: id } });
         await tx.quizQuestion.createMany({
           data: data.questions.map((qId, index) => ({
             quizId: id,
             questionId: qId,
             order: index + 1,
+            points: pointsByQuestionId.get(qId) ?? 1,
           })),
         });
       }
@@ -941,8 +1080,19 @@ export class QuizService {
         data: {
           title: data.title,
           description: data.description,
+          instructions: data.instructions,
+          timeLimit: data.timeLimit,
           maxAttempts: data.maxAttempts,
           passingScore: data.passingScore,
+          shuffleQuestions: data.shuffleQuestions,
+          showResults: data.showResults,
+          availableFrom: data.availableFrom
+            ? new Date(data.availableFrom)
+            : undefined,
+          availableUntil: data.availableUntil
+            ? new Date(data.availableUntil)
+            : undefined,
+          expiresAt: data.expiresAt ? new Date(data.expiresAt) : undefined,
           isPublished: data.isPublished ?? existingQuiz.isPublished,
         },
         include: {
@@ -996,6 +1146,17 @@ export class QuizService {
       }
 
       await tx.quizQuestion.deleteMany({ where: { quizId: id } });
+      await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT id FROM quizzes WHERE id = ${id} FOR UPDATE
+      `;
+      const attempts = await tx.quizAttempt.count({
+        where: { quizId: id },
+      });
+      if (attempts > 0) {
+        throw new ConflictException(
+          'A quiz with recorded attempts cannot be deleted',
+        );
+      }
       await tx.quiz.delete({ where: { id } });
     });
 
@@ -1014,6 +1175,7 @@ export class QuizService {
 
     const quizVersions = await this.prisma.quiz.findMany({
       where: { unitId, topicId: null },
+      orderBy: { updatedAt: 'desc' },
       select: { id: true, isPublished: true, updatedAt: true },
     });
     const publishedQuiz = quizVersions.find((quiz) => quiz.isPublished);
@@ -1040,6 +1202,7 @@ export class QuizService {
       ? await this.prisma.quiz
           .findFirst({
             where: { unitId, topicId: null, isPublished: true },
+            orderBy: { updatedAt: 'desc' },
             include: {
               questions: {
                 where: { question: this.getPublicQuestionWhere() },
@@ -1223,32 +1386,279 @@ export class QuizService {
     return publicQuestions;
   }
 
-  @ApiOperation({ summary: 'Submit an answer for a question' })
-  @ApiResponse({ status: 200, description: 'Answer submitted successfully' })
-  async submitAnswer(
+  async startQuizAttempt(
     userId: string,
-    questionId: string,
-    answer: string,
-  ): Promise<{
-    correct: boolean;
-    explanation?: string;
-  }> {
-    const question = await this.prisma.question.findFirst({
-      where: { id: questionId, ...this.getPublicQuestionWhere() },
-      include: { options: true },
-    });
-
-    if (!question) {
-      throw new NotFoundException(`Question ${questionId} not found`);
+    quizOrUnitId: string,
+    attemptId: string,
+  ): Promise<QuizAttemptStartResult> {
+    if (
+      typeof attemptId !== 'string' ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        attemptId,
+      )
+    ) {
+      throw new BadRequestException('A valid quiz attempt ID is required');
     }
 
-    const isCorrect = this.validateAnswer(question, answer);
-    await this.recordAttempt(userId, questionId, isCorrect);
-
-    return {
-      correct: isCorrect,
-      explanation: question.explanation ?? undefined,
+    const attemptInclude = {
+      quiz: {
+        select: {
+          id: true,
+          unitId: true,
+          timeLimit: true,
+          showResults: true,
+        },
+      },
     };
+    const existingAttempt = await this.prisma.quizAttempt.findUnique({
+      where: { id: attemptId },
+      include: attemptInclude,
+    });
+    if (existingAttempt) {
+      return this.toQuizAttemptStart(
+        existingAttempt,
+        existingAttempt.quiz,
+        userId,
+        quizOrUnitId,
+      );
+    }
+
+    const quizInclude = {
+      questions: {
+        where: { question: this.getPublicQuestionWhere() },
+        orderBy: { order: 'asc' as const },
+        select: { questionId: true },
+      },
+      unit: {
+        select: {
+          isPublished: true,
+          course: { select: { status: true } },
+        },
+      },
+      topic: {
+        select: {
+          unit: {
+            select: {
+              isPublished: true,
+              course: { select: { status: true } },
+            },
+          },
+        },
+      },
+    };
+    let quiz = await this.prisma.quiz.findFirst({
+      where: {
+        id: quizOrUnitId,
+        OR: [
+          { isPublished: true },
+          { autoGeneratedQuizzes: { some: { userId } } },
+        ],
+      },
+      include: quizInclude,
+    });
+    if (!quiz) {
+      quiz = await this.prisma.quiz.findFirst({
+        where: { unitId: quizOrUnitId, topicId: null, isPublished: true },
+        orderBy: { updatedAt: 'desc' },
+        include: quizInclude,
+      });
+    }
+
+    if (!quiz || !this.isQuizParentPublished(quiz)) {
+      throw new NotFoundException('No published quiz is available');
+    }
+    const now = new Date();
+    if (
+      (quiz.availableFrom && quiz.availableFrom > now) ||
+      (quiz.availableUntil && quiz.availableUntil <= now) ||
+      (quiz.expiresAt && quiz.expiresAt <= now)
+    ) {
+      throw new ConflictException('This quiz is outside its availability window');
+    }
+    if (quiz.questions.length === 0) {
+      throw new NotFoundException('The published quiz has no available questions');
+    }
+
+    const questionIds = quiz.questions.map(({ questionId }) => questionId);
+    if (quiz.shuffleQuestions) {
+      for (let index = questionIds.length - 1; index > 0; index--) {
+        const swapIndex = Math.floor(Math.random() * (index + 1));
+        [questionIds[index], questionIds[swapIndex]] = [
+          questionIds[swapIndex],
+          questionIds[index],
+        ];
+      }
+    }
+    const initialAnswers: StoredQuizAnswer[] = questionIds.map(
+      (questionId) => ({ questionId, selectedOption: null }),
+    );
+
+    try {
+      const attempt = await this.prisma.$transaction(async (tx) => {
+        await tx.$queryRaw<Array<{ id: string }>>`
+          SELECT id FROM quizzes WHERE id = ${quiz.id} FOR UPDATE
+        `;
+        const racedAttempt = await tx.quizAttempt.findUnique({
+          where: { id: attemptId },
+          include: attemptInclude,
+        });
+        if (racedAttempt) {
+          return this.toQuizAttemptStart(
+            racedAttempt,
+            racedAttempt.quiz,
+            userId,
+            quizOrUnitId,
+          );
+        }
+
+        const existingAttempts = await tx.quizAttempt.count({
+          where: { userId, quizId: quiz.id },
+        });
+        if (
+          quiz.maxAttempts !== null &&
+          existingAttempts >= quiz.maxAttempts
+        ) {
+          throw new MaxAttemptsExceededException(quiz.id);
+        }
+
+        const createdAttempt = await tx.quizAttempt.create({
+          data: {
+            id: attemptId,
+            userId,
+            quizId: quiz.id,
+            startedAt: now,
+            answers: initialAnswers as Prisma.InputJsonValue,
+          },
+        });
+        return this.toQuizAttemptStart(
+          createdAttempt,
+          quiz,
+          userId,
+          quizOrUnitId,
+        );
+      });
+      return attempt;
+    } catch (error) {
+      if (
+        error &&
+        typeof error === 'object' &&
+        'code' in error &&
+        error.code === 'P2002'
+      ) {
+        const committedAttempt = await this.prisma.quizAttempt.findUnique({
+          where: { id: attemptId },
+          include: attemptInclude,
+        });
+        if (committedAttempt) {
+          return this.toQuizAttemptStart(
+            committedAttempt,
+            committedAttempt.quiz,
+            userId,
+            quizOrUnitId,
+          );
+        }
+      }
+      throw error;
+    }
+  }
+
+  private toQuizAttemptStart(
+    attempt: Pick<QuizAttempt, 'id' | 'userId' | 'startedAt' | 'answers'>,
+    quiz: {
+      id: string;
+      unitId: string | null;
+      timeLimit: number | null;
+      showResults: boolean;
+    },
+    userId: string,
+    quizOrUnitId: string,
+  ): QuizAttemptStartResult {
+    if (
+      attempt.userId !== userId ||
+      (quiz.id !== quizOrUnitId && quiz.unitId !== quizOrUnitId)
+    ) {
+      throw new ConflictException(
+        'This quiz attempt ID is already associated with another submission',
+      );
+    }
+
+    const answers = parseStoredQuizAnswers(attempt.answers);
+    const expiresAt =
+      quiz.timeLimit === null
+        ? null
+        : new Date(attempt.startedAt.getTime() + quiz.timeLimit * 60_000);
+    return {
+      attemptId: attempt.id,
+      startedAt: attempt.startedAt,
+      questionIds: answers.map(({ questionId }) => questionId),
+      answers,
+      timeLimit: quiz.timeLimit,
+      expiresAt,
+      showResults: quiz.showResults,
+    };
+  }
+
+  async saveQuizAttemptAnswer(
+    userId: string,
+    attemptId: string,
+    questionId: string,
+    selectedOption: string,
+  ): Promise<{ saved: true }> {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT id FROM quiz_attempts WHERE id = ${attemptId} FOR UPDATE
+      `;
+      const attempt = await tx.quizAttempt.findUnique({
+        where: { id: attemptId },
+        include: { quiz: { select: { timeLimit: true } } },
+      });
+      if (!attempt) {
+        throw new NotFoundException(`Quiz attempt ${attemptId} not found`);
+      }
+      if (attempt.userId !== userId) {
+        throw new ConflictException('This quiz attempt belongs to another user');
+      }
+      if (attempt.completedAt) {
+        throw new ConflictException('This quiz attempt has already been submitted');
+      }
+      if (
+        isAttemptPastDeadline(
+          attempt.startedAt,
+          attempt.quiz.timeLimit,
+        )
+      ) {
+        throw new ConflictException('The quiz time limit has expired');
+      }
+
+      const answers = parseStoredQuizAnswers(attempt.answers);
+      const answerToUpdate = answers.find(
+        (answer) => answer.questionId === questionId,
+      );
+      if (!answerToUpdate) {
+        throw new BadRequestException(
+          'The question is not part of this quiz attempt',
+        );
+      }
+      const option = await tx.option.findFirst({
+        where: {
+          id: selectedOption,
+          questionId,
+        },
+        select: { id: true },
+      });
+      if (!option) {
+        throw new BadRequestException(
+          'The selected option is not part of this question',
+        );
+      }
+
+      answerToUpdate.selectedOption = selectedOption;
+      await tx.quizAttempt.update({
+        where: { id: attemptId },
+        data: { answers: answers as Prisma.InputJsonValue },
+      });
+      return { saved: true };
+    });
   }
 
   @ApiOperation({ summary: 'Get quiz results for a user' })
@@ -1340,11 +1750,14 @@ export class QuizService {
             id: true,
             topicId: true,
             unitId: true,
+            timeLimit: true,
             unit: { select: { courseId: true } },
           },
         },
       },
     });
+    let startedAttempt: NonNullable<typeof existingAttempt> | null = null;
+    let storedAnswers: StoredQuizAnswer[] | null = null;
     if (existingAttempt) {
       if (
         existingAttempt.userId !== userId ||
@@ -1356,46 +1769,48 @@ export class QuizService {
         );
       }
 
-      if (!Array.isArray(existingAttempt.answers)) {
-        throw new ConflictException('Stored quiz answers are invalid');
-      }
-      const expectedQuestionIds = existingAttempt.answers.map((answer) => {
+      storedAnswers = parseStoredQuizAnswers(existingAttempt.answers);
+      if (existingAttempt.completedAt) {
+        const submittedQuestionIds = answers.map(
+          (answer) => answer.questionId,
+        );
+        const expectedQuestionIds = storedAnswers.map(
+          ({ questionId }) => questionId,
+        );
         if (
-          !answer ||
-          typeof answer !== 'object' ||
-          Array.isArray(answer) ||
-          typeof answer.questionId !== 'string'
+          new Set(submittedQuestionIds).size !== submittedQuestionIds.length ||
+          submittedQuestionIds.some(
+            (questionId) => !expectedQuestionIds.includes(questionId),
+          )
         ) {
-          throw new ConflictException('Stored quiz answers are invalid');
+          throw new BadRequestException(
+            'A quiz submission contains duplicate or unknown question answers',
+          );
         }
-        return answer.questionId;
-      });
-      const submittedQuestionIds = answers.map((answer) => answer.questionId);
-      if (
-        new Set(submittedQuestionIds).size !== submittedQuestionIds.length ||
-        submittedQuestionIds.some(
-          (questionId) => !expectedQuestionIds.includes(questionId),
-        )
-      ) {
-        throw new BadRequestException(
-          'A quiz submission contains duplicate or unknown question answers',
+        const answersByQuestionId = new Map(
+          answers.map((answer) => [answer.questionId, answer]),
+        );
+        const normalizedAnswers = expectedQuestionIds.map(
+          (questionId) =>
+            answersByQuestionId.get(questionId) ?? {
+              questionId,
+              selectedOption: null,
+            },
+        );
+        return this.replayQuizSubmission(
+          existingAttempt,
+          existingAttempt.quiz,
+          userId,
+          canonicalizeQuizAnswers(normalizedAnswers),
         );
       }
-      const answersByQuestionId = new Map(
-        answers.map((answer) => [answer.questionId, answer]),
-      );
-      const normalizedAnswers = expectedQuestionIds.map(
-        (questionId) =>
-          answersByQuestionId.get(questionId) ?? {
-            questionId,
-            selectedOption: null,
-          },
-      );
-      return this.replayQuizSubmission(
-        existingAttempt,
-        existingAttempt.quiz,
-        userId,
-        canonicalizeQuizAnswers(normalizedAnswers),
+
+      startedAttempt = existingAttempt;
+    }
+
+    if (!startedAttempt || !storedAnswers) {
+      throw new ConflictException(
+        'Start a quiz attempt before submitting answers',
       );
     }
 
@@ -1426,17 +1841,20 @@ export class QuizService {
         },
       },
     };
+    const quizWhere: Prisma.QuizWhereInput = startedAttempt
+      ? { id: startedAttempt.quiz.id }
+      : {
+          id: unitId,
+          OR: [
+            { isPublished: true },
+            { autoGeneratedQuizzes: { some: { userId } } },
+          ],
+        };
     let quiz = await this.prisma.quiz.findFirst({
-      where: {
-        id: unitId,
-        OR: [
-          { isPublished: true },
-          { autoGeneratedQuizzes: { some: { userId } } },
-        ],
-      },
+      where: quizWhere,
       include: quizInclude,
     });
-    if (!quiz) {
+    if (!quiz && !startedAttempt) {
       quiz = await this.prisma.quiz.findFirst({
         where: { unitId, topicId: null, isPublished: true },
         include: quizInclude,
@@ -1453,7 +1871,7 @@ export class QuizService {
     }
 
     const activeQuiz = quiz;
-    if (!this.isQuizParentPublished(activeQuiz)) {
+    if (!startedAttempt && !this.isQuizParentPublished(activeQuiz)) {
       throw new NotFoundException(
         `No published quiz found for unit ${unitId}. Please use the generate endpoint first.`,
       );
@@ -1468,6 +1886,19 @@ export class QuizService {
     const expectedQuestionIds = activeQuiz.questions.map(
       (quizQuestion) => quizQuestion.questionId,
     );
+    const startedQuestionIds = storedAnswers.map(
+      ({ questionId }) => questionId,
+    );
+    if (
+      expectedQuestionIds.length !== startedQuestionIds.length ||
+      expectedQuestionIds.some(
+        (questionId) => !startedQuestionIds.includes(questionId),
+      )
+    ) {
+      throw new ConflictException(
+        'The quiz content no longer matches this attempt',
+      );
+    }
     if (
       new Set(submittedQuestionIds).size !== submittedQuestionIds.length ||
       submittedQuestionIds.some(
@@ -1490,15 +1921,10 @@ export class QuizService {
         },
     );
     const requestedAnswersKey = canonicalizeQuizAnswers(normalizedAnswers);
-    const existingAttempts = await this.prisma.quizAttempt.count({
-      where: { userId, quizId: activeQuiz.id },
-    });
-
-    if (activeQuiz.maxAttempts && existingAttempts >= activeQuiz.maxAttempts) {
-      this.logger.error(
-        `Maximum attempts exceeded for quiz ${activeQuiz.id} by user ${userId}`,
+    if (canonicalizeQuizAnswers(storedAnswers) !== requestedAnswersKey) {
+      throw new ConflictException(
+        'Submitted answers do not match the saved attempt answers',
       );
-      throw new MaxAttemptsExceededException(activeQuiz.id);
     }
 
     const bktUpdates: Array<{ skillId: string; isCorrect: boolean }> = [];
@@ -1507,18 +1933,35 @@ export class QuizService {
       Array<{ questionId: string; isCorrect: boolean }>
     >();
 
-    let result: { attempt: QuizAttempt };
+    let result: { attempt: QuizAttempt; alreadyCompleted?: boolean };
     try {
       result = await this.prisma.$transaction(async (tx) => {
-        const prelimAttempt = await tx.quizAttempt.create({
-          data: {
-            id: attemptId,
-            userId,
-            quizId: activeQuiz.id,
-            startedAt: new Date(),
-            answers: JSON.parse(requestedAnswersKey) as Prisma.InputJsonValue,
-          },
+        await tx.$queryRaw<Array<{ id: string }>>`
+          SELECT id FROM quiz_attempts WHERE id = ${attemptId} FOR UPDATE
+        `;
+        const prelimAttempt = await tx.quizAttempt.findUnique({
+          where: { id: attemptId },
         });
+        if (
+          !prelimAttempt ||
+          prelimAttempt.userId !== userId ||
+          prelimAttempt.quizId !== activeQuiz.id
+        ) {
+          throw new ConflictException(
+            'This quiz attempt is not available for submission',
+          );
+        }
+        if (prelimAttempt.completedAt) {
+          return { attempt: prelimAttempt, alreadyCompleted: true };
+        }
+        if (
+          canonicalizeQuizAnswers(prelimAttempt.answers) !==
+          requestedAnswersKey
+        ) {
+          throw new ConflictException(
+            'Submitted answers do not match the saved attempt answers',
+          );
+        }
 
         let correctAnswers = 0;
         const totalQuestions = activeQuiz.questions.length;
@@ -1526,9 +1969,10 @@ export class QuizService {
         let earnedPoints = 0;
 
         for (const answer of normalizedAnswers) {
-          const question = activeQuiz.questions.find(
+          const quizQuestion = activeQuiz.questions.find(
             (q) => q.questionId === answer.questionId,
-          )?.question;
+          );
+          const question = quizQuestion?.question;
           if (!question) {
             this.logger.warn(
               `Question ${answer.questionId} not found for quiz ${activeQuiz.id}`,
@@ -1540,7 +1984,7 @@ export class QuizService {
             question,
             answer.selectedOption,
           );
-          const questionPoints = question.points || 1;
+          const questionPoints = Math.max(1, quizQuestion.points);
           const responseScore = Math.min(
             questionPoints,
             Math.max(
@@ -1601,10 +2045,24 @@ export class QuizService {
         const attempt = await tx.quizAttempt.update({
           where: { id: prelimAttempt.id },
           data: {
+            answers: JSON.parse(requestedAnswersKey) as Prisma.InputJsonValue,
             score: scorePercentage,
             maxScore: totalPoints,
             percentage: scorePercentage,
             isPassed,
+            correctAnswers,
+            totalQuestions,
+            timeTaken: Math.min(
+              Math.max(
+                0,
+                Math.floor(
+                  (Date.now() - prelimAttempt.startedAt.getTime()) / 1000,
+                ),
+              ),
+              activeQuiz.timeLimit === null
+                ? 2_147_483_647
+                : activeQuiz.timeLimit * 60,
+            ),
             completedAt: new Date(),
           },
         });
@@ -1684,7 +2142,7 @@ export class QuizService {
           });
         }
 
-        return { attempt };
+        return { attempt, alreadyCompleted: false };
       });
     } catch (error) {
       if (
@@ -1711,6 +2169,24 @@ export class QuizService {
         }
       }
       throw error;
+    }
+
+    if (result.alreadyCompleted) {
+      const completedAttempt = await this.prisma.quizAttempt.findUnique({
+        where: { id: attemptId },
+        include: {
+          responses: { select: { questionId: true, isCorrect: true } },
+        },
+      });
+      if (!completedAttempt) {
+        throw new NotFoundException(`Quiz attempt ${attemptId} not found`);
+      }
+      return this.replayQuizSubmission(
+        completedAttempt,
+        activeQuiz,
+        userId,
+        requestedAnswersKey,
+      );
     }
 
     await this.redisService.del(`quiz:${activeQuiz.id}`).catch((error) => {
@@ -2437,6 +2913,7 @@ export class QuizService {
           quizId: createdQuiz.id,
           questionId: q.id,
           order: index + 1,
+          points: q.points ?? 1,
         })),
       });
 

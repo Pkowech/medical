@@ -140,11 +140,13 @@ export class QuizGenerationService {
 
     // 3. If not enough questions, fall back to recent ones (but different ones)
     if (questions.length < count) {
+      const selectedQuestionIds = questions.map((question) => question.id);
       const fallbackQuestions = await this.prisma.question.findMany({
         where: {
           topicIds: {
             has: topicId,
           },
+          id: { notIn: selectedQuestionIds },
           isActive: true,
         },
         orderBy: [

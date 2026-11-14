@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import {
   quizService,
@@ -8,7 +8,7 @@ import {
 } from '@/features/assessment/services/quiz';
 import { useXapi } from '@/lib/xapi/useXapi';
 import { URLS } from '@/lib/urls';
-import { CheckCircle, XCircle, AlertCircle, RefreshCw, Send } from 'lucide-react';
+import { CheckCircle, AlertCircle, RefreshCw, Send } from 'lucide-react';
 import { useCourseStudySession } from '@/features/learning-management/study/components/CourseStudySessionProvider';
 import { v4 as uuidv4 } from 'uuid';
 import { TOPIC_MASTERY_PASSING_SCORE, type GateDecision } from '@/shared/types/mastery.types';
@@ -19,7 +19,6 @@ interface Question {
   text: string;
   type: string;
   options: { id: string; text: string }[];
-  explanation?: string;
 }
 
 interface QuizPanelProps {
@@ -45,9 +44,11 @@ export const QuizPanel = ({
   onReturn,
   immersive = false,
 }: QuizPanelProps) => {
-  const attemptId = useMemo(() => uuidv4(), [lessonId, scope]);
   const { trackAction, XAPI_VERBS } = useXapi();
   const { activeSession, recordCourseActivity } = useCourseStudySession();
+  const [attemptId, setAttemptId] = useState<string | null>(null);
+  const [expiresAt, setExpiresAt] = useState<number | null>(null);
+  const [timeRemainingSeconds, setTimeRemainingSeconds] = useState<number | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [submittedAnswers, setSubmittedAnswers] = useState<Record<string, string[]>>({});
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -59,7 +60,9 @@ export const QuizPanel = ({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [submissionError, setSubmissionError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [answerCorrect, setAnswerCorrect] = useState<boolean | null>(null);
+  const [resultsAvailable, setResultsAvailable] = useState(true);
+  const finalizingRef = useRef(false);
+  const finalizeRef = useRef<(() => Promise<void>) | null>(null);
   const [finalResult, setFinalResult] = useState<{
     score: number;
     passed: boolean;
@@ -68,6 +71,7 @@ export const QuizPanel = ({
     nextTopicId?: string;
     gateDecision?: GateDecision;
     recommendations?: QuizPerformanceRecommendations;
+    resultsAvailable?: boolean;
   } | null>(null);
 
   const fetchQuestions = React.useCallback(async () => {
@@ -78,8 +82,71 @@ export const QuizPanel = ({
     setIsLoading(true);
     setLoadError(null);
     try {
-      const data = await quizService.getQuestionsForLesson(lessonId, scope);
-      setQuestions(data as Question[]);
+      let startedAttempt: Awaited<
+        ReturnType<typeof quizService.startQuizAttempt>
+      > | null = null;
+      if (scope !== 'topic') {
+        const storageKey = `quiz-attempt:${scope}:${lessonId}`;
+        let currentAttemptId = window.localStorage.getItem(storageKey);
+        if (!currentAttemptId) {
+          currentAttemptId = uuidv4();
+          window.localStorage.setItem(storageKey, currentAttemptId);
+        }
+        startedAttempt = await quizService.startQuizAttempt(
+          lessonId,
+          currentAttemptId
+        );
+        setAttemptId(currentAttemptId);
+        setExpiresAt(
+          startedAttempt.expiresAt
+            ? new Date(startedAttempt.expiresAt).getTime()
+            : null
+        );
+        setResultsAvailable(startedAttempt.showResults);
+      }
+
+      const data = (await quizService.getQuestionsForLesson(
+        lessonId,
+        scope
+      )) as Question[];
+      const orderedQuestions = startedAttempt
+        ? startedAttempt.questionIds.map(questionId =>
+            data.find(question => question.id === questionId)
+          )
+        : data;
+      if (orderedQuestions.some(question => !question)) {
+        throw new Error('The active quiz question set has changed. Restart the quiz.');
+      }
+      const questionsToShow = orderedQuestions as Question[];
+      setQuestions(questionsToShow);
+
+      if (startedAttempt) {
+        const savedAnswers = Object.fromEntries(
+          startedAttempt.answers
+            .filter(
+              (answer): answer is { questionId: string; selectedOption: string } =>
+                typeof answer.selectedOption === 'string'
+            )
+            .map(answer => [answer.questionId, [answer.selectedOption]])
+        );
+        setSubmittedAnswers(savedAnswers);
+        const firstUnansweredIndex = questionsToShow.findIndex(
+          question => !savedAnswers[question.id]
+        );
+        const questionIndex =
+          firstUnansweredIndex < 0
+            ? Math.max(0, questionsToShow.length - 1)
+            : firstUnansweredIndex;
+        const currentQuestion = questionsToShow[questionIndex];
+        setCurrentQuestionIndex(questionIndex);
+        setSelectedOption(savedAnswers[currentQuestion.id]?.[0] ?? null);
+        setIsSubmitted(Boolean(savedAnswers[currentQuestion.id]));
+      } else {
+        setSubmittedAnswers({});
+        setCurrentQuestionIndex(0);
+        setSelectedOption(null);
+        setIsSubmitted(false);
+      }
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : 'Failed to load quiz questions.');
     } finally {
@@ -92,7 +159,7 @@ export const QuizPanel = ({
   }, [fetchQuestions]);
 
   const handleOptionSelect = (optionId: string) => {
-    if (isSubmitted) return;
+    if (isSubmitted || timeRemainingSeconds === 0) return;
     setSelectedOption(optionId);
   };
 
@@ -110,14 +177,21 @@ export const QuizPanel = ({
     setSubmissionError(null);
 
     try {
-      const result = await quizService.submitAnswer(currentQuestion.id, selectedOption);
-      setAnswerCorrect(result.correct);
+      if (scope !== 'topic') {
+        if (!attemptId) {
+          throw new Error('The quiz attempt has not started yet.');
+        }
+        await quizService.submitAnswer(
+          attemptId,
+          currentQuestion.id,
+          selectedOption
+        );
+      }
       setIsSubmitted(true);
       setSubmittedAnswers(previous => ({
         ...previous,
         [currentQuestion.id]: [selectedOption],
       }));
-      if (result.correct) setScore(previous => previous + 1);
 
       trackAction(
         XAPI_VERBS.ATTEMPTED,
@@ -129,7 +203,6 @@ export const QuizPanel = ({
           },
         },
         {
-          success: result.correct,
           response: selected?.text,
         }
       );
@@ -140,21 +213,9 @@ export const QuizPanel = ({
     }
   };
 
-  const handleNext = async () => {
-    if (!questions.length) {
-      setSubmissionError('No quiz questions are available yet.');
-      return;
-    }
-
-    if (currentQuestionIndex < questions.length - 1) {
-      setCurrentQuestionIndex(prev => prev + 1);
-      setSelectedOption(null);
-      setIsSubmitted(false);
-      setAnswerCorrect(null);
-      setSubmissionError(null);
-      return;
-    }
-
+  const finalizeQuiz = async () => {
+    if (finalizingRef.current || isSubmitting || quizComplete) return;
+    finalizingRef.current = true;
     setIsSubmitting(true);
     setSubmissionError(null);
     try {
@@ -166,6 +227,7 @@ export const QuizPanel = ({
         nextTopicId?: string;
         gateDecision?: GateDecision;
         recommendations?: QuizPerformanceRecommendations;
+        resultsAvailable?: boolean;
       } = {
         score: Math.round((score / questions.length) * 100),
         passed:
@@ -184,29 +246,41 @@ export const QuizPanel = ({
         );
         result = topicResult;
       } else if ((scope === 'unit' || scope === 'assessment') && lessonId) {
+        if (!attemptId) {
+          throw new Error('The quiz attempt has not started yet.');
+        }
         const unitResult = await quizService.submitUnitQuiz(
           lessonId,
           attemptId,
           questions.map(question => ({
             questionId: question.id,
-            selectedOption: submittedAnswers[question.id]?.[0] || '',
+            selectedOption: submittedAnswers[question.id]?.[0] ?? null,
           }))
         );
         result = {
           ...result,
-          score: unitResult.percentage,
-          passed: unitResult.isPassed,
+          score: unitResult.percentage ?? 0,
+          passed: unitResult.isPassed ?? false,
           recommendations: unitResult.recommendations,
+          resultsAvailable: unitResult.resultsAvailable !== false,
         };
       }
 
+      setResultsAvailable(result.resultsAvailable !== false);
       setFinalResult(result);
       setQuizComplete(true);
-      if (scope !== 'assessment' && lessonId != null) {
+      window.localStorage.removeItem(`quiz-attempt:${scope}:${lessonId}`);
+      if (
+        result.resultsAvailable !== false &&
+        scope !== 'assessment' &&
+        lessonId != null
+      ) {
         recordCourseActivity(
           'quiz',
           courseId ?? activeSession?.courseId,
-          scope === 'topic' ? String(lessonId) : (activeSession?.topicId ?? String(lessonId)),
+          scope === 'topic'
+            ? String(lessonId)
+            : (activeSession?.topicId ?? String(lessonId)),
           result.score
         );
       }
@@ -234,22 +308,74 @@ export const QuizPanel = ({
             type: 'http://adlnet.gov/expapi/activities/assessment',
           },
         },
-        {
-          score: {
-            scaled: result.score / 100,
-            raw: result.score,
-            min: 0,
-            max: 100,
-          },
-          success: result.passed,
-        }
+        result.resultsAvailable === false
+          ? { completion: 'submitted' }
+          : {
+              score: {
+                scaled: result.score / 100,
+                raw: result.score,
+                min: 0,
+                max: 100,
+              },
+              success: result.passed,
+            }
       );
     } catch (error) {
       setSubmissionError(error instanceof Error ? error.message : 'Could not save quiz results.');
     } finally {
+      finalizingRef.current = false;
       setIsSubmitting(false);
     }
   };
+  finalizeRef.current = finalizeQuiz;
+
+  const handleNext = async () => {
+    if (!questions.length) {
+      setSubmissionError('No quiz questions are available yet.');
+      return;
+    }
+
+    if (
+      timeRemainingSeconds !== 0 &&
+      currentQuestionIndex < questions.length - 1
+    ) {
+      setCurrentQuestionIndex(prev => prev + 1);
+      const nextQuestion = questions[currentQuestionIndex + 1];
+      const savedOption = submittedAnswers[nextQuestion.id]?.[0] ?? null;
+      setSelectedOption(savedOption);
+      setIsSubmitted(Boolean(savedOption));
+      setSubmissionError(null);
+      return;
+    }
+
+    await finalizeQuiz();
+  };
+
+  useEffect(() => {
+    if (!expiresAt) {
+      setTimeRemainingSeconds(null);
+      return;
+    }
+    const updateRemaining = () => {
+      setTimeRemainingSeconds(
+        Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000))
+      );
+    };
+    updateRemaining();
+    const intervalId = window.setInterval(updateRemaining, 1000);
+    return () => window.clearInterval(intervalId);
+  }, [expiresAt]);
+
+  useEffect(() => {
+    if (
+      timeRemainingSeconds === 0 &&
+      !quizComplete &&
+      !isLoading &&
+      !isSubmitting
+    ) {
+      void finalizeRef.current?.();
+    }
+  }, [timeRemainingSeconds, quizComplete, isLoading, isSubmitting]);
 
   if (isLoading) {
     return (
@@ -289,6 +415,8 @@ export const QuizPanel = ({
   }
 
   if (quizComplete) {
+    const showResults =
+      resultsAvailable && finalResult?.resultsAvailable !== false;
     const scorePercentage = finalResult?.score ?? Math.round((score / questions.length) * 100);
     const passed =
       finalResult?.passed ??
@@ -306,12 +434,18 @@ export const QuizPanel = ({
           )}
         </div>
         <h3 className="text-2xl font-bold text-foreground dark:text-foreground">Quiz Complete!</h3>
-        <p className="text-muted-foreground mt-2 mb-6 text-lg">
-          Your score:{' '}
-          <span className="font-bold text-foreground dark:text-foreground">{scorePercentage}%</span>
-        </p>
+        {showResults ? (
+          <p className="text-muted-foreground mt-2 mb-6 text-lg">
+            Your score:{' '}
+            <span className="font-bold text-foreground dark:text-foreground">{scorePercentage}%</span>
+          </p>
+        ) : (
+          <p className="text-muted-foreground mt-2 mb-6">
+            Your submission was recorded. Results are not available yet.
+          </p>
+        )}
 
-        {passed ? (
+        {showResults && passed ? (
           <div className="bg-green-50 dark:bg-green-900/20 border border-green-100 dark:border-green-800/30 p-4 rounded-lg mb-8">
             <p className="text-green-800 dark:text-green-300 font-medium">
               {scope === 'topic'
@@ -321,7 +455,7 @@ export const QuizPanel = ({
                   : 'You passed the unit quiz.'}
             </p>
           </div>
-        ) : (
+        ) : showResults ? (
           <div className="bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800/30 p-4 rounded-lg mb-8">
             <p className="text-red-800 dark:text-red-300 font-medium">
               {scope === 'topic'
@@ -331,17 +465,17 @@ export const QuizPanel = ({
           </div>
         )}
 
-        {scope === 'topic' && finalResult?.gateDecision && (
+        {showResults && scope === 'topic' && finalResult?.gateDecision && (
           <MasteryReadinessPanel decision={finalResult.gateDecision} />
         )}
 
-        {finalResult?.nextTopicUnlocked && (
+        {showResults && finalResult?.nextTopicUnlocked && (
           <p className="mb-6 text-sm font-medium text-green-700 dark:text-green-300">
             The next topic is now unlocked.
           </p>
         )}
 
-        {finalResult?.recommendations?.topics.map(topic => (
+        {showResults && finalResult?.recommendations?.topics.map(topic => (
           <section
             key={topic.topicId}
             className="mb-6 rounded-xl border border-border bg-background/70 p-4 text-left"
@@ -425,6 +559,23 @@ export const QuizPanel = ({
         <span className="text-sm font-medium text-muted-foreground bg-muted dark:bg-secondary px-3 py-1 rounded-full">
           Question {currentQuestionIndex + 1} of {questions.length}
         </span>
+        {timeRemainingSeconds !== null && (
+          <span
+            role="timer"
+            aria-live="off"
+            className={`text-sm font-semibold tabular-nums ${
+              timeRemainingSeconds === 0 ? 'text-red-600' : 'text-muted-foreground'
+            }`}
+          >
+            {timeRemainingSeconds === 0
+              ? 'Time expired'
+              : `${Math.floor(timeRemainingSeconds / 60)
+                  .toString()
+                  .padStart(2, '0')}:${(timeRemainingSeconds % 60)
+                  .toString()
+                  .padStart(2, '0')}`}
+          </span>
+        )}
       </div>
 
       {immersive && (
@@ -451,24 +602,11 @@ export const QuizPanel = ({
           <div className="space-y-3">
             {currentQuestion.options.map(option => {
               const isSelected = selectedOption === option.id;
-              const isCorrect = isSubmitted && isSelected && answerCorrect === true;
-              const isIncorrect = isSubmitted && isSelected && answerCorrect === false;
               let borderClass = 'border-border dark:border-border/50';
               let bgClass = 'bg-card dark:bg-card';
               let textClass = 'text-muted-foreground dark:text-muted-foreground';
 
-              if (isSubmitted) {
-                if (isCorrect) {
-                  borderClass =
-                    'border-green-500 dark:border-green-500/50 ring-1 ring-green-500/20';
-                  bgClass = 'bg-green-50/50 dark:bg-green-500/10';
-                  textClass = 'text-green-700 dark:text-green-400';
-                } else if (isIncorrect) {
-                  borderClass = 'border-red-500 dark:border-red-500/50 ring-1 ring-red-500/20';
-                  bgClass = 'bg-red-50/50 dark:bg-red-500/10';
-                  textClass = 'text-red-700 dark:text-red-400';
-                }
-              } else if (isSelected) {
+              if (isSelected) {
                 borderClass = 'border-blue-500 ring-1 ring-blue-500/20';
                 bgClass = 'bg-blue-50/30 dark:bg-blue-500/5';
                 textClass = 'text-blue-700 dark:text-blue-400';
@@ -478,13 +616,14 @@ export const QuizPanel = ({
                 <button
                   key={option.id}
                   onClick={() => handleOptionSelect(option.id)}
-                  disabled={isSubmitted}
+                  disabled={isSubmitted || timeRemainingSeconds === 0}
                   aria-pressed={isSelected}
                   className={`w-full min-h-14 flex items-center justify-between p-4 rounded-xl border ${borderClass} ${bgClass} transition-all duration-200 text-left group hover:shadow-md active:scale-[0.99] disabled:cursor-default motion-reduce:transition-none`}
                 >
                   <span className={`text-sm font-medium ${textClass}`}>{option.text}</span>
-                  {isSubmitted && isCorrect && <CheckCircle className="w-5 h-5 text-green-500" />}
-                  {isIncorrect && <XCircle className="w-5 h-5 text-red-500" />}
+                  {isSubmitted && isSelected && (
+                    <CheckCircle className="w-5 h-5 text-blue-500" />
+                  )}
                 </button>
               );
             })}
@@ -493,10 +632,10 @@ export const QuizPanel = ({
           {isSubmitted && (
             <div className="mt-6 p-4 bg-blue-50/50 dark:bg-blue-500/5 border border-blue-100 dark:border-blue-800/30 rounded-xl animate-in fade-in slide-in-from-top-2 duration-300">
               <p className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-1">
-                Explanation
+                Answer saved
               </p>
               <p className="text-sm text-muted-foreground dark:text-muted-foreground">
-                {currentQuestion.explanation || 'Answer recorded.'}
+                Your answer will be scored when you submit the quiz.
               </p>
             </div>
           )}
@@ -514,11 +653,15 @@ export const QuizPanel = ({
           {!isSubmitted ? (
             <button
               onClick={handleSubmit}
-              disabled={!selectedOption || isSubmitting}
+              disabled={
+                !selectedOption ||
+                isSubmitting ||
+                timeRemainingSeconds === 0
+              }
               className="min-h-14 flex-1 bg-blue-600 text-white font-bold py-4 rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.99] motion-reduce:transition-none"
             >
               <Send className="w-4 h-4" />
-              {isSubmitting ? 'Checking answer...' : 'Submit Answer'}
+              {isSubmitting ? 'Saving answer...' : 'Save Answer'}
             </button>
           ) : (
             <button

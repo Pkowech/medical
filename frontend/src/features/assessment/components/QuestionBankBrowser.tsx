@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import apiService from '@/features/auth/services/apiClient';
 
 type BankQuestion = {
@@ -20,28 +20,52 @@ type BankResponse = {
 
 export function QuestionBankBrowser({ refreshKey = 0 }: { refreshKey?: number }) {
   const [search, setSearch] = useState('');
+  const [submittedSearch, setSubmittedSearch] = useState('');
+  const [searchVersion, setSearchVersion] = useState(0);
+  const [page, setPage] = useState(1);
   const [result, setResult] = useState<BankResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const loadQuestions = useCallback(async () => {
+  useEffect(() => {
+    let isCurrentRequest = true;
     setLoading(true);
     setError(null);
-    try {
-      const response = await apiService.get<BankResponse>('/quizzes/bank', {
-        params: { page: 1, limit: 20, search: search || undefined },
-      });
-      setResult(response.data);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Question bank could not be loaded.');
-    } finally {
-      setLoading(false);
-    }
-  }, [search]);
+    setResult(null);
 
-  useEffect(() => {
-    void loadQuestions();
-  }, [loadQuestions, refreshKey]);
+    void apiService
+      .get<BankResponse>('/quizzes/bank', {
+        params: {
+          page,
+          limit: 20,
+          search: submittedSearch || undefined,
+        },
+      })
+      .then((response) => {
+        if (isCurrentRequest) {
+          setResult(response.data);
+          if (page > response.data.pagination.pages) {
+            setPage(Math.max(1, response.data.pagination.pages));
+          }
+        }
+      })
+      .catch((cause: unknown) => {
+        if (isCurrentRequest) {
+          setError(
+            cause instanceof Error
+              ? cause.message
+              : 'Question bank could not be loaded.',
+          );
+        }
+      })
+      .finally(() => {
+        if (isCurrentRequest) setLoading(false);
+      });
+
+    return () => {
+      isCurrentRequest = false;
+    };
+  }, [page, refreshKey, searchVersion, submittedSearch]);
 
   return (
     <section className="space-y-4 rounded-xl border border-border bg-card p-5">
@@ -55,7 +79,9 @@ export function QuestionBankBrowser({ refreshKey = 0 }: { refreshKey?: number })
         className="flex gap-2"
         onSubmit={(event) => {
           event.preventDefault();
-          void loadQuestions();
+          setPage(1);
+          setSubmittedSearch(search.trim());
+          setSearchVersion((version) => version + 1);
         }}
       >
         <input
@@ -86,9 +112,52 @@ export function QuestionBankBrowser({ refreshKey = 0 }: { refreshKey?: number })
                   <p className="mt-1 text-xs text-muted-foreground">
                     {question.category} · {question.difficulty} · {question.topicIds.length} linked topic(s)
                   </p>
+                  <ul className="mt-2 space-y-1">
+                    {question.options.map((option) => (
+                      <li
+                        key={option.id}
+                        className="flex items-center justify-between gap-3 rounded-md bg-muted/50 px-3 py-1.5 text-sm"
+                      >
+                        <span>{option.text}</span>
+                        {option.isCorrect && (
+                          <span className="shrink-0 text-xs font-medium text-green-700 dark:text-green-400">
+                            Correct answer
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                  {question.tags.length > 0 && (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Tags: {question.tags.join(', ')}
+                    </p>
+                  )}
                 </li>
               ))}
             </ul>
+          )}
+          {result.pagination.pages > 1 && (
+            <div className="flex items-center justify-between border-t border-border pt-3">
+              <button
+                type="button"
+                className="rounded-md border border-input px-3 py-1.5 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={page <= 1 || loading}
+                onClick={() => setPage(currentPage => Math.max(1, currentPage - 1))}
+              >
+                Previous
+              </button>
+              <span className="text-sm text-muted-foreground">
+                Page {result.pagination.page} of {result.pagination.pages}
+              </span>
+              <button
+                type="button"
+                className="rounded-md border border-input px-3 py-1.5 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={page >= result.pagination.pages || loading}
+                onClick={() => setPage(currentPage => currentPage + 1)}
+              >
+                Next
+              </button>
+            </div>
           )}
         </>
       )}

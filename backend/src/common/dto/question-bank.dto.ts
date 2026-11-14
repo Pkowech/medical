@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   Question,
   QuestionType,
@@ -21,8 +21,25 @@ import {
   IsUrl,
   MinLength,
   ArrayMaxSize,
+  IsInt,
+  IsIn,
+  Max,
+  MaxLength,
 } from 'class-validator';
 import { QuestionOptionDto } from './base';
+
+const toStringArray = (value: unknown): unknown => {
+  if (value === undefined || value === null) return value;
+  const values = Array.isArray(value) ? value : [value];
+  return values.flatMap((entry) =>
+    typeof entry === 'string'
+      ? entry
+          .split(',')
+          .map((item) => item.trim())
+          .filter(Boolean)
+      : [entry],
+  );
+};
 
 export class CreateQuestionDto {
   @ApiProperty({ description: 'Question text' })
@@ -70,6 +87,15 @@ export class CreateQuestionDto {
 }
 
 export class QuestionBankFilterDto {
+  @ApiPropertyOptional({ description: 'Search question text and tags' })
+  @IsOptional()
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
+  @IsString()
+  @MaxLength(200)
+  search?: string;
+
   @ApiPropertyOptional({
     enum: QuestionType,
     description: 'Filter by question type',
@@ -88,14 +114,106 @@ export class QuestionBankFilterDto {
 
   @ApiPropertyOptional({ description: 'Filter by category' })
   @IsOptional()
-  @IsString()
-  category?: string;
+  @IsEnum(QuestionCategory)
+  category?: QuestionCategory;
 
   @ApiPropertyOptional({ description: 'Filter by tags' })
   @IsOptional()
+  @Transform(({ value }) => toStringArray(value))
   @IsArray()
+  @ArrayMaxSize(50)
   @IsString({ each: true })
   tags?: string[];
+
+  @ApiPropertyOptional({ description: 'Filter by course ID' })
+  @IsOptional()
+  @IsUUID('all')
+  courseId?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by unit ID' })
+  @IsOptional()
+  @IsUUID('all')
+  unitId?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by question author ID' })
+  @IsOptional()
+  @IsUUID('all')
+  createdBy?: string;
+
+  @ApiPropertyOptional({ description: 'Include active or inactive questions' })
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    return value;
+  })
+  @IsBoolean()
+  isActive?: boolean;
+
+  @ApiPropertyOptional({ minimum: 1, default: 1 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(1_000_000)
+  page?: number;
+
+  @ApiPropertyOptional({ minimum: 1, maximum: 100, default: 20 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number;
+
+  @ApiPropertyOptional({
+    enum: [
+      'id',
+      'text',
+      'type',
+      'difficulty',
+      'category',
+      'usageCount',
+      'successRate',
+      'averageTime',
+      'difficultyIndex',
+      'averageScore',
+      'createdAt',
+      'updatedAt',
+    ],
+  })
+  @IsOptional()
+  @IsIn([
+    'id',
+    'text',
+    'type',
+    'difficulty',
+    'category',
+    'usageCount',
+    'successRate',
+    'averageTime',
+    'difficultyIndex',
+    'averageScore',
+    'createdAt',
+    'updatedAt',
+  ])
+  sortBy?: string;
+
+  @ApiPropertyOptional({ enum: ['ASC', 'DESC'], default: 'DESC' })
+  @IsOptional()
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.toUpperCase() : value,
+  )
+  @IsIn(['ASC', 'DESC'])
+  sortOrder?: 'ASC' | 'DESC';
+
+  @ApiPropertyOptional({ type: [String], description: 'Question IDs to omit' })
+  @IsOptional()
+  @Transform(({ value }) => toStringArray(value))
+  @IsArray()
+  @ArrayMaxSize(100)
+  @IsUUID('all', { each: true })
+  excludeQuestionIds?: string[];
 }
 
 export class QuestionBankResponseDto {

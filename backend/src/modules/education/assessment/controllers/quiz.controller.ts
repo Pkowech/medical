@@ -11,6 +11,7 @@ import {
   HttpCode,
   HttpStatus,
   ForbiddenException,
+  BadRequestException,
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
@@ -27,10 +28,14 @@ import { RoleGuard } from '#common/guards/roles.guard';
 import { Roles } from '#common/decorators/roles.decorator';
 import { Role } from '#modules/auth/constants/role.constants';
 import { User } from '#common/decorators/user.decorator';
-import { SubmitQuizDto, SubmitQuizAnswerDto } from '#common/dto/assessment.dto';
+import {
+  SaveQuizAttemptAnswerDto,
+  StartQuizAttemptDto,
+  SubmitQuizDto,
+} from '#common/dto/assessment.dto';
 import {
   ImportQuizDto,
-  QuestionBankFilters,
+  QuestionBankFilterDto,
 } from '#common/dto/question-bank.dto';
 
 @ApiTags('Quiz')
@@ -104,8 +109,9 @@ export class QuizController {
   @Get('bank')
   @UseGuards(RoleGuard)
   @Roles(Role.instructor, Role.admin)
+  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
   @ApiOperation({ summary: 'Browse the question bank' })
-  async getQuestionBank(@Query() filters: QuestionBankFilters) {
+  async getQuestionBank(@Query() filters: QuestionBankFilterDto) {
     return this.quizService.getQuestionBank(filters);
   }
 
@@ -166,6 +172,37 @@ export class QuizController {
     );
   }
 
+  @Post(':quizId/start')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Start or resume a quiz attempt' })
+  async startQuizAttempt(
+    @Request() req: any,
+    @Param('quizId') quizId: string,
+    @Body() body: StartQuizAttemptDto,
+  ) {
+    return this.quizService.startQuizAttempt(
+      req.user.id,
+      quizId,
+      body.attemptId,
+    );
+  }
+
+  @Post('attempts/:attemptId/answers')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Save an answer without revealing correctness' })
+  async saveQuizAttemptAnswer(
+    @Request() req: any,
+    @Param('attemptId') attemptId: string,
+    @Body() body: SaveQuizAttemptAnswerDto,
+  ) {
+    return this.quizService.saveQuizAttemptAnswer(
+      req.user.id,
+      attemptId,
+      body.questionId,
+      body.selectedOption,
+    );
+  }
+
   @Post('unit/:unitId/generate')
   @ApiOperation({ summary: 'Generate a quiz for a unit' })
   async generateUnitQuiz(@Request() req: any, @Param('unitId') unitId: string) {
@@ -187,13 +224,9 @@ export class QuizController {
       return this.quizService.submitQuiz(userId, unitId, attemptId, answers);
     }
 
-    // Default to single answer submission
-    const submitDto = body as SubmitQuizAnswerDto;
-    const answer = submitDto.answerData
-      ? JSON.stringify(submitDto.answerData)
-      : submitDto.selectedOptionIds?.[0] || '';
-
-    return this.quizService.submitAnswer(userId, submitDto.questionId, answer);
+    throw new BadRequestException(
+      'Submit the answer through its active quiz attempt',
+    );
   }
 
   @Get('results/:userId/:unitId')

@@ -42,11 +42,13 @@ export class CreateQuizDto {
   @ApiPropertyOptional({ description: 'Time limit in minutes' })
   @IsOptional()
   @IsNumber()
+  @Min(1)
   timeLimit?: number;
 
   @ApiPropertyOptional({ description: 'Maximum attempts allowed' })
   @IsOptional()
   @IsNumber()
+  @Min(1)
   maxAttempts?: number;
 
   @ApiPropertyOptional({ description: 'Passing score percentage (0-100)' })
@@ -145,11 +147,13 @@ export class UpdateQuizDto {
   @ApiPropertyOptional({ description: 'Time limit in minutes' })
   @IsOptional()
   @IsNumber()
+  @Min(1)
   timeLimit?: number;
 
   @ApiPropertyOptional({ description: 'Maximum attempts allowed' })
   @IsOptional()
   @IsNumber()
+  @Min(1)
   maxAttempts?: number;
 
   @ApiPropertyOptional({ description: 'Passing score percentage (0-100)' })
@@ -336,13 +340,35 @@ export class SubmitQuizAnswerDto {
   answerData?: AnswerData;
 }
 
-export class QuizAnswerDto {
+export class StartQuizAttemptDto {
+  @ApiProperty({
+    description: 'Stable client-generated ID used to resume this attempt',
+  })
+  @IsUUID()
+  @IsNotEmpty()
+  attemptId!: string;
+}
+
+export class SaveQuizAttemptAnswerDto {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
   questionId!: string;
 
   @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  selectedOption!: string;
+}
+
+export class QuizAnswerDto {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  questionId!: string;
+
+  @ApiProperty({ required: false, nullable: true })
+  @IsOptional()
   @IsNotEmpty()
   selectedOption!: any;
 }

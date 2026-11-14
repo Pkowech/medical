@@ -45,12 +45,6 @@ export class QuestionBankService {
     await this.validateCourseAndUnit(dto.courseId, dto.unitId);
     this.validateQuestionOptions(dto.type, dto.options);
 
-    const cacheKey = `question:${dto.questionText}:${createdBy}`;
-    const cachedQuestion = await this.redisService.get(cacheKey);
-    if (cachedQuestion) {
-      return JSON.parse(cachedQuestion);
-    }
-
     const question = await this.prisma.$transaction(async (tx) => {
       const question = await tx.question.create({
         data: {
@@ -95,13 +89,9 @@ export class QuestionBankService {
       throw new Error('Question creation failed');
     }
 
-    await this.redisService.set(
-      cacheKey,
-      JSON.stringify(question),
-      24 * 60 * 60,
-    );
     await Promise.all([
       this.redisService.delPattern('questions:*'),
+      this.redisService.delPattern('adaptive_quiz_questions:*'),
       this.redisService.delPattern('unit:*:questions:v3:*'),
       this.redisService.delPattern('topic:*:questions:v3:*'),
       ...(dto.unitId
@@ -147,11 +137,23 @@ export class QuestionBankService {
       sortOrder = 'DESC',
     } = filters;
 
+    const normalizedSearch = search?.trim();
     const where: Prisma.QuestionWhereInput = { isActive };
-    if (search) {
+    if (normalizedSearch) {
+      const taggedQuestionIds = await this.prisma.$queryRaw<
+        Array<{ id: string }>
+      >`
+        SELECT q.id
+        FROM questions AS q
+        WHERE EXISTS (
+          SELECT 1
+          FROM unnest(q.tags) AS tag_values(tag)
+          WHERE POSITION(LOWER(${normalizedSearch}) IN LOWER(tag)) > 0
+        )
+      `;
       where.OR = [
-        { text: { contains: search, mode: 'insensitive' } },
-        { tags: { has: search } },
+        { text: { contains: normalizedSearch, mode: 'insensitive' } },
+        { id: { in: taggedQuestionIds.map(({ id }) => id) } },
       ];
     }
     if (type) {
@@ -302,6 +304,7 @@ export class QuestionBankService {
     });
     await Promise.all([
       this.redisService.delPattern('questions:*'),
+      this.redisService.delPattern('adaptive_quiz_questions:*'),
       this.redisService.delPattern('unit:*:questions:v3:*'),
       this.redisService.delPattern('topic:*:questions:v3:*'),
       ...(question.unitId
