@@ -12,10 +12,20 @@ export interface LearningResourceRecommendation {
   reason: string;
 }
 
+export interface LearningSequenceStep {
+  title: string;
+  rationale: string;
+  resources: LearningResourceRecommendation[];
+}
+
 export interface TopicPerformanceDiagnosis {
   topicId: string;
   topicName: string;
   accuracy: number;
+  targetEvidence: {
+    sampleSize: number;
+    accuracy: number | null;
+  };
   diagnosis: PerformanceDiagnosis;
   confidence: 'low' | 'medium' | 'high';
   prerequisiteEvidence: Array<{
@@ -24,6 +34,7 @@ export interface TopicPerformanceDiagnosis {
     sampleSize: number;
     accuracy: number | null;
   }>;
+  sequence: LearningSequenceStep[];
   recommendations: LearningResourceRecommendation[];
 }
 
@@ -45,6 +56,34 @@ interface UnitInfo {
   topics: Array<{ id: string; name: string }>;
 }
 
+interface AttemptAccuracy {
+  correct: number;
+  total: number;
+}
+
+const recordAttemptAnswer = (
+  attempts: Map<string, AttemptAccuracy>,
+  attemptId: string,
+  isCorrect: boolean,
+) => {
+  const accuracy = attempts.get(attemptId) ?? { correct: 0, total: 0 };
+  accuracy.total += 1;
+  if (isCorrect) accuracy.correct += 1;
+  attempts.set(attemptId, accuracy);
+};
+
+const summarizeAttempts = (attempts: Map<string, AttemptAccuracy>) => {
+  const scores = [...attempts.values()]
+    .filter((attempt) => attempt.total > 0)
+    .map((attempt) => attempt.correct / attempt.total);
+  return {
+    sampleSize: scores.length,
+    accuracy: scores.length
+      ? scores.reduce((sum, score) => sum + score, 0) / scores.length
+      : null,
+  };
+};
+
 @Injectable()
 export class AssessmentRecommendationService {
   constructor(private readonly prisma: PrismaService) {}
@@ -57,6 +96,7 @@ export class AssessmentRecommendationService {
       courseId?: string | null;
     },
     answers: SubmittedAnswer[],
+    attemptId?: string,
   ): Promise<QuizPerformanceRecommendations> {
     if (!answers.length) return { topics: [], recommendations: [] };
 
@@ -196,10 +236,12 @@ export class AssessmentRecommendationService {
         unitIdByTopicId.set(topic.id, unit.id);
       }
     }
-    const priorResponses =
+    const [priorResponses, targetResponses] = await Promise.all([
       prerequisiteUnitIds.length || prerequisiteTopicIds.length
-        ? await this.prisma.userResponse.findMany({
+        ? this.prisma.userResponse.findMany({
             where: {
+              ...(attemptId ? { attemptId: { not: attemptId } } : {}),
+              attempt: { is: { completedAt: { not: null } } },
               userId,
               question: {
                 OR: [
@@ -209,18 +251,32 @@ export class AssessmentRecommendationService {
               },
             },
             select: {
+              attemptId: true,
               isCorrect: true,
               question: { select: { unitId: true, topicIds: true } },
             },
             orderBy: { createdAt: 'desc' },
             take: 200,
           })
-        : [];
+        : Promise.resolve([]),
+      this.prisma.userResponse.findMany({
+        where: {
+          ...(attemptId ? { attemptId: { not: attemptId } } : {}),
+          attempt: { is: { completedAt: { not: null } } },
+          userId,
+          question: { topicIds: { hasSome: topicIds } },
+        },
+        select: {
+          attemptId: true,
+          isCorrect: true,
+          question: { select: { topicIds: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 500,
+      }),
+    ]);
 
-    const evidenceByUnit = new Map<
-      string,
-      { correct: number; total: number }
-    >();
+    const evidenceByUnit = new Map<string, Map<string, AttemptAccuracy>>();
     for (const response of priorResponses) {
       const responseUnitIds = new Set([
         ...(response.question.unitId &&
@@ -232,10 +288,22 @@ export class AssessmentRecommendationService {
           .filter((unitId): unitId is string => Boolean(unitId)),
       ]);
       for (const unitId of responseUnitIds) {
-        const evidence = evidenceByUnit.get(unitId) ?? { correct: 0, total: 0 };
-        evidence.total += 1;
-        if (response.isCorrect) evidence.correct += 1;
-        evidenceByUnit.set(unitId, evidence);
+        const attempts = evidenceByUnit.get(unitId) ?? new Map();
+        recordAttemptAnswer(attempts, response.attemptId, response.isCorrect);
+        evidenceByUnit.set(unitId, attempts);
+      }
+    }
+
+    const targetEvidenceByTopic = new Map<
+      string,
+      Map<string, AttemptAccuracy>
+    >();
+    for (const response of targetResponses) {
+      for (const topicId of response.question.topicIds) {
+        if (!topicIds.includes(topicId)) continue;
+        const attempts = targetEvidenceByTopic.get(topicId) ?? new Map();
+        recordAttemptAnswer(attempts, response.attemptId, response.isCorrect);
+        targetEvidenceByTopic.set(topicId, attempts);
       }
     }
 
@@ -254,9 +322,28 @@ export class AssessmentRecommendationService {
         const accuracy = scopedAnswers.length
           ? scopedAnswers.filter(Boolean).length / scopedAnswers.length
           : 1;
-        return { topic, accuracy };
+        const targetAttempts =
+          targetEvidenceByTopic.get(topic.id) ??
+          new Map<string, AttemptAccuracy>();
+        if (scopedAnswers.length) {
+          for (const isCorrect of scopedAnswers) {
+            recordAttemptAnswer(
+              targetAttempts,
+              attemptId ?? `current:${topic.id}`,
+              isCorrect,
+            );
+          }
+          targetEvidenceByTopic.set(topic.id, targetAttempts);
+        }
+        const targetEvidence = summarizeAttempts(targetAttempts);
+        return { topic, accuracy, targetEvidence };
       })
-      .filter((entry) => entry.accuracy < 0.7);
+      .filter(
+        (entry) =>
+          entry.accuracy < 0.7 ||
+          (entry.targetEvidence.accuracy !== null &&
+            entry.targetEvidence.accuracy < 0.7),
+      );
 
     const diagnoses: TopicPerformanceDiagnosis[] = [];
     for (const entry of weakTopics) {
@@ -266,34 +353,41 @@ export class AssessmentRecommendationService {
         ...(unitsByTopic.get(entry.topic.id)?.values() ?? []),
       ];
       const prerequisiteEvidence = prerequisiteUnitsForTopic.map((unit) => {
-        const evidence = evidenceByUnit.get(unit.id);
+        const attempts = evidenceByUnit.get(unit.id) ?? new Map();
+        const evidence = summarizeAttempts(attempts);
         return {
           unitId: unit.id,
           unitName: unit.title || unit.name,
-          sampleSize: evidence?.total ?? 0,
-          accuracy:
-            evidence && evidence.total > 0
-              ? evidence.correct / evidence.total
-              : null,
+          sampleSize: evidence.sampleSize,
+          accuracy: evidence.accuracy,
         };
       });
-      const hasCompleteEvidence =
-        prerequisiteEvidence.length > 0 &&
-        prerequisiteEvidence.every((item) => item.sampleSize >= 3);
+      const hasCompleteEvidence = prerequisiteEvidence.every(
+        (item) => item.sampleSize >= 3,
+      );
       const weakPrerequisite = prerequisiteEvidence.filter(
         (item) =>
           item.sampleSize >= 3 && item.accuracy !== null && item.accuracy < 0.6,
       );
       const diagnosis: PerformanceDiagnosis = weakPrerequisite.length
         ? 'prerequisite_gap'
-        : hasCompleteEvidence
+        : hasCompleteEvidence &&
+            entry.targetEvidence.sampleSize >= 3 &&
+            (entry.targetEvidence.accuracy ?? 1) < 0.7
           ? 'target_content_gap'
           : 'insufficient_evidence';
+      const relevantEvidenceCounts =
+        diagnosis === 'prerequisite_gap'
+          ? weakPrerequisite.map((item) => item.sampleSize)
+          : [
+              entry.targetEvidence.sampleSize,
+              ...prerequisiteEvidence.map((item) => item.sampleSize),
+            ];
+      const minimumEvidence = Math.min(...relevantEvidenceCounts);
       const confidence =
-        diagnosis === 'insufficient_evidence' ||
-        !prerequisiteEvidence.every((item) => item.sampleSize >= 3)
+        diagnosis === 'insufficient_evidence' || minimumEvidence < 3
           ? 'low'
-          : prerequisiteEvidence.every((item) => item.sampleSize >= 10)
+          : minimumEvidence >= 10
             ? 'high'
             : 'medium';
       const resourceTopics =
@@ -442,13 +536,91 @@ export class AssessmentRecommendationService {
         });
       }
 
+      const targetResources: LearningResourceRecommendation[] = [
+        {
+          kind: 'topic',
+          id: entry.topic.id,
+          title: entry.topic.name,
+          href: `/courses/${targetCourse.id}/units/${targetUnit.id}?topicId=${entry.topic.id}`,
+          reason:
+            'Return to this topic after reviewing the recommended foundations.',
+        },
+        {
+          kind: 'course',
+          id: targetCourse.id,
+          title: targetCourse.title || targetCourse.name,
+          href: `/courses/${targetCourse.id}`,
+          reason:
+            'Continue learning in the course that contains the target topic.',
+        },
+      ];
+      const sequence: LearningSequenceStep[] = [];
+      if (diagnosis === 'insufficient_evidence') {
+        const diagnostics = recommendations.filter(
+          (item) => item.kind === 'prerequisite_diagnostic',
+        );
+        sequence.push({
+          title: 'Check prerequisite knowledge',
+          rationale:
+            'More evidence is needed to tell whether this difficulty comes from a missing foundation.',
+          resources:
+            diagnostics.length > 0
+              ? diagnostics
+              : recommendations.filter((item) => item.kind === 'unit'),
+        });
+      } else if (diagnosis === 'prerequisite_gap') {
+        sequence.push({
+          title: 'Strengthen prerequisite foundations',
+          rationale:
+            'Repeated completed attempts show difficulty in mapped prerequisite units.',
+          resources: recommendations,
+        });
+      }
+
+      if (diagnosis !== 'prerequisite_gap') {
+        sequence.push({
+          title: 'Review the target topic',
+          rationale:
+            diagnosis === 'target_content_gap'
+              ? 'Prerequisite evidence is adequate; focus review on the target topic.'
+              : 'Use the target materials while gathering more evidence.',
+          resources: recommendations.filter(
+            (item) => item.kind !== 'prerequisite_diagnostic',
+          ),
+        });
+      } else {
+        sequence.push({
+          title: 'Return to the target topic',
+          rationale:
+            'After strengthening the prerequisites, revisit the original topic.',
+          resources: targetResources,
+        });
+      }
+
+      sequence.push({
+        title: 'Reassess progress',
+        rationale:
+          'Take the target unit quiz again to check whether the review resolved the gap.',
+        resources: [
+          {
+            kind: 'unit',
+            id: targetUnit.id,
+            title: `Reassess: ${targetUnit.title || targetUnit.name}`,
+            href: `/quiz/unit/${targetUnit.id}`,
+            reason: 'Use a new completed attempt to measure progress.',
+          },
+        ],
+      });
+
       diagnoses.push({
         topicId: entry.topic.id,
         topicName: entry.topic.name,
         accuracy: entry.accuracy,
+        targetEvidence: entry.targetEvidence,
         diagnosis,
         confidence,
         prerequisiteEvidence,
+        sequence,
         recommendations: this.uniqueRecommendations(recommendations),
       });
     }

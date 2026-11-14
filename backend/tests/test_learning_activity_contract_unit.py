@@ -60,3 +60,51 @@ const contentUpdate = {
 });
 """
     )
+
+
+def test_learning_progress_requires_active_enrollment_and_matching_topic():
+    run_typescript(
+        r"""
+const assert = require('node:assert/strict');
+const { ProgressService } =
+  require('./src/modules/education/courses/services/progress.service.ts');
+
+function createService(enrollment, topic) {
+  const service = Object.create(ProgressService.prototype);
+  service.prisma = {
+    courseEnrollment: { findUnique: async () => enrollment },
+    topic: { findUnique: async () => topic },
+  };
+  service.logger = { error: () => {}, warn: () => {}, log: () => {} };
+  return service;
+}
+
+const update = {
+  courseId: 'course-1',
+  topicId: 'topic-1',
+  status: 'inProgress',
+  progressPercentage: 10,
+  clientTimestamp: 1760000000000,
+};
+
+(async () => {
+  await assert.rejects(
+    createService({ status: 'dropped' }).updateUnitMaterialTopicProgress(
+      'user-1',
+      update,
+    ),
+    /active course enrollment is required/,
+  );
+  await assert.rejects(
+    createService(
+      { status: 'active' },
+      { unitId: 'unit-1', unit: { courseId: 'another-course' } },
+    ).updateUnitMaterialTopicProgress('user-1', update),
+    /associations do not match the selected topic/,
+  );
+})().catch(error => {
+  console.error(error);
+  process.exitCode = 1;
+});
+"""
+    )

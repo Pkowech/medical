@@ -245,8 +245,48 @@ export class ProgressService {
           where: { userId_courseId: { userId, courseId } },
         });
 
-        if (!enrollment) {
-          throw new NotFoundException('User not enrolled in this course');
+        if (
+          !enrollment ||
+          (enrollment.status !== EnrollmentStatus.active &&
+            enrollment.status !== EnrollmentStatus.completed)
+        ) {
+          throw new ForbiddenException(
+            'An active course enrollment is required to update progress.',
+          );
+        }
+      }
+
+      if (topicId) {
+        const topic = await this.prisma.topic.findUnique({
+          where: { id: topicId },
+          select: {
+            unitId: true,
+            unit: { select: { courseId: true } },
+          },
+        });
+        if (!topic) {
+          throw new NotFoundException(`Topic with ID ${topicId} not found`);
+        }
+        if (
+          (unitId && topic.unitId !== unitId) ||
+          (courseId && topic.unit?.courseId !== courseId)
+        ) {
+          throw new ForbiddenException(
+            'Progress associations do not match the selected topic.',
+          );
+        }
+      } else if (unitId && courseId && !materialId) {
+        const unit = await this.prisma.unit.findUnique({
+          where: { id: unitId },
+          select: { courseId: true },
+        });
+        if (!unit) {
+          throw new NotFoundException(`Unit with ID ${unitId} not found`);
+        }
+        if (unit.courseId !== courseId) {
+          throw new ForbiddenException(
+            'Progress associations do not match the selected unit.',
+          );
         }
       }
 

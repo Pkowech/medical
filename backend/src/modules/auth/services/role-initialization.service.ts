@@ -29,7 +29,7 @@ export class RoleInitializationService implements OnApplicationBootstrap {
         const roleNames = Object.values(Role);
         const existingRoles = await tx.role.findMany({
           where: { name: { in: roleNames } },
-          select: { name: true },
+          select: { id: true, name: true },
         });
         const existingRoleNames = new Set(
           existingRoles.map((role) => role.name),
@@ -38,12 +38,12 @@ export class RoleInitializationService implements OnApplicationBootstrap {
           roleNames.filter((roleName) => !existingRoleNames.has(roleName)),
         );
 
-        if (missingRoleNames.size === 0) {
-          return;
-        }
-
         // Ensure all default permissions exist
         const permissions = await this.createDefaultPermissions(tx);
+        if (missingRoleNames.size === 0) {
+          // Existing role grants may include intentional administrator changes.
+          return;
+        }
         const permissionMap: Record<string, PrismaPermission> =
           Object.fromEntries(permissions.map((p) => [p.name, p]));
 

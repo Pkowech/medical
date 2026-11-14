@@ -67,7 +67,8 @@ export class MaterialsController {
           'video/x-msvideo',
           'video/webm',
         ]);
-        const extension = file.originalname.split('.').pop()?.toLowerCase() ?? '';
+        const extension =
+          file.originalname.split('.').pop()?.toLowerCase() ?? '';
         const normalizedMimeType = (file.mimetype || '').toLowerCase();
         const allowedExtensions = new Set([
           'pdf',
@@ -83,7 +84,10 @@ export class MaterialsController {
           'webm',
         ]);
 
-        if (allowedMimeTypes.has(normalizedMimeType) || allowedExtensions.has(extension)) {
+        if (
+          allowedMimeTypes.has(normalizedMimeType) ||
+          allowedExtensions.has(extension)
+        ) {
           callback(null, true);
           return;
         }
@@ -109,7 +113,8 @@ export class MaterialsController {
         },
         courseId: {
           type: 'string',
-          description: 'Required course placement. A course alone is appropriate for course-level resources such as textbooks.',
+          description:
+            'Required course placement. A course alone is appropriate for course-level resources such as textbooks.',
         },
         unitId: {
           type: 'string',
@@ -146,7 +151,8 @@ export class MaterialsController {
         },
         shareWithCourse: {
           type: 'boolean',
-          description: 'Share this material with enrolled students in its course. Defaults to false.',
+          description:
+            'Share this material with enrolled students in its course. Defaults to false.',
         },
       },
       required: ['file', 'title', 'courseId'],
@@ -188,7 +194,10 @@ export class MaterialsController {
   }
 
   @Post('drive')
-  @ApiOperation({ summary: 'Link a material from Google Drive to the signed-in user’s library' })
+  @ApiOperation({
+    summary:
+      'Link a material from Google Drive to the signed-in user’s library',
+  })
   @ApiBody({
     schema: {
       type: 'object',
@@ -197,15 +206,22 @@ export class MaterialsController {
         title: { type: 'string' },
         description: { type: 'string' },
         courseId: { type: 'string', description: 'Required course placement.' },
-        unitId: { type: 'string', description: 'Optional unit within the course.' },
-        topicId: { type: 'string', description: 'Optional topic within the selected unit.' },
+        unitId: {
+          type: 'string',
+          description: 'Optional unit within the course.',
+        },
+        topicId: {
+          type: 'string',
+          description: 'Optional topic within the selected unit.',
+        },
         shareWithCourse: { type: 'boolean' },
       },
       required: ['url', 'title', 'courseId'],
     },
   })
   async registerDriveMaterial(
-    @Body() dto: {
+    @Body()
+    dto: {
       url: string;
       title: string;
       description?: string;
@@ -216,11 +232,16 @@ export class MaterialsController {
     },
     @GetUser() user: PrismaUser,
   ) {
-    return this.materialsService.registerGoogleDriveMaterial({ ...dto, userId: user.id });
+    return this.materialsService.registerGoogleDriveMaterial({
+      ...dto,
+      userId: user.id,
+    });
   }
 
   @Get('drive/connection')
-  @ApiOperation({ summary: 'Check whether the signed-in user connected Google Drive' })
+  @ApiOperation({
+    summary: 'Check whether the signed-in user connected Google Drive',
+  })
   async getDriveConnection(@GetUser() user: PrismaUser) {
     return this.materialsService.getGoogleDriveConnectionStatus(user.id);
   }
@@ -229,13 +250,17 @@ export class MaterialsController {
   @ApiOperation({ summary: 'Start read-only Google Drive authorization' })
   getDriveAuthorizationUrl(@GetUser() user: PrismaUser) {
     return {
-      authorizationUrl: this.materialsService.getGoogleDriveAuthorizationUrl(user.id),
+      authorizationUrl: this.materialsService.getGoogleDriveAuthorizationUrl(
+        user.id,
+      ),
     };
   }
 
   @Delete('drive/connection')
   @HttpCode(204)
-  @ApiOperation({ summary: 'Disconnect Google Drive from the signed-in account' })
+  @ApiOperation({
+    summary: 'Disconnect Google Drive from the signed-in account',
+  })
   async disconnectDrive(@GetUser() user: PrismaUser): Promise<void> {
     await this.materialsService.disconnectGoogleDrive(user.id);
   }
@@ -251,7 +276,9 @@ export class MaterialsController {
   ): Promise<void> {
     try {
       if (oauthError || !code || !state) {
-        throw new BadRequestException('Google Drive authorization was not completed.');
+        throw new BadRequestException(
+          'Google Drive authorization was not completed.',
+        );
       }
       await this.materialsService.completeGoogleDriveAuthorization(code, state);
       this.redirectAfterDriveAuthorization(response, true);
@@ -263,7 +290,10 @@ export class MaterialsController {
 
   @Post('drive/folder-preview')
   @HttpCode(200)
-  @ApiOperation({ summary: 'Preview supported files in a folder the signed-in Google account can access' })
+  @ApiOperation({
+    summary:
+      'Preview supported files in a folder the signed-in Google account can access',
+  })
   async previewDriveFolder(
     @Body('folderUrl') folderUrl: string,
     @GetUser() user: PrismaUser,
@@ -275,7 +305,10 @@ export class MaterialsController {
   }
 
   @Post('drive/folder-link')
-  @ApiOperation({ summary: 'Link selected Drive files to a course with optional unit/topic placement' })
+  @ApiOperation({
+    summary:
+      'Link selected Drive files to a course with optional unit/topic placement',
+  })
   @ApiBody({
     schema: {
       type: 'object',
@@ -288,9 +321,18 @@ export class MaterialsController {
               fileId: { type: 'string' },
               title: { type: 'string' },
               description: { type: 'string' },
-              courseId: { type: 'string', description: 'Required course placement.' },
-              unitId: { type: 'string', description: 'Optional unit within the course.' },
-              topicId: { type: 'string', description: 'Optional topic within the selected unit.' },
+              courseId: {
+                type: 'string',
+                description: 'Required course placement.',
+              },
+              unitId: {
+                type: 'string',
+                description: 'Optional unit within the course.',
+              },
+              topicId: {
+                type: 'string',
+                description: 'Optional topic within the selected unit.',
+              },
               shareWithCourse: { type: 'boolean' },
             },
             required: ['fileId', 'title', 'courseId'],
@@ -316,10 +358,17 @@ export class MaterialsController {
     return this.materialsService.linkGoogleDriveFolderFiles(items, user.id);
   }
 
-  private redirectAfterDriveAuthorization(response: Response, connected: boolean): void {
+  private redirectAfterDriveAuthorization(
+    response: Response,
+    connected: boolean,
+  ): void {
     const frontendUrl = this.configService.get<string>('FRONTEND_URL');
     if (!frontendUrl) {
-      response.status(500).send('Google Drive authorization completed, but FRONTEND_URL is not configured.');
+      response
+        .status(500)
+        .send(
+          'Google Drive authorization completed, but FRONTEND_URL is not configured.',
+        );
       return;
     }
     const redirectUrl = new URL('/study-planner/materials/upload', frontendUrl);
@@ -332,18 +381,30 @@ export class MaterialsController {
 
   @Post('attach')
   @RequireRole([Role.instructor, Role.admin])
-  @ApiOperation({ summary: 'Attach an existing R2 library material to a new topic/unit/course (zero re-upload)' })
+  @ApiOperation({
+    summary:
+      'Attach an existing R2 library material to a new topic/unit/course (zero re-upload)',
+  })
   @ApiBody({
     schema: {
       type: 'object',
       properties: {
-        sourceMaterialId: { type: 'string', description: 'ID of the existing material whose file to reuse' },
-        title:           { type: 'string' },
-        description:     { type: 'string' },
-        topicId:         { type: 'string', description: 'Optional topic within the selected unit.' },
-        unitId:          { type: 'string', description: 'Optional unit placement within the course.' },
-        courseId:        { type: 'string', description: 'Required course placement.' },
-        type:            { type: 'string' },
+        sourceMaterialId: {
+          type: 'string',
+          description: 'ID of the existing material whose file to reuse',
+        },
+        title: { type: 'string' },
+        description: { type: 'string' },
+        topicId: {
+          type: 'string',
+          description: 'Optional topic within the selected unit.',
+        },
+        unitId: {
+          type: 'string',
+          description: 'Optional unit placement within the course.',
+        },
+        courseId: { type: 'string', description: 'Required course placement.' },
+        type: { type: 'string' },
       },
       required: ['sourceMaterialId', 'title', 'courseId'],
     },
@@ -383,15 +444,22 @@ export class MaterialsController {
         url: { type: 'string' },
         type: { type: 'string', enum: Object.values(MaterialType) },
         courseId: { type: 'string', description: 'Required course placement.' },
-        unitId: { type: 'string', description: 'Optional unit within the course.' },
-        topicId: { type: 'string', description: 'Optional topic within the selected unit.' },
+        unitId: {
+          type: 'string',
+          description: 'Optional unit within the course.',
+        },
+        topicId: {
+          type: 'string',
+          description: 'Optional topic within the selected unit.',
+        },
         description: { type: 'string' },
       },
       required: ['title', 'url', 'type', 'courseId'],
     },
   })
   async registerExternalResource(
-    @Body() dto: {
+    @Body()
+    dto: {
       title: string;
       url: string;
       type: MaterialType;
@@ -410,7 +478,8 @@ export class MaterialsController {
 
   @Get('recommended')
   @ApiOperation({
-    summary: 'Get material recommendations based on the authenticated user’s quiz performance',
+    summary:
+      'Get material recommendations based on the authenticated user’s quiz performance',
   })
   async getRecommendedMaterials(@GetUser() user: PrismaUser) {
     return this.materialsService.getRecommendedMaterialsForUser(user.id);
@@ -424,7 +493,8 @@ export class MaterialsController {
     @Query('limit') limit: number = 20,
     @Query('search') search?: string,
     @Query('type') type?: string,
-    @Query('scope') scope?: 'all' | 'enrolled' | 'recommended' | 'owned' | 'shared',
+    @Query('scope')
+    scope?: 'all' | 'enrolled' | 'recommended' | 'owned' | 'shared',
     @Query('sortBy') sortBy?: string,
     @Query('sortOrder') sortOrder?: 'asc' | 'desc',
     @Query('unitId') unitId?: string,
@@ -478,7 +548,10 @@ export class MaterialsController {
 
   @Get('unit/:unitId')
   @ApiOperation({ summary: 'Get all materials for a unit' })
-  async findMaterialsByUnitId(@Param('unitId') unitId: string, @GetUser() user: PrismaUser) {
+  async findMaterialsByUnitId(
+    @Param('unitId') unitId: string,
+    @GetUser() user: PrismaUser,
+  ) {
     return this.materialsService.findMaterialsByUnitId(unitId, user.id);
   }
 
@@ -635,10 +708,12 @@ export class MaterialsController {
 
   @Get(':id/with-url')
   @ApiOperation({ summary: 'Get material with file URL for frontend' })
-  async getMaterialWithFileUrl(@Param('id') id: string, @GetUser() user: PrismaUser) {
+  async getMaterialWithFileUrl(
+    @Param('id') id: string,
+    @GetUser() user: PrismaUser,
+  ) {
     return this.materialsService.getMaterialWithFileUrl(id, user.id);
   }
-
 
   @Get(':id/overview')
   @ApiOperation({ summary: 'Get material statistics' })
@@ -654,7 +729,9 @@ export class MaterialsController {
   }
 
   @Patch(':id/share-with-course')
-  @ApiOperation({ summary: 'Share or unshare a material with enrolled course students' })
+  @ApiOperation({
+    summary: 'Share or unshare a material with enrolled course students',
+  })
   async setCourseSharing(
     @Param('id') materialId: string,
     @Body('shared') shared: boolean,
@@ -670,15 +747,35 @@ export class MaterialsController {
     @Body('userId') sharedWithUserId: string,
     @GetUser() user: PrismaUser,
   ) {
-    return this.materialsService.shareMaterial(materialId, user.id, sharedWithUserId);
+    return this.materialsService.shareMaterial(
+      materialId,
+      user.id,
+      sharedWithUserId,
+    );
   }
 
-
+  @Delete(':id/share')
+  @ApiOperation({ summary: 'Revoke a direct material share' })
+  async revokeMaterialShare(
+    @Param('id') materialId: string,
+    @Body('userId') sharedWithUserId: string,
+    @GetUser() user: PrismaUser,
+  ) {
+    await this.materialsService.revokeMaterialShare(
+      materialId,
+      user.id,
+      sharedWithUserId,
+    );
+    return { success: true };
+  }
 
   @Delete('files/:fileId')
   @RequireRole([Role.instructor, Role.admin])
   @ApiOperation({ summary: 'Delete a file' })
-  async deleteFile(@Param('fileId') fileId: string, @GetUser() user: PrismaUser) {
+  async deleteFile(
+    @Param('fileId') fileId: string,
+    @GetUser() user: PrismaUser,
+  ) {
     await this.materialsService.deleteFile(fileId, user.id);
     return { success: true };
   }
@@ -711,7 +808,9 @@ export class MaterialsController {
       throw new BadRequestException('No file uploaded');
     }
     if (!courseId?.trim()) {
-      throw new BadRequestException('Assign the converted material to a course.');
+      throw new BadRequestException(
+        'Assign the converted material to a course.',
+      );
     }
     return this.materialsService.convertToPdf(file, user.id, courseId);
   }
@@ -729,7 +828,10 @@ export class MaterialsController {
         mimetype: { type: 'string' },
         size: { type: 'number' },
         courseId: { type: 'string', description: 'Required course placement.' },
-        unitId: { type: 'string', description: 'Optional unit within the course.' },
+        unitId: {
+          type: 'string',
+          description: 'Optional unit within the course.',
+        },
       },
       required: ['hash', 'filename', 'mimetype', 'courseId'],
     },
@@ -811,5 +913,4 @@ export class MaterialsController {
   // ========================================
   // LOCAL FILE SYSTEM ENDPOINTS (DEV MODE)
   // ========================================
-
 }

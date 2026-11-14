@@ -6,9 +6,6 @@ use tonic::{Request, Response, Status};
 use crate::analytics::learning::learning_analytics::{
     calculate_goal_analytics, calculate_user_learning_summary, Goal, ProgressStatus,
 };
-use crate::modules::analytics::progress_tracking::{
-    calculate_user_course_progress, summarize_user_course_progress,
-};
 use crate::analytics_proto::{
     CalculateCourseProgressRequest, CohortAnalyticsResponse, CourseAnalyticsResponse,
     CourseProgress, CourseStatsResult, CourseStatsResultResponse, CourseUnitPopularity,
@@ -18,6 +15,9 @@ use crate::analytics_proto::{
     GetUserDataForProfileResponse, GetUserLearningSummaryRequest, LearningGoalAnalyticsResponse,
     LearningPathStatsResult, LearningPathStatsResultResponse, StrugglingStudent,
     UserLearningSummaryResponse,
+};
+use crate::modules::analytics::progress_tracking::{
+    calculate_user_course_progress, summarize_user_course_progress,
 };
 
 pub struct LearningService {
@@ -268,12 +268,9 @@ impl LearningService {
         let course_progress = calculate_user_course_progress(&self.pool, &user_id)
             .await
             .map_err(|error| {
-                Status::internal(format!(
-                    "Canonical course progress query failed: {error}"
-                ))
+                Status::internal(format!("Canonical course progress query failed: {error}"))
             })?;
-        let (total, completed, avg_progress) =
-            summarize_user_course_progress(&course_progress);
+        let (total, completed, avg_progress) = summarize_user_course_progress(&course_progress);
 
         let total_time: i64 = sqlx::query_scalar(
             "SELECT COALESCE(SUM(ss.duration), 0)

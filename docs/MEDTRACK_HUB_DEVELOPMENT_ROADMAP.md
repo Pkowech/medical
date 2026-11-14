@@ -29,10 +29,13 @@ This roadmap is being actively trimmed. Items that are already implemented or do
 - [ ] Verify Prisma migration deployment in CI.
 - [ ] Establish a reliable initial administrator creation flow.
 - [ ] Verify role and permission reference data.
+  - [x] Re-run default permission upserts when roles already exist, without reapplying grants that administrators may have changed.
+  - [ ] Track intentional role-grant overrides before attempting to repair missing default grants for existing roles.
 - [ ] Validate login, logout, refresh, password recovery, and rate limiting.
 - [ ] Verify RBAC at controller and service boundaries.
 - [ ] Audit and fix any remaining catalogue publication/authorization gaps.
 - [ ] Confirm material sharing, unpublished content filtering, and cache invalidation remain safe.
+  - [x] Add owner-checked direct-share revocation and refresh material search indexing after sharing changes.
 
 # 2. Phase 2 — Secure assessment integrity
 - [x] Define `QuizQuestion.points` as the quiz-specific grading weight and snapshot question order and answers per attempt.
@@ -55,6 +58,9 @@ This roadmap is being actively trimmed. Items that are already implemented or do
 - [ ] Finish onboarding and profile completion behavior.
 - [ ] Audit learning-path eligibility and recommendation filtering.
 - [ ] Build evidence-based prerequisite remediation paths: detect repeated topic-level difficulty from quiz/adaptive-assessment evidence; use a diagnostic assessment to distinguish a target-topic gap from missing foundational knowledge; map the confirmed gaps through explicit topic prerequisites and existing courses, units, materials, and assessments; then curate a sequenced, learner-specific path with a clear rationale and reassessment checkpoints.
+  - [x] Aggregate target and prerequisite evidence across distinct completed attempts, excluding the current attempt, and return insufficient evidence when the minimum evidence threshold is not met.
+  - [x] Present recommendation steps in order with rationale and a target reassessment checkpoint.
+  - [ ] Persist reviewed sequences as learner-specific paths with independent progress ownership and verified prerequisite ordering.
 - [ ] Define safe remediation rules: do not infer a broad knowledge deficit from one failed attempt; require sufficient evidence or a diagnostic, track confidence and evidence for each identified gap, avoid recommending unrelated prerequisites, and let learners review the proposed plan before it affects their active learning.
 - [ ] Verify generated remediation paths preserve source links, prerequisite order, learner eligibility, and progress attribution, and can be revised when new assessment evidence changes the diagnosis.
 - [ ] Verify student progression through content and assessments.

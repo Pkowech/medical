@@ -20,6 +20,10 @@ export interface QuizPerformanceRecommendations {
     topicId: string;
     topicName: string;
     accuracy: number;
+    targetEvidence: {
+      sampleSize: number;
+      accuracy: number | null;
+    };
     diagnosis: 'prerequisite_gap' | 'target_content_gap' | 'insufficient_evidence';
     confidence: 'low' | 'medium' | 'high';
     prerequisiteEvidence: Array<{
@@ -27,6 +31,17 @@ export interface QuizPerformanceRecommendations {
       unitName: string;
       sampleSize: number;
       accuracy: number | null;
+    }>;
+    sequence?: Array<{
+      title: string;
+      rationale: string;
+      resources: Array<{
+        kind: string;
+        id: string;
+        title: string;
+        href: string;
+        reason: string;
+      }>;
     }>;
     recommendations: Array<{
       kind: string;

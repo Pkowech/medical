@@ -8,7 +8,6 @@ import {
   Clock,
   Target,
   CheckCircle2,
-  AlertTriangle,
   TrendingUp,
   Search,
   Sparkles,
@@ -209,7 +208,7 @@ export function AssessmentDashboard() {
 
   if (isAdaptiveActive) {
     return (
-      <div className="container mx-auto px-4 py-8 space-y-6 max-w-5xl">
+      <div className="mx-auto w-full max-w-screen-lg space-y-6 px-4 py-6 sm:px-6">
         <div className="flex items-center justify-between">
           <Button variant="ghost" onClick={() => setIsAdaptiveActive(false)} className="gap-2">
             <RotateCcw className="h-4 w-4" />
@@ -226,9 +225,9 @@ export function AssessmentDashboard() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 space-y-8">
+    <div className="mx-auto w-full max-w-screen-2xl min-w-0 space-y-6 px-4 py-6 sm:px-6 lg:px-8">
       {/* Top Academic Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <section aria-label="Assessment overview" className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Card className="bg-card/80 dark:bg-card/50 backdrop-blur-sm border-border">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Academic Score</CardTitle>
@@ -274,10 +273,10 @@ export function AssessmentDashboard() {
             <p className="text-xs text-muted-foreground mt-1">No readiness assessment available</p>
           </CardContent>
         </Card>
-      </div>
+      </section>
 
       {/* Featured Adaptive Assessment Callout */}
-      <Card className="border-blue-500/20 bg-gradient-to-r from-blue-500/10 via-indigo-500/5 to-transparent dark:from-blue-950/30 dark:via-indigo-950/20 dark:to-transparent">
+      <Card className="rounded-xl border-blue-500/20 bg-gradient-to-r from-blue-500/10 via-indigo-500/5 to-transparent shadow-sm dark:from-blue-950/30 dark:via-indigo-950/20 dark:to-transparent">
         <CardContent className="p-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="space-y-2 max-w-2xl">
@@ -304,8 +303,8 @@ export function AssessmentDashboard() {
       </Card>
 
       {/* Main Tabs */}
-      <Tabs defaultValue="assessments" className="space-y-6">
-        <TabsList className="bg-muted/60 p-1">
+      <Tabs defaultValue="assessments" className="min-w-0 space-y-5">
+        <TabsList className="h-auto w-full flex-wrap justify-start gap-1 bg-muted/60 p-1">
           <TabsTrigger value="assessments" className="gap-2">
             <BookOpen className="h-4 w-4" />
             Curriculum Assessments
@@ -321,7 +320,7 @@ export function AssessmentDashboard() {
         </TabsList>
 
         {/* Tab 1: Available Assessments */}
-        <TabsContent value="assessments" className="space-y-6">
+        <TabsContent value="assessments" className="space-y-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-1">
               <p className="text-sm font-medium text-foreground">
@@ -343,7 +342,7 @@ export function AssessmentDashboard() {
           )}
 
           {/* Filters & Search */}
-          <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between">
+          <div className="flex flex-col items-stretch justify-between gap-3 rounded-xl border border-border bg-card/70 p-3 shadow-sm md:flex-row md:items-center">
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <input
@@ -355,7 +354,7 @@ export function AssessmentDashboard() {
                   setSelectedCategory('All');
                 }}
                 placeholder="Search all assessments by title, topic, course, or specialty..."
-                className="w-full pl-9 pr-4 py-2 text-sm rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                className="min-h-10 w-full rounded-lg border border-input bg-background py-2 pl-9 pr-4 text-sm text-foreground outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
               />
             </div>
 
@@ -383,9 +382,11 @@ export function AssessmentDashboard() {
               <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500" />
             </div>
           ) : filteredAssessments.length === 0 ? (
-            <Card className="text-center p-12">
+            <Card className="rounded-xl border-border bg-card/70 py-10 text-center shadow-sm">
               <CardContent className="space-y-4">
-                <AlertTriangle className="h-10 w-10 text-muted-foreground mx-auto" />
+                <span className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300">
+                  <Search className="h-6 w-6" aria-hidden="true" />
+                </span>
                 <h3 className="text-lg font-semibold text-foreground">
                   {currentSearchResult?.error
                     ? 'Assessment search unavailable'

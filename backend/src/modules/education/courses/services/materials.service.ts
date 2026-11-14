@@ -77,12 +77,12 @@ export class MaterialsService {
     private readonly googleDrive: GoogleDriveService,
   ) {
     this.storageProvider =
-      this.configService.get<string>('MATERIAL_FILE_STORAGE_PROVIDER') === 'local'
+      this.configService.get<string>('MATERIAL_FILE_STORAGE_PROVIDER') ===
+      'local'
         ? 'local'
         : 's3';
     this.localStoragePath =
-      this.configService.get<string>('LOCAL_STORAGE_PATH') ||
-      './uploads';
+      this.configService.get<string>('LOCAL_STORAGE_PATH') || './uploads';
 
     this.logger.log(
       `Materials service initialized with ${this.storageProvider} storage`,
@@ -194,14 +194,16 @@ export class MaterialsService {
       // Security check: ensure the file is within the allowed storage path
       const resolvedStoragePath = path.resolve(this.localStoragePath);
       const resolvedPath = path.resolve(resolvedStoragePath, filePath);
-      const relativeToStorage = path.relative(resolvedStoragePath, resolvedPath);
+      const relativeToStorage = path.relative(
+        resolvedStoragePath,
+        resolvedPath,
+      );
 
-      if (
-        !(
-          relativeToStorage === '' ||
-          (!relativeToStorage.startsWith('..') && !path.isAbsolute(relativeToStorage))
-        )
-      ) {
+      if (!(
+        relativeToStorage === '' ||
+        (!relativeToStorage.startsWith('..') &&
+          !path.isAbsolute(relativeToStorage))
+      )) {
         throw new ForbiddenException(
           'Access to file outside storage directory is not allowed',
         );
@@ -278,14 +280,16 @@ export class MaterialsService {
       // Security check: ensure requested directory is inside storage path
       const resolvedStoragePath = path.resolve(this.localStoragePath);
       const resolvedPath = path.resolve(dirPath);
-      const relativeToStorage = path.relative(resolvedStoragePath, resolvedPath);
+      const relativeToStorage = path.relative(
+        resolvedStoragePath,
+        resolvedPath,
+      );
 
-      if (
-        !(
-          relativeToStorage === '' ||
-          (!relativeToStorage.startsWith('..') && !path.isAbsolute(relativeToStorage))
-        )
-      ) {
+      if (!(
+        relativeToStorage === '' ||
+        (!relativeToStorage.startsWith('..') &&
+          !path.isAbsolute(relativeToStorage))
+      )) {
         throw new ForbiddenException(
           'Access outside storage directory is not allowed',
         );
@@ -474,7 +478,9 @@ export class MaterialsService {
           enrollments: {
             some: {
               userId: options.userId,
-              status: { in: [EnrollmentStatus.active, EnrollmentStatus.completed] },
+              status: {
+                in: [EnrollmentStatus.active, EnrollmentStatus.completed],
+              },
             },
           },
         };
@@ -628,7 +634,10 @@ export class MaterialsService {
     }
   }
 
-  async findMaterialsByUnitId(unitId: string, userId?: string): Promise<Material[]> {
+  async findMaterialsByUnitId(
+    unitId: string,
+    userId?: string,
+  ): Promise<Material[]> {
     try {
       const materials = await this.prisma.material.findMany({
         where: userId
@@ -645,7 +654,10 @@ export class MaterialsService {
                         course: {
                           status: 'published',
                           enrollments: {
-                            some: { userId, status: { in: ['active', 'completed'] } },
+                            some: {
+                              userId,
+                              status: { in: ['active', 'completed'] },
+                            },
                           },
                         },
                         isPublished: true,
@@ -775,7 +787,9 @@ export class MaterialsService {
       await this.validateMaterialPlacement(courseId, unitId, topicId);
       if (courseId) await this.assertCanManageCourseMaterials(courseId, userId);
       if (shareWithCourse && !courseId) {
-        throw new BadRequestException('Assign a course before sharing this material with a class.');
+        throw new BadRequestException(
+          'Assign a course before sharing this material with a class.',
+        );
       }
 
       // Calculate file hash for deduplication (streaming-friendly)
@@ -849,40 +863,53 @@ export class MaterialsService {
         'application/msword',
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         'application/vnd.ms-powerpoint',
-        'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
       ];
-      
+
       if (officeMimeTypes.includes(file.mimetype)) {
         this.logger.log('Sending document to Gotenberg for PDF conversion...');
         try {
           const formData = new FormData();
-          formData.append('files', new Blob([uploadBuffer as any]), file.originalname);
-          
+          formData.append(
+            'files',
+            new Blob([uploadBuffer as any]),
+            file.originalname,
+          );
+
           const gotenbergUrl = this.configService.get<string>('GOTENBERG_URL');
-          const response = await fetch(`${gotenbergUrl}/forms/libreoffice/convert`, {
-            method: 'POST',
-            body: formData,
-          });
+          const response = await fetch(
+            `${gotenbergUrl}/forms/libreoffice/convert`,
+            {
+              method: 'POST',
+              body: formData,
+            },
+          );
 
           if (!response.ok) {
-            this.logger.error(`Gotenberg conversion failed: ${response.status} ${response.statusText}`);
+            this.logger.error(
+              `Gotenberg conversion failed: ${response.status} ${response.statusText}`,
+            );
           } else {
             const pdfArrayBuffer = await response.arrayBuffer();
             const pdfBuffer = Buffer.from(pdfArrayBuffer);
             const pdfHash = await hashBuffer(pdfBuffer);
-            
+
             // Check if preview already exists
             const existingPreview = await this.prisma.file.findFirst({
               where: { hash: pdfHash },
             });
-            
+
             if (existingPreview) {
               previewFileRecord = existingPreview;
             } else {
-              const previewFilename = file.originalname.replace(/\.[^/.]+$/, "") + ".pdf";
-              const sanitizedPreviewName = previewFilename.replace(/[^\w\s.-]/g, '');
+              const previewFilename =
+                file.originalname.replace(/\.[^/.]+$/, '') + '.pdf';
+              const sanitizedPreviewName = previewFilename.replace(
+                /[^\w\s.-]/g,
+                '',
+              );
               const previewKey = `materials/previews/${pdfHash}-${sanitizedPreviewName}`;
-              
+
               await this.fileStorage.uploadBuffer(
                 previewKey,
                 pdfBuffer,
@@ -894,7 +921,7 @@ export class MaterialsService {
                   hash: pdfHash,
                 },
               );
-              
+
               previewFileRecord = await this.prisma.file.create({
                 data: {
                   filename: previewFilename,
@@ -905,17 +932,21 @@ export class MaterialsService {
                   uploadedById: userId,
                 },
               });
-              this.logger.log('Gotenberg conversion successful, saved preview file.');
+              this.logger.log(
+                'Gotenberg conversion successful, saved preview file.',
+              );
             }
           }
         } catch (convertErr) {
-          this.logger.error('Error connecting to Gotenberg', { error: (convertErr as Error).message });
+          this.logger.error('Error connecting to Gotenberg', {
+            error: (convertErr as Error).message,
+          });
         }
       }
 
       const eventId = randomUUID();
       const timestamp = new Date();
-      const material = await this.prisma.$transaction(async transaction => {
+      const material = await this.prisma.$transaction(async (transaction) => {
         const createdMaterial = await transaction.material.create({
           data: {
             title: title || file.originalname,
@@ -993,10 +1024,14 @@ export class MaterialsService {
       include: { file: true },
     });
     if (!source) {
-      throw new NotFoundException(`Source material ${dto.sourceMaterialId} not found`);
+      throw new NotFoundException(
+        `Source material ${dto.sourceMaterialId} not found`,
+      );
     }
     if (!source.fileId) {
-      throw new BadRequestException('Source material has no associated file in R2 storage');
+      throw new BadRequestException(
+        'Source material has no associated file in R2 storage',
+      );
     }
 
     await this.validateMaterialPlacement(courseId, unitId, topicId);
@@ -1068,7 +1103,10 @@ export class MaterialsService {
     } else {
       await this.assertCanAssignPrivateDriveMaterial(courseId, dto.userId);
     }
-    const driveFile = await this.googleDrive.getSharedDriveFile(dto.url, dto.userId);
+    const driveFile = await this.googleDrive.getSharedDriveFile(
+      dto.url,
+      dto.userId,
+    );
     const mimeType = driveFile.mimeType || '';
     const supportedGoogleDocs = new Set([
       'application/vnd.google-apps.document',
@@ -1076,10 +1114,14 @@ export class MaterialsService {
       'application/vnd.google-apps.presentation',
     ]);
     if (mimeType !== 'application/pdf' && !supportedGoogleDocs.has(mimeType)) {
-      throw new BadRequestException('Drive materials currently support PDF, Google Docs, Sheets, and Slides files.');
+      throw new BadRequestException(
+        'Drive materials currently support PDF, Google Docs, Sheets, and Slides files.',
+      );
     }
 
-    const personalDriveConnection = await this.googleDrive.isUserConnected(dto.userId);
+    const personalDriveConnection = await this.googleDrive.isUserConnected(
+      dto.userId,
+    );
     const material = await this.prisma.material.create({
       data: {
         title: dto.title.trim() || driveFile.name || 'Drive material',
@@ -1141,7 +1183,9 @@ export class MaterialsService {
     userId: string,
   ) {
     if (!Array.isArray(items) || items.length === 0) {
-      throw new BadRequestException('Select at least one supported Drive file to link.');
+      throw new BadRequestException(
+        'Select at least one supported Drive file to link.',
+      );
     }
     if (items.length > 200) {
       throw new BadRequestException('Link no more than 200 files at a time.');
@@ -1170,7 +1214,8 @@ export class MaterialsService {
           fileId: item.fileId || '',
           title: item.title || '',
           status: 'failed',
-          error: 'Each file needs a unique ID, title, and course; unit/topic placement must follow the course hierarchy.',
+          error:
+            'Each file needs a unique ID, title, and course; unit/topic placement must follow the course hierarchy.',
         });
         continue;
       }
@@ -1227,7 +1272,8 @@ export class MaterialsService {
 
     return {
       linked: results.filter(({ status }) => status === 'linked').length,
-      alreadyLinked: results.filter(({ status }) => status === 'already-linked').length,
+      alreadyLinked: results.filter(({ status }) => status === 'already-linked')
+        .length,
       failed: results.filter(({ status }) => status === 'failed').length,
       results,
     };
@@ -1244,14 +1290,20 @@ export class MaterialsService {
     });
     if (!material) throw new NotFoundException('Material not found.');
 
-    const courseId = material.courseId || (material.unitId
-      ? (await this.prisma.unit.findUnique({
-          where: { id: material.unitId },
-          select: { courseId: true },
-        }))?.courseId
-      : undefined);
+    const courseId =
+      material.courseId ||
+      (material.unitId
+        ? (
+            await this.prisma.unit.findUnique({
+              where: { id: material.unitId },
+              select: { courseId: true },
+            })
+          )?.courseId
+        : undefined);
     if (!courseId) {
-      throw new BadRequestException('Assign this material to a course before sharing it with a class.');
+      throw new BadRequestException(
+        'Assign this material to a course before sharing it with a class.',
+      );
     }
     await this.validateMaterialPlacement(
       courseId,
@@ -1262,15 +1314,19 @@ export class MaterialsService {
     await this.assertCanManageCourseMaterials(courseId, userId);
 
     const currentMetadata =
-      material.metadata && typeof material.metadata === 'object' && !Array.isArray(material.metadata)
-        ? material.metadata as Record<string, unknown>
+      material.metadata &&
+      typeof material.metadata === 'object' &&
+      !Array.isArray(material.metadata)
+        ? (material.metadata as Record<string, unknown>)
         : {};
-    return this.prisma.material.update({
+    const updatedMaterial = await this.prisma.material.update({
       where: { id: materialId },
       data: {
         metadata: { ...currentMetadata, shareWithCourse: shared },
       },
     });
+    await this.searchSync.syncEntity('material', updatedMaterial.id);
+    return updatedMaterial;
   }
 
   private async validateMaterialPlacement(
@@ -1281,7 +1337,8 @@ export class MaterialsService {
     const assignedCourseId = courseId?.trim();
     const assignedUnitId = unitId?.trim();
     const assignedTopicId = topicId?.trim();
-    if (!assignedCourseId) throw new BadRequestException('Assign this material to a course.');
+    if (!assignedCourseId)
+      throw new BadRequestException('Assign this material to a course.');
 
     const course = await this.prisma.course.findUnique({
       where: { id: assignedCourseId },
@@ -1290,7 +1347,9 @@ export class MaterialsService {
     if (!course) throw new NotFoundException('Course not found');
     if (!assignedUnitId) {
       if (assignedTopicId) {
-        throw new BadRequestException('Choose a unit before assigning a topic.');
+        throw new BadRequestException(
+          'Choose a unit before assigning a topic.',
+        );
       }
       return;
     }
@@ -1303,7 +1362,9 @@ export class MaterialsService {
       throw new NotFoundException('Unit not found');
     }
     if (unit.courseId !== assignedCourseId) {
-      throw new BadRequestException('The selected unit does not belong to the selected course.');
+      throw new BadRequestException(
+        'The selected unit does not belong to the selected course.',
+      );
     }
 
     if (!assignedTopicId) return;
@@ -1315,25 +1376,40 @@ export class MaterialsService {
       throw new NotFoundException('Topic not found');
     }
     if (topic.unitId !== unit.id) {
-      throw new BadRequestException('The selected topic does not belong to the selected unit.');
+      throw new BadRequestException(
+        'The selected topic does not belong to the selected unit.',
+      );
     }
   }
 
-  private async assertCanUploadToPlatformLibrary(userId: string): Promise<void> {
+  private async assertCanUploadToPlatformLibrary(
+    userId: string,
+  ): Promise<void> {
     const roles = await this.prisma.userRole.findMany({
       where: { userId },
       select: { role: { select: { name: true } } },
     });
-    if (!roles.some(({ role }) => role.name === RoleName.instructor || role.name === RoleName.admin)) {
+    if (
+      !roles.some(
+        ({ role }) =>
+          role.name === RoleName.instructor || role.name === RoleName.admin,
+      )
+    ) {
       throw new ForbiddenException(
         'Only instructors can add or manage materials in the MedTrack library. Link personal files from Google Drive instead.',
       );
     }
   }
 
-  private async assertCanManageCourseMaterials(courseId: string, userId: string): Promise<void> {
+  private async assertCanManageCourseMaterials(
+    courseId: string,
+    userId: string,
+  ): Promise<void> {
     const [course, instructorAssignment, roles] = await Promise.all([
-      this.prisma.course.findUnique({ where: { id: courseId }, select: { createdById: true } }),
+      this.prisma.course.findUnique({
+        where: { id: courseId },
+        select: { createdById: true },
+      }),
       this.prisma.courseInstructor.findUnique({
         where: { courseId_userId: { courseId, userId } },
         select: { id: true },
@@ -1345,34 +1421,48 @@ export class MaterialsService {
     ]);
     if (!course) throw new NotFoundException('Course not found.');
 
-    const isAdmin = roles.some(userRole => userRole.role.name === RoleName.admin);
+    const isAdmin = roles.some(
+      (userRole) => userRole.role.name === RoleName.admin,
+    );
     if (course.createdById !== userId && !instructorAssignment && !isAdmin) {
-      throw new ForbiddenException('Only this course’s instructors can manage its materials.');
+      throw new ForbiddenException(
+        'Only this course’s instructors can manage its materials.',
+      );
     }
   }
 
-  private async assertCanAssignPrivateDriveMaterial(courseId: string, userId: string): Promise<void> {
-    const [course, instructorAssignment, enrollment, roles] = await Promise.all([
-      this.prisma.course.findUnique({ where: { id: courseId }, select: { createdById: true } }),
-      this.prisma.courseInstructor.findUnique({
-        where: { courseId_userId: { courseId, userId } },
-        select: { id: true },
-      }),
-      this.prisma.courseEnrollment.findUnique({
-        where: { userId_courseId: { userId, courseId } },
-        select: { status: true },
-      }),
-      this.prisma.userRole.findMany({
-        where: { userId },
-        select: { role: { select: { name: true } } },
-      }),
-    ]);
+  private async assertCanAssignPrivateDriveMaterial(
+    courseId: string,
+    userId: string,
+  ): Promise<void> {
+    const [course, instructorAssignment, enrollment, roles] = await Promise.all(
+      [
+        this.prisma.course.findUnique({
+          where: { id: courseId },
+          select: { createdById: true },
+        }),
+        this.prisma.courseInstructor.findUnique({
+          where: { courseId_userId: { courseId, userId } },
+          select: { id: true },
+        }),
+        this.prisma.courseEnrollment.findUnique({
+          where: { userId_courseId: { userId, courseId } },
+          select: { status: true },
+        }),
+        this.prisma.userRole.findMany({
+          where: { userId },
+          select: { role: { select: { name: true } } },
+        }),
+      ],
+    );
     if (!course) throw new NotFoundException('Course not found.');
 
-    const canManageCourse = course.createdById === userId ||
+    const canManageCourse =
+      course.createdById === userId ||
       Boolean(instructorAssignment) ||
       roles.some(({ role }) => role.name === RoleName.admin);
-    const isEnrolled = enrollment?.status === 'active' || enrollment?.status === 'completed';
+    const isEnrolled =
+      enrollment?.status === 'active' || enrollment?.status === 'completed';
     if (!canManageCourse && !isEnrolled) {
       throw new ForbiddenException(
         'Enroll in this course before privately assigning your Google Drive material to it.',
@@ -1380,21 +1470,45 @@ export class MaterialsService {
     }
   }
 
-  private async assertCanReadDriveMaterial(material: Material, userId: string): Promise<void> {
-    const topicUnit = !material.unitId && material.topicId
-      ? await this.prisma.topic.findUnique({
-          where: { id: material.topicId },
-          select: { unitId: true },
-        })
-      : null;
+  private async assertCanReadDriveMaterial(
+    material: Material,
+    userId: string,
+  ): Promise<void> {
+    const topicUnit =
+      !material.unitId && material.topicId
+        ? await this.prisma.topic.findUnique({
+            where: { id: material.topicId },
+            select: { unitId: true },
+          })
+        : null;
     const placementUnitId = material.unitId || topicUnit?.unitId;
-    const courseId = material.courseId || (placementUnitId
-      ? (await this.prisma.unit.findUnique({ where: { id: placementUnitId }, select: { courseId: true } }))?.courseId
-      : undefined);
-    if (!courseId) throw new ForbiddenException('This Drive material is not attached to a course.');
+    const courseId =
+      material.courseId ||
+      (placementUnitId
+        ? (
+            await this.prisma.unit.findUnique({
+              where: { id: placementUnitId },
+              select: { courseId: true },
+            })
+          )?.courseId
+        : undefined);
+    if (!courseId)
+      throw new ForbiddenException(
+        'This Drive material is not attached to a course.',
+      );
 
-    const [course, unit, instructorAssignment, enrollment, groupMemberships, roles] = await Promise.all([
-      this.prisma.course.findUnique({ where: { id: courseId }, select: { createdById: true, status: true } }),
+    const [
+      course,
+      unit,
+      instructorAssignment,
+      enrollment,
+      groupMemberships,
+      roles,
+    ] = await Promise.all([
+      this.prisma.course.findUnique({
+        where: { id: courseId },
+        select: { createdById: true, status: true },
+      }),
       placementUnitId
         ? this.prisma.unit.findUnique({
             where: { id: placementUnitId },
@@ -1422,16 +1536,24 @@ export class MaterialsService {
         select: { role: { select: { name: true } } },
       }),
     ]);
-    const isAdmin = roles.some(userRole => userRole.role.name === RoleName.admin);
-    const isInstructor = course?.createdById === userId || Boolean(instructorAssignment);
-    const isEnrolled = enrollment?.status === 'active' || enrollment?.status === 'completed';
-    const metadata = material.metadata && typeof material.metadata === 'object' && !Array.isArray(material.metadata)
-      ? material.metadata as Record<string, unknown>
-      : {};
+    const isAdmin = roles.some(
+      (userRole) => userRole.role.name === RoleName.admin,
+    );
+    const isInstructor =
+      course?.createdById === userId || Boolean(instructorAssignment);
+    const isEnrolled =
+      enrollment?.status === 'active' || enrollment?.status === 'completed';
+    const metadata =
+      material.metadata &&
+      typeof material.metadata === 'object' &&
+      !Array.isArray(material.metadata)
+        ? (material.metadata as Record<string, unknown>)
+        : {};
     const sharedWithCourse = metadata.shareWithCourse !== false;
     const isCourseGroupMember = groupMemberships.some(({ studyGroup }) => {
       const metadata = studyGroup.metadata;
-      if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return false;
+      if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata))
+        return false;
       return (metadata as Record<string, unknown>).courseId === courseId;
     });
     if (
@@ -1441,12 +1563,21 @@ export class MaterialsService {
     ) {
       throw new ForbiddenException('This course content is not published.');
     }
-    if (!isAdmin && !isInstructor && !(sharedWithCourse && (isEnrolled || isCourseGroupMember))) {
-      throw new ForbiddenException('Enroll in this course to view its Drive materials.');
+    if (
+      !isAdmin &&
+      !isInstructor &&
+      !(sharedWithCourse && (isEnrolled || isCourseGroupMember))
+    ) {
+      throw new ForbiddenException(
+        'Enroll in this course to view its Drive materials.',
+      );
     }
   }
 
-  private async assertCanReadMaterial(material: Material, userId: string): Promise<void> {
+  private async assertCanReadMaterial(
+    material: Material,
+    userId: string,
+  ): Promise<void> {
     if (material.userId === userId) return;
 
     const directShare = await this.prisma.materialShare.findUnique({
@@ -1455,9 +1586,12 @@ export class MaterialsService {
     });
     if (directShare) return;
 
-    const metadata = material.metadata && typeof material.metadata === 'object' && !Array.isArray(material.metadata)
-      ? material.metadata as Record<string, unknown>
-      : {};
+    const metadata =
+      material.metadata &&
+      typeof material.metadata === 'object' &&
+      !Array.isArray(material.metadata)
+        ? (material.metadata as Record<string, unknown>)
+        : {};
     if (metadata.shareWithCourse !== false) {
       await this.assertCanReadDriveMaterial(material, userId);
       return;
@@ -1537,27 +1671,16 @@ export class MaterialsService {
       if (scope === 'owned') {
         where.userId = userId;
       } else if (scope === 'enrolled') {
-        where.OR = [
-          { userId },
-          sharedCoursePlacement,
-        ];
+        where.OR = [{ userId }, sharedCoursePlacement];
       } else if (scope === 'shared') {
         where.AND = [
           { OR: [{ userId: null }, { userId: { not: userId } }] },
           { OR: [directlyShared, sharedCoursePlacement] },
         ];
       } else if (scope === 'recommended') {
-        where.OR = [
-          { userId },
-          directlyShared,
-          sharedCoursePlacement,
-        ];
+        where.OR = [{ userId }, directlyShared, sharedCoursePlacement];
       } else if (scope === 'all') {
-        where.OR = [
-          { userId },
-          directlyShared,
-          sharedCoursePlacement,
-        ];
+        where.OR = [{ userId }, directlyShared, sharedCoursePlacement];
       }
 
       // 2. Filters
@@ -1621,10 +1744,7 @@ export class MaterialsService {
         where.AND = [
           ...(Array.isArray(where.AND) ? where.AND : []),
           {
-            OR: [
-              { courseId },
-              { unit: { courseId } },
-            ],
+            OR: [{ courseId }, { unit: { courseId } }],
           },
         ];
       }
@@ -1703,10 +1823,13 @@ export class MaterialsService {
                 // Use existing helper to generate a presigned URL
                 fileUrl = await this.getMaterialDownloadUrl(material.id);
               } catch (err) {
-                this.logger.warn('Failed to generate presigned URL for material', {
-                  materialId: material.id,
-                  error: (err as any)?.message,
-                });
+                this.logger.warn(
+                  'Failed to generate presigned URL for material',
+                  {
+                    materialId: material.id,
+                    error: (err as any)?.message,
+                  },
+                );
                 // Fallback to returning the storage key so callers can decide
                 fileUrl = material.file.key;
               }
@@ -1717,10 +1840,13 @@ export class MaterialsService {
             try {
               previewFileUrl = await this.getMaterialPreviewUrl(material.id);
             } catch (err) {
-              this.logger.warn('Failed to generate presigned preview URL for material', {
-                materialId: material.id,
-                error: (err as any)?.message,
-              });
+              this.logger.warn(
+                'Failed to generate presigned preview URL for material',
+                {
+                  materialId: material.id,
+                  error: (err as any)?.message,
+                },
+              );
             }
           }
 
@@ -1744,7 +1870,11 @@ export class MaterialsService {
     }
   }
 
-  async convertToPdf(file: Express.Multer.File, userId: string, courseId: string) {
+  async convertToPdf(
+    file: Express.Multer.File,
+    userId: string,
+    courseId: string,
+  ) {
     try {
       await this.assertCanUploadToPlatformLibrary(userId);
       const assignedCourseId = courseId?.trim();
@@ -1763,23 +1893,34 @@ export class MaterialsService {
       let pdfBuf: Buffer | undefined;
       try {
         const formData = new FormData();
-        formData.append('files', new Blob([file.buffer as any]), file.originalname);
+        formData.append(
+          'files',
+          new Blob([file.buffer as any]),
+          file.originalname,
+        );
 
         const gotenbergUrl = this.configService.get<string>('GOTENBERG_URL')!;
-        const response = await fetch(`${gotenbergUrl}/forms/libreoffice/convert`, {
-          method: 'POST',
-          body: formData,
-        });
+        const response = await fetch(
+          `${gotenbergUrl}/forms/libreoffice/convert`,
+          {
+            method: 'POST',
+            body: formData,
+          },
+        );
 
         if (!response.ok) {
-          this.logger.error(`Gotenberg conversion failed: ${response.status} ${response.statusText}`);
+          this.logger.error(
+            `Gotenberg conversion failed: ${response.status} ${response.statusText}`,
+          );
           throw new BadRequestException('Gotenberg conversion failed');
         }
 
         const pdfArrayBuffer = await response.arrayBuffer();
         pdfBuf = Buffer.from(pdfArrayBuffer);
       } catch (err) {
-        this.logger.error('Conversion failed via Gotenberg', { error: (err as any)?.message });
+        this.logger.error('Conversion failed via Gotenberg', {
+          error: (err as any)?.message,
+        });
         throw new BadRequestException('Conversion failed');
       }
 
@@ -1823,7 +1964,6 @@ export class MaterialsService {
     }
   }
 
-
   /**
    * Create a material linked to an external URL (e.g. YouTube, Wikipedia)
    */
@@ -1844,7 +1984,7 @@ export class MaterialsService {
         metadata,
       } = dto;
       await this.validateMaterialPlacement(courseId, unitId, topicId);
-      
+
       const material = await this.prisma.material.create({
         data: {
           title,
@@ -1861,8 +2001,8 @@ export class MaterialsService {
             ...metadata,
             externalUrl: url,
             isExternal: true,
-            tags: tags || []
-          }
+            tags: tags || [],
+          },
         },
       });
 
@@ -1885,7 +2025,16 @@ export class MaterialsService {
     userId?: string;
   }) {
     try {
-      const { hash, filename, mimetype, size, courseId, unitId, topicId, userId } = opts;
+      const {
+        hash,
+        filename,
+        mimetype,
+        size,
+        courseId,
+        unitId,
+        topicId,
+        userId,
+      } = opts;
       let assignedCourseId = courseId?.trim();
       if (!assignedCourseId && unitId) {
         const unit = await this.prisma.unit.findUnique({
@@ -2047,7 +2196,7 @@ export class MaterialsService {
     },
   ): Promise<void> {
     const eventId = randomUUID();
-    await this.prisma.$transaction(transaction =>
+    await this.prisma.$transaction((transaction) =>
       writeApplicationOutboxEvent(transaction, {
         eventType,
         aggregateId: event.materialId,
@@ -2172,6 +2321,39 @@ export class MaterialsService {
     }
   }
 
+  async revokeMaterialShare(
+    materialId: string,
+    ownerId: string,
+    sharedWithUserId: string,
+  ): Promise<void> {
+    try {
+      const material = await this.prisma.material.findUnique({
+        where: { id: materialId },
+      });
+      if (!material) {
+        throw new NotFoundException('Material not found');
+      }
+      if (material.userId !== ownerId) {
+        throw new ForbiddenException(
+          'Only the material owner can revoke a direct share.',
+        );
+      }
+
+      const result = await this.prisma.materialShare.deleteMany({
+        where: { materialId, userId: sharedWithUserId },
+      });
+      if (result.count > 0) {
+        await this.searchSync.syncEntity('material', materialId);
+      }
+      this.logger.log('Material share revoked', {
+        materialId,
+        sharedWithUserId,
+      });
+    } catch (error) {
+      handleServiceError(error, this.logger, 'revokeMaterialShare');
+    }
+  }
+
   async shareMaterial(
     materialId: string,
     ownerId: string,
@@ -2185,7 +2367,9 @@ export class MaterialsService {
         throw new NotFoundException('Material not found');
       }
       if (material.userId !== ownerId) {
-        throw new ForbiddenException('Only the material owner can share it directly.');
+        throw new ForbiddenException(
+          'Only the material owner can share it directly.',
+        );
       }
 
       const sharedWithUser = await this.prisma.user.findUnique({
@@ -2210,6 +2394,7 @@ export class MaterialsService {
         },
       });
 
+      await this.searchSync.syncEntity('material', materialId);
       this.logger.log('Material shared', { materialId, sharedWithUserId });
       return share;
     } catch (error) {
@@ -2227,9 +2412,7 @@ export class MaterialsService {
           where: { userId: requesterId },
           select: { role: { select: { name: true } } },
         });
-        if (
-          !requesterRoles.some(({ role }) => role.name === RoleName.admin)
-        ) {
+        if (!requesterRoles.some(({ role }) => role.name === RoleName.admin)) {
           throw new NotFoundException('Shared materials not found');
         }
       }
@@ -2293,7 +2476,8 @@ export class MaterialsService {
           ? [rawScores]
           : [];
       const scores = entries.flatMap((entry) => {
-        if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return [];
+        if (!entry || typeof entry !== 'object' || Array.isArray(entry))
+          return [];
         const data = entry as Record<string, unknown>;
         const value =
           typeof data.score === 'number'
@@ -2321,7 +2505,9 @@ export class MaterialsService {
       .map(([id, topic]) => ({
         id,
         ...topic,
-        average: topic.scores.reduce((sum, score) => sum + score, 0) / topic.scores.length,
+        average:
+          topic.scores.reduce((sum, score) => sum + score, 0) /
+          topic.scores.length,
       }))
       .filter((topic) => topic.average < 70)
       .sort((a, b) => a.average - b.average)
@@ -2348,23 +2534,32 @@ export class MaterialsService {
 
     return accessibleMaterials.items.flatMap((material) => {
       const topicId = material.topicId;
-      const topic = (topicId ? weakTopicById.get(topicId) : undefined)
-        ?? (material.unitId ? weakTopicsByUnitId.get(material.unitId)?.[0] : undefined);
+      const topic =
+        (topicId ? weakTopicById.get(topicId) : undefined) ??
+        (material.unitId
+          ? weakTopicsByUnitId.get(material.unitId)?.[0]
+          : undefined);
       if (!topic || usedTopicIds.has(topic.id)) return [];
       usedTopicIds.add(topic.id);
 
       const roundedScore = Math.round(topic.average);
-      return [{
-        id: material.id,
-        title: material.title,
-        description: material.description || `Review ${topic.title} using this class resource.`,
-        type: roundedScore < 50 ? 'Focused review' : 'Practice',
-        link: `/study-planner/materials/${material.id}`,
-        priority: roundedScore < 50 ? 'High' : 'Medium',
-        rationale: `Your quiz average for ${topic.title} is ${roundedScore}% across ${topic.scores.length} recorded result${topic.scores.length === 1 ? '' : 's'}.`,
-        relatedTopics: [topic.title],
-        estimatedTime: material.duration ? `${material.duration} minutes` : 'Review at your pace',
-      }];
+      return [
+        {
+          id: material.id,
+          title: material.title,
+          description:
+            material.description ||
+            `Review ${topic.title} using this class resource.`,
+          type: roundedScore < 50 ? 'Focused review' : 'Practice',
+          link: `/study-planner/materials/${material.id}`,
+          priority: roundedScore < 50 ? 'High' : 'Medium',
+          rationale: `Your quiz average for ${topic.title} is ${roundedScore}% across ${topic.scores.length} recorded result${topic.scores.length === 1 ? '' : 's'}.`,
+          relatedTopics: [topic.title],
+          estimatedTime: material.duration
+            ? `${material.duration} minutes`
+            : 'Review at your pace',
+        },
+      ];
     });
   }
 
@@ -2478,12 +2673,18 @@ export class MaterialsService {
         inline: true,
       });
     } catch (error) {
-      this.logger.warn(`Could not generate preview URL for material ${materialId}`, error);
+      this.logger.warn(
+        `Could not generate preview URL for material ${materialId}`,
+        error,
+      );
       return undefined;
     }
   }
 
-  async getMaterialPreviewContent(materialId: string, userId: string): Promise<{
+  async getMaterialPreviewContent(
+    materialId: string,
+    userId: string,
+  ): Promise<{
     content: Buffer;
     mimeType: string;
     fileName: string;
@@ -2497,19 +2698,36 @@ export class MaterialsService {
       }
       await this.assertCanReadMaterial(material, userId);
 
-      const metadata = material.metadata && typeof material.metadata === 'object' && !Array.isArray(material.metadata)
-        ? material.metadata as Record<string, unknown>
-        : {};
+      const metadata =
+        material.metadata &&
+        typeof material.metadata === 'object' &&
+        !Array.isArray(material.metadata)
+          ? (material.metadata as Record<string, unknown>)
+          : {};
       if (metadata.sourceProvider === 'google-drive') {
-        const driveFileId = typeof metadata.driveFileId === 'string' ? metadata.driveFileId : '';
-        const driveMimeType = typeof metadata.driveMimeType === 'string' ? metadata.driveMimeType : '';
-        const driveAuthUserId = typeof metadata.driveAuthUserId === 'string'
-          ? metadata.driveAuthUserId
-          : undefined;
-        if (!driveFileId || !driveMimeType) throw new NotFoundException('Drive material metadata is incomplete.');
-        const content = await this.googleDrive.downloadFile(driveFileId, driveMimeType, driveAuthUserId);
+        const driveFileId =
+          typeof metadata.driveFileId === 'string' ? metadata.driveFileId : '';
+        const driveMimeType =
+          typeof metadata.driveMimeType === 'string'
+            ? metadata.driveMimeType
+            : '';
+        const driveAuthUserId =
+          typeof metadata.driveAuthUserId === 'string'
+            ? metadata.driveAuthUserId
+            : undefined;
+        if (!driveFileId || !driveMimeType)
+          throw new NotFoundException('Drive material metadata is incomplete.');
+        const content = await this.googleDrive.downloadFile(
+          driveFileId,
+          driveMimeType,
+          driveAuthUserId,
+        );
         const sourceName = material.title.replace(/\.pdf$/i, '');
-        return { content, mimeType: 'application/pdf', fileName: `${sourceName}.pdf` };
+        return {
+          content,
+          mimeType: 'application/pdf',
+          fileName: `${sourceName}.pdf`,
+        };
       }
 
       const fileId = material.previewFileId || material.fileId;
@@ -2529,7 +2747,8 @@ export class MaterialsService {
         );
       }
 
-      const fileName = file.filename || file.key.split('/').pop() || 'preview.pdf';
+      const fileName =
+        file.filename || file.key.split('/').pop() || 'preview.pdf';
       const mimeType = file.mimetype || 'application/pdf';
       const content =
         this.storageProvider === 'local'
@@ -2554,7 +2773,9 @@ export class MaterialsService {
     });
     const response = await fetch(url);
     if (!response.ok) {
-      throw new BadRequestException('Unable to retrieve preview file from storage');
+      throw new BadRequestException(
+        'Unable to retrieve preview file from storage',
+      );
     }
     return Buffer.from(await response.arrayBuffer());
   }
@@ -2572,9 +2793,12 @@ export class MaterialsService {
         throw new NotFoundException(`Material with ID ${materialId} not found`);
       }
 
-      const metadata = material.metadata && typeof material.metadata === 'object' && !Array.isArray(material.metadata)
-        ? material.metadata as Record<string, unknown>
-        : {};
+      const metadata =
+        material.metadata &&
+        typeof material.metadata === 'object' &&
+        !Array.isArray(material.metadata)
+          ? (material.metadata as Record<string, unknown>)
+          : {};
       if (metadata.sourceProvider === 'google-drive') {
         return material;
       }

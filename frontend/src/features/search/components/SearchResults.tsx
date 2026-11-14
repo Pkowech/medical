@@ -77,7 +77,7 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
   };
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+    <div className="mx-auto w-full max-w-screen-2xl min-w-0 px-4 py-6 sm:px-6 lg:px-8">
       <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-4">
         {/* Sidebar Facets */}
         <aside aria-label="Search filters" className="space-y-5 lg:col-span-1">
@@ -157,14 +157,14 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
           </div>
 
           {expandedQuery && expandedQuery !== debouncedQuery && (
-            <div className="mb-5 flex items-center gap-3 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 dark:border-indigo-900 dark:bg-indigo-950/30">
-              <div className="rounded-lg bg-indigo-100 p-1.5 dark:bg-indigo-900/60">
-                <svg className="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="mb-5 flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 dark:border-blue-900 dark:bg-blue-950/30">
+              <div className="rounded-lg bg-blue-100 p-1.5 dark:bg-blue-900/60">
+                <svg className="h-4 w-4 text-blue-600 dark:text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
-              <span className="text-sm text-indigo-800">
-                Expanded search: <span className="font-semibold italic text-indigo-900 dark:text-indigo-200">{expandedQuery}</span>
+              <span className="text-sm text-blue-800 dark:text-blue-200">
+                Expanded search: <span className="font-semibold italic text-blue-900 dark:text-blue-100">{expandedQuery}</span>
               </span>
             </div>
           )}
@@ -213,8 +213,10 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
 
           <div className="space-y-4" onKeyDown={handleListKeyDown}>
             {!query && (
-              <div className="rounded-xl border border-dashed border-border bg-card/50 px-6 py-14 text-center">
-                <SearchIcon aria-hidden="true" className="mx-auto mb-4 h-9 w-9 text-muted-foreground/60" />
+              <div className="flex min-h-48 flex-col items-center justify-center rounded-xl border border-border bg-card/70 px-6 py-10 text-center shadow-sm">
+                <span className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300">
+                  <SearchIcon aria-hidden="true" className="h-6 w-6" />
+                </span>
                 <h2 className="mb-1 text-lg font-semibold text-foreground">Start searching</h2>
                 <p className="text-sm text-muted-foreground">Search across courses, materials, topics, and clinical cases.</p>
               </div>
@@ -295,15 +297,17 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
             )}
 
             {queryIsLongEnough && results.length === 0 && !isSearchPending && !error && (
-              <div className="rounded-xl border border-dashed border-border bg-card/50 px-6 py-14 text-center">
-                <SearchIcon aria-hidden="true" className="mx-auto mb-4 h-9 w-9 text-muted-foreground/60" />
+              <div className="flex min-h-48 flex-col items-center justify-center rounded-xl border border-border bg-card/70 px-6 py-10 text-center shadow-sm">
+                <span className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300">
+                  <SearchIcon aria-hidden="true" className="h-6 w-6" />
+                </span>
                 <h2 className="mb-1 text-lg font-semibold text-foreground">No results found</h2>
                 <p className="text-sm text-muted-foreground">Try a different term, check your spelling, or choose another type.</p>
               </div>
             )}
 
             {!queryIsLongEnough && query.length > 0 && (
-              <div className="rounded-xl border border-dashed border-border bg-card/50 px-6 py-10 text-center">
+              <div className="rounded-xl border border-border bg-card/70 px-6 py-6 text-center shadow-sm">
                 <p className="text-sm text-muted-foreground">Keep typing to search. Enter at least {SEARCH_CONFIG.MIN_QUERY_LENGTH} characters.</p>
               </div>
             )}

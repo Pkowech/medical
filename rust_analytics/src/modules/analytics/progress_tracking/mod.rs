@@ -469,6 +469,9 @@ mod tests {
             ("course-2".to_string(), 60),
             ("course-3".to_string(), 0),
         ];
-        assert_eq!(summarize_user_course_progress(&progress), (3, 1, 160.0 / 3.0));
+        assert_eq!(
+            summarize_user_course_progress(&progress),
+            (3, 1, 160.0 / 3.0)
+        );
     }
 }

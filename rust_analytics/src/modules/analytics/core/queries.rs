@@ -3,11 +3,11 @@
 //! These queries are verified against the actual database schema at compile time.
 //! This ensures type safety and prevents runtime errors from invalid SQL.
 
-use chrono::{DateTime, NaiveDateTime, Utc};
-use sqlx::{Pool, Postgres, Row};
 use crate::modules::analytics::progress_tracking::{
     calculate_course_progress, calculate_user_course_progress,
 };
+use chrono::{DateTime, NaiveDateTime, Utc};
+use sqlx::{Pool, Postgres, Row};
 
 /// Fetch a user's course progress
 ///
@@ -111,10 +111,9 @@ pub async fn get_user_courses(
         })
         .collect();
     for course in &mut courses {
-        course.progress_percentage =
-            calculate_course_progress(pool, user_id, &course.course_id)
-                .await?
-                .progress_percentage;
+        course.progress_percentage = calculate_course_progress(pool, user_id, &course.course_id)
+            .await?
+            .progress_percentage;
     }
 
     Ok(courses)

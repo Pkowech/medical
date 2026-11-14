@@ -1,8 +1,8 @@
-use serde::{Deserialize, Serialize};
-use sqlx::{Error, Pool, Postgres};
 use crate::modules::analytics::progress_tracking::{
     calculate_user_course_progress, summarize_user_course_progress,
 };
+use serde::{Deserialize, Serialize};
+use sqlx::{Error, Pool, Postgres};
 
 #[derive(Serialize, Deserialize)]
 pub struct UserPerformanceProfile {
@@ -50,8 +50,7 @@ pub async fn get_user_performance_profile(
     };
 
     let course_progress = calculate_user_course_progress(pool, user_id).await?;
-    let (total_courses, completed_courses, _) =
-        summarize_user_course_progress(&course_progress);
+    let (total_courses, completed_courses, _) = summarize_user_course_progress(&course_progress);
 
     // Fetch learning path progress
     let learning_path_progress = sqlx::query_as::<_, LearningPathProgress>(

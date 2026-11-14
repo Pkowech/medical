@@ -1,10 +1,10 @@
 /// Postgres implementation of ActivityRepository
 /// Manages persistence of user activity and engagement metrics
 use crate::domain::repositories::ActivityRepository;
-use crate::shared::error::AnalyticsError;
 use crate::modules::analytics::progress_tracking::{
     calculate_user_course_progress, summarize_user_course_progress,
 };
+use crate::shared::error::AnalyticsError;
 use chrono::NaiveDateTime;
 use sqlx::{Pool, Postgres};
 use std::sync::Arc;
@@ -55,10 +55,10 @@ impl ActivityRepository for PostgresActivityRepository {
         let progress = calculate_user_course_progress(&self.pool, user_id)
             .await
             .map_err(|error| {
-            AnalyticsError::DatabaseError(format!(
-                "Failed to calculate canonical course completion stats: {error}"
-            ))
-        })?;
+                AnalyticsError::DatabaseError(format!(
+                    "Failed to calculate canonical course completion stats: {error}"
+                ))
+            })?;
         let (total, completed, _) = summarize_user_course_progress(&progress);
 
         Ok((total, completed))

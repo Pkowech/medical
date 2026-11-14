@@ -463,7 +463,7 @@ export class LearningGoalsService {
 
     let completedAt: Date | null | undefined;
     let progress = updateDto.progressPercentage ?? goal.progress;
-    let status = updateDto.status;
+    const status = updateDto.status;
     let persistedStatus = updateDto.status as unknown as
       | ProgressStatus
       | undefined;

@@ -1,11 +1,12 @@
+import { Body, Controller, Post, Request, UseGuards } from '@nestjs/common';
 import {
-  Body,
-  Controller,
-  Post,
-  Request,
-  UseGuards,
-} from '@nestjs/common';
-import { IsNumber, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Max,
+  Min,
+} from 'class-validator';
 import { Question, Option } from '@prisma/client';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '#modules/auth/guards/jwt-auth.guard';
@@ -92,15 +93,17 @@ export class AdaptiveQuizController {
 
     if (result.isComplete) {
       await this.adaptiveQuizService.finalizeSession(result.session);
-      const recommendations = await this.recommendationService.recommendForAnswers(
-        request.user.id,
-        {
-          topicId: undefined,
-          unitId: result.session.unitId,
-          courseId: result.session.courseId,
-        },
-        result.session.responses,
-      );
+      const recommendations =
+        await this.recommendationService.recommendForAnswers(
+          request.user.id,
+          {
+            topicId: undefined,
+            unitId: result.session.unitId,
+            courseId: result.session.courseId,
+          },
+          result.session.responses,
+          result.session.sessionId,
+        );
       result.session.recommendations = recommendations.recommendations.map(
         (recommendation) => `${recommendation.title}: ${recommendation.reason}`,
       );

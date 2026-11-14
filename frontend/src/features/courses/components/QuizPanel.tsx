@@ -481,7 +481,12 @@ export const QuizPanel = ({
                   : topic.diagnosis === 'target_content_gap'
                     ? 'Mapped prerequisites look sufficiently strong; the current difficulty is more likely specific to this topic.'
                     : 'There is not enough prerequisite evidence to tell whether the difficulty is foundational or specific to this topic.'}{' '}
-                Topic accuracy: {Math.round(topic.accuracy * 100)}%; confidence: {topic.confidence}.
+                Current attempt: {Math.round(topic.accuracy * 100)}%; across{' '}
+                {topic.targetEvidence.sampleSize} completed attempts:{' '}
+                {topic.targetEvidence.accuracy === null
+                  ? 'not enough data'
+                  : `${Math.round(topic.targetEvidence.accuracy * 100)}% accuracy`}
+                ; confidence: {topic.confidence}.
               </p>
               {topic.prerequisiteEvidence.length > 0 && (
                 <ul className="mt-3 space-y-1 text-xs text-muted-foreground">
@@ -490,13 +495,39 @@ export const QuizPanel = ({
                       {evidence.unitName}:{' '}
                       {evidence.accuracy === null
                         ? 'no prior answers'
-                        : `${Math.round(evidence.accuracy * 100)}% accuracy`}{' '}
-                      ({evidence.sampleSize} responses)
+                        : `${Math.round(evidence.accuracy * 100)}% average attempt accuracy`}{' '}
+                      ({evidence.sampleSize} completed attempts)
                     </li>
                   ))}
                 </ul>
               )}
-              {topic.recommendations.length > 0 && (
+              {topic.sequence?.length ? (
+                <ol className="mt-4 space-y-4">
+                  {topic.sequence.map((step, index) => (
+                    <li key={`${topic.topicId}:step:${index}`}>
+                      <h5 className="text-sm font-semibold">
+                        {index + 1}. {step.title}
+                      </h5>
+                      <p className="text-xs text-muted-foreground">{step.rationale}</p>
+                      {step.resources.length > 0 && (
+                        <ul className="mt-2 space-y-2 pl-3">
+                          {step.resources.map(resource => (
+                            <li key={`${resource.kind}:${resource.id}`}>
+                              <Link
+                                href={resource.href}
+                                className="font-medium text-blue-700 underline dark:text-blue-300"
+                              >
+                                {resource.title}
+                              </Link>
+                              <p className="text-xs text-muted-foreground">{resource.reason}</p>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </li>
+                  ))}
+                </ol>
+              ) : topic.recommendations.length > 0 ? (
                 <ul className="mt-3 space-y-2">
                   {topic.recommendations.map(recommendation => (
                     <li key={`${recommendation.kind}:${recommendation.id}`}>
@@ -510,7 +541,7 @@ export const QuizPanel = ({
                     </li>
                   ))}
                 </ul>
-              )}
+              ) : null}
             </section>
           ))}
 

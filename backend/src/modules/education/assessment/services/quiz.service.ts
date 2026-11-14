@@ -2414,6 +2414,7 @@ export class QuizService {
           courseId: activeQuiz.unit?.courseId,
         },
         [...reviewAnswersByTopic.values()].flat(),
+        attemptId,
       );
 
     const feedback = JSON.parse(
@@ -2495,6 +2496,7 @@ export class QuizService {
               questionId,
               isCorrect,
             })),
+            attempt.id,
           );
 
     if (!storedRecommendations) {
@@ -2788,6 +2790,7 @@ export class QuizService {
             courseId: topic.unit.course.id,
           },
           reviewAnswers,
+          topicQuiz.attemptId,
         );
       let reviewCardsScheduled = 0;
       try {

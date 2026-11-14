@@ -304,17 +304,52 @@ const MedicalEducationDashboard = () => {
     return `${diffDays}d ago`;
   };
 
+  const quickActions = [
+    {
+      label: 'Study session',
+      description: 'Log focused study time.',
+      action: 'Start session',
+      icon: Clock,
+      onClick: () => {
+        setSelectedStudyCourseId(null);
+        setStudySessionStarted(false);
+        setShowStudySession(true);
+      },
+    },
+    {
+      label: 'Practice quiz',
+      description: 'Test what you know.',
+      action: 'Start a quiz',
+      icon: PlayCircle,
+      onClick: handlePracticeQuiz,
+    },
+    {
+      label: 'Flashcards',
+      description: 'Review your study cards.',
+      action: 'Review flashcards',
+      icon: BookMarked,
+      onClick: () => router.push('/flashcards'),
+    },
+    {
+      label: 'Study planner',
+      description: 'Organize your next study session.',
+      action: 'Open planner',
+      icon: Calendar,
+      onClick: () => router.push('/study-planner'),
+    },
+  ];
+
   return (
     <div className="min-h-[calc(100dvh-4rem)] w-full min-w-0 bg-background p-3 sm:p-4 md:p-6">
       <div className="mx-auto w-full max-w-screen-2xl min-w-0 space-y-4">
         <section className="grid grid-cols-1 gap-4 lg:grid-cols-12" aria-label="Study overview">
-          <div className="relative isolate overflow-hidden rounded-3xl border border-border bg-linear-to-br from-white via-indigo-50 to-cyan-50 p-6 text-foreground shadow-sm dark:border-border dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 dark:text-foreground sm:p-8 lg:col-span-8">
-            <div className="pointer-events-none absolute -right-16 -top-24 -z-10 h-72 w-72 rounded-full bg-indigo-500/20 blur-3xl" />
-            <div className="pointer-events-none absolute -bottom-32 right-1/4 -z-10 h-64 w-64 rounded-full bg-cyan-400/10 blur-3xl" />
+          <div className="relative isolate overflow-hidden rounded-2xl border border-border bg-linear-to-br from-white via-blue-50 to-slate-50 p-6 text-foreground shadow-sm dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 sm:p-7 lg:col-span-8">
+            <div className="pointer-events-none absolute -right-16 -top-24 -z-10 h-72 w-72 rounded-full bg-blue-500/15 blur-3xl" />
+            <div className="pointer-events-none absolute -bottom-32 right-1/4 -z-10 h-64 w-64 rounded-full bg-sky-400/10 blur-3xl" />
             <div className="flex h-full flex-col justify-between gap-8">
               <div>
                 <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-border bg-card/70 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground dark:border-white/10 dark:bg-card/5 dark:text-muted-foreground">
-                  <GraduationCap className="h-4 w-4 text-cyan-600 dark:text-cyan-300" />
+                  <GraduationCap className="h-4 w-4 text-blue-600 dark:text-blue-300" />
                   My learning
                 </div>
                 <h2 className="max-w-xl text-2xl font-semibold tracking-tight sm:text-3xl">
@@ -352,7 +387,7 @@ const MedicalEducationDashboard = () => {
                         aria-valuenow={Math.min(100, Math.max(0, displayCourse.progressPercentage))}
                       >
                         <div
-                          className="h-full rounded-full bg-cyan-500 transition-[width] dark:bg-cyan-300"
+                          className="h-full rounded-full bg-blue-600 transition-[width] dark:bg-blue-400"
                           style={{ width: `${Math.min(100, Math.max(0, displayCourse.progressPercentage))}%` }}
                         />
                       </div>
@@ -365,7 +400,7 @@ const MedicalEducationDashboard = () => {
                 <button
                   type="button"
                   onClick={handleContinueLearning}
-                  className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-cyan-500 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-cyan-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:bg-cyan-300 dark:text-foreground dark:hover:bg-cyan-200 dark:focus-visible:ring-cyan-200 dark:focus-visible:ring-offset-slate-950"
+                  className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:bg-blue-500 dark:hover:bg-blue-400 dark:focus-visible:ring-offset-slate-950"
                 >
                   {activeCourse ? 'Continue learning' : firstCourse ? 'Review a course' : 'Explore courses'}
                   <ArrowRight className="h-4 w-4" />
@@ -374,10 +409,10 @@ const MedicalEducationDashboard = () => {
             </div>
           </div>
 
-          <div className="flex flex-col justify-between gap-5 rounded-3xl border border-border bg-card p-6 text-card-foreground shadow-sm lg:col-span-4">
+          <div className="flex flex-col justify-between gap-5 rounded-2xl border border-border bg-card p-6 text-card-foreground shadow-sm lg:col-span-4">
             <div>
               <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground dark:text-muted-foreground">
-                <Target className="h-4 w-4 text-indigo-500" />
+                <Target className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                 Your study rhythm
               </div>
               <div className="mt-5 grid grid-cols-2 divide-x divide-border dark:divide-border">
@@ -405,88 +440,75 @@ const MedicalEducationDashboard = () => {
         </section>
 
         {/* Recent learning outcomes */}
-        <div className="grid grid-cols-2 gap-3 sm:gap-4">
-          <StatCard
-            icon={ClipboardList}
-            title="Quizzes"
-            value={isPerformanceSummaryLoading
-              ? '…'
-              : performanceSummaryError
-                ? '—'
-                : performanceSummary?.totalAttempts ?? 0}
-            subtitle={performanceSummaryError
-              ? 'Unavailable'
-              : `${performanceSummary?.totalAttempts === 1 ? 'Attempt' : 'Attempts'} completed`}
-            colorClass="bg-slate-700"
-            onClick={() => router.push('/quiz/history')}
-          />
-          <StatCard
-            icon={Target}
-            title="Avg Score"
-            value={isPerformanceSummaryLoading
-              ? 'Loading…'
-              : performanceSummaryError
-                ? 'Unavailable'
-                : performanceSummary?.totalAttempts
-                  ? `${performanceSummary.overallScore.toFixed(1)}%`
-                  : '—'}
-            subtitle={performanceSummaryError
-              ? 'Unavailable'
-              : performanceSummary?.totalAttempts
-                ? `${performanceSummary.totalAttempts} ${performanceSummary.totalAttempts === 1 ? 'assessment' : 'assessments'}`
-                : 'No scores yet'}
-            colorClass="bg-emerald-500"
-            onClick={() => router.push('/progress')}
-          />
-        </div>
+        <section aria-labelledby="learning-snapshot" className="space-y-3">
+          <div>
+            <h2 id="learning-snapshot" className="text-lg font-semibold text-foreground">
+              Your learning snapshot
+            </h2>
+            <p className="text-sm text-muted-foreground">A quick look at your recent progress.</p>
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+              <StatCard
+                icon={ClipboardList}
+                title="Quizzes"
+                value={isPerformanceSummaryLoading
+                  ? '…'
+                  : performanceSummaryError
+                    ? '—'
+                    : performanceSummary?.totalAttempts ?? 0}
+                subtitle={performanceSummaryError
+                  ? 'Unavailable'
+                  : `${performanceSummary?.totalAttempts === 1 ? 'Attempt' : 'Attempts'} completed`}
+                colorClass="bg-blue-600"
+                onClick={() => router.push('/quiz/history')}
+              />
+              <StatCard
+                icon={Target}
+                title="Avg Score"
+                value={isPerformanceSummaryLoading
+                  ? 'Loading…'
+                  : performanceSummaryError
+                    ? 'Unavailable'
+                    : performanceSummary?.totalAttempts
+                      ? `${performanceSummary.overallScore.toFixed(1)}%`
+                      : '—'}
+                subtitle={performanceSummaryError
+                  ? 'Unavailable'
+                  : performanceSummary?.totalAttempts
+                    ? `${performanceSummary.totalAttempts} ${performanceSummary.totalAttempts === 1 ? 'assessment' : 'assessments'}`
+                    : 'No scores yet'}
+                colorClass="bg-sky-600"
+                onClick={() => router.push('/progress')}
+              />
+          </div>
+        </section>
 
-        <section aria-label="Quick actions" className="rounded-2xl border border-border bg-card p-4 text-card-foreground shadow-sm sm:p-5">
-          <h2 className="mb-3 text-sm font-semibold tracking-tight text-foreground sm:text-base">Quick actions</h2>
-          <div className="grid grid-cols-4 gap-1 sm:gap-3">
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedStudyCourseId(null);
-                setStudySessionStarted(false);
-                setShowStudySession(true);
-              }}
-              className="group flex min-w-0 flex-col items-center gap-2 rounded-xl px-1 py-3 text-center transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
-            >
-              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600 transition-colors group-hover:bg-emerald-500/20 dark:text-emerald-400">
-                <Clock aria-hidden="true" className="h-4 w-4" />
-              </span>
-              <span className="text-[11px] font-medium leading-tight text-foreground sm:text-xs">Study session</span>
-            </button>
-            <button
-              type="button"
-              onClick={handlePracticeQuiz}
-              className="group flex min-w-0 flex-col items-center gap-2 rounded-xl px-1 py-3 text-center transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500"
-            >
-              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-cyan-500/10 text-cyan-700 transition-colors group-hover:bg-cyan-500/20 dark:text-cyan-400">
-                <PlayCircle aria-hidden="true" className="h-4 w-4" />
-              </span>
-              <span className="text-[11px] font-medium leading-tight text-foreground sm:text-xs">Quiz</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => router.push('/flashcards')}
-              className="group flex min-w-0 flex-col items-center gap-2 rounded-xl px-1 py-3 text-center transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
-            >
-              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-violet-500/10 text-violet-600 transition-colors group-hover:bg-violet-500/20 dark:text-violet-400">
-                <BookMarked aria-hidden="true" className="h-4 w-4" />
-              </span>
-              <span className="text-[11px] font-medium leading-tight text-foreground sm:text-xs">Flashcards</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => router.push('/study-planner')}
-              className="group flex min-w-0 flex-col items-center gap-2 rounded-xl px-1 py-3 text-center transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
-            >
-              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-500/10 text-amber-600 transition-colors group-hover:bg-amber-500/20 dark:text-amber-400">
-                <Calendar aria-hidden="true" className="h-4 w-4" />
-              </span>
-              <span className="text-[11px] font-medium leading-tight text-foreground sm:text-xs">Planner</span>
-            </button>
+        <section aria-labelledby="dashboard-quick-actions" className="space-y-3">
+          <div>
+            <h2 id="dashboard-quick-actions" className="text-lg font-semibold text-foreground">
+              Continue learning
+            </h2>
+            <p className="text-sm text-muted-foreground">Jump back into a study activity or plan what comes next.</p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {quickActions.map(({ label, description, action, icon: Icon, onClick }) => (
+              <button
+                key={label}
+                type="button"
+                onClick={onClick}
+                className="group flex min-h-36 flex-col rounded-xl border border-border bg-card/80 p-4 text-left shadow-sm transition-colors hover:border-blue-300 hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:bg-card/70 dark:hover:border-blue-800 dark:hover:bg-card"
+              >
+                <span className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300">
+                  <Icon aria-hidden="true" className="h-5 w-5" />
+                </span>
+                <span className="font-semibold text-foreground">{label}</span>
+                <span className="mt-1 flex-1 text-sm text-muted-foreground">{description}</span>
+                <span className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-blue-700 dark:text-blue-300">
+                  {action}
+                  <ChevronRight aria-hidden="true" className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                </span>
+              </button>
+            ))}
           </div>
         </section>
 
@@ -522,7 +544,7 @@ const MedicalEducationDashboard = () => {
               </div>
             </div>
           )}
-          <div className={hasFlashcardActivity ? 'h-full' : 'max-w-xl'}>
+          <div className="min-w-0">
             <GoalsProgressWidget />
           </div>
         </div>

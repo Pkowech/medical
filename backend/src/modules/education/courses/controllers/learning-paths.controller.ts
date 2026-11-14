@@ -153,7 +153,11 @@ export class LearningPathsController {
     status: 200,
     description: 'Path analytics retrieved successfully',
   })
-  async getPathAnalytics(@Param('id') id: string) {
+  async getPathAnalytics(
+    @Param('id') id: string,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    await this.learningPathsService.findOne(id, req.user.id);
     return await this.learningAnalyticsService.getPathAnalytics(id);
   }
 
@@ -228,6 +232,7 @@ export class LearningPathsController {
     @Param('id') pathId: string,
     @Request() req: AuthenticatedRequest,
   ) {
+    await this.learningPathsService.findOne(pathId, req.user.id);
     return await this.progressService.getProgress(req.user.id, pathId);
   }
 
@@ -242,6 +247,7 @@ export class LearningPathsController {
     @Body() progressUpdate: ProgressUpdateDto,
     @Request() req: AuthenticatedRequest,
   ) {
+    await this.learningPathsService.findOne(pathId, req.user.id);
     return await this.progressService.updateProgress(
       req.user.id,
       pathId,
@@ -320,7 +326,11 @@ export class LearningPathsController {
     status: 200,
     description: 'Path integrity verification details',
   })
-  async checkIntegrity(@Param('id') id: string) {
+  async checkIntegrity(
+    @Param('id') id: string,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    await this.learningPathsService.findOne(id, req.user.id);
     return await this.learningPathsService.checkPathIntegrity(id);
   }
 

@@ -156,9 +156,7 @@ impl CourseRepository for PostgresCourseRepository {
         .bind(course_id)
         .fetch_one(&*self.pool)
         .await
-        .map_err(|e| {
-            AnalyticsError::DatabaseError(format!("Failed to fetch study time: {}", e))
-        })?;
+        .map_err(|e| AnalyticsError::DatabaseError(format!("Failed to fetch study time: {}", e)))?;
 
         Ok(CourseStats {
             total_courses: if is_enrolled { 1 } else { 0 },
@@ -176,10 +174,15 @@ impl CourseRepository for PostgresCourseRepository {
                     "Failed to calculate canonical course completion: {e}"
                 ))
             })?;
-        i32::try_from(progress.iter().filter(|(_, percentage)| *percentage >= 100).count())
-            .map_err(|e| {
-                AnalyticsError::DatabaseError(format!("Completed course count exceeds i32: {e}"))
-            })
+        i32::try_from(
+            progress
+                .iter()
+                .filter(|(_, percentage)| *percentage >= 100)
+                .count(),
+        )
+        .map_err(|e| {
+            AnalyticsError::DatabaseError(format!("Completed course count exceeds i32: {e}"))
+        })
     }
 
     async fn count_total_courses(&self, user_id: &str) -> Result<i32, AnalyticsError> {
@@ -190,9 +193,8 @@ impl CourseRepository for PostgresCourseRepository {
                     "Failed to calculate canonical enrolled courses: {e}"
                 ))
             })?;
-        i32::try_from(progress.len()).map_err(|e| {
-            AnalyticsError::DatabaseError(format!("Course count exceeds i32: {e}"))
-        })
+        i32::try_from(progress.len())
+            .map_err(|e| AnalyticsError::DatabaseError(format!("Course count exceeds i32: {e}")))
     }
 }
 
