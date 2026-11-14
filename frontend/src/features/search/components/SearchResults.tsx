@@ -159,7 +159,7 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
                 Searching...
               </div>
             )}
-          </section>
+          </div>
 
           {expandedQuery && expandedQuery !== debouncedQuery && (
             <div className="mb-5 flex items-center gap-3 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 dark:border-indigo-900 dark:bg-indigo-950/30">
