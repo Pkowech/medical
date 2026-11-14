@@ -343,21 +343,9 @@ export class QuizService {
         data: {
           title: data.title,
           description: data.description,
-          instructions: data.instructions,
-          timeLimit: data.timeLimit,
           unitId,
           topicId,
-          maxAttempts: data.maxAttempts ?? 3,
           passingScore: data.passingScore ?? 70,
-          shuffleQuestions: data.shuffleQuestions ?? false,
-          showResults: data.showResults ?? true,
-          availableFrom: data.availableFrom
-            ? new Date(data.availableFrom)
-            : undefined,
-          availableUntil: data.availableUntil
-            ? new Date(data.availableUntil)
-            : undefined,
-          expiresAt: data.expiresAt ? new Date(data.expiresAt) : undefined,
           isPublished: data.isPublished ?? false,
           publishedAt: data.isPublished ? new Date() : null,
           createdBy: creatorId,

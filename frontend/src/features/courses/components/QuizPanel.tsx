@@ -463,7 +463,7 @@ export const QuizPanel = ({
                 : 'You did not reach the required passing score. Review the material and try again.'}
             </p>
           </div>
-        )}
+        ) : null}
 
         {showResults && scope === 'topic' && finalResult?.gateDecision && (
           <MasteryReadinessPanel decision={finalResult.gateDecision} />

@@ -215,7 +215,7 @@ export class QuizController {
   async submit(
     @Request() req: any,
     @Query('type') type: string,
-    @Body() body: SubmitQuizDto | SubmitQuizAnswerDto,
+    @Body() body: SubmitQuizDto,
   ) {
     const userId = req.user.id;
 
