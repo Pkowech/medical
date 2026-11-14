@@ -30,7 +30,7 @@ export default function AssessmentDetailPage({ params }: AssessmentPageProps) {
       <div className="mx-auto max-w-5xl">
         <QuizPanel
           lessonId={assessmentId}
-          lessonTitle="Learning path assessment"
+          lessonTitle="Learning path quiz"
           scope="assessment"
           onReturn={() => router.back()}
         />

@@ -26,15 +26,25 @@ export class ModuleDto {
   id!: string;
 
   @ApiProperty({
-    enum: ['course', 'assessment', 'clinicalCase', 'resource', 'milestone'],
+    enum: ['course', 'unit', 'assessment', 'clinicalCase', 'resource', 'milestone'],
     description: 'Module type',
   })
   @IsString()
-  type!: 'course' | 'assessment' | 'clinicalCase' | 'resource' | 'milestone';
+  type!: 'course' | 'unit' | 'assessment' | 'clinicalCase' | 'resource' | 'milestone';
 
   @ApiProperty({ description: 'Resource ID' })
   @IsString()
   resourceId!: string;
+
+  @ApiPropertyOptional({ description: 'Parent course ID for a unit module' })
+  @IsOptional()
+  @IsString()
+  courseId?: string;
+
+  @ApiPropertyOptional({ description: 'Unit ID for a unit module' })
+  @IsOptional()
+  @IsString()
+  unitId?: string;
 
   @ApiProperty({ description: 'Module title' })
   @IsString()

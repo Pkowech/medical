@@ -78,11 +78,6 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-      <div className="mb-7">
-        <h1 className="mb-2 text-3xl font-bold tracking-tight text-foreground">Search</h1>
-        <p className="text-muted-foreground">Find courses, learning materials, topics, and more.</p>
-      </div>
-
       <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-4">
         {/* Sidebar Facets */}
         <aside aria-label="Search filters" className="space-y-5 lg:col-span-1">

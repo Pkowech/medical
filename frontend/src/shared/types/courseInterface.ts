@@ -112,6 +112,7 @@ export interface CourseUnit extends BaseEntity {
   order?: number;
   orderIndex?: number;
   estimatedMinutes?: number;
+  estimatedDuration?: number;
   duration?: number;
   isCompleted?: boolean;
   content?: string;
@@ -120,6 +121,7 @@ export interface CourseUnit extends BaseEntity {
   topics?: Topic[];
   learningObjectives?: string[];
   status?: 'active' | 'inactive';
+  isPublished?: boolean;
   estimatedHours?: number;
 }
 

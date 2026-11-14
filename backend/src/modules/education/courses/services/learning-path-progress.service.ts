@@ -303,6 +303,11 @@ export class LearningPathProgressService {
       });
       return updated;
     });
+    this.eventEmitter.emit('learning-path.progress.updated', {
+      userId,
+      learningPathId,
+      progressPercentage: updatedProgress.overallProgressPercentage,
+    });
     for (const milestone of newlyAchievedMilestones) {
       this.eventEmitter.emit('integration.milestone-achieved', {
         userId,

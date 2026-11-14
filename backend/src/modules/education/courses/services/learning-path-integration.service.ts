@@ -17,6 +17,7 @@ import {
   ProgressEntryType,
   LearningGoal,
   LearningPath,
+  LearningPathProgress,
   LearningPathMilestone,
   Prisma,
   ProgressStatus,
@@ -103,6 +104,146 @@ export class LearningPathIntegrationService {
         `Failed to sync course progress: ${getErrorMessage(error)}`,
       );
     }
+  }
+
+  async syncUnitCompletion(
+    userId: string,
+    unitId: string,
+    completedAt: Date,
+  ): Promise<void> {
+    try {
+      const pathProgresses = await this.prisma.learningPathProgress.findMany({
+        where: {
+          userId,
+          status: {
+            in: [ProgressStatus.inProgress, ProgressStatus.notStarted],
+          },
+          learningPath: {
+            phases: {
+              some: {
+                modules: {
+                  some: {
+                    type: 'unit',
+                    OR: [{ unitId }, { resourceId: unitId }],
+                  },
+                },
+              },
+            },
+          },
+        },
+        include: {
+          learningPath: {
+            select: {
+              id: true,
+              title: true,
+              phases: { include: { modules: true } },
+            },
+          },
+        },
+      });
+
+      await Promise.all(
+        pathProgresses.map(async pathProgress => {
+          const moduleInfo = this.findModuleInPathStructure(
+            pathProgress.learningPath.phases,
+            'unit',
+            unitId,
+          );
+          if (!moduleInfo) return;
+
+          await this.updateModuleProgress(
+            pathProgress,
+            {
+              phaseId: moduleInfo.phase.id,
+              moduleId: moduleInfo.module.id,
+              progressPercentage: 100,
+              status: 'completed',
+              timestamp: completedAt,
+              completedItems: 1,
+              totalItems: 1,
+              percentage: 100,
+            },
+          );
+        }),
+      );
+    } catch (error) {
+      this.logger.error(
+        `Error syncing completed unit ${unitId} to learning paths`,
+        {
+          error: getErrorMessage(error),
+          stack: getErrorStack(error),
+        },
+      );
+      throw new BadRequestException(
+        `Failed to sync unit completion: ${getErrorMessage(error)}`,
+      );
+    }
+  }
+
+  async syncLearningPathCompletion(
+    userId: string,
+    pathId: string,
+    completedAt: Date,
+  ): Promise<void> {
+    const goals = await this.prisma.learningGoal.findMany({
+      where: {
+        userId,
+        learningPathId: pathId,
+        status: {
+          in: [
+            ProgressStatus.active,
+            ProgressStatus.inProgress,
+            ProgressStatus.notStarted,
+          ],
+        },
+      },
+      select: { id: true },
+    });
+
+    await Promise.all(
+      goals.map(goal =>
+        this.goalsService.update(
+          goal.id,
+          {
+            status: GoalStatus.completed,
+            progressPercentage: 100,
+            completedAt,
+          },
+          userId,
+        ),
+      ),
+    );
+  }
+
+  async syncLearningPathProgress(
+    userId: string,
+    pathId: string,
+    progressPercentage: number,
+  ): Promise<void> {
+    const goals = await this.prisma.learningGoal.findMany({
+      where: {
+        userId,
+        learningPathId: pathId,
+        status: {
+          in: [
+            ProgressStatus.active,
+            ProgressStatus.inProgress,
+            ProgressStatus.notStarted,
+          ],
+        },
+      },
+      select: { id: true },
+    });
+
+    await Promise.all(
+      goals.map(goal =>
+        this.goalsService.update(
+          goal.id,
+          { progressPercentage },
+          userId,
+        ),
+      ),
+    );
   }
 
   async syncAssessmentResults(
@@ -802,6 +943,7 @@ export class LearningPathIntegrationService {
         if (
           module.type === moduleType &&
           (module.resourceId === resourceId ||
+            module.unitId === resourceId ||
             module.courseId === resourceId ||
             module.quizId === resourceId ||
             module.id === resourceId)
@@ -814,14 +956,14 @@ export class LearningPathIntegrationService {
   }
 
   private async updateModuleProgress(
-    pathProgress: PathProgressWithLearningPath,
+    pathProgress: Pick<LearningPathProgress, 'userId' | 'learningPathId'>,
     updateData: ModuleProgressUpdate,
   ): Promise<void> {
     try {
       await this.pathProgressService.updateProgress(
         pathProgress.userId,
         pathProgress.learningPathId,
-        updateData,
+        { ...updateData, moduleStatus: updateData.status },
       );
 
       this.logger.debug(
@@ -1279,6 +1421,7 @@ export class LearningPathIntegrationService {
         (module: any) =>
           module.type === resourceType &&
           (module.resourceId === resourceId ||
+            module.unitId === resourceId ||
             module.courseId === resourceId ||
             module.quizId === resourceId ||
             module.id === resourceId),

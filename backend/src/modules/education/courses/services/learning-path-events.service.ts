@@ -6,6 +6,7 @@ import { LearningPathIntegrationService } from './learning-path-integration.serv
 import { ProgressData } from '#common/dto';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '#infrastructure/prisma/prisma.service';
+import { UnitCompletedEvent } from '../events/unit-completed.event';
 
 @Injectable()
 export class LearningPathEventsService {
@@ -65,6 +66,62 @@ export class LearningPathEventsService {
     } catch (error) {
       this.logger.error(
         `Error handling course progress update: ${getErrorMessage(error)}`,
+        getErrorStack(error),
+      );
+    }
+  }
+
+  @OnEvent('unit.completed')
+  async handleUnitCompleted(event: UnitCompletedEvent) {
+    try {
+      await this.integrationService.syncUnitCompletion(
+        event.userId,
+        event.unitId,
+        event.completedAt,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Error handling completed unit ${event.unitId}: ${getErrorMessage(error)}`,
+        getErrorStack(error),
+      );
+    }
+  }
+
+  @OnEvent('learning-path.completed')
+  async handleLearningPathCompleted(payload: {
+    userId: string;
+    learningPathId: string;
+    completionData: { completedAt?: Date | null };
+  }) {
+    try {
+      await this.integrationService.syncLearningPathCompletion(
+        payload.userId,
+        payload.learningPathId,
+        payload.completionData.completedAt ?? new Date(),
+      );
+    } catch (error) {
+      this.logger.error(
+        `Error syncing goals for completed learning path ${payload.learningPathId}: ${getErrorMessage(error)}`,
+        getErrorStack(error),
+      );
+    }
+  }
+
+  @OnEvent('learning-path.progress.updated')
+  async handleLearningPathProgressUpdated(payload: {
+    userId: string;
+    learningPathId: string;
+    progressPercentage: number;
+  }) {
+    try {
+      await this.integrationService.syncLearningPathProgress(
+        payload.userId,
+        payload.learningPathId,
+        payload.progressPercentage,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Error syncing goals for learning path ${payload.learningPathId}: ${getErrorMessage(error)}`,
         getErrorStack(error),
       );
     }

@@ -260,6 +260,12 @@ export const GoalsManagementInterface: React.FC = () => {
       (typeof goal.metadata?.learningPathId === 'string'
         ? goal.metadata.learningPathId
         : undefined);
+    const courseId =
+      goal.courseId ??
+      goal.course?.id ??
+      (typeof goal.metadata?.courseId === 'string'
+        ? goal.metadata.courseId
+        : undefined);
     const isOverdue =
       daysRemaining !== null && daysRemaining < 0 && goal.status === 'active';
     const isDueSoon =
@@ -312,9 +318,9 @@ export const GoalsManagementInterface: React.FC = () => {
                     <BookOpen className="w-3 h-3" /> View Curriculum &rarr;
                   </Link>
                 )}
-                {goal.metadata && typeof goal.metadata === 'object' && (goal.metadata as any).courseId && (
+                {courseId && (
                   <Link
-                    href={`/courses/${(goal.metadata as any).courseId}`}
+                    href={`/courses/${courseId}`}
                     onClick={(e) => e.stopPropagation()}
                     className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-sky-100 text-sky-800 hover:bg-sky-200 dark:bg-sky-950/50 dark:text-sky-300 dark:hover:bg-sky-900/50 transition-colors"
                   >

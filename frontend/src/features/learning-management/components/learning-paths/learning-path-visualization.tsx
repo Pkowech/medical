@@ -195,6 +195,7 @@ export const LearningPathVisualization: React.FC<LearningPathVisualizationProps>
   const getModuleIcon = (type: string) => {
     switch (type) {
       case 'course': return BookOpen;
+      case 'unit': return BookOpen;
       case 'assessment': return FileText;
       case 'clinical_case': return Users;
       case 'milestone': return Award;
@@ -218,6 +219,13 @@ export const LearningPathVisualization: React.FC<LearningPathVisualizationProps>
     }
     switch (module.type) {
       case 'course': router.push(`/courses/${module.resourceId}`); break;
+      case 'unit':
+        if (module.courseId) {
+          router.push(`/courses/${module.courseId}/units/${module.unitId || module.resourceId}`);
+        } else {
+          toast.error('This unit is not linked to its course.');
+        }
+        break;
       case 'assessment': router.push(`/assessment/${module.resourceId}`); break;
       case 'clinical_case':
       case 'clinicalCase':

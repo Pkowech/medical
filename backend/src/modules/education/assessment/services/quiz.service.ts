@@ -712,55 +712,44 @@ export class QuizService {
 
     const skip = (page - 1) * limit;
 
-    const where: any = {
-      AND: [
-        {
-          OR: [
-            { unitId: null },
-            {
-              unit: {
-                is: {
-                  isPublished: true,
-                  course: { is: { status: 'published' } },
-                },
+    const whereConditions: Prisma.QuizWhereInput[] = [
+      {
+        OR: [
+          { unitId: null },
+          {
+            unit: {
+              is: {
+                isPublished: true,
+                course: { is: { status: 'published' } },
               },
             },
-          ],
-        },
-        {
-          OR: [
-            { topicId: null },
-            {
-              topic: {
-                is: {
-                  unit: {
-                    is: {
-                      isPublished: true,
-                      course: { is: { status: 'published' } },
-                    },
+          },
+        ],
+      },
+      {
+        OR: [
+          { topicId: null },
+          {
+            topic: {
+              is: {
+                unit: {
+                  is: {
+                    isPublished: true,
+                    course: { is: { status: 'published' } },
                   },
                 },
               },
             },
-          ],
-        },
-      ],
-    };
-    if (filters?.unitId) {
-      where.unitId = filters.unitId;
-    }
-    if (filters?.topicId) {
-      where.topicId = filters.topicId;
-    }
-    if (filters?.isPublished !== undefined) {
-      where.isPublished = filters.isPublished;
-    }
+          },
+        ],
+      },
+    ];
     const searchTerms = filters?.search
       ?.trim()
       .split(/\s+/)
       .filter(Boolean);
     if (searchTerms?.length) {
-      where.AND.push(
+      whereConditions.push(
         ...searchTerms.map((term) => {
           const containsTerm = { contains: term, mode: 'insensitive' as const };
           return {
@@ -804,7 +793,7 @@ export class QuizService {
                 topic: {
                   is: {
                     OR: [
-                      { title: containsTerm },
+                      { name: containsTerm },
                       { description: containsTerm },
                     ],
                   },
@@ -815,6 +804,14 @@ export class QuizService {
         }),
       );
     }
+    const where: Prisma.QuizWhereInput = {
+      AND: whereConditions,
+      ...(filters?.unitId ? { unitId: filters.unitId } : {}),
+      ...(filters?.topicId ? { topicId: filters.topicId } : {}),
+      ...(filters?.isPublished !== undefined
+        ? { isPublished: filters.isPublished }
+        : {}),
+    };
 
     const [quizzes, total] = await Promise.all([
       this.prisma.quiz.findMany({

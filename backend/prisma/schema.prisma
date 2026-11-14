@@ -902,6 +902,7 @@ model Unit {
   topics                  Topic[]
   accesses                UnitAccess[]
   unitCompletions         UnitCompletion[]
+  learningPathModules     LearningPathModule[]
   sourceUnitRelations     UnitRelation[]           @relation("SourceUnitRelations")
   targetUnitRelations     UnitRelation[]           @relation("TargetUnitRelations")
   course                  Course                   @relation(fields: [courseId], references: [id], onDelete: Cascade)
@@ -1413,6 +1414,7 @@ model LearningPathMilestone {
 
 enum PathModuleType {
   course
+  unit
   assessment
   clinical_case
   milestone
@@ -1446,6 +1448,7 @@ model LearningPathModule {
   type             PathModuleType               @default(course)
   resourceId       String                       @map("resource_id")
   courseId         String?                      @map("course_id")
+  unitId           String?                      @map("unit_id")
   quizId           String?                      @map("quiz_id")
   order            Int                          @default(1)
   estimatedMinutes Int?                         @map("estimated_minutes")
@@ -1456,12 +1459,14 @@ model LearningPathModule {
 
   phase            LearningPathPhase            @relation(fields: [phaseId], references: [id], onDelete: Cascade)
   course           Course?                      @relation(fields: [courseId], references: [id], onDelete: Restrict)
+  unit             Unit?                        @relation(fields: [unitId], references: [id], onDelete: Restrict)
   quiz             Quiz?                        @relation(fields: [quizId], references: [id], onDelete: Restrict)
   moduleProgress   LearningPathModuleProgress[]
 
   @@unique([phaseId, order])
   @@index([phaseId])
   @@index([courseId])
+  @@index([unitId])
   @@index([quizId])
   @@map("learning_path_modules")
 }

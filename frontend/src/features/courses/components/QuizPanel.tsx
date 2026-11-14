@@ -229,7 +229,7 @@ export const QuizPanel = ({
           id: `${URLS.BASE}/quizzes/${lessonId || 'general'}`,
           definition: {
             name: {
-              'en-US': `${scope === 'topic' ? 'Topic Mastery Quiz' : scope === 'assessment' ? 'Assessment' : 'Unit Quiz'}: ${lessonTitle || (scope === 'topic' ? 'Topic' : scope === 'assessment' ? 'Assessment' : 'Unit')}`,
+              'en-US': `${scope === 'topic' ? 'Topic Mastery Quiz' : scope === 'assessment' ? 'Learning Path Quiz' : 'Unit Quiz'}: ${lessonTitle || (scope === 'topic' ? 'Topic' : scope === 'assessment' ? 'Quiz' : 'Unit')}`,
             },
             type: 'http://adlnet.gov/expapi/activities/assessment',
           },
@@ -317,7 +317,7 @@ export const QuizPanel = ({
               {scope === 'topic'
                 ? "Congratulations! You've mastered this topic."
                 : scope === 'assessment'
-                  ? 'You passed the assessment.'
+                  ? 'You passed the learning-path quiz.'
                   : 'You passed the unit quiz.'}
             </p>
           </div>
@@ -398,7 +398,7 @@ export const QuizPanel = ({
         >
           {finalResult?.nextTopicId && onNextTopic
             ? 'Next Topic'
-            : `Return to ${scope === 'topic' ? 'Topic' : scope === 'assessment' ? 'Assessment' : 'Unit'}`}
+            : `Return to ${scope === 'topic' ? 'Topic' : scope === 'assessment' ? 'Quiz' : 'Unit'}`}
         </button>
       </div>
     );
@@ -419,7 +419,7 @@ export const QuizPanel = ({
           {scope === 'topic'
             ? 'Topic Mastery Quiz'
             : scope === 'assessment'
-              ? 'Assessment'
+              ? 'Learning Path Quiz'
               : 'Unit Quiz'}
         </h3>
         <span className="text-sm font-medium text-muted-foreground bg-muted dark:bg-secondary px-3 py-1 rounded-full">

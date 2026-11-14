@@ -46,6 +46,7 @@ export class LearningModuleStatsDto {
 
 export type LearningResourceType =
   | 'course'
+  | 'unit'
   | 'learningPath'
   | 'assessment'
   | 'clinicalCase'
@@ -105,6 +106,8 @@ export interface Module {
   title: string;
   description?: string;
   resourceId?: string;
+  courseId?: string;
+  unitId?: string;
   order: number;
   required?: boolean;
   estimatedMinutes?: number;

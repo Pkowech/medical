@@ -2,8 +2,10 @@ export interface PathModule {
   id: string;
   title: string;
   description: string;
-  type: 'course' | 'assessment' | 'clinical_case' | 'clinicalCase' | 'resource' | 'milestone' | 'custom';
+  type: 'course' | 'unit' | 'assessment' | 'clinical_case' | 'clinicalCase' | 'resource' | 'milestone' | 'custom';
   resourceId?: string;
+  courseId?: string;
+  unitId?: string;
   estimatedHours?: number;
   isRequired: boolean;
   unlockConditions?: string[];

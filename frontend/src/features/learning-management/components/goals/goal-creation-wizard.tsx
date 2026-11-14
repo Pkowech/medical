@@ -26,6 +26,35 @@ type Milestone = {
   completedAt?: string;
 };
 
+type GoalResourceType = 'none' | 'course' | 'learningPath';
+type GoalResourceOption = { id: string; title: string };
+
+const parseGoalResourceOptions = (
+  payload: unknown,
+  collectionName: string,
+): GoalResourceOption[] => {
+  let value = payload;
+  for (let depth = 0; depth < 5; depth += 1) {
+    if (Array.isArray(value)) {
+      return value.map(item => {
+        if (!item || typeof item !== 'object') {
+          throw new Error(`The ${collectionName} response contained an invalid item.`);
+        }
+        const record = item as Record<string, unknown>;
+        const title = record.title ?? record.name;
+        if (typeof record.id !== 'string' || typeof title !== 'string') {
+          throw new Error(`The ${collectionName} response contained an item without an ID or title.`);
+        }
+        return { id: record.id, title };
+      });
+    }
+    if (!value || typeof value !== 'object') break;
+    const record = value as Record<string, unknown>;
+    value = record[collectionName] ?? record.items ?? record.data;
+  }
+  throw new Error(`Could not read the ${collectionName} response.`);
+};
+
 export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
   isOpen,
   onClose,
@@ -72,6 +101,11 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
   });
 
   const [availableGoals, setAvailableGoals] = useState<LearningGoal[]>([]);
+  const [availableCourses, setAvailableCourses] = useState<GoalResourceOption[]>([]);
+  const [availableLearningPaths, setAvailableLearningPaths] = useState<GoalResourceOption[]>([]);
+  const [resourceType, setResourceType] = useState<GoalResourceType>('none');
+  const [resourcesLoading, setResourcesLoading] = useState(false);
+  const [resourcesError, setResourcesError] = useState('');
 
   useEffect(() => {
     if (isOpen && initialData) {
@@ -92,6 +126,17 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
       const storedSmartCriteria =
         initialData.smartCriteria ??
         (metadata?.smartCriteria as typeof goalData.smartCriteria | undefined);
+      const currentCourseId =
+        initialData.courseId ??
+        initialData.course?.id ??
+        (typeof metadata?.courseId === 'string' ? metadata.courseId : '');
+      const currentLearningPathId =
+        initialData.learningPathId ??
+        initialData.learningPath?.id ??
+        (typeof metadata?.learningPathId === 'string' ? metadata.learningPathId : '');
+      setResourceType(
+        currentLearningPathId ? 'learningPath' : currentCourseId ? 'course' : 'none',
+      );
       const targetValue = storedTargetCriteria?.targetValue;
       const priority = String(initialData.priority ?? '');
       const normalizedPriority = ['low', 'medium', 'high', 'critical'].includes(priority)
@@ -105,7 +150,8 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
         description: initialData.description ?? prev.description,
         type: initialData.type ?? prev.type,
         category: initialData.category ?? prev.category,
-        learningPathId: initialData.learningPathId ?? prev.learningPathId,
+        courseId: currentCourseId,
+        learningPathId: currentLearningPathId,
         priority: normalizedPriority,
         startDate: toDateInput(initialData.startDate) || prev.startDate,
         targetDate: toDateInput(initialData.targetDate) || prev.targetDate,
@@ -136,6 +182,55 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
       resetForm();
     }
   }, [isOpen, initialData]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let active = true;
+    setResourcesLoading(true);
+    setResourcesError('');
+
+    Promise.allSettled([
+      apiService.get<unknown>('/courses?status=published&page=1&limit=100'),
+      apiService.get<unknown>('/learning-paths?status=published'),
+    ]).then(([coursesResult, pathsResult]) => {
+      if (!active) return;
+      const errors: string[] = [];
+
+      if (coursesResult.status === 'fulfilled') {
+        try {
+          setAvailableCourses(parseGoalResourceOptions(coursesResult.value.data, 'courses'));
+        } catch (error) {
+          console.error('Failed to parse available courses for goal linking:', error);
+          errors.push('Courses could not be loaded.');
+        }
+      } else {
+        console.error('Failed to load courses for goal linking:', coursesResult.reason);
+        errors.push('Courses could not be loaded.');
+      }
+
+      if (pathsResult.status === 'fulfilled') {
+        try {
+          setAvailableLearningPaths(
+            parseGoalResourceOptions(pathsResult.value.data, 'learningPaths'),
+          );
+        } catch (error) {
+          console.error('Failed to parse learning paths for goal linking:', error);
+          errors.push('Learning paths could not be loaded.');
+        }
+      } else {
+        console.error('Failed to load learning paths for goal linking:', pathsResult.reason);
+        errors.push('Learning paths could not be loaded.');
+      }
+
+      setResourcesError(errors.join(' '));
+      setResourcesLoading(false);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [isOpen]);
+
   const [smartSuggestions, setSmartSuggestions] = useState<SMARTSuggestions | null>(null);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
@@ -162,7 +257,11 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
     { id: 2, title: 'SMART Criteria', description: 'Make it specific and measurable' },
     { id: 3, title: 'Timeline & Milestones', description: 'Set deadlines and checkpoints' },
     { id: 4, title: 'Tracking & Reminders', description: 'Configure progress tracking' },
-    { id: 5, title: 'Review & Create', description: 'Confirm your goal' },
+    {
+      id: 5,
+      title: initialData?.id ? 'Review & Save' : 'Review & Create',
+      description: 'Confirm your goal',
+    },
   ];
 
   useEffect(() => {
@@ -263,8 +362,18 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
         ...goalData,
         startDate: `${goalData.startDate}T00:00:00.000Z`,
         targetDate: `${goalData.targetDate}T00:00:00.000Z`,
-        courseId: orUndefined(goalData.courseId),
-        learningPathId: orUndefined(goalData.learningPathId),
+        courseId:
+          resourceType === 'course' && goalData.courseId
+            ? goalData.courseId
+            : initialData?.id
+              ? null
+              : undefined,
+        learningPathId:
+          resourceType === 'learningPath' && goalData.learningPathId
+            ? goalData.learningPathId
+            : initialData?.id
+              ? null
+              : undefined,
         dependsOnGoalId: orUndefined(goalData.dependsOnGoalId),
       };
       if (initialData?.id) {
@@ -330,6 +439,7 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
       },
       dependsOnGoalId: '',
     });
+    setResourceType('none');
     setErrors({});
     setSmartSuggestions(null);
   };
@@ -363,6 +473,26 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
       milestones: prev.milestones.filter((_, i) => i !== index),
     }));
   };
+
+  const selectedResourceId =
+    resourceType === 'course'
+      ? goalData.courseId
+      : resourceType === 'learningPath'
+        ? goalData.learningPathId
+        : '';
+  const resourceOptions =
+    resourceType === 'course' ? availableCourses : availableLearningPaths;
+  const currentResourceTitle =
+    resourceType === 'course'
+      ? initialData?.course?.title
+      : initialData?.learningPath?.title;
+  const optionsWithCurrentResource =
+    selectedResourceId && !resourceOptions.some(option => option.id === selectedResourceId)
+      ? [...resourceOptions, {
+          id: selectedResourceId,
+          title: currentResourceTitle || `Current ${resourceType === 'course' ? 'course' : 'learning path'}`,
+        }]
+      : resourceOptions;
 
   const renderStep1 = () => (
     <div className="space-y-6">
@@ -466,6 +596,60 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
             <option value="custom">Custom</option>
           </select>
         </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-muted-foreground mb-2">
+            Attach to a course or learning path
+          </label>
+          <select
+            value={resourceType}
+            onChange={event => {
+              setResourceType(event.target.value as GoalResourceType);
+              setGoalData(prev => ({ ...prev, courseId: '', learningPathId: '' }));
+            }}
+            className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            <option value="none">No linked resource</option>
+            <option value="course">Course</option>
+            <option value="learningPath">Learning path</option>
+          </select>
+        </div>
+        {resourceType !== 'none' && (
+          <div>
+            <label className="block text-sm font-medium text-muted-foreground mb-2">
+              {resourceType === 'course' ? 'Course' : 'Learning path'}
+            </label>
+            <select
+              value={selectedResourceId}
+              onChange={event => {
+                const id = event.target.value;
+                setGoalData(prev => ({
+                  ...prev,
+                  courseId: resourceType === 'course' ? id : '',
+                  learningPathId: resourceType === 'learningPath' ? id : '',
+                }));
+              }}
+              disabled={resourcesLoading}
+              className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-60"
+            >
+              <option value="">
+                {resourcesLoading
+                  ? 'Loading…'
+                  : `Select a ${resourceType === 'course' ? 'course' : 'learning path'}`}
+              </option>
+              {optionsWithCurrentResource.map(option => (
+                <option key={option.id} value={option.id}>{option.title}</option>
+              ))}
+            </select>
+          </div>
+        )}
+        {resourcesError && resourceType !== 'none' && (
+          <p role="alert" className="text-sm text-destructive md:col-span-2">
+            {resourcesError} You can still save the goal without a linked resource.
+          </p>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

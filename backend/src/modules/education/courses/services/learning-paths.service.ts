@@ -18,6 +18,7 @@ import {
   LearningPath,
   Prisma,
   CourseDifficulty,
+  CourseStatus,
   LearningPathStatus,
   LearningPathCategory,
   PathModuleType,
@@ -106,6 +107,14 @@ export class LearningPathsService {
                       code: true,
                     },
                   },
+                  unit: {
+                    select: {
+                      id: true,
+                      title: true,
+                      name: true,
+                      courseId: true,
+                    },
+                  },
                 },
               },
             },
@@ -152,6 +161,14 @@ export class LearningPathsService {
                     select: {
                       id: true,
                       title: true,
+                    },
+                  },
+                  unit: {
+                    select: {
+                      id: true,
+                      title: true,
+                      name: true,
+                      courseId: true,
                     },
                   },
                 },
@@ -303,6 +320,7 @@ export class LearningPathsService {
         const mod = phase.modules[mIdx];
         const modAny = mod as any;
         let courseId: string | null = null;
+        let unitId: string | null = null;
         let quizId: string | null = null;
         const targetResourceId = mod.resourceId || mod.id;
 
@@ -312,16 +330,38 @@ export class LearningPathsService {
             select: { id: true },
           });
           if (course) courseId = course.id;
+        } else if (mod.type === 'unit' && targetResourceId) {
+          const unit = await tx.unit.findUnique({
+            where: { id: mod.unitId || targetResourceId },
+            select: { id: true, courseId: true },
+          });
+          if (
+            !unit ||
+            targetResourceId !== unit.id ||
+            (mod.courseId && unit.courseId !== mod.courseId)
+          ) {
+            throw new BadRequestException(
+              `Unit ${targetResourceId} does not belong to the selected course.`,
+            );
+          }
+          unitId = unit.id;
+          courseId = unit.courseId;
         } else if (mod.type === 'assessment' && targetResourceId) {
           const quiz = await tx.quiz.findUnique({
             where: { id: targetResourceId },
-            select: { id: true },
+            select: { id: true, isPublished: true },
           });
-          if (quiz) quizId = quiz.id;
+          if (!quiz || !quiz.isPublished) {
+            throw new BadRequestException(
+              `Quiz ${targetResourceId} was not found or is not published.`,
+            );
+          }
+          quizId = quiz.id;
         }
 
         const validTypes = [
           'course',
+          'unit',
           'assessment',
           'clinical_case',
           'milestone',
@@ -339,6 +379,7 @@ export class LearningPathsService {
             type: modType,
             resourceId: targetResourceId,
             courseId,
+            unitId,
             quizId,
             order: mod.order ?? mIdx + 1,
             estimatedMinutes:
@@ -616,6 +657,7 @@ export class LearningPathsService {
 
         const validModuleTypes = [
           'course',
+          'unit',
           'assessment',
           'clinical_case',
           'resource',
@@ -629,6 +671,18 @@ export class LearningPathsService {
           );
         }
       }
+
+    }
+
+    const quizIds = pathStructure.phases.flatMap(phase =>
+      phase.modules
+        .filter(module => module.type === 'assessment')
+        .map(module => module.resourceId),
+    );
+    if (new Set(quizIds).size !== quizIds.length) {
+      throw new BadRequestException(
+        'A quiz can only be added to one learning-path stage so its progress is tracked correctly.',
+      );
     }
   }
 
@@ -663,10 +717,16 @@ export class LearningPathsService {
       errors.push('At least one phase is required');
     } else {
       const courseIds: string[] = [];
+      const unitIds: string[] = [];
+      const quizIds: string[] = [];
       for (const phase of phases) {
         for (const module of phase.modules || []) {
           if (module.type === 'course' && (module.resourceId || module.courseId)) {
             courseIds.push(module.resourceId || module.courseId);
+          } else if (module.type === 'unit') {
+            unitIds.push(module.unitId || module.resourceId);
+          } else if (module.type === 'assessment' && (module.resourceId || module.quizId)) {
+            quizIds.push(module.resourceId || module.quizId);
           }
         }
       }
@@ -683,6 +743,38 @@ export class LearningPathsService {
         if (missingCourseIds.length > 0) {
           errors.push(
             `Referenced course(s) not found in catalog: ${missingCourseIds.join(', ')}`,
+          );
+        }
+      }
+
+      if (unitIds.length > 0) {
+        const units = await this.prisma.unit.findMany({
+          where: {
+            id: { in: unitIds },
+            isPublished: true,
+            course: { status: CourseStatus.published },
+          },
+          select: { id: true },
+        });
+        const existingIds = new Set(units.map(unit => unit.id));
+        const unavailableUnitIds = unitIds.filter(id => !existingIds.has(id));
+        if (unavailableUnitIds.length > 0) {
+          errors.push(
+            `Referenced unit(s) are missing or unavailable: ${unavailableUnitIds.join(', ')}`,
+          );
+        }
+      }
+
+      if (quizIds.length > 0) {
+        const publishedQuizzes = await this.prisma.quiz.findMany({
+          where: { id: { in: quizIds }, isPublished: true },
+          select: { id: true },
+        });
+        const publishedQuizIds = new Set(publishedQuizzes.map(quiz => quiz.id));
+        const unavailableQuizIds = quizIds.filter(id => !publishedQuizIds.has(id));
+        if (unavailableQuizIds.length > 0) {
+          errors.push(
+            `Referenced quiz(es) are missing or unpublished: ${unavailableQuizIds.join(', ')}`,
           );
         }
       }

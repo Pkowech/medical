@@ -52,6 +52,8 @@ export function useLearningPath(pathId: string) {
               description: toDisplayString(moduleItem.description),
               type: toDisplayString(moduleItem.type, 'course'),
               resourceId: toDisplayString(moduleItem.resourceId ?? moduleItem.resource_id),
+              courseId: toDisplayString(moduleItem.courseId ?? moduleItem.course_id),
+              unitId: toDisplayString(moduleItem.unitId ?? moduleItem.unit_id),
               estimatedHours: Number(moduleItem.estimatedHours ?? moduleItem.estimated_hours ?? 0),
               isRequired: Boolean(moduleItem.isRequired ?? moduleItem.is_required ?? false),
               unlockConditions: Array.isArray(moduleItem.unlockConditions)

@@ -44,6 +44,7 @@ export interface LearningGoal {
     title: string;
   };
   learningPathId?: string;
+  courseId?: string;
   course?: {
     id: string;
     title: string;

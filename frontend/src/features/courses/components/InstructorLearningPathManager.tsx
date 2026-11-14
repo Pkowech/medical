@@ -5,6 +5,7 @@ import { BookOpen, CheckCircle, Clock3, Plus, Sparkles, Trash2 } from 'lucide-re
 import { toast } from 'sonner';
 import { fetchAssessments, type Assessment } from '@/features/assessment/services/assessmentService';
 import type { Course } from '@/shared/types/courseInterface';
+import { unitService, type Unit } from '@/features/courses/services/unitService';
 import {
   learningPathService,
   type CreateLearningPathPayload,
@@ -33,7 +34,9 @@ interface PathPhaseDraft {
   title: string;
   description: string;
   courseId: string;
-  assessmentId: string;
+  contentMode: 'course' | 'units';
+  unitIds: string[];
+  quizIds: string[];
   milestone: string;
 }
 
@@ -48,7 +51,9 @@ const createPhaseDraft = (): PathPhaseDraft => ({
   title: '',
   description: '',
   courseId: '',
-  assessmentId: '',
+  contentMode: 'course',
+  unitIds: [],
+  quizIds: [],
   milestone: '',
 });
 
@@ -86,15 +91,18 @@ export function InstructorLearningPathManager({
   onOpenCourses,
 }: InstructorLearningPathManagerProps) {
   const [paths, setPaths] = useState<InstructorLearningPath[]>([]);
-  const [assessments, setAssessments] = useState<Assessment[]>([]);
-  const [assessmentsError, setAssessmentsError] = useState('');
-  const [assessmentsLoading, setAssessmentsLoading] = useState(true);
+  const [quizzes, setQuizzes] = useState<Assessment[]>([]);
+  const [quizzesError, setQuizzesError] = useState('');
+  const [quizzesLoading, setQuizzesLoading] = useState(true);
   const [pathListLoading, setPathListLoading] = useState(true);
   const [pathListError, setPathListError] = useState('');
   const [pathFormError, setPathFormError] = useState('');
   const [form, setForm] = useState(createEmptyPath);
   const [isSaving, setIsSaving] = useState(false);
   const [publishingPathId, setPublishingPathId] = useState<string | null>(null);
+  const [unitsByCourseId, setUnitsByCourseId] = useState<Record<string, Unit[]>>({});
+  const [loadingUnitsForCourse, setLoadingUnitsForCourse] = useState<Set<string>>(new Set());
+  const [unitLoadErrors, setUnitLoadErrors] = useState<Record<string, string>>({});
 
   const publishedCourses = courses.filter(course => course.status === 'published');
 
@@ -119,16 +127,16 @@ export function InstructorLearningPathManager({
     let active = true;
     fetchAssessments()
       .then(items => {
-        if (active) setAssessments(items);
+        if (active) setQuizzes(items);
       })
       .catch(error => {
-        console.error('Failed to load published assessments for path builder:', error);
+        console.error('Failed to load published quizzes for path builder:', error);
         if (active) {
-          setAssessmentsError(getErrorMessage(error, 'Published assessments could not be loaded.'));
+          setQuizzesError(getErrorMessage(error, 'Published quizzes could not be loaded.'));
         }
       })
       .finally(() => {
-        if (active) setAssessmentsLoading(false);
+        if (active) setQuizzesLoading(false);
       });
 
     return () => {
@@ -143,6 +151,43 @@ export function InstructorLearningPathManager({
         phase.id === phaseId ? { ...phase, ...updates } : phase,
       ),
     }));
+  };
+
+  const loadCourseUnits = async (courseId: string) => {
+    if (!courseId || unitsByCourseId[courseId] || loadingUnitsForCourse.has(courseId)) return;
+    setLoadingUnitsForCourse(current => new Set(current).add(courseId));
+    setUnitLoadErrors(current => {
+      const next = { ...current };
+      delete next[courseId];
+      return next;
+    });
+    try {
+      const units = await unitService.getUnitsByCourseId(courseId);
+      setUnitsByCourseId(current => ({
+        ...current,
+        [courseId]: units.filter(unit => unit.isPublished !== false && unit.status !== 'inactive'),
+      }));
+    } catch (error) {
+      console.error(`Failed to load units for course ${courseId}:`, error);
+      setUnitLoadErrors(current => ({
+        ...current,
+        [courseId]: getErrorMessage(error, 'Could not load units for this course.'),
+      }));
+    } finally {
+      setLoadingUnitsForCourse(current => {
+        const next = new Set(current);
+        next.delete(courseId);
+        return next;
+      });
+    }
+  };
+
+  const togglePhaseUnit = (phase: PathPhaseDraft, unitId: string) => {
+    updatePhase(phase.id, {
+      unitIds: phase.unitIds.includes(unitId)
+        ? phase.unitIds.filter(id => id !== unitId)
+        : [...phase.unitIds, unitId],
+    });
   };
 
   const toggleCareerStage = (stage: string) => {
@@ -165,20 +210,38 @@ export function InstructorLearningPathManager({
       setPathFormError('Choose at least one target learner stage.');
       return null;
     }
-    if (form.phases.some(phase => !phase.title.trim() || !phase.courseId)) {
-      setPathFormError('Give every phase a title and select a published course.');
+    if (form.phases.some(phase =>
+      !phase.title.trim() ||
+      !phase.courseId ||
+      (phase.contentMode === 'units' && phase.unitIds.length === 0),
+    )) {
+      setPathFormError(
+        'Give every phase a title, select a published course, and choose at least one unit when using selected-units mode.',
+      );
+      return null;
+    }
+    if (form.phases.some(phase => phase.contentMode === 'units' &&
+      phase.unitIds.some(unitId => !(unitsByCourseId[phase.courseId] || []).some(unit => unit.id === unitId)),
+    )) {
+      setPathFormError('Reload the selected course units and choose from the available units.');
       return null;
     }
     if (
       form.phases.some(phase =>
-        phase.assessmentId &&
-        !assessments.some(assessment =>
-          assessment.id === phase.assessmentId &&
-          (!assessment.courseId || assessment.courseId === phase.courseId),
+        phase.quizIds.some(quizId =>
+          !quizzes.some(quiz =>
+            quiz.id === quizId &&
+            (!quiz.courseId || quiz.courseId === phase.courseId),
+          ),
         ),
       )
     ) {
-      setPathFormError('A selected assessment is not available for its course. Choose another assessment.');
+      setPathFormError('A selected quiz is not available for its course. Choose another quiz.');
+      return null;
+    }
+    const selectedQuizIds = form.phases.flatMap(phase => phase.quizIds);
+    if (new Set(selectedQuizIds).size !== selectedQuizIds.length) {
+      setPathFormError('Add each quiz to only one phase so its progress is tracked at the right stage.');
       return null;
     }
 
@@ -219,17 +282,35 @@ export function InstructorLearningPathManager({
               ? Math.round(course.estimatedHours * 60)
               : undefined,
           };
-          const modules: CreateLearningPathPayload['pathStructure']['phases'][number]['modules'] = [
-            courseModule,
-          ];
-          const assessment = assessments.find(item => item.id === phase.assessmentId);
-          if (assessment) {
+          const selectedUnits = (unitsByCourseId[course.id] || []).filter(unit =>
+            phase.unitIds.includes(unit.id),
+          );
+          const modules: CreateLearningPathPayload['pathStructure']['phases'][number]['modules'] =
+            phase.contentMode === 'course'
+              ? [courseModule]
+              : selectedUnits.map((unit, unitIndex) => ({
+                  id: crypto.randomUUID(),
+                  type: 'unit' as const,
+                  resourceId: unit.id,
+                  unitId: unit.id,
+                  courseId: course.id,
+                  title: unit.title || unit.name || 'Untitled unit',
+                  description: unit.description || '',
+                  order: unitIndex + 1,
+                  required: true,
+                  estimatedMinutes: unit.estimatedMinutes ?? unit.estimatedDuration,
+                }));
+          const phaseQuizzes = phase.quizIds
+            .map(id => quizzes.find(item => item.id === id))
+            .filter((quiz): quiz is Assessment => Boolean(quiz));
+          for (const quiz of phaseQuizzes) {
             modules.push({
               id: crypto.randomUUID(),
               type: 'assessment',
-              resourceId: assessment.id,
-              title: assessment.title,
-              description: assessment.description,
+              resourceId: quiz.id,
+              title: quiz.title,
+              description: quiz.description,
+              estimatedMinutes: quiz.timeLimitMinutes,
               order: modules.length + 1,
               required: true,
             });
@@ -302,7 +383,7 @@ export function InstructorLearningPathManager({
           <p className="text-sm font-medium text-primary">Path builder</p>
           <h2 className="mt-1 text-xl font-semibold tracking-tight">Create a learning path</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Organize your published courses into phases, set learning objectives, and add checkpoints.
+            Organize full courses or selected units into phases, set learning objectives, and add checkpoints.
           </p>
         </div>
 
@@ -310,7 +391,7 @@ export function InstructorLearningPathManager({
           <div className="rounded-xl border border-dashed border-border bg-muted/40 p-5">
             <p className="font-medium text-foreground">Publish a course first</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              A path contains courses, including their units and topics. Only your published courses can be added.
+              A path can include a whole published course or selected published units from it.
             </p>
             <button
               type="button"
@@ -463,7 +544,7 @@ export function InstructorLearningPathManager({
                 <div>
                   <h3 className="text-sm font-semibold">Path phases</h3>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Add a course and its units/topics, plus an optional published assessment and checkpoint.
+                    Add a whole course or selected units, plus optional checkpoint quizzes.
                   </p>
                 </div>
                 <button
@@ -479,8 +560,17 @@ export function InstructorLearningPathManager({
                 </button>
               </div>
 
-              {form.phases.map((phase, index) => (
-                <fieldset key={phase.id} className="rounded-xl border border-border bg-background p-4">
+              {form.phases.map((phase, index) => {
+                const availableQuizzes = quizzes.filter(quiz =>
+                  (!quiz.courseId || quiz.courseId === phase.courseId) &&
+                  !form.phases.some(otherPhase =>
+                    otherPhase.id !== phase.id &&
+                    otherPhase.quizIds.includes(quiz.id),
+                  ),
+                );
+
+                return (
+                  <fieldset key={phase.id} className="rounded-xl border border-border bg-background p-4">
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <legend className="text-sm font-semibold">Phase {index + 1}</legend>
                     {form.phases.length > 1 && (
@@ -515,10 +605,16 @@ export function InstructorLearningPathManager({
                       <select
                         id={`phase-course-${phase.id}`}
                         value={phase.courseId}
-                        onChange={event => updatePhase(phase.id, {
-                          courseId: event.target.value,
-                          assessmentId: '',
-                        })}
+                        onChange={event => {
+                          const courseId = event.target.value;
+                          updatePhase(phase.id, {
+                            courseId,
+                            contentMode: 'course',
+                            unitIds: [],
+                            quizIds: [],
+                          });
+                          if (courseId) void loadCourseUnits(courseId);
+                        }}
                         required
                         className="h-9 w-full rounded-lg border border-input bg-card px-3 text-sm"
                       >
@@ -530,38 +626,122 @@ export function InstructorLearningPathManager({
                         ))}
                       </select>
                     </div>
-                    <div>
-                      <label htmlFor={`phase-assessment-${phase.id}`} className="mb-1 block text-xs font-medium">
-                        Assessment <span className="font-normal text-muted-foreground">(optional)</span>
-                      </label>
-                      <select
-                        id={`phase-assessment-${phase.id}`}
-                        value={phase.assessmentId}
-                        onChange={event => updatePhase(phase.id, { assessmentId: event.target.value })}
-                        disabled={!phase.courseId || assessmentsLoading || Boolean(assessmentsError)}
-                        className="h-9 w-full rounded-lg border border-input bg-card px-3 text-sm disabled:opacity-60"
-                      >
-                        <option value="">
-                          {assessmentsLoading
-                            ? 'Loading assessments…'
-                            : assessmentsError
-                              ? 'Assessments unavailable'
-                              : 'No assessment'}
-                        </option>
-                        {assessments
-                          .filter(assessment =>
-                            !assessment.courseId || assessment.courseId === phase.courseId,
-                          )
-                          .map(assessment => (
-                            <option key={assessment.id} value={assessment.id}>
-                              {assessment.title}
-                            </option>
-                          ))}
-                      </select>
-                      {assessmentsError && (
-                        <p className="mt-1 text-xs text-destructive">{assessmentsError}</p>
+                    <fieldset className="sm:col-span-2">
+                      <legend className="mb-1 block text-xs font-medium">Course content</legend>
+                      <div className="flex flex-wrap gap-4 text-sm">
+                        <label className="inline-flex items-center gap-2">
+                          <input
+                            type="radio"
+                            name={`phase-content-${phase.id}`}
+                            value="course"
+                            checked={phase.contentMode === 'course'}
+                            onChange={() => updatePhase(phase.id, { contentMode: 'course' })}
+                          />
+                          Whole course
+                        </label>
+                        <label className="inline-flex items-center gap-2">
+                          <input
+                            type="radio"
+                            name={`phase-content-${phase.id}`}
+                            value="units"
+                            checked={phase.contentMode === 'units'}
+                            disabled={!phase.courseId}
+                            onChange={() => {
+                              updatePhase(phase.id, { contentMode: 'units' });
+                              void loadCourseUnits(phase.courseId);
+                            }}
+                          />
+                          Selected units only
+                        </label>
+                      </div>
+                      {phase.contentMode === 'units' && (
+                        <div className="mt-3 rounded-lg border border-border p-3">
+                          {loadingUnitsForCourse.has(phase.courseId) ? (
+                            <p role="status" className="text-sm text-muted-foreground">Loading course units…</p>
+                          ) : unitLoadErrors[phase.courseId] ? (
+                            <div>
+                              <p role="alert" className="text-sm text-destructive">{unitLoadErrors[phase.courseId]}</p>
+                              <button
+                                type="button"
+                                onClick={() => void loadCourseUnits(phase.courseId)}
+                                className="mt-2 text-sm font-medium text-primary hover:underline"
+                              >
+                                Try again
+                              </button>
+                            </div>
+                          ) : (unitsByCourseId[phase.courseId] || []).length === 0 ? (
+                            <p className="text-sm text-muted-foreground">
+                              This course has no published units available to add.
+                            </p>
+                          ) : (
+                            <div className="space-y-2">
+                              <p className="text-xs text-muted-foreground">
+                                Choose the units learners should complete in this phase.
+                              </p>
+                              {(unitsByCourseId[phase.courseId] || []).map(unit => (
+                                <label key={unit.id} className="flex items-start gap-2 text-sm">
+                                  <input
+                                    type="checkbox"
+                                    checked={phase.unitIds.includes(unit.id)}
+                                    onChange={() => togglePhaseUnit(phase, unit.id)}
+                                    className="mt-0.5"
+                                  />
+                                  <span>{unit.title || unit.name}</span>
+                                </label>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       )}
-                    </div>
+                    </fieldset>
+                    <fieldset className="sm:col-span-2">
+                      <legend className="mb-1 block text-xs font-medium">
+                        Checkpoint quizzes <span className="font-normal text-muted-foreground">(optional)</span>
+                      </legend>
+                      <p className="mb-2 text-xs text-muted-foreground">
+                        Add one or more quizzes to this phase. They follow its course or selected units, and required quizzes must be passed to count toward path completion.
+                      </p>
+                      {quizzesLoading ? (
+                        <p role="status" className="text-sm text-muted-foreground">Loading published quizzes…</p>
+                      ) : quizzesError ? (
+                        <p role="alert" className="text-sm text-destructive">{quizzesError}</p>
+                      ) : !phase.courseId ? (
+                        <p className="text-sm text-muted-foreground">Select a course to choose relevant quizzes.</p>
+                      ) : availableQuizzes.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">
+                          No other published quizzes are available for this phase.
+                        </p>
+                      ) : (
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          {availableQuizzes.map(quiz => (
+                            <label
+                              key={quiz.id}
+                              className="flex items-start gap-2 rounded-lg border border-border p-3 text-sm"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={phase.quizIds.includes(quiz.id)}
+                                onChange={() => updatePhase(phase.id, {
+                                  quizIds: phase.quizIds.includes(quiz.id)
+                                    ? phase.quizIds.filter(id => id !== quiz.id)
+                                    : [...phase.quizIds, quiz.id],
+                                })}
+                                className="mt-0.5"
+                              />
+                              <span>
+                                <span className="block font-medium">{quiz.title}</span>
+                                <span className="block text-xs text-muted-foreground">
+                                  {quiz.questionCount} questions
+                                  {quiz.timeLimitMinutes
+                                    ? ` · ${quiz.timeLimitMinutes} min`
+                                    : ''}
+                                </span>
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                    </fieldset>
                     <div className="sm:col-span-2">
                       <label htmlFor={`phase-description-${phase.id}`} className="mb-1 block text-xs font-medium">
                         Phase description <span className="font-normal text-muted-foreground">(optional)</span>
@@ -590,7 +770,8 @@ export function InstructorLearningPathManager({
                     </div>
                   </div>
                 </fieldset>
-              ))}
+                );
+              })}
             </div>
 
             {pathFormError && (

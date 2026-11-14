@@ -21,7 +21,6 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   GoalFiltersDto,
   CreateLearningGoalDto,
-  MilestoneDto,
   RecommendedGoalDto,
   RecommendedGoalsResponseDto,
   GoalRecommendationSource,
@@ -318,7 +317,7 @@ export class LearningGoalsService {
         if (!g.targetDate) {
           return false;
         }
-        const td = g.targetDate as unknown as Date;
+        const td = g.targetDate;
         return new Date(td) < new Date();
       }).length;
 
@@ -337,8 +336,11 @@ export class LearningGoalsService {
       const avgCompletionDays =
         completed.length > 0
           ? completed.reduce((sum, g) => {
-              const created = g.createdAt as unknown as Date;
-              const completedAt = g.completedAt as unknown as Date;
+              if (!g.completedAt) {
+                return sum;
+              }
+              const created = g.createdAt;
+              const completedAt = g.completedAt;
               return (
                 sum +
                 (completedAt.getTime() - created.getTime()) /
@@ -414,6 +416,7 @@ export class LearningGoalsService {
         where: { id, userId },
         include: {
           course: true,
+          learningPath: true,
           LearningGoalProgress: {
             orderBy: { createdAt: 'desc' },
           },
@@ -534,12 +537,19 @@ export class LearningGoalsService {
           dependsOnGoalId: updateDto.dependsOnGoalId, // GOAL-005
           topicId: updateDto.topicId,
           materialId: updateDto.materialId,
+          courseId: updateDto.courseId,
           learningPathId: updateDto.learningPathId,
           blockedReason: updateDto.blockedReason, // GOAL-005
           escalationLevel: targetDateChanged ? 0 : undefined,
           lastEscalatedAt: targetDateChanged ? null : undefined,
           metadata: {
             ...((goal.metadata as Prisma.JsonObject) || {}),
+            ...(updateDto.courseId !== undefined
+              ? { courseId: updateDto.courseId }
+              : {}),
+            ...(updateDto.learningPathId !== undefined
+              ? { learningPathId: updateDto.learningPathId }
+              : {}),
             milestones: updateDto.milestones,
             targetCriteria: updateDto.targetCriteria,
             progressTracking: updateDto.progressTracking,
@@ -1424,11 +1434,11 @@ export class LearningGoalsService {
   }
 
   async getActiveGoals(userId: string): Promise<LearningGoal[]> {
-    return this.findAll(userId, { status: 'active' as any });
+    return this.findAll(userId, { status: 'active' });
   }
 
   async getCompletedGoals(userId: string): Promise<LearningGoal[]> {
-    return this.findAll(userId, { status: 'completed' as any });
+    return this.findAll(userId, { status: 'completed' });
   }
 
   async getUserStreakInfo(userId: string) {
@@ -1437,21 +1447,19 @@ export class LearningGoalsService {
   }
 
   async startGoal(id: string, userId: string): Promise<LearningGoal> {
-    return this.update(id, { status: 'active' as any }, userId);
+    return this.update(id, { status: 'active' }, userId);
   }
 
   async pauseGoal(id: string, userId: string): Promise<LearningGoal> {
-    // Map paused to skipped status in the DB enum
-    return this.update(id, { status: 'skipped' as any }, userId);
+    return this.update(id, { status: GoalStatus.paused }, userId);
   }
 
   async completeGoal(id: string, userId: string): Promise<LearningGoal> {
-    return this.update(id, { status: 'completed' as any }, userId);
+    return this.update(id, { status: 'completed' }, userId);
   }
 
   async abandonGoal(id: string, userId: string): Promise<LearningGoal> {
-    // Map cancelled to dropped status in the DB enum
-    return this.update(id, { status: 'dropped' as any }, userId);
+    return this.update(id, { status: GoalStatus.cancelled }, userId);
   }
 
   async updateGoalProgress(
