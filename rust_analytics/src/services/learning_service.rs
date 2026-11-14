@@ -6,6 +6,9 @@ use tonic::{Request, Response, Status};
 use crate::analytics::learning::learning_analytics::{
     calculate_goal_analytics, calculate_user_learning_summary, Goal, ProgressStatus,
 };
+use crate::modules::analytics::progress_tracking::{
+    calculate_user_course_progress, summarize_user_course_progress,
+};
 use crate::analytics_proto::{
     CalculateCourseProgressRequest, CohortAnalyticsResponse, CourseAnalyticsResponse,
     CourseProgress, CourseStatsResult, CourseStatsResultResponse, CourseUnitPopularity,
@@ -262,20 +265,15 @@ impl LearningService {
             return Err(Status::invalid_argument("user_id required"));
         }
 
-        let total: i64 =
-            sqlx::query_scalar("SELECT COUNT(*) FROM course_enrollments WHERE user_id = $1")
-                .bind(&user_id)
-                .fetch_one(&self.pool)
-                .await
-                .map_err(|e| Status::internal(format!("DB error: {}", e)))?;
-
-        let completed: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM course_enrollments WHERE user_id = $1 AND status::text IN ('completed', 'COMPLETED')"
-        )
-        .bind(&user_id)
-        .fetch_one(&self.pool)
-        .await
-        .map_err(|e| Status::internal(format!("DB error: {}", e)))?;
+        let course_progress = calculate_user_course_progress(&self.pool, &user_id)
+            .await
+            .map_err(|error| {
+                Status::internal(format!(
+                    "Canonical course progress query failed: {error}"
+                ))
+            })?;
+        let (total, completed, avg_progress) =
+            summarize_user_course_progress(&course_progress);
 
         let total_time: i64 = sqlx::query_scalar(
             "SELECT COALESCE(SUM(ss.duration), 0)
@@ -289,15 +287,6 @@ impl LearningService {
         .await
         .map_err(|e| Status::internal(format!("DB error: {}", e)))?;
 
-        let avg_progress: f64 = sqlx::query_scalar::<_, Option<f64>>(
-            "SELECT AVG(progress_percentage) FROM course_enrollments WHERE user_id = $1",
-        )
-        .bind(&user_id)
-        .fetch_one(&self.pool)
-        .await
-        .map_err(|e| Status::internal(format!("DB error: {}", e)))?
-        .unwrap_or(0.0);
-
         let completed_items: i64 = sqlx::query_scalar(
             "SELECT COUNT(*) FROM topic_progress WHERE user_id = $1 AND is_completed = true",
         )
@@ -307,10 +296,10 @@ impl LearningService {
         .map_err(|e| Status::internal(format!("Completed-items query failed: {e}")))?;
 
         let cs = CourseStatsResult {
-            total_courses: total as i32,
-            completed_courses: completed as i32,
+            total_courses: total,
+            completed_courses: completed,
             total_study_time_minutes: total_time.min(i32::MAX as i64) as i32,
-            average_course_progress: avg_progress as f32,
+            average_course_progress: avg_progress,
             completion_rate: if total > 0 {
                 completed as f32 / total as f32
             } else {

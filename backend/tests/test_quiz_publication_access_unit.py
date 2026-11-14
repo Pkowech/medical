@@ -299,6 +299,11 @@ const service = Object.create(QuizService.prototype);
 service.prisma = {
   quiz: { findUnique: async () => existingQuiz },
   $transaction: async callback => callback({
+    $queryRaw: async () => [],
+    quizAttempt: { count: async () => 0 },
+    question: {
+      findMany: async () => [{ id: 'question-2', points: 1 }],
+    },
     quizQuestion: {
       deleteMany: async () => { membershipUpdated = true; },
       createMany: async () => { membershipUpdated = true; },
@@ -364,6 +369,7 @@ const quiz = {
   unitId: 'unit-1',
   topicId: null,
   isPublished: true,
+  showResults: true,
   maxAttempts: 1,
   questions: [{ questionId: 'question-1', question: { id: 'question-1', topicIds: [] } }],
   unit: {
@@ -376,7 +382,15 @@ const attempt = {
   id: '123e4567-e89b-42d3-a456-426614174000',
   userId: 'student-1',
   quizId: quiz.id,
-  quiz: { id: quiz.id, unitId: quiz.unitId, topicId: null, unit: quiz.unit },
+  startedAt: new Date('2025-01-01T00:00:00Z'),
+  completedAt: new Date('2025-01-01T00:10:00Z'),
+  quiz: {
+    id: quiz.id,
+    unitId: quiz.unitId,
+    topicId: null,
+    showResults: true,
+    unit: quiz.unit,
+  },
   answers: [{ questionId: 'question-1', selectedOption: 'option-1' }],
   feedback: recommendations,
   responses: [{ questionId: 'question-1', isCorrect: true }],
@@ -433,28 +447,6 @@ service.recommendationService = {
     error => error instanceof ConflictException,
   );
 
-  let raceLookupCount = 0;
-  const raceService = Object.create(QuizService.prototype);
-  raceService.prisma = {
-    quiz: { findFirst: async () => quiz },
-    quizAttempt: {
-      findUnique: async () => {
-        raceLookupCount += 1;
-        return raceLookupCount === 1 ? null : attempt;
-      },
-      count: async () => 0,
-    },
-    $transaction: async () => { throw { code: 'P2002' }; },
-  };
-  raceService.recommendationService = service.recommendationService;
-  const concurrentReplay = await raceService.submitQuiz(
-    'student-1',
-    'quiz-1',
-    '123e4567-e89b-42d3-a456-426614174000',
-    [{ questionId: 'question-1', selectedOption: 'option-1' }],
-  );
-  assert.equal(concurrentReplay.id, attempt.id);
-  assert.equal(raceLookupCount, 2);
 })().catch(error => {
   console.error(error);
   process.exitCode = 1;
@@ -480,9 +472,13 @@ service.prisma = {
       topicIds: ['topic-1'],
       quizQuestions: [{ quizId: 'quiz-1' }],
     }),
-    update: async () => undefined,
   },
-  instructorOverride: { create: async () => undefined },
+  $transaction: async callback => callback({
+    $queryRaw: async () => [],
+    quizAttempt: { count: async () => 0 },
+    instructorOverride: { create: async () => undefined },
+    question: { update: async () => undefined },
+  }),
 };
 service.redisService = {
   del: async key => { deletedKeys.push(key); },
@@ -656,36 +652,30 @@ service.prisma = {
     )
 
 
-def test_answer_submission_filters_inactive_and_unpublished_content():
+def test_legacy_single_answer_submission_does_not_return_correctness():
     run_typescript(
         r"""
 const assert = require('node:assert/strict');
-const { NotFoundException } = require('@nestjs/common');
-const { QuizService } =
-  require('./src/modules/education/assessment/services/quiz.service.ts');
+const { BadRequestException } = require('@nestjs/common');
+const { QuizController } =
+  require('./src/modules/education/assessment/controllers/quiz.controller.ts');
 
-let query;
-let attempts = 0;
-const service = Object.create(QuizService.prototype);
-service.prisma = {
-  question: {
-    findFirst: async args => {
-      query = args.where;
-      return null;
-    },
-  },
+let fullSubmissionCalls = 0;
+const controller = Object.create(QuizController.prototype);
+controller.quizService = {
+  submitQuiz: async () => { fullSubmissionCalls += 1; },
 };
-service.recordAttempt = async () => { attempts += 1; };
 
 (async () => {
   await assert.rejects(
-    service.submitAnswer('student-1', 'hidden-question', 'option-1'),
-    error => error instanceof NotFoundException,
+    controller.submit(
+      { user: { id: 'student-1' } },
+      'answer',
+      { questionId: 'question-1', selectedOptionIds: ['option-1'] },
+    ),
+    error => error instanceof BadRequestException,
   );
-  assert.equal(query.isActive, true);
-  assert.ok(query.AND[0].OR.some(entry => entry.unit?.is?.isPublished));
-  assert.ok(query.AND[1].OR.some(entry => entry.quizQuestions?.some));
-  assert.equal(attempts, 0);
+  assert.equal(fullSubmissionCalls, 0);
 })().catch(error => {
   console.error(error);
   process.exitCode = 1;
@@ -694,7 +684,7 @@ service.recordAttempt = async () => { attempts += 1; };
     )
 
 
-def test_full_quiz_submission_rechecks_current_parent_publication():
+def test_quiz_attempt_start_rechecks_current_parent_publication():
     run_typescript(
         r"""
 const assert = require('node:assert/strict');
@@ -723,11 +713,10 @@ service.prisma = {
 
 (async () => {
   await assert.rejects(
-    service.submitQuiz(
+    service.startQuizAttempt(
       'student-1',
       'unit-1',
       '123e4567-e89b-42d3-a456-426614174000',
-      [],
     ),
     error => error instanceof NotFoundException,
   );

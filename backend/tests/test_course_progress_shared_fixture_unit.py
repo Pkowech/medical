@@ -52,7 +52,33 @@ service.logger = {{ warn: () => {{}} }};
       completedUnits: result.completedUnits,
       totalUnits: result.totalUnits,
     }},
-    fixture.expected,
+    {{
+      percentage: fixture.expected.percentage,
+      completedUnits: fixture.expected.completedUnits,
+      totalUnits: fixture.expected.totalUnits,
+    }},
+  );
+
+  const enrollments = [0, 1, 100].map(percentage => ({{
+    userId: fixture.userId,
+    courseId: `course-${{percentage}}`,
+    enrolledAt: new Date(),
+    course: {{ id: `course-${{percentage}}`, title: 'Course', name: 'Course' }},
+    percentage,
+  }}));
+  service.prisma.courseEnrollment = {{
+    findMany: async () => enrollments,
+  }};
+  service.redisService = {{ get: async () => null, set: async () => undefined }};
+  service.calculateCourseProgress = async (_userId, courseId) => ({{
+    percentage: Number(courseId.split('-').at(-1)),
+    completedUnits: 0,
+    totalUnits: 1,
+  }});
+  const statusResults = await service.getCourseProgress(fixture.userId);
+  assert.deepEqual(
+    statusResults.map(course => course.status),
+    ['notStarted', 'inProgress', 'completed'],
   );
 }})().catch(error => {{
   console.error(error);

@@ -52,14 +52,14 @@ function isAdaptiveQuizSession(value: unknown): value is AdaptiveQuizSession {
     typeof session.userId === 'string' &&
     Array.isArray(session.questions) &&
     session.questions.every(
-      question =>
+      (question) =>
         Boolean(question) &&
         typeof question === 'object' &&
         typeof (question as Record<string, unknown>).id === 'string',
     ) &&
     Array.isArray(session.responses) &&
     session.responses.every(
-      response =>
+      (response) =>
         Boolean(response) &&
         typeof response === 'object' &&
         typeof (response as Record<string, unknown>).questionId === 'string',
@@ -124,11 +124,39 @@ export class AssessmentAnalyticsService implements OnModuleInit {
     );
   }
 
-  private parseAdaptiveSession(value: Prisma.JsonValue | null): AdaptiveQuizSession | undefined {
+  private parseAdaptiveSession(
+    value: Prisma.JsonValue | null,
+  ): AdaptiveQuizSession | undefined {
     return isAdaptiveQuizSession(value) ? value : undefined;
   }
 
-  private async cacheAdaptiveSession(session: AdaptiveQuizSession): Promise<void> {
+  private async assertNoHiddenResults(
+    userId: string,
+    assessmentId?: string,
+  ): Promise<void> {
+    const hiddenAttempt = await this.prisma.quizAttempt.findFirst({
+      where: {
+        userId,
+        completedAt: { not: null },
+        quiz: {
+          is: {
+            showResults: false,
+            ...(assessmentId ? { id: assessmentId } : {}),
+          },
+        },
+      },
+      select: { id: true },
+    });
+    if (hiddenAttempt) {
+      throw new ConflictException(
+        'Assessment performance results are not available yet',
+      );
+    }
+  }
+
+  private async cacheAdaptiveSession(
+    session: AdaptiveQuizSession,
+  ): Promise<void> {
     try {
       const key = ANALYTICS_CACHE_CONFIG.ASSESSMENT.ADAPTIVE_SESSION(
         session.userId,
@@ -200,7 +228,9 @@ export class AssessmentAnalyticsService implements OnModuleInit {
         throw new NotFoundException(`Published unit ${unitId} not found`);
       }
       if (courseId && courseId !== unit.courseId) {
-        throw new BadRequestException('The selected unit does not belong to the course');
+        throw new BadRequestException(
+          'The selected unit does not belong to the course',
+        );
       }
       courseId = unit.courseId;
     } else if (courseId) {
@@ -247,7 +277,9 @@ export class AssessmentAnalyticsService implements OnModuleInit {
         ),
       );
       if (visibleQuestions.every(Boolean)) {
-        this.logger.log(`Resuming persisted adaptive session for user ${userId}`);
+        this.logger.log(
+          `Resuming persisted adaptive session for user ${userId}`,
+        );
         await this.cacheAdaptiveSession(session);
         return session;
       }
@@ -399,8 +431,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
         const nextQuestion = session.isComplete
           ? undefined
           : (safeQuestions[session.currentQuestionIndex] as
-              | Question
-              | undefined);
+              Question | undefined);
         await this.cacheAdaptiveSession(session);
         return {
           isCorrect: priorResponse.isCorrect,
@@ -411,12 +442,13 @@ export class AssessmentAnalyticsService implements OnModuleInit {
         };
       }
 
-      const currentQuestionIndex = Number.isInteger(session.currentQuestionIndex)
+      const currentQuestionIndex = Number.isInteger(
+        session.currentQuestionIndex,
+      )
         ? session.currentQuestionIndex
         : 0;
-      const currentQuestion = safeQuestions[
-        currentQuestionIndex
-      ] as AdaptiveQuestionWithOptions | undefined;
+      const currentQuestion = safeQuestions[currentQuestionIndex] as
+        AdaptiveQuestionWithOptions | undefined;
       if (!currentQuestion || currentQuestion.id !== dto.questionId) {
         throw new BadRequestException(
           `Question ${dto.questionId} is not the current question in this session`,
@@ -497,7 +529,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
             success: true,
             timestamp: new Date(),
           })
-          .catch(error =>
+          .catch((error) =>
             this.logger.warn(
               `Could not record adaptive quiz metric: ${getErrorMessage(error)}`,
             ),
@@ -524,7 +556,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
       };
       try {
         committed = await this.prisma.$transaction(
-          async tx => {
+          async (tx) => {
             const attempt = await tx.quizAttempt.findFirst({
               where: {
                 id: session.sessionId,
@@ -553,7 +585,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
                 );
               }
               const prior = currentSession.responses.find(
-                response => response.questionId === dto.questionId,
+                (response) => response.questionId === dto.questionId,
               );
               if (prior) {
                 return {
@@ -563,7 +595,8 @@ export class AssessmentAnalyticsService implements OnModuleInit {
               }
             } else if (
               currentSession.currentQuestionIndex !== currentQuestionIndex ||
-              currentSession.questions[currentQuestionIndex]?.id !== dto.questionId
+              currentSession.questions[currentQuestionIndex]?.id !==
+                dto.questionId
             ) {
               throw new ConflictException(
                 'The adaptive quiz advanced on another request. Reload the session.',
@@ -620,7 +653,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
           session.sessionId,
         );
         const concurrentResponse = latestSession?.responses.find(
-          response => response.questionId === dto.questionId,
+          (response) => response.questionId === dto.questionId,
         );
         if (
           !latestSession ||
@@ -642,9 +675,8 @@ export class AssessmentAnalyticsService implements OnModuleInit {
       await this.cacheAdaptiveSession(committedSession);
       const resolvedNextQuestion = committedSession.isComplete
         ? undefined
-        : (committedSession.questions[
-            committedSession.currentQuestionIndex
-          ] as Question | undefined);
+        : (committedSession.questions[committedSession.currentQuestionIndex] as
+            Question | undefined);
 
       return {
         isCorrect,
@@ -664,7 +696,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
   async finalizeSession(session: AdaptiveQuizSession): Promise<void> {
     try {
       await this.prisma.$transaction(
-        async tx => {
+        async (tx) => {
           const attempt = await tx.quizAttempt.findFirst({
             where: { id: session.sessionId, userId: session.userId },
             select: {
@@ -696,7 +728,9 @@ export class AssessmentAnalyticsService implements OnModuleInit {
           }
 
           const responses = persistedSession.responses;
-          const correct = responses.filter(response => response.isCorrect).length;
+          const correct = responses.filter(
+            (response) => response.isCorrect,
+          ).length;
           const finalScore =
             responses.length > 0 ? (correct / responses.length) * 100 : 0;
           const completedAt = new Date();
@@ -1001,7 +1035,9 @@ export class AssessmentAnalyticsService implements OnModuleInit {
       : [];
     const sessionWithoutQuestion = {
       ...session,
-      questions: sessionQuestions.filter((question) => question.id !== questionId),
+      questions: sessionQuestions.filter(
+        (question) => question.id !== questionId,
+      ),
     };
     const question = await this.prisma.question.findFirst({
       where: this.getAdaptiveQuestionWhere(questionId, sessionWithoutQuestion),
@@ -1109,7 +1145,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
       where: {
         userId,
         completedAt: { not: null },
-        quiz: { isPublished: true },
+        quiz: { isPublished: true, showResults: true },
       },
       select: {
         quizId: true,
@@ -1178,9 +1214,9 @@ export class AssessmentAnalyticsService implements OnModuleInit {
   }
 
   async getUserAssessmentPrediction(userId: string, assessmentId: string) {
-    const prediction = (
-      await this.getUserAssessmentPredictions(userId)
-    ).find((item) => item.assessmentId === assessmentId);
+    const prediction = (await this.getUserAssessmentPredictions(userId)).find(
+      (item) => item.assessmentId === assessmentId,
+    );
     return prediction ?? null;
   }
 
@@ -1254,6 +1290,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
     userId: string,
   ): Promise<Record<string, unknown>> {
     try {
+      await this.assertNoHiddenResults(userId);
       const cacheKey = `${ANALYTICS_CACHE_CONFIG.ASSESSMENT.PERFORMANCE(userId)}:assessment-summary:v2`;
 
       const cached = await this.redisService.get<string>(cacheKey);
@@ -1283,7 +1320,9 @@ export class AssessmentAnalyticsService implements OnModuleInit {
 
       const metrics = grpcResp.performanceMetrics;
       if (!metrics) {
-        throw new Error('Rust analytics omitted assessment performance metrics');
+        throw new Error(
+          'Rust analytics omitted assessment performance metrics',
+        );
       }
       const analytics = {
         userId,
@@ -1337,10 +1376,10 @@ export class AssessmentAnalyticsService implements OnModuleInit {
       );
 
       const recommendations = response.areas.map((a) => ({
-          topic: a.topic,
-          cardCount: a.cardCount,
-          passRate: a.passRate,
-        }));
+        topic: a.topic,
+        cardCount: a.cardCount,
+        passRate: a.passRate,
+      }));
 
       await this.redisService.set(
         cacheKey,
@@ -1444,6 +1483,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
     weaknessAreas: string[];
   }> {
     try {
+      await this.assertNoHiddenResults(userId);
       const cacheKey = `${ANALYTICS_CACHE_CONFIG.ASSESSMENT.PERFORMANCE(userId)}:v2`;
       const cached = await this.redisService.get<string>(cacheKey);
       if (typeof cached === 'string') {
@@ -1614,6 +1654,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
     userId: string,
     assessmentId?: string,
   ): Promise<PerformanceAnalyticsDto> {
+    await this.assertNoHiddenResults(userId, assessmentId);
     const response = await this.requestAssessmentPerformanceAnalytics(
       userId,
       assessmentId,
@@ -1634,7 +1675,11 @@ export class AssessmentAnalyticsService implements OnModuleInit {
   async analyzeDifficulty(
     userId: string,
     question: Pick<Question, 'id'>,
-  ): Promise<{ difficultyScore: number; suggestion: string; sampleSize: number }> {
+  ): Promise<{
+    difficultyScore: number;
+    suggestion: string;
+    sampleSize: number;
+  }> {
     return this.callGrpc(
       this.analyticsServiceGrpc.analyzeQuestionDifficulty({
         userId,
@@ -1651,6 +1696,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
     userId: string,
   ): Promise<UserPerformanceProfileDto> {
     try {
+      await this.assertNoHiddenResults(userId);
       const [learningAnalytics, assessmentAnalytics, userAbility] =
         await Promise.all([
           this.callGrpc(
@@ -1659,16 +1705,14 @@ export class AssessmentAnalyticsService implements OnModuleInit {
             }),
           ),
           this.requestAssessmentPerformanceAnalytics(userId),
-          this.callGrpc(
-            this.analyticsServiceGrpc.getUserAbility({ userId }),
-          ),
+          this.callGrpc(this.analyticsServiceGrpc.getUserAbility({ userId })),
         ]);
       const { courseStats, pathStats } = learningAnalytics;
-        const performanceMetrics = learningAnalytics.performanceMetrics;
-        if (!courseStats || !pathStats || !performanceMetrics) {
-          throw new Error(
-            'Rust analytics omitted required course, path, or performance statistics',
-          );
+      const performanceMetrics = learningAnalytics.performanceMetrics;
+      if (!courseStats || !pathStats || !performanceMetrics) {
+        throw new Error(
+          'Rust analytics omitted required course, path, or performance statistics',
+        );
       }
       const categoryValues = Object.values(QuestionCategory);
       const knowledgeGaps = assessmentAnalytics.weaknesses.map((category) => {
@@ -1736,7 +1780,29 @@ export class AssessmentAnalyticsService implements OnModuleInit {
           offset: options?.offset ?? 0,
         }),
       );
-      return resp.attempts;
+      const quizIds = [
+        ...new Set(resp.attempts.map((attempt) => attempt.quizId)),
+      ];
+      const quizzes = quizIds.length
+        ? await this.prisma.quiz.findMany({
+            where: { id: { in: quizIds } },
+            select: { id: true, showResults: true },
+          })
+        : [];
+      const resultsVisibility = new Map(
+        quizzes.map((quiz) => [quiz.id, quiz.showResults]),
+      );
+      return resp.attempts.map((attempt) => {
+        if (resultsVisibility.get(attempt.quizId) === true) {
+          return { ...attempt, resultsAvailable: true };
+        }
+
+        return {
+          quizId: attempt.quizId,
+          date: attempt.date,
+          resultsAvailable: false,
+        };
+      });
     } catch (error) {
       this.logger.warn(
         `getQuizAttemptHistory gRPC failure: ${getErrorMessage(error)}`,
@@ -1753,9 +1819,8 @@ export class AssessmentAnalyticsService implements OnModuleInit {
       const cacheKey = `${ANALYTICS_CACHE_CONFIG.ASSESSMENT.PERFORMANCE(
         `${userId}:mastery`,
       )}:v2`;
-      const cached = await this.redisService.get<Record<string, number>>(
-        cacheKey,
-      );
+      const cached =
+        await this.redisService.get<Record<string, number>>(cacheKey);
       if (cached !== null) {
         return cached;
       }
@@ -1923,6 +1988,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
     userId: string,
     assessmentId?: string,
   ): Promise<any> {
+    await this.assertNoHiddenResults(userId, assessmentId);
     const cacheKey = `${ANALYTICS_CACHE_CONFIG.ASSESSMENT.PREDICTIONS(
       userId,
       assessmentId,
@@ -1951,25 +2017,62 @@ export class AssessmentAnalyticsService implements OnModuleInit {
         offset: 0,
       }),
     );
+    const quizIds = [
+      ...new Set(response.attempts.map((attempt) => attempt.quizId)),
+    ];
+    const quizzes = quizIds.length
+      ? await this.prisma.quiz.findMany({
+          where: { id: { in: quizIds } },
+          select: { id: true, showResults: true },
+        })
+      : [];
+    const resultsVisibility = new Map(
+      quizzes.map((quiz) => [quiz.id, quiz.showResults]),
+    );
+    const visibleAttempts = response.attempts.filter(
+      (attempt) => resultsVisibility.get(attempt.quizId) === true,
+    );
+    const visibleScores = visibleAttempts.map((attempt) => attempt.score);
+
     return {
-      attempts: response.attempts.map((attempt) => ({
-        id: attempt.attemptId,
-        quizId: attempt.quizId,
-        quizTitle: attempt.quizTitle,
-        score: attempt.score,
-        totalQuestions: attempt.totalQuestions,
-        correctAnswers: attempt.correctAnswers,
-        timeSpent: Math.round(attempt.timeTakenSeconds / 60),
-        completedAt: attempt.date,
-        unitId: attempt.unitId,
-        unitTitle: attempt.unitTitle,
-      })),
+      attempts: response.attempts.map((attempt) =>
+        resultsVisibility.get(attempt.quizId) !== true
+          ? {
+              id: attempt.attemptId,
+              quizId: attempt.quizId,
+              quizTitle: attempt.quizTitle,
+              timeSpent: Math.round(attempt.timeTakenSeconds / 60),
+              completedAt: attempt.date,
+              unitId: attempt.unitId,
+              unitTitle: attempt.unitTitle,
+              resultsAvailable: false,
+            }
+          : {
+              id: attempt.attemptId,
+              quizId: attempt.quizId,
+              quizTitle: attempt.quizTitle,
+              score: attempt.score,
+              totalQuestions: attempt.totalQuestions,
+              correctAnswers: attempt.correctAnswers,
+              timeSpent: Math.round(attempt.timeTakenSeconds / 60),
+              completedAt: attempt.date,
+              unitId: attempt.unitId,
+              unitTitle: attempt.unitTitle,
+              resultsAvailable: true,
+            },
+      ),
       stats: {
         totalAttempts: response.totalAttempts,
-        averageScore: response.averageScore,
-        bestScore: response.bestScore,
+        averageScore: visibleScores.length
+          ? visibleScores.reduce((total, score) => total + score, 0) /
+            visibleScores.length
+          : null,
+        bestScore: visibleScores.length ? Math.max(...visibleScores) : null,
         totalTimeSpent: Math.round(response.totalTimeSpentSeconds / 60),
-        recentImprovement: response.recentImprovement,
+        recentImprovement:
+          visibleScores.length > 1
+            ? visibleScores[0] - visibleScores[visibleScores.length - 1]
+            : null,
       },
     };
   }
@@ -1981,7 +2084,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
    * (merged from consolidated-analytics.service.ts)
    */
   async getUserLearningAnalytics(userId: string): Promise<any> {
-    const cacheKey = `user-learning:${userId}`;
+    const cacheKey = `user-learning:v2:${userId}`;
     const cached = await this.redisService.get<any>(cacheKey);
     if (cached) {
       this.logger.log(`Retrieved cached user learning analytics for ${userId}`);
@@ -1999,6 +2102,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
               select: {
                 title: true,
                 description: true,
+                showResults: true,
               },
             },
           },
@@ -2024,12 +2128,37 @@ export class AssessmentAnalyticsService implements OnModuleInit {
       },
     });
 
+    const safeAnalytics = analytics
+      ? {
+          ...analytics,
+          quizAttempts: analytics.quizAttempts.map(({ quiz, ...attempt }) =>
+            quiz.showResults
+              ? {
+                  ...attempt,
+                  quiz: {
+                    title: quiz.title,
+                    description: quiz.description,
+                  },
+                  resultsAvailable: true,
+                }
+              : {
+                  completedAt: attempt.completedAt,
+                  quiz: {
+                    title: quiz.title,
+                    description: quiz.description,
+                  },
+                  resultsAvailable: false,
+                },
+          ),
+        }
+      : null;
+
     await this.redisService.set(
       cacheKey,
-      JSON.stringify(analytics),
+      JSON.stringify(safeAnalytics),
       this.cacheTtl,
     );
-    return analytics;
+    return safeAnalytics;
   }
 
   /**

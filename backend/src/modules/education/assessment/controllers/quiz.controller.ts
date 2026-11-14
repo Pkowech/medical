@@ -50,8 +50,11 @@ export class QuizController {
 
   @Get('unit/:unitId')
   @ApiOperation({ summary: 'Get questions for a unit-based quiz' })
-  async getQuestionsByUnit(@Param('unitId') unitId: string) {
-    return this.quizService.getQuestionsByUnit(unitId);
+  async getQuestionsByUnit(
+    @Request() req: any,
+    @Param('unitId') unitId: string,
+  ) {
+    return this.quizService.getQuestionsByUnit(unitId, req.user.id);
   }
 
   @Get()
@@ -211,7 +214,7 @@ export class QuizController {
 
   @Post('submit')
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Submit a quiz answer or full quiz' })
+  @ApiOperation({ summary: 'Submit a full quiz attempt' })
   async submit(
     @Request() req: any,
     @Query('type') type: string,
@@ -220,8 +223,12 @@ export class QuizController {
     const userId = req.user.id;
 
     if (type === 'full') {
-      const { unitId, attemptId, answers } = body as SubmitQuizDto;
-      return this.quizService.submitQuiz(userId, unitId, attemptId, answers);
+      return this.quizService.submitQuiz(
+        userId,
+        body.unitId,
+        body.attemptId,
+        body.answers,
+      );
     }
 
     throw new BadRequestException(

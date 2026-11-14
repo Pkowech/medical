@@ -3,6 +3,7 @@ import {
   IsArray,
   IsBoolean,
   IsEnum,
+  IsInt,
   IsNotEmpty,
   IsNumber,
   IsOptional,
@@ -41,12 +42,14 @@ export class CreateQuizDto {
 
   @ApiPropertyOptional({ description: 'Time limit in minutes' })
   @IsOptional()
+  @IsInt()
   @IsNumber()
   @Min(1)
   timeLimit?: number;
 
   @ApiPropertyOptional({ description: 'Maximum attempts allowed' })
   @IsOptional()
+  @IsInt()
   @IsNumber()
   @Min(1)
   maxAttempts?: number;
@@ -146,12 +149,14 @@ export class UpdateQuizDto {
 
   @ApiPropertyOptional({ description: 'Time limit in minutes' })
   @IsOptional()
+  @IsInt()
   @IsNumber()
   @Min(1)
   timeLimit?: number;
 
   @ApiPropertyOptional({ description: 'Maximum attempts allowed' })
   @IsOptional()
+  @IsInt()
   @IsNumber()
   @Min(1)
   maxAttempts?: number;
@@ -586,8 +591,11 @@ export class AssessmentHistoryDto {
   @ApiProperty()
   quizId!: string;
 
-  @ApiProperty()
-  score!: number;
+  @ApiProperty({ required: false })
+  score?: number;
+
+  @ApiProperty({ required: false })
+  resultsAvailable?: boolean;
 
   @ApiProperty()
   completedAt!: Date;
@@ -866,6 +874,9 @@ export class AssessmentProgressDto {
   @ApiProperty({ required: false })
   bestScore?: number;
 
-  @ApiProperty()
-  isPassed!: boolean;
+  @ApiProperty({ required: false })
+  isPassed?: boolean;
+
+  @ApiProperty({ required: false })
+  resultsAvailable?: boolean;
 }

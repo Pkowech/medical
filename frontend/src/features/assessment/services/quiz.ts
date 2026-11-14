@@ -1,16 +1,19 @@
 import { apiService } from '@/features/auth/services/apiClient';
 import type { GateDecision } from '@/shared/types/mastery.types';
 
-export interface TopicQuizSubmission {
-  score: number;
-  feedback: string;
-  passed: boolean;
-  masteryUnlocked: boolean;
-  nextTopicUnlocked: boolean;
-  nextTopicId?: string;
-  gateDecision?: GateDecision;
-  recommendations?: QuizPerformanceRecommendations;
-}
+export type TopicQuizSubmission =
+  | { resultsAvailable: false }
+  | {
+      score: number;
+      feedback: string;
+      passed: boolean;
+      masteryUnlocked: boolean;
+      nextTopicUnlocked: boolean;
+      nextTopicId?: string;
+      gateDecision?: GateDecision;
+      recommendations?: QuizPerformanceRecommendations;
+      resultsAvailable: true;
+    };
 
 export interface QuizPerformanceRecommendations {
   topics: Array<{
@@ -45,6 +48,7 @@ export interface QuizPerformanceRecommendations {
 export interface StartedQuizAttempt {
   attemptId: string;
   startedAt: string;
+  completedAt: string | null;
   questionIds: string[];
   answers: Array<{ questionId: string; selectedOption: string | null }>;
   timeLimit: number | null;

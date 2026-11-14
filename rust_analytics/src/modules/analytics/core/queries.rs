@@ -5,6 +5,9 @@
 
 use chrono::{DateTime, NaiveDateTime, Utc};
 use sqlx::{Pool, Postgres, Row};
+use crate::modules::analytics::progress_tracking::{
+    calculate_course_progress, calculate_user_course_progress,
+};
 
 /// Fetch a user's course progress
 ///
@@ -33,9 +36,6 @@ pub async fn get_course_progress(
                       AND ss.is_valid = true
                       AND ss.end_time IS NOT NULL
                 ), 0), 2147483647)::int AS time_spent,
-                ROUND(COALESCE(ce.progress_percentage, 0))::int AS progress_percentage,
-                COALESCE(ce.completed_units, 0) AS completed_units,
-                COALESCE(ce.total_units, 0) AS total_units,
                 ce.enrolled_at AS started_at, ce.completed_at,
                 COALESCE(ce.last_accessed, ce.enrolled_at) AS last_accessed_at,
                 ce.enrolled_at AS created_at,
@@ -48,20 +48,25 @@ pub async fn get_course_progress(
     .fetch_optional(pool)
     .await?;
 
-    Ok(row.map(|r| CourseProgressRecord {
-        id: r.get("id"),
-        user_id: r.get("user_id"),
-        course_id: r.get("course_id"),
-        status: r.get("status"),
-        time_spent: r.get("time_spent"),
-        progress_percentage: r.get("progress_percentage"),
-        completed_units: r.get("completed_units"),
-        total_units: r.get("total_units"),
-        started_at: r.get("started_at"),
-        completed_at: r.get("completed_at"),
-        last_accessed_at: r.get("last_accessed_at"),
-        created_at: r.get("created_at"),
-        updated_at: r.get("updated_at"),
+    let Some(row) = row else {
+        return Ok(None);
+    };
+    let canonical_progress = calculate_course_progress(pool, user_id, course_id).await?;
+
+    Ok(Some(CourseProgressRecord {
+        id: row.get("id"),
+        user_id: row.get("user_id"),
+        course_id: row.get("course_id"),
+        status: row.get("status"),
+        time_spent: row.get("time_spent"),
+        progress_percentage: canonical_progress.progress_percentage,
+        completed_units: canonical_progress.completed_units,
+        total_units: canonical_progress.total_units,
+        started_at: row.get("started_at"),
+        completed_at: row.get("completed_at"),
+        last_accessed_at: row.get("last_accessed_at"),
+        created_at: row.get("created_at"),
+        updated_at: row.get("updated_at"),
     }))
 }
 
@@ -78,18 +83,19 @@ pub async fn get_user_courses(
     user_id: &str,
 ) -> Result<Vec<UserCourseRecord>, sqlx::Error> {
     let rows = sqlx::query(
-        "SELECT ce.id, ce.user_id, ce.course_id, ce.status, ce.progress_percentage, 
+        "SELECT ce.id, ce.user_id, ce.course_id, ce.status,
                 ce.enrolled_at, ce.completed_at, c.title, c.description, c.level
          FROM course_enrollments ce
          JOIN courses c ON ce.course_id = c.id
          WHERE ce.user_id = $1
+           AND ce.status::text NOT IN ('dropped', 'DROPPED')
          ORDER BY ce.enrolled_at DESC",
     )
     .bind(user_id)
     .fetch_all(pool)
     .await?;
 
-    Ok(rows
+    let mut courses: Vec<UserCourseRecord> = rows
         .into_iter()
         .map(|r| UserCourseRecord {
             enrollment_id: r.get("id"),
@@ -99,11 +105,19 @@ pub async fn get_user_courses(
             description: r.get("description"),
             level: r.get("level"),
             status: r.get("status"),
-            progress_percentage: r.get("progress_percentage"),
+            progress_percentage: 0,
             enrolled_at: r.get("enrolled_at"),
             completed_at: r.get("completed_at"),
         })
-        .collect())
+        .collect();
+    for course in &mut courses {
+        course.progress_percentage =
+            calculate_course_progress(pool, user_id, &course.course_id)
+                .await?
+                .progress_percentage;
+    }
+
+    Ok(courses)
 }
 
 /// Fetch user's recent study activity
@@ -146,16 +160,11 @@ pub async fn count_completed_courses(
     pool: &Pool<Postgres>,
     user_id: &str,
 ) -> Result<i64, sqlx::Error> {
-    let result = sqlx::query(
-        "SELECT COUNT(*) as count 
-         FROM course_enrollments
-         WHERE user_id = $1 AND status::text = 'completed'",
-    )
-    .bind(user_id)
-    .fetch_one(pool)
-    .await?;
-
-    Ok(result.get::<i64, _>("count"))
+    let progress = calculate_user_course_progress(pool, user_id).await?;
+    Ok(progress
+        .iter()
+        .filter(|(_, percentage)| *percentage >= 100)
+        .count() as i64)
 }
 
 /// Get learning paths for a specific user

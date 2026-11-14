@@ -38,6 +38,13 @@ import {
 } from '#common/dto';
 import type { UserEnrollment } from '#common/dto/progress.dto';
 
+function getProgressStatus(percentage: number): ProgressStatus {
+  const roundedPercentage = Math.round(percentage);
+  if (roundedPercentage >= 100) return ProgressStatus.completed;
+  if (roundedPercentage <= 0) return ProgressStatus.notStarted;
+  return ProgressStatus.inProgress;
+}
+
 @Injectable()
 export class ProgressService {
   private readonly logger = new Logger(ProgressService.name);
@@ -506,10 +513,7 @@ export class ProgressService {
               progressPercentage: Math.round(courseProgress.percentage),
               progressRevision: nextRevision,
               completedUnits: courseProgress.completedUnits,
-              status:
-                courseProgress.percentage >= 100
-                  ? ProgressStatus.completed
-                  : ProgressStatus.inProgress,
+              status: getProgressStatus(courseProgress.percentage),
               timeSpent: 0,
               lastAccessedAt: new Date(),
             };
@@ -761,13 +765,12 @@ export class ProgressService {
         courseId,
       );
       if (courseProgress) {
-        const isCompleted = courseProgress.percentage >= 100;
+        const status = getProgressStatus(courseProgress.percentage);
+        const isCompleted = status === ProgressStatus.completed;
         const progressData = {
           progressPercentage: Math.round(courseProgress.percentage),
           timeSpentMinutes: 0,
-          status: isCompleted
-            ? ProgressStatus.completed
-            : ProgressStatus.inProgress,
+          status,
           completed: isCompleted,
           timestamp: new Date(),
         };
@@ -916,10 +919,7 @@ export class ProgressService {
           id: unit.id,
           userId,
           unitId: unit.id,
-          status:
-            percentage >= 100
-              ? ProgressStatus.completed
-              : ProgressStatus.inProgress,
+          status: getProgressStatus(percentage),
           progressPercentage: Math.round(percentage),
           timeSpent: 0,
           lastAccessedAt: new Date(),
@@ -984,10 +984,7 @@ export class ProgressService {
         id: 'derived',
         userId,
         courseId,
-        status:
-          (analytics?.percentage ?? 0) >= 100
-            ? ProgressStatus.completed
-            : ProgressStatus.inProgress,
+        status: getProgressStatus(analytics?.percentage ?? 0),
         progressPercentage: Math.round(analytics?.percentage ?? 0),
         completedUnits: analytics?.completedUnits ?? 0,
         timeSpent: 0,
@@ -1117,10 +1114,7 @@ export class ProgressService {
             courseId: e.courseId,
             title: e.course?.title || e.course?.name || 'Untitled Course',
             courseName: e.course?.name || e.course?.title || 'Untitled Course',
-            status:
-              (analytics?.percentage ?? 0) >= 100
-                ? ProgressStatus.completed
-                : ProgressStatus.inProgress,
+            status: getProgressStatus(analytics?.percentage ?? 0),
             progressPercentage: Math.round(analytics?.percentage ?? 0),
             completedUnits: analytics?.completedUnits ?? 0,
             timeSpent: 0,

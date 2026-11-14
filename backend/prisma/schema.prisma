@@ -19,6 +19,7 @@ model Question {
   explanation         String?
   conceptsCovered     String[]             @map("concepts_covered")
   tags                String[]
+  /// Default scoring weight copied to QuizQuestion when a question is added to a quiz.
   points              Int                  @default(1)
   metadata            Json?
   choices             Json?
@@ -205,6 +206,7 @@ model QuizQuestion {
   quizId     String   @map("quiz_id")
   questionId String   @map("question_id")
   order      Int      @default(0)
+  /// Scoring weight for this quiz's version of the question; authoritative during grading.
   points     Int      @default(1)
   isRequired Boolean  @default(true) @map("is_required")
   question   Question @relation(fields: [questionId], references: [id])

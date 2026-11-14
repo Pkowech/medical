@@ -1,5 +1,8 @@
 use serde::{Deserialize, Serialize};
 use sqlx::{Error, Pool, Postgres};
+use crate::modules::analytics::progress_tracking::{
+    calculate_user_course_progress, summarize_user_course_progress,
+};
 
 #[derive(Serialize, Deserialize)]
 pub struct UserPerformanceProfile {
@@ -25,11 +28,6 @@ pub struct QuizAttempt {
 }
 
 #[derive(Debug, sqlx::FromRow)]
-pub struct CourseEnrollment {
-    pub status: String,
-}
-
-#[derive(Debug, sqlx::FromRow)]
 pub struct LearningPathProgress {
     pub status: String,
 }
@@ -51,19 +49,9 @@ pub async fn get_user_performance_profile(
         quiz_attempts.iter().map(|a| a.score).sum::<f64>() / quiz_attempts.len() as f64
     };
 
-    // Fetch course enrollments
-    let course_enrollments = sqlx::query_as::<_, CourseEnrollment>(
-        "SELECT status FROM course_enrollments WHERE user_id = $1",
-    )
-    .bind(user_id)
-    .fetch_all(pool)
-    .await?;
-
-    let total_courses = course_enrollments.len() as i32;
-    let completed_courses = course_enrollments
-        .iter()
-        .filter(|e| e.status == "completed")
-        .count() as i32;
+    let course_progress = calculate_user_course_progress(pool, user_id).await?;
+    let (total_courses, completed_courses, _) =
+        summarize_user_course_progress(&course_progress);
 
     // Fetch learning path progress
     let learning_path_progress = sqlx::query_as::<_, LearningPathProgress>(

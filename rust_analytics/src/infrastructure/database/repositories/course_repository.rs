@@ -1,6 +1,9 @@
 /// Postgres implementation of CourseRepository
 /// Manages persistence of course progress and enrollment data
 use crate::domain::repositories::{CourseRepository, CourseStats, UnitProgress};
+use crate::modules::analytics::progress_tracking::{
+    calculate_course_progress, calculate_user_course_progress,
+};
 use crate::shared::error::AnalyticsError;
 use sqlx::{Pool, Postgres, Row};
 use std::sync::Arc;
@@ -101,26 +104,52 @@ impl CourseRepository for PostgresCourseRepository {
         user_id: &str,
         course_id: &str,
     ) -> Result<CourseStats, AnalyticsError> {
-        let row = sqlx::query(
+        let is_enrolled: bool = sqlx::query_scalar(
+            "SELECT EXISTS(
+                SELECT 1 FROM course_enrollments
+                WHERE user_id = $1
+                  AND course_id = $2
+                  AND status::text NOT IN ('dropped', 'DROPPED')
+            )",
+        )
+        .bind(user_id)
+        .bind(course_id)
+        .fetch_one(&*self.pool)
+        .await
+        .map_err(|e| {
+            AnalyticsError::DatabaseError(format!("Failed to check course enrollment: {}", e))
+        })?;
+
+        let (completed_courses, average_course_progress) = if is_enrolled {
+            let progress = calculate_course_progress(&self.pool, user_id, course_id)
+                .await
+                .map_err(|error| {
+                    AnalyticsError::DatabaseError(format!(
+                        "Failed to calculate canonical course progress: {error}"
+                    ))
+                })?;
+            (
+                if progress.progress_percentage >= 100 {
+                    1
+                } else {
+                    0
+                },
+                progress.progress_percentage as f32,
+            )
+        } else {
+            (0, 0.0)
+        };
+        let total_time: i64 = sqlx::query_scalar(
             r#"
-            SELECT
-                COUNT(*) as total_courses,
-                (SELECT COUNT(*) FROM course_enrollments
-                 WHERE user_id = $1 AND status::text = 'completed') as completed_courses,
-                COALESCE((
-                    SELECT SUM(ss.duration)
-                    FROM study_sessions ss
-                    LEFT JOIN topics t ON t.id = ss.topic_id
-                    LEFT JOIN materials m ON m.id = ss.material_id
-                    JOIN units u ON u.id = COALESCE(t.unit_id, m.unit_id)
-                    WHERE ss.user_id = $1
-                      AND u.course_id = $2
-                      AND ss.is_valid = true
-                      AND ss.end_time IS NOT NULL
-                ), 0) as total_time,
-                COALESCE(AVG(progress_percentage), 0.0) as avg_progress
-            FROM course_enrollments
-            WHERE user_id = $1 AND course_id = $2
+            SELECT COALESCE(SUM(ss.duration), 0)::bigint
+            FROM study_sessions ss
+            LEFT JOIN topics t ON t.id = ss.topic_id
+            LEFT JOIN materials m ON m.id = ss.material_id
+            JOIN units u ON u.id = COALESCE(t.unit_id, m.unit_id)
+            WHERE ss.user_id = $1
+              AND u.course_id = $2
+              AND ss.is_valid = true
+              AND ss.end_time IS NOT NULL
             "#,
         )
         .bind(user_id)
@@ -128,45 +157,42 @@ impl CourseRepository for PostgresCourseRepository {
         .fetch_one(&*self.pool)
         .await
         .map_err(|e| {
-            AnalyticsError::DatabaseError(format!("Failed to fetch course stats: {}", e))
+            AnalyticsError::DatabaseError(format!("Failed to fetch study time: {}", e))
         })?;
 
-        let total_time: i64 = row.try_get("total_time").unwrap_or(0);
-
         Ok(CourseStats {
-            total_courses: row.try_get("total_courses").unwrap_or(0),
-            completed_courses: row.try_get("completed_courses").unwrap_or(0),
+            total_courses: if is_enrolled { 1 } else { 0 },
+            completed_courses,
             total_study_time_minutes: total_time.min(i32::MAX as i64) as i32,
-            average_course_progress: row.try_get::<f64, _>("avg_progress").unwrap_or(0.0) as f32,
+            average_course_progress,
         })
     }
 
     async fn count_completed_courses(&self, user_id: &str) -> Result<i32, AnalyticsError> {
-        sqlx::query_scalar::<_, i64>(
-            r#"
-            SELECT COUNT(*)
-            FROM course_enrollments
-            WHERE user_id = $1 AND status::text = 'completed'
-            "#,
-        )
-        .bind(user_id)
-        .fetch_one(&*self.pool)
-        .await
-        .map_err(|e| {
-            AnalyticsError::DatabaseError(format!("Failed to count completed courses: {}", e))
-        })
-        .map(|count| count as i32)
+        let progress = calculate_user_course_progress(&self.pool, user_id)
+            .await
+            .map_err(|e| {
+                AnalyticsError::DatabaseError(format!(
+                    "Failed to calculate canonical course completion: {e}"
+                ))
+            })?;
+        i32::try_from(progress.iter().filter(|(_, percentage)| *percentage >= 100).count())
+            .map_err(|e| {
+                AnalyticsError::DatabaseError(format!("Completed course count exceeds i32: {e}"))
+            })
     }
 
     async fn count_total_courses(&self, user_id: &str) -> Result<i32, AnalyticsError> {
-        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM course_enrollments WHERE user_id = $1")
-            .bind(user_id)
-            .fetch_one(&*self.pool)
+        let progress = calculate_user_course_progress(&self.pool, user_id)
             .await
             .map_err(|e| {
-                AnalyticsError::DatabaseError(format!("Failed to count total courses: {}", e))
-            })
-            .map(|count| count as i32)
+                AnalyticsError::DatabaseError(format!(
+                    "Failed to calculate canonical enrolled courses: {e}"
+                ))
+            })?;
+        i32::try_from(progress.len()).map_err(|e| {
+            AnalyticsError::DatabaseError(format!("Course count exceeds i32: {e}"))
+        })
     }
 }
 

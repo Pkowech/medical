@@ -69,7 +69,10 @@ service.getVisibleTopic = async () => ({
   unit: { course: { id: 'course-1' } },
 });
 service.getPublicQuestionWhere = () => ({});
-service.ensureTopicPracticeQuiz = async () => ({ id: 'quiz-1' });
+service.ensureTopicPracticeQuiz = async () => ({
+  id: 'quiz-1',
+  showResults: true,
+});
 service.prisma = {
   question: {
     findMany: async () => [{
@@ -112,6 +115,18 @@ service.masteryGateService = {
     [{ questionId: 'question-1', selectedAnswers: ['option-1'] }],
   );
   assert.deepEqual(result.gateDecision, gateDecision);
+
+  service.ensureTopicPracticeQuiz = async () => ({
+    id: 'quiz-1',
+    showResults: false,
+  });
+  const hiddenResult = await service.submitTopicQuiz(
+    'user-1',
+    'topic-1',
+    attemptId,
+    [{ questionId: 'question-1', selectedAnswers: ['option-1'] }],
+  );
+  assert.deepEqual(hiddenResult, { resultsAvailable: false });
 })().catch(error => {
   console.error(error);
   process.exitCode = 1;

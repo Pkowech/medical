@@ -15,18 +15,19 @@ import { Card } from '@/shared/components/ui/card';
 interface QuizAttempt {
   id: string;
   quizId: string;
-  score: number;
-  percentage: number;
-  correctAnswers: number;
-  totalQuestions: number;
   completedAt: string | null;
-  isPassed: boolean;
+  resultsAvailable: boolean;
+  score?: number;
+  percentage?: number;
+  correctAnswers?: number;
+  totalQuestions?: number;
+  isPassed?: boolean;
 }
 
 interface QuizResultsSummary {
   totalQuizzes: number;
   completedQuizzes: number;
-  averageScore: number;
+  averageScore: number | null;
   attempts: QuizAttempt[];
 }
 
@@ -39,12 +40,15 @@ function isQuizAttempt(value: unknown): value is QuizAttempt {
     isRecord(value) &&
     typeof value.id === 'string' &&
     typeof value.quizId === 'string' &&
-    typeof value.score === 'number' &&
-    typeof value.percentage === 'number' &&
-    typeof value.correctAnswers === 'number' &&
-    typeof value.totalQuestions === 'number' &&
+    typeof value.resultsAvailable === 'boolean' &&
     (typeof value.completedAt === 'string' || value.completedAt === null) &&
-    typeof value.isPassed === 'boolean'
+    (value.resultsAvailable
+      ? typeof value.score === 'number' &&
+        typeof value.percentage === 'number' &&
+        typeof value.correctAnswers === 'number' &&
+        typeof value.totalQuestions === 'number' &&
+        typeof value.isPassed === 'boolean'
+      : true)
   );
 }
 
@@ -53,7 +57,7 @@ function isQuizResultsSummary(value: unknown): value is QuizResultsSummary {
     isRecord(value) &&
     typeof value.totalQuizzes === 'number' &&
     typeof value.completedQuizzes === 'number' &&
-    typeof value.averageScore === 'number' &&
+    (typeof value.averageScore === 'number' || value.averageScore === null) &&
     Array.isArray(value.attempts) &&
     value.attempts.every(isQuizAttempt)
   );
@@ -117,7 +121,9 @@ export default function QuizResultsPage() {
         <SEO title="Quiz Results" description="View your quiz results and performance analytics" />
         <div className="mx-auto max-w-3xl px-4 py-8">
           <Card className="p-8 text-center">
-            <h1 className="text-2xl font-bold text-foreground dark:text-foreground">Quiz Results</h1>
+            <h1 className="text-2xl font-bold text-foreground dark:text-foreground">
+              Quiz Results
+            </h1>
             <p className="mt-2 text-sm text-muted-foreground dark:text-muted-foreground">
               Choose a quiz from your history to review results for its unit.
             </p>
@@ -141,7 +147,10 @@ export default function QuizResultsPage() {
             <h1 className="text-2xl font-bold text-foreground dark:text-foreground">
               Unable to load results
             </h1>
-            <p role="alert" className="mt-2 text-sm text-muted-foreground dark:text-muted-foreground">
+            <p
+              role="alert"
+              className="mt-2 text-sm text-muted-foreground dark:text-muted-foreground"
+            >
               {error}
             </p>
             <div className="mt-5 flex flex-col justify-center gap-2 sm:flex-row">
@@ -164,7 +173,9 @@ export default function QuizResultsPage() {
       <div className="mx-auto max-w-5xl px-4 py-8">
         <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-foreground dark:text-foreground">Quiz Results</h1>
+            <h1 className="text-2xl font-bold text-foreground dark:text-foreground">
+              Quiz Results
+            </h1>
             <p className="mt-1 text-sm text-muted-foreground dark:text-muted-foreground">
               Your recent attempts for this unit.
             </p>
@@ -176,21 +187,27 @@ export default function QuizResultsPage() {
 
         <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
           <Card className="p-4">
-            <p className="text-sm text-muted-foreground dark:text-muted-foreground">Total attempts</p>
+            <p className="text-sm text-muted-foreground dark:text-muted-foreground">
+              Total attempts
+            </p>
             <p className="mt-1 text-2xl font-bold text-foreground dark:text-foreground">
               {results.totalQuizzes}
             </p>
           </Card>
           <Card className="p-4">
-            <p className="text-sm text-muted-foreground dark:text-muted-foreground">Completed attempts</p>
+            <p className="text-sm text-muted-foreground dark:text-muted-foreground">
+              Completed attempts
+            </p>
             <p className="mt-1 text-2xl font-bold text-foreground dark:text-foreground">
               {results.completedQuizzes}
             </p>
           </Card>
           <Card className="p-4">
-            <p className="text-sm text-muted-foreground dark:text-muted-foreground">Average score</p>
+            <p className="text-sm text-muted-foreground dark:text-muted-foreground">
+              Average score
+            </p>
             <p className="mt-1 text-2xl font-bold text-foreground dark:text-foreground">
-              {Math.round(results.averageScore)}%
+              {results.averageScore === null ? '—' : `${Math.round(results.averageScore)}%`}
             </p>
           </Card>
         </div>
@@ -217,28 +234,32 @@ export default function QuizResultsPage() {
                     : 'In progress'}
                 </p>
               </div>
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                <span className="text-lg font-bold text-foreground dark:text-foreground">
-                  {Math.round(attempt.percentage)}%
-                </span>
-                <span className="text-sm text-muted-foreground dark:text-muted-foreground">
-                  {attempt.correctAnswers}/{attempt.totalQuestions} correct
-                </span>
-                <span
-                  className={`inline-flex items-center gap-1 text-sm font-medium ${
-                    attempt.isPassed
-                      ? 'text-green-700 dark:text-green-400'
-                      : 'text-amber-700 dark:text-amber-400'
-                  }`}
-                >
-                  {attempt.isPassed ? (
-                    <CheckCircle2 aria-hidden="true" className="h-4 w-4" />
-                  ) : (
-                    <XCircle aria-hidden="true" className="h-4 w-4" />
-                  )}
-                  {attempt.isPassed ? 'Passed' : 'Needs review'}
-                </span>
-              </div>
+              {attempt.resultsAvailable ? (
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                  <span className="text-lg font-bold text-foreground dark:text-foreground">
+                    {Math.round(attempt.percentage ?? 0)}%
+                  </span>
+                  <span className="text-sm text-muted-foreground dark:text-muted-foreground">
+                    {attempt.correctAnswers}/{attempt.totalQuestions} correct
+                  </span>
+                  <span
+                    className={`inline-flex items-center gap-1 text-sm font-medium ${
+                      attempt.isPassed
+                        ? 'text-green-700 dark:text-green-400'
+                        : 'text-amber-700 dark:text-amber-400'
+                    }`}
+                  >
+                    {attempt.isPassed ? (
+                      <CheckCircle2 aria-hidden="true" className="h-4 w-4" />
+                    ) : (
+                      <XCircle aria-hidden="true" className="h-4 w-4" />
+                    )}
+                    {attempt.isPassed ? 'Passed' : 'Needs review'}
+                  </span>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">Results are not available yet.</p>
+              )}
             </Card>
           ))}
 

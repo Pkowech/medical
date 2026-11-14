@@ -14,21 +14,22 @@ interface QuizAttempt {
   id: string;
   quizId: string;
   quizTitle: string;
-  score: number;
-  totalQuestions: number;
-  correctAnswers: number;
+  score?: number;
+  totalQuestions?: number;
+  correctAnswers?: number;
   timeSpent: number;
   completedAt: string;
   unitId: string;
   unitTitle: string;
+  resultsAvailable: boolean;
 }
 
 interface QuizStats {
   totalAttempts: number;
-  averageScore: number;
-  bestScore: number;
+  averageScore: number | null;
+  bestScore: number | null;
   totalTimeSpent: number;
-  recentImprovement: number;
+  recentImprovement: number | null;
 }
 
 export default function QuizHistoryPage() {
@@ -39,10 +40,10 @@ export default function QuizHistoryPage() {
   const [attempts, setAttempts] = useState<QuizAttempt[]>([]);
   const [stats, setStats] = useState<QuizStats>({
     totalAttempts: 0,
-    averageScore: 0,
-    bestScore: 0,
+    averageScore: null,
+    bestScore: null,
     totalTimeSpent: 0,
-    recentImprovement: 0,
+    recentImprovement: null,
   });
 
   useEffect(() => {
@@ -50,9 +51,10 @@ export default function QuizHistoryPage() {
       try {
         setLoadError(null);
         const response = await apiService.get<
-          { attempts: QuizAttempt[]; stats: QuizStats } | {
-            data: { attempts: QuizAttempt[]; stats: QuizStats };
-          }
+          | { attempts: QuizAttempt[]; stats: QuizStats }
+          | {
+              data: { attempts: QuizAttempt[]; stats: QuizStats };
+            }
         >('/assessment-progress/history');
         const payload = response.data;
         const history = 'data' in payload ? payload.data : payload;
@@ -124,7 +126,7 @@ export default function QuizHistoryPage() {
               <div>
                 <p className="text-sm text-muted-foreground">Average Score</p>
                 <p className="text-2xl font-bold">
-                  {stats.totalAttempts > 0 ? `${stats.averageScore.toFixed(1)}%` : '—'}
+                  {stats.averageScore !== null ? `${stats.averageScore.toFixed(1)}%` : '—'}
                 </p>
               </div>
             </div>
@@ -135,7 +137,7 @@ export default function QuizHistoryPage() {
               <div>
                 <p className="text-sm text-muted-foreground">Best Score</p>
                 <p className="text-2xl font-bold">
-                  {stats.totalAttempts > 0 ? `${stats.bestScore.toFixed(1)}%` : '—'}
+                  {stats.bestScore !== null ? `${stats.bestScore.toFixed(1)}%` : '—'}
                 </p>
               </div>
             </div>
@@ -158,7 +160,9 @@ export default function QuizHistoryPage() {
               <div className="flex flex-col md:flex-row md:items-center md:justify-between">
                 <div className="space-y-2">
                   <h3 className="text-lg font-semibold">{attempt.quizTitle}</h3>
-                    <p className="text-sm text-muted-foreground">{attempt.unitTitle || 'Independent quiz'}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {attempt.unitTitle || 'Independent quiz'}
+                  </p>
                   <div className="flex items-center space-x-4 text-sm text-muted-foreground">
                     <div className="flex items-center">
                       <Calendar className="w-4 h-4 mr-1" />
@@ -171,20 +175,24 @@ export default function QuizHistoryPage() {
                   </div>
                 </div>
                 <div className="mt-4 flex flex-col gap-2 md:mt-0 md:items-end">
-                  <div className="text-2xl font-bold text-blue-600">
-                    {attempt.score.toFixed(1)}%
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    {attempt.correctAnswers} of {attempt.totalQuestions} correct
-                  </p>
+                  {attempt.resultsAvailable ? (
+                    <>
+                      <div className="text-2xl font-bold text-blue-600">
+                        {(attempt.score ?? 0).toFixed(1)}%
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {attempt.correctAnswers} of {attempt.totalQuestions} correct
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Results are not available yet.</p>
+                  )}
                   {attempt.unitId ? (
                     <div className="flex flex-col gap-2 sm:flex-row">
                       <Button
                         variant="outline"
                         onClick={() =>
-                          router.push(
-                            `/quiz/results?unitId=${encodeURIComponent(attempt.unitId)}`,
-                          )
+                          router.push(`/quiz/results?unitId=${encodeURIComponent(attempt.unitId)}`)
                         }
                       >
                         View Results
@@ -197,7 +205,9 @@ export default function QuizHistoryPage() {
                       </Button>
                     </div>
                   ) : (
-                    <p className="mt-2 text-xs text-muted-foreground">This quiz is no longer linked to a unit.</p>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      This quiz is no longer linked to a unit.
+                    </p>
                   )}
                 </div>
               </div>

@@ -168,6 +168,17 @@ export class LearningService {
       let result: ProgressResponse | undefined;
 
       if (courseId) {
+        if (
+          (!data.topicId && !data.materialId) ||
+          !data.idempotencyKey ||
+          data.expectedRevision === undefined ||
+          data.clientTimestamp === undefined
+        ) {
+          throw new BadRequestException(
+            'Content progress updates require a topic or material, idempotency key, expected revision, and client timestamp.',
+          );
+        }
+
         const progressUpdateDto: ProgressUpdateDto = {
           courseId,
           unitId: data.unitId,
@@ -176,6 +187,9 @@ export class LearningService {
           status: data.status,
           progressPercentage: progress,
           timeSpent: progressData.timeSpent || 0,
+          clientTimestamp: data.clientTimestamp,
+          idempotencyKey: data.idempotencyKey,
+          expectedRevision: data.expectedRevision,
         };
 
         const courseProgress =

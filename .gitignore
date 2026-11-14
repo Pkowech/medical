@@ -11,6 +11,7 @@ backend/.env
 backend/.env.*
 backend/python_analytics/.env
 backend/python_analytics/.env.*
+backend/tsconfig.tsbuildinfo
 
 # 🔑 Secret and credential files
 secrets/

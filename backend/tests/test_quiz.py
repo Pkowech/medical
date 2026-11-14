@@ -1,3 +1,5 @@
+import uuid
+
 import pytest
 
 
@@ -54,19 +56,46 @@ def test_student_can_submit_quiz(user_factory, course_and_unit):
     student = user_factory(role="student")
     headers = {"Authorization": f"Bearer {student['accessToken']}"}
     unit_id = course_and_unit["id"]
-    submission_payload = {
-        "unitId": unit_id,
-        "answers": [
-            {"questionId": "1", "selectedOptionId": "a"},
-            {"questionId": "2", "selectedOptionId": "c"}
-        ]
-    }
+    attempt_id = str(uuid.uuid4())
+    start_response = user_factory.session.post(
+        f"{user_factory.base_url}/quizzes/{unit_id}/start",
+        headers=headers,
+        json={"attemptId": attempt_id},
+    )
+    if start_response.status_code == 404:
+        return
+    assert start_response.status_code == 200, start_response.text
 
-    # Act: Post the submission to the consolidated submit endpoint
-    response = user_factory.session.post(f"{user_factory.base_url}/quizzes/submit?type=full", headers=headers, json=submission_payload)
+    question_response = user_factory.session.get(
+        f"{user_factory.base_url}/quizzes/unit/{unit_id}",
+        headers=headers,
+    )
+    assert question_response.status_code == 200, question_response.text
+    questions = question_response.json()["data"]
+    answers = []
+    for question in questions:
+        options = question.get("options", [])
+        selected_option = options[0]["id"] if options else None
+        answers.append(
+            {"questionId": question["id"], "selectedOption": selected_option}
+        )
+        if selected_option:
+            answer_response = user_factory.session.post(
+                f"{user_factory.base_url}/quizzes/attempts/{attempt_id}/answers",
+                headers=headers,
+                json={
+                    "questionId": question["id"],
+                    "selectedOption": selected_option,
+                },
+            )
+            assert answer_response.status_code == 200, answer_response.text
 
-    # Assert: Check for response (201 if quiz exists, 404 if no published quiz exists)
-    assert response.status_code in (201, 404), f"Expected 201 or 404, got {response.status_code}. Response: {response.text}"
+    response = user_factory.session.post(
+        f"{user_factory.base_url}/quizzes/submit?type=full",
+        headers=headers,
+        json={"unitId": unit_id, "attemptId": attempt_id, "answers": answers},
+    )
+    assert response.status_code == 201, response.text
 
 
 def test_submit_quiz_returns_404_when_no_quiz_exists(user_factory):
@@ -78,14 +107,11 @@ def test_submit_quiz_returns_404_when_no_quiz_exists(user_factory):
     headers = {"Authorization": f"Bearer {student['accessToken']}"}
     fake_unit_id = "00000000-0000-0000-0000-000000000000"
     
-    submission_payload = {
-        "unitId": fake_unit_id,
-        "answers": [
-            {"questionId": "1", "selectedOptionId": "a"}
-        ]
-    }
-
-    response = user_factory.session.post(f"{user_factory.base_url}/quizzes/submit?type=full", headers=headers, json=submission_payload)
+    response = user_factory.session.post(
+        f"{user_factory.base_url}/quizzes/{fake_unit_id}/start",
+        headers=headers,
+        json={"attemptId": str(uuid.uuid4())},
+    )
     assert response.status_code == 404, f"Expected 404 for missing quiz, got {response.status_code}"
 
 

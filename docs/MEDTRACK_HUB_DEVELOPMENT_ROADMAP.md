@@ -8,11 +8,11 @@ This roadmap is being actively trimmed. Items that are already implemented or do
 - [x] The database reset and migration consolidation work is treated as completed at the project level, with verification still required before claiming production readiness.
 - [x] The PWA foundation exists and should be preserved while behavior is being verified rather than replaced.
 - [x] The architecture no longer treats `analytics_events` as the canonical source of learning truth.
+- [x] Phase 2 assessment integrity is implemented and covered by focused regressions; the scoring backfill migration still requires deployment validation in Phase 1.
 
 ## In progress / still active
 - [ ] Confirm the canonical ownership model is enforced in code, not just documented.
 - [ ] Verify all publication, authorization, and cache invalidation paths for catalogue content.
-- [ ] Verify quiz submission idempotency, retries, and adaptive session safety.
 - [ ] Reconcile interrupted study sessions and duration rules.
 - [ ] Complete the durable outbox pattern for post-quiz processing and critical events.
 - [ ] Validate end-to-end learning progress, streak, and mastery parity.
@@ -35,12 +35,12 @@ This roadmap is being actively trimmed. Items that are already implemented or do
 - [ ] Confirm material sharing, unpublished content filtering, and cache invalidation remain safe.
 
 # 2. Phase 2 — Secure assessment integrity
-- [ ] Build a single authoritative question representation and remove ambiguity.
-- [ ] Verify proper answer exposure rules and question versioning.
-- [ ] Check quiz generation, randomization, timers, and answer grading.
-- [ ] Ensure duplicate and replayed submissions are rejected or safely idempotent.
-- [ ] Verify adaptive assessment behavior and session safety.
-- [ ] Confirm assessment result persistence works under retries and disconnects.
+- [x] Define `QuizQuestion.points` as the quiz-specific grading weight and snapshot question order and answers per attempt.
+- [x] Withhold answer feedback and configured-hidden results; prevent edits that could change attempted quizzes.
+- [x] Enforce quiz randomization, server-side attempt limits and deadlines, and weighted grading.
+- [x] Make duplicate and replayed submissions safe and idempotent.
+- [x] Verify adaptive assessment behavior and session safety.
+- [x] Confirm assessment results persist across retries and disconnects.
 
 # 3. Phase 3 — Unify learning activity
 - [ ] Finalize canonical domain ownership for progress, quiz attempts, sessions, and activity projections.
@@ -54,6 +54,9 @@ This roadmap is being actively trimmed. Items that are already implemented or do
 - [ ] Verify course, unit, topic, and material publication logic.
 - [ ] Finish onboarding and profile completion behavior.
 - [ ] Audit learning-path eligibility and recommendation filtering.
+- [ ] Build evidence-based prerequisite remediation paths: detect repeated topic-level difficulty from quiz/adaptive-assessment evidence; use a diagnostic assessment to distinguish a target-topic gap from missing foundational knowledge; map the confirmed gaps through explicit topic prerequisites and existing courses, units, materials, and assessments; then curate a sequenced, learner-specific path with a clear rationale and reassessment checkpoints.
+- [ ] Define safe remediation rules: do not infer a broad knowledge deficit from one failed attempt; require sufficient evidence or a diagnostic, track confidence and evidence for each identified gap, avoid recommending unrelated prerequisites, and let learners review the proposed plan before it affects their active learning.
+- [ ] Verify generated remediation paths preserve source links, prerequisite order, learner eligibility, and progress attribution, and can be revised when new assessment evidence changes the diagnosis.
 - [ ] Verify student progression through content and assessments.
 - [ ] Ensure goal tracking and next-step recommendations are valid.
 
@@ -82,9 +85,10 @@ This roadmap is being actively trimmed. Items that are already implemented or do
 
 ---
 
-## Working checklist for the next three milestones
-1. [ ] Assessment integrity report: prove quiz submission, grading, retries, and adaptive sessions are correct.
+## Working checklist for the next milestones
+1. [x] Assessment integrity report: verify quiz submission, grading, retries, and adaptive sessions.
 2. [ ] Canonical activity architecture: establish one reliable source of learning activity and make the outbox durable.
 3. [ ] Verified Pharmacy learning journey: demonstrate a student can onboard, study, complete a quiz, receive correct progress, and get valid next-step recommendations.
+4. [ ] Prerequisite remediation journey: demonstrate that repeated difficulty in an endocrine clinical-pharmacy topic triggers a targeted diagnostic, identifies only evidence-supported gaps, and proposes an ordered path through relevant foundational resources, courses, and assessments with a follow-up check.
 
 This is the active backlog. Once a task is independently verified, it should be moved from the active list into the done section above and removed from the working backlog.

@@ -461,11 +461,15 @@ export class LearningGoalsService {
       }
     }
 
-    let completedAt: Date | undefined;
+    let completedAt: Date | null | undefined;
     let progress = updateDto.progressPercentage ?? goal.progress;
+    let status = updateDto.status;
+    let persistedStatus = updateDto.status as unknown as
+      | ProgressStatus
+      | undefined;
 
-    if (updateDto.status && updateDto.status !== goal.status) {
-      if (updateDto.status === GoalStatus.completed) {
+    if (status && status !== goal.status) {
+      if (status === GoalStatus.completed) {
         completedAt = new Date();
         progress = 100;
 
@@ -491,7 +495,7 @@ export class LearningGoalsService {
           'success',
           { goalId: id, type: 'goal_completed' },
         );
-      } else if (updateDto.status === GoalStatus.cancelled) {
+      } else if (status === GoalStatus.cancelled) {
         // GOAL-005: Block dependent goals
         await this.blockDependentGoals(
           id,
@@ -499,6 +503,15 @@ export class LearningGoalsService {
           `Parent goal "${goal.title}" was cancelled`,
         );
       }
+    }
+    if (
+      goal.status === GoalStatus.completed &&
+      updateDto.progressPercentage !== undefined &&
+      progress < 100 &&
+      status === undefined
+    ) {
+      persistedStatus = ProgressStatus.inProgress;
+      completedAt = null;
     }
 
     const targetDateChanged =
@@ -532,7 +545,7 @@ export class LearningGoalsService {
           targetDate: updateDto.targetDate,
           progress,
           completedAt,
-          status: updateDto.status as unknown as ProgressStatus,
+          status: persistedStatus,
           updatedAt: new Date(),
           dependsOnGoalId: updateDto.dependsOnGoalId, // GOAL-005
           topicId: updateDto.topicId,
@@ -723,8 +736,16 @@ export class LearningGoalsService {
         where: { id: goalId },
         data: {
           progress: progressPercentage,
-          status: isCompleted ? ProgressStatus.completed : undefined,
-          completedAt: isCompleted ? new Date() : undefined,
+          status: isCompleted
+            ? ProgressStatus.completed
+            : goal.status === ProgressStatus.completed
+              ? ProgressStatus.inProgress
+              : undefined,
+          completedAt: isCompleted
+            ? new Date()
+            : goal.status === ProgressStatus.completed
+              ? null
+              : undefined,
           updatedAt: new Date(),
         },
       });

@@ -679,6 +679,9 @@ export interface ProgressUpdateData {
   timeSpent: number;
   isStale?: boolean;
   materialVersion?: number;
+  clientTimestamp?: number;
+  idempotencyKey?: string;
+  expectedRevision?: number;
 }
 
 export interface ProgressTracking {

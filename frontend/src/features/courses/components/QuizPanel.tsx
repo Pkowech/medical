@@ -8,7 +8,7 @@ import {
 } from '@/features/assessment/services/quiz';
 import { useXapi } from '@/lib/xapi/useXapi';
 import { URLS } from '@/lib/urls';
-import { CheckCircle, AlertCircle, RefreshCw, Send } from 'lucide-react';
+import { AlertCircle, CheckCircle, Clock3, RefreshCw, Send } from 'lucide-react';
 import { useCourseStudySession } from '@/features/learning-management/study/components/CourseStudySessionProvider';
 import { v4 as uuidv4 } from 'uuid';
 import { TOPIC_MASTERY_PASSING_SCORE, type GateDecision } from '@/shared/types/mastery.types';
@@ -54,7 +54,6 @@ export const QuizPanel = ({
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [isSubmitted, setIsSubmitted] = useState(false);
-  const [score, setScore] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [quizComplete, setQuizComplete] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -64,8 +63,8 @@ export const QuizPanel = ({
   const finalizingRef = useRef(false);
   const finalizeRef = useRef<(() => Promise<void>) | null>(null);
   const [finalResult, setFinalResult] = useState<{
-    score: number;
-    passed: boolean;
+    score?: number;
+    passed?: boolean;
     masteryUnlocked?: boolean;
     nextTopicUnlocked?: boolean;
     nextTopicId?: string;
@@ -81,10 +80,10 @@ export const QuizPanel = ({
     }
     setIsLoading(true);
     setLoadError(null);
+    setQuizComplete(false);
+    setFinalResult(null);
     try {
-      let startedAttempt: Awaited<
-        ReturnType<typeof quizService.startQuizAttempt>
-      > | null = null;
+      let startedAttempt: Awaited<ReturnType<typeof quizService.startQuizAttempt>> | null = null;
       if (scope !== 'topic') {
         const storageKey = `quiz-attempt:${scope}:${lessonId}`;
         let currentAttemptId = window.localStorage.getItem(storageKey);
@@ -92,23 +91,15 @@ export const QuizPanel = ({
           currentAttemptId = uuidv4();
           window.localStorage.setItem(storageKey, currentAttemptId);
         }
-        startedAttempt = await quizService.startQuizAttempt(
-          lessonId,
-          currentAttemptId
-        );
+        startedAttempt = await quizService.startQuizAttempt(lessonId, currentAttemptId);
         setAttemptId(currentAttemptId);
         setExpiresAt(
-          startedAttempt.expiresAt
-            ? new Date(startedAttempt.expiresAt).getTime()
-            : null
+          startedAttempt.expiresAt ? new Date(startedAttempt.expiresAt).getTime() : null
         );
         setResultsAvailable(startedAttempt.showResults);
       }
 
-      const data = (await quizService.getQuestionsForLesson(
-        lessonId,
-        scope
-      )) as Question[];
+      const data = (await quizService.getQuestionsForLesson(lessonId, scope)) as Question[];
       const orderedQuestions = startedAttempt
         ? startedAttempt.questionIds.map(questionId =>
             data.find(question => question.id === questionId)
@@ -134,13 +125,32 @@ export const QuizPanel = ({
           question => !savedAnswers[question.id]
         );
         const questionIndex =
-          firstUnansweredIndex < 0
-            ? Math.max(0, questionsToShow.length - 1)
-            : firstUnansweredIndex;
+          firstUnansweredIndex < 0 ? Math.max(0, questionsToShow.length - 1) : firstUnansweredIndex;
         const currentQuestion = questionsToShow[questionIndex];
         setCurrentQuestionIndex(questionIndex);
         setSelectedOption(savedAnswers[currentQuestion.id]?.[0] ?? null);
         setIsSubmitted(Boolean(savedAnswers[currentQuestion.id]));
+        if (startedAttempt.completedAt) {
+          const completedResult = await quizService.submitUnitQuiz(
+            lessonId,
+            startedAttempt.attemptId,
+            questionsToShow.map(question => ({
+              questionId: question.id,
+              selectedOption: savedAnswers[question.id]?.[0] ?? null,
+            }))
+          );
+          setFinalResult({
+            score: completedResult.percentage ?? 0,
+            passed: completedResult.isPassed ?? false,
+            masteryUnlocked: false,
+            nextTopicUnlocked: false,
+            recommendations: completedResult.recommendations,
+            resultsAvailable: completedResult.resultsAvailable !== false,
+          });
+          setResultsAvailable(completedResult.resultsAvailable !== false);
+          setQuizComplete(true);
+          window.localStorage.removeItem(`quiz-attempt:${scope}:${lessonId}`);
+        }
       } else {
         setSubmittedAnswers({});
         setCurrentQuestionIndex(0);
@@ -181,11 +191,7 @@ export const QuizPanel = ({
         if (!attemptId) {
           throw new Error('The quiz attempt has not started yet.');
         }
-        await quizService.submitAnswer(
-          attemptId,
-          currentQuestion.id,
-          selectedOption
-        );
+        await quizService.submitAnswer(attemptId, currentQuestion.id, selectedOption);
       }
       setIsSubmitted(true);
       setSubmittedAnswers(previous => ({
@@ -220,23 +226,22 @@ export const QuizPanel = ({
     setSubmissionError(null);
     try {
       let result: {
-        score: number;
-        passed: boolean;
-        masteryUnlocked: boolean;
-        nextTopicUnlocked: boolean;
+        score?: number;
+        passed?: boolean;
+        masteryUnlocked?: boolean;
+        nextTopicUnlocked?: boolean;
         nextTopicId?: string;
         gateDecision?: GateDecision;
         recommendations?: QuizPerformanceRecommendations;
         resultsAvailable?: boolean;
       } = {
-        score: Math.round((score / questions.length) * 100),
-        passed:
-          score / questions.length >= TOPIC_MASTERY_PASSING_SCORE / 100,
+        score: 0,
+        passed: false,
         masteryUnlocked: false,
         nextTopicUnlocked: false,
       };
 
-      if (scope === 'topic' && lessonId) {
+      if (scope === 'topic' && lessonId && result.resultsAvailable !== false) {
         const topicResult = await quizService.submitTopicQuiz(
           lessonId,
           questions.map(question => ({
@@ -270,23 +275,19 @@ export const QuizPanel = ({
       setFinalResult(result);
       setQuizComplete(true);
       window.localStorage.removeItem(`quiz-attempt:${scope}:${lessonId}`);
-      if (
-        result.resultsAvailable !== false &&
-        scope !== 'assessment' &&
-        lessonId != null
-      ) {
+      if (result.resultsAvailable !== false && scope !== 'assessment' && lessonId != null) {
         recordCourseActivity(
           'quiz',
           courseId ?? activeSession?.courseId,
-          scope === 'topic'
-            ? String(lessonId)
-            : (activeSession?.topicId ?? String(lessonId)),
+          scope === 'topic' ? String(lessonId) : (activeSession?.topicId ?? String(lessonId)),
           result.score
         );
       }
       if (scope === 'topic' && lessonId) {
         try {
-          if (result.masteryUnlocked) onTopicCompleted?.();
+          if (result.resultsAvailable !== false && result.masteryUnlocked) {
+            onTopicCompleted?.();
+          }
         } catch (error) {
           console.warn('Quiz passed, but local progress state could not be refreshed:', error);
         }
@@ -308,8 +309,8 @@ export const QuizPanel = ({
             type: 'http://adlnet.gov/expapi/activities/assessment',
           },
         },
-        result.resultsAvailable === false
-          ? { completion: 'submitted' }
+        result.resultsAvailable === false || result.score === undefined
+          ? { completion: true }
           : {
               score: {
                 scaled: result.score / 100,
@@ -317,7 +318,7 @@ export const QuizPanel = ({
                 min: 0,
                 max: 100,
               },
-              success: result.passed,
+              success: result.passed ?? false,
             }
       );
     } catch (error) {
@@ -335,10 +336,7 @@ export const QuizPanel = ({
       return;
     }
 
-    if (
-      timeRemainingSeconds !== 0 &&
-      currentQuestionIndex < questions.length - 1
-    ) {
+    if (timeRemainingSeconds !== 0 && currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex(prev => prev + 1);
       const nextQuestion = questions[currentQuestionIndex + 1];
       const savedOption = submittedAnswers[nextQuestion.id]?.[0] ?? null;
@@ -357,9 +355,7 @@ export const QuizPanel = ({
       return;
     }
     const updateRemaining = () => {
-      setTimeRemainingSeconds(
-        Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000))
-      );
+      setTimeRemainingSeconds(Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000)));
     };
     updateRemaining();
     const intervalId = window.setInterval(updateRemaining, 1000);
@@ -367,12 +363,7 @@ export const QuizPanel = ({
   }, [expiresAt]);
 
   useEffect(() => {
-    if (
-      timeRemainingSeconds === 0 &&
-      !quizComplete &&
-      !isLoading &&
-      !isSubmitting
-    ) {
+    if (timeRemainingSeconds === 0 && !quizComplete && !isLoading && !isSubmitting) {
       void finalizeRef.current?.();
     }
   }, [timeRemainingSeconds, quizComplete, isLoading, isSubmitting]);
@@ -415,19 +406,19 @@ export const QuizPanel = ({
   }
 
   if (quizComplete) {
-    const showResults =
-      resultsAvailable && finalResult?.resultsAvailable !== false;
-    const scorePercentage = finalResult?.score ?? Math.round((score / questions.length) * 100);
+    const showResults = resultsAvailable && finalResult?.resultsAvailable !== false;
+    const scorePercentage = finalResult?.score ?? 0;
     const passed =
       finalResult?.passed ??
-      scorePercentage >=
-        (scope === 'topic' ? TOPIC_MASTERY_PASSING_SCORE : 80);
+      (showResults && scorePercentage >= (scope === 'topic' ? TOPIC_MASTERY_PASSING_SCORE : 80));
     return (
       <div className="bg-card/80 dark:bg-card/50 backdrop-blur-sm rounded-xl p-8 shadow-sm border border-border dark:border-border/50 text-center animate-in fade-in zoom-in duration-500 motion-reduce:animate-none">
         <div
-          className={`w-20 h-20 mx-auto rounded-full flex items-center justify-center mb-6 ${passed ? 'bg-green-100 dark:bg-green-500/20' : 'bg-red-100 dark:bg-red-500/20'}`}
+          className={`w-20 h-20 mx-auto rounded-full flex items-center justify-center mb-6 ${!showResults ? 'bg-muted' : passed ? 'bg-green-100 dark:bg-green-500/20' : 'bg-red-100 dark:bg-red-500/20'}`}
         >
-          {passed ? (
+          {!showResults ? (
+            <Clock3 className="w-10 h-10 text-muted-foreground" />
+          ) : passed ? (
             <CheckCircle className="w-10 h-10 text-green-600" />
           ) : (
             <AlertCircle className="w-10 h-10 text-red-600" />
@@ -437,7 +428,9 @@ export const QuizPanel = ({
         {showResults ? (
           <p className="text-muted-foreground mt-2 mb-6 text-lg">
             Your score:{' '}
-            <span className="font-bold text-foreground dark:text-foreground">{scorePercentage}%</span>
+            <span className="font-bold text-foreground dark:text-foreground">
+              {scorePercentage}%
+            </span>
           </p>
         ) : (
           <p className="text-muted-foreground mt-2 mb-6">
@@ -475,50 +468,51 @@ export const QuizPanel = ({
           </p>
         )}
 
-        {showResults && finalResult?.recommendations?.topics.map(topic => (
-          <section
-            key={topic.topicId}
-            className="mb-6 rounded-xl border border-border bg-background/70 p-4 text-left"
-          >
-            <h4 className="font-semibold">Learning diagnosis: {topic.topicName}</h4>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {topic.diagnosis === 'prerequisite_gap'
-                ? 'Prior quiz evidence suggests a gap in mapped prerequisite knowledge.'
-                : topic.diagnosis === 'target_content_gap'
-                  ? 'Mapped prerequisites look sufficiently strong; the current difficulty is more likely specific to this topic.'
-                  : 'There is not enough prerequisite evidence to tell whether the difficulty is foundational or specific to this topic.'}{' '}
-              Topic accuracy: {Math.round(topic.accuracy * 100)}%; confidence: {topic.confidence}.
-            </p>
-            {topic.prerequisiteEvidence.length > 0 && (
-              <ul className="mt-3 space-y-1 text-xs text-muted-foreground">
-                {topic.prerequisiteEvidence.map(evidence => (
-                  <li key={evidence.unitId}>
-                    {evidence.unitName}:{' '}
-                    {evidence.accuracy === null
-                      ? 'no prior answers'
-                      : `${Math.round(evidence.accuracy * 100)}% accuracy`}{' '}
-                    ({evidence.sampleSize} responses)
-                  </li>
-                ))}
-              </ul>
-            )}
-            {topic.recommendations.length > 0 && (
-              <ul className="mt-3 space-y-2">
-                {topic.recommendations.map(recommendation => (
-                  <li key={`${recommendation.kind}:${recommendation.id}`}>
-                    <Link
-                      href={recommendation.href}
-                      className="font-medium text-blue-700 underline dark:text-blue-300"
-                    >
-                      {recommendation.title}
-                    </Link>
-                    <p className="text-xs text-muted-foreground">{recommendation.reason}</p>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-        ))}
+        {showResults &&
+          finalResult?.recommendations?.topics.map(topic => (
+            <section
+              key={topic.topicId}
+              className="mb-6 rounded-xl border border-border bg-background/70 p-4 text-left"
+            >
+              <h4 className="font-semibold">Learning diagnosis: {topic.topicName}</h4>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {topic.diagnosis === 'prerequisite_gap'
+                  ? 'Prior quiz evidence suggests a gap in mapped prerequisite knowledge.'
+                  : topic.diagnosis === 'target_content_gap'
+                    ? 'Mapped prerequisites look sufficiently strong; the current difficulty is more likely specific to this topic.'
+                    : 'There is not enough prerequisite evidence to tell whether the difficulty is foundational or specific to this topic.'}{' '}
+                Topic accuracy: {Math.round(topic.accuracy * 100)}%; confidence: {topic.confidence}.
+              </p>
+              {topic.prerequisiteEvidence.length > 0 && (
+                <ul className="mt-3 space-y-1 text-xs text-muted-foreground">
+                  {topic.prerequisiteEvidence.map(evidence => (
+                    <li key={evidence.unitId}>
+                      {evidence.unitName}:{' '}
+                      {evidence.accuracy === null
+                        ? 'no prior answers'
+                        : `${Math.round(evidence.accuracy * 100)}% accuracy`}{' '}
+                      ({evidence.sampleSize} responses)
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {topic.recommendations.length > 0 && (
+                <ul className="mt-3 space-y-2">
+                  {topic.recommendations.map(recommendation => (
+                    <li key={`${recommendation.kind}:${recommendation.id}`}>
+                      <Link
+                        href={recommendation.href}
+                        className="font-medium text-blue-700 underline dark:text-blue-300"
+                      >
+                        {recommendation.title}
+                      </Link>
+                      <p className="text-xs text-muted-foreground">{recommendation.reason}</p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          ))}
 
         <button
           onClick={() => {
@@ -571,9 +565,7 @@ export const QuizPanel = ({
               ? 'Time expired'
               : `${Math.floor(timeRemainingSeconds / 60)
                   .toString()
-                  .padStart(2, '0')}:${(timeRemainingSeconds % 60)
-                  .toString()
-                  .padStart(2, '0')}`}
+                  .padStart(2, '0')}:${(timeRemainingSeconds % 60).toString().padStart(2, '0')}`}
           </span>
         )}
       </div>
@@ -621,9 +613,7 @@ export const QuizPanel = ({
                   className={`w-full min-h-14 flex items-center justify-between p-4 rounded-xl border ${borderClass} ${bgClass} transition-all duration-200 text-left group hover:shadow-md active:scale-[0.99] disabled:cursor-default motion-reduce:transition-none`}
                 >
                   <span className={`text-sm font-medium ${textClass}`}>{option.text}</span>
-                  {isSubmitted && isSelected && (
-                    <CheckCircle className="w-5 h-5 text-blue-500" />
-                  )}
+                  {isSubmitted && isSelected && <CheckCircle className="w-5 h-5 text-blue-500" />}
                 </button>
               );
             })}
@@ -653,11 +643,7 @@ export const QuizPanel = ({
           {!isSubmitted ? (
             <button
               onClick={handleSubmit}
-              disabled={
-                !selectedOption ||
-                isSubmitting ||
-                timeRemainingSeconds === 0
-              }
+              disabled={!selectedOption || isSubmitting || timeRemainingSeconds === 0}
               className="min-h-14 flex-1 bg-blue-600 text-white font-bold py-4 rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.99] motion-reduce:transition-none"
             >
               <Send className="w-4 h-4" />

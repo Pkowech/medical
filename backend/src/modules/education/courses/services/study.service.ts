@@ -18,6 +18,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 const INTERRUPTED_SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 const INTERRUPTED_SESSION_REASON =
   'Session expired after 24 hours without completion';
+const MIN_VALID_DURATION_SECONDS = 5 * 60;
 
 @Injectable()
 export class StudyService {
@@ -333,7 +334,6 @@ export class StudyService {
         : 0;
 
     // SESS-001: Session outcome tracking
-    const MIN_VALID_DURATION = 5; // minutes
     const quizActivities = (activities as any[]).filter(
       (a) => a?.type === 'quiz',
     );
@@ -341,10 +341,11 @@ export class StudyService {
       .map((a) => a?.attemptId)
       .filter(Boolean);
 
-    const isValid = duration >= MIN_VALID_DURATION;
+    const isValid =
+      activeDurationSeconds >= MIN_VALID_DURATION_SECONDS;
     const invalidReason = isValid
       ? null
-      : `Session too short (${duration} min < ${MIN_VALID_DURATION} min minimum)`;
+      : `Session too short (${duration} min < 5 min minimum)`;
 
     // LearningGain: focus score improvement relative to baseline (0.5 expected)
     const learningGain = isValid
@@ -434,21 +435,23 @@ export class StudyService {
         });
       }
 
-      await writeApplicationOutboxEvent(tx, {
-        eventType: 'user.study.session',
-        aggregateId: sessionId,
-        dedupeKey: `study-session-completed:${sessionId}`,
-        payload: {
-          userId: session.userId,
-          sessionData: {
-            durationMinutes: duration,
-            materialsCovered,
-            coursesCovered: courseId ? [courseId] : [],
-            assessmentsCompleted: [],
-            clinicalCasesCompleted,
+      if (isValid) {
+        await writeApplicationOutboxEvent(tx, {
+          eventType: 'user.study.session',
+          aggregateId: sessionId,
+          dedupeKey: `study-session-completed:${sessionId}`,
+          payload: {
+            userId: session.userId,
+            sessionData: {
+              durationMinutes: duration,
+              materialsCovered,
+              coursesCovered: courseId ? [courseId] : [],
+              assessmentsCompleted: [],
+              clinicalCasesCompleted,
+            },
           },
-        },
-      });
+        });
+      }
 
       return updatedSession;
     });

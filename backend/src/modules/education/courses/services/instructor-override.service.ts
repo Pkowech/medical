@@ -2,7 +2,12 @@
 // Instructors can hide, mark irrelevant, or update explanations for questions.
 // All actions are audit-logged and affected students are notified.
 
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { NotificationPriority } from '@prisma/client';
 import { PrismaService } from '#infrastructure/prisma/prisma.service';
 import { RedisService } from '#infrastructure/redis/redis.service';
@@ -36,51 +41,82 @@ export class InstructorOverrideService {
         quizQuestions: { select: { quizId: true } },
       },
     });
+    if (!question) {
+      throw new NotFoundException(`Question ${dto.questionId} not found`);
+    }
 
-    // Log the override
-    await this.prisma.instructorOverride.create({
-      data: {
-        instructorId: dto.instructorId,
-        questionId: dto.questionId,
-        action: dto.action,
-        reason: dto.reason,
-      },
-    });
-
-    // Apply the action
-    switch (dto.action) {
-      case 'hide':
-        await this.prisma.question.update({
-          where: { id: dto.questionId },
-          data: { isActive: false },
-        });
-        await this.notifyAffectedStudents(
-          dto.questionId,
-          'removed from the question bank',
-        );
-        break;
-
-      case 'mark_irrelevant':
-        await this.prisma.question.update({
-          where: { id: dto.questionId },
-          data: {
-            metadata: { irrelevant: true, markedAt: new Date().toISOString() },
-          },
-        });
-        break;
-
-      case 'update_explanation':
-        if (dto.newExplanation) {
-          await this.prisma.question.update({
-            where: { id: dto.questionId },
-            data: { explanation: dto.newExplanation },
-          });
-          await this.notifyAffectedStudents(
-            dto.questionId,
-            'had its explanation updated by an instructor',
+    await this.prisma.$transaction(async (tx) => {
+      if (dto.action !== 'mark_irrelevant') {
+        const quizIds = [
+          ...new Set(question.quizQuestions.map(({ quizId }) => quizId)),
+        ].sort();
+        for (const quizId of quizIds) {
+          await tx.$queryRaw<Array<{ id: string }>>`
+            SELECT id FROM quizzes WHERE id = ${quizId} FOR UPDATE
+          `;
+        }
+        const attempts = quizIds.length
+          ? await tx.quizAttempt.count({
+              where: { quizId: { in: quizIds } },
+            })
+          : 0;
+        if (attempts > 0) {
+          throw new ConflictException(
+            'Questions used by attempted quizzes cannot be changed; create a new quiz version instead',
           );
         }
-        break;
+      }
+
+      await tx.instructorOverride.create({
+        data: {
+          instructorId: dto.instructorId,
+          questionId: dto.questionId,
+          action: dto.action,
+          reason: dto.reason,
+        },
+      });
+
+      switch (dto.action) {
+        case 'hide':
+          await tx.question.update({
+            where: { id: dto.questionId },
+            data: { isActive: false },
+          });
+          break;
+
+        case 'mark_irrelevant':
+          await tx.question.update({
+            where: { id: dto.questionId },
+            data: {
+              metadata: {
+                irrelevant: true,
+                markedAt: new Date().toISOString(),
+              },
+            },
+          });
+          break;
+
+        case 'update_explanation':
+          if (dto.newExplanation) {
+            await tx.question.update({
+              where: { id: dto.questionId },
+              data: { explanation: dto.newExplanation },
+            });
+          }
+          break;
+      }
+    });
+
+    if (dto.action === 'hide') {
+      await this.notifyAffectedStudents(
+        dto.questionId,
+        'removed from the question bank',
+      );
+    } else if (dto.action === 'update_explanation' && dto.newExplanation) {
+      await this.notifyAffectedStudents(
+        dto.questionId,
+        'had its explanation updated by an instructor',
+      );
     }
 
     await Promise.all([

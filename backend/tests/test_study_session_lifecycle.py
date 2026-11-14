@@ -158,6 +158,126 @@ service.logger = { log: () => {} };
     )
 
 
+def test_invalid_study_session_does_not_enqueue_learning_follow_up():
+    run_typescript(
+        r"""
+const assert = require('node:assert/strict');
+const { StudyService } =
+  require('./src/modules/education/courses/services/study.service.ts');
+const service = Object.create(StudyService.prototype);
+const session = {
+  id: 'short-session',
+  userId: 'user-1',
+  startTime: new Date(Date.now() - 10 * 60 * 1000),
+  topicId: null,
+  materialId: null,
+  topic: null,
+};
+let savedSession;
+let activityWrites = 0;
+let outboxWrites = 0;
+service.prisma = {
+  studySession: {
+    findFirst: async () => session,
+    findUniqueOrThrow: async () => savedSession,
+  },
+  $transaction: async callback => callback({
+    studySession: {
+      updateMany: async ({ data }) => {
+        savedSession = { ...session, ...data };
+        return { count: 1 };
+      },
+      findUniqueOrThrow: async () => savedSession,
+    },
+    userActivity: {
+      upsert: async () => { activityWrites++; return {}; },
+    },
+    applicationOutboxEvent: {
+      upsert: async () => { outboxWrites++; return {}; },
+    },
+  }),
+};
+service.progressService = { invalidateUserProgressCache: async () => {} };
+service.logger = { log: () => {}, warn: () => {} };
+
+(async () => {
+  const result = await service.endStudySession(
+    'user-1',
+    session.id,
+    [],
+    undefined,
+    240,
+    0,
+  );
+  assert.equal(result.isValid, false);
+  assert.equal(activityWrites, 0);
+  assert.equal(outboxWrites, 0);
+})().catch(error => {
+  console.error(error);
+  process.exitCode = 1;
+});
+"""
+    )
+
+
+def test_study_session_validity_uses_exact_five_minute_boundary():
+    run_typescript(
+        r"""
+const assert = require('node:assert/strict');
+const { StudyService } =
+  require('./src/modules/education/courses/services/study.service.ts');
+
+async function endSession(durationSeconds) {
+  const service = Object.create(StudyService.prototype);
+  const session = {
+    id: 'session-1',
+    userId: 'user-1',
+    startTime: new Date(Date.now() - 10 * 60 * 1000),
+    topicId: null,
+    materialId: null,
+    topic: null,
+  };
+  let savedSession;
+  service.prisma = {
+    studySession: {
+      findFirst: async () => session,
+      findUniqueOrThrow: async () => savedSession,
+    },
+    $transaction: async callback => callback({
+      studySession: {
+        updateMany: async ({ data }) => {
+          savedSession = { ...session, ...data };
+          return { count: 1 };
+        },
+        findUniqueOrThrow: async () => savedSession,
+      },
+      userActivity: { upsert: async () => ({}) },
+      applicationOutboxEvent: { upsert: async () => ({}) },
+    }),
+  };
+  service.progressService = { invalidateUserProgressCache: async () => {} };
+  service.logger = { log: () => {}, warn: () => {} };
+  return service.endStudySession(
+    'user-1',
+    session.id,
+    [],
+    undefined,
+    durationSeconds,
+    0,
+  );
+}
+
+(async () => {
+  assert.equal((await endSession(299)).isValid, false);
+  assert.equal((await endSession(300)).isValid, true);
+})().catch(error => {
+  console.error(error);
+  process.exitCode = 1;
+});
+"""
+    )
+
+
 def test_missing_client_active_duration_never_falls_back_to_wall_time():
     run_typescript(
         r"""

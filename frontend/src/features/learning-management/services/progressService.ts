@@ -760,40 +760,6 @@ const progressService = {
   },
 
   /**
-   * Sync course progress with learning path
-   */
-  async syncCourseProgress(
-    courseId: string,
-    progressData: { percentage: number; completedItems: number; totalItems: number }
-  ): Promise<void> {
-    try {
-      await api.post(
-        '/learning/progress',
-        {
-          courseId,
-          progress: progressData.percentage,
-          timeSpent: 0,
-          metadata: progressData,
-        },
-        {
-          headers: {
-            'X-Client-Timestamp': `${getClientTimestamp()}`,
-          },
-        }
-      );
-    } catch (error) {
-      if (isOfflineQueuedError(error)) return;
-      // Handle 409 Conflict - server has newer data
-      if ((error as { response?: { status?: number } })?.response?.status === 409) {
-        console.warn('Conflict detected in course sync: server has newer data');
-        return; // Non-fatal
-      }
-      console.error('Error syncing course progress:', error);
-      // Non-critical - don't throw
-    }
-  },
-
-  /**
    * Get user streak information
    */
   async getUserStreaks(userId: string): Promise<LearningStreakSummary> {

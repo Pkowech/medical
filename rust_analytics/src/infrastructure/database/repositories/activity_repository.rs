@@ -2,6 +2,9 @@
 /// Manages persistence of user activity and engagement metrics
 use crate::domain::repositories::ActivityRepository;
 use crate::shared::error::AnalyticsError;
+use crate::modules::analytics::progress_tracking::{
+    calculate_user_course_progress, summarize_user_course_progress,
+};
 use chrono::NaiveDateTime;
 use sqlx::{Pool, Postgres};
 use std::sync::Arc;
@@ -49,32 +52,14 @@ impl ActivityRepository for PostgresActivityRepository {
         &self,
         user_id: &str,
     ) -> Result<(i32, i32), AnalyticsError> {
-        let (total, completed): (i64, i64) = sqlx::query_as(
-            r#"
-            SELECT
-                COUNT(*)::bigint,
-                COUNT(*) FILTER (
-                    WHERE COALESCE(progress_percentage, 0) >= 100
-                )::bigint
-            FROM course_enrollments
-            WHERE user_id = $1
-            "#,
-        )
-        .bind(user_id)
-        .fetch_one(&*self.pool)
-        .await
-        .map_err(|error| {
+        let progress = calculate_user_course_progress(&self.pool, user_id)
+            .await
+            .map_err(|error| {
             AnalyticsError::DatabaseError(format!(
-                "Failed to fetch course completion stats: {error}"
+                "Failed to calculate canonical course completion stats: {error}"
             ))
         })?;
-
-        let total = i32::try_from(total).map_err(|error| {
-            AnalyticsError::DatabaseError(format!("Course count exceeds i32: {error}"))
-        })?;
-        let completed = i32::try_from(completed).map_err(|error| {
-            AnalyticsError::DatabaseError(format!("Completed course count exceeds i32: {error}"))
-        })?;
+        let (total, completed, _) = summarize_user_course_progress(&progress);
 
         Ok((total, completed))
     }

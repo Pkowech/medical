@@ -15,13 +15,51 @@ type AssessmentProgress = {
   lastAttemptedAt?: Date;
   totalAttempts: number;
   bestScore?: number;
-  isPassed: boolean;
+  isPassed?: boolean;
+  resultsAvailable?: boolean;
 };
 
 @Injectable()
 @ApiTags('assessment-progress')
 export class AssessmentProgressService {
   private readonly logger = new Logger(AssessmentProgressService.name);
+
+  private hideUnavailableResults(
+    progress: AssessmentProgress,
+    showResults: boolean,
+  ): AssessmentProgress {
+    if (showResults) {
+      return { ...progress, resultsAvailable: true };
+    }
+
+    const safeProgress = { ...progress };
+    delete safeProgress.bestScore;
+    delete safeProgress.isPassed;
+    return { ...safeProgress, resultsAvailable: false };
+  }
+
+  private async applyResultVisibility(
+    progressRecords: AssessmentProgress[],
+  ): Promise<AssessmentProgress[]> {
+    const assessmentIds = [
+      ...new Set(progressRecords.map(({ assessmentId }) => assessmentId)),
+    ];
+    const quizzes = assessmentIds.length
+      ? await this.prisma.quiz.findMany({
+          where: { id: { in: assessmentIds } },
+          select: { id: true, showResults: true },
+        })
+      : [];
+    const resultsVisibility = new Map(
+      quizzes.map((quiz) => [quiz.id, quiz.showResults]),
+    );
+    return progressRecords.map((progress) =>
+      this.hideUnavailableResults(
+        progress,
+        resultsVisibility.get(progress.assessmentId) === true,
+      ),
+    );
+  }
 
   constructor(
     private readonly prisma: PrismaService,
@@ -109,6 +147,7 @@ export class AssessmentProgressService {
     await Promise.all([
       this.redisService.set(cacheKey, JSON.stringify(result), 24 * 60 * 60),
       this.redisService.del(`quiz:results:${userId}:${quiz.unitId ?? ''}`),
+      this.redisService.del(`quiz:results:v2:${userId}:${quiz.unitId ?? ''}`),
     ]);
     this.logger.log(
       `Updated progress for user ${userId}, assessment ${assessmentId}`,
@@ -141,7 +180,7 @@ export class AssessmentProgressService {
       });
     }
 
-    return result;
+    return this.hideUnavailableResults(result, quiz.showResults);
   }
 
   @ApiOperation({ summary: 'Get user progress for an assessment' })
@@ -154,13 +193,20 @@ export class AssessmentProgressService {
     userId: string,
     assessmentId: string,
   ): Promise<AssessmentProgress> {
+    const quiz = await this.prisma.quiz.findUnique({
+      where: { id: assessmentId },
+      select: { showResults: true },
+    });
     const cacheKey = `progress:${userId}:${assessmentId}`;
     const cachedProgress = await this.redisService.get(cacheKey);
     if (cachedProgress) {
       this.logger.log(
         `Retrieved cached progress for user ${userId}, assessment ${assessmentId}`,
       );
-      return JSON.parse(cachedProgress);
+      return this.hideUnavailableResults(
+        JSON.parse(cachedProgress),
+        quiz?.showResults === true,
+      );
     }
 
     const progress = await (
@@ -189,7 +235,7 @@ export class AssessmentProgressService {
     };
 
     await this.redisService.set(cacheKey, JSON.stringify(result), 24 * 60 * 60); // 1 day TTL
-    return result;
+    return this.hideUnavailableResults(result, quiz?.showResults === true);
   }
 
   @ApiOperation({ summary: 'Get all progress records for a user' })
@@ -203,7 +249,7 @@ export class AssessmentProgressService {
     const cachedProgress = await this.redisService.get(cacheKey);
     if (cachedProgress) {
       this.logger.log(`Retrieved cached progress records for user ${userId}`);
-      return JSON.parse(cachedProgress);
+      return this.applyResultVisibility(JSON.parse(cachedProgress));
     }
 
     const progressRecords = await (
@@ -212,7 +258,7 @@ export class AssessmentProgressService {
       where: { userId },
     });
 
-    const result = progressRecords.map((progress) => ({
+    const result: AssessmentProgress[] = progressRecords.map((progress) => ({
       userId: progress.userId,
       assessmentId: progress.assessmentId,
       completionPercentage: progress.completionPercentage,
@@ -226,7 +272,7 @@ export class AssessmentProgressService {
     this.logger.log(
       `Fetched ${result.length} progress records for user ${userId}`,
     );
-    return result;
+    return this.applyResultVisibility(result);
   }
 
   @ApiOperation({ summary: 'Delete user progress for an assessment' })

@@ -138,6 +138,11 @@ The application now requires expected revisions for progress writes, persists
 adaptive quiz checkpoints in `quiz_attempts`, and enqueues adaptive BKT updates
 through the outbox. Shared fixtures exercise backend course aggregation,
 streaks, mastery projection and outbox replay, and Rust streak/BKT logic.
+The legacy learning-progress route requires content identifiers, an idempotency
+key, a client timestamp, and the expected revision. Rust user-level course
+statistics now derive from published topic/unit progress rather than enrollment
+progress snapshots. Reducing a completed goal's progress reopens it and clears
+its completion timestamp. Learning-path discovery hides drafts from other users.
 These tests are calculation-level checks; they do not prove
 database-query/schema parity or a production student's end-to-end dashboard
 parity.

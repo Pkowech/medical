@@ -12,6 +12,8 @@ import {
   HttpStatus,
   HttpCode,
   Header,
+  Headers,
+  BadRequestException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -86,6 +88,8 @@ export class LearningController {
     @Body()
     data: {
       courseId?: string;
+      topicId?: string;
+      materialId?: string;
       learningPathId?: string;
       phaseId?: string;
       moduleId?: string;
@@ -94,9 +98,55 @@ export class LearningController {
       metadata?: Record<string, any>;
     },
     @Request() req: any,
+    @Headers('X-Client-Timestamp') clientTimestampHeader?: string,
+    @Headers('X-Idempotency-Key') idempotencyKey?: string,
+    @Headers('X-Expected-Revision') expectedRevisionHeader?: string,
   ) {
+    if (!data.courseId || (!data.topicId && !data.materialId)) {
+      throw new BadRequestException(
+        'Course progress is derived. Provide an enrolled course and a topic or material to update.',
+      );
+    }
+
+    if (
+      typeof idempotencyKey !== 'string' ||
+      idempotencyKey.trim().length === 0 ||
+      idempotencyKey.length > 200
+    ) {
+      throw new BadRequestException(
+        'X-Idempotency-Key is required and must be at most 200 characters.',
+      );
+    }
+
+    const clientTimestamp =
+      typeof clientTimestampHeader === 'string' &&
+      /^\d+$/.test(clientTimestampHeader)
+        ? Number(clientTimestampHeader)
+        : NaN;
+    if (!Number.isSafeInteger(clientTimestamp)) {
+      throw new BadRequestException(
+        'X-Client-Timestamp is required and must be epoch milliseconds.',
+      );
+    }
+
+    const expectedRevision =
+      typeof expectedRevisionHeader === 'string' &&
+      /^\d+$/.test(expectedRevisionHeader)
+        ? Number(expectedRevisionHeader)
+        : NaN;
+    if (
+      !Number.isSafeInteger(expectedRevision) ||
+      expectedRevision < 0
+    ) {
+      throw new BadRequestException(
+        'X-Expected-Revision is required and must be a non-negative safe integer.',
+      );
+    }
+
     const {
       courseId,
+      topicId,
+      materialId,
       learningPathId,
       phaseId,
       moduleId,
@@ -116,6 +166,8 @@ export class LearningController {
     return this.learningService.updateProgress(req.user.id, {
       userId: req.user.id,
       courseId,
+      topicId,
+      materialId,
       learningPathId,
       phaseId: phaseId ?? (typeof metadata?.phaseId === 'string' ? metadata.phaseId : undefined),
       moduleId: moduleId ?? (typeof metadata?.moduleId === 'string' ? metadata.moduleId : undefined),
@@ -127,6 +179,9 @@ export class LearningController {
       status:
         progress === 100 ? ProgressStatus.completed : ProgressStatus.inProgress,
       metadata,
+      clientTimestamp,
+      idempotencyKey,
+      expectedRevision,
     });
   }
 

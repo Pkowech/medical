@@ -1,9 +1,4 @@
-import {
-  Injectable,
-  Logger,
-  Inject,
-  OnModuleInit,
-} from '@nestjs/common';
+import { Injectable, Logger, Inject, OnModuleInit } from '@nestjs/common';
 import { ClientGrpc } from '@nestjs/microservices';
 import { RedisService } from '#infrastructure/redis/redis.service';
 import { firstValueFrom, timeout, Observable } from 'rxjs';
@@ -315,7 +310,11 @@ export class UserAnalyticsService implements OnModuleInit {
           },
         }),
         this.prisma.quizAttempt.findMany({
-          where: { userId, completedAt: { not: null } },
+          where: {
+            userId,
+            completedAt: { not: null },
+            quiz: { is: { showResults: true } },
+          },
           select: {
             percentage: true,
             quiz: { select: { topic: { select: { name: true } } } },

@@ -307,8 +307,11 @@ export class LearningPathsController {
     status: 200,
     description: 'Learning paths retrieved successfully',
   })
-  async findAll(@Query() filters: LearningPathFiltersDto) {
-    return await this.learningPathsService.findAll(filters);
+  async findAll(
+    @Query() filters: LearningPathFiltersDto,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return await this.learningPathsService.findAll(filters, req.user.id);
   }
 
   @Get(':id/integrity')
@@ -327,8 +330,11 @@ export class LearningPathsController {
     status: 200,
     description: 'Learning path retrieved successfully',
   })
-  async findOne(@Param('id') id: string) {
-    return await this.learningPathsService.findOne(id);
+  async findOne(
+    @Param('id') id: string,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return await this.learningPathsService.findOne(id, req.user.id);
   }
 
   @Patch(':id')

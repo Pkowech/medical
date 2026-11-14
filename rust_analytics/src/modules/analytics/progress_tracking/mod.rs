@@ -7,6 +7,124 @@ use sqlx::{Pool, Postgres};
 
 use crate::analytics_proto::{CourseProgress, ProgressStatus};
 
+pub async fn calculate_user_course_progress(
+    pool: &Pool<Postgres>,
+    user_id: &str,
+) -> Result<Vec<(String, i32)>, sqlx::Error> {
+    sqlx::query_as(
+        r#"
+        WITH enrolled_courses AS (
+            SELECT DISTINCT course_id
+            FROM course_enrollments
+            WHERE user_id = $1
+              AND status::text NOT IN ('dropped', 'DROPPED')
+        ),
+        unit_progress AS (
+            SELECT
+                enrolled.course_id,
+                unit.id AS unit_id,
+                COALESCE(unit_state.is_completed, false) AS explicitly_completed,
+                COALESCE(unit_state.progress_percentage, 0)::float8 AS unit_percentage,
+                COUNT(DISTINCT topic.id)::bigint AS total_topics,
+                COUNT(DISTINCT topic.id) FILTER (
+                    WHERE COALESCE(topic_state.is_completed, false)
+                )::bigint AS completed_topics,
+                COALESCE(AVG(
+                    CASE
+                        WHEN topic.id IS NULL THEN NULL
+                        WHEN COALESCE(topic_state.is_completed, false) THEN 100
+                        ELSE COALESCE(topic_state.progress_percentage, 0)
+                    END
+                ), 0)::float8 AS topic_percentage
+            FROM enrolled_courses enrolled
+            JOIN units unit ON unit.course_id = enrolled.course_id
+            LEFT JOIN topics topic ON topic.unit_id = unit.id
+                AND topic.status::text = 'published'
+                AND (
+                    NOT EXISTS (
+                        SELECT 1
+                        FROM topics mandatory
+                        WHERE mandatory.unit_id = unit.id
+                          AND mandatory.status::text = 'published'
+                          AND mandatory.is_mandatory = true
+                    )
+                    OR topic.is_mandatory = true
+                )
+            LEFT JOIN LATERAL (
+                SELECT
+                    BOOL_OR(
+                        progress.is_completed = true
+                        OR progress.status::text IN ('completed', 'COMPLETED')
+                    ) AS is_completed,
+                    MAX(progress.progress_percentage) AS progress_percentage
+                FROM topic_progress progress
+                WHERE progress.topic_id = topic.id
+                  AND progress.user_id = $1
+                  AND progress.material_id IS NULL
+            ) topic_state ON true
+            LEFT JOIN LATERAL (
+                SELECT
+                    BOOL_OR(
+                        progress.is_completed = true
+                        OR progress.status::text IN ('completed', 'COMPLETED')
+                    ) AS is_completed,
+                    MAX(progress.progress_percentage) AS progress_percentage
+                FROM topic_progress progress
+                WHERE progress.unit_id = unit.id
+                  AND progress.user_id = $1
+                  AND progress.topic_id IS NULL
+                  AND progress.material_id IS NULL
+            ) unit_state ON true
+            GROUP BY
+                enrolled.course_id,
+                unit.id,
+                unit_state.is_completed,
+                unit_state.progress_percentage
+        )
+        SELECT
+            enrolled.course_id,
+            COALESCE(ROUND(AVG(
+                CASE
+                    WHEN unit.unit_id IS NULL THEN NULL
+                    WHEN unit.explicitly_completed
+                      OR (
+                          unit.total_topics > 0
+                          AND unit.completed_topics = unit.total_topics
+                      ) THEN 100
+                    WHEN unit.total_topics > 0 THEN unit.topic_percentage
+                    ELSE unit.unit_percentage
+                END
+            )), 0)::int AS progress_percentage
+        FROM enrolled_courses enrolled
+        LEFT JOIN unit_progress unit ON unit.course_id = enrolled.course_id
+        GROUP BY enrolled.course_id
+        ORDER BY enrolled.course_id
+        "#,
+    )
+    .bind(user_id)
+    .fetch_all(pool)
+    .await
+}
+
+pub fn summarize_user_course_progress(progress: &[(String, i32)]) -> (i32, i32, f32) {
+    let total = progress.len().min(i32::MAX as usize) as i32;
+    let completed = progress
+        .iter()
+        .filter(|(_, percentage)| *percentage >= 100)
+        .count()
+        .min(i32::MAX as usize) as i32;
+    let average = if progress.is_empty() {
+        0.0
+    } else {
+        progress
+            .iter()
+            .map(|(_, percentage)| *percentage as f32)
+            .sum::<f32>()
+            / progress.len() as f32
+    };
+    (total, completed, average)
+}
+
 pub async fn calculate_course_progress(
     pool: &Pool<Postgres>,
     user_id: &str,
@@ -164,7 +282,7 @@ fn build_course_progress(
 
 #[cfg(test)]
 mod tests {
-    use super::{build_course_progress, ProgressStatus};
+    use super::{build_course_progress, summarize_user_course_progress, ProgressStatus};
     use serde_json::Value;
     use std::collections::HashMap;
 
@@ -337,5 +455,20 @@ mod tests {
             progress.total_units,
             fixture["expected"]["totalUnits"].as_i64().unwrap() as i32
         );
+        assert_eq!(
+            progress.status,
+            ProgressStatus::InProgress as i32,
+            "course progress status must match the shared fixture"
+        );
+    }
+
+    #[test]
+    fn summarizes_course_progress_without_enrollment_snapshots() {
+        let progress = vec![
+            ("course-1".to_string(), 100),
+            ("course-2".to_string(), 60),
+            ("course-3".to_string(), 0),
+        ];
+        assert_eq!(summarize_user_course_progress(&progress), (3, 1, 160.0 / 3.0));
     }
 }

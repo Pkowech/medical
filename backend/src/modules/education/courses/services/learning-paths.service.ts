@@ -87,8 +87,21 @@ export class LearningPathsService {
     }
   }
 
-  async findAll(filters: LearningPathFiltersDto = {}): Promise<LearningPath[]> {
-    const whereClause = this.buildWhereClause(filters);
+  async findAll(
+    filters: LearningPathFiltersDto = {},
+    userId?: string,
+  ): Promise<LearningPath[]> {
+    const visibilityFilter: Prisma.LearningPathWhereInput = userId
+      ? {
+          OR: [
+            { status: LearningPathStatus.published },
+            { createdBy: userId },
+          ],
+        }
+      : { status: LearningPathStatus.published };
+    const whereClause: Prisma.LearningPathWhereInput = {
+      AND: [this.buildWhereClause(filters), visibilityFilter],
+    };
 
     try {
       return await this.prisma.learningPath.findMany({
@@ -188,6 +201,13 @@ export class LearningPathsService {
       });
 
       if (!learningPath) {
+        throw new NotFoundException('Learning path not found');
+      }
+      if (
+        userId &&
+        learningPath.status !== LearningPathStatus.published &&
+        learningPath.createdBy !== userId
+      ) {
         throw new NotFoundException('Learning path not found');
       }
 
