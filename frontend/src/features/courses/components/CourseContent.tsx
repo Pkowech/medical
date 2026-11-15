@@ -51,6 +51,24 @@ export const CourseContent = ({
       item => !item.progress?.isCompleted && (item.progress?.progressPercentage ?? 0) > 0,
     ) ??
     materialStatuses.find(item => !item.progress?.isCompleted);
+  const nextMaterialIsVideo = Boolean(
+    nextMaterial?.material.type?.toLowerCase().includes('video') ||
+    nextMaterial?.material.contentType?.toLowerCase().includes('video'),
+  );
+  const nextMaterialIsNotes = Boolean(
+    nextMaterial?.material.title.toLowerCase().includes('notes'),
+  );
+  const nextMaterialAction = nextMaterialIsVideo
+    ? nextMaterial?.progress?.progressPercentage
+      ? 'Continue video'
+      : 'Watch video'
+    : nextMaterialIsNotes
+      ? nextMaterial?.progress?.progressPercentage
+        ? 'Continue reading'
+        : 'Read notes'
+      : nextMaterial?.progress?.progressPercentage
+        ? 'Continue studying'
+        : 'Open material';
   const allMaterialsComplete =
     materialStatuses.length > 0 &&
     materialStatuses.every(item => item.progress?.isCompleted);
@@ -113,7 +131,7 @@ export const CourseContent = ({
   return (
     <div className="pb-20 sm:pb-0">
       <div className="mb-4 flex items-start justify-between gap-3">
-        <h2 className="min-w-0 text-2xl font-bold leading-tight text-foreground dark:text-foreground">
+        <h2 className="min-w-0 text-3xl font-semibold leading-tight tracking-tight text-foreground dark:text-foreground">
           {lesson.title}
         </h2>
         <details className="group relative shrink-0">
@@ -175,12 +193,12 @@ export const CourseContent = ({
       )}
 
       {lesson.content?.text && (
-        <div className="prose dark:prose-invert max-w-none mb-6">
-          <p className="text-foreground/75 leading-relaxed">{lesson.content?.text}</p>
+        <div className="mb-8 max-w-3xl">
+          <p className="text-base leading-7 text-foreground/80">{lesson.content.text}</p>
         </div>
       )}
 
-      <section className="mt-6 space-y-4 border-t border-border pt-5">
+      <section className="mt-8 space-y-5 rounded-2xl border border-border bg-card/70 p-5 shadow-sm sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-[13px] font-semibold uppercase tracking-wide text-primary">Your next step</p>
@@ -222,11 +240,15 @@ export const CourseContent = ({
         </p>
 
         {nextStep === 'material' && nextMaterial && (
-          <div className="rounded-xl bg-primary/[0.06] p-4">
+          <button
+            type="button"
+            onClick={() => openMaterial(String(nextMaterial.material.id))}
+            aria-label={`${nextMaterialAction}: ${nextMaterial.material.title}`}
+            className="group flex min-h-20 w-full items-center justify-between gap-4 rounded-xl border border-primary/20 bg-primary/[0.06] p-4 text-left transition-colors hover:border-primary/40 hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+          >
             <div className="flex min-w-0 items-center gap-3">
               <div className="shrink-0 rounded-lg bg-blue-50 p-3 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400">
-                {nextMaterial.material.type?.toLowerCase().includes('video') ||
-                nextMaterial.material.contentType?.toLowerCase().includes('video')
+                {nextMaterialIsVideo
                   ? <PlayCircle aria-hidden="true" className="h-5 w-5" />
                   : <FileText aria-hidden="true" className="h-5 w-5" />}
               </div>
@@ -237,23 +259,22 @@ export const CourseContent = ({
                 <p className="mt-1 line-clamp-2 font-semibold text-foreground">
                   {nextMaterial.material.title}
                 </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {(nextMaterial.progress?.progressPercentage ?? 0) > 0
+                    ? `In progress · ${nextMaterial.progress?.progressPercentage}%`
+                    : 'Not started'}
+                </p>
               </div>
             </div>
-          </div>
+            <span className="inline-flex shrink-0 items-center gap-1 text-right text-xs font-semibold text-primary sm:text-sm">
+              <span>{nextMaterialAction}</span>
+              <ChevronRight aria-hidden="true" className="h-5 w-5 transition-transform group-hover:translate-x-0.5" />
+            </span>
+          </button>
         )}
 
-        <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-50 border-t border-border bg-background/95 px-4 py-3 shadow-[0_-8px_24px_rgba(15,23,42,0.12)] backdrop-blur sm:static sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:shadow-none sm:backdrop-blur-none">
-          {nextStep === 'material' && nextMaterial ? (
-            <button
-              type="button"
-              onClick={() => openMaterial(String(nextMaterial.material.id))}
-              className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 sm:w-auto"
-              aria-label={`Open ${nextMaterial.material.title}`}
-            >
-              {nextMaterial.material.title.toLowerCase().includes('notes') ? 'Open notes' : 'Open material'}
-              <ChevronRight aria-hidden="true" className="h-4 w-4" />
-            </button>
-          ) : (
+        {nextStep !== 'material' && (
+          <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-50 border-t border-border bg-background/95 px-4 py-3 shadow-[0_-8px_24px_rgba(15,23,42,0.12)] backdrop-blur sm:static sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:shadow-none sm:backdrop-blur-none">
             <button
               type="button"
               onClick={nextStep === 'next-topic' ? navigateNext : onOpenMasteryQuiz}
@@ -270,8 +291,8 @@ export const CourseContent = ({
                   : 'Review assessment'}
               <ChevronRight aria-hidden="true" className="h-4 w-4" />
             </button>
-          )}
-        </div>
+          </div>
+        )}
 
         <ol aria-label="Topic learning pathway" className="grid gap-2 sm:grid-cols-3">
           {[
@@ -356,32 +377,43 @@ export const CourseContent = ({
         )}
       </section>
 
-      <div className="flex justify-between items-center mt-8 pt-6 border-t border-border dark:border-border/50">
+      <nav aria-label="Topic navigation" className="mt-8 flex items-center justify-between gap-3 border-t border-border pt-6">
         <button
+          type="button"
           onClick={navigatePrev}
           disabled={isFirstLesson}
-          className="flex min-h-11 items-center space-x-2 rounded-lg bg-muted px-4 py-2 text-muted-foreground transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-50 dark:bg-secondary dark:text-muted-foreground dark:hover:bg-secondary"
-          title="Previous Lesson"
+          className="flex min-h-11 items-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-50"
+          title="Previous topic"
         >
           <ChevronLeft className="w-4 h-4" />
-          <span>Previous</span>
+          <span>Previous topic</span>
         </button>
+        <p className="hidden text-center text-xs text-muted-foreground sm:block">
+          {isLastLesson
+            ? lesson.masteryUnlocked
+              ? 'You’ve reached the final topic.'
+              : 'Pass the assessment to complete this unit.'
+            : isNextTopicLocked
+              ? 'Pass the assessment to unlock the next topic.'
+              : ''}
+        </p>
         <button
+          type="button"
           onClick={navigateNext}
           disabled={!canNavigateNext}
-          className="flex min-h-11 items-center space-x-2 rounded-lg bg-primary px-4 py-2 text-primary-foreground shadow-sm shadow-primary/20 transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex min-h-11 items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm shadow-primary/20 transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
           title={
             isNextTopicLocked
-              ? 'Complete the study materials and pass the mastery quiz to continue'
+              ? 'Pass the topic assessment to continue'
               : isLastLesson
                 ? 'End of course content'
-                : 'Next Lesson'
+                : 'Next topic'
           }
         >
-          <span>Next</span>
+          <span>Next topic</span>
           <ChevronRight className="w-4 h-4" />
         </button>
-      </div>
+      </nav>
     </div>
   );
 };

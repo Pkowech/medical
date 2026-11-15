@@ -688,16 +688,7 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
                 />
               </div>
             ) : !hasSelectedTopic ? (
-              <section className="mx-auto w-full max-w-6xl space-y-5">
-                <header className="border-b border-border pb-5">
-                  <h1 className="text-2xl font-bold text-foreground">{unitData.title}</h1>
-                  {unitData.description && (
-                    <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
-                      {unitData.description}
-                    </p>
-                  )}
-                </header>
-
+              <section className="mx-auto w-full max-w-6xl space-y-6">
                 <div className="flex flex-wrap items-end justify-between gap-2">
                   <div>
                     <h2 className="text-lg font-semibold text-foreground">Learning roadmap</h2>
