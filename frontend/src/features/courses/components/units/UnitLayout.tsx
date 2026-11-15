@@ -560,38 +560,40 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
                       ]}
                     />
                     {hasSelectedTopic && (
-                      <Link
-                        href={courseId ? `/courses/${courseId}/units/${unitId}` : `/unit/${unitId}`}
-                        className="inline-flex min-h-10 items-center gap-2 text-sm font-medium text-primary hover:underline"
-                      >
-                        <ChevronLeft aria-hidden="true" className="h-4 w-4" />
-                        All topics
-                      </Link>
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                        <Link
+                          href={courseId ? `/courses/${courseId}/units/${unitId}` : `/unit/${unitId}`}
+                          className="inline-flex min-h-10 items-center gap-2 text-sm font-medium text-primary hover:underline"
+                        >
+                          <ChevronLeft aria-hidden="true" className="h-4 w-4" />
+                          All topics
+                        </Link>
+                        <Button
+                          type="button"
+                          variant={activeCoursePanel === 'notes' ? 'default' : 'outline'}
+                          aria-pressed={activeCoursePanel === 'notes'}
+                          aria-label={activeCoursePanel === 'notes' ? 'Return to topic' : 'Open notes for this topic'}
+                          onClick={() => openCoursePanel('notes')}
+                          className="min-h-10"
+                        >
+                          <NotebookPen className="mr-2 h-4 w-4" />
+                          {activeCoursePanel === 'notes' ? 'Back to topic' : 'Topic notes'}
+                        </Button>
+                      </div>
                     )}
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
                     {hasSelectedTopic && (
-                      <>
-                        <Button
-                          type="button"
-                          variant={activeCoursePanel === 'notes' ? 'default' : 'outline'}
-                          aria-pressed={activeCoursePanel === 'notes'}
-                          onClick={() => openCoursePanel('notes')}
-                        >
-                          <NotebookPen className="mr-2 h-4 w-4" />
-                          Notes
-                        </Button>
-                        <Button
-                          type="button"
-                          variant={activeCoursePanel === 'discussion' ? 'default' : 'outline'}
-                          aria-pressed={activeCoursePanel === 'discussion'}
-                          onClick={() => openCoursePanel('discussion')}
-                        >
-                          <MessageSquare className="mr-2 h-4 w-4" />
-                          Discussion
-                        </Button>
-                      </>
+                      <Button
+                        type="button"
+                        variant={activeCoursePanel === 'discussion' ? 'default' : 'outline'}
+                        aria-pressed={activeCoursePanel === 'discussion'}
+                        onClick={() => openCoursePanel('discussion')}
+                      >
+                        <MessageSquare className="mr-2 h-4 w-4" />
+                        Discussion
+                      </Button>
                     )}
                     {unitResources.length > 0 && (
                       <details className="group relative">
@@ -825,7 +827,12 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
 
             {/* Notes panel */}
             {!selectedMaterialId && activeCoursePanel === 'notes' && (
-              <NotesPanel lessonKey={lessonKey} notes={notes} saveNote={saveNote} />
+              <NotesPanel
+                topicId={typedCurrentTopic?.id == null ? undefined : String(typedCurrentTopic.id)}
+                lessonKey={lessonKey}
+                notes={notes}
+                saveNote={saveNote}
+              />
             )}
 
             {/* Discussion panel */}
