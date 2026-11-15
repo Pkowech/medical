@@ -369,18 +369,17 @@ export default function MaterialsDashboard() {
   });
 
   useEffect(() => {
-    const courseTitle = selectedCourse?.title || selectedCourse?.name;
     setHeader({
       title: selectedCourseId ? 'Course roadmap' : 'Knowledge Vault',
       description: selectedCourseId
-        ? courseTitle || 'Follow your course units and topics'
+        ? 'Your units, topics, and linked study resources'
         : 'Centralized intelligence for your medical mastery',
       icon: selectedCourseId
         ? <BookOpen className="h-6 w-6 text-indigo-500" />
         : <Database className="h-6 w-6 text-indigo-500" />,
     });
     return () => setHeader(null);
-  }, [selectedCourseId, selectedCourse?.title, selectedCourse?.name, setHeader]);
+  }, [selectedCourseId, setHeader]);
 
   // Debounce search
   useEffect(() => {
@@ -967,7 +966,7 @@ export default function MaterialsDashboard() {
                     <Button
                       type="button"
                       onClick={() => router.push(`/courses/${selectedCourse.id}`)}
-                      className="shrink-0 gap-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700"
+                      className="min-h-11 shrink-0 gap-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
                     >
                       <Play className="h-4 w-4" />
                       Continue learning
@@ -1007,29 +1006,43 @@ export default function MaterialsDashboard() {
                       All goals
                     </Link>
                   </div>
-                  {goalsError && (
-                    <div className="mt-3 text-sm text-rose-700 dark:text-rose-300" role="alert">
-                      Could not load course goals.{' '}
-                      <button type="button" className="underline" onClick={() => void refetchGoals()}>
-                        Retry
-                      </button>
-                    </div>
-                  )}
-                  {deadlinesError && (
-                    <div className="mt-3 text-sm text-rose-700 dark:text-rose-300" role="alert">
-                      Could not load course deadlines.{' '}
-                      <button type="button" className="underline" onClick={() => void refetchDeadlines()}>
-                        Retry
-                      </button>
+                  {(goalsError || deadlinesError) && (
+                    <div
+                      role="alert"
+                      className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/25 dark:text-amber-200"
+                    >
+                      <span>
+                        {goalsError && deadlinesError
+                          ? 'Goals and deadlines could not be loaded.'
+                          : goalsError
+                            ? 'Course goals could not be loaded.'
+                            : 'Course deadlines could not be loaded.'}
+                      </span>
+                      <div className="flex flex-wrap gap-x-3 gap-y-1">
+                        {goalsError && (
+                          <button
+                            type="button"
+                            className="font-semibold underline underline-offset-2"
+                            onClick={() => void refetchGoals()}
+                          >
+                            Retry goals
+                          </button>
+                        )}
+                        {deadlinesError && (
+                          <button
+                            type="button"
+                            className="font-semibold underline underline-offset-2"
+                            onClick={() => void refetchDeadlines()}
+                          >
+                            Retry deadlines
+                          </button>
+                        )}
+                      </div>
                     </div>
                   )}
                   {goalsLoading || deadlinesLoading ? (
                     <p className="mt-3 text-sm text-muted-foreground dark:text-muted-foreground" role="status">
                       Loading course goals and deadlines…
-                    </p>
-                  ) : goalsError || deadlinesError ? (
-                    <p className="mt-3 text-sm text-muted-foreground dark:text-muted-foreground">
-                      Some course due dates may be missing because a source could not be loaded.
                     </p>
                   ) : dueSoonItems.length > 0 ? (
                     <ul className="mt-3 space-y-3">
@@ -1071,6 +1084,12 @@ export default function MaterialsDashboard() {
                         );
                       })}
                     </ul>
+                  ) : goalsError || deadlinesError ? (
+                    <p className="mt-3 text-sm text-muted-foreground dark:text-muted-foreground">
+                      {goalsError && deadlinesError
+                        ? 'Due items will appear when the sources are available again.'
+                        : 'No due items were found in the source that loaded.'}
+                    </p>
                   ) : (
                     <p className="mt-3 text-sm text-muted-foreground dark:text-muted-foreground">
                       No course goals or deadlines are overdue or due in the next 7 days.{' '}
@@ -1244,7 +1263,7 @@ export default function MaterialsDashboard() {
                           key={unitId}
                           className="overflow-hidden rounded-xl border border-border bg-card dark:bg-card"
                         >
-                          <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-4 marker:hidden hover:bg-muted/50 dark:hover:bg-secondary/50 sm:px-5">
+                          <summary                           className="group/roadmap flex cursor-pointer list-none items-center gap-3 px-4 py-4 marker:hidden hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 dark:hover:bg-secondary/50 sm:px-5">
                             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-sm font-semibold text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
                               {String(unitIndex + 1).padStart(2, '0')}
                             </span>
@@ -1257,7 +1276,7 @@ export default function MaterialsDashboard() {
                                 {unitResourceCount > 0 && ` · ${unitResourceCount} ${unitResourceCount === 1 ? 'resource' : 'resources'}`}
                               </span>
                             </span>
-                            <ChevronDown aria-hidden="true" className="h-4 w-4 shrink-0 text-muted-foreground" />
+                            <ChevronDown aria-hidden="true" className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open/roadmap:rotate-180" />
                           </summary>
                           <div className="space-y-3 border-t border-border p-3 sm:p-5 dark:border-border">
                             {unit.description && (
