@@ -84,7 +84,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         <>
             <div className="flex h-screen h-dvh overflow-hidden bg-background">
                 {!isQuizSessionPage && !isImmersive && (
-                    <div className={cn(isFullHeightPage && 'lg:hidden')}>
+                    <div className={cn(isMaterialViewPage && 'lg:hidden')}>
                         <Sidebar
                             theme={colorScheme}
                             toggleTheme={toggleTheme}
@@ -104,7 +104,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                     inert={sidebarOpen || undefined}
                 >
                     {!isQuizSessionPage && !isImmersive && (
-                        <AppHeader showDesktopSidebarToggle={!isFullHeightPage} />
+                        <AppHeader showDesktopSidebarToggle={!isMaterialViewPage} />
                     )}
 
                     {/* content area */}
