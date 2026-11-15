@@ -4,10 +4,16 @@ import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useQueryClient } from '@tanstack/react-query';
 import {
+  BookOpen,
+  CheckCircle,
+  Circle,
   ChevronLeft,
   ChevronRight,
   ClipboardCheck,
-  Info,
+  Clock,
+  MessageSquare,
+  NotebookPen,
+  PlayCircle,
 } from 'lucide-react';
 import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/features/auth/hooks/useAuth';
@@ -18,7 +24,6 @@ import { usePageHeader } from '@/core/providers/HeaderContext';
 import { useCourseProgressStore } from '@/features/courses/hooks/useCourseProgressStore';
 import { Breadcrumb } from '@/shared/components/ui/breadcrumb';
 import { ProgressBar } from '@/shared/components/ui/ProgressBar';
-import { CourseSidebar } from '@/features/courses/components/CourseSidebar';
 import { CourseContent } from '@/features/courses/components/CourseContent';
 import { Material } from '@/shared/types/materialInterface';
 import { URLS } from '@/lib/urls';
@@ -91,9 +96,6 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
     activeCoursePanel,
     toggleCoursePanel,
     closeCoursePanel,
-    sidebarOpen,
-    sidebarCollapsed,
-    setSidebarCollapsed,
   } = useLayoutStore();
 
   // ── Page header ────────────────────────────────────────────────────────
@@ -148,16 +150,13 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
         id,
       );
     }
-    setSidebarCollapsed(false);
     updateRouteQuery('materialId', id);
   };
   const openCoursePanel = (panelName: string) => {
     updateRouteQuery('materialId', null, true);
-    setSidebarCollapsed(false);
     toggleCoursePanel(panelName);
   };
   const closeMaterial = () => {
-    setSidebarCollapsed(false);
     updateRouteQuery('materialId', null, true);
   };
 
@@ -352,12 +351,25 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
       console.error('Failed to refresh topic progress after saving:', error);
     });
   };
-  const unitProgressPercentage = unitData?.chapters?.length
-    ? Math.round(
-        (unitData.chapters.filter(chapter => chapter.lessons[0]?.isCompleted).length /
-          unitData.chapters.length) * 100,
-      )
+  const chapters = unitData?.chapters || [];
+  const isTopicComplete = (chapterIndex: number) => {
+    const chapter = chapters[chapterIndex];
+    const topic = chapter?.lessons[0];
+    return Boolean(
+      topic?.masteryUnlocked ||
+      topic?.isCompleted ||
+      (topic && progress[`${chapter.id}-${topic.id}`]),
+    );
+  };
+  const completedTopicCount = chapters.filter((_, index) => isTopicComplete(index)).length;
+  const unitProgressPercentage = chapters.length
+    ? Math.round((completedTopicCount / chapters.length) * 100)
     : 0;
+  const nextTopicIndex = chapters.findIndex((_, index) => {
+    const previousTopic = chapters[index - 1]?.lessons[0];
+    return !isTopicComplete(index) && (index === 0 || previousTopic?.nextTopicUnlocked === true);
+  });
+  const currentTopicIndex = hasSelectedTopic ? currentChapterIndex : nextTopicIndex;
 
   // ── Materials for the current topic ───────────────────────────────────
   // The lesson carries `resources` (set in normalizeUnitToChapters).
@@ -468,7 +480,7 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
     );
   }
 
-  // ── Separate topic materials from general sidebar resources ────────────
+  // ── Separate topic materials from unit resources ───────────────────────
   type ResourceLike = Partial<Material> & {
     contentType?: string;
     size?: string;
@@ -498,7 +510,7 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
       topicResources.forEach(resource => topicMaterialIds.add(String(resource.id)));
     });
   });
-  const sidebarResources = allResources.filter(resource =>
+  const unitResources = allResources.filter(resource =>
     resource.topicId == null && !topicMaterialIds.has(String(resource.id)),
   );
 
@@ -506,33 +518,6 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
   return (
     <div className="flex h-full flex-col flex-1 min-h-0 bg-background/50 dark:bg-card">
       <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden relative">
-
-        {/*
-         * Sidebar
-         * unitData.chapters is now [topic1, topic2, …] — one chapter per topic.
-         * CourseSidebar will render each chapter (topic) as a top-level item,
-         * exactly like it renders lessons in the course layout.
-         */}
-        <div
-          className={cn(
-            'fixed lg:static inset-y-0 left-0 z-60 lg:z-40 h-full min-h-0 w-80 shrink-0 overflow-hidden transition-[width,transform] duration-300 ease-in-out',
-            sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
-            sidebarCollapsed && selectedMaterialId ? 'lg:w-0' : 'lg:w-80',
-          )}
-        >
-          <CourseSidebar
-            chapters={unitData.chapters || []}
-            resources={sidebarResources}
-            parentUnitId={unitData.id}
-            currentChapterIndex={currentChapterIndex}
-            currentLessonIndex={currentLessonIndex}
-            navigateTo={selectTopic}
-            progress={progress}
-            toggleCoursePanel={openCoursePanel}
-            openMaterial={openMaterial}
-            allowCollapse={Boolean(selectedMaterialId)}
-          />
-        </div>
 
         {/* Main content area */}
         <main className={cn(
@@ -544,82 +529,119 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
             selectedMaterialId && 'flex h-full w-full max-w-none flex-1 flex-col space-y-0 pb-0',
           )}>
 
-            {/* Breadcrumb + progress */}
-            {!selectedMaterialId && <div className="space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex min-w-0 flex-wrap items-center gap-3">
-                {sidebarCollapsed && selectedMaterialId && (
-                  <button
-                    type="button"
-                    onClick={() => setSidebarCollapsed(false)}
-                    className="rounded-md border border-border bg-card p-2 text-muted-foreground hover:bg-background dark:border-border dark:bg-card dark:text-muted-foreground dark:hover:bg-card"
-                    aria-label="Open course sidebar"
-                    title="Open course sidebar"
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </button>
-                )}
-                <Breadcrumb
-                  items={[
-                    { label: 'Courses', href: '/courses' },
-                    ...(courseId
-                      ? [{
-                          label: unitData.courseName || unitData.title,
-                          href: `/courses/${courseId}`,
-                        }]
-                      : []),
-                    ...(hasSelectedTopic
-                      ? [{ label: getTopicBreadcrumbTitle(typedCurrentTopic?.title || unitData.title) }]
-                      : !courseId || Boolean(unitData.courseName && unitData.courseName !== unitData.title)
-                        ? [{ label: unitData.title }]
-                        : []),
-                  ]}
-                />
-                <details className="group relative shrink-0">
-                  <summary
-                    aria-label="About this unit"
-                    title="About this unit"
-                    className="list-none cursor-pointer rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-                  >
-                    <Info className="h-4 w-4" />
-                  </summary>
-                  <div className="absolute left-0 top-full z-30 mt-2 w-72 max-w-[calc(100vw-2rem)] rounded-lg border border-border bg-card p-3 text-sm shadow-lg">
-                    <p className="font-semibold text-foreground">{unitData.title}</p>
-                    {unitData.description && (
-                      <p className="mt-1 text-muted-foreground">{unitData.description}</p>
+            {!selectedMaterialId && (
+              <header className="space-y-4 border-b border-border pb-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0 space-y-2">
+                    <Breadcrumb
+                      items={[
+                        { label: 'Courses', href: '/courses' },
+                        ...(courseId
+                          ? [{
+                              label: unitData.courseName || 'Course',
+                              href: `/courses/${courseId}`,
+                            }]
+                          : []),
+                        ...(hasSelectedTopic
+                          ? [
+                              {
+                                label: unitData.title,
+                                href: courseId
+                                  ? `/courses/${courseId}/units/${unitId}`
+                                  : `/unit/${unitId}`,
+                              },
+                              {
+                                label: getTopicBreadcrumbTitle(
+                                  typedCurrentTopic?.title || unitData.title,
+                                ),
+                              },
+                            ]
+                          : [{ label: unitData.title }]),
+                      ]}
+                    />
+                    {hasSelectedTopic && (
+                      <Link
+                        href={courseId ? `/courses/${courseId}/units/${unitId}` : `/unit/${unitId}`}
+                        className="inline-flex min-h-10 items-center gap-2 text-sm font-medium text-primary hover:underline"
+                      >
+                        <ChevronLeft aria-hidden="true" className="h-4 w-4" />
+                        All topics
+                      </Link>
                     )}
                   </div>
-                </details>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    {hasSelectedTopic && (
+                      <>
+                        <Button
+                          type="button"
+                          variant={activeCoursePanel === 'notes' ? 'default' : 'outline'}
+                          aria-pressed={activeCoursePanel === 'notes'}
+                          onClick={() => openCoursePanel('notes')}
+                        >
+                          <NotebookPen className="mr-2 h-4 w-4" />
+                          Notes
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={activeCoursePanel === 'discussion' ? 'default' : 'outline'}
+                          aria-pressed={activeCoursePanel === 'discussion'}
+                          onClick={() => openCoursePanel('discussion')}
+                        >
+                          <MessageSquare className="mr-2 h-4 w-4" />
+                          Discussion
+                        </Button>
+                      </>
+                    )}
+                    {unitResources.length > 0 && (
+                      <details className="group relative">
+                        <summary className="flex min-h-10 cursor-pointer list-none items-center rounded-md border border-border bg-card px-3 text-sm font-medium text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                          <BookOpen className="mr-2 h-4 w-4" />
+                          Unit resources ({unitResources.length})
+                        </summary>
+                        <div className="absolute right-0 z-30 mt-2 grid max-h-80 w-72 max-w-[calc(100vw-2rem)] gap-1 overflow-y-auto rounded-lg border border-border bg-card p-2 shadow-lg">
+                          {unitResources.map(resource => (
+                            <button
+                              key={resource.id}
+                              type="button"
+                              onClick={() => openMaterial(String(resource.id))}
+                              className="min-h-10 rounded-md px-3 py-2 text-left text-sm text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                            >
+                              {resource.title}
+                            </button>
+                          ))}
+                        </div>
+                      </details>
+                    )}
+                    <Button
+                      type="button"
+                      variant={activeCoursePanel === 'unit-quiz' ? 'outline' : 'default'}
+                      onClick={() => {
+                        if (typedCurrentTopic?.id != null) {
+                          recordCourseActivity('reading', courseId, String(typedCurrentTopic.id));
+                        }
+                        toggleCoursePanel('unit-quiz');
+                      }}
+                      aria-label={activeCoursePanel === 'unit-quiz' ? 'Return to unit content' : 'Open unit assessment'}
+                      aria-pressed={activeCoursePanel === 'unit-quiz'}
+                    >
+                      <ClipboardCheck className="mr-2 h-4 w-4" />
+                      {activeCoursePanel === 'unit-quiz' ? 'Back to unit' : 'Unit assessment'}
+                    </Button>
+                  </div>
                 </div>
-                <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
-                  <Button
-                    type="button"
-                    variant={activeCoursePanel === 'unit-quiz' ? 'outline' : 'default'}
-                    onClick={() => {
-                      if (typedCurrentTopic?.id != null) {
-                        recordCourseActivity('reading', courseId, String(typedCurrentTopic.id));
-                      }
-                      toggleCoursePanel('unit-quiz');
-                    }}
-                    aria-label={activeCoursePanel === 'unit-quiz' ? 'Return to unit content' : 'Open unit quiz'}
-                    aria-pressed={activeCoursePanel === 'unit-quiz'}
-                    className="min-h-11 shrink-0"
-                  >
-                    <ClipboardCheck className="mr-2 h-4 w-4" />
-                    {activeCoursePanel === 'unit-quiz' ? 'Back to Unit' : 'Unit Quiz'}
-                  </Button>
-                </div>
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs font-medium text-foreground/75">
-                  {unitData.courseProgressPercentage == null ? 'Unit progress' : 'Course progress'}
-                </p>
-                <ProgressBar
-                  value={unitData.courseProgressPercentage ?? unitProgressPercentage}
-                  className="h-1.5"
-                />
-              </div>
-            </div>}
+
+                {hasSelectedTopic && (
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>Unit progress · {completedTopicCount} of {chapters.length} topics</span>
+                      <span>{unitProgressPercentage}%</span>
+                    </div>
+                    <ProgressBar value={unitProgressPercentage} className="h-1.5" />
+                  </div>
+                )}
+              </header>
+            )}
 
             {/* Admin actions - Add Topic */}
             {!selectedMaterialId && isAdmin && (
@@ -666,25 +688,81 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
                 />
               </div>
             ) : !hasSelectedTopic ? (
-              <section className="rounded-xl border border-border bg-card p-6 shadow-sm dark:border-border dark:bg-card">
-                <h1 className="text-2xl font-bold text-foreground dark:text-foreground">{unitData.title}</h1>
-                <p className="mt-2 text-muted-foreground dark:text-muted-foreground">{unitData.description || 'Choose a topic to begin.'}</p>
-                <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:hidden">
-                  {(unitData.chapters || []).map((chapter, chapterIndex) => (
-                    <button
-                      key={chapter.id}
-                      type="button"
-                      onClick={() => selectTopic(chapterIndex, 0)}
-                      className="flex w-full items-center justify-between rounded-lg border border-border p-4 text-left hover:border-blue-400 hover:bg-blue-50/50 dark:border-border dark:hover:bg-blue-950/20"
-                    >
-                      <span>
-                        <span className="block font-semibold text-foreground dark:text-foreground">{chapter.title}</span>
-                        <span className="text-sm text-muted-foreground dark:text-muted-foreground">{chapter.duration}</span>
-                      </span>
-                      <span className="text-sm font-semibold text-blue-600">Open topic</span>
-                    </button>
-                  ))}
+              <section className="mx-auto w-full max-w-4xl space-y-5">
+                <header className="border-b border-border pb-5">
+                  <h1 className="text-2xl font-bold text-foreground">{unitData.title}</h1>
+                  {unitData.description && (
+                    <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
+                      {unitData.description}
+                    </p>
+                  )}
+                </header>
+
+                <div className="flex flex-wrap items-end justify-between gap-2">
+                  <div>
+                    <h2 className="text-lg font-semibold text-foreground">Learning roadmap</h2>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {completedTopicCount} of {chapters.length} topics completed
+                    </p>
+                  </div>
+                  <span className="text-sm font-medium text-muted-foreground">
+                    {unitProgressPercentage}% complete
+                  </span>
                 </div>
+                <ProgressBar value={unitProgressPercentage} className="h-2" />
+
+                <ol className="space-y-3" aria-label="Topics in this unit">
+                  {chapters.map((chapter, chapterIndex) => {
+                    const isComplete = isTopicComplete(chapterIndex);
+                    const previousTopic = chapters[chapterIndex - 1]?.lessons[0];
+                    const isLocked = chapterIndex > 0 && previousTopic?.nextTopicUnlocked !== true;
+                    const isCurrent = !isComplete && chapterIndex === currentTopicIndex;
+
+                    return (
+                      <li
+                        key={chapter.id}
+                        className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4 sm:flex-row sm:items-center sm:justify-between"
+                      >
+                        <div className="flex min-w-0 items-start gap-3">
+                          <span className="mt-0.5 shrink-0 text-muted-foreground">
+                            {isComplete ? (
+                              <CheckCircle aria-label="Completed" className="h-5 w-5 text-emerald-600" />
+                            ) : isLocked ? (
+                              <Circle aria-label="Upcoming" className="h-5 w-5" />
+                            ) : (
+                              <PlayCircle aria-label={isCurrent ? 'Current topic' : 'Available topic'} className="h-5 w-5 text-blue-600" />
+                            )}
+                          </span>
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                              Topic {String(chapterIndex + 1).padStart(2, '0')}
+                              <span className="ml-2 normal-case tracking-normal">
+                                {isComplete ? 'Completed' : isCurrent ? 'Current' : 'Upcoming'}
+                              </span>
+                            </p>
+                            <h3 className="mt-1 font-semibold text-foreground">{chapter.title}</h3>
+                            {chapter.duration && chapter.duration !== '0m' && (
+                              <p className="mt-1 inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+                                <Clock className="h-3.5 w-3.5" />
+                                {chapter.duration}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          variant={isCurrent ? 'default' : 'outline'}
+                          disabled={isLocked}
+                          onClick={() => selectTopic(chapterIndex, 0)}
+                          className="shrink-0"
+                        >
+                          {isComplete ? 'Review topic' : isCurrent ? (selectedTopicId ? 'Continue topic' : 'Start topic') : 'Open topic'}
+                          {!isLocked && <ChevronRight className="ml-2 h-4 w-4" />}
+                        </Button>
+                      </li>
+                    );
+                  })}
+                </ol>
               </section>
             ) : activeCoursePanel === 'quiz' ? (
               <div className="animate-in fade-in slide-in-from-right-4 duration-500">

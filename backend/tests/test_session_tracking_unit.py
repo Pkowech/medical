@@ -11,11 +11,20 @@ const { SessionTrackingService } =
 const created = [];
 const cache = new Map();
 const blacklisted = [];
+const queuedAuditEvents = [];
 const service = Object.create(SessionTrackingService.prototype);
 service.maxSessions = { student: 3 };
 service.prefix = 'session:';
 service.userSessionsPrefix = 'userSessions:';
 service.prisma = {
+  $transaction: async callback => callback({
+    transaction: true,
+    userSession: {
+      create: async args => { created.push(args.data); },
+      update: async () => undefined,
+      updateMany: async args => { service.revokedWhere = args.where; },
+    },
+  }),
   userSession: {
     findUnique: async () => null,
     findMany: async () => [],
@@ -27,7 +36,6 @@ service.prisma = {
       });
       return { token: 'access-token-secret' };
     },
-    create: async args => { created.push(args.data); },
     update: async () => undefined,
     updateMany: async args => { service.revokedWhere = args.where; },
   },
@@ -38,7 +46,13 @@ service.redisService = {
   del: async () => undefined,
   removeFromSet: async () => undefined,
 };
-service.auditLogService = { log: async () => undefined };
+service.auditLogService = {
+  enqueueInTransaction: async (transaction, payload) => {
+    assert.equal(transaction.transaction, true);
+    queuedAuditEvents.push(payload);
+  },
+  log: async () => undefined,
+};
 service.tokenBlacklistService = {
   blacklistToken: async token => { blacklisted.push(token); },
 };
@@ -64,6 +78,9 @@ service.logger = { log: () => undefined, warn: () => undefined };
     Object.hasOwn(cache.get('session:session-1'), 'token'),
     false,
   );
+  assert.equal(queuedAuditEvents.length, 1);
+  assert.equal(queuedAuditEvents[0].eventType, 'sessionCreated');
+  assert.equal(queuedAuditEvents[0].userId, 'user-1');
 
   await service.removeSession('session-1', 'user-1');
   assert.deepEqual(blacklisted, ['access-token-secret']);
@@ -71,6 +88,8 @@ service.logger = { log: () => undefined, warn: () => undefined };
     id: 'session-1',
     userId: 'user-1',
   });
+  assert.equal(queuedAuditEvents.length, 2);
+  assert.equal(queuedAuditEvents[1].eventType, 'sessionRevoked');
 })().catch(error => {
   console.error(error);
   process.exitCode = 1;
@@ -87,14 +106,19 @@ const { SessionTrackingService } =
   require('./src/modules/auth/services/session-tracking.service.ts');
 
 const revoked = [];
+const queuedAuditEvents = [];
 const service = Object.create(SessionTrackingService.prototype);
 service.prefix = 'session:';
 service.userSessionsPrefix = 'userSessions:';
 service.prisma = {
+  $transaction: async callback => callback({
+    userSession: {
+      updateMany: async args => { revoked.push(args.where.id); },
+    },
+  }),
   userSession: {
     findMany: async () => [{ id: 'session-1' }, { id: 'session-2' }],
     findFirst: async args => ({ token: `token-${args.where.id}` }),
-    updateMany: async args => { revoked.push(args.where.id); },
   },
 };
 service.redisService = {
@@ -107,7 +131,11 @@ service.tokenBlacklistService = {
 service.refreshTokenService = {
   revokeSessionTokens: async () => undefined,
 };
-service.auditLogService = { log: async () => undefined };
+service.auditLogService = {
+  enqueueInTransaction: async (_transaction, payload) => {
+    queuedAuditEvents.push(payload);
+  },
+};
 
 (async () => {
   assert.equal(await service.revokeAllSessions('user-1'), 2);
@@ -117,6 +145,8 @@ service.auditLogService = { log: async () => undefined };
     'token-session-2',
     'session-2',
   ]);
+  assert.equal(queuedAuditEvents.length, 2);
+  assert.ok(queuedAuditEvents.every(event => event.eventType === 'sessionRevoked'));
 })().catch(error => {
   console.error(error);
   process.exitCode = 1;
@@ -149,6 +179,51 @@ service.redisService = {
     'refresh_token:first',
     'refresh_token:second',
     'user_tokens:user-1',
+  ]);
+})().catch(error => {
+  console.error(error);
+  process.exitCode = 1;
+});
+"""
+    )
+
+
+def test_revoke_session_tokens_batches_reads_and_removes_expired_index_entries():
+    run_typescript(
+        r"""
+const assert = require('node:assert/strict');
+const { RefreshTokenService } =
+  require('./src/modules/auth/services/refresh-token.service.ts');
+
+const tokens = new Map([
+  ['refresh_token:old-session', { sessionId: 'session-old' }],
+  ['refresh_token:current-session', { sessionId: 'session-current' }],
+]);
+const removed = [];
+const service = Object.create(RefreshTokenService.prototype);
+service.userTokensPrefix = 'user_tokens:';
+service.tokenPrefix = 'refresh_token:';
+service.redisService = {
+  getSetMembers: async () => [
+    'refresh_token:old-session',
+    'refresh_token:current-session',
+    'refresh_token:expired',
+  ],
+  get: async key => tokens.get(key) ?? null,
+  del: async key => {
+    removed.push(key);
+    tokens.delete(key);
+  },
+  removeFromSet: async (_setKey, key) => { removed.push(key); },
+};
+
+(async () => {
+  await service.revokeSessionTokens('user-1', 'session-old');
+  assert.equal(tokens.has('refresh_token:old-session'), false);
+  assert.equal(tokens.has('refresh_token:current-session'), true);
+  assert.deepEqual([...new Set(removed)].sort(), [
+    'refresh_token:expired',
+    'refresh_token:old-session',
   ]);
 })().catch(error => {
   console.error(error);

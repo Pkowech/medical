@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { BookOpen, CheckCircle, ChevronRight, Circle, CircleCheck, Clock, PlayCircle, Plus, Sparkles } from 'lucide-react';
+import { BookOpen, ChevronRight, Circle, CircleCheck, Clock, PlayCircle, Plus, Sparkles } from 'lucide-react';
 import { apiService } from '@/features/auth/services/apiClient';
 import { toast } from 'sonner';
 import { courseService } from '@/features/courses/services/courseService';
@@ -17,13 +17,6 @@ import { usePageHeader } from '@/core/providers/HeaderContext';
 type CourseProgress = {
   topicProgress?: Array<TopicProgress & { topicId?: string }>;
 };
-
-const UNIT_HEADER_COLORS = [
-  'bg-[#536f7b]',
-  'bg-[#3568c4]',
-  'bg-[#39766e]',
-  'bg-[#765c4d]',
-];
 
 export function CourseOverview() {
   const router = useRouter();
@@ -193,7 +186,6 @@ export function CourseOverview() {
             const statusLabel = isCompleted ? 'Completed' : isInProgress ? 'Ongoing' : 'Not enrolled';
             const StatusIcon = isCompleted ? CircleCheck : isInProgress ? PlayCircle : Circle;
             const isEnrolled = enrolledUnitIds.has(String(unit.id)) || isCompleted;
-            const matchesCourse = String(unit.courseId) === String(courseId);
             const estimatedMinutes = unit.estimatedMinutes;
             const estimatedTimeLabel = estimatedMinutes == null || estimatedMinutes <= 0
               ? null
@@ -201,88 +193,95 @@ export function CourseOverview() {
                 ? `${Number((estimatedMinutes / 60).toFixed(1))} hrs`
                 : `${estimatedMinutes} min`;
 
+            const handleOpenUnit = () => {
+              if (!user) {
+                router.push(`/login?callbackUrl=${encodeURIComponent(`/courses/${courseId}`)}`);
+              } else if (isEnrolled) {
+                router.push(`/courses/${courseId}/units/${unit.id}`);
+              } else {
+                setShowEnrollment(true);
+              }
+            };
+
             return (
-              <details
+              <article
                 key={unit.id}
-                open={Boolean(matchesCourse || isEnrolled || isActive || isCompleted)}
-                className="group block min-h-80 overflow-hidden rounded-lg border border-border bg-card text-left shadow-sm transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-border dark:bg-card"
+                className="flex min-h-72 flex-col rounded-xl border border-border bg-card p-5 shadow-sm transition-colors hover:border-primary/40 hover:shadow-md"
               >
-                <summary className="hidden" aria-label={`${unit.title || unit.name}, ${statusLabel}, ${completedTopics} of ${topics.length} topics complete`} />
-                <button
-                  type="button"
-                  aria-label={`${unit.title || unit.name}, ${statusLabel}, ${completedTopics} of ${topics.length} topics complete`}
-                  onClick={() => {
-                    if (!user) {
-                      router.push(`/login?callbackUrl=${encodeURIComponent(`/courses/${courseId}`)}`);
-                    } else if (isEnrolled) {
-                      router.push(`/courses/${courseId}/units/${unit.id}`);
-                    } else {
-                      setShowEnrollment(true);
-                    }
-                  }}
-                  className="flex min-h-80 w-full flex-col overflow-hidden text-left"
-                >
-                <span className={`relative flex flex-col gap-3 overflow-hidden p-5 text-white ${UNIT_HEADER_COLORS[index % UNIT_HEADER_COLORS.length]}`}>
-                  <span className="relative flex items-center justify-between gap-3">
-                    <span className="text-sm font-bold uppercase text-white/90">Unit {String(index + 1).padStart(2, '0')}</span>
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-black/15 px-2.5 py-1 text-xs font-medium text-white" aria-label={`Unit status: ${statusLabel}`}>
-                      <StatusIcon aria-hidden="true" className="h-3.5 w-3.5" />
-                      {statusLabel}
-                    </span>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Unit {String(index + 1).padStart(2, '0')}
                   </span>
-                  <span className="relative block pr-8">
-                    <span className="block text-xl font-semibold leading-7 line-clamp-2">
-                      {unit.title || unit.name}
-                    </span>
-                    <span className="mt-2 block text-sm leading-5 text-white/80 line-clamp-3">
-                      {unit.description || 'Continue through the topics and resources in this unit.'}
-                    </span>
+                  <span
+                    className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${
+                      isCompleted
+                        ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
+                        : isInProgress
+                          ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300'
+                          : 'bg-muted text-muted-foreground'
+                    }`}
+                    aria-label={`Unit status: ${statusLabel}`}
+                  >
+                    <StatusIcon aria-hidden="true" className="h-3.5 w-3.5" />
+                    {statusLabel}
                   </span>
-                </span>
-                <span className="flex flex-1 flex-col p-5">
-                  <span className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground dark:text-muted-foreground">
+                </div>
+                <h3 className="mt-4 text-lg font-semibold leading-6 text-foreground">
+                  {unit.title || unit.name}
+                </h3>
+                <p className="mt-2 line-clamp-3 text-sm leading-6 text-muted-foreground">
+                  {unit.description || 'Continue through the topics and resources in this unit.'}
+                </p>
+
+                <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
+                  <span className="inline-flex items-center gap-1.5">
+                    <BookOpen aria-hidden="true" className="h-4 w-4" />
+                    {topics.length} topics
+                  </span>
+                  {estimatedTimeLabel && (
                     <span className="inline-flex items-center gap-1.5">
-                      <BookOpen className="h-4 w-4" /> {topics.length} topics
+                      <Clock aria-hidden="true" className="h-4 w-4" />
+                      {estimatedTimeLabel}
                     </span>
-                    {estimatedTimeLabel && (
-                      <span className="inline-flex items-center gap-1.5">
-                        <Clock className="h-4 w-4" /> {estimatedTimeLabel}
-                      </span>
-                    )}
-                  </span>
-                  <span className="mt-auto pt-6">
-                    <span className="flex items-center justify-between gap-3 text-xs text-muted-foreground dark:text-muted-foreground">
-                      <span className="font-medium">
-                        {user ? `${completedTopics}/${topics.length} topics` : `${topics.length} topics`}
-                      </span>
-                      {user && isCompleted && <CheckCircle aria-hidden="true" className="h-4 w-4 text-emerald-600" />}
+                  )}
+                  {course.difficulty && (
+                    <span className="rounded-full bg-muted px-2.5 py-1 text-xs capitalize text-foreground">
+                      {course.difficulty}
                     </span>
-                    <span
-                      className="mt-2 block h-2 overflow-hidden rounded-full bg-muted dark:bg-card"
-                      role="progressbar"
-                      aria-label={`${unit.title || unit.name} progress`}
-                      aria-valuemin={0}
-                      aria-valuemax={100}
-                      aria-valuenow={percentage}
-                    >
-                      <span className="block h-full rounded-full bg-blue-600 transition-[width]" style={{ width: `${percentage}%` }} />
-                    </span>
-                    <span className="mt-4 flex items-center justify-between border-t border-border pt-3 text-sm font-semibold text-blue-700 dark:border-border dark:text-blue-300">
-                      <span>
-                        {!user
-                          ? 'Sign in to access'
-                          : isCompleted
-                            ? 'Review unit'
-                            : isActive
-                              ? 'Continue unit'
-                              : 'Choose unit'}
-                      </span>
-                      <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-                    </span>
-                  </span>
-                </span>
-                </button>
-              </details>
+                  )}
+                </div>
+
+                <div className="mt-auto pt-6">
+                  <div className="flex items-center justify-between gap-3 text-sm text-muted-foreground">
+                    <span>{user ? `${completedTopics} of ${topics.length} topics completed` : `${topics.length} topics`}</span>
+                    <span className="font-semibold text-foreground">{percentage}%</span>
+                  </div>
+                  <div
+                    className="mt-2 h-2 overflow-hidden rounded-full bg-muted"
+                    role="progressbar"
+                    aria-label={`${unit.title || unit.name} progress`}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={percentage}
+                  >
+                    <div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${percentage}%` }} />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleOpenUnit}
+                    className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                  >
+                    {!user
+                      ? 'Sign in to access'
+                      : isCompleted
+                        ? 'Review unit'
+                        : isActive
+                          ? 'Continue unit'
+                          : 'Choose unit'}
+                    <ChevronRight aria-hidden="true" className="h-4 w-4" />
+                  </button>
+                </div>
+              </article>
             );
           })}
           </div>

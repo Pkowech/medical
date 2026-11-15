@@ -194,6 +194,7 @@ export const validationSchema = Joi.object({
   ENCRYPTION_KEY: Joi.string().length(32).optional(),
 
   // Logging
+  PRISMA_QUERY_LOG: Joi.boolean().default(false),
   LOG_LEVEL: Joi.string()
     .valid('error', 'warn', 'info', 'http', 'verbose', 'debug', 'silly')
     .default('info'),

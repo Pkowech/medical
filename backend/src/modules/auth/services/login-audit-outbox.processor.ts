@@ -17,6 +17,27 @@ type OutboxRow = {
 const MAX_BATCH_SIZE = 10;
 const MAX_OUTBOX_RETRIES = 8;
 const MAX_BACKOFF_SECONDS = 300;
+const MAX_TRANSACTION_START_WAIT_MS = 10_000;
+
+function getErrorDetails(error: unknown): {
+  name: string;
+  message: string;
+  code?: string;
+} {
+  if (error instanceof Error) {
+    const candidate = error as Error & { code?: unknown };
+    return {
+      name: error.name,
+      message: error.message.slice(0, 500),
+      ...(typeof candidate.code === 'string' ? { code: candidate.code } : {}),
+    };
+  }
+
+  return {
+    name: 'UnknownError',
+    message: String(error).slice(0, 500),
+  };
+}
 
 function decodePayload(value: Prisma.JsonValue): AuditOutboxPayload | null {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
@@ -62,10 +83,11 @@ export class LoginAuditOutboxProcessor {
     private readonly auditLogService: AuditLogService,
   ) {}
 
-  @Cron('*/2 * * * * *')
+  @Cron('*/2 * * * * *', { waitForCompletion: true })
   async processPendingEvents(): Promise<void> {
     for (let processed = 0; processed < MAX_BATCH_SIZE; processed += 1) {
       let selectedId: string | undefined;
+      let operation = 'poll';
 
       try {
         const row = await this.prisma.$transaction(async (transaction) => {
@@ -86,6 +108,7 @@ export class LoginAuditOutboxProcessor {
           selectedId = currentRow.id;
           const payload = decodePayload(currentRow.payload);
           if (!payload) {
+            operation = 'reschedule malformed event';
             const isRetained = await this.retryOrDrop(transaction, currentRow.id, 'InvalidPayload');
             if (isRetained) {
               this.logger.error(
@@ -99,50 +122,59 @@ export class LoginAuditOutboxProcessor {
             return null;
           }
 
+          operation = 'persist event';
           await this.auditLogService.persistOutboxEvent(
             transaction,
             payload,
             currentRow.createdAt,
           );
+          operation = 'delete processed event';
           await transaction.$executeRaw`
             DELETE FROM "login_audit_outbox" WHERE "id" = ${currentRow.id}
           `;
 
           return currentRow;
-        });
+        }, { maxWait: MAX_TRANSACTION_START_WAIT_MS });
 
         if (!row) {
           return;
         }
       } catch (error) {
-        const errorType = error instanceof Error ? error.name : 'UnknownError';
-        this.logger.error(
-          `Failed to persist authentication audit outbox event ${selectedId ?? 'unknown'}: ${errorType}`,
-        );
+        const errorDetails = getErrorDetails(error);
+        const errorType = errorDetails.code ?? errorDetails.name;
+        const errorSummary = `${errorDetails.name}${errorDetails.code ? ` (${errorDetails.code})` : ''}: ${errorDetails.message}`;
+        const failureMessage = `Failed to ${operation} authentication audit outbox event ${selectedId ?? 'unknown'}: ${errorSummary}`;
+        if (operation === 'poll' && errorDetails.code === 'P2028') {
+          this.logger.warn(
+            `${failureMessage}. The next scheduled poll will retry.`,
+          );
+        } else {
+          this.logger.error(failureMessage);
+        }
 
         if (!selectedId) {
           return;
         }
 
+        const eventId = selectedId;
         try {
           const shouldRetry = await this.prisma.$transaction(async (transaction) =>
-            this.retryOrDrop(transaction, selectedId!, errorType),
+            this.retryOrDrop(transaction, eventId, errorType),
           );
 
           if (shouldRetry) {
             this.logger.warn(
-              `Requeued authentication audit outbox event ${selectedId} after transient persistence failure`,
+              `Requeued authentication audit outbox event ${eventId} after transient persistence failure`,
             );
           } else {
             this.logger.warn(
-              `Dropped authentication audit outbox event ${selectedId} after ${MAX_OUTBOX_RETRIES} persistence failures`,
+              `Dropped authentication audit outbox event ${eventId} after ${MAX_OUTBOX_RETRIES} persistence failures`,
             );
           }
         } catch (retryError) {
-          const retryErrorType =
-            retryError instanceof Error ? retryError.name : 'UnknownError';
+          const retryErrorDetails = getErrorDetails(retryError);
           this.logger.error(
-            `Failed to requeue authentication audit outbox event ${selectedId}: ${retryErrorType}`,
+            `Failed to requeue authentication audit outbox event ${eventId}: ${retryErrorDetails.name}${retryErrorDetails.code ? ` (${retryErrorDetails.code})` : ''}: ${retryErrorDetails.message}`,
           );
           return;
         }

@@ -12,32 +12,11 @@ export class PermissionCalculationService {
   ) {}
 
   async getEffectivePermissionsForRole(roleName: Role): Promise<string[]> {
-    // Batch fetch the target role plus any inherited roles in a single query
     const inheritedRoles = (Object.entries(roleHierarchy) as [Role, number][])
       .filter(([, level]) => level < roleHierarchy[roleName])
       .map(([r]) => r);
 
-    const roleNames = [roleName, ...inheritedRoles];
-
-    const roles = await this.prisma.role.findMany({
-      where: { name: { in: roleNames } },
-      include: {
-        permissions: {
-          include: {
-            permission: true,
-          },
-        },
-      },
-    });
-
-    if (!roles || roles.length === 0) {
-      return [];
-    }
-
-    const perms = roles.flatMap((r) =>
-      r.permissions.map((rp) => rp.permission.name),
-    );
-    return [...new Set(perms)];
+    return this.getPermissionNamesForRoles([roleName, ...inheritedRoles]);
   }
 
   async calculateUserPermissions(userId: string): Promise<string[]> {
@@ -51,7 +30,7 @@ export class PermissionCalculationService {
     // Fetch user's roles first
     const userRoles = await this.prisma.userRole.findMany({
       where: { userId },
-      include: { role: true },
+      select: { role: { select: { name: true } } },
     });
 
     if (!userRoles || userRoles.length === 0) {
@@ -59,7 +38,7 @@ export class PermissionCalculationService {
     }
 
     const initialRoleNames = Array.from(
-      new Set(userRoles.map((ur) => ur.role.name as Role)),
+      new Set(userRoles.map((ur) => ur.role.name)),
     );
 
     // Determine all roles we need to fetch including inherited roles
@@ -73,20 +52,31 @@ export class PermissionCalculationService {
       }
     }
 
-    // Batch fetch all roles and their permissions
-    const roles = await this.prisma.role.findMany({
-      where: { name: { in: Array.from(neededRoleNames) } },
-      include: { permissions: { include: { permission: true } } },
-    });
-
-    const allPermissions = roles.flatMap((r) =>
-      r.permissions.map((rp) => rp.permission.name),
+    const uniquePermissions = await this.getPermissionNamesForRoles(
+      Array.from(neededRoleNames),
     );
-
-    const uniquePermissions = [...new Set(allPermissions)];
 
     await this.cacheManager.set(cacheKey, uniquePermissions, 3600); // Cache for 1 hour
 
     return uniquePermissions;
+  }
+
+  private async getPermissionNamesForRoles(
+    roleNames: Role[],
+  ): Promise<string[]> {
+    if (roleNames.length === 0) {
+      return [];
+    }
+
+    const permissions = await this.prisma.permission.findMany({
+      where: {
+        roles: {
+          some: { role: { name: { in: roleNames } } },
+        },
+      },
+      select: { name: true },
+    });
+
+    return permissions.map(({ name }) => name);
   }
 }

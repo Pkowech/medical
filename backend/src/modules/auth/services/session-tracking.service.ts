@@ -48,18 +48,6 @@ export class SessionTrackingService {
 
     if (existing) {
       await this.tokenBlacklistService.blacklistToken(existing.token);
-      await this.prisma.userSession.update({
-        where: { id: sessionId },
-        data: {
-          token: sessionInfo.token,
-          deviceId: sessionInfo.deviceId,
-          ipAddress: sessionInfo.ipAddress,
-          userAgent: sessionInfo.userAgent,
-          expiresAt: sessionInfo.expiresAt,
-          lastAccessed: new Date(),
-          isActive: true,
-        },
-      });
     } else {
       const activeSessions = await this.prisma.userSession.findMany({
         where: {
@@ -77,39 +65,62 @@ export class SessionTrackingService {
           `Removed oldest session for user ${sessionInfo.userId} due to limit`,
         );
       }
-
-      await this.prisma.userSession.create({
-        data: {
-          id: sessionId,
-          userId: sessionInfo.userId,
-          token: sessionInfo.token,
-          deviceId: sessionInfo.deviceId,
-          ipAddress: sessionInfo.ipAddress,
-          userAgent: sessionInfo.userAgent,
-          expiresAt: sessionInfo.expiresAt,
-          createdAt: sessionInfo.createdAt,
-          isActive: true,
-        },
-      });
     }
+
+    await this.prisma.$transaction(async (transaction) => {
+      if (existing) {
+        await transaction.userSession.update({
+          where: { id: sessionId },
+          data: {
+            token: sessionInfo.token,
+            deviceId: sessionInfo.deviceId,
+            ipAddress: sessionInfo.ipAddress,
+            userAgent: sessionInfo.userAgent,
+            expiresAt: sessionInfo.expiresAt,
+            lastAccessed: new Date(),
+            isActive: true,
+          },
+        });
+      } else {
+        await transaction.userSession.create({
+          data: {
+            id: sessionId,
+            userId: sessionInfo.userId,
+            token: sessionInfo.token,
+            deviceId: sessionInfo.deviceId,
+            ipAddress: sessionInfo.ipAddress,
+            userAgent: sessionInfo.userAgent,
+            expiresAt: sessionInfo.expiresAt,
+            createdAt: sessionInfo.createdAt,
+            isActive: true,
+          },
+        });
+      }
+
+      await this.auditLogService.enqueueInTransaction(transaction, {
+        eventType: securityEventTypes.sessionCreated,
+        userId: sessionInfo.userId,
+        ipAddress: sessionInfo.ipAddress || 'unknown',
+        userAgent: sessionInfo.userAgent || 'unknown',
+        eventData: { success: true, role: sessionInfo.role },
+      });
+    });
 
     const sessionMetadata: SessionInfo = { ...sessionInfo };
     delete sessionMetadata.token;
-    await this.redisService.set(
-      `${this.prefix}${sessionId}`,
-      JSON.stringify(sessionMetadata),
-      Math.max(1, Math.ceil((sessionInfo.expiresAt.getTime() - Date.now()) / 1000)),
-    );
-
-    await this.redisService.addToSet(userSessionsKey, sessionId);
-
-    await this.auditLogService.log(
-      securityEventTypes.sessionCreated,
-      sessionInfo.userId,
-      sessionInfo.ipAddress || 'unknown',
-      sessionInfo.userAgent || 'unknown',
-      { success: true, role: sessionInfo.role },
-    );
+    await Promise.all([
+      this.redisService.set(
+        `${this.prefix}${sessionId}`,
+        JSON.stringify(sessionMetadata),
+        Math.max(
+          1,
+          Math.ceil(
+            (sessionInfo.expiresAt.getTime() - Date.now()) / 1000,
+          ),
+        ),
+      ),
+      this.redisService.addToSet(userSessionsKey, sessionId),
+    ]);
 
     this.logger.log(
       `Session tracked for user ${sessionInfo.userId} (${sessionInfo.role})`,
@@ -148,24 +159,28 @@ export class SessionTrackingService {
       await this.tokenBlacklistService.blacklistToken(session.token);
     }
 
-    await this.prisma.userSession.updateMany({
-      where: { id: sessionId, userId },
-      data: { revokedAt: new Date(), isActive: false },
+    await this.prisma.$transaction(async (transaction) => {
+      await transaction.userSession.updateMany({
+        where: { id: sessionId, userId },
+        data: { revokedAt: new Date(), isActive: false },
+      });
+      await this.auditLogService.enqueueInTransaction(transaction, {
+        eventType: securityEventTypes.sessionRevoked,
+        userId,
+        ipAddress: 'unknown',
+        userAgent: 'unknown',
+        eventData: { success: true, sessionId },
+      });
     });
-    await this.refreshTokenService.revokeSessionTokens(userId, sessionId);
-    await this.redisService.del(`${this.prefix}${sessionId}`);
-    await this.redisService.removeFromSet(
-      `${this.userSessionsPrefix}${userId}`,
-      sessionId,
-    );
 
-    await this.auditLogService.log(
-      securityEventTypes.sessionRevoked,
-      userId,
-      'unknown',
-      'unknown',
-      { success: true, sessionId },
-    );
+    await Promise.all([
+      this.refreshTokenService.revokeSessionTokens(userId, sessionId),
+      this.redisService.del(`${this.prefix}${sessionId}`),
+      this.redisService.removeFromSet(
+        `${this.userSessionsPrefix}${userId}`,
+        sessionId,
+      ),
+    ]);
   }
 
   async endSessionByToken(userId: string, token: string): Promise<boolean> {

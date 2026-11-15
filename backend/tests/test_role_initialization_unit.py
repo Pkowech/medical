@@ -31,17 +31,21 @@ const transaction = {
     },
   },
   permission: {
-    upsert: async ({ where, update, create }) => {
-      const existing = permissions.get(where.name);
-      if (existing) {
-        Object.assign(existing, update);
-        return existing;
+    createMany: async ({ data, skipDuplicates }) => {
+      assert.equal(skipDuplicates, true);
+      for (const create of data) {
+        if (!permissions.has(create.name)) {
+          permissions.set(create.name, {
+            id: `permission-${create.name}`,
+            ...create,
+          });
+        }
       }
-
-      const permission = { id: `permission-${where.name}`, ...create };
-      permissions.set(where.name, permission);
-      return permission;
     },
+    findMany: async ({ where }) =>
+      [...permissions.values()].filter(permission =>
+        where.name.in.includes(permission.name),
+      ),
   },
   rolePermission: {
     createMany: async ({ data, skipDuplicates }) => {

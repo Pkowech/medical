@@ -13,7 +13,7 @@ const existingRoleNames = ['admin', 'instructor', 'moderator', 'student'];
 const customGrant = 'role-admin:custom-permission';
 const grants = new Set([customGrant]);
 let addedDefaultGrants = 0;
-let permissionUpserts = 0;
+let permissionBatches = 0;
 const service = Object.create(RoleInitializationService.prototype);
 service.prisma = {
   $transaction: async callback => callback({
@@ -23,10 +23,13 @@ service.prisma = {
       upsert: async ({ where }) => ({ id: `role-${where.name}` }),
     },
     permission: {
-      upsert: async ({ where }) => {
-        permissionUpserts += 1;
-        return { id: `permission-${where.name}`, name: where.name };
+      createMany: async ({ data, skipDuplicates }) => {
+        assert.equal(skipDuplicates, true);
+        permissionBatches += 1;
+        return { count: data.length };
       },
+      findMany: async ({ where }) =>
+        where.name.in.map(name => ({ id: `permission-${name}`, name })),
     },
     rolePermission: {
       createMany: async ({ data }) => {
@@ -51,7 +54,7 @@ service.logger = {
 (async () => {
   await service.initializeDefaultRoles();
   assert.equal(grants.has(customGrant), true);
-  assert.ok(permissionUpserts > 0);
+  assert.equal(permissionBatches, 1);
   assert.equal(addedDefaultGrants, 0);
 })().catch(error => {
   console.error(error);

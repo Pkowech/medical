@@ -762,16 +762,22 @@ export class AuthService {
       if (error instanceof ServiceUnavailableException) {
         loginOutcome = 'rejected';
       }
-      this.logger.error(`Login error: ${getErrorMessage(error)}`, {
-        ...logContext,
-        stack: getErrorStack(error),
-      });
-
-      if (
+      const isExpectedRejection =
         error instanceof UnauthorizedException ||
-        error instanceof BadRequestException ||
-        error instanceof ServiceUnavailableException
-      ) {
+        error instanceof BadRequestException;
+      if (isExpectedRejection) {
+        this.logger.warn(
+          `Login rejected: ${getErrorMessage(error)}`,
+          logContext,
+        );
+      } else {
+        this.logger.error(`Login error: ${getErrorMessage(error)}`, {
+          ...logContext,
+          stack: getErrorStack(error),
+        });
+      }
+
+      if (isExpectedRejection || error instanceof ServiceUnavailableException) {
         throw error;
       }
 

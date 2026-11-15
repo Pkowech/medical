@@ -10,10 +10,10 @@ import {
   ChevronLeft,
   Bookmark,
   CheckCircle,
-  Clock,
   AlertCircle,
   Lightbulb,
   BookOpen,
+  Brain,
   WifiOff,
   HardDriveDownload,
 } from 'lucide-react';
@@ -35,7 +35,6 @@ import { NotesPanel } from './NotesPanel';
 import { Button } from '@/shared/components/ui/button';
 import { Badge } from '@/shared/components/ui/badge';
 import { toast } from 'sonner';
-import { Brain } from 'lucide-react';
 import { offlineService } from '@/lib/core/offline/offlineService';
 import { isOfflineQueuedError } from '@/lib/core/offline/offlineQueuedError';
 import {
@@ -44,6 +43,7 @@ import {
 } from '@/lib/core/offline/reconcileOfflineRevision';
 import { StoragePersistenceNotice } from '@/lib/core/offline/StoragePersistenceNotice';
 import type { OfflineQuizQuestion, OfflineTopicBundle } from '@/lib/core/offline/db';
+import { TOPIC_MASTERY_PASSING_SCORE } from '@/shared/types/mastery.types';
 import {
   useCourseStudySession,
 } from '@/features/learning-management/study/components/CourseStudySessionProvider';
@@ -171,17 +171,6 @@ const MATERIAL_ICONS: Record<string, React.ReactNode> = {
 };
 
 const getMaterialIcon = (type: string) => MATERIAL_ICONS[type?.toUpperCase()] || <Download className="w-5 h-5" />;
-const getMaterialColor = (type: string): string => {
-  const types: Record<string, string> = {
-    VIDEO: 'from-blue-500 to-blue-600',
-    PDF: 'from-red-500 to-red-600',
-    DOCUMENT: 'from-orange-500 to-orange-600',
-    ARTICLE: 'from-green-500 to-green-600',
-    INTERACTIVE: 'from-purple-500 to-purple-600',
-    QUIZ: 'from-pink-500 to-pink-600',
-  };
-  return types[type?.toUpperCase()] || 'from-gray-500 to-gray-600';
-};
 
 export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topicId }) => {
   const router = useRouter();
@@ -656,15 +645,13 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
     score: number;
   }) => {
     if (!result.masteryUnlocked) {
-      toast.error(`You scored ${result.score}%. At least 70% is required to pass.`);
+      toast.error(
+        `You scored ${result.score}%. At least ${TOPIC_MASTERY_PASSING_SCORE}% is required to pass.`,
+      );
       return;
     }
     await refreshLearningCaches();
     toast.success(`Topic assessment passed with ${result.score}%`);
-  };
-
-  const handleGoBack = () => {
-    router.back();
   };
 
   const handleNavigateToUnit = () => {
@@ -698,8 +685,8 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
             <p className="text-muted-foreground dark:text-muted-foreground">
               {loadError ? 'Complete the preceding topic quiz before opening this topic.' : "The topic you're looking for doesn't exist."}
             </p>
-            <Button onClick={handleGoBack} variant="outline">
-              Go Back
+            <Button onClick={handleNavigateToUnit} variant="outline">
+              Back to unit topics
             </Button>
           </div>
         </div>
@@ -717,7 +704,8 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={handleGoBack}
+                onClick={handleNavigateToUnit}
+                aria-label="Back to unit topics"
                 className="flex-shrink-0"
               >
                 <ChevronLeft className="w-5 h-5" />
@@ -769,7 +757,7 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
       </div>
 
       {/* Main Content */}
-      <div className="max-w-5xl mx-auto px-4 md:px-8 py-8 space-y-8">
+      <div className="mx-auto max-w-4xl space-y-6 px-4 py-6 md:px-8 md:py-8">
         {isOffline && (
           <div
             role="status"
@@ -828,94 +816,91 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
           </section>
         )}
 
-        {/* Topic Description */}
+        {/* Topic overview */}
         {topic.description && (
-          <div className="bg-card dark:bg-card rounded-xl p-6 shadow-sm border border-border dark:border-border">
-            <h2 className="text-lg font-semibold text-foreground dark:text-foreground mb-3">
-              Overview
-            </h2>
-            <p className="text-muted-foreground dark:text-muted-foreground leading-relaxed">
+          <section className="border-b border-border pb-5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Topic overview
+            </p>
+            <p className="mt-2 leading-7 text-foreground/80">
               {topic.description}
             </p>
-          </div>
+          </section>
         )}
 
-        {/* Materials Section */}
-        {materials.length > 0 ? (
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <BookOpen className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-              <h2 className="text-xl font-bold text-foreground dark:text-foreground">
-                Study Materials
-              </h2>
-              <Badge variant="outline">{materials.length}</Badge>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {materials.map((material) => (
-                <div
-                  key={material.id}
-                  className="bg-card dark:bg-card rounded-xl p-5 shadow-sm border border-border dark:border-border hover:shadow-md transition-shadow group cursor-pointer"
-                  onClick={() => handleOpenMaterial(material.id)}
-                >
-                  {/* Material Header */}
-                  <div className="flex items-start justify-between mb-3">
-                    <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${getMaterialColor(material.type || 'DOCUMENT')} flex items-center justify-center text-white`}>
+        <section className="space-y-3" aria-labelledby="topic-materials-heading">
+          <div className="flex items-center gap-2">
+            <BookOpen className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+            <h2 id="topic-materials-heading" className="text-lg font-semibold text-foreground">
+              Learning materials
+            </h2>
+            <Badge variant="outline">{materials.length}</Badge>
+          </div>
+          {materials.length > 0 ? (
+            <ul className="divide-y divide-border rounded-lg border border-border bg-card">
+              {materials.map(material => (
+                <li key={material.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <span className="mt-0.5 shrink-0 text-muted-foreground">
                       {getMaterialIcon(material.type || 'DOCUMENT')}
-                    </div>
-                    <Badge variant="secondary" className="text-xs">
-                      {material.type || 'DOCUMENT'}
-                    </Badge>
-                  </div>
-
-                  {/* Material Info */}
-                  <h3 className="font-semibold text-foreground dark:text-foreground mb-2 line-clamp-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                    {material.title}
-                  </h3>
-
-                  {material.description && (
-                    <p className="text-sm text-muted-foreground dark:text-muted-foreground line-clamp-2 mb-3">
-                      {material.description}
-                    </p>
-                  )}
-
-                  {/* Material Footer */}
-                  <div className="flex items-center justify-between pt-3 border-t border-border dark:border-border">
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground dark:text-muted-foreground">
-                      {material.duration && (
-                        <>
-                          <Clock className="w-3.5 h-3.5" />
-                          <span>{material.duration} min</span>
-                        </>
+                    </span>
+                    <div className="min-w-0">
+                      <h3 className="font-medium text-foreground">{material.title}</h3>
+                      {material.description && (
+                        <p className="mt-1 text-sm text-muted-foreground">{material.description}</p>
                       )}
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {material.type || 'DOCUMENT'}
+                        {material.duration ? ` · ${material.duration} min` : ''}
+                      </p>
                     </div>
-                    <Button
-                      variant="default"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleOpenMaterial(material.id);
-                      }}
-                      className="group-hover:shadow-lg transition-shadow"
-                    >
-                      Study Now →
-                    </Button>
                   </div>
-                </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="shrink-0"
+                    onClick={() => handleOpenMaterial(material.id)}
+                  >
+                    Study material
+                  </Button>
+                </li>
               ))}
-            </div>
-          </div>
-        ) : (
-          <div className="bg-card dark:bg-card rounded-xl p-8 shadow-sm border border-border dark:border-border text-center">
-            <BookOpen className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
-            <p className="text-muted-foreground dark:text-muted-foreground font-medium">
-              No materials available for this topic yet
+            </ul>
+          ) : (
+            <p className="rounded-lg border border-border px-4 py-3 text-sm text-muted-foreground">
+              No learning materials are available for this topic yet.
             </p>
-          </div>
-        )}
+          )}
+        </section>
 
-        {/* Action Buttons */}
-        <div className="flex flex-col sm:flex-row gap-3 justify-between pt-4">
+        <section className="rounded-lg border border-border bg-card p-5" aria-labelledby="topic-assessment-heading">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <Brain className="mt-0.5 h-5 w-5 shrink-0 text-blue-600 dark:text-blue-400" />
+              <div>
+                <h2 id="topic-assessment-heading" className="font-semibold text-foreground">
+                  Topic assessment
+                </h2>
+                <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                  Take the quiz to check your understanding. A score of {TOPIC_MASTERY_PASSING_SCORE}% is required to pass.
+                </p>
+              </div>
+            </div>
+            <Button
+              type="button"
+              onClick={() => {
+                recordCourseActivity('reading', courseId, topicId);
+                setShowQuiz(true);
+              }}
+              className="shrink-0"
+            >
+              <Brain className="mr-2 h-4 w-4" />
+              {isCompleted ? 'Retake assessment' : 'Start assessment'}
+            </Button>
+          </div>
+        </section>
+
+        <div className="flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
           <Button
             variant="outline"
             onClick={handleNavigateToUnit}
@@ -958,16 +943,6 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
                   : `Download for offline${offlinePdfCount ? ` · ${offlinePdfCount} PDF${offlinePdfCount === 1 ? '' : 's'}${getEstimatedPdfSize(materials)}` : ' · practice quiz'}`}
               </Button>
             )}
-            <Button
-              onClick={() => {
-                recordCourseActivity('reading', courseId, topicId);
-                setShowQuiz(true);
-              }}
-              className="flex items-center gap-2"
-            >
-              <Brain className="w-4 h-4" />
-              {isCompleted ? 'Retake Topic Quiz' : 'Take Topic Quiz'}
-            </Button>
           </div>
         </div>
       </div>

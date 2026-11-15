@@ -193,6 +193,8 @@ Keep `ENABLE_GRPC=true`. The image starts Rust analytics first and configures th
 
 The Node backend uses up to 3 PostgreSQL connections by default, and Rust analytics uses up to 2. Set `DATABASE_POOL_MAX` and `RUST_ANALYTICS_DB_MAX_CONNECTIONS` to lower or raise these per-process limits according to the database plan's connection cap and the number of running instances. The maximum across this combined service is 5 connections per instance, so account for every running instance and any other app using the same database.
 
+Prisma SQL query logging is disabled by default, including in development. Set `PRISMA_QUERY_LOG=true` temporarily in development when investigating database queries; avoid enabling verbose query logging in production because it can be noisy and may expose query details.
+
 Configure Redis with a single `redis://` or `rediss://` endpoint in `REDIS_URL`, or use `REDIS_HOST`, `REDIS_PORT`, `REDIS_USERNAME`, `REDIS_PASSWORD`, and `REDIS_DB`. Sentinel endpoints are not accepted as comma-separated `REDIS_URL` values. The local fallback cache is limited to 10,000 least-recently-used entries and 64 MiB by default; set `REDIS_MEMORY_MAX_ENTRIES` or `REDIS_MEMORY_MAX_BYTES` to adjust those per-process limits. This fallback is process-local and best-effort, not a replacement for shared Redis state.
 
 ### Login latency and capacity
@@ -205,7 +207,7 @@ The default per-process password-verification limit is 2 concurrent operations, 
 
 The PostgreSQL pool remains capped at 3 connections per Node process by default; `DATABASE_POOL_MAX` can override it. Include every backend replica and the Rust service when calculating the database plan's total connection budget.
 
-The successful-login audit events are written to a PostgreSQL transactional outbox with the login-state update, then materialized by a background worker. Apply the `20261106204500_login_audit_outbox` migration before deploying this code (`pnpm exec prisma migrate deploy` from `backend/`). Audit records may become visible a few seconds after the login response.
+Authentication and session audit events are written to a PostgreSQL transactional outbox, then materialized by a background worker. Apply the `20261106204500_login_audit_outbox` migration before deploying this code (`pnpm exec prisma migrate deploy` from `backend/`). Audit records may become visible a few seconds after the login response.
 
 ### Application outbox
 

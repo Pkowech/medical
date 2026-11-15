@@ -182,7 +182,7 @@ export class RoleInitializationService implements OnApplicationBootstrap {
   }
 
   private async createDefaultPermissions(
-    tx: PrismaClient | Prisma.TransactionClient, // Corrected to use PrismaClient directly
+    tx: PrismaClient | Prisma.TransactionClient,
   ): Promise<PrismaPermission[]> {
     const defaultPermissions = [
       {
@@ -391,26 +391,24 @@ export class RoleInitializationService implements OnApplicationBootstrap {
       },
     ];
 
-    const permissions: PrismaPermission[] = [];
-    for (const permData of defaultPermissions) {
-      try {
-        const permission = await tx.permission.upsert({
-          where: { name: permData.name },
-          update: {},
-          create: { ...permData, createdAt: new Date(), updatedAt: new Date() },
-        });
-        this.logger.debug(
-          `Created/Updated permission: ${permission.name} (ID: ${permission.id})`,
-        );
-        permissions.push(permission);
-      } catch (error) {
-        const errorMessage = getErrorMessage(error);
-        this.logger.error(
-          `Failed to create permission ${permData.name}: ${errorMessage}`,
-        );
-        throw error;
-      }
+    await tx.permission.createMany({
+      data: defaultPermissions.map((permission) => ({
+        ...permission,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })),
+      skipDuplicates: true,
+    });
+
+    const permissions = await tx.permission.findMany({
+      where: { name: { in: defaultPermissions.map(({ name }) => name) } },
+    });
+    for (const permission of permissions) {
+      this.logger.debug(
+        `Created/Updated permission: ${permission.name} (ID: ${permission.id})`,
+      );
     }
+
     this.logger.log(`Total permissions created: ${permissions.length}`);
     return permissions;
   }

@@ -8,6 +8,8 @@ import { RedisService } from '#infrastructure/redis/redis.service';
 import type { TokenData } from '#common/dto/security.dto';
 import { securityEventTypes } from '#common/dto/security.dto';
 
+const TOKEN_LOOKUP_BATCH_SIZE = 25;
+
 @Injectable()
 export class RefreshTokenService {
   private readonly logger = new Logger(RefreshTokenService.name);
@@ -177,13 +179,32 @@ export class RefreshTokenService {
 
   async revokeSessionTokens(userId: string, sessionId: string): Promise<void> {
     const userTokensKey = `${this.userTokensPrefix}${userId}`;
-    const tokenKeys = await this.redisService.getSetMembers(userTokensKey);
-    for (const tokenKey of tokenKeys) {
-      if (!tokenKey.startsWith(this.tokenPrefix)) continue;
-      const tokenData = await this.redisService.get<TokenData>(tokenKey);
-      if (tokenData?.sessionId !== sessionId) continue;
-      await this.redisService.del(tokenKey);
-      await this.redisService.removeFromSet(userTokensKey, tokenKey);
+    const tokenKeys = (await this.redisService.getSetMembers(userTokensKey))
+      .filter((tokenKey) => tokenKey.startsWith(this.tokenPrefix));
+
+    for (
+      let offset = 0;
+      offset < tokenKeys.length;
+      offset += TOKEN_LOOKUP_BATCH_SIZE
+    ) {
+      const batch = tokenKeys.slice(offset, offset + TOKEN_LOOKUP_BATCH_SIZE);
+      const tokenData = await Promise.all(
+        batch.map((tokenKey) =>
+          this.redisService.get<TokenData>(tokenKey),
+        ),
+      );
+      const tokenKeysToRemove = batch.filter(
+        (_tokenKey, index) =>
+          tokenData[index] === null ||
+          tokenData[index]?.sessionId === sessionId,
+      );
+
+      await Promise.all(
+        tokenKeysToRemove.flatMap((tokenKey) => [
+          this.redisService.del(tokenKey),
+          this.redisService.removeFromSet(userTokensKey, tokenKey),
+        ]),
+      );
     }
   }
 }

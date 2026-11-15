@@ -22,6 +22,8 @@ type AuditTransaction = Pick<
   'user' | 'securityAudit' | 'securityEvent'
 >;
 
+const MAX_TRANSACTION_START_WAIT_MS = 10_000;
+
 @Injectable()
 export class AuditLogService {
   private readonly logger = new Logger(AuditLogService.name);
@@ -36,13 +38,17 @@ export class AuditLogService {
     userAgent: string;
     eventData?: any;
   }) {
-    await this.log(
-      payload.eventType,
-      payload.userId,
-      payload.ipAddress,
-      payload.userAgent,
-      payload.eventData,
-    );
+    try {
+      await this.prisma.$transaction(
+        (transaction) => this.enqueueInTransaction(transaction, payload),
+        { maxWait: MAX_TRANSACTION_START_WAIT_MS },
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to enqueue security audit event ${payload.eventType}: ${getErrorMessage(error)}`,
+        getErrorStack(error),
+      );
+    }
   }
 
   async log(

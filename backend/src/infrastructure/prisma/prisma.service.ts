@@ -52,13 +52,16 @@ export class PrismaService
 
     const pool = new Pool(poolConfig);
     const adapter = new PrismaPg(pool);
+    const prismaLogLevels: ('query' | 'info' | 'warn' | 'error')[] =
+      process.env.NODE_ENV !== 'development'
+        ? ['error']
+        : process.env.PRISMA_QUERY_LOG === 'true'
+          ? ['query', 'info', 'warn', 'error']
+          : ['info', 'warn', 'error'];
 
     super({
       adapter,
-      log:
-        process.env.NODE_ENV === 'development'
-          ? ['query', 'info', 'warn', 'error']
-          : ['error'],
+      log: prismaLogLevels,
     });
 
     this.pool = pool;

@@ -39,3 +39,38 @@ service.usersService = {
 });
 """
     )
+
+
+def test_expected_login_rejection_is_not_logged_as_an_application_error():
+    run_typescript(
+        r"""
+const assert = require('node:assert/strict');
+const { AuthService } = require('./src/modules/auth/services/auth.service.ts');
+
+const errors = [];
+const warnings = [];
+const service = Object.create(AuthService.prototype);
+service.prisma = {
+  user: { findFirst: async () => null },
+};
+service.enqueueAuthenticationAudit = async () => undefined;
+service.metrics = { recordAuthStage: () => undefined };
+service.logger = {
+  error: message => errors.push(message),
+  warn: message => warnings.push(message),
+};
+
+(async () => {
+  await assert.rejects(
+    service.login({ username: 'missing-user', password: 'password' }),
+    error => error.status === 401,
+  );
+  assert.equal(errors.length, 0);
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /Username not found/);
+})().catch(error => {
+  console.error(error);
+  process.exitCode = 1;
+});
+"""
+    )

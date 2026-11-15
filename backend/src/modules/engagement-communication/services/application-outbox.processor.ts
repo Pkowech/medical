@@ -22,6 +22,7 @@ const MAX_OUTBOX_RETRIES = 8;
 const LOCK_TIMEOUT_MS = 5 * 60 * 1000;
 const MAX_RETRY_DELAY_MS = 5 * 60 * 1000;
 const STALE_EVENT_AGE_MS = 10 * 60 * 1000;
+const MAX_TRANSACTION_START_WAIT_MS = 10_000;
 
 export type OutboxEventState = 'pending' | 'processed' | 'failed';
 
@@ -35,7 +36,7 @@ export class ApplicationOutboxProcessor {
     private readonly metrics: MetricsService,
   ) {}
 
-  @Cron('*/2 * * * * *')
+  @Cron('*/2 * * * * *', { waitForCompletion: true })
   async processPendingEvents(): Promise<void> {
     for (let index = 0; index < MAX_BATCH_SIZE; index += 1) {
       const event = await this.claimNextEvent();
@@ -215,7 +216,7 @@ export class ApplicationOutboxProcessor {
           attempts: true,
         },
       });
-    });
+    }, { maxWait: MAX_TRANSACTION_START_WAIT_MS });
   }
 }
 
