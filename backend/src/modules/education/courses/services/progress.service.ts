@@ -2115,6 +2115,29 @@ export class ProgressService {
     }
   }
 
+  private async writeUnitProgress(
+    userId: string,
+    unitId: string,
+    courseId: string,
+    update: Prisma.ProgressUpdateInput,
+    create: Prisma.ProgressUncheckedCreateInput,
+  ): Promise<void> {
+    const existing = await this.prisma.progress.findFirst({
+      where: { userId, topicId: null, materialId: null, unitId, courseId },
+      orderBy: { updatedAt: 'desc' },
+      select: { id: true },
+    });
+
+    if (existing) {
+      await this.prisma.progress.update({
+        where: { id: existing.id },
+        data: update,
+      });
+    } else {
+      await this.prisma.progress.create({ data: create });
+    }
+  }
+
   async trackUnitAccess(userId: string, unitId: string): Promise<void> {
     try {
       const unit = await this.prisma.unit.findUnique({
@@ -2123,28 +2146,22 @@ export class ProgressService {
       });
 
       if (unit?.courseId) {
-        await this.prisma.progress.upsert({
-          where: {
-            userId_topicId_materialId_unitId_courseId: {
-              userId,
-              topicId: null as any,
-              materialId: null as any,
-              unitId,
-              courseId: unit.courseId,
-            },
-          },
-          update: { lastAccessedAt: new Date() },
-          create: {
+        const lastAccessedAt = new Date();
+        await this.writeUnitProgress(
+          userId,
+          unitId,
+          unit.courseId,
+          { lastAccessedAt },
+          {
             userId,
-            topicId: null as any,
-            materialId: null as any,
+            topicId: null,
+            materialId: null,
             unitId,
             courseId: unit.courseId,
             status: ProgressStatus.inProgress,
             progressPercentage: 0,
-            lastAccessedAt: new Date(),
           },
-        });
+        );
       }
     } catch (error) {
       this.logger.error(`Error tracking unit access for ${unitId}:`, error);
@@ -2159,34 +2176,28 @@ export class ProgressService {
       });
 
       if (unit?.courseId) {
-        await this.prisma.progress.upsert({
-          where: {
-            userId_topicId_materialId_unitId_courseId: {
-              userId,
-              topicId: null as any,
-              materialId: null as any,
-              unitId,
-              courseId: unit.courseId,
-            },
-          },
-          update: {
+        const completedAt = new Date();
+        await this.writeUnitProgress(
+          userId,
+          unitId,
+          unit.courseId,
+          {
             status: ProgressStatus.completed,
             progressPercentage: 100,
             isCompleted: true,
-            completedAt: new Date(),
+            completedAt,
           },
-          create: {
+          {
             userId,
-            topicId: null as any,
-            materialId: null as any,
+            topicId: null,
+            materialId: null,
             unitId,
             courseId: unit.courseId,
             status: ProgressStatus.completed,
             progressPercentage: 100,
             isCompleted: true,
-            completedAt: new Date(),
           },
-        });
+        );
       }
     } catch (error) {
       this.logger.error(`Error tracking unit completion for ${unitId}:`, error);

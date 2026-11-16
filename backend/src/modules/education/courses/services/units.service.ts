@@ -838,31 +838,41 @@ export class UnitsService {
         unit.courseId,
       );
 
-      await (this.prisma.progress).upsert({
+      const courseProgress = await this.prisma.progress.findFirst({
         where: {
-          userId_topicId_materialId_unitId_courseId: {
-            userId,
-            topicId: '00000000-0000-0000-0000-000000000000',
-            materialId: '00000000-0000-0000-0000-000000000000',
-            unitId: '00000000-0000-0000-0000-000000000000',
-            courseId: unit.courseId,
-          },
-        },
-        update: {
-          progressPercentage: progress?.percentage ?? 0,
-          lastAccessedAt: new Date(),
-        },
-        create: {
           userId,
+          topicId: null,
+          materialId: null,
+          unitId: null,
           courseId: unit.courseId,
-          topicId: '00000000-0000-0000-0000-000000000000',
-          materialId: '00000000-0000-0000-0000-000000000000',
-          unitId: '00000000-0000-0000-0000-000000000000',
-          progressPercentage: progress?.percentage ?? 0,
-          status: ProgressStatus.inProgress,
-          lastAccessedAt: new Date(),
         },
+        select: { id: true },
       });
+      const progressPercentage = progress?.percentage ?? 0;
+      const lastAccessedAt = new Date();
+
+      if (courseProgress) {
+        await this.prisma.progress.update({
+          where: { id: courseProgress.id },
+          data: {
+            progressPercentage,
+            lastAccessedAt,
+          },
+        });
+      } else {
+        await this.prisma.progress.create({
+          data: {
+            userId,
+            topicId: null,
+            materialId: null,
+            unitId: null,
+            courseId: unit.courseId,
+            progressPercentage,
+            status: ProgressStatus.inProgress,
+            lastAccessedAt,
+          },
+        });
+      }
 
       await this.clearCacheForUnit(unit);
 
