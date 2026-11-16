@@ -160,9 +160,12 @@ export function InstructorCourseManager({ instructorId }: { instructorId: string
     }
   };
 
-  const handleSaveTopic = async (topicData: Partial<Topic>) => {
+  const handleSaveTopic = async (
+    topicData: Partial<Topic>,
+    hasPendingMaterial: boolean,
+  ): Promise<Topic> => {
     const unit = formContext.unit;
-    if (!unit) return;
+    if (!unit) throw new Error('Choose a unit before saving a topic.');
     try {
       if (formContext.topic?.id) {
         const updatedTopic = await topicService.updateTopic(formContext.topic.id, topicData);
@@ -173,7 +176,10 @@ export function InstructorCourseManager({ instructorId }: { instructorId: string
             : item),
         })));
         setSuccessMessage('Topic updated successfully.');
-        setFormContext({ mode: 'none' });
+        setFormContext(hasPendingMaterial
+          ? { mode: 'topic', course: formContext.course, unit, topic: updatedTopic }
+          : { mode: 'none' });
+        return updatedTopic;
       } else {
         const newTopic = await topicService.createTopic(unit.id, topicData);
         setCourses(current => current.map(course => course.id === formContext.course?.id ? ({
@@ -184,9 +190,11 @@ export function InstructorCourseManager({ instructorId }: { instructorId: string
         }) : course));
         setFormContext({ mode: 'topic', course: formContext.course, unit, topic: newTopic });
         setSuccessMessage('Topic created. You can now add its assessment and materials.');
+        return newTopic;
       }
     } catch (saveError) {
       setError(getErrorMessage(saveError, 'Failed to save topic.'));
+      throw saveError;
     }
   };
 

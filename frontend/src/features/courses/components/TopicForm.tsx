@@ -19,17 +19,21 @@ import {
 } from '@/shared/components/ui/select';
 import { Checkbox } from '@/shared/components/ui/checkbox';
 
+const INITIAL_MATERIAL_EXTENSIONS = new Set([
+  'pdf', 'doc', 'docx', 'ppt', 'pptx', 'mp4', 'mpg', 'mpeg', 'mov', 'avi', 'webm',
+]);
+
 interface TopicFormProps {
   topic: Topic | null;
   courseId?: string;
   unitId: string;
-  onSave: (topic: Partial<Topic>) => Promise<void>;
+  onSave: (topic: Partial<Topic>, hasPendingMaterial: boolean) => Promise<Topic | void>;
   onCancel: () => void;
 }
 
 export const TopicForm: React.FC<TopicFormProps> = ({ topic, courseId, unitId, onSave, onCancel }) => {
   const [formData, setFormData] = useState<Partial<Topic>>({
-    title: '',
+    name: '',
     description: '',
     orderIndex: 0,
     isMandatory: false,
@@ -44,6 +48,8 @@ export const TopicForm: React.FC<TopicFormProps> = ({ topic, courseId, unitId, o
   const [showLibraryPicker, setShowLibraryPicker] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [shareWithCourse, setShareWithCourse] = useState(false);
+  const [initialMaterialFile, setInitialMaterialFile] = useState<File | null>(null);
+  const [initialMaterialTitle, setInitialMaterialTitle] = useState('');
 
   const loadMaterials = useCallback(async () => {
     if (!topic?.id) return;
@@ -61,10 +67,11 @@ export const TopicForm: React.FC<TopicFormProps> = ({ topic, courseId, unitId, o
 
   useEffect(() => {
     if (topic) {
-      setFormData(topic);
+      const { title, ...topicData } = topic;
+      setFormData({ ...topicData, name: topicData.name || title });
     } else {
       setFormData({
-        title: '',
+        name: '',
         description: '',
         orderIndex: 0,
         isMandatory: false,
@@ -101,24 +108,77 @@ export const TopicForm: React.FC<TopicFormProps> = ({ topic, courseId, unitId, o
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (formData.title && unitId) {
+    const name = formData.name?.trim() || formData.title?.trim();
+    if (name && unitId) {
+      let topicSaved = false;
       try {
         setLoading(true);
         setErrorMessage(null);
-        await onSave(formData);
+        const { title: _title, ...topicData } = formData;
+        const savedTopic = await onSave({ ...topicData, name }, Boolean(initialMaterialFile));
+        topicSaved = true;
+
+        if (initialMaterialFile) {
+          const targetTopic = savedTopic || topic;
+          if (!targetTopic?.id) {
+            throw new Error('The topic was saved, but its ID was not returned for the material upload.');
+          }
+          const materialCourseId = courseId || targetTopic.courseId;
+          if (!materialCourseId) {
+            throw new Error('The topic was saved, but a course is required to upload its material.');
+          }
+
+          const materialFormData = new FormData();
+          materialFormData.append('file', initialMaterialFile);
+          materialFormData.append('title', initialMaterialTitle.trim() || initialMaterialFile.name);
+          materialFormData.append('courseId', materialCourseId);
+          materialFormData.append('unitId', unitId);
+          materialFormData.append('topicId', targetTopic.id);
+          materialFormData.append('shareWithCourse', String(shareWithCourse));
+          await materialService.uploadMaterial(materialFormData);
+          setInitialMaterialFile(null);
+          setInitialMaterialTitle('');
+          setRefreshKey(current => current + 1);
+        }
       } catch (error) {
         console.error('Error saving topic:', error);
-        setErrorMessage(
-          error instanceof Error && error.message
-            ? error.message
-            : 'Failed to save topic. Please try again.',
-        );
+        const message = error instanceof Error && error.message
+          ? error.message
+          : 'Please try again.';
+        setErrorMessage(topicSaved
+          ? `Topic saved, but its material could not be uploaded. Save again to retry. ${message}`
+          : `Failed to save topic. ${message}`);
       } finally {
         setLoading(false);
       }
     } else {
-      setErrorMessage('Enter a topic title before saving.');
+      setErrorMessage('Enter a topic name before saving.');
     }
+  };
+
+  const handleInitialMaterialChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = event.target.files?.[0] ?? null;
+    if (!selectedFile) return;
+
+    const extension = selectedFile.name.split('.').pop()?.toLowerCase();
+    if (selectedFile.size > 50 * 1024 * 1024) {
+      setInitialMaterialFile(null);
+      setInitialMaterialTitle('');
+      setErrorMessage('Material file must be 50MB or smaller.');
+      event.target.value = '';
+      return;
+    }
+    if (!extension || !INITIAL_MATERIAL_EXTENSIONS.has(extension)) {
+      setInitialMaterialFile(null);
+      setInitialMaterialTitle('');
+      setErrorMessage('Choose a PDF, DOC, DOCX, PPT, PPTX, or supported video file.');
+      event.target.value = '';
+      return;
+    }
+
+    setErrorMessage(null);
+    setInitialMaterialFile(selectedFile);
+    setInitialMaterialTitle(selectedFile.name.replace(/\.[^.]+$/, ''));
   };
 
   const handleAttachMaterial = async (
@@ -152,12 +212,12 @@ export const TopicForm: React.FC<TopicFormProps> = ({ topic, courseId, unitId, o
             </p>
           )}
           <div>
-            <label htmlFor="title" className="block text-sm font-medium mb-1">
-              Title *
+            <label htmlFor="name" className="block text-sm font-medium mb-1">
+              Name *
             </label>
             <Input 
-              id="title" 
-              value={formData.title || ''} 
+              id="name"
+              value={formData.name || ''}
               onChange={handleChange} 
               placeholder="e.g., Skeletal System"
               required 
@@ -215,6 +275,63 @@ export const TopicForm: React.FC<TopicFormProps> = ({ topic, courseId, unitId, o
               Mark as Mandatory
             </label>
           </div>
+          {(!topic?.id || initialMaterialFile) && (
+            <div className="space-y-3 rounded-lg border border-border p-4">
+              <div>
+                <h3 className="flex items-center gap-2 font-semibold">
+                  <Paperclip className="h-4 w-4 text-primary" />
+                  Initial topic material (optional)
+                </h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Choose a file up to 50MB to upload and link to this topic when you save it.
+                </p>
+              </div>
+              <label htmlFor="initial-topic-material" className="block text-sm font-medium">
+                Choose material file
+              </label>
+              <Input
+                id="initial-topic-material"
+                type="file"
+                accept=".pdf,.doc,.docx,.ppt,.pptx,.mp4,.mpg,.mpeg,.mov,.avi,.webm"
+                onChange={handleInitialMaterialChange}
+                disabled={loading}
+              />
+              {initialMaterialFile && (
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    Selected: {initialMaterialFile.name} ({(initialMaterialFile.size / (1024 * 1024)).toFixed(2)} MB)
+                  </p>
+                  <div>
+                    <label htmlFor="initial-material-title" className="mb-1 block text-sm font-medium">
+                      Material title
+                    </label>
+                    <Input
+                      id="initial-material-title"
+                      value={initialMaterialTitle}
+                      onChange={event => setInitialMaterialTitle(event.target.value)}
+                      required
+                      disabled={loading}
+                    />
+                  </div>
+                </>
+              )}
+              {!topic?.id && (
+                <div className="flex items-start gap-2">
+                  <Checkbox
+                    id="shareInitialTopicMaterial"
+                    checked={shareWithCourse}
+                    onCheckedChange={checked => setShareWithCourse(checked === true)}
+                  />
+                  <label htmlFor="shareInitialTopicMaterial" className="text-sm leading-5">
+                    Make the uploaded material available to enrolled learners
+                    <span className="block text-xs text-muted-foreground">
+                      Unchecked materials remain private to their owner and course staff.
+                    </span>
+                  </label>
+                </div>
+              )}
+            </div>
+          )}
           {topic?.id ? (
             <div className="space-y-4 rounded-lg border border-border p-4">
               <div>
@@ -318,7 +435,9 @@ export const TopicForm: React.FC<TopicFormProps> = ({ topic, courseId, unitId, o
               type="submit"
               disabled={loading}
             >
-              {loading ? 'Saving...' : 'Save Topic'}
+              {loading
+                ? initialMaterialFile ? 'Saving and uploading...' : 'Saving...'
+                : initialMaterialFile ? 'Save Topic and Upload Material' : 'Save Topic'}
             </Button>
           </div>
         </form>

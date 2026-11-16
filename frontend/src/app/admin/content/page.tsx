@@ -210,7 +210,10 @@ export default function AdminContentPage() {
   };
 
   // Handle topic creation/update
-  const handleCreateOrUpdateTopic = async (topicData: Partial<Topic>) => {
+  const handleCreateOrUpdateTopic = async (
+    topicData: Partial<Topic>,
+    hasPendingMaterial: boolean,
+  ): Promise<Topic> => {
     try {
       if (formContext.topic?.id) {
         const updatedTopic = await topicService.updateTopic(formContext.topic.id, topicData);
@@ -232,6 +235,10 @@ export default function AdminContentPage() {
           return c;
         }));
         setSuccessMessage('Topic updated successfully');
+        setFormContext(hasPendingMaterial
+          ? { ...formContext, topic: updatedTopic }
+          : { mode: 'none' });
+        return updatedTopic;
       } else {
         const newTopic = await topicService.createTopic(formContext.unit?.id || '', topicData);
         setCourses(courses.map(c => {
@@ -252,11 +259,15 @@ export default function AdminContentPage() {
           return c;
         }));
         setSuccessMessage('Topic created successfully');
+        setFormContext(hasPendingMaterial
+          ? { ...formContext, topic: newTopic }
+          : { mode: 'none' });
+        return newTopic;
       }
-      setFormContext({ mode: 'none' });
     } catch (err) {
-      setError('Failed to save topic');
+      setError(getSaveErrorMessage(err, 'Failed to save topic'));
       console.error(err);
+      throw err;
     }
   };
 
@@ -330,6 +341,7 @@ export default function AdminContentPage() {
       {formContext.mode === 'topic' && formContext.unit && (
         <TopicForm
           topic={formContext.topic || null}
+          courseId={formContext.course?.id || formContext.unit.courseId}
           unitId={formContext.unit.id}
           onSave={handleCreateOrUpdateTopic}
           onCancel={() => setFormContext({ mode: 'none' })}

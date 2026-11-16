@@ -110,6 +110,7 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
   // ── Local state ────────────────────────────────────────────────────────
   const [offlineMode, setOfflineMode] = useState(false);
   const [isAddTopicOpen, setIsAddTopicOpen] = useState(false);
+  const [createdTopic, setCreatedTopic] = useState<Topic | null>(null);
   const [progressRevision, setProgressRevision] = useState<number>();
   const selectedMaterialId = searchParams.get('materialId');
   const hasSelectedTopic = Boolean(selectedTopicId);
@@ -155,16 +156,21 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
     updateRouteQuery('materialId', null, true);
   };
 
-  const handleAddTopic = async (topicData: Partial<Topic>) => {
+  const handleAddTopic = async (topicData: Partial<Topic>, hasPendingMaterial: boolean) => {
     if (!unitId) {
       throw new Error('Cannot create a topic because the unit could not be identified.');
     }
 
     try {
-      await topicService.createTopic(unitId, topicData);
-      setIsAddTopicOpen(false);
+      const newTopic = await topicService.createTopic(unitId, topicData);
+      if (hasPendingMaterial) {
+        setCreatedTopic(newTopic);
+      } else {
+        setIsAddTopicOpen(false);
+      }
       toast.success('Topic created successfully.');
       await refetchUnit();
+      return newTopic;
     } catch (error) {
       console.error('Failed to create topic:', error);
       throw error;
@@ -866,13 +872,23 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
           </div>
         </main>
       </div>
-      <Dialog open={isAddTopicOpen} onOpenChange={setIsAddTopicOpen}>
+      <Dialog
+        open={isAddTopicOpen}
+        onOpenChange={open => {
+          setIsAddTopicOpen(open);
+          if (!open) setCreatedTopic(null);
+        }}
+      >
         <DialogContent className="max-h-[90vh] overflow-y-auto">
           <TopicForm
-            topic={null}
+            topic={createdTopic}
+            courseId={courseId}
             unitId={unitId}
             onSave={handleAddTopic}
-            onCancel={() => setIsAddTopicOpen(false)}
+            onCancel={() => {
+              setIsAddTopicOpen(false);
+              setCreatedTopic(null);
+            }}
           />
         </DialogContent>
       </Dialog>

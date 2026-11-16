@@ -7,6 +7,11 @@ export interface Material extends SharedMaterial {
   topicId?: string;
 }
 
+const toTopicWritePayload = ({ name, title, ...topicData }: Partial<Topic>) => ({
+  ...topicData,
+  name: name ?? title,
+});
+
 class TopicService {
   private readonly baseUrl = '/topics';
 
@@ -47,7 +52,7 @@ class TopicService {
   async createTopic(unitId: string, topicData: Partial<Topic>): Promise<Topic> {
     const response = await apiService.post<Topic>(this.baseUrl, {
       unitId,
-      ...topicData,
+      ...toTopicWritePayload(topicData),
     });
     return response.data;
   }
@@ -56,7 +61,10 @@ class TopicService {
    * Update a topic
    */
   async updateTopic(id: string, topicData: Partial<Topic>): Promise<Topic> {
-    const response = await apiService.patch<Topic>(`${this.baseUrl}/${id}`, topicData);
+    const response = await apiService.patch<Topic>(
+      `${this.baseUrl}/${id}`,
+      toTopicWritePayload(topicData),
+    );
     return response.data;
   }
 
