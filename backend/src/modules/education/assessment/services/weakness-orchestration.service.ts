@@ -94,7 +94,7 @@ export class WeaknessOrchestrationService {
             `We created a custom 5-question quiz to help strengthen this area. Your current mastery: ${(chain.weakTopic.pKnown * 100).toFixed(0)}%`,
             'WEAKNESS_QUIZ',
             {
-              actionUrl: `/quiz/${quiz.id}`,
+              actionUrl: `/assessment/${quiz.id}`,
             },
             NotificationPriority.high,
             true,

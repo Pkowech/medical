@@ -11,41 +11,41 @@ datasource db {
 }
 
 model Question {
-  id                  String               @id @default(uuid())
-  text                String               @db.VarChar(1000)
-  type                QuestionType         @default(multiple_choice)
-  difficulty          QuestionDifficulty   @default(medium)
-  category            QuestionCategory     @default(general)
-  explanation         String?
-  conceptsCovered     String[]             @map("concepts_covered")
-  tags                String[]
+  id                     String                  @id @default(uuid())
+  text                   String                  @db.VarChar(1000)
+  type                   QuestionType            @default(multiple_choice)
+  difficulty             QuestionDifficulty      @default(medium)
+  category               QuestionCategory        @default(general)
+  explanation            String?
+  conceptsCovered        String[]                @map("concepts_covered")
+  tags                   String[]
   /// Default scoring weight copied to QuizQuestion when a question is added to a quiz.
-  points              Int                  @default(1)
-  metadata            Json?
-  choices             Json?
-  usageCount          Int                  @default(0) @map("usage_count")
-  successRate         Float                @default(0) @map("success_rate")
-  averageTime         Int                  @default(0) @map("average_time")
-  difficultyIndex     Float?               @map("difficulty_index")
-  discrimination      Float                @default(0)
-  guessing            Float                @default(0)
-  averageScore        Float?               @default(0) @map("average_score")
-  isActive            Boolean              @default(true) @map("is_active")
-  createdBy           String?              @map("created_by")
-  courseId            String?              @map("course_id")
-  unitId              String?              @map("unit_id")
-  topicIds            String[]             @map("topic_ids")
-  createdAt           DateTime             @default(now()) @map("created_at")
-  updatedAt           DateTime             @updatedAt @map("updated_at")
-  flashcards          Flashcard[]
-  instructorOverrides InstructorOverride[]
-  questionFlags       QuestionFlag[]
+  points                 Int                     @default(1)
+  metadata               Json?
+  choices                Json?
+  usageCount             Int                     @default(0) @map("usage_count")
+  successRate            Float                   @default(0) @map("success_rate")
+  averageTime            Int                     @default(0) @map("average_time")
+  difficultyIndex        Float?                  @map("difficulty_index")
+  discrimination         Float                   @default(0)
+  guessing               Float                   @default(0)
+  averageScore           Float?                  @default(0) @map("average_score")
+  isActive               Boolean                 @default(true) @map("is_active")
+  createdBy              String?                 @map("created_by")
+  courseId               String?                 @map("course_id")
+  unitId                 String?                 @map("unit_id")
+  topicIds               String[]                @map("topic_ids")
+  createdAt              DateTime                @default(now()) @map("created_at")
+  updatedAt              DateTime                @updatedAt @map("updated_at")
+  flashcards             Flashcard[]
+  instructorOverrides    InstructorOverride[]
+  questionFlags          QuestionFlag[]
   questionModerationCase QuestionModerationCase?
-  options             Option[]
-  course              Course?              @relation(fields: [courseId], references: [id])
-  unit                Unit?                @relation(fields: [unitId], references: [id])
-  quizQuestions       QuizQuestion[]
-  userResponses       UserResponse[]
+  options                Option[]
+  course                 Course?                 @relation(fields: [courseId], references: [id])
+  unit                   Unit?                   @relation(fields: [unitId], references: [id])
+  quizQuestions          QuizQuestion[]
+  userResponses          UserResponse[]
 
   @@index([courseId])
   @@index([unitId])
@@ -220,31 +220,41 @@ model QuizQuestion {
 }
 
 model QuizAttempt {
-  id             String         @id @default(uuid())
-  userId         String         @map("user_id")
-  quizId         String         @map("quiz_id")
-  startedAt      DateTime       @default(now()) @map("started_at")
-  completedAt    DateTime?      @map("completed_at")
-  score          Float          @default(0)
-  maxScore       Float          @default(0) @map("max_score")
-  percentage     Float          @default(0)
-  timeTaken      Int?           @map("time_taken")
-  isPassed       Boolean        @default(false) @map("is_passed")
-  correctAnswers Int            @default(0) @map("correct_answers")
-  totalQuestions Int            @default(0) @map("total_questions")
-  answers        Json?
-  feedback       Json?
-  adaptiveState  Json?          @map("adaptive_state")
-  createdAt      DateTime       @default(now()) @map("created_at")
-  quiz           Quiz           @relation(fields: [quizId], references: [id])
-  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  responses      UserResponse[]
+  id               String                       @id @default(uuid())
+  userId           String                       @map("user_id")
+  quizId           String                       @map("quiz_id")
+  startedAt        DateTime                     @default(now()) @map("started_at")
+  completedAt      DateTime?                    @map("completed_at")
+  score            Float                        @default(0)
+  maxScore         Float                        @default(0) @map("max_score")
+  percentage       Float                        @default(0)
+  timeTaken        Int?                         @map("time_taken")
+  isPassed         Boolean                      @default(false) @map("is_passed")
+  correctAnswers   Int                          @default(0) @map("correct_answers")
+  totalQuestions   Int                          @default(0) @map("total_questions")
+  answers          Json?
+  feedback         Json?
+  adaptiveState    Json?                        @map("adaptive_state")
+  createdAt        DateTime                     @default(now()) @map("created_at")
+  quiz             Quiz                         @relation(fields: [quizId], references: [id])
+  user             User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  responses        UserResponse[]
+  questionSnapshot QuizAttemptQuestionSnapshot?
 
   @@index([userId])
   @@index([quizId])
   @@index([startedAt])
   @@index([completedAt])
   @@map("quiz_attempts")
+}
+
+model QuizAttemptQuestionSnapshot {
+  attemptId String      @id @map("attempt_id")
+  snapshot  Json        @db.JsonB
+  createdAt DateTime    @default(now()) @map("created_at")
+  attempt   QuizAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+
+  @@map("quiz_attempt_question_snapshots")
 }
 
 model UserResponse {
@@ -325,107 +335,107 @@ model UserFlashcardProgress {
 }
 
 model User {
-  id                             String                          @id @default(uuid())
-  email                          String                          @unique @db.VarChar(255)
-  firstName                      String?                         @map("first_name") @db.VarChar(255)
-  lastName                       String?                         @map("last_name") @db.VarChar(255)
-  username                       String?                         @unique @db.VarChar(100)
-  password                       String?                         @db.VarChar(255)
-  phoneNumber                    String?                         @map("phone_number") @db.VarChar(50)
-  profileImage                   String?                         @map("profile_image") @db.VarChar(2048)
-  bio                            String?
-  location                       String?                         @db.VarChar(255)
-  careerStage                    String?                         @map("career_stage") @db.VarChar(32)
-  healthcareField                String?                         @map("healthcare_field") @db.VarChar(80)
-  studyYear                      Int?                            @map("study_year")
-  yearOfExperience               Int?                            @map("year_of_experience")
-  streakDays                     Int                             @default(0) @map("streak_days")
-  preferences                    Json?
-  guidanceLevel                  GuidanceLevel?                  @map("guidance_level")
-  guidanceLevelOverride          Boolean                         @default(false) @map("guidance_level_override")
-  isActive                       Boolean                         @default(true) @map("is_active")
-  isLocked                       Boolean                         @default(false) @map("is_locked")
-  lockedUntil                    DateTime?                       @map("locked_until")
-  failedLoginAttempts            Int                             @default(0) @map("failed_login_attempts")
-  points                         Int                             @default(0)
-  rewards                        Json                            @default("[]")
-  specialization                 String?
-  lastLogin                      DateTime?                       @map("last_login")
-  createdAt                      DateTime                        @default(now()) @map("created_at")
-  updatedAt                      DateTime                        @updatedAt @map("updated_at")
-  enrollmentType                 EnrollmentType                  @default(self_paced) @map("enrollment_type")
-  fts                            Unsupported("tsvector")?
-  assessmentProgresses           AssessmentProgress[]
-  autoGeneratedQuizzes           AutoGeneratedQuiz[]
-  caseAttempts                   CaseAttempt[]
-  chatMessages                   ChatMessage[]
-  chatSessions                   ChatSession[]
-  enrollments                    CourseEnrollment[]
-  instructingCourses             CourseInstructor[]
-  coursesCreated                 Course[]                        @relation("CourseCreator")
-  cpdActivities                  CPDActivity[]
-  cpdCycles                      CPDCycle[]
-  deadlines                      Deadline[]                      @relation("UserDeadlines")
-  discussionMessages             DiscussionMessage[]
-  directConversationParticipants DirectConversationParticipant[]
-  sentDirectMessages             DirectMessage[]                 @relation("DirectMessageSender")
-  EmailVerificationToken         EmailVerificationToken?
-  passwordResetToken             PasswordResetToken?
-  experimentAssignments          ExperimentAssignment[]
-  File                           File[]
-  instructorOverrides            InstructorOverride[]
-  analyticsInstructorOverrides   AnalyticsOverride[]             @relation("OverrideInstructor")
-  analyticsStudentOverrides      AnalyticsOverride[]             @relation("OverrideStudent")
-  LearningGoalProgress           LearningGoalProgress[]
-  notes                          Note[]
-  learningGoals                  LearningGoal[]
-  learningHistory                LearningHistory[]
-  learningPathProgress           LearningPathProgress[]
-  learningPathPhaseProgress      LearningPathPhaseProgress[]
-  learningPathModuleProgress     LearningPathModuleProgress[]
-  learningSuggestions            LearningSuggestion[]
-  materialEngagements            MaterialEngagement[]
-  materialEvents                 MaterialEvent[]
-  materialShares                 MaterialShare[]
-  materials                      Material[]
-  academicContentReviews         AcademicContentReview[]         @relation("AcademicContentReviewer")
-  contentReportsFiled            AcademicContentReport[]         @relation("ContentReportReporter")
-  contentReportsModerated        AcademicContentReport[]         @relation("ContentReportModerator")
-  notifications                  Notification[]
-  pushSubscriptions              PushSubscription[]
-  predictionAudits               PredictionAudit[]
-  predictionValidations          PredictionValidation[]
-  questionFlags                  QuestionFlag[]
-  questionModerationCasesAssigned QuestionModerationCase[] @relation("QuestionModerationAssignee")
-  questionModerationEvents       QuestionModerationEvent[] @relation("QuestionModerationActor")
-  quizAttempts                   QuizAttempt[]
-  offlinePracticeAttempts        OfflinePracticeAttempt[]
-  recommendations                Recommendation[]
-  scheduleEvents                 ScheduleEvent[]
-  securityAudits                 SecurityAudit[]
-  securityEvents                 SecurityEvent[]
-  skillTrajectories              SkillTrajectory[]
-  studentInteractions            StudentInteraction[]
-  studyEvents                    StudyEvent[]
-  studyGroups                    StudyGroupMember[]
-  studySessions                  StudySession[]
-  syncLogs                       SyncLog[]
-  progress                       Progress[]
-  unitAccesses                   UnitAccess[]
-  unitCompletions                UnitCompletion[]
-  userActivities                 UserActivity[]
-  userBadges                     UserBadge[]                     @relation("UserUserBadges")
-  userFlashcardProgresses        UserFlashcardProgress[]
-  flashcardResults               FlashcardResult[]
-  googleDriveConnection          GoogleDriveConnection?
-  analytics                      UserLearningAnalytics?
-  UserResponse                   UserResponse[]
-  userRoles                      UserRole[]
-  securitySettings               UserSecuritySettings?
-  sessions                       UserSession[]
-  userSkillStates                UserSkillState[]
-  weeklyDigests                  WeeklyDigest[]
-  xapiStatements                 XapiStatement[]
+  id                              String                          @id @default(uuid())
+  email                           String                          @unique @db.VarChar(255)
+  firstName                       String?                         @map("first_name") @db.VarChar(255)
+  lastName                        String?                         @map("last_name") @db.VarChar(255)
+  username                        String?                         @unique @db.VarChar(100)
+  password                        String?                         @db.VarChar(255)
+  phoneNumber                     String?                         @map("phone_number") @db.VarChar(50)
+  profileImage                    String?                         @map("profile_image") @db.VarChar(2048)
+  bio                             String?
+  location                        String?                         @db.VarChar(255)
+  careerStage                     String?                         @map("career_stage") @db.VarChar(32)
+  healthcareField                 String?                         @map("healthcare_field") @db.VarChar(80)
+  studyYear                       Int?                            @map("study_year")
+  yearOfExperience                Int?                            @map("year_of_experience")
+  streakDays                      Int                             @default(0) @map("streak_days")
+  preferences                     Json?
+  guidanceLevel                   GuidanceLevel?                  @map("guidance_level")
+  guidanceLevelOverride           Boolean                         @default(false) @map("guidance_level_override")
+  isActive                        Boolean                         @default(true) @map("is_active")
+  isLocked                        Boolean                         @default(false) @map("is_locked")
+  lockedUntil                     DateTime?                       @map("locked_until")
+  failedLoginAttempts             Int                             @default(0) @map("failed_login_attempts")
+  points                          Int                             @default(0)
+  rewards                         Json                            @default("[]")
+  specialization                  String?
+  lastLogin                       DateTime?                       @map("last_login")
+  createdAt                       DateTime                        @default(now()) @map("created_at")
+  updatedAt                       DateTime                        @updatedAt @map("updated_at")
+  enrollmentType                  EnrollmentType                  @default(self_paced) @map("enrollment_type")
+  fts                             Unsupported("tsvector")?
+  assessmentProgresses            AssessmentProgress[]
+  autoGeneratedQuizzes            AutoGeneratedQuiz[]
+  caseAttempts                    CaseAttempt[]
+  chatMessages                    ChatMessage[]
+  chatSessions                    ChatSession[]
+  enrollments                     CourseEnrollment[]
+  instructingCourses              CourseInstructor[]
+  coursesCreated                  Course[]                        @relation("CourseCreator")
+  cpdActivities                   CPDActivity[]
+  cpdCycles                       CPDCycle[]
+  deadlines                       Deadline[]                      @relation("UserDeadlines")
+  discussionMessages              DiscussionMessage[]
+  directConversationParticipants  DirectConversationParticipant[]
+  sentDirectMessages              DirectMessage[]                 @relation("DirectMessageSender")
+  EmailVerificationToken          EmailVerificationToken?
+  passwordResetToken              PasswordResetToken?
+  experimentAssignments           ExperimentAssignment[]
+  File                            File[]
+  instructorOverrides             InstructorOverride[]
+  analyticsInstructorOverrides    AnalyticsOverride[]             @relation("OverrideInstructor")
+  analyticsStudentOverrides       AnalyticsOverride[]             @relation("OverrideStudent")
+  LearningGoalProgress            LearningGoalProgress[]
+  notes                           Note[]
+  learningGoals                   LearningGoal[]
+  learningHistory                 LearningHistory[]
+  learningPathProgress            LearningPathProgress[]
+  learningPathPhaseProgress       LearningPathPhaseProgress[]
+  learningPathModuleProgress      LearningPathModuleProgress[]
+  learningSuggestions             LearningSuggestion[]
+  materialEngagements             MaterialEngagement[]
+  materialEvents                  MaterialEvent[]
+  materialShares                  MaterialShare[]
+  materials                       Material[]
+  academicContentReviews          AcademicContentReview[]         @relation("AcademicContentReviewer")
+  contentReportsFiled             AcademicContentReport[]         @relation("ContentReportReporter")
+  contentReportsModerated         AcademicContentReport[]         @relation("ContentReportModerator")
+  notifications                   Notification[]
+  pushSubscriptions               PushSubscription[]
+  predictionAudits                PredictionAudit[]
+  predictionValidations           PredictionValidation[]
+  questionFlags                   QuestionFlag[]
+  questionModerationCasesAssigned QuestionModerationCase[]        @relation("QuestionModerationAssignee")
+  questionModerationEvents        QuestionModerationEvent[]       @relation("QuestionModerationActor")
+  quizAttempts                    QuizAttempt[]
+  offlinePracticeAttempts         OfflinePracticeAttempt[]
+  recommendations                 Recommendation[]
+  scheduleEvents                  ScheduleEvent[]
+  securityAudits                  SecurityAudit[]
+  securityEvents                  SecurityEvent[]
+  skillTrajectories               SkillTrajectory[]
+  studentInteractions             StudentInteraction[]
+  studyEvents                     StudyEvent[]
+  studyGroups                     StudyGroupMember[]
+  studySessions                   StudySession[]
+  syncLogs                        SyncLog[]
+  progress                        Progress[]
+  unitAccesses                    UnitAccess[]
+  unitCompletions                 UnitCompletion[]
+  userActivities                  UserActivity[]
+  userBadges                      UserBadge[]                     @relation("UserUserBadges")
+  userFlashcardProgresses         UserFlashcardProgress[]
+  flashcardResults                FlashcardResult[]
+  googleDriveConnection           GoogleDriveConnection?
+  analytics                       UserLearningAnalytics?
+  UserResponse                    UserResponse[]
+  userRoles                       UserRole[]
+  securitySettings                UserSecuritySettings?
+  sessions                        UserSession[]
+  userSkillStates                 UserSkillState[]
+  weeklyDigests                   WeeklyDigest[]
+  xapiStatements                  XapiStatement[]
 
   @@index([email])
   @@index([username])
@@ -783,44 +793,44 @@ model AcademicYear {
 }
 
 model Course {
-  id                String                   @id @default(uuid())
-  name              String                   @db.VarChar(255)
-  title             String?                  @db.VarChar(255)
-  code              String?                  @unique @db.VarChar(50)
-  description       String?
-  difficulty        CourseDifficulty         @default(beginner)
-  status            CourseStatus             @default(draft)
+  id                  String                   @id @default(uuid())
+  name                String                   @db.VarChar(255)
+  title               String?                  @db.VarChar(255)
+  code                String?                  @unique @db.VarChar(50)
+  description         String?
+  difficulty          CourseDifficulty         @default(beginner)
+  status              CourseStatus             @default(draft)
   contentVersion      Int                      @default(1) @map("content_version")
-  categoryId        String?                  @map("category_id")
-  createdById       String?                  @map("created_by_id")
-  estimatedHours    Int?                     @default(0) @map("estimated_hours")
-  tags              String[]                 @default([])
-  rating            Float?                   @default(0)
-  price             Float?                   @default(0)
-  enrollmentCount   Int?                     @default(0) @map("enrollment_count")
-  isFeatured        Boolean                  @default(false) @map("is_featured")
-  createdAt         DateTime                 @default(now()) @map("created_at")
-  updatedAt         DateTime                 @updatedAt @map("updated_at")
+  categoryId          String?                  @map("category_id")
+  createdById         String?                  @map("created_by_id")
+  estimatedHours      Int?                     @default(0) @map("estimated_hours")
+  tags                String[]                 @default([])
+  rating              Float?                   @default(0)
+  price               Float?                   @default(0)
+  enrollmentCount     Int?                     @default(0) @map("enrollment_count")
+  isFeatured          Boolean                  @default(false) @map("is_featured")
+  createdAt           DateTime                 @default(now()) @map("created_at")
+  updatedAt           DateTime                 @updatedAt @map("updated_at")
   /// Full-text search vector for PostgreSQL tsvector queries (@@ operator).
   /// Automatically updated by trigger on INSERT/UPDATE.
   /// Supports weighted search across title(A), name(A), description(B), tags(C).
   /// Marked Unsupported because Prisma lacks native tsvector support.
   /// Use in raw queries only: prisma.$queryRaw`WHERE fts @@ plainto_tsquery(...)`
-  fts               Unsupported("tsvector")?
-  clinicalCases     ClinicalCase[]
-  enrollments       CourseEnrollment[]
-  instructors       CourseInstructor[]
-  prerequisites     CoursePrerequisite[]     @relation("PrerequisiteTo")
-  isPrerequisiteFor CoursePrerequisite[]     @relation("PrerequisiteFor")
-  category          CourseCategory?          @relation(fields: [categoryId], references: [id])
-  createdBy         User?                    @relation("CourseCreator", fields: [createdById], references: [id])
-  deadlines         Deadline[]               @relation("CourseDeadlines")
-  LearningGoal      LearningGoal[]
-  materials         Material[]
-  Question          Question[]
-  scheduleEvents    ScheduleEvent[]
-  progress          Progress[]
-  units             Unit[]
+  fts                 Unsupported("tsvector")?
+  clinicalCases       ClinicalCase[]
+  enrollments         CourseEnrollment[]
+  instructors         CourseInstructor[]
+  prerequisites       CoursePrerequisite[]     @relation("PrerequisiteTo")
+  isPrerequisiteFor   CoursePrerequisite[]     @relation("PrerequisiteFor")
+  category            CourseCategory?          @relation(fields: [categoryId], references: [id])
+  createdBy           User?                    @relation("CourseCreator", fields: [createdById], references: [id])
+  deadlines           Deadline[]               @relation("CourseDeadlines")
+  LearningGoal        LearningGoal[]
+  materials           Material[]
+  Question            Question[]
+  scheduleEvents      ScheduleEvent[]
+  progress            Progress[]
+  units               Unit[]
   learningPathModules LearningPathModule[]
   curriculumCourses   CurriculumCourse[]
 
@@ -1107,20 +1117,20 @@ model MaterialShare {
 }
 
 model MaterialEvent {
-  id             String   @id @default(uuid())
-  userId         String   @map("user_id")
-  materialId     String   @map("material_id")
-  eventType      String   @map("event_type")
-  viewCount      Int      @default(0) @map("view_count")
-  downloadCount  Int      @default(0) @map("download_count")
-  lastPage       Int?     @map("last_page")
-  lastOccurredAt DateTime @map("last_occurred_at")
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
-  isOverride     Boolean  @default(false) @map("is_override")
-  overrideReason String?  @map("override_reason")
-  material       Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id             String                  @id @default(uuid())
+  userId         String                  @map("user_id")
+  materialId     String                  @map("material_id")
+  eventType      String                  @map("event_type")
+  viewCount      Int                     @default(0) @map("view_count")
+  downloadCount  Int                     @default(0) @map("download_count")
+  lastPage       Int?                    @map("last_page")
+  lastOccurredAt DateTime                @map("last_occurred_at")
+  createdAt      DateTime                @default(now()) @map("created_at")
+  updatedAt      DateTime                @updatedAt @map("updated_at")
+  isOverride     Boolean                 @default(false) @map("is_override")
+  overrideReason String?                 @map("override_reason")
+  material       Material                @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  user           User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
   deliveries     MaterialEventDelivery[]
 
   @@unique([userId, materialId, eventType], name: "material_events_user_material_type_idx")
@@ -1427,18 +1437,18 @@ enum PathModuleType {
 }
 
 model LearningPathPhase {
-  id             String                      @id @default(uuid())
-  learningPathId String                      @map("learning_path_id")
-  title          String                      @db.VarChar(255)
+  id             String   @id @default(uuid())
+  learningPathId String   @map("learning_path_id")
+  title          String   @db.VarChar(255)
   description    String?
-  order          Int                         @default(1)
-  estimatedWeeks Int?                        @map("estimated_weeks")
-  createdAt      DateTime                    @default(now()) @map("created_at")
-  updatedAt      DateTime                    @updatedAt @map("updated_at")
+  order          Int      @default(1)
+  estimatedWeeks Int?     @map("estimated_weeks")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
 
-  learningPath   LearningPath                @relation(fields: [learningPathId], references: [id], onDelete: Cascade)
-  modules        LearningPathModule[]
-  phaseProgress  LearningPathPhaseProgress[]
+  learningPath  LearningPath                @relation(fields: [learningPathId], references: [id], onDelete: Cascade)
+  modules       LearningPathModule[]
+  phaseProgress LearningPathPhaseProgress[]
 
   @@unique([learningPathId, order])
   @@index([learningPathId])
@@ -1446,27 +1456,27 @@ model LearningPathPhase {
 }
 
 model LearningPathModule {
-  id               String                       @id @default(uuid())
-  phaseId          String                       @map("phase_id")
-  title            String                       @db.VarChar(255)
+  id               String         @id @default(uuid())
+  phaseId          String         @map("phase_id")
+  title            String         @db.VarChar(255)
   description      String?
-  type             PathModuleType               @default(course)
-  resourceId       String                       @map("resource_id")
-  courseId         String?                      @map("course_id")
-  unitId           String?                      @map("unit_id")
-  quizId           String?                      @map("quiz_id")
-  order            Int                          @default(1)
-  estimatedMinutes Int?                         @map("estimated_minutes")
-  isRequired       Boolean                      @default(true) @map("is_required")
-  unlockConditions Json?                        @map("unlock_conditions")
-  createdAt        DateTime                     @default(now()) @map("created_at")
-  updatedAt        DateTime                     @updatedAt @map("updated_at")
+  type             PathModuleType @default(course)
+  resourceId       String         @map("resource_id")
+  courseId         String?        @map("course_id")
+  unitId           String?        @map("unit_id")
+  quizId           String?        @map("quiz_id")
+  order            Int            @default(1)
+  estimatedMinutes Int?           @map("estimated_minutes")
+  isRequired       Boolean        @default(true) @map("is_required")
+  unlockConditions Json?          @map("unlock_conditions")
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
 
-  phase            LearningPathPhase            @relation(fields: [phaseId], references: [id], onDelete: Cascade)
-  course           Course?                      @relation(fields: [courseId], references: [id], onDelete: Restrict)
-  unit             Unit?                        @relation(fields: [unitId], references: [id], onDelete: Restrict)
-  quiz             Quiz?                        @relation(fields: [quizId], references: [id], onDelete: Restrict)
-  moduleProgress   LearningPathModuleProgress[]
+  phase          LearningPathPhase            @relation(fields: [phaseId], references: [id], onDelete: Cascade)
+  course         Course?                      @relation(fields: [courseId], references: [id], onDelete: Restrict)
+  unit           Unit?                        @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  quiz           Quiz?                        @relation(fields: [quizId], references: [id], onDelete: Restrict)
+  moduleProgress LearningPathModuleProgress[]
 
   @@unique([phaseId, order])
   @@index([phaseId])
@@ -1477,16 +1487,16 @@ model LearningPathModule {
 }
 
 model LearningPathPhaseProgress {
-  id                 String            @id @default(uuid())
-  userId             String            @map("user_id")
-  phaseId            String            @map("phase_id")
-  status             ProgressStatus    @default(notStarted)
-  progressPercentage Float             @default(0) @map("progress_percentage")
-  completedAt        DateTime?         @map("completed_at")
-  lastAccessedAt     DateTime?         @map("last_accessed_at")
+  id                 String         @id @default(uuid())
+  userId             String         @map("user_id")
+  phaseId            String         @map("phase_id")
+  status             ProgressStatus @default(notStarted)
+  progressPercentage Float          @default(0) @map("progress_percentage")
+  completedAt        DateTime?      @map("completed_at")
+  lastAccessedAt     DateTime?      @map("last_accessed_at")
 
-  user               User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  phase              LearningPathPhase @relation(fields: [phaseId], references: [id], onDelete: Restrict)
+  user  User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  phase LearningPathPhase @relation(fields: [phaseId], references: [id], onDelete: Restrict)
 
   @@unique([userId, phaseId])
   @@index([userId])
@@ -1495,18 +1505,18 @@ model LearningPathPhaseProgress {
 }
 
 model LearningPathModuleProgress {
-  id                 String             @id @default(uuid())
-  userId             String             @map("user_id")
-  moduleId           String             @map("module_id")
-  status             ProgressStatus     @default(notStarted)
-  progressPercentage Float              @default(0) @map("progress_percentage")
-  timeSpentMinutes   Int                @default(0) @map("time_spent_minutes")
-  bestScore          Float?             @map("best_score")
-  completedAt        DateTime?          @map("completed_at")
-  lastAccessedAt     DateTime?          @map("last_accessed_at")
+  id                 String         @id @default(uuid())
+  userId             String         @map("user_id")
+  moduleId           String         @map("module_id")
+  status             ProgressStatus @default(notStarted)
+  progressPercentage Float          @default(0) @map("progress_percentage")
+  timeSpentMinutes   Int            @default(0) @map("time_spent_minutes")
+  bestScore          Float?         @map("best_score")
+  completedAt        DateTime?      @map("completed_at")
+  lastAccessedAt     DateTime?      @map("last_accessed_at")
 
-  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  module             LearningPathModule @relation(fields: [moduleId], references: [id], onDelete: Restrict)
+  user   User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  module LearningPathModule @relation(fields: [moduleId], references: [id], onDelete: Restrict)
 
   @@unique([userId, moduleId])
   @@index([userId])
@@ -2183,19 +2193,19 @@ model QuestionFlag {
 }
 
 model QuestionModerationCase {
-  id                   String                    @id @default(uuid())
-  questionId           String                    @unique @map("question_id")
-  status               QuestionModerationStatus  @default(open)
-  assignedModeratorId  String?                   @map("assigned_moderator_id")
-  resolution           String?                   @db.VarChar(50)
-  resolutionNote       String?                   @map("resolution_note") @db.Text
-  openedAt             DateTime                  @default(now()) @map("opened_at")
-  closedAt             DateTime?                 @map("closed_at")
-  createdAt            DateTime                  @default(now()) @map("created_at")
-  updatedAt            DateTime                  @updatedAt @map("updated_at")
-  question             Question                  @relation(fields: [questionId], references: [id], onDelete: Cascade)
-  assignedModerator    User?                     @relation("QuestionModerationAssignee", fields: [assignedModeratorId], references: [id], onDelete: SetNull)
-  events               QuestionModerationEvent[]
+  id                  String                    @id @default(uuid())
+  questionId          String                    @unique @map("question_id")
+  status              QuestionModerationStatus  @default(open)
+  assignedModeratorId String?                   @map("assigned_moderator_id")
+  resolution          String?                   @db.VarChar(50)
+  resolutionNote      String?                   @map("resolution_note") @db.Text
+  openedAt            DateTime                  @default(now()) @map("opened_at")
+  closedAt            DateTime?                 @map("closed_at")
+  createdAt           DateTime                  @default(now()) @map("created_at")
+  updatedAt           DateTime                  @updatedAt @map("updated_at")
+  question            Question                  @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  assignedModerator   User?                     @relation("QuestionModerationAssignee", fields: [assignedModeratorId], references: [id], onDelete: SetNull)
+  events              QuestionModerationEvent[]
 
   @@index([status, updatedAt])
   @@index([assignedModeratorId, status])
@@ -2203,16 +2213,16 @@ model QuestionModerationCase {
 }
 
 model QuestionModerationEvent {
-  id          String                    @id @default(uuid())
-  caseId      String                    @map("case_id")
-  actorId     String?                   @map("actor_id")
-  action      String                    @db.VarChar(30)
-  fromStatus  QuestionModerationStatus? @map("from_status")
-  toStatus    QuestionModerationStatus  @map("to_status")
-  reason      String?                   @db.Text
-  createdAt   DateTime                  @default(now()) @map("created_at")
-  moderationCase QuestionModerationCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
-  actor       User?                     @relation("QuestionModerationActor", fields: [actorId], references: [id], onDelete: SetNull)
+  id             String                    @id @default(uuid())
+  caseId         String                    @map("case_id")
+  actorId        String?                   @map("actor_id")
+  action         String                    @db.VarChar(30)
+  fromStatus     QuestionModerationStatus? @map("from_status")
+  toStatus       QuestionModerationStatus  @map("to_status")
+  reason         String?                   @db.Text
+  createdAt      DateTime                  @default(now()) @map("created_at")
+  moderationCase QuestionModerationCase    @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  actor          User?                     @relation("QuestionModerationActor", fields: [actorId], references: [id], onDelete: SetNull)
 
   @@index([caseId, createdAt])
   @@index([actorId, createdAt])

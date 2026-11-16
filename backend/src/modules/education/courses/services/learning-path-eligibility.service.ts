@@ -30,3 +30,13 @@ export class LearningPathEligibilityService {
     }
   }
 }
+
+export function getLearningPathEligibilityService(
+  candidate?: Partial<LearningPathEligibilityService> | null,
+): LearningPathEligibilityService {
+  if (candidate && typeof candidate.evaluate === 'function' && typeof candidate.assertEligible === 'function') {
+    return candidate as LearningPathEligibilityService;
+  }
+
+  return new LearningPathEligibilityService();
+}

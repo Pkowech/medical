@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
   Body,
   Headers,
   Param,
@@ -32,6 +33,8 @@ import {
   SaveQuizAttemptAnswerDto,
   StartQuizAttemptDto,
   SubmitQuizDto,
+  CreateQuizDto,
+  UpdateQuizDto,
 } from '#common/dto/assessment.dto';
 import {
   ImportQuizDto,
@@ -116,6 +119,41 @@ export class QuizController {
   @ApiOperation({ summary: 'Browse the question bank' })
   async getQuestionBank(@Query() filters: QuestionBankFilterDto) {
     return this.quizService.getQuestionBank(filters);
+  }
+
+  @Post()
+  @UseGuards(RoleGuard)
+  @Roles(Role.instructor, Role.admin)
+  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
+  @ApiOperation({ summary: 'Create a quiz from selected question-bank items' })
+  async createQuiz(@Request() req: any, @Body() body: CreateQuizDto) {
+    return this.quizService.create(body, req.user.id);
+  }
+
+  @Patch(':quizId')
+  @UseGuards(RoleGuard)
+  @Roles(Role.instructor, Role.admin)
+  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
+  @ApiOperation({
+    summary: 'Update a quiz draft before learner attempts exist',
+  })
+  async updateQuiz(
+    @Request() req: any,
+    @Param('quizId') quizId: string,
+    @Body() body: UpdateQuizDto,
+  ) {
+    return this.quizService.update(quizId, body, req.user.id);
+  }
+
+  @Get(':quizId/authoring')
+  @UseGuards(RoleGuard)
+  @Roles(Role.instructor, Role.admin)
+  @ApiOperation({ summary: 'Get an owned quiz for editing' })
+  async getQuizForAuthoring(
+    @Request() req: any,
+    @Param('quizId') quizId: string,
+  ) {
+    return this.quizService.findById(quizId, req.user.id);
   }
 
   @Post('import')
@@ -207,6 +245,8 @@ export class QuizController {
   }
 
   @Post('unit/:unitId/generate')
+  @UseGuards(RoleGuard)
+  @Roles(Role.instructor, Role.admin)
   @ApiOperation({ summary: 'Generate a quiz for a unit' })
   async generateUnitQuiz(@Request() req: any, @Param('unitId') unitId: string) {
     return this.quizService.generateUnitQuiz(unitId, req.user.id);

@@ -11,6 +11,7 @@ import {
   IsString,
   IsUUID,
   IsDateString,
+  ArrayUnique,
   Min,
   Max,
   ValidateNested,
@@ -128,6 +129,8 @@ export class CreateQuizDto {
   })
   @IsOptional()
   @IsArray()
+  @IsUUID('all', { each: true })
+  @ArrayUnique()
   questions?: string[];
 }
 
@@ -168,11 +171,6 @@ export class UpdateQuizDto {
   @Max(100)
   passingScore?: number;
 
-  @ApiPropertyOptional({ description: 'Whether the quiz is published' })
-  @IsOptional()
-  @IsBoolean()
-  isPublished?: boolean;
-
   @ApiPropertyOptional({ description: 'When the quiz expires' })
   @IsOptional()
   @IsDateString()
@@ -210,6 +208,8 @@ export class UpdateQuizDto {
   })
   @IsOptional()
   @IsArray()
+  @IsUUID('all', { each: true })
+  @ArrayUnique()
   questions?: string[];
 }
 
@@ -360,10 +360,12 @@ export class SaveQuizAttemptAnswerDto {
   @IsNotEmpty()
   questionId!: string;
 
-  @ApiProperty()
-  @IsString()
+  @ApiProperty({
+    oneOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }],
+  })
   @IsNotEmpty()
-  selectedOption!: string;
+  @IsString({ each: true })
+  selectedOption!: string | string[];
 }
 
 export class QuizAnswerDto {

@@ -19,10 +19,24 @@ const quiz = {
   timeLimit: 30,
   shuffleQuestions: false,
   showResults: false,
+  passingScore: 70,
   availableFrom: null,
   availableUntil: null,
   expiresAt: null,
-  questions: [{ questionId: 'question-1' }, { questionId: 'question-2' }],
+  questions: [
+    { questionId: 'question-1', order: 1, points: 2, isRequired: true, question: {
+      id: 'question-1', text: 'Original prompt', type: 'multiple_choice',
+      points: 1, topicIds: [], options: [
+        { id: 'option-1', text: 'Correct', isCorrect: true, order: 0 },
+      ],
+    } },
+    { questionId: 'question-2', order: 2, points: 1, isRequired: true, question: {
+      id: 'question-2', text: 'Second prompt', type: 'multiple_choice',
+      points: 1, topicIds: [], options: [
+        { id: 'option-2', text: 'Correct', isCorrect: true, order: 0 },
+      ],
+    } },
+  ],
   unit: { isPublished: true, course: { status: 'published' } },
   topic: null,
 };
@@ -53,6 +67,15 @@ const tx = {
       };
       attempts.push(attempt);
       return attempt;
+    },
+  },
+  quizAttemptQuestionSnapshot: {
+    create: async ({ data }) => {
+      const attempt = attempts.find(item => item.id === data.attemptId);
+      attempt.questionSnapshot = {
+        snapshot: JSON.parse(JSON.stringify(data.snapshot)),
+      };
+      return attempt.questionSnapshot;
     },
   },
 };
@@ -90,8 +113,12 @@ service.prisma = {
   assert.equal(lockedQuizRows, 2);
 
   const acceptedId = attempts[0].id;
+  const originalText = attempts[0].questionSnapshot.snapshot.questions[0].question.text;
+  quiz.questions[0].question.text = 'Edited after attempt start';
   const resumed = await service.startQuizAttempt('student-1', 'unit-1', acceptedId);
   assert.deepEqual(resumed.questionIds, ['question-1', 'question-2']);
+  assert.equal(resumed.questions[0].text, originalText);
+  assert.equal('isCorrect' in resumed.questions[0].options[0], false);
   assert.equal(resumed.showResults, false);
   assert.equal(resumed.timeLimit, 30);
 })().catch(error => {
@@ -130,7 +157,13 @@ service.prisma = {
         return attempt;
       },
     },
-    option: { findFirst: async () => ({ id: 'option-1' }) },
+    option: {
+      findFirst: async () => ({ id: 'option-1' }),
+      findMany: async ({ where }) =>
+        where.id.in
+          .filter(id => ['option-1', 'option-2'].includes(id))
+          .map(id => ({ id })),
+    },
   }),
 };
 
@@ -147,6 +180,24 @@ service.prisma = {
   ]);
   assert.equal('correct' in result, false);
   assert.equal('explanation' in result, false);
+
+  await service.saveQuizAttemptAnswer(
+    'student-1',
+    attempt.id,
+    'question-1',
+    ['option-1', 'option-2'],
+  );
+  assert.deepEqual(attempt.answers, [
+    { questionId: 'question-1', selectedOption: ['option-1', 'option-2'] },
+  ]);
+  await assert.rejects(
+    service.saveQuizAttemptAnswer(
+      'student-1',
+      attempt.id,
+      'question-1',
+      ['option-1', 'option-1'],
+    ),
+  );
 
   attempt.startedAt = new Date(Date.now() - 31 * 60_000);
   await assert.rejects(
@@ -302,6 +353,71 @@ service.logger = { warn: () => undefined };
     )
 
 
+def test_submission_replay_survives_recommendation_generation_failure():
+    run_typescript(
+        r"""
+const assert = require('node:assert/strict');
+const { QuizService } =
+  require('./src/modules/education/assessment/services/quiz.service.ts');
+
+const attempt = {
+  id: '123e4567-e89b-42d3-a456-426614174000',
+  userId: 'student-1',
+  quizId: 'quiz-1',
+  answers: [{ questionId: 'question-1', selectedOption: 'option-1' }],
+  responses: [{ questionId: 'question-1', isCorrect: true }],
+  questionSnapshot: {
+    snapshot: {
+      questions: [{
+        question: { options: [{ id: 'option-1', isCorrect: true }] },
+      }],
+    },
+  },
+  feedback: null,
+  completedAt: new Date(),
+};
+const quiz = {
+  id: 'quiz-1',
+  topicId: 'topic-1',
+  unitId: 'unit-1',
+  showResults: true,
+  unit: { courseId: 'course-1' },
+};
+const service = Object.create(QuizService.prototype);
+service.recommendationService = {
+  recommendForAnswers: async () => {
+    throw new Error('recommendation service unavailable');
+  },
+};
+service.logger = { error: () => undefined };
+service.prisma = {
+  quizAttempt: {
+    update: async () => {
+      throw new Error('A failed recommendation must not be persisted');
+    },
+  },
+};
+
+(async () => {
+  const result = await service.replayQuizSubmission(
+    attempt,
+    quiz,
+    'student-1',
+    '[{"questionId":"question-1","selectedOption":"option-1"}]',
+  );
+  assert.equal(result.id, attempt.id);
+  assert.equal(result.resultsAvailable, true);
+  assert.equal(result.recommendationsAvailable, false);
+  assert.equal('recommendations' in result, false);
+  assert.equal(JSON.stringify(result).includes('"isCorrect"'), false);
+})().catch(error => {
+  console.error(error);
+  process.exitCode = 1;
+});
+"""
+    )
+
+
 def test_submission_scores_against_the_quiz_question_weight():
     run_typescript(
         r"""
@@ -318,6 +434,27 @@ const storedAttempt = {
   startedAt,
   completedAt: null,
   answers: [{ questionId: 'question-1', selectedOption: 'option-correct' }],
+  questionSnapshot: {
+    snapshot: {
+      version: 1,
+      quizId: 'quiz-1',
+      passingScore: 70,
+      questions: [{
+        questionId: 'question-1',
+        order: 0,
+        points: 5,
+        isRequired: true,
+        question: {
+          id: 'question-1',
+          text: 'Original prompt',
+          type: 'multiple_choice',
+          points: 2,
+          topicIds: [],
+          options: [{ id: 'option-correct', text: 'Correct', isCorrect: true, order: 0 }],
+        },
+      }],
+    },
+  },
   responses: [],
   quiz: {
     id: 'quiz-1',
@@ -337,16 +474,16 @@ const quiz = {
   showResults: true,
   timeLimit: 10,
   maxAttempts: 1,
-  passingScore: 70,
+  passingScore: 99,
   questions: [{
     questionId: 'question-1',
-    points: 5,
+    points: 100,
     question: {
       id: 'question-1',
       type: 'multiple_choice',
-      points: 2,
+      points: 100,
       topicIds: [],
-      options: [{ id: 'option-correct', isCorrect: true }],
+      options: [{ id: 'option-correct', isCorrect: false }],
     },
   }],
   unit: {
@@ -403,6 +540,7 @@ service.logger = { log: () => undefined, warn: () => undefined };
   );
   assert.equal(result.resultsAvailable, true);
   assert.equal(result.maxScore, 5);
+  assert.equal(result.isPassed, true);
   assert.equal(responseRecord.score, 5);
   assert.equal(result.timeTaken >= 0, true);
 })().catch(error => {
@@ -502,10 +640,24 @@ const quiz = {
   timeLimit: null,
   shuffleQuestions: false,
   showResults: true,
+  passingScore: 70,
   availableFrom: null,
   availableUntil: null,
   expiresAt: null,
-  questions: [{ questionId: 'question-1' }],
+  questions: [{
+    questionId: 'question-1',
+    order: 0,
+    points: 1,
+    isRequired: true,
+    question: {
+      id: 'question-1',
+      text: 'Prompt',
+      type: 'multiple_choice',
+      points: 1,
+      topicIds: [],
+      options: [{ id: 'option-1', text: 'Choice', isCorrect: true, order: 0 }],
+    },
+  }],
   unit: { isPublished: true, course: { status: 'published' } },
   topic: null,
 };
@@ -523,6 +675,9 @@ service.prisma = {
     $queryRaw: async () => [],
     quiz: { findUnique: async () => quiz },
     autoGeneratedQuiz: { findFirst: async () => ({ id: 'assignment-1' }) },
+    quizAttemptQuestionSnapshot: {
+      create: async () => ({ snapshot: {} }),
+    },
     quizAttempt: {
       findUnique: async () => null,
       count: async () => 0,

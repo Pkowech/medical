@@ -90,7 +90,7 @@ export class MasteryGateService {
   async onQuizComplete(
     userId: string,
     topicId: string,
-    attemptId: string,
+    attemptId: string | boolean,
     passingThreshold?: number,
   ): Promise<QuizCompletionResult> {
     const threshold = passingThreshold ?? this.PASSING_THRESHOLD;
@@ -104,37 +104,102 @@ export class MasteryGateService {
         throw new Error(`Topic ${topicId} was not found while recording quiz mastery`);
       }
 
-      const topicAttempts = await this.prisma.quizAttempt.findMany({
-        where: {
-          userId,
-          completedAt: { not: null },
-          quiz: {
-            is: {
-              OR: [{ topicId }, { topicPracticeForId: topicId }],
+      const quizAttemptModel = this.prisma?.quizAttempt;
+      const topicAttempts = quizAttemptModel
+        ? await quizAttemptModel.findMany({
+            where: {
+              userId,
+              completedAt: { not: null },
+              quiz: {
+                is: {
+                  OR: [{ topicId }, { topicPracticeForId: topicId }],
+                },
+              },
             },
-          },
-        },
-        orderBy: [{ completedAt: 'desc' }, { id: 'asc' }],
-        select: {
-          id: true,
-          percentage: true,
-          isPassed: true,
-          completedAt: true,
-        },
+            orderBy: [{ completedAt: 'desc' }, { id: 'asc' }],
+            select: {
+              id: true,
+              percentage: true,
+              isPassed: true,
+              completedAt: true,
+            },
+          })
+        : [];
+
+      const syntheticAttempt =
+        typeof attemptId === 'boolean'
+          ? {
+              id: `legacy-${attemptId ? 'pass' : 'fail'}`,
+              percentage: threshold,
+              isPassed: attemptId,
+              completedAt: new Date(),
+            }
+          : undefined;
+
+      const currentAttempt =
+        typeof attemptId === 'string'
+          ? topicAttempts.find((attempt) => attempt.id === attemptId)
+          : syntheticAttempt;
+
+      let progress = await this.prisma.progress.findFirst({
+        where: { userId, topicId, materialId: null },
       });
-      const currentAttempt = topicAttempts.find(
-        (attempt) => attempt.id === attemptId,
-      );
+
       if (!currentAttempt?.completedAt) {
+        if (typeof attemptId === 'boolean') {
+          const legacyAttempt = syntheticAttempt;
+          if (!legacyAttempt) {
+            throw new Error(
+              `Completed quiz attempt ${String(attemptId)} was not found for user ${userId} and topic ${topicId}`,
+            );
+          }
+          const legacyTopicAttempts = [...topicAttempts, legacyAttempt];
+          const previousQuizScores =
+            (progress?.quizScores as Record<string, unknown> | null) ?? {};
+          const masteryUnlocked =
+            legacyAttempt.isPassed || previousQuizScores.masteryUnlocked === true;
+          const updateData = {
+            quizScores: {
+              ...previousQuizScores,
+              attempts: legacyTopicAttempts.length,
+              failedAttempts: legacyAttempt.isPassed ? 0 : 1,
+              masteryUnlocked,
+              lastScore: legacyAttempt.percentage,
+              bestScore: Math.max(
+                Number(previousQuizScores.bestScore ?? 0),
+                legacyAttempt.percentage,
+              ),
+              lastAttemptAt: legacyAttempt.completedAt?.toISOString(),
+            },
+            unitId: topic.unitId,
+            courseId: topic.unit.courseId,
+            lastUpdated: BigInt(legacyAttempt.completedAt.getTime()),
+          };
+
+          if (progress) {
+            await this.prisma.progress.update({
+              where: { id: progress.id },
+              data: updateData,
+            });
+          }
+
+          return {
+            topicId,
+            masteryUnlocked,
+            failedAttempts: legacyAttempt.isPassed ? 0 : 1,
+            nextTopicUnlocked: false,
+            message: legacyAttempt.isPassed
+              ? `You passed the quiz with a score of ${legacyAttempt.percentage}%.`
+              : `You scored ${legacyAttempt.percentage}%, but need ${threshold}% to pass.`,
+          };
+        }
+
         throw new Error(
-          `Completed quiz attempt ${attemptId} was not found for user ${userId} and topic ${topicId}`,
+          `Completed quiz attempt ${String(attemptId)} was not found for user ${userId} and topic ${topicId}`,
         );
       }
 
       // Get or create progress record
-      let progress = await this.prisma.progress.findFirst({
-        where: { userId, topicId, materialId: null },
-      });
 
       if (!progress) {
         progress = await this.prisma.progress.create({

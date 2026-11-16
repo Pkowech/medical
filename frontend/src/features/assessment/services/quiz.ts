@@ -12,6 +12,7 @@ export type TopicQuizSubmission =
       nextTopicId?: string;
       gateDecision?: GateDecision;
       recommendations?: QuizPerformanceRecommendations;
+      recommendationsAvailable?: boolean;
       resultsAvailable: true;
     };
 
@@ -65,7 +66,15 @@ export interface StartedQuizAttempt {
   startedAt: string;
   completedAt: string | null;
   questionIds: string[];
-  answers: Array<{ questionId: string; selectedOption: string | null }>;
+  questions?: Array<{
+    id: string;
+    text: string;
+    type: string;
+    points: number;
+    topicIds: string[];
+    options: Array<{ id: string; text: string; order: number }>;
+  }>;
+  answers: Array<{ questionId: string; selectedOption: string | string[] | null }>;
   timeLimit: number | null;
   expiresAt: string | null;
   showResults: boolean;
@@ -96,11 +105,11 @@ class QuizService {
   async submitAnswer(
     attemptId: string,
     questionId: string,
-    selectedOptionId: string
+    selectedOption: string | string[]
   ): Promise<{ saved: true }> {
     const response = await apiService.post<{ saved: true }>(
       `${this.baseUrl}/attempts/${attemptId}/answers`,
-      { questionId, selectedOption: selectedOptionId }
+      { questionId, selectedOption }
     );
     return response.data;
   }
@@ -108,29 +117,33 @@ class QuizService {
   async submitUnitQuiz(
     unitId: string | number,
     attemptId: string,
-    answers: Array<{ questionId: string; selectedOption: string | null }>
+    answers: Array<{ questionId: string; selectedOption: string | string[] | null }>
   ): Promise<{
     percentage?: number;
     isPassed?: boolean;
     resultsAvailable?: boolean;
     recommendations?: QuizPerformanceRecommendations;
+    recommendationsAvailable?: boolean;
   }> {
     const response = await apiService.post<{
       percentage?: number;
       isPassed?: boolean;
       resultsAvailable?: boolean;
       recommendations?: QuizPerformanceRecommendations;
+      recommendationsAvailable?: boolean;
     }>(`${this.baseUrl}/submit?type=full`, { unitId, attemptId, answers });
     return response.data;
   }
 
   async submitTopicQuiz(
     topicId: string | number,
-    responses: Array<{ questionId: string; selectedAnswers: string[] }>
+    responses: Array<{ questionId: string; selectedAnswers: string[] }>,
+    idempotencyKey = crypto.randomUUID(),
   ): Promise<TopicQuizSubmission> {
     const response = await apiService.post<TopicQuizSubmission>(
       `${this.baseUrl}/topic/${topicId}/submit`,
-      { responses }
+      { responses },
+      { headers: { 'X-Idempotency-Key': idempotencyKey } },
     );
     return response.data;
   }

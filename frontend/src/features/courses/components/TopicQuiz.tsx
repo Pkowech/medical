@@ -97,6 +97,8 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
   const [isReporting, setIsReporting] = useState(false);
   const [reportNotice, setReportNotice] = useState<string | null>(null);
   const [reportError, setReportError] = useState<string | null>(null);
+  const attemptStorageKey = `topic-quiz-attempt:${userId ?? 'anonymous'}:${topicId}`;
+  const draftStorageKey = `topic-quiz-draft:${userId ?? 'anonymous'}:${topicId}`;
 
   const resetQuizState = React.useCallback(() => {
     setQuestions([]);
@@ -108,12 +110,24 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
     setNextTopicId(undefined);
     setGateDecision(undefined);
     setIsProvisional(false);
-    setAttemptId(uuidv4());
+    setAttemptId(() => {
+      if (typeof window === 'undefined') return uuidv4();
+      try {
+        const existingAttemptId = window.localStorage.getItem(attemptStorageKey);
+        if (existingAttemptId) return existingAttemptId;
+        const newAttemptId = uuidv4();
+        window.localStorage.setItem(attemptStorageKey, newAttemptId);
+        return newAttemptId;
+      } catch (error) {
+        console.error('Could not persist the topic quiz attempt ID:', error);
+        return uuidv4();
+      }
+    });
     setIsReportOpen(false);
     setReportDescription('');
     setReportNotice(null);
     setReportError(null);
-  }, []);
+  }, [attemptStorageKey]);
 
   React.useEffect(() => {
     if (!isOpen) return;
@@ -151,6 +165,7 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
           : undefined;
         if (savedDraft) {
           setAttemptId(savedDraft.id);
+          window.localStorage.setItem(attemptStorageKey, savedDraft.id);
           setSelectedAnswers(
             Object.fromEntries(
               savedDraft.responses.map(response => [response.questionId, response.selectedAnswers]),
@@ -163,6 +178,35 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
         `/quizzes/topic/${topicId}`
       );
       setQuestions(response.data || []);
+      const savedDraft = window.localStorage.getItem(draftStorageKey);
+      if (savedDraft) {
+        try {
+          const draft = JSON.parse(savedDraft) as Record<string, unknown>;
+          const questionsById = new Map(
+            (response.data ?? []).map(question => [question.id, question]),
+          );
+          const answers = Object.fromEntries(
+            Object.entries(draft).flatMap(([questionId, selected]) => {
+              const question = questionsById.get(questionId);
+              if (!question || !Array.isArray(selected)) return [];
+              const availableOptionIds = new Set(
+                question.options.map(option => option.id),
+              );
+              const validSelections = selected.filter(
+                (optionId): optionId is string =>
+                  typeof optionId === 'string' && availableOptionIds.has(optionId),
+              );
+              return validSelections.length
+                ? [[questionId, validSelections]]
+                : [];
+            }),
+          ) as Record<string, string[]>;
+          setSelectedAnswers(answers);
+        } catch (error) {
+          console.warn('Ignoring an invalid saved topic quiz draft:', error);
+          window.localStorage.removeItem(draftStorageKey);
+        }
+      }
       if (response.data?.length === 0) {
         toast.info('No quiz questions available for this topic');
       }
@@ -238,6 +282,11 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
         }
       : { ...selectedAnswers, [currentQuestion.id]: [optionId] };
     setSelectedAnswers(updatedAnswers);
+    try {
+      window.localStorage.setItem(draftStorageKey, JSON.stringify(updatedAnswers));
+    } catch (error) {
+      console.error('Could not persist the topic quiz draft:', error);
+    }
     if (isOffline && userId) {
       void offlineService
         .saveOfflinePracticeAttempt({
@@ -310,6 +359,12 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
       setNextTopicId(result?.nextTopicId);
       setGateDecision(result?.gateDecision);
       setQuizCompleted(true);
+      try {
+        window.localStorage.removeItem(attemptStorageKey);
+        window.localStorage.removeItem(draftStorageKey);
+      } catch (error) {
+        console.error('Quiz was submitted, but its local draft could not be cleared:', error);
+      }
       recordCourseActivity('quiz', courseId, topicId, result.score);
 
       if (onComplete) {

@@ -56,3 +56,53 @@ const quizEvent = {
 });
 """
     )
+
+
+def test_duplicate_quiz_submitted_events_reuse_stable_attempt_effect_ids():
+    run_typescript(
+        r"""
+const assert = require('node:assert/strict');
+const { QuizSubmissionListener } =
+  require('./src/modules/education/assessment/services/quiz-submission.listener.ts');
+
+const effects = { bkt: [], mastery: [], reviews: [] };
+const listener = new QuizSubmissionListener(
+  { updateProgress: async () => undefined },
+  {
+    generateAnalytics: async () => undefined,
+    updateBktForAssessment: async (...args) => { effects.bkt.push(args); },
+  },
+  { onQuizComplete: async (...args) => { effects.mastery.push(args); } },
+  {
+    recordTopicQuizReviews: async (...args) => { effects.reviews.push(args); },
+  },
+);
+listener.logger = { error: () => undefined, warn: () => undefined, log: () => undefined };
+
+const event = {
+  userId: 'student-1',
+  quizId: 'quiz-1',
+  attemptId: 'attempt-1',
+  topicId: 'topic-1',
+  score: 80,
+  isPassed: true,
+  passingScore: 70,
+  bktUpdates: [{ skillId: 'skill-1', isCorrect: true }],
+  reviewAnswers: [{ questionId: 'question-1', isCorrect: true }],
+};
+
+(async () => {
+  await listener.handle(event);
+  await listener.handle(event);
+  assert.deepEqual(effects.bkt.map(args => args[3]), [
+    'quiz-attempt:attempt-1:bkt:0',
+    'quiz-attempt:attempt-1:bkt:0',
+  ]);
+  assert.deepEqual(effects.mastery.map(args => args[2]), ['attempt-1', 'attempt-1']);
+  assert.deepEqual(effects.reviews.map(args => args[3]), ['attempt-1', 'attempt-1']);
+})().catch(error => {
+  console.error(error);
+  process.exitCode = 1;
+});
+"""
+    )

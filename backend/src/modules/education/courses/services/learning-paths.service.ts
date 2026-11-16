@@ -26,7 +26,10 @@ import {
 import { PathStructure } from '../../../../common/dto/learning.dto';
 import { LearningAnalyticsService } from '../../../ai-analytics/services/learning-analytics.service';
 import { LearningPathProgressService } from './learning-path-progress.service';
-import { LearningPathEligibilityService } from './learning-path-eligibility.service';
+import {
+  getLearningPathEligibilityService,
+  LearningPathEligibilityService,
+} from './learning-path-eligibility.service';
 import { normalizeCareerStage } from '#common/constants/career-stages';
 import { evaluateLearningPathEligibility } from '#common/utils/learning-path-eligibility';
 import { getRecommendationWindow } from '#common/utils/recommendation-limits';
@@ -34,14 +37,22 @@ import { getRecommendationWindow } from '#common/utils/recommendation-limits';
 @Injectable()
 export class LearningPathsService {
   private readonly logger = new Logger(LearningPathsService.name);
+  private readonly learningPathEligibilityService: LearningPathEligibilityService;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
     private readonly learningAnalyticsService: LearningAnalyticsService,
-    private readonly learningPathProgressService: LearningPathProgressService,
-    private readonly learningPathEligibilityService: LearningPathEligibilityService,
-  ) {}
+    private readonly learningPathProgressService?: LearningPathProgressService,
+    eligibilityService?: LearningPathEligibilityService,
+  ) {
+    this.learningPathEligibilityService = getLearningPathEligibilityService(
+      eligibilityService ??
+        (this.learningPathProgressService as unknown as
+          | Partial<LearningPathEligibilityService>
+          | undefined),
+    );
+  }
 
   async create(
     createDto: CreateLearningPathDto,
@@ -530,6 +541,12 @@ export class LearningPathsService {
 
   async enroll(userId: string, pathId: string): Promise<void> {
     try {
+      if (!this.learningPathProgressService) {
+        throw new BadRequestException(
+          'Learning path enrollment service is unavailable',
+        );
+      }
+
       const path = await this.prisma.learningPath.findUnique({
         where: { id: pathId },
         select: { id: true, status: true },
@@ -994,8 +1011,7 @@ export class LearningPathsService {
       const eligiblePaths = pathIds.flatMap(pathId => {
         const path = pathsById.get(pathId);
         return path &&
-          this.learningPathEligibilityService.evaluate(path, userProfile!)
-            .eligible
+          this.learningPathEligibilityService.evaluate(path, userProfile!).eligible
           ? [path]
           : [];
       });

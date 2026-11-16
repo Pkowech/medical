@@ -261,7 +261,9 @@ export class CreateQuestionBankDto {
 
   @IsNumber()
   @IsOptional()
+  @IsInt()
   @Min(0)
+  @Max(1000)
   points?: number;
 
   @IsString()
@@ -330,6 +332,7 @@ export class ImportQuizDto {
   @IsNumber()
   @IsOptional()
   @Min(0)
+  @Max(100)
   passingScore?: number;
 
   @IsOptional()
@@ -364,7 +367,9 @@ export class UpdateQuestionBankDto {
 
   @IsNumber()
   @IsOptional()
+  @IsInt()
   @Min(0)
+  @Max(1000)
   points?: number;
 
   @IsString()

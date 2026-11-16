@@ -1,5 +1,10 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { Question, QuestionDifficulty, QuestionCategory } from '@prisma/client';
+import {
+  Option,
+  Question,
+  QuestionDifficulty,
+  QuestionCategory,
+} from '@prisma/client';
 import { AdaptiveQuizSession } from '../dto/assessment.dto';
 
 type QuestionType =
@@ -34,6 +39,7 @@ export class QuizUtils {
   static gradeOptionQuiz(
     questions: Array<{
       id: string;
+      type: Question['type'];
       points: number;
       options: Array<{ id: string; isCorrect: boolean }>;
     }>,
@@ -79,30 +85,40 @@ export class QuizUtils {
       }
 
       const optionIds = new Set(question.options.map((option) => option.id));
-      if (response.selectedAnswers.some((id) => !optionIds.has(id))) {
+      if (
+        response.selectedAnswers.some((id) => !optionIds.has(id)) ||
+        (question.type !== 'multiple_select' &&
+          response.selectedAnswers.length > 1)
+      ) {
         throw new BadRequestException(
-          'A selected option does not belong to its question',
+          'A quiz response contains an invalid selection',
         );
       }
 
-      const correctOptionIds = question.options
-        .filter((option) => option.isCorrect)
-        .map((option) => option.id);
-      const isCorrect =
-        correctOptionIds.length === response.selectedAnswers.length &&
-        correctOptionIds.every((id) => response.selectedAnswers.includes(id));
       const points = question.points || 1;
+      const answer =
+        question.type === 'multiple_select'
+          ? response.selectedAnswers
+          : response.selectedAnswers[0];
+      const grading = this.gradeAnswer(
+        { type: question.type, points, options: question.options },
+        answer,
+      );
+      const earnedQuestionPoints = Math.min(
+        points,
+        Math.max(0, grading.isCorrect ? points : (grading.partialCredit ?? 0)),
+      );
       totalPoints += points;
-      if (isCorrect) {
+      earnedPoints += earnedQuestionPoints;
+      if (grading.isCorrect) {
         correctAnswers += 1;
-        earnedPoints += points;
       }
 
       return {
         questionId: response.questionId,
         selectedAnswers: response.selectedAnswers,
-        isCorrect,
-        earnedPoints: isCorrect ? points : 0,
+        isCorrect: grading.isCorrect,
+        earnedPoints: earnedQuestionPoints,
       };
     });
 
@@ -236,8 +252,8 @@ export class QuizUtils {
   }
 
   static gradeAnswer(
-    question: Question & {
-      options?: Array<{ id: string; isCorrect: boolean }>;
+    question: Pick<Question, 'type' | 'points'> & {
+      options?: Array<Pick<Option, 'id' | 'isCorrect'>>;
     },
     answer: any,
   ): { isCorrect: boolean; partialCredit?: number } {

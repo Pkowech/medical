@@ -39,6 +39,32 @@ assert.deepEqual(validateSync(omittedArrays), []);
     )
 
 
+def test_quiz_attempt_answer_dto_accepts_single_and_multiple_option_ids():
+    run_typescript(
+        r"""
+const assert = require('node:assert/strict');
+const { plainToInstance } = require('class-transformer');
+const { validateSync } = require('class-validator');
+const { SaveQuizAttemptAnswerDto } =
+  require('./src/common/dto/assessment.dto.ts');
+
+for (const selectedOption of ['option-1', ['option-1', 'option-2']]) {
+  const answer = plainToInstance(SaveQuizAttemptAnswerDto, {
+    questionId: 'question-1',
+    selectedOption,
+  });
+  assert.deepEqual(validateSync(answer), []);
+}
+
+const invalidAnswer = plainToInstance(SaveQuizAttemptAnswerDto, {
+  questionId: 'question-1',
+  selectedOption: ['option-1', 42],
+});
+assert.ok(validateSync(invalidAnswer).some(error => error.property === 'selectedOption'));
+"""
+    )
+
+
 def test_weakness_quiz_fallback_excludes_already_selected_questions():
     run_typescript(
         r"""

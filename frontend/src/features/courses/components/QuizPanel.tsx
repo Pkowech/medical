@@ -52,7 +52,7 @@ export const QuizPanel = ({
   const [questions, setQuestions] = useState<Question[]>([]);
   const [submittedAnswers, setSubmittedAnswers] = useState<Record<string, string[]>>({});
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [selectedOption, setSelectedOption] = useState<string | null>(null);
+  const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [quizComplete, setQuizComplete] = useState(false);
@@ -70,6 +70,7 @@ export const QuizPanel = ({
     nextTopicId?: string;
     gateDecision?: GateDecision;
     recommendations?: QuizPerformanceRecommendations;
+    recommendationsAvailable?: boolean;
     resultsAvailable?: boolean;
   } | null>(null);
 
@@ -83,6 +84,7 @@ export const QuizPanel = ({
     setQuizComplete(false);
     setFinalResult(null);
     try {
+      let data: Question[];
       let startedAttempt: Awaited<ReturnType<typeof quizService.startQuizAttempt>> | null = null;
       if (scope !== 'topic') {
         const storageKey = `quiz-attempt:${scope}:${lessonId}`;
@@ -92,14 +94,18 @@ export const QuizPanel = ({
           window.localStorage.setItem(storageKey, currentAttemptId);
         }
         startedAttempt = await quizService.startQuizAttempt(lessonId, currentAttemptId);
+        data =
+          startedAttempt.questions ??
+          ((await quizService.getQuestionsForLesson(lessonId, scope)) as Question[]);
         setAttemptId(currentAttemptId);
         setExpiresAt(
           startedAttempt.expiresAt ? new Date(startedAttempt.expiresAt).getTime() : null
         );
         setResultsAvailable(startedAttempt.showResults);
+      } else {
+        data = (await quizService.getQuestionsForLesson(lessonId, scope)) as Question[];
       }
 
-      const data = (await quizService.getQuestionsForLesson(lessonId, scope)) as Question[];
       const orderedQuestions = startedAttempt
         ? startedAttempt.questionIds.map(questionId =>
             data.find(question => question.id === questionId)
@@ -112,14 +118,43 @@ export const QuizPanel = ({
       setQuestions(questionsToShow);
 
       if (startedAttempt) {
-        const savedAnswers = Object.fromEntries(
-          startedAttempt.answers
-            .filter(
-              (answer): answer is { questionId: string; selectedOption: string } =>
-                typeof answer.selectedOption === 'string'
-            )
-            .map(answer => [answer.questionId, [answer.selectedOption]])
+        const savedAnswers: Record<string, string[]> = {};
+        const draftKey = `quiz-attempt-draft:${startedAttempt.attemptId}`;
+        const availableOptions = new Map(
+          questionsToShow.map(question => [
+            question.id,
+            new Set(question.options.map(option => option.id)),
+          ])
         );
+        const storedDraft = window.localStorage.getItem(draftKey);
+        if (storedDraft) {
+          try {
+            const draft = JSON.parse(storedDraft) as Record<string, unknown>;
+            for (const [questionId, selected] of Object.entries(draft)) {
+              const options = availableOptions.get(questionId);
+              if (!options || !Array.isArray(selected)) continue;
+              const validSelections = selected.filter(
+                (optionId): optionId is string =>
+                  typeof optionId === 'string' && options.has(optionId)
+              );
+              if (validSelections.length) {
+                savedAnswers[questionId] = validSelections;
+              }
+            }
+          } catch (error) {
+            console.warn('Ignoring an invalid saved quiz attempt draft:', error);
+            window.localStorage.removeItem(draftKey);
+          }
+        }
+        for (const answer of startedAttempt.answers) {
+          if (typeof answer.selectedOption === 'string') {
+            savedAnswers[answer.questionId] = [answer.selectedOption];
+          } else if (Array.isArray(answer.selectedOption)) {
+            savedAnswers[answer.questionId] = answer.selectedOption.filter(
+              (optionId): optionId is string => typeof optionId === 'string'
+            );
+          }
+        }
         setSubmittedAnswers(savedAnswers);
         const firstUnansweredIndex = questionsToShow.findIndex(
           question => !savedAnswers[question.id]
@@ -128,15 +163,18 @@ export const QuizPanel = ({
           firstUnansweredIndex < 0 ? Math.max(0, questionsToShow.length - 1) : firstUnansweredIndex;
         const currentQuestion = questionsToShow[questionIndex];
         setCurrentQuestionIndex(questionIndex);
-        setSelectedOption(savedAnswers[currentQuestion.id]?.[0] ?? null);
-        setIsSubmitted(Boolean(savedAnswers[currentQuestion.id]));
+        setSelectedOptions(savedAnswers[currentQuestion.id] ?? []);
+        setIsSubmitted(Boolean(savedAnswers[currentQuestion.id]?.length));
         if (startedAttempt.completedAt) {
           const completedResult = await quizService.submitUnitQuiz(
             lessonId,
             startedAttempt.attemptId,
             questionsToShow.map(question => ({
               questionId: question.id,
-              selectedOption: savedAnswers[question.id]?.[0] ?? null,
+              selectedOption:
+                question.type === 'multiple_select'
+                  ? (savedAnswers[question.id] ?? [])
+                  : (savedAnswers[question.id]?.[0] ?? null),
             }))
           );
           setFinalResult({
@@ -150,12 +188,45 @@ export const QuizPanel = ({
           setResultsAvailable(completedResult.resultsAvailable !== false);
           setQuizComplete(true);
           window.localStorage.removeItem(`quiz-attempt:${scope}:${lessonId}`);
+          window.localStorage.removeItem(`quiz-attempt-draft:${startedAttempt.attemptId}`);
         }
       } else {
-        setSubmittedAnswers({});
-        setCurrentQuestionIndex(0);
-        setSelectedOption(null);
-        setIsSubmitted(false);
+        const savedAnswers: Record<string, string[]> = {};
+        if (scope === 'topic') {
+          const draftKey = `topic-quiz-draft:${lessonId}`;
+          const serializedDraft = window.localStorage.getItem(draftKey);
+          if (serializedDraft) {
+            try {
+              const draft = JSON.parse(serializedDraft) as Record<string, unknown>;
+              for (const question of questionsToShow) {
+                const selected = draft[question.id];
+                if (Array.isArray(selected)) {
+                  const availableOptionIds = new Set(question.options.map(option => option.id));
+                  const validSelections = selected.filter(
+                    (optionId): optionId is string =>
+                      typeof optionId === 'string' && availableOptionIds.has(optionId)
+                  );
+                  if (validSelections.length) {
+                    savedAnswers[question.id] = validSelections;
+                  }
+                }
+              }
+            } catch (error) {
+              console.warn('Ignoring an invalid saved topic quiz draft:', error);
+              window.localStorage.removeItem(draftKey);
+            }
+          }
+        }
+        setSubmittedAnswers(savedAnswers);
+        const firstUnansweredIndex = questionsToShow.findIndex(
+          question => !savedAnswers[question.id]?.length
+        );
+        const questionIndex =
+          firstUnansweredIndex < 0 ? Math.max(0, questionsToShow.length - 1) : firstUnansweredIndex;
+        const currentQuestion = questionsToShow[questionIndex];
+        setCurrentQuestionIndex(questionIndex);
+        setSelectedOptions(savedAnswers[currentQuestion.id] ?? []);
+        setIsSubmitted(Boolean(savedAnswers[currentQuestion.id]?.length));
       }
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : 'Failed to load quiz questions.');
@@ -170,11 +241,34 @@ export const QuizPanel = ({
 
   const handleOptionSelect = (optionId: string) => {
     if (isSubmitted || timeRemainingSeconds === 0) return;
-    setSelectedOption(optionId);
+    const currentQuestion = questions[currentQuestionIndex];
+    if (!currentQuestion) return;
+    const nextOptions =
+      currentQuestion.type === 'multiple_select'
+        ? selectedOptions.includes(optionId)
+          ? selectedOptions.filter(id => id !== optionId)
+          : [...selectedOptions, optionId]
+        : [optionId];
+    setSelectedOptions(nextOptions);
+    if (scope !== 'topic' && attemptId) {
+      try {
+        window.localStorage.setItem(
+          `quiz-attempt-draft:${attemptId}`,
+          JSON.stringify({
+            ...submittedAnswers,
+            [currentQuestion.id]: nextOptions,
+          })
+        );
+      } catch (error) {
+        console.warn('The local quiz draft could not be saved:', error);
+      }
+    } else {
+      return;
+    }
   };
 
   const handleSubmit = async () => {
-    if (!selectedOption || isSubmitted || isSubmitting) return;
+    if (!selectedOptions.length || isSubmitted || isSubmitting) return;
 
     if (!questions.length) {
       setSubmissionError('No quiz questions are available yet.');
@@ -182,7 +276,11 @@ export const QuizPanel = ({
     }
 
     const currentQuestion = questions[currentQuestionIndex];
-    const selected = currentQuestion.options.find(option => option.id === selectedOption);
+    const answer =
+      currentQuestion.type === 'multiple_select' ? selectedOptions : selectedOptions[0];
+    const selectedTexts = selectedOptions
+      .map(optionId => currentQuestion.options.find(option => option.id === optionId)?.text)
+      .filter((text): text is string => Boolean(text));
     setIsSubmitting(true);
     setSubmissionError(null);
 
@@ -191,13 +289,22 @@ export const QuizPanel = ({
         if (!attemptId) {
           throw new Error('The quiz attempt has not started yet.');
         }
-        await quizService.submitAnswer(attemptId, currentQuestion.id, selectedOption);
+        await quizService.submitAnswer(attemptId, currentQuestion.id, answer);
       }
       setIsSubmitted(true);
       setSubmittedAnswers(previous => ({
         ...previous,
-        [currentQuestion.id]: [selectedOption],
+        [currentQuestion.id]: selectedOptions,
       }));
+      if (scope === 'topic') {
+        window.localStorage.setItem(
+          `topic-quiz-draft:${lessonId}`,
+          JSON.stringify({
+            ...submittedAnswers,
+            [currentQuestion.id]: selectedOptions,
+          })
+        );
+      }
 
       trackAction(
         XAPI_VERBS.ATTEMPTED,
@@ -209,7 +316,7 @@ export const QuizPanel = ({
           },
         },
         {
-          response: selected?.text,
+          response: selectedTexts.join(', '),
         }
       );
     } catch (error) {
@@ -233,6 +340,7 @@ export const QuizPanel = ({
         nextTopicId?: string;
         gateDecision?: GateDecision;
         recommendations?: QuizPerformanceRecommendations;
+        recommendationsAvailable?: boolean;
         resultsAvailable?: boolean;
       } = {
         score: 0,
@@ -242,12 +350,19 @@ export const QuizPanel = ({
       };
 
       if (scope === 'topic' && lessonId && result.resultsAvailable !== false) {
+        const idempotencyStorageKey = `topic-quiz-submission:${lessonId}`;
+        let idempotencyKey = window.localStorage.getItem(idempotencyStorageKey);
+        if (!idempotencyKey) {
+          idempotencyKey = uuidv4();
+          window.localStorage.setItem(idempotencyStorageKey, idempotencyKey);
+        }
         const topicResult = await quizService.submitTopicQuiz(
           lessonId,
           questions.map(question => ({
             questionId: question.id,
             selectedAnswers: submittedAnswers[question.id] || [],
-          }))
+          })),
+          idempotencyKey
         );
         result = topicResult;
       } else if ((scope === 'unit' || scope === 'assessment') && lessonId) {
@@ -259,7 +374,10 @@ export const QuizPanel = ({
           attemptId,
           questions.map(question => ({
             questionId: question.id,
-            selectedOption: submittedAnswers[question.id]?.[0] ?? null,
+            selectedOption:
+              question.type === 'multiple_select'
+                ? (submittedAnswers[question.id] ?? [])
+                : (submittedAnswers[question.id]?.[0] ?? null),
           }))
         );
         result = {
@@ -267,6 +385,7 @@ export const QuizPanel = ({
           score: unitResult.percentage ?? 0,
           passed: unitResult.isPassed ?? false,
           recommendations: unitResult.recommendations,
+          recommendationsAvailable: unitResult.recommendationsAvailable,
           resultsAvailable: unitResult.resultsAvailable !== false,
         };
       }
@@ -274,7 +393,18 @@ export const QuizPanel = ({
       setResultsAvailable(result.resultsAvailable !== false);
       setFinalResult(result);
       setQuizComplete(true);
-      window.localStorage.removeItem(`quiz-attempt:${scope}:${lessonId}`);
+      try {
+        window.localStorage.removeItem(`quiz-attempt:${scope}:${lessonId}`);
+        if (attemptId) {
+          window.localStorage.removeItem(`quiz-attempt-draft:${attemptId}`);
+        }
+        if (scope === 'topic' && lessonId) {
+          window.localStorage.removeItem(`topic-quiz-submission:${lessonId}`);
+          window.localStorage.removeItem(`topic-quiz-draft:${lessonId}`);
+        }
+      } catch (error) {
+        console.warn('Quiz was submitted, but its local draft could not be cleared:', error);
+      }
       if (result.resultsAvailable !== false && scope !== 'assessment' && lessonId != null) {
         recordCourseActivity(
           'quiz',
@@ -339,9 +469,9 @@ export const QuizPanel = ({
     if (timeRemainingSeconds !== 0 && currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex(prev => prev + 1);
       const nextQuestion = questions[currentQuestionIndex + 1];
-      const savedOption = submittedAnswers[nextQuestion.id]?.[0] ?? null;
-      setSelectedOption(savedOption);
-      setIsSubmitted(Boolean(savedOption));
+      const savedOptions = submittedAnswers[nextQuestion.id] ?? [];
+      setSelectedOptions(savedOptions);
+      setIsSubmitted(savedOptions.length > 0);
       setSubmissionError(null);
       return;
     }
@@ -465,6 +595,12 @@ export const QuizPanel = ({
         {showResults && finalResult?.nextTopicUnlocked && (
           <p className="mb-6 text-sm font-medium text-green-700 dark:text-green-300">
             The next topic is now unlocked.
+          </p>
+        )}
+
+        {showResults && finalResult?.recommendationsAvailable === false && (
+          <p role="status" className="mb-6 text-sm text-muted-foreground">
+            Your quiz was submitted, but learning recommendations are temporarily unavailable.
           </p>
         )}
 
@@ -624,7 +760,7 @@ export const QuizPanel = ({
           </h4>
           <div className="space-y-3">
             {currentQuestion.options.map(option => {
-              const isSelected = selectedOption === option.id;
+              const isSelected = selectedOptions.includes(option.id);
               let borderClass = 'border-border dark:border-border/50';
               let bgClass = 'bg-card dark:bg-card';
               let textClass = 'text-muted-foreground dark:text-muted-foreground';
@@ -674,7 +810,7 @@ export const QuizPanel = ({
           {!isSubmitted ? (
             <button
               onClick={handleSubmit}
-              disabled={!selectedOption || isSubmitting || timeRemainingSeconds === 0}
+              disabled={!selectedOptions.length || isSubmitting || timeRemainingSeconds === 0}
               className="min-h-14 flex-1 bg-blue-600 text-white font-bold py-4 rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.99] motion-reduce:transition-none"
             >
               <Send className="w-4 h-4" />

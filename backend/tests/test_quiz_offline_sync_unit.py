@@ -27,13 +27,19 @@ const responses = [
 const questions = [
   {
     id: 'question-1',
+    type: 'multiple_choice',
     points: 1,
     options: [
       { id: 'option-correct', isCorrect: true },
       { id: 'option-wrong', isCorrect: false },
     ],
   },
-  { id: 'question-2', points: 1, options: [{ id: 'option-2-correct', isCorrect: true }] },
+  {
+    id: 'question-2',
+    type: 'multiple_choice',
+    points: 1,
+    options: [{ id: 'option-2-correct', isCorrect: true }],
+  },
 ];
 let questionWhere;
 const prisma = {

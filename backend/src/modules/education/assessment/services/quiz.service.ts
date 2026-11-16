@@ -4,6 +4,7 @@ import {
   NotFoundException,
   BadRequestException,
   ConflictException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '#infrastructure/prisma/prisma.service';
 import { Prisma } from '@prisma/client';
@@ -25,7 +26,11 @@ import {
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { QuizUtils } from '#common/utils/quiz.utils';
-import { QuizAnswerDto, CreateQuizDto } from '#common/dto/assessment.dto';
+import {
+  QuizAnswerDto,
+  CreateQuizDto,
+  UpdateQuizDto,
+} from '#common/dto/assessment.dto';
 import {
   ImportQuizDto,
   QuestionBankFilters,
@@ -48,6 +53,59 @@ type PublicQuizQuestion = Omit<
   options: Array<Pick<Option, 'id' | 'text' | 'order'>>;
 };
 
+type AttemptQuestionSnapshotQuestion = {
+  questionId: string;
+  order: number;
+  points: number;
+  isRequired: boolean;
+  question: Pick<Question, 'id' | 'text' | 'type' | 'points' | 'topicIds'> & {
+    options: Array<Pick<Option, 'id' | 'text' | 'isCorrect' | 'order'>>;
+  };
+};
+
+type AttemptQuestionSnapshot = {
+  version: 1;
+  quizId: string;
+  passingScore: number | null;
+  questions: AttemptQuestionSnapshotQuestion[];
+};
+
+const KNOWN_QUESTION_TYPES = new Set([
+  'multiple_choice',
+  'multiple_select',
+  'true_false',
+  'short_answer',
+  'essay',
+  'fill_in_blank',
+  'matching',
+  'ordering',
+]);
+
+const LEARNER_SUPPORTED_QUESTION_TYPES = new Set<Question['type']>([
+  'multiple_choice',
+  'multiple_select',
+  'true_false',
+]);
+
+function assertLearnerSupportedQuestionTypes(
+  questions: Array<{ type: Question['type'] }>,
+): void {
+  if (
+    questions.some(({ type }) => !LEARNER_SUPPORTED_QUESTION_TYPES.has(type))
+  ) {
+    throw new BadRequestException(
+      'Quizzes currently support multiple-choice, multiple-select, and true/false questions only',
+    );
+  }
+}
+
+type AttemptStartQuestion = Pick<
+  Question,
+  'id' | 'text' | 'type' | 'points' | 'topicIds'
+> & {
+  options: Array<Pick<Option, 'id' | 'text' | 'order'>>;
+};
+
 type StoredQuizAnswer = {
   questionId: string;
   selectedOption: unknown;
@@ -58,6 +116,7 @@ type QuizAttemptStartResult = {
   startedAt: Date;
   completedAt: Date | null;
   questionIds: string[];
+  questions?: AttemptStartQuestion[];
   answers: StoredQuizAnswer[];
   timeLimit: number | null;
   expiresAt: Date | null;
@@ -67,13 +126,127 @@ type QuizAttemptStartResult = {
 type QuizSubmissionResult =
   | (QuizAttempt & {
       resultsAvailable: true;
-      recommendations: QuizPerformanceRecommendations;
+      recommendations?: QuizPerformanceRecommendations;
+      recommendationsAvailable: boolean;
     })
   | {
       id: string;
       completedAt: Date | null;
       resultsAvailable: false;
     };
+
+function parseAttemptQuestionSnapshot(value: unknown): AttemptQuestionSnapshot {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new ConflictException('Stored quiz question snapshot is invalid');
+  }
+  const snapshot = value as Record<string, unknown>;
+  if (
+    snapshot.version !== 1 ||
+    typeof snapshot.quizId !== 'string' ||
+    (snapshot.passingScore !== null &&
+      (typeof snapshot.passingScore !== 'number' ||
+        !Number.isFinite(snapshot.passingScore) ||
+        snapshot.passingScore < 0 ||
+        snapshot.passingScore > 100)) ||
+    !Array.isArray(snapshot.questions) ||
+    snapshot.questions.length === 0
+  ) {
+    throw new ConflictException('Stored quiz question snapshot is invalid');
+  }
+
+  const questions = snapshot.questions.map((entry) => {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+      throw new ConflictException('Stored quiz question snapshot is invalid');
+    }
+    const item = entry as Record<string, unknown>;
+    const question = item.question;
+    if (
+      typeof item.questionId !== 'string' ||
+      typeof item.order !== 'number' ||
+      !Number.isInteger(item.order) ||
+      item.order < 0 ||
+      typeof item.points !== 'number' ||
+      !Number.isInteger(item.points) ||
+      item.points < 0 ||
+      typeof item.isRequired !== 'boolean' ||
+      !question ||
+      typeof question !== 'object' ||
+      Array.isArray(question)
+    ) {
+      throw new ConflictException('Stored quiz question snapshot is invalid');
+    }
+    const questionData = question as Record<string, unknown>;
+    if (
+      questionData.id !== item.questionId ||
+      typeof questionData.text !== 'string' ||
+      typeof questionData.type !== 'string' ||
+      !KNOWN_QUESTION_TYPES.has(questionData.type) ||
+      typeof questionData.points !== 'number' ||
+      !Array.isArray(questionData.topicIds) ||
+      questionData.topicIds.some((topicId) => typeof topicId !== 'string') ||
+      !Array.isArray(questionData.options)
+    ) {
+      throw new ConflictException('Stored quiz question snapshot is invalid');
+    }
+    const options = questionData.options.map((option) => {
+      if (!option || typeof option !== 'object' || Array.isArray(option)) {
+        throw new ConflictException('Stored quiz question snapshot is invalid');
+      }
+      const optionData = option as Record<string, unknown>;
+      if (
+        typeof optionData.id !== 'string' ||
+        typeof optionData.text !== 'string' ||
+        typeof optionData.isCorrect !== 'boolean' ||
+        typeof optionData.order !== 'number' ||
+        !Number.isInteger(optionData.order) ||
+        optionData.order < 0
+      ) {
+        throw new ConflictException('Stored quiz question snapshot is invalid');
+      }
+      return {
+        id: optionData.id,
+        text: optionData.text,
+        isCorrect: optionData.isCorrect,
+        order: optionData.order,
+      };
+    });
+
+    return {
+      questionId: item.questionId,
+      order: item.order,
+      points: item.points,
+      isRequired: item.isRequired,
+      question: {
+        id: questionData.id,
+        text: questionData.text,
+        type: questionData.type as Question['type'],
+        points: questionData.points,
+        topicIds: questionData.topicIds as string[],
+        options,
+      },
+    };
+  });
+
+  if (
+    new Set(questions.map((question) => question.questionId)).size !==
+      questions.length ||
+    new Set(questions.map((question) => question.order)).size !==
+      questions.length ||
+    questions.some(
+      ({ question }) =>
+        new Set(question.options.map((option) => option.id)).size !==
+        question.options.length,
+    )
+  ) {
+    throw new ConflictException('Stored quiz question snapshot is invalid');
+  }
+  return {
+    version: 1,
+    quizId: snapshot.quizId,
+    passingScore: snapshot.passingScore as number | null,
+    questions,
+  };
+}
 
 function parseStoredQuizAnswers(value: unknown): StoredQuizAnswer[] {
   if (!Array.isArray(value)) {
@@ -271,6 +444,9 @@ export class QuizService {
             : [],
       };
     });
+    if (data.isPublished) {
+      assertLearnerSupportedQuestionTypes(preparedQuestions);
+    }
     for (const question of preparedQuestions) {
       await this.questionBankService.validateCourseAndUnit(
         question.courseId,
@@ -556,6 +732,7 @@ export class QuizService {
   private getPublicQuestionWhere(): Prisma.QuestionWhereInput {
     return {
       isActive: true,
+      type: { in: [...LEARNER_SUPPORTED_QUESTION_TYPES] },
       AND: [
         {
           OR: [
@@ -716,23 +893,45 @@ export class QuizService {
   }
 
   async publishQuiz(quizId: string, creatorId: string): Promise<Quiz> {
-    const quiz = await this.prisma.quiz.findUnique({ where: { id: quizId } });
-    if (!quiz) throw new NotFoundException(`Quiz ${quizId} not found`);
-    if (quiz.createdBy !== creatorId) {
-      throw new BadRequestException(
-        'Only the quiz creator can publish this quiz',
-      );
-    }
-    if (quiz.questionCount < 1) {
-      throw new BadRequestException(
-        'A quiz must contain at least one question before publishing',
-      );
-    }
-
-    const publishedQuiz = await this.prisma.quiz.update({
-      where: { id: quizId },
-      data: { isPublished: true, publishedAt: quiz.publishedAt ?? new Date() },
-    });
+    const { quiz, publishedQuiz } = await this.prisma.$transaction(
+      async (tx) => {
+        await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT id FROM quizzes WHERE id = ${quizId} FOR UPDATE
+      `;
+        const currentQuiz = await tx.quiz.findUnique({ where: { id: quizId } });
+        if (!currentQuiz)
+          throw new NotFoundException(`Quiz ${quizId} not found`);
+        if (currentQuiz.createdBy !== creatorId) {
+          throw new BadRequestException(
+            'Only the quiz creator can publish this quiz',
+          );
+        }
+        const questionCount = await tx.quizQuestion.count({
+          where: { quizId },
+        });
+        if (questionCount < 1) {
+          throw new BadRequestException(
+            'A quiz must contain at least one question before publishing',
+          );
+        }
+        const questions = await tx.quizQuestion.findMany({
+          where: { quizId },
+          select: { question: { select: { type: true } } },
+        });
+        assertLearnerSupportedQuestionTypes(
+          questions.map(({ question }) => question),
+        );
+        const published = await tx.quiz.update({
+          where: { id: quizId },
+          data: {
+            isPublished: true,
+            publishedAt: currentQuiz.publishedAt ?? new Date(),
+            questionCount,
+          },
+        });
+        return { quiz: currentQuiz, publishedQuiz: published };
+      },
+    );
     await this.invalidateAssessmentCaches(
       quiz.unitId ? [quiz.unitId] : [],
       quiz.topicId ? [quiz.topicId] : [],
@@ -745,6 +944,11 @@ export class QuizService {
   @ApiOperation({ summary: 'Create a new quiz' })
   @ApiResponse({ status: 201, description: 'Quiz created successfully' })
   async create(data: CreateQuizDto, creatorId: string): Promise<Quiz> {
+    if (data.isPublished && !data.questions?.length) {
+      throw new BadRequestException(
+        'A quiz must contain at least one question before publishing',
+      );
+    }
     const cacheKey = `quiz:create:${JSON.stringify(data)}:${creatorId}`;
     const cachedQuiz = await this.redisService.get(cacheKey);
     if (cachedQuiz) {
@@ -784,12 +988,15 @@ export class QuizService {
       if (data.questions && data.questions.length > 0) {
         const questions = await tx.question.findMany({
           where: { id: { in: data.questions } },
-          select: { id: true, points: true },
+          select: { id: true, points: true, type: true },
         });
         if (questions.length !== data.questions.length) {
           throw new BadRequestException(
             'One or more quiz questions could not be found',
           );
+        }
+        if (data.isPublished) {
+          assertLearnerSupportedQuestionTypes(questions);
         }
         const pointsByQuestionId = new Map(
           questions.map(({ id: questionId, points }) => [questionId, points]),
@@ -1010,16 +1217,25 @@ export class QuizService {
 
   @ApiOperation({ summary: 'Find a quiz by ID' })
   @ApiResponse({ status: 200, description: 'Quiz details' })
-  async findById(id: string): Promise<Quiz> {
+  async findById(id: string, creatorId?: string): Promise<Quiz> {
     const cacheKey = `quiz:${id}`;
     const cachedQuiz = await this.redisService.get(cacheKey);
     if (cachedQuiz) {
+      let cached: Quiz | null = null;
       try {
-        this.logger.log(`Retrieved cached quiz ${id}`);
-        return JSON.parse(cachedQuiz);
+        cached = JSON.parse(cachedQuiz) as Quiz;
       } catch {
         this.logger.warn(`Corrupt cache for quiz ${id}`);
         await this.redisService.del(cacheKey);
+      }
+      if (cached) {
+        this.logger.log(`Retrieved cached quiz ${id}`);
+        if (creatorId && cached.createdBy !== creatorId) {
+          throw new ForbiddenException(
+            'Only the quiz creator can access this draft',
+          );
+        }
+        return cached;
       }
     }
 
@@ -1043,6 +1259,11 @@ export class QuizService {
       this.logger.error(`Quiz ${id} not found`);
       throw new NotFoundException(`Quiz with ID ${id} not found`);
     }
+    if (creatorId && quiz.createdBy !== creatorId) {
+      throw new ForbiddenException(
+        'Only the quiz creator can access this draft',
+      );
+    }
 
     await this.redisService.set(cacheKey, JSON.stringify(quiz), 1 * 60 * 60); // 1 hour TTL
     this.logger.log(`Fetched quiz ${id}`);
@@ -1053,7 +1274,7 @@ export class QuizService {
   @ApiResponse({ status: 200, description: 'Quiz updated successfully' })
   async update(
     id: string,
-    data: Partial<CreateQuizDto>,
+    data: UpdateQuizDto,
     creatorId: string,
   ): Promise<Quiz> {
     const existingQuiz = await this.prisma.quiz.findUnique({ where: { id } });
@@ -1067,6 +1288,11 @@ export class QuizService {
         `User ${creatorId} not authorized to update quiz ${id}`,
       );
       throw new BadRequestException('Only the creator can update this quiz');
+    }
+    if (existingQuiz.isPublished && data.questions?.length === 0) {
+      throw new BadRequestException(
+        'A published quiz must contain at least one question',
+      );
     }
 
     const quiz = await this.prisma.$transaction(async (tx) => {
@@ -1085,12 +1311,15 @@ export class QuizService {
       if (data.questions) {
         const questions = await tx.question.findMany({
           where: { id: { in: data.questions } },
-          select: { id: true, points: true },
+          select: { id: true, points: true, type: true },
         });
         if (questions.length !== data.questions.length) {
           throw new BadRequestException(
             'One or more quiz questions could not be found',
           );
+        }
+        if (existingQuiz.isPublished) {
+          assertLearnerSupportedQuestionTypes(questions);
         }
         const pointsByQuestionId = new Map(
           questions.map(({ id: questionId, points }) => [questionId, points]),
@@ -1124,7 +1353,7 @@ export class QuizService {
             ? new Date(data.availableUntil)
             : undefined,
           expiresAt: data.expiresAt ? new Date(data.expiresAt) : undefined,
-          isPublished: data.isPublished ?? existingQuiz.isPublished,
+          questionCount: data.questions?.length,
         },
         include: {
           questions: { include: { question: true } },
@@ -1177,17 +1406,6 @@ export class QuizService {
       }
 
       await tx.quizQuestion.deleteMany({ where: { quizId: id } });
-      await tx.$queryRaw<Array<{ id: string }>>`
-        SELECT id FROM quizzes WHERE id = ${id} FOR UPDATE
-      `;
-      const attempts = await tx.quizAttempt.count({
-        where: { quizId: id },
-      });
-      if (attempts > 0) {
-        throw new ConflictException(
-          'A quiz with recorded attempts cannot be deleted',
-        );
-      }
       await tx.quiz.delete({ where: { id } });
     });
 
@@ -1532,6 +1750,7 @@ export class QuizService {
           showResults: true,
         },
       },
+      questionSnapshot: { select: { snapshot: true } },
     };
     const existingAttempt = await this.prisma.quizAttempt.findUnique({
       where: { id: attemptId },
@@ -1550,7 +1769,25 @@ export class QuizService {
       questions: {
         where: { question: this.getPublicQuestionWhere() },
         orderBy: { order: 'asc' as const },
-        select: { questionId: true },
+        select: {
+          questionId: true,
+          order: true,
+          points: true,
+          isRequired: true,
+          question: {
+            select: {
+              id: true,
+              text: true,
+              type: true,
+              points: true,
+              topicIds: true,
+              options: {
+                select: { id: true, text: true, isCorrect: true, order: true },
+                orderBy: { order: 'asc' as const },
+              },
+            },
+          },
+        },
       },
       unit: {
         select: {
@@ -1655,6 +1892,12 @@ export class QuizService {
             'The quiz is no longer available to start',
           );
         }
+        const questionsById = new Map(
+          lockedQuiz.questions.map((quizQuestion) => [
+            quizQuestion.questionId,
+            quizQuestion,
+          ]),
+        );
         const questionIds = lockedQuiz.questions.map(
           ({ questionId }) => questionId,
         );
@@ -1694,8 +1937,37 @@ export class QuizService {
             answers: initialAnswers as Prisma.InputJsonValue,
           },
         });
+        const questionSnapshot: AttemptQuestionSnapshot = {
+          version: 1,
+          quizId: lockedQuiz.id,
+          passingScore: lockedQuiz.passingScore,
+          questions: questionIds.map((questionId, order) => {
+            const quizQuestion = questionsById.get(questionId);
+            if (!quizQuestion) {
+              throw new ConflictException(
+                'The quiz question set changed while the attempt was starting',
+              );
+            }
+            return {
+              questionId,
+              order,
+              points: quizQuestion.points,
+              isRequired: quizQuestion.isRequired,
+              question: quizQuestion.question,
+            };
+          }),
+        };
+        await tx.quizAttemptQuestionSnapshot.create({
+          data: {
+            attemptId: createdAttempt.id,
+            snapshot: questionSnapshot as Prisma.InputJsonValue,
+          },
+        });
         return this.toQuizAttemptStart(
-          createdAttempt,
+          {
+            ...createdAttempt,
+            questionSnapshot: { snapshot: questionSnapshot },
+          },
           lockedQuiz,
           userId,
           quizOrUnitId,
@@ -1730,7 +2002,7 @@ export class QuizService {
     attempt: Pick<
       QuizAttempt,
       'id' | 'userId' | 'startedAt' | 'completedAt' | 'answers'
-    >,
+    > & { questionSnapshot?: { snapshot: Prisma.JsonValue } | null },
     quiz: {
       id: string;
       unitId: string | null;
@@ -1750,6 +2022,14 @@ export class QuizService {
     }
 
     const answers = parseStoredQuizAnswers(attempt.answers);
+    const snapshot = attempt.questionSnapshot
+      ? parseAttemptQuestionSnapshot(attempt.questionSnapshot.snapshot)
+      : undefined;
+    if (snapshot && snapshot.quizId !== quiz.id) {
+      throw new ConflictException(
+        'Stored quiz question snapshot does not match this quiz attempt',
+      );
+    }
     const expiresAt =
       quiz.timeLimit === null
         ? null
@@ -1759,6 +2039,24 @@ export class QuizService {
       startedAt: attempt.startedAt,
       completedAt: attempt.completedAt,
       questionIds: answers.map(({ questionId }) => questionId),
+      ...(snapshot
+        ? {
+            questions: snapshot.questions
+              .sort((left, right) => left.order - right.order)
+              .map(({ question }) => ({
+                id: question.id,
+                text: question.text,
+                type: question.type,
+                points: question.points,
+                topicIds: question.topicIds,
+                options: question.options.map(({ id, text, order }) => ({
+                  id,
+                  text,
+                  order,
+                })),
+              })),
+          }
+        : {}),
       answers,
       timeLimit: quiz.timeLimit,
       expiresAt,
@@ -1770,7 +2068,7 @@ export class QuizService {
     userId: string,
     attemptId: string,
     questionId: string,
-    selectedOption: string,
+    selectedOption: string | string[],
   ): Promise<{ saved: true }> {
     return this.prisma.$transaction(async (tx) => {
       await tx.$queryRaw<Array<{ id: string }>>`
@@ -1806,20 +2104,43 @@ export class QuizService {
           'The question is not part of this quiz attempt',
         );
       }
-      const option = await tx.option.findFirst({
-        where: {
-          id: selectedOption,
-          questionId,
-        },
-        select: { id: true },
-      });
-      if (!option) {
+      const selectedOptionIds = Array.isArray(selectedOption)
+        ? selectedOption
+        : [selectedOption];
+      if (
+        selectedOptionIds.length === 0 ||
+        selectedOptionIds.some((id) => typeof id !== 'string' || !id) ||
+        new Set(selectedOptionIds).size !== selectedOptionIds.length
+      ) {
+        throw new BadRequestException('The selected options are invalid');
+      }
+
+      const options = Array.isArray(selectedOption)
+        ? await tx.option.findMany({
+            where: {
+              id: { in: selectedOptionIds },
+              questionId,
+            },
+            select: { id: true },
+          })
+        : await tx.option
+            .findFirst({
+              where: {
+                id: selectedOptionIds[0],
+                questionId,
+              },
+              select: { id: true },
+            })
+            .then((option) => (option ? [option] : []));
+      if (options.length !== selectedOptionIds.length) {
         throw new BadRequestException(
-          'The selected option is not part of this question',
+          'A selected option is not part of this question',
         );
       }
 
-      answerToUpdate.selectedOption = selectedOption;
+      answerToUpdate.selectedOption = Array.isArray(selectedOption)
+        ? selectedOption
+        : selectedOptionIds[0];
       await tx.quizAttempt.update({
         where: { id: attemptId },
         data: { answers: answers as Prisma.InputJsonValue },
@@ -1942,6 +2263,7 @@ export class QuizService {
       where: { id: attemptId },
       include: {
         responses: { select: { questionId: true, isCorrect: true } },
+        questionSnapshot: { select: { snapshot: true } },
         quiz: {
           select: {
             id: true,
@@ -1956,6 +2278,7 @@ export class QuizService {
     });
     let startedAttempt: NonNullable<typeof existingAttempt> | null = null;
     let storedAnswers: StoredQuizAnswer[] | null = null;
+    let attemptSnapshot: AttemptQuestionSnapshot | undefined;
     if (existingAttempt) {
       if (
         existingAttempt.userId !== userId ||
@@ -2002,6 +2325,19 @@ export class QuizService {
       }
 
       startedAttempt = existingAttempt;
+      attemptSnapshot = existingAttempt.questionSnapshot
+        ? parseAttemptQuestionSnapshot(
+            existingAttempt.questionSnapshot.snapshot,
+          )
+        : undefined;
+      if (
+        attemptSnapshot &&
+        attemptSnapshot.quizId !== existingAttempt.quiz.id
+      ) {
+        throw new ConflictException(
+          'Stored quiz question snapshot does not match this quiz attempt',
+        );
+      }
     }
 
     if (!startedAttempt || !storedAnswers) {
@@ -2072,24 +2408,27 @@ export class QuizService {
         `No published quiz found for unit ${unitId}. Please use the generate endpoint first.`,
       );
     }
-    if (activeQuiz.questions.length === 0) {
+    if (!attemptSnapshot && activeQuiz.questions.length === 0) {
       throw new NotFoundException(
         `Published quiz ${activeQuiz.id} has no currently available questions.`,
       );
     }
 
     const submittedQuestionIds = answers.map((answer) => answer.questionId);
-    const expectedQuestionIds = activeQuiz.questions.map(
+    const questionsForAttempt =
+      attemptSnapshot?.questions ?? activeQuiz.questions;
+    const expectedQuestionIds = questionsForAttempt.map(
       (quizQuestion) => quizQuestion.questionId,
     );
     const startedQuestionIds = storedAnswers.map(
       ({ questionId }) => questionId,
     );
     if (
-      expectedQuestionIds.length !== startedQuestionIds.length ||
-      expectedQuestionIds.some(
-        (questionId) => !startedQuestionIds.includes(questionId),
-      )
+      !attemptSnapshot &&
+      (expectedQuestionIds.length !== startedQuestionIds.length ||
+        expectedQuestionIds.some(
+          (questionId) => !startedQuestionIds.includes(questionId),
+        ))
     ) {
       throw new ConflictException(
         'The quiz content no longer matches this attempt',
@@ -2159,12 +2498,12 @@ export class QuizService {
         }
 
         let correctAnswers = 0;
-        const totalQuestions = activeQuiz.questions.length;
+        const totalQuestions = questionsForAttempt.length;
         let totalPoints = 0;
         let earnedPoints = 0;
 
         for (const answer of normalizedAnswers) {
-          const quizQuestion = activeQuiz.questions.find(
+          const quizQuestion = questionsForAttempt.find(
             (q) => q.questionId === answer.questionId,
           );
           const question = quizQuestion?.question;
@@ -2191,7 +2530,7 @@ export class QuizService {
             questionPoints,
             Math.max(
               0,
-              partialCredit ?? (gradingResult.isCorrect ? questionPoints : 0),
+              gradingResult.isCorrect ? questionPoints : (partialCredit ?? 0),
             ),
           );
           totalPoints += questionPoints;
@@ -2241,7 +2580,9 @@ export class QuizService {
           earnedPoints,
           totalPoints,
         );
-        const passingScore = activeQuiz.passingScore ?? 70;
+        const passingScore = attemptSnapshot
+          ? (attemptSnapshot.passingScore ?? 70)
+          : (activeQuiz.passingScore ?? 70);
         const isPassed = scorePercentage >= passingScore;
 
         const attempt = await tx.quizAttempt.update({
@@ -2405,8 +2746,10 @@ export class QuizService {
       `Submitted quiz ${activeQuiz.id} for user ${userId} with score ${result.attempt.score}`,
     );
 
-    const recommendations =
-      await this.recommendationService.recommendForAnswers(
+    let completedAttempt = result.attempt;
+    let recommendations: QuizPerformanceRecommendations | undefined;
+    try {
+      recommendations = await this.recommendationService.recommendForAnswers(
         userId,
         {
           topicId: activeQuiz.topicId,
@@ -2417,13 +2760,18 @@ export class QuizService {
         attemptId,
       );
 
-    const feedback = JSON.parse(
-      JSON.stringify(recommendations),
-    ) as Prisma.InputJsonValue;
-    const completedAttempt = await this.prisma.quizAttempt.update({
-      where: { id: attemptId },
-      data: { feedback },
-    });
+      const feedback = JSON.parse(
+        JSON.stringify(recommendations),
+      ) as Prisma.InputJsonValue;
+      completedAttempt = await this.prisma.quizAttempt.update({
+        where: { id: attemptId },
+        data: { feedback },
+      });
+    } catch (error) {
+      this.logger.error(
+        `Quiz attempt ${attemptId} was persisted, but recommendations could not be generated: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
 
     if (!activeQuiz.showResults) {
       return {
@@ -2433,12 +2781,18 @@ export class QuizService {
       };
     }
 
-    return { ...completedAttempt, recommendations, resultsAvailable: true };
+    return {
+      ...completedAttempt,
+      ...(recommendations ? { recommendations } : {}),
+      recommendationsAvailable: recommendations !== undefined,
+      resultsAvailable: true,
+    };
   }
 
   private async replayQuizSubmission(
     attempt: QuizAttempt & {
       responses: Array<{ questionId: string; isCorrect: boolean }>;
+      questionSnapshot?: { snapshot: Prisma.JsonValue } | null;
       quiz?: {
         id: string;
         topicId: string | null;
@@ -2475,41 +2829,59 @@ export class QuizService {
       };
     }
 
-    const { responses, quiz: _quiz, ...attemptResult } = attempt;
+    const {
+      responses,
+      quiz: _quiz,
+      questionSnapshot: _questionSnapshot,
+      ...attemptResult
+    } = attempt;
     void _quiz;
+    void _questionSnapshot;
     const storedRecommendations = attempt.feedback;
-    const recommendations =
+    let recommendations: QuizPerformanceRecommendations | undefined;
+    if (
       storedRecommendations &&
       typeof storedRecommendations === 'object' &&
       !Array.isArray(storedRecommendations)
-        ? (JSON.parse(
-            JSON.stringify(storedRecommendations),
-          ) as QuizPerformanceRecommendations)
-        : await this.recommendationService.recommendForAnswers(
-            userId,
-            {
-              topicId: quiz.topicId,
-              unitId: quiz.unitId,
-              courseId: quiz.unit?.courseId,
-            },
-            responses.map(({ questionId, isCorrect }) => ({
-              questionId,
-              isCorrect,
-            })),
-            attempt.id,
-          );
-
-    if (!storedRecommendations) {
-      const feedback = JSON.parse(
-        JSON.stringify(recommendations),
-      ) as Prisma.InputJsonValue;
-      await this.prisma.quizAttempt.update({
-        where: { id: attempt.id },
-        data: { feedback },
-      });
+    ) {
+      recommendations = JSON.parse(
+        JSON.stringify(storedRecommendations),
+      ) as QuizPerformanceRecommendations;
+    } else {
+      try {
+        recommendations = await this.recommendationService.recommendForAnswers(
+          userId,
+          {
+            topicId: quiz.topicId,
+            unitId: quiz.unitId,
+            courseId: quiz.unit?.courseId,
+          },
+          responses.map(({ questionId, isCorrect }) => ({
+            questionId,
+            isCorrect,
+          })),
+          attempt.id,
+        );
+        const feedback = JSON.parse(
+          JSON.stringify(recommendations),
+        ) as Prisma.InputJsonValue;
+        await this.prisma.quizAttempt.update({
+          where: { id: attempt.id },
+          data: { feedback },
+        });
+      } catch (error) {
+        this.logger.error(
+          `Quiz attempt ${attempt.id} was persisted, but recommendations could not be generated: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
     }
 
-    return { ...attemptResult, recommendations, resultsAvailable: true };
+    return {
+      ...attemptResult,
+      ...(recommendations ? { recommendations } : {}),
+      recommendationsAvailable: recommendations !== undefined,
+      resultsAvailable: true,
+    };
   }
 
   @ApiOperation({ summary: 'Get progress for a topic quiz' })
@@ -2576,7 +2948,8 @@ export class QuizService {
         nextTopicId?: string;
         gateDecision?: GateDecision;
         reviewCardsScheduled: number;
-        recommendations: QuizPerformanceRecommendations;
+        recommendations?: QuizPerformanceRecommendations;
+        recommendationsAvailable: boolean;
         resultsAvailable: true;
       }
   > {
@@ -2781,8 +3154,9 @@ export class QuizService {
           attemptId: concurrentAttempt.id,
         };
       }
-      const recommendations =
-        await this.recommendationService.recommendForAnswers(
+      let recommendations: QuizPerformanceRecommendations | undefined;
+      try {
+        recommendations = await this.recommendationService.recommendForAnswers(
           userId,
           {
             topicId,
@@ -2792,6 +3166,11 @@ export class QuizService {
           reviewAnswers,
           topicQuiz.attemptId,
         );
+      } catch (error) {
+        this.logger.error(
+          `Topic quiz attempt ${topicQuiz.attemptId} was persisted, but recommendations could not be generated: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
       let reviewCardsScheduled = 0;
       try {
         reviewCardsScheduled =
@@ -2827,7 +3206,8 @@ export class QuizService {
         nextTopicId: mastery.nextTopicId,
         gateDecision: mastery.gateDecision,
         reviewCardsScheduled,
-        recommendations,
+        ...(recommendations ? { recommendations } : {}),
+        recommendationsAvailable: recommendations !== undefined,
         resultsAvailable: true,
       };
     } catch (error) {
