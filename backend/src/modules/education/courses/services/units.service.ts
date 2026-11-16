@@ -566,14 +566,11 @@ export class UnitsService {
       let isCompleted = false;
 
       if (userId) {
-        const unitProgress = await this.progressService.calculateUnitProgress(
-          userId,
-          id,
-        );
+        const unitProgress = await this.progressService.calculateUnitProgress(userId, id);
         progressPercentage = unitProgress.progressPercentage;
         isCompleted = unitProgress.isCompleted;
 
-        await this.progressService.trackUnitAccess(userId, id);
+        void this.progressService.trackUnitAccess(userId, id);
       }
 
       const courseMaterials = unit.course?.materials ?? [];

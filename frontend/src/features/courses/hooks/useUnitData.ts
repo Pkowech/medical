@@ -151,11 +151,19 @@ export const useUnitData = (unitId: string, courseIdOverride?: string) => {
       if (!unitId) return null;
 
       try {
-        const response = await apiService.get<UnitResponse>(`/units/${unitId}`, {
-          params: {
-            include: 'topics,materials,topicMaterials',
-          },
+        const unitRequest = apiService.get<UnitResponse>(`/units/${unitId}`, {
+          params: { include: 'topics,materials,topicMaterials' },
         });
+        const progressRequest = courseIdOverride
+          ? courseService.getDetailedCourseProgress(courseIdOverride).catch(progressError => {
+              console.warn('Failed to load topic progress for unit:', progressError);
+              return null;
+            })
+          : null;
+        const [response, initialCourseProgress] = await Promise.all([
+          unitRequest,
+          progressRequest,
+        ]);
 
         const unit = response.data as UnitResponse;
 
@@ -163,9 +171,9 @@ export const useUnitData = (unitId: string, courseIdOverride?: string) => {
           throw new Error(`Unit with ID ${unitId} not found`);
         }
 
-        let courseProgress: DetailedCourseProgress | null = null;
+        let courseProgress: DetailedCourseProgress | null = initialCourseProgress;
         const courseId = unit.courseId || courseIdOverride;
-        if (courseId) {
+        if (courseId && !progressRequest) {
           try {
             courseProgress = await courseService.getDetailedCourseProgress(courseId);
           } catch (progressError) {

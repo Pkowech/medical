@@ -2088,16 +2088,15 @@ export class ProgressService {
     unitId: string,
   ): Promise<{ progressPercentage: number; isCompleted: boolean }> {
     try {
-      const materialCount = await this.prisma.material.count({
-        where: { unitId },
-      });
+      const [materialCount, completedMaterials] = await Promise.all([
+        this.prisma.material.count({ where: { unitId } }),
+        this.prisma.progress.count({
+          where: { userId, material: { unitId }, isCompleted: true },
+        }),
+      ]);
       if (materialCount === 0) {
         return { progressPercentage: 100, isCompleted: true };
       }
-
-      const completedMaterials = await this.prisma.progress.count({
-        where: { userId, material: { unitId }, isCompleted: true },
-      });
 
       const progressPercentage = Math.round(
         (completedMaterials / materialCount) * 100,

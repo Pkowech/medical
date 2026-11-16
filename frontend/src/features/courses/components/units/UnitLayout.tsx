@@ -70,11 +70,6 @@ type NormalisedMaterial = {
   unitId?: string | number;
 };
 
-function getMobileTopicTitle(title?: string): string {
-  const words = title?.trim().split(/\s+/).filter(Boolean) ?? [];
-  return words.length > 2 ? words.slice(0, 2).join(' ') : title || 'Topic';
-}
-
 function getTopicBreadcrumbTitle(title: string): string {
   return /\boverview$/i.test(title.trim()) ? 'Overview' : title;
 }
@@ -236,7 +231,7 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
       setHeader({
         title: unitData.title,
         mobileTitle: hasSelectedTopic
-          ? getMobileTopicTitle(typedCurrentTopic?.title)
+          ? typedCurrentTopic?.title || 'Topic'
           : undefined,
         description: unitData.description || 'Unit content and materials',
         canResumeStudySession: isTopicReading,
@@ -516,13 +511,29 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
 
   // ── Render ─────────────────────────────────────────────────────────────
   return (
-    <div className="flex h-full flex-col flex-1 min-h-0 bg-background/50 dark:bg-card">
-      <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden relative">
+    <div
+      className={cn(
+        'relative flex w-full flex-1 flex-col bg-background/50 dark:bg-card',
+        selectedMaterialId
+          ? 'h-full min-h-0'
+          : 'min-h-full lg:h-full lg:min-h-0',
+      )}
+    >
+      <div
+        className={cn(
+          'relative flex min-w-0 flex-1',
+          selectedMaterialId
+            ? 'min-h-0 overflow-hidden'
+            : 'lg:min-h-0 lg:overflow-hidden',
+        )}
+      >
 
         {/* Main content area */}
         <main className={cn(
-          'min-h-0 min-w-0 flex-1 overscroll-contain scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-slate-700',
-          selectedMaterialId ? 'flex overflow-hidden p-0' : 'overflow-y-auto p-4 md:p-8',
+          'min-w-0 flex-1 overscroll-contain scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-slate-700',
+          selectedMaterialId
+            ? 'flex min-h-0 overflow-hidden p-0'
+            : 'overflow-visible px-4 py-4 sm:px-6 sm:py-6 lg:min-h-0 lg:overflow-y-auto lg:p-8',
         )}>
           <div className={cn(
             'max-w-6xl mx-auto space-y-6 md:space-y-8 pb-20',
@@ -570,6 +581,7 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
                         </Link>
                         <Button
                           type="button"
+                          size="sm"
                           variant={activeCoursePanel === 'notes' ? 'default' : 'outline'}
                           aria-pressed={activeCoursePanel === 'notes'}
                           aria-label={activeCoursePanel === 'notes' ? 'Return to topic' : 'Open notes for this topic'}
@@ -583,10 +595,11 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
                     )}
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                     {hasSelectedTopic && (
                       <Button
                         type="button"
+                        size="sm"
                         variant={activeCoursePanel === 'discussion' ? 'default' : 'outline'}
                         aria-pressed={activeCoursePanel === 'discussion'}
                         onClick={() => openCoursePanel('discussion')}
@@ -617,6 +630,7 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
                     )}
                     <Button
                       type="button"
+                      size="sm"
                       variant={activeCoursePanel === 'unit-quiz' ? 'outline' : 'default'}
                       onClick={() => {
                         if (typedCurrentTopic?.id != null) {

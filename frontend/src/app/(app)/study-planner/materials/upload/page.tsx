@@ -216,7 +216,7 @@ export default function UploadMaterialPage() {
       const availableTopics = selectedUnit.lessons || selectedUnit.topics || [];
       setTopics(availableTopics.map((topic: Lesson | Topic) => ({
         id: topic.id,
-        title: topic.title || String(topic.id),
+        title: topic.title || ('name' in topic ? topic.name : undefined) || String(topic.id),
       })));
     }
   }, [unitId, units]);

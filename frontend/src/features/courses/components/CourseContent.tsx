@@ -131,7 +131,7 @@ export const CourseContent = ({
   return (
     <div className="pb-20 sm:pb-0">
       <div className="mb-4 flex items-start justify-between gap-3">
-        <h2 className="min-w-0 text-3xl font-semibold leading-tight tracking-tight text-foreground dark:text-foreground">
+        <h2 className="min-w-0 text-2xl font-semibold leading-tight tracking-tight text-foreground dark:text-foreground sm:text-3xl">
           {lesson.title}
         </h2>
         <details className="group relative shrink-0">
@@ -274,7 +274,7 @@ export const CourseContent = ({
         )}
 
         {nextStep !== 'material' && (
-          <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-50 border-t border-border bg-background/95 px-4 py-3 shadow-[0_-8px_24px_rgba(15,23,42,0.12)] backdrop-blur sm:static sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:shadow-none sm:backdrop-blur-none">
+          <div className="flex">
             <button
               type="button"
               onClick={nextStep === 'next-topic' ? navigateNext : onOpenMasteryQuiz}
