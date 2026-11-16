@@ -42,7 +42,7 @@ export class LearningPathProgressService {
   >;
 
   constructor(
-    private readonly prisma: PrismaService,
+    @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(LearningPathEligibilityService)
     eligibilityService: Pick<
       LearningPathEligibilityService,
