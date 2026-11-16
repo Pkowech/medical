@@ -418,7 +418,7 @@ export const StudySession: React.FC<StudySessionProps> = ({
               </h2>
               {contextLabel && <p className="mt-1 text-sm text-muted-foreground">{contextLabel}</p>}
               <p className="mt-1 text-xs text-muted-foreground">
-                Sessions under 5 minutes are saved but do not count toward progress or streaks.
+                Sessions under 1 minute are saved but do not count toward progress or streaks.
               </p>
             </div>
             <div

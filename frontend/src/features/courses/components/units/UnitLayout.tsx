@@ -99,6 +99,7 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
   const {
     activeSession,
     ensureCourseSession,
+    endCourseSession,
     pauseCourseSession,
     recordCourseActivity,
   } = useCourseStudySession();
@@ -152,7 +153,8 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
     updateRouteQuery('materialId', null, true);
     toggleCoursePanel(panelName);
   };
-  const closeMaterial = () => {
+  const closeMaterial = async () => {
+    if (courseId) await endCourseSession(courseId);
     updateRouteQuery('materialId', null, true);
   };
 

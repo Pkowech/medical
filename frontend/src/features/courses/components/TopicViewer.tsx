@@ -184,6 +184,7 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
   const {
     activeSession,
     ensureCourseSession,
+    endCourseSession,
     pauseCourseSession,
     recordCourseActivity,
   } = useCourseStudySession();
@@ -551,6 +552,7 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
 
   const handleCloseMaterial = async () => {
     setShowMaterialModal(false);
+    await endCourseSession(courseId);
     if (offlineUserId) {
       try {
         setOfflineBundle(await offlineService.getOfflineTopicBundle(offlineUserId, topicId));
@@ -732,8 +734,7 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
                 variant={showNotes ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => {
-                  setSelectedMaterialId(null);
-                  setShowMaterialModal(false);
+                  if (showMaterialModal) void handleCloseMaterial();
                   setShowNotes(current => !current);
                 }}
                 aria-expanded={showNotes}

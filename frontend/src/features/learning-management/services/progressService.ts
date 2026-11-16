@@ -154,7 +154,9 @@ const progressService = {
 
   async getUserProgress(userId: string): Promise<UnknownRecord[]> {
     try {
-      const response = await api.get<UnknownRecord[]>(`/progress/user-progress/${userId}`);
+      const response = await api.get<UnknownRecord[]>('/progress/sync', {
+        params: { userId },
+      });
       return Array.isArray(response.data) ? response.data : [];
     } catch (error) {
       console.error('Error fetching user progress:', formatError(error));

@@ -57,7 +57,7 @@ interface CourseStudySessionContextValue {
   switchCourseTopic: (courseId: string, topicId: string, topicTitle: string) => void;
   pauseCourseSession: (reason?: NonNullable<ActiveCourseSession['pauseReason']>) => void;
   resumeCourseSession: () => void;
-  endCourseSession: () => Promise<StudySession | null>;
+  endCourseSession: (courseId?: string) => Promise<StudySession | null>;
 }
 
 const CourseStudySessionContext = createContext<CourseStudySessionContextValue | null>(null);
@@ -129,6 +129,7 @@ function CourseStudySessionStateProvider({
   const activeSessionRef = useRef(activeSession);
   const isStartingRef = useRef(false);
   const isEndingRef = useRef(false);
+  const sessionStartPromiseRef = useRef<Promise<void> | null>(null);
   const isPausedByVisibilityRef = useRef(false);
   const pendingCourseSessionRef = useRef<PendingCourseSession | null>(null);
   const lastInteractionAtRef = useRef(Date.now());
@@ -254,7 +255,6 @@ function CourseStudySessionStateProvider({
         activities: [activity],
         notes: '',
       };
-      pendingCourseSessionRef.current = null;
       lastInteractionAtRef.current = Date.now();
       activeSessionRef.current = newSession;
       setActiveSession(newSession);
@@ -299,7 +299,19 @@ function CourseStudySessionStateProvider({
           ...(materialId ? { materialId } : {}),
         },
       };
-      void startCourseSessionForActivity(pending, activity);
+      if (isStartingRef.current) return;
+      const startPromise = startCourseSessionForActivity(pending, activity);
+      sessionStartPromiseRef.current = startPromise;
+      const clearStartPromise = () => {
+        if (sessionStartPromiseRef.current === startPromise) {
+          sessionStartPromiseRef.current = null;
+        }
+      };
+      void startPromise.then(clearStartPromise, error => {
+        clearStartPromise();
+        console.error('Could not start the course study session:', error);
+        toast.error('Could not start the course study session.');
+      });
       return;
     }
     if (courseId && current.courseId !== courseId) return;
@@ -464,9 +476,22 @@ function CourseStudySessionStateProvider({
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [pauseCourseSession, resumeCourseSession]);
 
-  const endCourseSession = useCallback(async () => {
+  const endCourseSession = useCallback(async (courseId?: string) => {
+    if (isEndingRef.current) return null;
+    if (
+      (!activeSessionRef.current || activeSessionRef.current.courseId !== courseId) &&
+      sessionStartPromiseRef.current
+    ) {
+      await sessionStartPromiseRef.current;
+    }
     const currentSession = activeSessionRef.current;
-    if (!currentSession || isEndingRef.current) return null;
+    if (
+      !currentSession ||
+      (courseId && currentSession.courseId !== courseId) ||
+      isEndingRef.current
+    ) {
+      return null;
+    }
     isEndingRef.current = true;
     setIsEnding(true);
     const clearLocalSession = async () => {
@@ -589,6 +614,8 @@ function CourseStudySessionStateProvider({
   ) => {
     if (!userId || sessionReadyUserId !== userId) return;
 
+    const pending = { courseId, topicId, topicTitle };
+    pendingCourseSessionRef.current = pending;
     const currentSession = activeSessionRef.current;
     if (currentSession?.courseId === courseId) {
       if (currentSession.topicId !== topicId) {
@@ -604,7 +631,6 @@ function CourseStudySessionStateProvider({
       }
       return;
     }
-    const pending = { courseId, topicId, topicTitle };
     if (isStartingRef.current) {
       pendingCourseSessionRef.current = pending;
       return;

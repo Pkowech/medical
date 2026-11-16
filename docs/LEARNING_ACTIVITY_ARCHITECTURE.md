@@ -107,13 +107,17 @@ it is not authoritative score history. Score analytics read completed
   from double-counting session minutes in content progress.
   If a client omits active duration, record zero rather than treating elapsed
   wall-clock time as study time.
-  Sessions shorter than five minutes are invalid for study-day activity.
+  Sessions shorter than one minute are invalid for study-day activity.
   An unfinished session expires after 24 hours, is closed as invalid with zero
   duration, and creates no study-day activity; a late end request cannot make
   it valid. Do not infer duration from elapsed wall time or a Redis key.
   Dashboard total/weekly study time comes from valid, ended
   `StudySession` rows. Resource-level `topic_progress.timeSpent` is separate
   and must not be added again to session duration.
+  Closing a course material reader flushes its content progress before ending
+  the active course study session. Opening another material or activity starts
+  a new session; the dedicated study-session workflow retains its explicit
+  session controls.
 - A UTC study day qualifies on persisted content progress, a completed quiz
   attempt, a valid completed study session, or an explicit flashcard review.
   Login, enrollment, profile changes, recommendations, and generic telemetry

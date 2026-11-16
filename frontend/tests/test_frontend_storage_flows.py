@@ -138,6 +138,24 @@ def test_material_progress_does_not_queue_permanent_api_errors():
     assert "Could not refresh learning data after material progress changed" in close_handler
 
 
+def test_material_progress_revision_lookup_uses_progress_sync_endpoint():
+    progress_service = read_frontend(
+        "src/features/learning-management/services/progressService.ts"
+    )
+    backend_controller = (
+        FRONTEND_ROOT.parent
+        / "backend/src/modules/education/courses/controllers/progress.controller.ts"
+    ).read_text(encoding="utf-8")
+    get_user_progress = progress_service.split(
+        "async getUserProgress(userId: string)", 1
+    )[1].split("async getCourseProgress", 1)[0]
+
+    assert "api.get<UnknownRecord[]>('/progress/sync'" in get_user_progress
+    assert "params: { userId }" in get_user_progress
+    assert "@Get('sync')" in backend_controller
+    assert "@Query('userId', ParseUUIDPipe) userId: string" in backend_controller
+
+
 def test_offline_replay_only_queues_allowlisted_learning_posts_not_admin_deletes():
     policy = read_frontend("src/lib/core/offline/offlineQueueShared.js")
     api_client = read_frontend("src/features/auth/services/apiClient.ts")

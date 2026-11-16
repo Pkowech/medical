@@ -206,7 +206,7 @@ service.logger = { log: () => {}, warn: () => {} };
     session.id,
     [],
     undefined,
-    240,
+    30,
     0,
   );
   assert.equal(result.isValid, false);
@@ -220,7 +220,7 @@ service.logger = { log: () => {}, warn: () => {} };
     )
 
 
-def test_study_session_validity_uses_exact_five_minute_boundary():
+def test_study_session_validity_uses_exact_one_minute_boundary():
     run_typescript(
         r"""
 const assert = require('node:assert/strict');
@@ -268,8 +268,8 @@ async function endSession(durationSeconds) {
 }
 
 (async () => {
-  assert.equal((await endSession(299)).isValid, false);
-  assert.equal((await endSession(300)).isValid, true);
+  assert.equal((await endSession(59)).isValid, false);
+  assert.equal((await endSession(60)).isValid, true);
 })().catch(error => {
   console.error(error);
   process.exitCode = 1;

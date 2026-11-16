@@ -18,7 +18,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 const INTERRUPTED_SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 const INTERRUPTED_SESSION_REASON =
   'Session expired after 24 hours without completion';
-const MIN_VALID_DURATION_SECONDS = 5 * 60;
+const MIN_VALID_DURATION_SECONDS = 60;
 
 @Injectable()
 export class StudyService {
@@ -345,7 +345,7 @@ export class StudyService {
       activeDurationSeconds >= MIN_VALID_DURATION_SECONDS;
     const invalidReason = isValid
       ? null
-      : `Session too short (${duration} min < 5 min minimum)`;
+      : 'Session too short (less than 1 minute of active study)';
 
     // LearningGain: focus score improvement relative to baseline (0.5 expected)
     const learningGain = isValid

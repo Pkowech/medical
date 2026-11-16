@@ -9,7 +9,7 @@ This roadmap is being actively trimmed. Items that are already implemented or do
 - [x] The PWA foundation exists and should be preserved while behavior is being verified rather than replaced.
 - [x] The architecture no longer treats `analytics_events` as the canonical source of learning truth.
 - [x] Phase 2 assessment integrity is implemented and covered by focused regressions; the scoring backfill migration still requires deployment validation in Phase 1.
-- [x] Study-session validity uses unrounded active seconds with a five-minute minimum; expired sessions close as invalid, and invalid sessions create no learning activity or outbox event.
+- [x] Study-session validity uses unrounded active seconds with a one-minute minimum; expired sessions close as invalid, and invalid sessions create no learning activity or outbox event.
 - [x] Legacy learning-progress updates require content identifiers, idempotency, client time, and an expected revision; course enrollment and topic/material associations are validated.
 - [x] Rust user-level course statistics derive from published topic/unit progress; shared fixtures cover aggregation and zero-progress status mapping.
 

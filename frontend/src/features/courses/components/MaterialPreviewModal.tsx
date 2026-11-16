@@ -255,9 +255,9 @@ export const MaterialPreviewModal = ({
       material?.file?.mimetype?.toLowerCase() === 'application/pdf' ||
       material?.previewFile?.mimetype?.toLowerCase() === 'application/pdf';
     if (isPdf && pdfNumPages && pdfNumPages > 0) {
-      return Math.min(99, Math.round((pdfPagesViewed / pdfNumPages) * 100));
+      return Math.min(100, Math.round((pdfPagesViewed / pdfNumPages) * 100));
     }
-    if (isVideo) return Math.min(99, videoProgressPercent);
+    if (isVideo) return Math.min(100, videoProgressPercent);
     return 0;
   }, [
     isVideo,
@@ -497,7 +497,13 @@ export const MaterialPreviewModal = ({
         </div>
         {!isLoading && material && (
           <footer className="flex flex-wrap items-center justify-between gap-3 border-t bg-background p-3 text-xs text-muted-foreground dark:border-border dark:bg-card/30">
-            <span>{material.type?.toLowerCase() === 'pdf' && pdfNumPages ? `Page ${pdfCurrentPage} of ${pdfNumPages}` : 'Progress saves while you study. Closing does not mark this complete.'}</span>
+            <span>
+              {material.type?.toLowerCase() === 'pdf' && pdfNumPages
+                ? `Page ${pdfCurrentPage} of ${pdfNumPages} · progress saves automatically`
+                : isVideo
+                  ? 'Progress saves automatically; finishing the video marks it complete.'
+                  : 'Progress saves while you study. Mark complete when you finish.'}
+            </span>
             <Button
               type="button"
               size="sm"
