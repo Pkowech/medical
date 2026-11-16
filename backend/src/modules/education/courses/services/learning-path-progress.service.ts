@@ -1,5 +1,6 @@
 // src/modules/progress/services/learning-path-progress.service.ts
 import {
+  Inject,
   Injectable,
   NotFoundException,
   BadRequestException,
@@ -42,17 +43,13 @@ export class LearningPathProgressService {
 
   constructor(
     private readonly prisma: PrismaService,
-    eligibilityService?: Pick<LearningPathEligibilityService, 'assertEligible'>,
-    legacyEligibilityService?: Pick<
+    @Inject(LearningPathEligibilityService)
+    eligibilityService: Pick<
       LearningPathEligibilityService,
       'assertEligible'
     >,
   ) {
-    const candidate = eligibilityService ?? legacyEligibilityService;
-    this.learningPathEligibilityService =
-      candidate && typeof candidate.assertEligible === 'function'
-        ? candidate
-        : new LearningPathEligibilityService();
+    this.learningPathEligibilityService = eligibilityService;
   }
 
   private async findEnrollment(userId: string, learningPathId: string) {

@@ -462,7 +462,6 @@ const service = new LearningPathProgressService(
       create: async () => { progressCreated = true; },
     },
   },
-  {},
   new LearningPathEligibilityService(),
 );
 
@@ -472,6 +471,39 @@ const service = new LearningPathProgressService(
     BadRequestException,
   );
   assert.equal(progressCreated, false);
+})().catch(error => {
+  console.error(error);
+  process.exitCode = 1;
+});
+"""
+    )
+
+
+def test_learning_path_progress_service_resolves_eligibility_dependency():
+    run_typescript(
+        r"""
+const assert = require('node:assert/strict');
+const { Test } = require('@nestjs/testing');
+const { PrismaService } =
+  require('./src/infrastructure/prisma/prisma.service.ts');
+const { LearningPathProgressService } =
+  require('./src/modules/education/courses/services/learning-path-progress.service.ts');
+const { LearningPathEligibilityService } =
+  require('./src/modules/education/courses/services/learning-path-eligibility.service.ts');
+
+(async () => {
+  const moduleRef = await Test.createTestingModule({
+    providers: [
+      LearningPathProgressService,
+      { provide: PrismaService, useValue: {} },
+      {
+        provide: LearningPathEligibilityService,
+        useValue: { assertEligible: () => undefined },
+      },
+    ],
+  }).compile();
+  assert.ok(moduleRef.get(LearningPathProgressService));
+  await moduleRef.close();
 })().catch(error => {
   console.error(error);
   process.exitCode = 1;
