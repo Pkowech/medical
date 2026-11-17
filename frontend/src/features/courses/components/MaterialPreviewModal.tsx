@@ -37,7 +37,7 @@ import { getPageMetadata } from '@/core/metadata/pageMetadata';
 interface MaterialPreviewModalProps {
   materialId: string | null;
   isOpen: boolean;
-  onClose: () => void;
+  onClose: () => void | Promise<void>;
   materials?: Array<{ id: string | number }>;
   onNavigate?: (id: string) => void;
   inline?: boolean;
@@ -285,7 +285,7 @@ export const MaterialPreviewModal = ({
   });
   const closeMaterial = async () => {
     await stopTracking();
-    onClose();
+    await onClose();
   };
 
   useEffect(() => {

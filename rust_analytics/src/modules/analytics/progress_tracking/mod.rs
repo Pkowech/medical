@@ -403,7 +403,7 @@ mod tests {
     }
 
     #[test]
-    fn matches_the_shared_published_mandatory_and_empty_unit_history() {
+    fn matches_the_shared_published_and_empty_unit_history() {
         let fixture: Value = serde_json::from_str(include_str!(
             "../../../../../shared_fixtures/course-progress-history.json"
         ))
@@ -432,17 +432,7 @@ mod tests {
                     .iter()
                     .filter(|topic| topic["status"] == "published")
                     .collect();
-                let mandatory_topics: Vec<&Value> = published_topics
-                    .iter()
-                    .copied()
-                    .filter(|topic| topic["isMandatory"] == true)
-                    .collect();
-                let required_topics = if mandatory_topics.is_empty() {
-                    published_topics
-                } else {
-                    mandatory_topics
-                };
-                let topic_percentages: Vec<f64> = required_topics
+                let topic_percentages: Vec<f64> = published_topics
                     .iter()
                     .map(|topic| {
                         let progress = topic_progress
@@ -457,7 +447,7 @@ mod tests {
                         }
                     })
                     .collect();
-                let completed_topics = required_topics
+                let completed_topics = published_topics
                     .iter()
                     .filter(|topic| {
                         topic_progress
@@ -479,7 +469,7 @@ mod tests {
                     .and_then(|row| row["progressPercentage"].as_f64())
                     .unwrap_or(0.0);
                 (
-                    required_topics.len() as i64,
+                    published_topics.len() as i64,
                     completed_topics,
                     unit_completed,
                     topic_percentage,

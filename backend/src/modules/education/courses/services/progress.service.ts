@@ -1638,43 +1638,48 @@ export class ProgressService {
     try {
       const [units, topicProgressRows, unitProgressRows, materials] =
         await Promise.all([
-        client.unit.findMany({
-          where: { courseId },
-          select: {
-            id: true,
-            topics: {
-              where: { status: 'published' },
-              select: { id: true },
+          client.unit.findMany({
+            where: { courseId },
+            select: {
+              id: true,
+              topics: {
+                where: { status: 'published' },
+                select: { id: true },
+              },
             },
-          },
-        }),
-        client.progress.findMany({
-          where: { userId, courseId, topicId: { not: null }, materialId: null },
-          select: {
-            topicId: true,
-            quizScores: true,
-          },
-        }),
-        client.progress.findMany({
-          where: {
-            userId,
-            courseId,
-            unitId: { not: null },
-            topicId: null,
-            materialId: null,
-          },
-          select: {
-            unitId: true,
-            progressPercentage: true,
-            isCompleted: true,
-            status: true,
-          },
-        }),
-        client.material.findMany({
-          where: { unit: { courseId } },
-          select: { id: true, unitId: true },
-        }),
-      ]);
+          }),
+          client.progress.findMany({
+            where: {
+              userId,
+              courseId,
+              topicId: { not: null },
+              materialId: null,
+            },
+            select: {
+              topicId: true,
+              quizScores: true,
+            },
+          }),
+          client.progress.findMany({
+            where: {
+              userId,
+              courseId,
+              unitId: { not: null },
+              topicId: null,
+              materialId: null,
+            },
+            select: {
+              unitId: true,
+              progressPercentage: true,
+              isCompleted: true,
+              status: true,
+            },
+          }),
+          client.material.findMany({
+            where: { unit: { courseId } },
+            select: { id: true, unitId: true },
+          }),
+        ]);
       const materialIds = materials.map((material) => material.id);
       const materialProgressRows = materialIds.length
         ? await client.progress.findMany({
@@ -1764,9 +1769,9 @@ export class ProgressService {
           ? topicPercentage
           : unitMaterials.length
             ? materialPercentage
-          : isCompleted
-            ? 100
-            : (unitProgress?.percentage ?? 0);
+            : isCompleted
+              ? 100
+              : (unitProgress?.percentage ?? 0);
 
         totalUnitPercentage += unitPercentage;
         if (isCompleted) completedUnits += 1;
@@ -1787,7 +1792,7 @@ export class ProgressService {
         throw error;
       }
       this.logger.warn(
-        'Failed to derive course progress locally; gRPC remains unavailable',
+        'Failed to derive course progress from database',
         { userId, courseId, error: getErrorMessage(error) },
       );
       return undefined;

@@ -48,3 +48,15 @@ def test_topic_completion_is_based_on_assessment_mastery_not_manual_study_status
     assert "topic?.masteryUnlocked === true" in unit_layout
     assert "Mark topic complete" not in topic_viewer
     assert "progress[`${chapter.id}-${topic.id}`]" not in unit_layout
+
+
+def test_closing_material_refreshes_progress_before_returning_to_the_topic():
+    unit_layout = read_frontend("src/features/courses/components/units/UnitLayout.tsx")
+    material_modal = read_frontend("src/features/courses/components/MaterialPreviewModal.tsx")
+    close_handler = unit_layout.split("const closeMaterial", 1)[1].split(
+        "const handleAddTopic", 1
+    )[0]
+
+    assert "await refreshLearningCaches();" in close_handler
+    assert "await stopTracking();" in material_modal
+    assert "await onClose();" in material_modal

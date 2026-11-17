@@ -146,8 +146,13 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
     updateRouteQuery('materialId', null, true);
     toggleCoursePanel(panelName);
   };
-  const closeMaterial = () => {
+  const closeMaterial = async () => {
     updateRouteQuery('materialId', null, true);
+    try {
+      await refreshLearningCaches();
+    } catch (error) {
+      console.error('Could not refresh learning data after material progress changed:', error);
+    }
   };
 
   const handleAddTopic = async (topicData: Partial<Topic>, hasPendingMaterial: boolean) => {
