@@ -101,19 +101,6 @@ export const CourseContent = ({
     }
   }, [lesson?.id, lesson?.title, trackAction, XAPI_VERBS.INITIALIZED]);
 
-  // Track Unit Completion (if it becomes completed while viewing)
-  useEffect(() => {
-    if (lesson?.id && progress[lessonKey]) {
-      trackAction(XAPI_VERBS.COMPLETED, {
-        id: `${URLS.BASE}/units/${lesson.id}`,
-        definition: {
-          name: { 'en-US': lesson.title },
-          type: 'http://adlnet.gov/expapi/activities/lesson',
-        },
-      });
-    }
-  }, [lesson?.id, !!progress[lessonKey], trackAction, XAPI_VERBS.COMPLETED]);
-
   if (!lesson) {
     return (
       <div className="bg-card/80 dark:bg-card/50 backdrop-blur-sm rounded-lg p-12 shadow-sm border border-border dark:border-border/50 flex flex-col items-center justify-center text-center animate-in fade-in zoom-in duration-500">

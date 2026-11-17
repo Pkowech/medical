@@ -33,7 +33,7 @@ pub async fn calculate_user_course_progress(
                     CASE
                         WHEN topic.id IS NULL THEN NULL
                         WHEN COALESCE(topic_state.is_completed, false) THEN 100
-                        ELSE COALESCE(topic_state.progress_percentage, 0)
+                        ELSE 0
                     END
                 ), 0)::float8 AS topic_percentage
             FROM enrolled_courses enrolled
@@ -52,10 +52,8 @@ pub async fn calculate_user_course_progress(
                 )
             LEFT JOIN LATERAL (
                 SELECT
-                    BOOL_OR(
-                        progress.is_completed = true
-                        OR progress.status::text IN ('completed', 'COMPLETED')
-                    ) AS is_completed,
+                BOOL_OR(progress.quiz_scores ->> 'masteryUnlocked' = 'true')
+                    AS is_completed,
                     MAX(progress.progress_percentage) AS progress_percentage
                 FROM topic_progress progress
                 WHERE progress.topic_id = topic.id
@@ -86,12 +84,10 @@ pub async fn calculate_user_course_progress(
             COALESCE(ROUND(AVG(
                 CASE
                     WHEN unit.unit_id IS NULL THEN NULL
-                    WHEN unit.explicitly_completed
-                      OR (
-                          unit.total_topics > 0
-                          AND unit.completed_topics = unit.total_topics
-                      ) THEN 100
+                    WHEN unit.total_topics > 0
+                      AND unit.completed_topics = unit.total_topics THEN 100
                     WHEN unit.total_topics > 0 THEN unit.topic_percentage
+                    WHEN unit.explicitly_completed THEN 100
                     ELSE unit.unit_percentage
                 END
             )), 0)::int AS progress_percentage
@@ -142,7 +138,7 @@ pub async fn calculate_course_progress(
 				CASE
 					WHEN t.id IS NULL THEN NULL
 					WHEN COALESCE(tp.is_completed, false) THEN 100
-					ELSE COALESCE(tp.progress_percentage, 0)
+					ELSE 0
 				END
 			), 0)::float8,
 			COALESCE(unit_progress.progress_percentage, 0)::float8
@@ -160,7 +156,7 @@ pub async fn calculate_course_progress(
 			)
 		LEFT JOIN LATERAL (
 			SELECT
-				BOOL_OR(p.is_completed = true OR p.status = 'completed') AS is_completed,
+				BOOL_OR(p.quiz_scores ->> 'masteryUnlocked' = 'true') AS is_completed,
 				MAX(p.progress_percentage) AS progress_percentage
 			FROM topic_progress p
 			WHERE p.topic_id = t.id
@@ -225,7 +221,11 @@ fn build_course_progress(
         .iter()
         .filter(
             |(total_topics, completed_topics, explicitly_completed, _, _)| {
-                *explicitly_completed || (*total_topics > 0 && total_topics == completed_topics)
+                if *total_topics > 0 {
+                    total_topics == completed_topics
+                } else {
+                    *explicitly_completed
+                }
             },
         )
         .count() as i32;
@@ -236,10 +236,10 @@ fn build_course_progress(
             .iter()
             .map(
                 |(total_topics, _, explicitly_completed, topic_percentage, unit_percentage)| {
-                    if *explicitly_completed {
-                        100.0
-                    } else if *total_topics > 0 {
+                    if *total_topics > 0 {
                         topic_percentage.clamp(0.0, 100.0)
+                    } else if *explicitly_completed {
+                        100.0
                     } else {
                         unit_percentage.clamp(0.0, 100.0)
                     }
@@ -391,15 +391,12 @@ mod tests {
                         let progress = topic_progress
                             .get(topic["id"].as_str().expect("topic id"))
                             .copied();
-                        let completed = progress.is_some_and(|row| {
-                            row["isCompleted"] == true || row["status"] == "completed"
-                        });
+                        let completed = progress
+                            .is_some_and(|row| row["quizScores"]["masteryUnlocked"] == true);
                         if completed {
                             100.0
                         } else {
-                            progress
-                                .and_then(|row| row["progressPercentage"].as_f64())
-                                .unwrap_or(0.0)
+                            0.0
                         }
                     })
                     .collect();
@@ -408,9 +405,7 @@ mod tests {
                     .filter(|topic| {
                         topic_progress
                             .get(topic["id"].as_str().expect("topic id"))
-                            .is_some_and(|row| {
-                                row["isCompleted"] == true || row["status"] == "completed"
-                            })
+                            .is_some_and(|row| row["quizScores"]["masteryUnlocked"] == true)
                     })
                     .count() as i64;
                 let topic_percentage = if topic_percentages.is_empty() {

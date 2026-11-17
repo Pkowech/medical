@@ -9,7 +9,7 @@ const { ProgressStatus } = require('@prisma/client');
 const { ProgressService } =
   require('./src/modules/education/courses/services/progress.service.ts');
 
-async function createService() {
+async function createService(masteryUnlocked = false) {
   const existing = {
     id: 'progress-1',
     userId: 'user-1',
@@ -22,6 +22,7 @@ async function createService() {
     progressPercentage: 100,
     completionPercentage: 100,
     completedAt: new Date('2026-01-01T00:00:00Z'),
+    quizScores: { masteryUnlocked },
     lastUpdated: BigInt(Date.now()),
     revision: 7,
     timeSpent: 12,
@@ -161,7 +162,7 @@ async function createService() {
   );
   assert.equal(concurrentReset.calls.update.length, 1);
 
-  const idempotent = await createService();
+  const idempotent = await createService(true);
   await idempotent.service.updateUnitMaterialTopicProgress('user-1', {
     topicId: 'topic-1',
     status: ProgressStatus.completed,

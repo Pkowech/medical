@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { Pause, Play, Square } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/shared/components/ui/button';
@@ -177,7 +178,6 @@ function CourseStudySessionStateProvider({
       activeSessionRef.current = restored;
       setActiveSession(restored);
       setSessionElapsedBase(restored.elapsedSeconds);
-      toast.info('Your saved course session and notes were restored.');
     }).catch(error => {
       if (!cancelled) {
         console.error('Could not restore the offline study session:', error);
@@ -536,18 +536,12 @@ function CourseStudySessionStateProvider({
         currentSession.elapsedSeconds,
         pausedDurationSeconds,
       );
-      if (ended.isValid) {
-        toast.success(`Course study session saved (${ended.duration ?? 0} minutes).`);
-      } else {
-        toast.info(`Session saved but did not count toward progress. ${ended.invalidReason ?? ''}`);
-      }
       await clearLocalSession();
       return ended;
     } catch (error) {
       // apiClient may have already queued the end mutation; do not enqueue again.
       if (isOfflineQueuedError(error)) {
         await clearLocalSession();
-        toast.success('Session and notes saved on this device. They will sync when you are back online.');
         return null;
       }
       if (isNetworkUnavailable(error) && userId) {
@@ -584,7 +578,6 @@ function CourseStudySessionStateProvider({
             'study_session_end',
           );
           await clearLocalSession();
-          toast.success('Session and notes saved on this device. They will sync when you are back online.');
           return null;
         } catch (queueError) {
           console.error('Could not queue the offline study session:', queueError);
@@ -595,7 +588,6 @@ function CourseStudySessionStateProvider({
       if (getHttpStatus(error) === 404) {
         console.warn('The active course study session no longer exists on the server:', currentSession.id);
         await clearLocalSession();
-        toast.info('This study session was already removed. You can continue studying.');
         return null;
       }
       console.error('Failed to save course study session:', error);
@@ -637,22 +629,53 @@ function CourseStudySessionStateProvider({
     }
 
     isStartingRef.current = true;
+    let shouldStartSession = false;
     try {
       if (currentSession) {
         await endCourseSession();
         if (activeSessionRef.current) return;
       }
       pendingCourseSessionRef.current = pending;
+      shouldStartSession = true;
     } finally {
       isStartingRef.current = false;
+    }
+
+    if (!shouldStartSession || activeSessionRef.current) return;
+    const initialActivity: StudySessionActivity = {
+      type: 'reading',
+      duration: 0,
+      timestamp: new Date().toISOString(),
+      metadata: { topicId, durationSeconds: 0 },
+    };
+    const startPromise = startCourseSessionForActivity(pending, initialActivity);
+    sessionStartPromiseRef.current = startPromise;
+    try {
+      await startPromise;
+    } finally {
+      if (sessionStartPromiseRef.current === startPromise) {
+        sessionStartPromiseRef.current = null;
+      }
     }
   }, [
     endCourseSession,
     resumeCourseSession,
     sessionReadyUserId,
+    startCourseSessionForActivity,
     switchCourseTopic,
     userId,
   ]);
+
+  const pathname = usePathname();
+  useEffect(() => {
+    const currentSession = activeSessionRef.current;
+    if (!currentSession || !pathname) return;
+
+    const courseUnitPrefix = `/courses/${currentSession.courseId}/units/`;
+    if (!pathname.startsWith(courseUnitPrefix)) {
+      void endCourseSession(currentSession.courseId);
+    }
+  }, [activeSession?.courseId, endCourseSession, pathname]);
 
   const activeSessionSummary = useMemo<ActiveCourseSessionSummary | null>(() => activeSession
     ? {

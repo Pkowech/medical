@@ -78,12 +78,13 @@ const service = new MasteryGateService(prisma, {}, {}, {});
     )
 
 
-def test_passing_quiz_does_not_complete_reading_progress():
+def test_passing_quiz_completes_topic_progress_without_changing_study_time():
     run_typescript(
         r"""
 const assert = require('node:assert/strict');
 const { MasteryGateService } =
   require('./src/modules/education/courses/services/mastery-gate.service.ts');
+const completedAt = new Date('2026-11-17T10:00:00.000Z');
 const progress = {
   id: 'topic-progress-1',
   userId: 'user-1',
@@ -92,6 +93,8 @@ const progress = {
   courseId: 'course-1',
   status: 'inProgress',
   progressPercentage: 35,
+  completionPercentage: 35,
+  timeSpent: 12,
   isCompleted: false,
   completedAt: null,
   quizScores: {},
@@ -104,6 +107,14 @@ const prisma = {
       unitId: 'unit-1',
       unit: { id: 'unit-1', courseId: 'course-1' },
     }),
+  },
+  quizAttempt: {
+    findMany: async () => [{
+      id: 'attempt-1',
+      percentage: 85,
+      isPassed: true,
+      completedAt,
+    }],
   },
   progress: {
     findFirst: async () => progress,
@@ -127,16 +138,83 @@ service.unlockNextTopic = async () => ({
 });
 
 (async () => {
-  await service.onQuizComplete('user-1', 'topic-1', true, 85);
-  for (const update of updates) {
-    assert.equal('progressPercentage' in update, false);
-    assert.equal('status' in update, false);
-    assert.equal('isCompleted' in update, false);
-    assert.equal('completedAt' in update, false);
-  }
-  assert.equal(progress.progressPercentage, 35);
-  assert.equal(progress.isCompleted, false);
+  await service.onQuizComplete('user-1', 'topic-1', 'attempt-1', 85);
+  assert.equal(progress.progressPercentage, 100);
+  assert.equal(progress.completionPercentage, 100);
+  assert.equal(progress.status, 'completed');
+  assert.equal(progress.isCompleted, true);
+  assert.equal(progress.completedAt.toISOString(), completedAt.toISOString());
+  assert.equal(progress.timeSpent, 12);
   assert.equal(progress.quizScores.masteryUnlocked, true);
+  assert.equal(updates[0].progressPercentage, 100);
+  assert.equal(updates[0].status, 'completed');
+})().catch(error => {
+  console.error(error);
+  process.exitCode = 1;
+});
+"""
+    )
+
+
+def test_failed_quiz_does_not_complete_topic_progress():
+    run_typescript(
+        r"""
+const assert = require('node:assert/strict');
+const { MasteryGateService } =
+  require('./src/modules/education/courses/services/mastery-gate.service.ts');
+const completedAt = new Date('2026-11-17T10:00:00.000Z');
+const progress = {
+  id: 'topic-progress-1',
+  unitId: 'unit-1',
+  courseId: 'course-1',
+  status: 'inProgress',
+  progressPercentage: 35,
+  completionPercentage: 35,
+  timeSpent: 3,
+  isCompleted: false,
+  completedAt: null,
+  quizScores: {},
+};
+const service = Object.create(MasteryGateService.prototype);
+service.PASSING_THRESHOLD = 70;
+service.prisma = {
+  topic: {
+    findUnique: async () => ({
+      id: 'topic-1',
+      unitId: 'unit-1',
+      unit: { courseId: 'course-1' },
+    }),
+  },
+  quizAttempt: {
+    findMany: async () => [{
+      id: 'attempt-failed',
+      percentage: 40,
+      isPassed: false,
+      completedAt,
+    }],
+  },
+  progress: {
+    findFirst: async () => progress,
+    update: async ({ data }) => {
+      Object.assign(progress, data);
+      return progress;
+    },
+  },
+};
+service.redisService = { del: async () => undefined };
+service.eventEmitter = { emit: () => undefined };
+service.logger = { error: () => undefined, log: () => undefined, warn: () => undefined };
+
+(async () => {
+  await service.onQuizComplete('student-1', 'topic-1', 'attempt-failed');
+  assert.equal(progress.status, 'inProgress');
+  assert.equal(progress.progressPercentage, 35);
+  assert.equal(progress.completionPercentage, 35);
+  assert.equal(progress.isCompleted, false);
+  assert.equal(progress.completedAt, null);
+  assert.equal(progress.timeSpent, 3);
+  assert.equal(progress.quizScores.masteryUnlocked, false);
+  assert.equal(progress.quizScores.failedAttempts, 1);
 })().catch(error => {
   console.error(error);
   process.exitCode = 1;

@@ -21,10 +21,6 @@ import { useSession } from 'next-auth/react';
 import { apiService } from '@/features/auth/services/apiClient';
 import { topicService, Topic } from '@/features/courses/services/topicService';
 import materialService from '@/features/courses/services/materialService';
-import progressService, {
-  isProgressConflict,
-} from '@/features/learning-management/services/progressService';
-import offlineProgressSync from '@/features/learning-management/services/offlineProgressSync';
 import { Material, MaterialType } from '@/shared/types/materialInterface';
 import { usePageHeader } from '@/core/providers/HeaderContext';
 import { useCourseProgressStore } from '@/features/courses/hooks/useCourseProgressStore';
@@ -36,7 +32,6 @@ import { Button } from '@/shared/components/ui/button';
 import { Badge } from '@/shared/components/ui/badge';
 import { toast } from 'sonner';
 import { offlineService } from '@/lib/core/offline/offlineService';
-import { isOfflineQueuedError } from '@/lib/core/offline/offlineQueuedError';
 import {
   markBundleStaleIfOutdated,
   revisionFromTopicContent,
@@ -173,7 +168,6 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
   const router = useRouter();
   const queryClient = useQueryClient();
   const userId = useAuthStore(state => state.user?.id);
-  const [progressRevision, setProgressRevision] = useState(0);
   const { data: session } = useSession();
   const { setHeader } = usePageHeader();
   const { toggleBookmark, bookmarks, markLessonComplete, progress, notes, saveNote } =
@@ -181,7 +175,6 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
   const {
     activeSession,
     ensureCourseSession,
-    endCourseSession,
     pauseCourseSession,
     recordCourseActivity,
   } = useCourseStudySession();
@@ -197,27 +190,13 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
       queryClient.invalidateQueries({ queryKey: ['studyResume', userId] }),
       queryClient.invalidateQueries({ queryKey: ['courses'] }),
       queryClient.invalidateQueries({ queryKey: ['unit'] }),
+      queryClient.invalidateQueries({
+        queryKey: ['course-overview-progress', courseId, userId],
+      }),
+      queryClient.invalidateQueries({
+        queryKey: ['course-overview-active-units', courseId, userId],
+      }),
     ]);
-  };
-
-  const progressRevisionStorageKey = `progressRevision:${userId}:${courseId}:${unitId}:${topicId}`;
-  const refreshProgressRevision = async (): Promise<number> => {
-    if (!userId) return 0;
-    const progressRows = await progressService.getUserProgress(userId);
-    const row = progressRows.find(
-      progress =>
-        progress.topicId === topicId &&
-        progress.materialId == null &&
-        progress.unitId === unitId &&
-        progress.courseId === courseId
-    );
-    const revision =
-      typeof row?.revision === 'number' && Number.isSafeInteger(row.revision) ? row.revision : 0;
-    setProgressRevision(revision);
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem(progressRevisionStorageKey, String(revision));
-    }
-    return revision;
   };
 
   const [topic, setTopic] = useState<Topic | null>(null);
@@ -231,7 +210,6 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
   const [offlineUserId, setOfflineUserId] = useState<string>();
   const [offlineBundle, setOfflineBundle] = useState<OfflineTopicBundle>();
   const [isDownloading, setIsDownloading] = useState(false);
-  const [isMarkingComplete, setIsMarkingComplete] = useState(false);
   const [isOffline, setIsOffline] = useState(false);
 
   useEffect(() => {
@@ -279,20 +257,6 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
         setLoadError(null);
         const topicData = await topicService.getTopicById(courseId, unitId, topicId);
         setTopic(topicData);
-        if (userId) {
-          if (navigator.onLine) {
-            try {
-              await refreshProgressRevision();
-            } catch (progressError) {
-              console.warn('Could not refresh topic progress revision:', progressError);
-            }
-          } else {
-            const cachedRevision = Number(window.localStorage.getItem(progressRevisionStorageKey));
-            setProgressRevision(
-              Number.isSafeInteger(cachedRevision) && cachedRevision >= 0 ? cachedRevision : 0
-            );
-          }
-        }
         let currentMaterials: Material[] = [];
         let currentMaterialsComplete = true;
 
@@ -547,7 +511,6 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
 
   const handleCloseMaterial = async () => {
     setShowMaterialModal(false);
-    await endCourseSession(courseId);
     if (offlineUserId) {
       try {
         setOfflineBundle(await offlineService.getOfflineTopicBundle(offlineUserId, topicId));
@@ -569,66 +532,6 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
     toast.success(isBookmarked ? 'Removed from bookmarks' : 'Added to bookmarks');
   };
 
-  const handleMarkComplete = async () => {
-    setIsMarkingComplete(true);
-    const idempotencyKey = crypto.randomUUID();
-    try {
-      await progressService.updateContentProgress(
-        {
-          courseId,
-          unitId,
-          topicId,
-          status: 'completed',
-          progressPercentage: 100,
-          expectedRevision: progressRevision,
-        },
-        idempotencyKey
-      );
-      setProgressRevision(progressRevision + 1);
-      window.localStorage.setItem(progressRevisionStorageKey, String(progressRevision + 1));
-      await refreshLearningCaches();
-      markLessonComplete(topicId);
-      toast.success('Topic marked as complete!');
-    } catch (error) {
-      if (isOfflineQueuedError(error)) {
-        setProgressRevision(progressRevision + 1);
-        window.localStorage.setItem(progressRevisionStorageKey, String(progressRevision + 1));
-        markLessonComplete(topicId);
-        toast.info('Topic completion saved offline and will sync when connected.');
-        return;
-      }
-      if (isProgressConflict(error)) {
-        await Promise.all([refreshLearningCaches(), refreshProgressRevision()]).catch(
-          refreshError =>
-            console.error('Failed to refresh conflicted topic progress:', refreshError)
-        );
-        toast.error('Progress changed elsewhere. Refresh and retry.');
-        return;
-      }
-      console.error('Error saving topic completion:', error);
-      try {
-        await offlineProgressSync.addToQueue({
-          courseId,
-          unitId,
-          topicId,
-          percent: 100,
-          status: 'completed',
-          expectedRevision: progressRevision,
-          idempotencyKey,
-        });
-        setProgressRevision(progressRevision + 1);
-        window.localStorage.setItem(progressRevisionStorageKey, String(progressRevision + 1));
-        markLessonComplete(topicId);
-        toast.info('Topic completion saved offline and will sync when connected.');
-      } catch (queueError) {
-        console.error('Failed to queue topic completion for sync:', queueError);
-        toast.error('Topic completion could not be saved.');
-      }
-    } finally {
-      setIsMarkingComplete(false);
-    }
-  };
-
   const handleTopicQuizComplete = async (result: { masteryUnlocked: boolean; score: number }) => {
     if (!result.masteryUnlocked) {
       toast.error(
@@ -637,6 +540,7 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
       return;
     }
     await refreshLearningCaches();
+    markLessonComplete(topicId);
     toast.success(`Topic assessment passed with ${result.score}%`);
   };
 
@@ -904,17 +808,6 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
             Back to Unit
           </Button>
           <div className="flex flex-col gap-2 sm:flex-row">
-            {!isCompleted && (
-              <Button
-                variant="outline"
-                onClick={() => void handleMarkComplete()}
-                disabled={isMarkingComplete}
-                className="flex items-center gap-2"
-              >
-                <CheckCircle className="w-4 h-4" />
-                {isMarkingComplete ? 'Saving…' : 'Mark topic complete'}
-              </Button>
-            )}
             {offlineBundle && offlineBundle.cacheMode !== 'session' ? (
               <Button
                 variant="outline"

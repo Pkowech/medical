@@ -174,6 +174,13 @@ export class MasteryGateService {
             unitId: topic.unitId,
             courseId: topic.unit.courseId,
             lastUpdated: BigInt(legacyAttempt.completedAt.getTime()),
+            ...(legacyAttempt.isPassed && {
+              status: ProgressStatus.completed,
+              progressPercentage: 100,
+              completionPercentage: 100,
+              isCompleted: true,
+              completedAt: progress?.completedAt ?? legacyAttempt.completedAt,
+            }),
           };
 
           if (progress) {
@@ -181,6 +188,9 @@ export class MasteryGateService {
               where: { id: progress.id },
               data: updateData,
             });
+            if (legacyAttempt.isPassed) {
+              await this.clearProgressCache(userId, topic.unit.courseId);
+            }
           }
 
           return {
@@ -252,6 +262,11 @@ export class MasteryGateService {
         // Quiz passed - unlock mastery
         const updateData = {
           lastUpdated: BigInt(attemptTimestamp.getTime()),
+          status: ProgressStatus.completed,
+          progressPercentage: 100,
+          completionPercentage: 100,
+          isCompleted: true,
+          completedAt: progress.completedAt ?? attemptTimestamp,
           quizScores: {
             ...previousQuizScores,
             attempts: topicAttempts.length,

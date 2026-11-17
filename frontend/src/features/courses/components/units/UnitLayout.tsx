@@ -41,11 +41,6 @@ import type { Topic } from '@/shared/types/courseInterface';
 import { TOPIC_MASTERY_PASSING_SCORE } from '@/shared/types/mastery.types';
 import { Button } from '@/shared/components/ui/button';
 import { Dialog, DialogContent } from '@/shared/components/ui/dialog';
-import progressService, {
-  isProgressConflict,
-} from '@/features/learning-management/services/progressService';
-import offlineProgressSync from '@/features/learning-management/services/offlineProgressSync';
-import { isOfflineQueuedError } from '@/lib/core/offline/offlineQueuedError';
 import { toast } from 'sonner';
 import {
   useCourseStudySession,
@@ -99,7 +94,6 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
   const {
     activeSession,
     ensureCourseSession,
-    endCourseSession,
     pauseCourseSession,
     recordCourseActivity,
   } = useCourseStudySession();
@@ -112,7 +106,6 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
   const [offlineMode, setOfflineMode] = useState(false);
   const [isAddTopicOpen, setIsAddTopicOpen] = useState(false);
   const [createdTopic, setCreatedTopic] = useState<Topic | null>(null);
-  const [progressRevision, setProgressRevision] = useState<number>();
   const selectedMaterialId = searchParams.get('materialId');
   const hasSelectedTopic = Boolean(selectedTopicId);
   const { user } = useAuth();
@@ -153,8 +146,7 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
     updateRouteQuery('materialId', null, true);
     toggleCoursePanel(panelName);
   };
-  const closeMaterial = async () => {
-    if (courseId) await endCourseSession(courseId);
+  const closeMaterial = () => {
     updateRouteQuery('materialId', null, true);
   };
 
@@ -228,9 +220,6 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
   };
 
   const typedCurrentTopic = getCurrentTopic() as unknown as Lesson & { resources?: Material[] };
-  useEffect(() => {
-    setProgressRevision(typedCurrentTopic?.progressRevision ?? 0);
-  }, [typedCurrentTopic?.id, typedCurrentTopic?.progressRevision]);
 
   // ── Page header sync ───────────────────────────────────────────────────
   useEffect(() => {
@@ -287,81 +276,21 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
       queryClient.invalidateQueries({ queryKey: ['studyResume', user.id] }),
       queryClient.invalidateQueries({ queryKey: ['courses'] }),
       queryClient.invalidateQueries({ queryKey: ['unit'] }),
+      queryClient.invalidateQueries({
+        queryKey: ['course-overview-progress', courseId, user.id],
+      }),
+      queryClient.invalidateQueries({
+        queryKey: ['course-overview-active-units', courseId, user.id],
+      }),
     ]);
   };
-  const handleToggleLessonComplete = async (key: string) => {
-    if (typedCurrentTopic?.id == null) {
-      toast.error('This topic cannot be updated because it has no topic ID.');
-      return;
-    }
-
-    const isComplete = Boolean(progress[key]);
-    const nextStatus: 'notStarted' | 'completed' = isComplete ? 'notStarted' : 'completed';
-    const progressPercentage = isComplete ? 0 : 100;
-    const update = {
-      courseId,
-      unitId,
-      topicId: String(typedCurrentTopic.id),
-      status: nextStatus,
-      progressPercentage,
-      expectedRevision:
-        progressRevision ?? typedCurrentTopic.progressRevision ?? 0,
-    };
-    const idempotencyKey = crypto.randomUUID();
-
-    try {
-      await progressService.updateContentProgress(update, idempotencyKey);
-    } catch (error) {
-      if (isOfflineQueuedError(error)) {
-        setProgressRevision(update.expectedRevision + 1);
-        toggleLessonComplete(key);
-        toast.info('Topic progress saved offline and will sync when connected.');
-        return;
-      }
-      if (isProgressConflict(error)) {
-        await Promise.all([refreshLearningCaches(), refetchUnit()]).catch(
-          refreshError =>
-            console.error('Failed to refresh conflicted topic progress:', refreshError),
-        );
-        toast.error('Progress changed elsewhere. Refresh and retry.');
-        return;
-      }
-      console.error('Failed to update topic progress:', error);
-      try {
-        await offlineProgressSync.addToQueue({
-          courseId: update.courseId,
-          unitId,
-          topicId: update.topicId,
-          percent: progressPercentage,
-          status: isComplete ? 'notStarted' : 'completed',
-          expectedRevision: update.expectedRevision,
-          idempotencyKey,
-        });
-        setProgressRevision(update.expectedRevision + 1);
-        toggleLessonComplete(key);
-        toast.info('Topic progress saved offline and will sync when connected.');
-        return;
-      } catch (queueError) {
-        console.error('Failed to queue topic progress:', queueError);
-        toast.error('Topic progress could not be saved.');
-        return;
-      }
-    }
-
-    toggleLessonComplete(key);
-    setProgressRevision(update.expectedRevision + 1);
-    await Promise.all([refreshLearningCaches(), refetchUnit()]).catch(error => {
-      console.error('Failed to refresh topic progress after saving:', error);
-    });
-  };
+  const handleToggleLessonComplete = (key: string) => toggleLessonComplete(key);
   const chapters = unitData?.chapters || [];
   const isTopicComplete = (chapterIndex: number) => {
     const chapter = chapters[chapterIndex];
     const topic = chapter?.lessons[0];
     return Boolean(
-      topic?.masteryUnlocked ||
-      topic?.isCompleted ||
-      (topic && progress[`${chapter.id}-${topic.id}`]),
+      topic?.masteryUnlocked === true,
     );
   };
   const completedTopicCount = chapters.filter((_, index) => isTopicComplete(index)).length;

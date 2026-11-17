@@ -49,27 +49,41 @@
   "topicProgress": [
     {
       "topicId": "mandatory-topic",
-      "isCompleted": false,
-      "status": "inProgress",
-      "progressPercentage": 80
+      "isCompleted": true,
+      "status": "completed",
+      "progressPercentage": 100,
+      "quizScores": {
+        "masteryUnlocked": false,
+        "failedAttempts": 1,
+        "bestScore": 60
+      }
     },
     {
       "topicId": "optional-topic",
       "isCompleted": true,
       "status": "completed",
-      "progressPercentage": 100
+      "progressPercentage": 100,
+      "quizScores": {
+        "masteryUnlocked": true
+      }
     },
     {
       "topicId": "unpublished-mandatory",
       "isCompleted": true,
       "status": "completed",
-      "progressPercentage": 100
+      "progressPercentage": 100,
+      "quizScores": {
+        "masteryUnlocked": true
+      }
     },
     {
       "topicId": "completed-topic",
       "isCompleted": true,
       "status": "completed",
-      "progressPercentage": 100
+      "progressPercentage": 100,
+      "quizScores": {
+        "masteryUnlocked": true
+      }
     },
     {
       "topicId": "untouched-topic",
@@ -93,7 +107,7 @@
     }
   ],
   "expected": {
-    "percentage": 66,
+    "percentage": 46,
     "completedUnits": 1,
     "totalUnits": 4,
     "status": "inProgress"

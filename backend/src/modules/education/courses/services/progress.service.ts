@@ -370,6 +370,13 @@ export class ProgressService {
           topicId || materialId
             ? await tx.progress.findFirst({ where: canonicalProgressWhere })
             : null;
+        const existingQuizScores =
+          existingProgress?.quizScores &&
+          typeof existingProgress.quizScores === 'object' &&
+          !Array.isArray(existingProgress.quizScores)
+            ? (existingProgress.quizScores as Record<string, unknown>)
+            : {};
+        const topicMasteryUnlocked = existingQuizScores.masteryUnlocked === true;
         const currentRevision = existingProgress?.revision ?? 0;
         if (
           expectedRevision !== undefined &&
@@ -381,6 +388,16 @@ export class ProgressService {
             expectedRevision,
             currentRevision,
           });
+        }
+        if (
+          topicId &&
+          !materialId &&
+          !topicMasteryUnlocked &&
+          (status === ProgressStatus.completed || progressValue >= 100)
+        ) {
+          throw new ForbiddenException(
+            'A topic can only be completed by passing its assessment.',
+          );
         }
         const nextRevision = currentRevision + 1;
         if (nextRevision > 2_147_483_647) {
@@ -523,10 +540,13 @@ export class ProgressService {
           // PrismaClientValidationError ("Expected Int, provided Object"),
           // since create() has no existing row to increment from.
           const preserveCompletion =
-            Boolean(existingProgress?.isCompleted) &&
-            status !== ProgressStatus.notStarted;
-          const isCompleted =
-            status === ProgressStatus.completed || preserveCompletion;
+            topicId && !materialId
+              ? topicMasteryUnlocked
+              : Boolean(existingProgress?.isCompleted) &&
+                status !== ProgressStatus.notStarted;
+          const isCompleted = topicId && !materialId
+            ? topicMasteryUnlocked
+            : status === ProgressStatus.completed || preserveCompletion;
           const effectiveStatus = isCompleted
             ? ProgressStatus.completed
             : (status ?? ProgressStatus.inProgress);
@@ -968,7 +988,15 @@ export class ProgressService {
         this.prisma.unit.findMany({
           where: { courseId },
           orderBy: { order: 'asc' },
-          select: { id: true, title: true, order: true },
+          select: {
+            id: true,
+            title: true,
+            order: true,
+            topics: {
+              where: { status: 'published' },
+              select: { id: true },
+            },
+          },
         }),
         this.prisma.material.findMany({
           where: { unit: { courseId } },
@@ -976,8 +1004,46 @@ export class ProgressService {
         }),
       ]);
 
+      const masteryByTopicId = new Map<string, boolean>();
+      for (const progress of allProgress) {
+        if (!progress.topicId || progress.materialId !== null) continue;
+        const quizScores =
+          progress.quizScores &&
+          typeof progress.quizScores === 'object' &&
+          !Array.isArray(progress.quizScores)
+            ? (progress.quizScores as Record<string, unknown>)
+            : {};
+        masteryByTopicId.set(
+          progress.topicId,
+          quizScores.masteryUnlocked === true,
+        );
+      }
+
       // Calculate unit progress efficiently using the fetched data
       const unitProgress = units.map((unit) => {
+        if (unit.topics.length > 0) {
+          const completedTopics = unit.topics.filter((topic) =>
+            masteryByTopicId.get(topic.id),
+          ).length;
+          const percentage = Math.round(
+            (completedTopics / unit.topics.length) * 100,
+          );
+          return {
+            id: unit.id,
+            userId,
+            unitId: unit.id,
+            status: getProgressStatus(percentage),
+            progressPercentage: percentage,
+            timeSpent: 0,
+            lastAccessedAt: new Date(),
+            unit: {
+              id: unit.id,
+              title: unit.title ?? '',
+              order: unit.order,
+            },
+          };
+        }
+
         const unitMaterials = allMaterials.filter((m) => m.unitId === unit.id);
         const materialIds = unitMaterials.map((m) => m.id);
 
@@ -1023,9 +1089,17 @@ export class ProgressService {
         (progress) => {
           const quizScores =
             (progress.quizScores as Record<string, unknown> | null) ?? {};
+          const masteryUnlocked = quizScores.masteryUnlocked === true;
           return {
             ...progress,
-            masteryUnlocked: quizScores.masteryUnlocked === true,
+            masteryUnlocked,
+            isCompleted: masteryUnlocked,
+            status: masteryUnlocked
+              ? ProgressStatus.completed
+              : progress.status === ProgressStatus.completed
+                ? ProgressStatus.inProgress
+                : progress.status,
+            progressPercentage: masteryUnlocked ? 100 : 0,
             nextTopicUnlocked: quizScores.nextTopicUnlocked === true,
             failedAttempts: Number(quizScores.failedAttempts ?? 0),
             readinessSignal: getReadinessSignal(
@@ -1346,6 +1420,7 @@ export class ProgressService {
                 topicId: true,
                 status: true,
                 isCompleted: true,
+                quizScores: true,
                 updatedAt: true,
               },
             })
@@ -1357,7 +1432,22 @@ export class ProgressService {
       >();
       for (const progress of topicProgress) {
         if (progress.topicId && !progressByTopicId.has(progress.topicId)) {
-          progressByTopicId.set(progress.topicId, progress);
+          const quizScores =
+            progress.quizScores &&
+            typeof progress.quizScores === 'object' &&
+            !Array.isArray(progress.quizScores)
+              ? (progress.quizScores as Record<string, unknown>)
+              : {};
+          const masteryUnlocked = quizScores.masteryUnlocked === true;
+          progressByTopicId.set(progress.topicId, {
+            ...progress,
+            isCompleted: masteryUnlocked,
+            status: masteryUnlocked
+              ? ProgressStatus.completed
+              : progress.status === ProgressStatus.completed
+                ? ProgressStatus.inProgress
+                : progress.status,
+          });
         }
       }
 
@@ -1382,9 +1472,9 @@ export class ProgressService {
               topicRecord?.status === ProgressStatus.completed
             );
           });
-          const isCompleted =
-            unitProgress?.status === ProgressStatus.completed ||
-            (totalTopics > 0 && completedTopics === totalTopics);
+          const isCompleted = totalTopics > 0
+            ? completedTopics === totalTopics
+            : unitProgress?.status === ProgressStatus.completed;
           if (!unitProgress && !hasTopicProgress) return null;
 
           const nextTopic = unit.topics.find((topic) => {
@@ -1558,9 +1648,7 @@ export class ProgressService {
           where: { userId, courseId, topicId: { not: null }, materialId: null },
           select: {
             topicId: true,
-            progressPercentage: true,
-            isCompleted: true,
-            status: true,
+            quizScores: true,
           },
         }),
         client.progress.findMany({
@@ -1583,10 +1671,13 @@ export class ProgressService {
       const topicProgressById = new Map<string, number>();
       for (const progress of topicProgressRows) {
         if (!progress.topicId) continue;
-        const percentage =
-          progress.isCompleted || progress.status === ProgressStatus.completed
-            ? 100
-            : Math.min(100, Math.max(0, progress.progressPercentage));
+        const quizScores =
+          progress.quizScores &&
+          typeof progress.quizScores === 'object' &&
+          !Array.isArray(progress.quizScores)
+            ? (progress.quizScores as Record<string, unknown>)
+            : {};
+        const percentage = quizScores.masteryUnlocked === true ? 100 : 0;
         topicProgressById.set(
           progress.topicId,
           Math.max(topicProgressById.get(progress.topicId) ?? 0, percentage),
@@ -1627,14 +1718,13 @@ export class ProgressService {
           ? topicPercentages.reduce((sum, percentage) => sum + percentage, 0) /
             topicPercentages.length
           : 0;
-        const isCompleted =
-          unitProgress?.completed ||
-          (topicPercentages.length > 0 &&
-            topicPercentages.every((value) => value === 100));
-        const unitPercentage = isCompleted
-          ? 100
-          : topicPercentages.length
-            ? topicPercentage
+        const isCompleted = topicPercentages.length
+          ? topicPercentages.every((value) => value === 100)
+          : Boolean(unitProgress?.completed);
+        const unitPercentage = topicPercentages.length
+          ? topicPercentage
+          : isCompleted
+            ? 100
             : (unitProgress?.percentage ?? 0);
 
         totalUnitPercentage += unitPercentage;
@@ -2088,29 +2178,72 @@ export class ProgressService {
     unitId: string,
   ): Promise<{ progressPercentage: number; isCompleted: boolean }> {
     try {
+      const unit = await this.prisma.unit.findUnique({
+        where: { id: unitId },
+        select: {
+          topics: {
+            where: { status: 'published' },
+            select: { id: true },
+          },
+        },
+      });
+      if (!unit) {
+        throw new NotFoundException(`Unit with ID ${unitId} not found`);
+      }
+
+      if (unit.topics.length) {
+        const topicProgress = await this.prisma.progress.findMany({
+          where: {
+            userId,
+            topicId: { in: unit.topics.map((topic) => topic.id) },
+            materialId: null,
+          },
+          select: { topicId: true, quizScores: true },
+        });
+        const masteredTopicIds = new Set(
+          topicProgress.flatMap((progress) => {
+            const quizScores =
+              progress.quizScores &&
+              typeof progress.quizScores === 'object' &&
+              !Array.isArray(progress.quizScores)
+                ? (progress.quizScores as Record<string, unknown>)
+                : {};
+            return quizScores.masteryUnlocked === true && progress.topicId
+              ? [progress.topicId]
+              : [];
+          }),
+        );
+        const completedTopics = unit.topics.filter((topic) =>
+          masteredTopicIds.has(topic.id),
+        ).length;
+        const progressPercentage = Math.round(
+          (completedTopics / unit.topics.length) * 100,
+        );
+        return {
+          progressPercentage,
+          isCompleted: completedTopics === unit.topics.length,
+        };
+      }
+
       const [materialCount, completedMaterials] = await Promise.all([
         this.prisma.material.count({ where: { unitId } }),
         this.prisma.progress.count({
           where: { userId, material: { unitId }, isCompleted: true },
         }),
       ]);
-      if (materialCount === 0) {
-        return { progressPercentage: 100, isCompleted: true };
-      }
-
-      const progressPercentage = Math.round(
-        (completedMaterials / materialCount) * 100,
-      );
+      const progressPercentage = materialCount
+        ? Math.round((completedMaterials / materialCount) * 100)
+        : 0;
       return {
         progressPercentage,
-        isCompleted: progressPercentage >= 100,
+        isCompleted: materialCount > 0 && completedMaterials === materialCount,
       };
     } catch (error) {
       this.logger.error(
         `Error calculating unit progress for ${unitId}:`,
         error,
       );
-      return { progressPercentage: 0, isCompleted: false };
+      throw error;
     }
   }
 

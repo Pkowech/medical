@@ -176,13 +176,15 @@ export function CourseOverview() {
             const topics = unit.topics || [];
             const completedTopics = topics.filter(topic => {
               const item = topicProgress.get(String(topic.id));
-              return Boolean(item?.isCompleted || item?.status === 'completed' || topic.isCompleted);
+              return item?.masteryUnlocked === true;
             }).length;
             const percentage = topics.length ? Math.round((completedTopics / topics.length) * 100) : 0;
             const isActive = activeUnitIds.has(String(unit.id));
-            const isCompleted = completedUnitIdSet.has(String(unit.id)) ||
-              (topics.length > 0 && completedTopics === topics.length);
-            const isInProgress = isActive && !isCompleted;
+            const isCompleted = topics.length > 0
+              ? completedTopics === topics.length
+              : completedUnitIdSet.has(String(unit.id));
+            const isInProgress =
+              (isActive || completedUnitIdSet.has(String(unit.id))) && !isCompleted;
             const statusLabel = isCompleted ? 'Completed' : isInProgress ? 'Ongoing' : 'Not enrolled';
             const StatusIcon = isCompleted ? CircleCheck : isInProgress ? PlayCircle : Circle;
             const isEnrolled = enrolledUnitIds.has(String(unit.id)) || isCompleted;

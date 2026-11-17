@@ -10,7 +10,6 @@ import { usePathname } from 'next/navigation';
 import { useLayoutStore } from '@/core/stores/useLayoutStore';
 import { usePageHeader } from '@/core/providers/HeaderContext';
 import { getPageMetadata } from '@/core/metadata/pageMetadata';
-import { CourseStudySessionIndicator } from '@/features/learning-management/study/components/CourseStudySessionProvider';
 
 export const AppHeader: React.FC<{ showDesktopSidebarToggle?: boolean }> = ({
   showDesktopSidebarToggle = true,
@@ -90,7 +89,6 @@ export const AppHeader: React.FC<{ showDesktopSidebarToggle?: boolean }> = ({
             </div>
           )}
           <div className="ml-auto flex shrink-0 items-center gap-1">
-            <CourseStudySessionIndicator canResume={header?.canResumeStudySession} />
             {header?.actions}
           </div>
         </div>

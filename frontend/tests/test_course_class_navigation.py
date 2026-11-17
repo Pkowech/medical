@@ -37,3 +37,14 @@ def test_class_roadmap_shows_all_unit_statuses_and_opens_units_without_old_topic
     assert "router.push(" in overview
     assert "topicId=" not in overview
     assert "String(unit.courseId) === String(courseId)" in overview
+
+
+def test_topic_completion_is_based_on_assessment_mastery_not_manual_study_status():
+    overview = read_frontend("src/features/courses/components/CourseOverview.tsx")
+    unit_layout = read_frontend("src/features/courses/components/units/UnitLayout.tsx")
+    topic_viewer = read_frontend("src/features/courses/components/TopicViewer.tsx")
+
+    assert "return item?.masteryUnlocked === true;" in overview
+    assert "topic?.masteryUnlocked === true" in unit_layout
+    assert "Mark topic complete" not in topic_viewer
+    assert "progress[`${chapter.id}-${topic.id}`]" not in unit_layout

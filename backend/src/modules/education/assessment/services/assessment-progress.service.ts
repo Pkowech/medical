@@ -97,6 +97,7 @@ export class AssessmentProgressService {
       select: {
         startedAt: true,
         completedAt: true,
+        timeTaken: true,
         percentage: true,
         isPassed: true,
       },
@@ -158,7 +159,10 @@ export class AssessmentProgressService {
       const timestamp = new Date();
       const latestCompletedAttempt = completedAttempts.reduce(
         (latest, attempt) =>
-          attempt.startedAt > latest.startedAt ? attempt : latest,
+          (attempt.completedAt ?? attempt.startedAt) >
+          (latest.completedAt ?? latest.startedAt)
+            ? attempt
+            : latest,
       );
       const score = latestCompletedAttempt.percentage;
       this.eventEmitter.emit('assessment.completed', {
@@ -174,7 +178,9 @@ export class AssessmentProgressService {
           maxScore: 100,
           passed: latestCompletedAttempt.isPassed,
           progressPercentage: result.completionPercentage,
-          timeSpentMinutes: 0,
+          timeSpentMinutes: Math.ceil(
+            (latestCompletedAttempt.timeTaken ?? 0) / 60,
+          ),
           timestamp: timestamp.toISOString(),
         },
       });
