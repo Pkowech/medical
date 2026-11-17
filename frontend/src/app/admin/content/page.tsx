@@ -333,6 +333,7 @@ export default function AdminContentPage() {
         <UnitForm
           unit={formContext.unit || null}
           courseId={formContext.course.id}
+          courseTitle={formContext.course.title || formContext.course.name}
           onSave={handleCreateOrUpdateUnit}
           onCancel={() => setFormContext({ mode: 'none' })}
         />
@@ -342,7 +343,9 @@ export default function AdminContentPage() {
         <TopicForm
           topic={formContext.topic || null}
           courseId={formContext.course?.id || formContext.unit.courseId}
+          courseTitle={formContext.course?.title || formContext.course?.name}
           unitId={formContext.unit.id}
+          unitTitle={formContext.unit.title || formContext.unit.name}
           onSave={handleCreateOrUpdateTopic}
           onCancel={() => setFormContext({ mode: 'none' })}
         />
@@ -370,17 +373,10 @@ export default function AdminContentPage() {
               setFormContext({ mode: 'topic', course, unit });
             }
           }}
-          onEditTopic={(topic, unitId) => {
-            let selectedUnit = null;
-            for (const course of courses) {
-              const unit = course.units?.find(u => u.id === unitId);
-              if (unit) {
-                selectedUnit = unit;
-                break;
-              }
-            }
+          onEditTopic={(topic, unitId, course) => {
+            const selectedUnit = course.units?.find(unit => unit.id === unitId);
             if (selectedUnit) {
-              setFormContext({ mode: 'topic', unit: selectedUnit, topic });
+              setFormContext({ mode: 'topic', course, unit: selectedUnit, topic });
             }
           }}
           onDeleteTopic={handleDeleteTopic}

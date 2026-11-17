@@ -286,13 +286,21 @@ export function InstructorCourseManager({ instructorId }: { instructorId: string
             <CourseForm course={formContext.course || null} onSave={handleSaveCourse} onCancel={() => setFormContext({ mode: 'none' })} />
           )}
           {formContext.mode === 'unit' && formContext.course && (
-            <UnitForm unit={formContext.unit || null} courseId={formContext.course.id} onSave={handleSaveUnit} onCancel={() => setFormContext({ mode: 'none' })} />
+            <UnitForm
+              unit={formContext.unit || null}
+              courseId={formContext.course.id}
+              courseTitle={formContext.course.title || formContext.course.name}
+              onSave={handleSaveUnit}
+              onCancel={() => setFormContext({ mode: 'none' })}
+            />
           )}
           {formContext.mode === 'topic' && formContext.unit && (
             <TopicForm
               topic={formContext.topic || null}
               courseId={formContext.course?.id}
+              courseTitle={formContext.course?.title || formContext.course?.name}
               unitId={formContext.unit.id}
+              unitTitle={formContext.unit.title || formContext.unit.name}
               onSave={handleSaveTopic}
               onCancel={() => setFormContext({ mode: 'none' })}
             />
@@ -315,9 +323,9 @@ export function InstructorCourseManager({ instructorId }: { instructorId: string
                 const course = courses.find(item => item.id === courseId);
                 if (course) setFormContext({ mode: 'topic', course, unit });
               }}
-              onEditTopic={(topic, unitId) => {
-                const unit = courses.flatMap(course => course.units || []).find(item => item.id === unitId);
-                if (unit) setFormContext({ mode: 'topic', unit, topic });
+              onEditTopic={(topic, unitId, course) => {
+                const unit = course.units?.find(item => item.id === unitId);
+                if (unit) setFormContext({ mode: 'topic', course, unit, topic });
               }}
               onDeleteTopic={handleDeleteTopic}
             />

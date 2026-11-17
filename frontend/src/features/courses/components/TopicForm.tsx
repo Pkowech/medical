@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui
 import { Input } from '@/shared/components/ui/input';
 import { Button } from '@/shared/components/ui/button';
 import { Textarea } from '@/shared/components/ui/textarea';
-import { BookOpen, Library, Paperclip } from 'lucide-react';
+import { BookOpen, ChevronRight, Library, Paperclip } from 'lucide-react';
 import FileUpload from '@/shared/components/forms/FileUpload';
 import { BulkQuestionImport } from '@/features/assessment/components/BulkQuestionImport';
 import { MaterialLibraryPicker } from '@/features/materials/components/MaterialLibraryPicker';
@@ -26,12 +26,22 @@ const INITIAL_MATERIAL_EXTENSIONS = new Set([
 interface TopicFormProps {
   topic: Topic | null;
   courseId?: string;
+  courseTitle?: string;
   unitId: string;
+  unitTitle?: string;
   onSave: (topic: Partial<Topic>, hasPendingMaterial: boolean) => Promise<Topic | void>;
   onCancel: () => void;
 }
 
-export const TopicForm: React.FC<TopicFormProps> = ({ topic, courseId, unitId, onSave, onCancel }) => {
+export const TopicForm: React.FC<TopicFormProps> = ({
+  topic,
+  courseId,
+  courseTitle,
+  unitId,
+  unitTitle,
+  onSave,
+  onCancel,
+}) => {
   const [formData, setFormData] = useState<Partial<Topic>>({
     name: '',
     description: '',
@@ -205,6 +215,25 @@ export const TopicForm: React.FC<TopicFormProps> = ({ topic, courseId, unitId, o
         <CardTitle>{topic ? 'Edit Topic' : 'Add New Topic'}</CardTitle>
       </CardHeader>
       <CardContent>
+        <div
+          aria-label="Topic placement"
+          className="mb-4 rounded-lg border border-primary/20 bg-primary/5 p-3"
+        >
+          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            {topic ? 'Topic location' : 'Adding topic to'}
+          </p>
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <div>
+              <span className="mr-2 text-muted-foreground">Course</span>
+              <span className="font-semibold">{courseTitle || 'Current course'}</span>
+            </div>
+            <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+            <div>
+              <span className="mr-2 text-muted-foreground">Unit</span>
+              <span className="font-semibold">{unitTitle || 'Current unit'}</span>
+            </div>
+          </div>
+        </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           {errorMessage && (
             <p role="alert" className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">

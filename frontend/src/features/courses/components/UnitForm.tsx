@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui
 import { Input } from '@/shared/components/ui/input';
 import { Button } from '@/shared/components/ui/button';
 import { Textarea } from '@/shared/components/ui/textarea';
+import { BookOpen } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -15,11 +16,12 @@ import {
 interface UnitFormProps {
   unit: Unit | null;
   courseId: string;
+  courseTitle: string;
   onSave: (unit: Partial<Unit>) => Promise<void>;
   onCancel: () => void;
 }
 
-export const UnitForm: React.FC<UnitFormProps> = ({ unit, courseId, onSave, onCancel }) => {
+export const UnitForm: React.FC<UnitFormProps> = ({ unit, courseId, courseTitle, onSave, onCancel }) => {
   const [formData, setFormData] = useState<Partial<Unit>>({
     title: '',
     description: '',
@@ -82,6 +84,13 @@ export const UnitForm: React.FC<UnitFormProps> = ({ unit, courseId, onSave, onCa
         <CardTitle>{unit ? 'Edit Unit' : 'Add New Unit'}</CardTitle>
       </CardHeader>
       <CardContent>
+        <div className="mb-4 flex items-center gap-3 rounded-lg border border-primary/20 bg-primary/5 p-3">
+          <BookOpen className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Course</p>
+            <p className="text-sm font-semibold">{courseTitle}</p>
+          </div>
+        </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label htmlFor="title" className="block text-sm font-medium mb-1">

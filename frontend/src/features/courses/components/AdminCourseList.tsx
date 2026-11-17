@@ -18,7 +18,7 @@ interface AdminCourseListProps {
   onEditUnit: (unit: Unit, courseId: string) => void;
   onDeleteUnit: (unit: Unit) => void;
   onAddTopic: (unit: Unit, courseId: string) => void;
-  onEditTopic: (topic: Topic, unitId: string) => void;
+  onEditTopic: (topic: Topic, unitId: string, course: Course) => void;
   onDeleteTopic: (topic: Topic) => void;
 }
 
@@ -222,7 +222,7 @@ export const AdminCourseList: React.FC<AdminCourseListProps> = ({
                                         <Button
                                           size="sm"
                                           variant="outline"
-                                          onClick={() => onEditTopic(normalizedTopic, unit.id)}
+                                          onClick={() => onEditTopic(normalizedTopic, unit.id, course)}
                                           className="gap-1"
                                         >
                                           <Edit className="h-3 w-3" />

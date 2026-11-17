@@ -221,6 +221,8 @@ function configureRateLimiting(
       DEFAULT_RATE_LIMIT_WINDOW_MS,
     ),
     max: config.get<number>('RATE_LIMIT_MAX', isProduction ? 500 : 5000),
+    skip: (request) =>
+      request.path === '/health' || request.path.startsWith('/health/'),
     message:
       'Too many requests from this IP, please try again after 15 minutes',
     standardHeaders: true,

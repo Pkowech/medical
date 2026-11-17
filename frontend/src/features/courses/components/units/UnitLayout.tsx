@@ -885,7 +885,9 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
           <TopicForm
             topic={createdTopic}
             courseId={courseId}
+            courseTitle={unitData?.courseName}
             unitId={unitId}
+            unitTitle={unitData?.title}
             onSave={handleAddTopic}
             onCancel={() => {
               setIsAddTopicOpen(false);
