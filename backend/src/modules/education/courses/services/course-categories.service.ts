@@ -136,10 +136,11 @@ export class CourseCategoriesService {
         );
       }
       visited.add(currentId);
-      const current = await this.prisma.courseCategory.findUnique({
-        where: { id: currentId },
-        select: { parentId: true },
-      });
+      const current: { parentId: string | null } | null =
+        await this.prisma.courseCategory.findUnique({
+          where: { id: currentId },
+          select: { parentId: true },
+        });
       if (!current) {
         throw new NotFoundException('Parent category not found');
       }

@@ -40,6 +40,12 @@ const questions = [
     points: 1,
     options: [{ id: 'option-2-correct', isCorrect: true }],
   },
+  {
+    id: 'question-3',
+    type: 'multiple_choice',
+    points: 1,
+    options: [{ id: 'option-3-correct', isCorrect: true }],
+  },
 ];
 let questionWhere;
 const prisma = {
@@ -48,6 +54,7 @@ const prisma = {
       id: topicId,
       name: 'Topic',
       unitId: 'unit-1',
+      quizQuestionCount: 2,
       unit: {
         id: 'unit-1',
         isPublished: true,
@@ -66,8 +73,21 @@ const prisma = {
 let masteryCalls = 0;
 const masteryGate = { onQuizComplete: async () => { masteryCalls += 1; } };
 const service = new QuizService(prisma, {}, {}, {}, masteryGate, {}, {}, {});
+service.getQuestionsByTopic = async () => questions.map(({ id }) => ({ id }));
 
 (async () => {
+  const selectedQuestions = service.selectTopicQuizQuestions(
+    topicId,
+    questions,
+    2,
+    attemptId,
+  );
+  assert.equal(selectedQuestions.length, 2);
+  assert.deepEqual(
+    service.selectTopicQuizQuestions(topicId, questions, 2, attemptId).map(({ id }) => id),
+    selectedQuestions.map(({ id }) => id),
+  );
+
   const validatedAt = new Date();
   prisma.offlinePracticeAttempt.upsert = async args => ({
     id: attemptId,

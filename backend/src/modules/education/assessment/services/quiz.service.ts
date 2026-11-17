@@ -1694,7 +1694,6 @@ export class QuizService {
       }
     }
 
-    let publicQuestions: PublicQuizQuestion[];
     const optionInclude = {
       options: {
         select: { id: true, text: true, order: true },
@@ -1737,7 +1736,7 @@ export class QuizService {
     for (const question of standaloneQuestions) {
       questionById.set(question.id, question);
     }
-    publicQuestions = Array.from(questionById.values())
+    const publicQuestions = Array.from(questionById.values())
       .sort(
         (left, right) => right.createdAt.getTime() - left.createdAt.getTime(),
       )
@@ -3008,6 +3007,7 @@ export class QuizService {
         nextTopicUnlocked: boolean;
         nextTopicId?: string;
         gateDecision?: GateDecision;
+        readinessPending?: boolean;
         reviewCardsScheduled: number;
         recommendations?: QuizPerformanceRecommendations;
         recommendationsAvailable: boolean;
@@ -3054,19 +3054,13 @@ export class QuizService {
       const availableQuestionIds = availableQuestionSummaries.map(
         ({ id }) => id,
       );
-      const attemptQuestionSummaries = await this.getQuestionsByTopic(
-        topicId,
-        true,
-        attemptId,
-      );
-      const attemptQuestionIds = attemptQuestionSummaries.map(({ id }) => id);
       const expectedQuestionCount = Math.min(
         topic.quizQuestionCount,
-        attemptQuestionIds.length,
+        availableQuestionIds.length,
       );
       if (
         questionIds.length !== expectedQuestionCount ||
-        questionIds.some((id) => !attemptQuestionIds.includes(id))
+        questionIds.some((id) => !availableQuestionIds.includes(id))
       ) {
         throw new BadRequestException(
           `This topic quiz requires exactly ${expectedQuestionCount} current question responses`,
@@ -3273,6 +3267,22 @@ export class QuizService {
           `Topic quiz ${topicQuiz.quiz.id} was recorded, but its review cards could not be scheduled: ${String(error)}`,
         );
       }
+      let readinessPending = false;
+      try {
+        for (const [index, response] of graded.responses.entries()) {
+          await this.analyticsService.updateBktForAssessment(
+            userId,
+            topicId,
+            response.isCorrect,
+            `quiz-attempt:${topicQuiz.attemptId}:bkt:${index}`,
+          );
+        }
+      } catch (error) {
+        readinessPending = true;
+        this.logger.warn(
+          `Quiz attempt ${topicQuiz.attemptId} was saved, but its readiness estimate is still updating: ${String(error)}`,
+        );
+      }
       const mastery = await this.masteryGateService.onQuizComplete(
         userId,
         topicId,
@@ -3292,7 +3302,8 @@ export class QuizService {
         masteryUnlocked: mastery.masteryUnlocked,
         nextTopicUnlocked: mastery.nextTopicUnlocked,
         nextTopicId: mastery.nextTopicId,
-        gateDecision: mastery.gateDecision,
+        gateDecision: readinessPending ? undefined : mastery.gateDecision,
+        ...(readinessPending ? { readinessPending: true } : {}),
         reviewCardsScheduled,
         ...(recommendations ? { recommendations } : {}),
         recommendationsAvailable: recommendations !== undefined,

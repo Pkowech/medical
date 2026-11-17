@@ -16,7 +16,8 @@ import { RoleGuard } from '#common/guards/roles.guard';
 import { JwtAuthGuard } from '#modules/auth/guards/jwt-auth.guard';
 import { Role } from '#modules/auth/constants/role.constants';
 import { User } from '@prisma/client';
-import { TopicsService, TopicMutationInput } from '../services/topics.service';
+import { TopicMutationDto } from '#common/dto/topic.dto';
+import { TopicsService } from '../services/topics.service';
 
 @ApiTags('topics')
 @ApiBearerAuth()
@@ -41,7 +42,7 @@ export class TopicsController {
   @UseGuards(RoleGuard)
   @Roles(Role.instructor, Role.admin)
   @ApiOperation({ summary: 'Create a topic in an instructor-owned unit' })
-  create(@Body() input: TopicMutationInput, @GetUser() user: User) {
+  create(@Body() input: TopicMutationDto, @GetUser() user: User) {
     return this.topicsService.create(input, user.id);
   }
 
@@ -51,7 +52,7 @@ export class TopicsController {
   @ApiOperation({ summary: 'Update a topic in an instructor-owned course' })
   update(
     @Param('id') id: string,
-    @Body() input: TopicMutationInput,
+    @Body() input: TopicMutationDto,
     @GetUser() user: User,
   ) {
     return this.topicsService.update(id, input, user.id);

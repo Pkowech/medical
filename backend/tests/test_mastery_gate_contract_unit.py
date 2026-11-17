@@ -66,8 +66,14 @@ const service = Object.create(QuizService.prototype);
 service.getVisibleTopic = async () => ({
   id: 'topic-1',
   unitId: 'unit-1',
+  quizQuestionCount: 1,
   unit: { course: { id: 'course-1' } },
 });
+service.getQuestionsByTopic = async () => [
+  { id: 'question-1' },
+  { id: 'question-2' },
+];
+service.logger = { error: () => undefined, warn: () => undefined, log: () => undefined };
 service.getPublicQuestionWhere = () => ({});
 service.ensureTopicPracticeQuiz = async () => ({
   id: 'quiz-1',
@@ -75,11 +81,18 @@ service.ensureTopicPracticeQuiz = async () => ({
 });
 service.prisma = {
   question: {
-    findMany: async () => [{
-      id: 'question-1',
-      points: 1,
-      options: [{ id: 'option-1', isCorrect: true }],
-    }],
+    findMany: async () => [
+      {
+        id: 'question-1',
+        points: 1,
+        options: [{ id: 'option-1', isCorrect: true }],
+      },
+      {
+        id: 'question-2',
+        points: 1,
+        options: [{ id: 'option-2', isCorrect: true }],
+      },
+    ],
   },
   $transaction: async callback => callback({
     quizAttempt: {
@@ -115,6 +128,13 @@ service.masteryGateService = {
     [{ questionId: 'question-1', selectedAnswers: ['option-1'] }],
   );
   assert.deepEqual(result.gateDecision, gateDecision);
+  await assert.rejects(
+    service.submitTopicQuiz('user-1', 'topic-1', attemptId, [
+      { questionId: 'question-1', selectedAnswers: ['option-1'] },
+      { questionId: 'question-2', selectedAnswers: ['option-2'] },
+    ]),
+    error => error instanceof require('@nestjs/common').BadRequestException,
+  );
 
   service.ensureTopicPracticeQuiz = async () => ({
     id: 'quiz-1',
