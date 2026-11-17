@@ -57,9 +57,11 @@ async function forward(request: NextRequest, path: string[]) {
   const headers = new Headers();
   const contentType = request.headers.get('content-type');
   const accept = request.headers.get('accept');
+  const idempotencyKey = request.headers.get('x-idempotency-key');
 
   if (contentType) headers.set('content-type', contentType);
   if (accept) headers.set('accept', accept);
+  if (idempotencyKey) headers.set('x-idempotency-key', idempotencyKey);
   if (token?.accessToken) {
     headers.set('authorization', `Bearer ${token.accessToken}`);
   }

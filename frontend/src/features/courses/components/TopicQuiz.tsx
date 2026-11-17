@@ -15,23 +15,14 @@ import {
 import { Button } from '@/shared/components/ui/button';
 import { Badge } from '@/shared/components/ui/badge';
 import { Progress } from '@/shared/components/ui/progress';
-import {
-  CheckCircle,
-  Brain,
-  Award,
-  ArrowRight,
-  Flag,
-} from 'lucide-react';
+import { CheckCircle, Brain, Award, ArrowRight, Flag } from 'lucide-react';
 import { apiService } from '@/features/auth/services/apiClient';
 import { toast } from 'sonner';
 import { Textarea } from '@/shared/components/ui/textarea';
 import { useCourseStudySession } from '@/features/learning-management/study/components/CourseStudySessionProvider';
 import { v4 as uuidv4 } from 'uuid';
 import { offlineService } from '@/lib/core/offline/offlineService';
-import {
-  TOPIC_MASTERY_PASSING_SCORE,
-  type GateDecision,
-} from '@/shared/types/mastery.types';
+import { TOPIC_MASTERY_PASSING_SCORE, type GateDecision } from '@/shared/types/mastery.types';
 import { MasteryReadinessPanel } from './MasteryReadinessPanel';
 
 interface QuizOption {
@@ -52,6 +43,7 @@ interface QuizQuestion {
 
 interface TopicQuizProps {
   topicId: string;
+  questionCount: number;
   unitId: string;
   courseId: string;
   userId: string;
@@ -76,6 +68,7 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
   onClose,
   onComplete,
   onNextTopic,
+  questionCount,
 }) => {
   const { recordCourseActivity } = useCourseStudySession();
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
@@ -100,41 +93,56 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
   const attemptStorageKey = `topic-quiz-attempt:${userId ?? 'anonymous'}:${topicId}`;
   const draftStorageKey = `topic-quiz-draft:${userId ?? 'anonymous'}:${topicId}`;
 
-  const resetQuizState = React.useCallback(() => {
-    setQuestions([]);
-    setCurrentQuestionIndex(0);
-    setSelectedAnswers({});
-    setQuizCompleted(false);
-    setScore(0);
-    setFeedback('');
-    setNextTopicId(undefined);
-    setGateDecision(undefined);
-    setIsProvisional(false);
-    setAttemptId(() => {
-      if (typeof window === 'undefined') return uuidv4();
-      try {
-        const existingAttemptId = window.localStorage.getItem(attemptStorageKey);
-        if (existingAttemptId) return existingAttemptId;
-        const newAttemptId = uuidv4();
-        window.localStorage.setItem(attemptStorageKey, newAttemptId);
-        return newAttemptId;
-      } catch (error) {
-        console.error('Could not persist the topic quiz attempt ID:', error);
-        return uuidv4();
-      }
-    });
-    setIsReportOpen(false);
-    setReportDescription('');
-    setReportNotice(null);
-    setReportError(null);
+  const getOrCreateAttemptId = React.useCallback(() => {
+    if (typeof window === 'undefined') return uuidv4();
+    try {
+      const existingAttemptId = window.localStorage.getItem(attemptStorageKey);
+      if (existingAttemptId) return existingAttemptId;
+      const newAttemptId = uuidv4();
+      window.localStorage.setItem(attemptStorageKey, newAttemptId);
+      return newAttemptId;
+    } catch (error) {
+      console.error('Could not persist the topic quiz attempt ID:', error);
+      return uuidv4();
+    }
   }, [attemptStorageKey]);
+
+  const resetQuizState = React.useCallback(
+    (nextAttemptId: string) => {
+      setQuestions([]);
+      setCurrentQuestionIndex(0);
+      setSelectedAnswers({});
+      setQuizCompleted(false);
+      setScore(0);
+      setFeedback('');
+      setNextTopicId(undefined);
+      setGateDecision(undefined);
+      setIsProvisional(false);
+      setAttemptId(nextAttemptId);
+      setIsReportOpen(false);
+      setReportDescription('');
+      setReportNotice(null);
+      setReportError(null);
+    },
+    [attemptStorageKey]
+  );
 
   React.useEffect(() => {
     if (!isOpen) return;
-    resetQuizState();
+    const nextAttemptId = getOrCreateAttemptId();
+    resetQuizState(nextAttemptId);
     recordCourseActivity('reading', courseId, topicId);
-    void loadQuizQuestions();
-  }, [courseId, isOpen, recordCourseActivity, resetQuizState, topicId, userId]);
+    void loadQuizQuestions(nextAttemptId);
+  }, [
+    courseId,
+    getOrCreateAttemptId,
+    isOpen,
+    questionCount,
+    recordCourseActivity,
+    resetQuizState,
+    topicId,
+    userId,
+  ]);
 
   React.useEffect(() => {
     const updateConnection = () => setIsOffline(!navigator.onLine);
@@ -147,7 +155,7 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
     };
   }, []);
 
-  const loadQuizQuestions = async () => {
+  const loadQuizQuestions = async (requestedAttemptId: string) => {
     try {
       setIsLoading(true);
       if (!navigator.onLine) {
@@ -157,7 +165,9 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
         if (!cachedQuiz) {
           throw new Error('This topic quiz has not been downloaded for offline use.');
         }
-        setQuestions(cachedQuiz.questions);
+        const offlineQuestions = selectTopicQuestions(cachedQuiz.questions, questionCount);
+        setQuestions(offlineQuestions);
+        const offlineQuestionIds = new Set(offlineQuestions.map(question => question.id));
         const savedDraft = userId
           ? (await offlineService.getOfflinePracticeAttempts(userId))
               .filter(attempt => attempt.topicId === topicId && attempt.status === 'draft')
@@ -168,38 +178,40 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
           window.localStorage.setItem(attemptStorageKey, savedDraft.id);
           setSelectedAnswers(
             Object.fromEntries(
-              savedDraft.responses.map(response => [response.questionId, response.selectedAnswers]),
-            ),
+              savedDraft.responses
+                .filter(response => offlineQuestionIds.has(response.questionId))
+                .map(response => [response.questionId, response.selectedAnswers])
+            )
           );
         }
         return;
       }
       const response = await apiService.get<QuizQuestion[]>(
-        `/quizzes/topic/${topicId}`
+        `/quizzes/topic/${topicId}?attemptId=${encodeURIComponent(requestedAttemptId)}`
       );
-      setQuestions(response.data || []);
+      setQuestions(selectTopicQuestions(response.data || [], questionCount));
       const savedDraft = window.localStorage.getItem(draftStorageKey);
       if (savedDraft) {
         try {
           const draft = JSON.parse(savedDraft) as Record<string, unknown>;
           const questionsById = new Map(
-            (response.data ?? []).map(question => [question.id, question]),
+            (response.data ?? []).map(question => [question.id, question])
+          );
+          const visibleQuestionIds = new Set(
+            selectTopicQuestions(response.data ?? [], questionCount).map(question => question.id)
           );
           const answers = Object.fromEntries(
             Object.entries(draft).flatMap(([questionId, selected]) => {
               const question = questionsById.get(questionId);
-              if (!question || !Array.isArray(selected)) return [];
-              const availableOptionIds = new Set(
-                question.options.map(option => option.id),
-              );
+              if (!question || !visibleQuestionIds.has(questionId) || !Array.isArray(selected))
+                return [];
+              const availableOptionIds = new Set(question.options.map(option => option.id));
               const validSelections = selected.filter(
                 (optionId): optionId is string =>
-                  typeof optionId === 'string' && availableOptionIds.has(optionId),
+                  typeof optionId === 'string' && availableOptionIds.has(optionId)
               );
-              return validSelections.length
-                ? [[questionId, validSelections]]
-                : [];
-            }),
+              return validSelections.length ? [[questionId, validSelections]] : [];
+            })
           ) as Record<string, string[]>;
           setSelectedAnswers(answers);
         } catch (error) {
@@ -212,13 +224,14 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
       }
     } catch (error) {
       console.error('Error loading quiz:', error);
-      const status = (error as { status?: number; rawResponse?: { statusCode?: number } })
-        ?.status ?? (error as { rawResponse?: { statusCode?: number } })?.rawResponse?.statusCode;
+      const status =
+        (error as { status?: number; rawResponse?: { statusCode?: number } })?.status ??
+        (error as { rawResponse?: { statusCode?: number } })?.rawResponse?.statusCode;
       if (userId && status !== 401 && status !== 403 && status !== 404) {
         try {
           const cachedQuiz = await offlineService.getOfflineTopicQuiz(userId, topicId);
           if (cachedQuiz) {
-            setQuestions(cachedQuiz.questions);
+            setQuestions(selectTopicQuestions(cachedQuiz.questions, questionCount));
             toast.info('Using the practice quiz saved on this device.');
             return;
           }
@@ -260,10 +273,12 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
       setReportNotice(
         response.data.duplicate
           ? 'You have already submitted this report.'
-          : 'Thanks. Your report has been sent to the moderation team.',
+          : 'Thanks. Your report has been sent to the moderation team.'
       );
     } catch (error) {
-      setReportError(error instanceof Error ? error.message : 'Your report could not be submitted.');
+      setReportError(
+        error instanceof Error ? error.message : 'Your report could not be submitted.'
+      );
     } finally {
       setIsReporting(false);
     }
@@ -306,8 +321,8 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
   };
 
   const handleSubmitQuiz = async () => {
-    if (!questions.length || !hasCurrentAnswer) {
-      toast.error('Select at least one answer before submitting.');
+    if (!questions.length || questions.some(question => !selectedAnswers[question.id]?.length)) {
+      toast.error('Answer every question before submitting.');
       return;
     }
 
@@ -350,7 +365,7 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
       }>(
         `/quizzes/topic/${topicId}/submit`,
         { responses },
-        { headers: { 'X-Idempotency-Key': attemptId } },
+        { headers: { 'X-Idempotency-Key': attemptId } }
       );
 
       const result = response.data;
@@ -391,6 +406,16 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
       setIsSubmitting(false);
     }
   };
+
+  function selectTopicQuestions<T>(questions: T[], questionCount: number): T[] {
+    if (questions.length <= questionCount) return questions;
+    const shuffled = [...questions];
+    for (let index = shuffled.length - 1; index > 0; index -= 1) {
+      const swapIndex = Math.floor(Math.random() * (index + 1));
+      [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+    }
+    return shuffled.slice(0, questionCount);
+  }
 
   const handleNextQuestion = () => {
     if (currentQuestionIndex < questions.length - 1) {
@@ -441,57 +466,65 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
             </DialogDescription>
           </DialogHeader>
 
-            {isProvisional ? (
-              <div className="space-y-6">
-                <p className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-                  Answers are saved on this device. They will be checked by the server when your
-                  connection returns. You can review sync status in Offline downloads.
+          {isProvisional ? (
+            <div className="space-y-6">
+              <p className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                Answers are saved on this device. They will be checked by the server when your
+                connection returns. You can review sync status in Offline downloads.
+              </p>
+              <Button onClick={onClose} className="w-full">
+                Close
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <div className="text-center space-y-4">
+                <div
+                  className={`text-5xl font-bold ${score >= TOPIC_MASTERY_PASSING_SCORE ? 'text-green-600' : 'text-orange-600'}`}
+                >
+                  {score}%
+                </div>
+                <p className="text-muted-foreground dark:text-muted-foreground">
+                  {score >= 90
+                    ? '🎉 Excellent! You mastered this topic!'
+                    : score >= TOPIC_MASTERY_PASSING_SCORE
+                      ? '👍 Good job! You understand the key concepts.'
+                      : '📚 Keep practicing! Review the materials and try again.'}
                 </p>
-                <Button onClick={onClose} className="w-full">Close</Button>
               </div>
-            ) : (
-              <div className="space-y-6">
-                <div className="text-center space-y-4">
-                  <div className={`text-5xl font-bold ${score >= TOPIC_MASTERY_PASSING_SCORE ? 'text-green-600' : 'text-orange-600'}`}>
-                    {score}%
-                  </div>
-                  <p className="text-muted-foreground dark:text-muted-foreground">
-                    {score >= 90
-                      ? '🎉 Excellent! You mastered this topic!'
-                      : score >= TOPIC_MASTERY_PASSING_SCORE
-                        ? '👍 Good job! You understand the key concepts.'
-                        : '📚 Keep practicing! Review the materials and try again.'}
+
+              {feedback && (
+                <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <h4 className="font-semibold text-foreground dark:text-foreground mb-2">
+                    Feedback
+                  </h4>
+                  <p className="text-muted-foreground dark:text-muted-foreground text-sm">
+                    {feedback}
                   </p>
                 </div>
+              )}
 
-                {feedback && (
-                  <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
-                    <h4 className="font-semibold text-foreground dark:text-foreground mb-2">Feedback</h4>
-                    <p className="text-muted-foreground dark:text-muted-foreground text-sm">{feedback}</p>
-                  </div>
-                )}
+              {gateDecision && <MasteryReadinessPanel decision={gateDecision} />}
 
-                {gateDecision && <MasteryReadinessPanel decision={gateDecision} />}
-
-                <div className="flex gap-3">
-                  <Button variant="outline" onClick={onClose} className="flex-1">
-                    Close
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      if (nextTopicId && onNextTopic) {
-                        onNextTopic(nextTopicId);
-                      } else {
-                        window.location.reload();
-                      }
-                    }}
-                    className="flex-1"
-                  >
-                    {nextTopicId && onNextTopic ? 'Next Topic' : 'Retake Quiz'}
-                  </Button>
-                </div>
+              <div className="flex gap-3">
+                <Button variant="outline" onClick={onClose} className="flex-1">
+                  Close
+                </Button>
+                <Button
+                  onClick={() => {
+                    if (nextTopicId && onNextTopic) {
+                      onNextTopic(nextTopicId);
+                    } else {
+                      window.location.reload();
+                    }
+                  }}
+                  className="flex-1"
+                >
+                  {nextTopicId && onNextTopic ? 'Next Topic' : 'Retake Quiz'}
+                </Button>
               </div>
-            )}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     );
@@ -530,11 +563,11 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
         </DialogHeader>
 
         <div className="space-y-6">
-            {isOffline && (
-              <p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-                Offline practice only. Your attempt will be provisional until the server validates it.
-              </p>
-            )}
+          {isOffline && (
+            <p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+              Offline practice only. Your attempt will be provisional until the server validates it.
+            </p>
+          )}
           {/* Progress Bar */}
           <div className="space-y-2">
             <Progress value={progress} className="h-2" />
@@ -567,9 +600,15 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
                 <Flag className="mr-2 h-4 w-4" />
                 Report question
               </Button>
-              {reportNotice && <p className="text-sm text-green-700" role="status">{reportNotice}</p>}
+              {reportNotice && (
+                <p className="text-sm text-green-700" role="status">
+                  {reportNotice}
+                </p>
+              )}
               {isOffline && (
-                <p className="text-xs text-muted-foreground">Connect to the internet to report a question.</p>
+                <p className="text-xs text-muted-foreground">
+                  Connect to the internet to report a question.
+                </p>
               )}
               {isReportOpen && (
                 <div className="space-y-3 rounded-md border border-border p-3">
@@ -596,12 +635,20 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
                       placeholder="Describe what should be reviewed."
                     />
                   </label>
-                  {reportError && <p className="text-sm text-destructive" role="alert">{reportError}</p>}
+                  {reportError && (
+                    <p className="text-sm text-destructive" role="alert">
+                      {reportError}
+                    </p>
+                  )}
                   <div className="flex justify-end gap-2">
                     <Button type="button" variant="outline" onClick={() => setIsReportOpen(false)}>
                       Cancel
                     </Button>
-                    <Button type="button" onClick={submitQuestionReport} disabled={isReporting || isOffline}>
+                    <Button
+                      type="button"
+                      onClick={submitQuestionReport}
+                      disabled={isReporting || isOffline}
+                    >
                       {isReporting ? 'Sending…' : 'Submit report'}
                     </Button>
                   </div>
@@ -615,10 +662,7 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
                 <button
                   key={option.id}
                   onClick={() =>
-                    handleAnswerSelect(
-                      option.id,
-                      currentQuestion.type === 'multiple_select'
-                    )
+                    handleAnswerSelect(option.id, currentQuestion.type === 'multiple_select')
                   }
                   className={`w-full text-left p-3 rounded-lg border-2 transition-all ${
                     selectedAnswers[currentQuestion.id]?.includes(option.id)

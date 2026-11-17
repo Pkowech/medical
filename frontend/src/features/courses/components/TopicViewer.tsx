@@ -44,9 +44,7 @@ import {
 import { StoragePersistenceNotice } from '@/lib/core/offline/StoragePersistenceNotice';
 import type { OfflineQuizQuestion, OfflineTopicBundle } from '@/lib/core/offline/db';
 import { TOPIC_MASTERY_PASSING_SCORE } from '@/shared/types/mastery.types';
-import {
-  useCourseStudySession,
-} from '@/features/learning-management/study/components/CourseStudySessionProvider';
+import { useCourseStudySession } from '@/features/learning-management/study/components/CourseStudySessionProvider';
 
 interface TopicViewerProps {
   courseId: string;
@@ -86,7 +84,7 @@ async function prepareTopicOfflineContent(
   unitId: string,
   materialsMetadataComplete: boolean,
   cacheMode: 'download' | 'session',
-  sessionId?: string,
+  sessionId?: string
 ): Promise<{ bundle: OfflineTopicBundle; complete: boolean }> {
   const pdfMaterials = materials.filter(isPdfMaterial);
   const [quizResult, ...materialResults] = await Promise.allSettled([
@@ -105,7 +103,7 @@ async function prepareTopicOfflineContent(
   ]);
 
   const downloadedMaterials = materialResults.flatMap(result =>
-    result.status === 'fulfilled' ? [result.value] : [],
+    result.status === 'fulfilled' ? [result.value] : []
   );
   const questions: OfflineQuizQuestion[] =
     quizResult.status === 'fulfilled'
@@ -153,9 +151,7 @@ async function prepareTopicOfflineContent(
     contentRevision: revisionFromTopicContent(
       topic.id,
       pdfMaterials,
-      quizResult.status === 'fulfilled'
-        ? quizResult.value.data
-        : [],
+      quizResult.status === 'fulfilled' ? quizResult.value.data : []
     ),
   });
   return { bundle, complete };
@@ -170,7 +166,8 @@ const MATERIAL_ICONS: Record<string, React.ReactNode> = {
   QUIZ: <BookOpen className="w-5 h-5" />,
 };
 
-const getMaterialIcon = (type: string) => MATERIAL_ICONS[type?.toUpperCase()] || <Download className="w-5 h-5" />;
+const getMaterialIcon = (type: string) =>
+  MATERIAL_ICONS[type?.toUpperCase()] || <Download className="w-5 h-5" />;
 
 export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topicId }) => {
   const router = useRouter();
@@ -212,12 +209,10 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
         progress.topicId === topicId &&
         progress.materialId == null &&
         progress.unitId === unitId &&
-        progress.courseId === courseId,
+        progress.courseId === courseId
     );
     const revision =
-      typeof row?.revision === 'number' && Number.isSafeInteger(row.revision)
-        ? row.revision
-        : 0;
+      typeof row?.revision === 'number' && Number.isSafeInteger(row.revision) ? row.revision : 0;
     setProgressRevision(revision);
     if (typeof window !== 'undefined') {
       window.localStorage.setItem(progressRevisionStorageKey, String(revision));
@@ -255,7 +250,7 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
   const sessionCacheIdRef = useRef(
     typeof crypto !== 'undefined' && 'randomUUID' in crypto
       ? crypto.randomUUID()
-      : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`
   );
 
   const isBookmarked = bookmarks.includes(topicId);
@@ -292,13 +287,9 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
               console.warn('Could not refresh topic progress revision:', progressError);
             }
           } else {
-            const cachedRevision = Number(
-              window.localStorage.getItem(progressRevisionStorageKey),
-            );
+            const cachedRevision = Number(window.localStorage.getItem(progressRevisionStorageKey));
             setProgressRevision(
-              Number.isSafeInteger(cachedRevision) && cachedRevision >= 0
-                ? cachedRevision
-                : 0,
+              Number.isSafeInteger(cachedRevision) && cachedRevision >= 0 ? cachedRevision : 0
             );
           }
         }
@@ -379,7 +370,7 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
                   topicId: bundle.topicId,
                   createdAt: new Date(material.cachedAt).toISOString(),
                   updatedAt: new Date(material.cachedAt).toISOString(),
-                })),
+                }))
               );
               setMaterialsLoaded(true);
               setOfflineBundle(bundle);
@@ -410,7 +401,7 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
               ? 'This topic is no longer available.'
               : status === 401
                 ? 'Sign in again while online to access this topic.'
-                : 'Failed to load topic',
+                : 'Failed to load topic'
         );
       } finally {
         setOfflineBundleLoaded(true);
@@ -444,13 +435,15 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
         courseId,
         unitId,
         materialsMetadataComplete,
-        'download',
+        'download'
       );
       setOfflineBundle(bundle);
       toast.success(`Available offline (${formatOfflineSize(bundle.totalBytes)})`);
     } catch (error) {
       console.error('[OfflineCache] Failed to download this topic:', error);
-      toast.error('Could not download this topic. Check your connection and access, then try again.');
+      toast.error(
+        'Could not download this topic. Check your connection and access, then try again.'
+      );
     } finally {
       setIsDownloading(false);
     }
@@ -488,19 +481,21 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
       unitId,
       materialsMetadataComplete,
       'session',
-      sessionCacheIdRef.current,
+      sessionCacheIdRef.current
     );
     sessionCachePromiseRef.current = cachePromise;
-    void cachePromise.then(({ bundle, complete }) => {
-      if (sessionCacheRequestRef.current !== requestKey) return;
-      setOfflineBundle(bundle);
-      setSessionCacheStatus(complete ? 'ready' : 'partial');
-    }).catch(error => {
-      console.warn('[OfflineCache] Could not prepare this topic for interruptions:', error);
-      if (sessionCacheRequestRef.current === requestKey) {
-        setSessionCacheStatus('unavailable');
-      }
-    });
+    void cachePromise
+      .then(({ bundle, complete }) => {
+        if (sessionCacheRequestRef.current !== requestKey) return;
+        setOfflineBundle(bundle);
+        setSessionCacheStatus(complete ? 'ready' : 'partial');
+      })
+      .catch(error => {
+        console.warn('[OfflineCache] Could not prepare this topic for interruptions:', error);
+        if (sessionCacheRequestRef.current === requestKey) {
+          setSessionCacheStatus('unavailable');
+        }
+      });
   }, [
     courseId,
     isOffline,
@@ -524,8 +519,8 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
           await pendingCache?.catch(() => undefined);
           await offlineService.removeSessionOfflineTopic(offlineUserId, topicId, sessionId);
         })().catch(error => {
-            console.warn('[OfflineCache] Could not clear temporary topic content:', error);
-          });
+          console.warn('[OfflineCache] Could not clear temporary topic content:', error);
+        });
       }
     };
   }, [offlineUserId, topicId]);
@@ -578,39 +573,34 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
     setIsMarkingComplete(true);
     const idempotencyKey = crypto.randomUUID();
     try {
-      await progressService.updateContentProgress({
-        courseId,
-        unitId,
-        topicId,
-        status: 'completed',
-        progressPercentage: 100,
-        expectedRevision: progressRevision,
-      }, idempotencyKey);
-      setProgressRevision(progressRevision + 1);
-      window.localStorage.setItem(
-        progressRevisionStorageKey,
-        String(progressRevision + 1),
+      await progressService.updateContentProgress(
+        {
+          courseId,
+          unitId,
+          topicId,
+          status: 'completed',
+          progressPercentage: 100,
+          expectedRevision: progressRevision,
+        },
+        idempotencyKey
       );
+      setProgressRevision(progressRevision + 1);
+      window.localStorage.setItem(progressRevisionStorageKey, String(progressRevision + 1));
       await refreshLearningCaches();
       markLessonComplete(topicId);
       toast.success('Topic marked as complete!');
     } catch (error) {
       if (isOfflineQueuedError(error)) {
         setProgressRevision(progressRevision + 1);
-        window.localStorage.setItem(
-          progressRevisionStorageKey,
-          String(progressRevision + 1),
-        );
+        window.localStorage.setItem(progressRevisionStorageKey, String(progressRevision + 1));
         markLessonComplete(topicId);
         toast.info('Topic completion saved offline and will sync when connected.');
         return;
       }
       if (isProgressConflict(error)) {
-        await Promise.all([
-          refreshLearningCaches(),
-          refreshProgressRevision(),
-        ]).catch(refreshError =>
-          console.error('Failed to refresh conflicted topic progress:', refreshError),
+        await Promise.all([refreshLearningCaches(), refreshProgressRevision()]).catch(
+          refreshError =>
+            console.error('Failed to refresh conflicted topic progress:', refreshError)
         );
         toast.error('Progress changed elsewhere. Refresh and retry.');
         return;
@@ -627,10 +617,7 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
           idempotencyKey,
         });
         setProgressRevision(progressRevision + 1);
-        window.localStorage.setItem(
-          progressRevisionStorageKey,
-          String(progressRevision + 1),
-        );
+        window.localStorage.setItem(progressRevisionStorageKey, String(progressRevision + 1));
         markLessonComplete(topicId);
         toast.info('Topic completion saved offline and will sync when connected.');
       } catch (queueError) {
@@ -642,13 +629,10 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
     }
   };
 
-  const handleTopicQuizComplete = async (result: {
-    masteryUnlocked: boolean;
-    score: number;
-  }) => {
+  const handleTopicQuizComplete = async (result: { masteryUnlocked: boolean; score: number }) => {
     if (!result.masteryUnlocked) {
       toast.error(
-        `You scored ${result.score}%. At least ${TOPIC_MASTERY_PASSING_SCORE}% is required to pass.`,
+        `You scored ${result.score}%. At least ${TOPIC_MASTERY_PASSING_SCORE}% is required to pass.`
       );
       return;
     }
@@ -667,7 +651,9 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
           <div className="flex items-center justify-center min-h-screen">
             <div className="text-center space-y-4">
               <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mx-auto" />
-              <p className="text-muted-foreground dark:text-muted-foreground font-medium">Loading topic...</p>
+              <p className="text-muted-foreground dark:text-muted-foreground font-medium">
+                Loading topic...
+              </p>
             </div>
           </div>
         </div>
@@ -685,7 +671,9 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
               {loadError || 'Topic not found'}
             </h2>
             <p className="text-muted-foreground dark:text-muted-foreground">
-              {loadError ? 'Complete the preceding topic quiz before opening this topic.' : "The topic you're looking for doesn't exist."}
+              {loadError
+                ? 'Complete the preceding topic quiz before opening this topic.'
+                : "The topic you're looking for doesn't exist."}
             </p>
             <Button onClick={handleNavigateToUnit} variant="outline">
               Back to unit topics
@@ -823,9 +811,7 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Topic overview
             </p>
-            <p className="mt-2 leading-7 text-foreground/80">
-              {topic.description}
-            </p>
+            <p className="mt-2 leading-7 text-foreground/80">{topic.description}</p>
           </section>
         )}
 
@@ -840,7 +826,10 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
           {materials.length > 0 ? (
             <ul className="divide-y divide-border rounded-lg border border-border bg-card">
               {materials.map(material => (
-                <li key={material.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <li
+                  key={material.id}
+                  className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
+                >
                   <div className="flex min-w-0 items-start gap-3">
                     <span className="mt-0.5 shrink-0 text-muted-foreground">
                       {getMaterialIcon(material.type || 'DOCUMENT')}
@@ -874,7 +863,10 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
           )}
         </section>
 
-        <section className="rounded-lg border border-border bg-card p-5" aria-labelledby="topic-assessment-heading">
+        <section
+          className="rounded-lg border border-border bg-card p-5"
+          aria-labelledby="topic-assessment-heading"
+        >
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-start gap-3">
               <Brain className="mt-0.5 h-5 w-5 shrink-0 text-blue-600 dark:text-blue-400" />
@@ -883,7 +875,8 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
                   Topic assessment
                 </h2>
                 <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                  Take the quiz to check your understanding. A score of {TOPIC_MASTERY_PASSING_SCORE}% is required to pass.
+                  Take the quiz to check your understanding. A score of{' '}
+                  {TOPIC_MASTERY_PASSING_SCORE}% is required to pass.
                 </p>
               </div>
             </div>
@@ -951,12 +944,13 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
       {/* Topic Quiz Modal */}
       <TopicQuiz
         topicId={topicId}
+        questionCount={topic?.quizQuestionCount ?? 10}
         unitId={unitId}
         courseId={courseId}
         userId={offlineUserId || ''}
         isOpen={showQuiz}
         onClose={() => setShowQuiz(false)}
-        onNextTopic={(nextTopicId) => {
+        onNextTopic={nextTopicId => {
           setShowQuiz(false);
           router.push(`/courses/${courseId}/units/${unitId}/topics/${nextTopicId}`);
         }}
@@ -994,12 +988,13 @@ function formatOfflineSize(bytes: number): string {
 }
 
 function getEstimatedPdfSize(materials: Material[]): string {
-  const pdfs = materials.filter(material =>
-    material.type?.toLowerCase() === 'pdf' ||
-    material.contentType?.toLowerCase() === 'application/pdf' ||
-    material.metadata?.driveMimeType?.toLowerCase() === 'application/pdf' ||
-    material.file?.mimetype?.toLowerCase() === 'application/pdf' ||
-    material.previewFile?.mimetype?.toLowerCase() === 'application/pdf',
+  const pdfs = materials.filter(
+    material =>
+      material.type?.toLowerCase() === 'pdf' ||
+      material.contentType?.toLowerCase() === 'application/pdf' ||
+      material.metadata?.driveMimeType?.toLowerCase() === 'application/pdf' ||
+      material.file?.mimetype?.toLowerCase() === 'application/pdf' ||
+      material.previewFile?.mimetype?.toLowerCase() === 'application/pdf'
   );
   const sizes = pdfs.map(material => {
     const match = material.size?.trim().match(/^([\d,.]+)\s*(B|KB|KIB|MB|MIB|GB|GIB)?$/i);
@@ -1008,9 +1003,13 @@ function getEstimatedPdfSize(materials: Material[]): string {
     if (!Number.isFinite(size)) return undefined;
     const unit = (match[2] || 'B').toUpperCase();
     const multiplier =
-      unit === 'KB' || unit === 'KIB' ? 1024 :
-      unit === 'MB' || unit === 'MIB' ? 1024 ** 2 :
-      unit === 'GB' || unit === 'GIB' ? 1024 ** 3 : 1;
+      unit === 'KB' || unit === 'KIB'
+        ? 1024
+        : unit === 'MB' || unit === 'MIB'
+          ? 1024 ** 2
+          : unit === 'GB' || unit === 'GIB'
+            ? 1024 ** 3
+            : 1;
     return size * multiplier;
   });
   return sizes.some(size => size === undefined)

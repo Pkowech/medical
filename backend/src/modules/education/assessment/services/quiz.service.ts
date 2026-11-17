@@ -6,6 +6,7 @@ import {
   ConflictException,
   ForbiddenException,
 } from '@nestjs/common';
+import { createHash, randomInt } from 'node:crypto';
 import { PrismaService } from '#infrastructure/prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 import { RedisService } from '#infrastructure/redis/redis.service';
@@ -607,6 +608,7 @@ export class QuizService {
         id: true,
         name: true,
         unitId: true,
+        quizQuestionCount: true,
         unit: {
           select: {
             id: true,
@@ -1640,8 +1642,20 @@ export class QuizService {
     status: 200,
     description: 'Topic questions retrieved successfully',
   })
-  async getQuestionsByTopic(topicId: string): Promise<PublicQuizQuestion[]> {
+  async getQuestionsByTopic(
+    topicId: string,
+    applyTopicQuestionLimit = true,
+    attemptId?: string,
+  ): Promise<PublicQuizQuestion[]> {
     const topic = await this.getVisibleTopic(topicId);
+    if (
+      attemptId !== undefined &&
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        attemptId,
+      )
+    ) {
+      throw new BadRequestException('A valid quiz attempt ID is required');
+    }
     const now = new Date();
     const quizVersions = await this.prisma.quiz.findMany({
       where: {
@@ -1665,13 +1679,22 @@ export class QuizService {
     if (cachedQuestions) {
       try {
         this.logger.debug(`Retrieved cached questions for topic ${topicId}`);
-        return JSON.parse(cachedQuestions);
+        const questions = JSON.parse(cachedQuestions) as PublicQuizQuestion[];
+        return applyTopicQuestionLimit
+          ? this.selectTopicQuizQuestions(
+              topicId,
+              questions,
+              topic.quizQuestionCount,
+              attemptId,
+            )
+          : questions;
       } catch {
         this.logger.warn(`Corrupt cache for topic ${topicId} questions`);
         await this.redisService.del(cacheKey);
       }
     }
 
+    let publicQuestions: PublicQuizQuestion[];
     const optionInclude = {
       options: {
         select: { id: true, text: true, order: true },
@@ -1714,7 +1737,7 @@ export class QuizService {
     for (const question of standaloneQuestions) {
       questionById.set(question.id, question);
     }
-    const publicQuestions = Array.from(questionById.values())
+    publicQuestions = Array.from(questionById.values())
       .sort(
         (left, right) => right.createdAt.getTime() - left.createdAt.getTime(),
       )
@@ -1724,7 +1747,45 @@ export class QuizService {
       JSON.stringify(publicQuestions),
       3600,
     );
-    return publicQuestions;
+    return applyTopicQuestionLimit
+      ? this.selectTopicQuizQuestions(
+          topicId,
+          publicQuestions,
+          topic.quizQuestionCount,
+          attemptId,
+        )
+      : publicQuestions;
+  }
+
+  private selectTopicQuizQuestions(
+    topicId: string,
+    questions: PublicQuizQuestion[],
+    questionCount: number,
+    attemptId?: string,
+  ): PublicQuizQuestion[] {
+    const targetCount = Math.min(questionCount, questions.length);
+    if (questions.length <= targetCount) return questions;
+    if (attemptId) {
+      return questions
+        .map((question) => ({
+          question,
+          rank: createHash('sha256')
+            .update(`${topicId}:${attemptId}:${question.id}`)
+            .digest('hex'),
+        }))
+        .sort((left, right) => left.rank.localeCompare(right.rank))
+        .slice(0, targetCount)
+        .map(({ question }) => question);
+    }
+    const shuffled = [...questions];
+    for (let index = shuffled.length - 1; index > 0; index -= 1) {
+      const swapIndex = randomInt(index + 1);
+      [shuffled[index], shuffled[swapIndex]] = [
+        shuffled[swapIndex],
+        shuffled[index],
+      ];
+    }
+    return shuffled.slice(0, targetCount);
   }
 
   async startQuizAttempt(
@@ -2986,23 +3047,50 @@ export class QuizService {
           'Topic quiz responses contain invalid or duplicate question IDs',
         );
       }
+      const availableQuestionSummaries = await this.getQuestionsByTopic(
+        topicId,
+        false,
+      );
+      const availableQuestionIds = availableQuestionSummaries.map(
+        ({ id }) => id,
+      );
+      const attemptQuestionSummaries = await this.getQuestionsByTopic(
+        topicId,
+        true,
+        attemptId,
+      );
+      const attemptQuestionIds = attemptQuestionSummaries.map(({ id }) => id);
+      const expectedQuestionCount = Math.min(
+        topic.quizQuestionCount,
+        attemptQuestionIds.length,
+      );
+      if (
+        questionIds.length !== expectedQuestionCount ||
+        questionIds.some((id) => !attemptQuestionIds.includes(id))
+      ) {
+        throw new BadRequestException(
+          `This topic quiz requires exactly ${expectedQuestionCount} current question responses`,
+        );
+      }
+
       const fetchedQuestions = await this.prisma.question.findMany({
         where: {
           ...this.getPublicQuestionWhere(),
-          topicIds: { has: topicId },
+          id: { in: availableQuestionIds },
         },
         include: { options: true },
         orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
       });
-      if (
-        fetchedQuestions.length !== questionIds.length ||
-        fetchedQuestions.some((question) => !questionIds.includes(question.id))
-      ) {
+      if (fetchedQuestions.length !== availableQuestionIds.length) {
         throw new BadRequestException(
-          'A topic quiz must answer every current question exactly once',
+          'Some topic quiz questions are no longer available',
         );
       }
-      const graded = QuizUtils.gradeOptionQuiz(fetchedQuestions, responses);
+      const selectedQuestionIds = new Set(questionIds);
+      const selectedQuestions = fetchedQuestions.filter((question) =>
+        selectedQuestionIds.has(question.id),
+      );
+      const graded = QuizUtils.gradeOptionQuiz(selectedQuestions, responses);
       const reviewAnswers = graded.responses.map(
         ({ questionId, isCorrect }) => ({
           questionId,
@@ -3063,7 +3151,7 @@ export class QuizService {
               maxScore: graded.totalPoints,
               percentage: scorePercentage,
               correctAnswers: graded.correctAnswers,
-              totalQuestions: fetchedQuestions.length,
+              totalQuestions: selectedQuestions.length,
               isPassed: passed,
             },
           });
@@ -3261,24 +3349,45 @@ export class QuizService {
     }
 
     const topic = await this.getVisibleTopic(topicId);
+    const availableQuestionSummaries = await this.getQuestionsByTopic(
+      topicId,
+      false,
+    );
+    const availableQuestionIds = availableQuestionSummaries.map(({ id }) => id);
+    const expectedQuestionCount = Math.min(
+      topic.quizQuestionCount,
+      availableQuestionIds.length,
+    );
+    if (
+      questionIds.length !== expectedQuestionCount ||
+      questionIds.some(
+        (questionId) => !availableQuestionIds.includes(questionId),
+      )
+    ) {
+      throw new BadRequestException(
+        `This topic practice attempt requires exactly ${expectedQuestionCount} current question responses`,
+      );
+    }
+
     const questions = await this.prisma.question.findMany({
       where: {
         ...this.getPublicQuestionWhere(),
-        topicIds: { has: topicId },
+        id: { in: availableQuestionIds },
       },
       include: { options: { select: { id: true, isCorrect: true } } },
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     });
-    if (
-      questions.length !== questionIds.length ||
-      questions.some((question) => !questionIds.includes(question.id))
-    ) {
+    if (questions.length !== availableQuestionIds.length) {
       throw new BadRequestException(
-        'A practice attempt must answer every current question for this topic',
+        'Some topic practice questions are no longer available',
       );
     }
 
-    const graded = QuizUtils.gradeOptionQuiz(questions, responses);
+    const selectedQuestionIds = new Set(questionIds);
+    const selectedQuestions = questions.filter((question) =>
+      selectedQuestionIds.has(question.id),
+    );
+    const graded = QuizUtils.gradeOptionQuiz(selectedQuestions, responses);
     const normalizedResponses = graded.responses.map((response) => ({
       questionId: response.questionId,
       selectedAnswers: [...response.selectedAnswers].sort(),

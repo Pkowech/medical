@@ -58,10 +58,12 @@ export class TopicsService {
     userId?: string,
   ): Promise<TopicWithTitle[]> {
     const roles = userId
-      ? (await this.prisma.userRole.findMany({
-          where: { userId },
-          include: { role: { select: { name: true } } },
-        })).map(({ role }) => role.name)
+      ? (
+          await this.prisma.userRole.findMany({
+            where: { userId },
+            include: { role: { select: { name: true } } },
+          })
+        ).map(({ role }) => role.name)
       : [];
     const courseIds = [
       ...new Set(topics.map((topic) => topic.unit?.course?.id).filter(Boolean)),
@@ -145,17 +147,21 @@ export class TopicsService {
         userId,
       ))
     ) {
-      throw new ForbiddenException('Only the course instructor or an admin can manage topics');
+      throw new ForbiddenException(
+        'Only the course instructor or an admin can manage topics',
+      );
     }
     return topic;
   }
 
   async findAll(unitId?: string, userId?: string): Promise<TopicWithTitle[]> {
     const roles = userId
-      ? (await this.prisma.userRole.findMany({
-          where: { userId },
-          include: { role: { select: { name: true } } },
-        })).map(({ role }) => role.name)
+      ? (
+          await this.prisma.userRole.findMany({
+            where: { userId },
+            include: { role: { select: { name: true } } },
+          })
+        ).map(({ role }) => role.name)
       : [];
     const where: Prisma.TopicWhereInput = unitId ? { unitId } : {};
     if (!roles.includes(Role.admin)) {
@@ -244,13 +250,18 @@ export class TopicsService {
     return (await this.toVisibleTopics([topic], userId))[0];
   }
 
-  async create(input: TopicMutationInput, userId: string): Promise<TopicWithTitle> {
+  async create(
+    input: TopicMutationInput,
+    userId: string,
+  ): Promise<TopicWithTitle> {
     const unitId = input.unitId?.trim();
     const name = (input.name || input.title || '').trim();
     if (!unitId || !name) {
       throw new BadRequestException('Unit ID and topic title are required');
     }
-    const quizQuestionCount = this.validateQuizQuestionCount(input.quizQuestionCount);
+    const quizQuestionCount = this.validateQuizQuestionCount(
+      input.quizQuestionCount,
+    );
 
     const unit = await this.prisma.unit.findUnique({
       where: { id: unitId },
@@ -264,7 +275,9 @@ export class TopicsService {
         userId,
       ))
     ) {
-      throw new ForbiddenException('Only the course instructor or an admin can manage topics');
+      throw new ForbiddenException(
+        'Only the course instructor or an admin can manage topics',
+      );
     }
 
     const lastTopic = await this.prisma.topic.findFirst({
@@ -273,11 +286,12 @@ export class TopicsService {
       select: { order: true },
     });
     const requestedOrder = Number(input.order ?? input.orderIndex);
-    const order = Number.isInteger(requestedOrder) && requestedOrder > 0
-      ? requestedOrder
-      : (lastTopic?.order || 0) + 1;
+    const order =
+      Number.isInteger(requestedOrder) && requestedOrder > 0
+        ? requestedOrder
+        : (lastTopic?.order || 0) + 1;
 
-    const topic = await this.prisma.$transaction(async prisma => {
+    const topic = await this.prisma.$transaction(async (prisma) => {
       await prisma.topic.updateMany({
         where: { unitId, order: { gte: order } },
         data: { order: { increment: 1 } },
@@ -300,18 +314,25 @@ export class TopicsService {
     return this.toResponse(topic);
   }
 
-  async update(id: string, input: TopicMutationInput, userId: string): Promise<TopicWithTitle> {
+  async update(
+    id: string,
+    input: TopicMutationInput,
+    userId: string,
+  ): Promise<TopicWithTitle> {
     await this.getTopicForManagement(id, userId);
-    const quizQuestionCount = this.validateQuizQuestionCount(input.quizQuestionCount);
+    const quizQuestionCount = this.validateQuizQuestionCount(
+      input.quizQuestionCount,
+    );
     const name = input.name ?? input.title;
     if (name !== undefined && !name.trim()) {
       throw new BadRequestException('Topic title cannot be empty');
     }
 
     const requestedOrder = Number(input.order ?? input.orderIndex);
-    const order = Number.isInteger(requestedOrder) && requestedOrder > 0
-      ? requestedOrder
-      : undefined;
+    const order =
+      Number.isInteger(requestedOrder) && requestedOrder > 0
+        ? requestedOrder
+        : undefined;
 
     const topic = await this.prisma.topic.update({
       where: { id },
@@ -320,7 +341,7 @@ export class TopicsService {
         description: input.description,
         order,
         estimatedMinutes: input.estimatedMinutes,
-        quizQuestionCount,
+        ...(quizQuestionCount !== undefined ? { quizQuestionCount } : {}),
         isMandatory: input.isMandatory,
         categoryId: input.categoryId,
       },
@@ -333,7 +354,9 @@ export class TopicsService {
   private validateQuizQuestionCount(value?: number): number | undefined {
     if (value === undefined) return undefined;
     if (!Number.isInteger(value) || value < 1 || value > 100) {
-      throw new BadRequestException('Quiz question count must be an integer from 1 to 100');
+      throw new BadRequestException(
+        'Quiz question count must be an integer from 1 to 100',
+      );
     }
     return value;
   }
@@ -352,16 +375,15 @@ export class TopicsService {
     }
 
     try {
-      await this.prisma.$transaction(async prisma => {
+      await this.prisma.$transaction(async (prisma) => {
         const laterTopics = await prisma.topic.findMany({
           where: { unitId: existing.unitId, order: { gt: existing.order } },
           select: { id: true, order: true },
           orderBy: { order: 'asc' },
         });
-        const temporaryOrderBase = Math.max(
-          existing.order,
-          ...laterTopics.map(topic => topic.order),
-        ) + 1000;
+        const temporaryOrderBase =
+          Math.max(existing.order, ...laterTopics.map((topic) => topic.order)) +
+          1000;
 
         for (const [index, topic] of laterTopics.entries()) {
           await prisma.topic.update({
@@ -380,8 +402,13 @@ export class TopicsService {
         }
       });
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003') {
-        throw new BadRequestException('Cannot delete this topic while it has linked records');
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2003'
+      ) {
+        throw new BadRequestException(
+          'Cannot delete this topic while it has linked records',
+        );
       }
       throw error;
     }

@@ -14,7 +14,13 @@ export class CourseCategoriesService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(createCategoryDto: CreateCategoryDto) {
-    const { name, slug, description, parentId, isActive = true } = createCategoryDto;
+    const {
+      name,
+      slug,
+      description,
+      parentId,
+      isActive = true,
+    } = createCategoryDto;
 
     // Check if slug exists
     const existing = await this.prisma.courseCategory.findUnique({
@@ -23,6 +29,7 @@ export class CourseCategoriesService {
     if (existing) {
       throw new BadRequestException('Category slug already exists');
     }
+    await this.assertValidParent(undefined, parentId);
 
     return await this.prisma.courseCategory.create({
       data: {
@@ -88,6 +95,14 @@ export class CourseCategoriesService {
   }
 
   async update(id: string, updateCategoryDto: UpdateCategoryDto) {
+    const category = await this.prisma.courseCategory.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+    if (!category) {
+      throw new NotFoundException('Category not found');
+    }
+
     const { slug } = updateCategoryDto;
 
     if (slug) {
@@ -98,15 +113,38 @@ export class CourseCategoriesService {
         throw new BadRequestException('Category slug already exists');
       }
     }
+    await this.assertValidParent(id, updateCategoryDto.parentId);
 
-    const category = await this.prisma.courseCategory.update({
+    return this.prisma.courseCategory.update({
       where: { id },
       data: updateCategoryDto,
     });
-    if (!category) {
-      throw new NotFoundException('Category not found');
+  }
+
+  private async assertValidParent(
+    categoryId: string | undefined,
+    parentId: string | null | undefined,
+  ): Promise<void> {
+    if (!parentId) return;
+
+    const visited = new Set<string>();
+    let currentId: string | null = parentId;
+    while (currentId) {
+      if (currentId === categoryId || visited.has(currentId)) {
+        throw new BadRequestException(
+          'Category parent would create a hierarchy cycle',
+        );
+      }
+      visited.add(currentId);
+      const current = await this.prisma.courseCategory.findUnique({
+        where: { id: currentId },
+        select: { parentId: true },
+      });
+      if (!current) {
+        throw new NotFoundException('Parent category not found');
+      }
+      currentId = current.parentId;
     }
-    return category;
   }
 
   async remove(id: string) {

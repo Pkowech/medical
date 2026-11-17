@@ -82,7 +82,7 @@ export function InstructorCourseManager({ instructorId }: { instructorId: string
     setLoadingCourseIds(current => new Set(current).add(courseId));
     try {
       const detailedCourse = await courseService.getCourseById(courseId);
-      setCourses(current => current.map(item => item.id === courseId ? detailedCourse : item));
+      setCourses(current => current.map(item => (item.id === courseId ? detailedCourse : item)));
     } catch (loadError) {
       setError(getErrorMessage(loadError, 'Failed to load course units and topics.'));
     } finally {
@@ -98,7 +98,9 @@ export function InstructorCourseManager({ instructorId }: { instructorId: string
     try {
       if (formContext.course?.id) {
         const updatedCourse = await courseService.updateCourse(formContext.course.id, courseData);
-        setCourses(current => current.map(course => course.id === updatedCourse.id ? updatedCourse : course));
+        setCourses(current =>
+          current.map(course => (course.id === updatedCourse.id ? updatedCourse : course))
+        );
         setSuccessMessage('Course updated successfully.');
       } else {
         const newCourse = await courseService.createCourse(courseData);
@@ -112,7 +114,12 @@ export function InstructorCourseManager({ instructorId }: { instructorId: string
   };
 
   const handleDeleteCourse = async (course: Course) => {
-    if (!confirm(`Delete "${course.title}" and all of its units and topics?`)) return;
+    if (
+      !confirm(
+        `Delete "${course.title}" and its curriculum? Courses with learner history or curriculum references must be archived instead.`
+      )
+    )
+      return;
     try {
       await courseService.deleteCourse(course.id);
       setCourses(current => current.filter(item => item.id !== course.id));
@@ -128,15 +135,24 @@ export function InstructorCourseManager({ instructorId }: { instructorId: string
     try {
       if (formContext.unit?.id) {
         const updatedUnit = await unitService.updateUnit(formContext.unit.id, unitData);
-        setCourses(current => current.map(item => item.id === course.id
-          ? { ...item, units: item.units?.map(unit => unit.id === updatedUnit.id ? updatedUnit : unit) }
-          : item));
+        setCourses(current =>
+          current.map(item =>
+            item.id === course.id
+              ? {
+                  ...item,
+                  units: item.units?.map(unit => (unit.id === updatedUnit.id ? updatedUnit : unit)),
+                }
+              : item
+          )
+        );
         setSuccessMessage('Unit updated successfully.');
       } else {
         const newUnit = await unitService.createUnit(course.id, unitData);
-        setCourses(current => current.map(item => item.id === course.id
-          ? { ...item, units: [...(item.units || []), newUnit] }
-          : item));
+        setCourses(current =>
+          current.map(item =>
+            item.id === course.id ? { ...item, units: [...(item.units || []), newUnit] } : item
+          )
+        );
         setSuccessMessage('Unit created successfully.');
       }
       setFormContext({ mode: 'none' });
@@ -149,10 +165,12 @@ export function InstructorCourseManager({ instructorId }: { instructorId: string
     if (!confirm(`Delete "${unit.title}" and its topics?`)) return;
     try {
       await unitService.deleteUnit(unit.id);
-      setCourses(current => current.map(course => ({
-        ...course,
-        units: course.units?.filter(item => item.id !== unit.id),
-      })));
+      setCourses(current =>
+        current.map(course => ({
+          ...course,
+          units: course.units?.filter(item => item.id !== unit.id),
+        }))
+      );
       setSuccessMessage('Unit deleted successfully.');
     } catch (deleteError) {
       setError(getErrorMessage(deleteError, 'Failed to delete unit.'));
@@ -161,32 +179,51 @@ export function InstructorCourseManager({ instructorId }: { instructorId: string
 
   const handleSaveTopic = async (
     topicData: Partial<Topic>,
-    hasPendingMaterial: boolean,
+    hasPendingMaterial: boolean
   ): Promise<Topic> => {
     const unit = formContext.unit;
     if (!unit) throw new Error('Choose a unit before saving a topic.');
     try {
       if (formContext.topic?.id) {
         const updatedTopic = await topicService.updateTopic(formContext.topic.id, topicData);
-        setCourses(current => current.map(course => ({
-          ...course,
-          units: course.units?.map(item => item.id === unit.id
-            ? { ...item, topics: item.topics?.map(topic => topic.id === updatedTopic.id ? updatedTopic : topic) }
-            : item),
-        })));
+        setCourses(current =>
+          current.map(course => ({
+            ...course,
+            units: course.units?.map(item =>
+              item.id === unit.id
+                ? {
+                    ...item,
+                    topics: item.topics?.map(topic =>
+                      topic.id === updatedTopic.id ? updatedTopic : topic
+                    ),
+                  }
+                : item
+            ),
+          }))
+        );
         setSuccessMessage('Topic updated successfully.');
-        setFormContext(hasPendingMaterial
-          ? { mode: 'topic', course: formContext.course, unit, topic: updatedTopic }
-          : { mode: 'none' });
+        setFormContext(
+          hasPendingMaterial
+            ? { mode: 'topic', course: formContext.course, unit, topic: updatedTopic }
+            : { mode: 'none' }
+        );
         return updatedTopic;
       } else {
         const newTopic = await topicService.createTopic(unit.id, topicData);
-        setCourses(current => current.map(course => course.id === formContext.course?.id ? ({
-          ...course,
-          units: course.units?.map(item => item.id === unit.id
-            ? { ...item, topics: [...(item.topics || []), newTopic] }
-            : item),
-        }) : course));
+        setCourses(current =>
+          current.map(course =>
+            course.id === formContext.course?.id
+              ? {
+                  ...course,
+                  units: course.units?.map(item =>
+                    item.id === unit.id
+                      ? { ...item, topics: [...(item.topics || []), newTopic] }
+                      : item
+                  ),
+                }
+              : course
+          )
+        );
         setFormContext({ mode: 'topic', course: formContext.course, unit, topic: newTopic });
         setSuccessMessage('Topic created. You can now add its assessment and materials.');
         return newTopic;
@@ -201,13 +238,15 @@ export function InstructorCourseManager({ instructorId }: { instructorId: string
     if (!confirm(`Delete "${topic.title || topic.name || 'this topic'}"?`)) return;
     try {
       await topicService.deleteTopic(topic.id);
-      setCourses(current => current.map(course => ({
-        ...course,
-        units: course.units?.map(unit => ({
-          ...unit,
-          topics: unit.topics?.filter(item => item.id !== topic.id),
-        })),
-      })));
+      setCourses(current =>
+        current.map(course => ({
+          ...course,
+          units: course.units?.map(unit => ({
+            ...unit,
+            topics: unit.topics?.filter(item => item.id !== topic.id),
+          })),
+        }))
+      );
       setSuccessMessage('Topic deleted successfully.');
     } catch (deleteError) {
       setError(getErrorMessage(deleteError, 'Failed to delete topic.'));
@@ -215,7 +254,9 @@ export function InstructorCourseManager({ instructorId }: { instructorId: string
   };
 
   if (loading) {
-    return <div className="py-12 text-center text-sm text-muted-foreground">Loading your courses...</div>;
+    return (
+      <div className="py-12 text-center text-sm text-muted-foreground">Loading your courses...</div>
+    );
   }
 
   return (
@@ -244,16 +285,37 @@ export function InstructorCourseManager({ instructorId }: { instructorId: string
         )}
       </div>
 
-      {successMessage && <div role="status" className="rounded-md border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">{successMessage}</div>}
-      {error && <div role="alert" className="flex items-center gap-2 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"><AlertCircle className="h-4 w-4 shrink-0" />{error}</div>}
+      {successMessage && (
+        <div
+          role="status"
+          className="rounded-md border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800"
+        >
+          {successMessage}
+        </div>
+      )}
+      {error && (
+        <div
+          role="alert"
+          className="flex items-center gap-2 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+        >
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          {error}
+        </div>
+      )}
 
-      <div className="inline-flex rounded-xl border border-border bg-muted p-1" role="group" aria-label="Instructor workspace">
+      <div
+        className="inline-flex rounded-xl border border-border bg-muted p-1"
+        role="group"
+        aria-label="Instructor workspace"
+      >
         <button
           type="button"
           aria-pressed={activeWorkspace === 'courses'}
           onClick={() => setActiveWorkspace('courses')}
           className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-            activeWorkspace === 'courses' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+            activeWorkspace === 'courses'
+              ? 'bg-background text-foreground shadow-sm'
+              : 'text-muted-foreground hover:text-foreground'
           }`}
         >
           Courses
@@ -266,7 +328,9 @@ export function InstructorCourseManager({ instructorId }: { instructorId: string
             setFormContext({ mode: 'none' });
           }}
           className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-            activeWorkspace === 'paths' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+            activeWorkspace === 'paths'
+              ? 'bg-background text-foreground shadow-sm'
+              : 'text-muted-foreground hover:text-foreground'
           }`}
         >
           Learning paths
@@ -282,7 +346,11 @@ export function InstructorCourseManager({ instructorId }: { instructorId: string
       ) : (
         <>
           {formContext.mode === 'course' && (
-            <CourseForm course={formContext.course || null} onSave={handleSaveCourse} onCancel={() => setFormContext({ mode: 'none' })} />
+            <CourseForm
+              course={formContext.course || null}
+              onSave={handleSaveCourse}
+              onCancel={() => setFormContext({ mode: 'none' })}
+            />
           )}
           {formContext.mode === 'unit' && formContext.course && (
             <UnitForm
@@ -312,15 +380,19 @@ export function InstructorCourseManager({ instructorId }: { instructorId: string
               onEdit={course => setFormContext({ mode: 'course', course })}
               onDelete={handleDeleteCourse}
               canDeleteCourse
-              onAddUnit={course => router.push(`/instructor/content/create?courseId=${encodeURIComponent(course.id)}`)}
+              onAddUnit={course =>
+                router.push(`/instructor/content/create?courseId=${encodeURIComponent(course.id)}`)
+              }
               onEditUnit={(unit, courseId) => {
                 const course = courses.find(item => item.id === courseId);
                 if (course) setFormContext({ mode: 'unit', course, unit });
               }}
               onDeleteUnit={handleDeleteUnit}
-              onAddTopic={(unit, courseId) => router.push(
-                `/instructor/content/create?courseId=${encodeURIComponent(courseId)}&unitId=${encodeURIComponent(unit.id)}`,
-              )}
+              onAddTopic={(unit, courseId) =>
+                router.push(
+                  `/instructor/content/create?courseId=${encodeURIComponent(courseId)}&unitId=${encodeURIComponent(unit.id)}`
+                )
+              }
               onEditTopic={(topic, unitId, course) => {
                 const unit = course.units?.find(item => item.id === unitId);
                 if (unit) setFormContext({ mode: 'topic', course, unit, topic });

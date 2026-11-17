@@ -53,11 +53,7 @@ export default function AdminContentPage() {
       title: 'Content Management',
       description: 'Create and manage courses, units, and topics.',
       actions: (
-        <Button
-          size="sm"
-          onClick={() => setFormContext({ mode: 'course' })}
-          className="gap-2"
-        >
+        <Button size="sm" onClick={() => setFormContext({ mode: 'course' })} className="gap-2">
           <PlusCircle className="h-4 w-4" />
           <span className="hidden sm:inline">Create Course</span>
           <span className="sm:hidden">Create</span>
@@ -90,9 +86,7 @@ export default function AdminContentPage() {
     setLoadingCourseIds(current => new Set(current).add(courseId));
     try {
       const detailedCourse = await courseService.getCourseById(courseId);
-      setCourses(current =>
-        current.map(item => item.id === courseId ? detailedCourse : item),
-      );
+      setCourses(current => current.map(item => (item.id === courseId ? detailedCourse : item)));
     } catch (err) {
       setError(getSaveErrorMessage(err, 'Failed to load course units and topics'));
     } finally {
@@ -125,7 +119,7 @@ export default function AdminContentPage() {
       let updatedCourse: Course;
       if (formContext.course?.id) {
         updatedCourse = await courseService.updateCourse(formContext.course.id, courseData);
-        setCourses(courses.map(c => c.id === updatedCourse.id ? updatedCourse : c));
+        setCourses(courses.map(c => (c.id === updatedCourse.id ? updatedCourse : c)));
         setSuccessMessage('Course updated successfully');
       } else {
         updatedCourse = await courseService.createCourse(courseData);
@@ -142,7 +136,11 @@ export default function AdminContentPage() {
 
   // Handle course deletion
   const handleDeleteCourse = async (course: Course) => {
-    if (confirm(`Are you sure you want to delete "${course.title}"? This will also delete all associated units and topics.`)) {
+    if (
+      confirm(
+        `Delete "${course.title}" and its curriculum? Courses with learner history or curriculum references must be archived instead.`
+      )
+    ) {
       try {
         await courseService.deleteCourse(course.id);
         setCourses(courses.filter(c => c.id !== course.id));
@@ -159,27 +157,31 @@ export default function AdminContentPage() {
     try {
       if (formContext.unit?.id) {
         const updatedUnit = await unitService.updateUnit(formContext.unit.id, unitData);
-        setCourses(courses.map(c => {
-          if (c.id === formContext.course?.id && c.units) {
-            return {
-              ...c,
-              units: c.units.map(u => u.id === updatedUnit.id ? updatedUnit : u),
-            };
-          }
-          return c;
-        }));
+        setCourses(
+          courses.map(c => {
+            if (c.id === formContext.course?.id && c.units) {
+              return {
+                ...c,
+                units: c.units.map(u => (u.id === updatedUnit.id ? updatedUnit : u)),
+              };
+            }
+            return c;
+          })
+        );
         setSuccessMessage('Unit updated successfully');
       } else {
         const newUnit = await unitService.createUnit(formContext.course?.id || '', unitData);
-        setCourses(courses.map(c => {
-          if (c.id === formContext.course?.id) {
-            return {
-              ...c,
-              units: [...(c.units || []), newUnit],
-            };
-          }
-          return c;
-        }));
+        setCourses(
+          courses.map(c => {
+            if (c.id === formContext.course?.id) {
+              return {
+                ...c,
+                units: [...(c.units || []), newUnit],
+              };
+            }
+            return c;
+          })
+        );
         setSuccessMessage('Unit created successfully');
       }
       setFormContext({ mode: 'none' });
@@ -192,18 +194,24 @@ export default function AdminContentPage() {
 
   // Handle unit deletion
   const handleDeleteUnit = async (unit: Unit) => {
-    if (confirm(`Are you sure you want to delete "${unit.title}"? This will also delete all associated topics.`)) {
+    if (
+      confirm(
+        `Are you sure you want to delete "${unit.title}"? This will also delete all associated topics.`
+      )
+    ) {
       try {
         await unitService.deleteUnit(unit.id);
-        setCourses(courses.map(c => {
-          if (c.units) {
-            return {
-              ...c,
-              units: c.units.filter(u => u.id !== unit.id),
-            };
-          }
-          return c;
-        }));
+        setCourses(
+          courses.map(c => {
+            if (c.units) {
+              return {
+                ...c,
+                units: c.units.filter(u => u.id !== unit.id),
+              };
+            }
+            return c;
+          })
+        );
         setSuccessMessage('Unit deleted successfully');
       } catch (err) {
         setError('Failed to delete unit');
@@ -215,56 +223,58 @@ export default function AdminContentPage() {
   // Handle topic creation/update
   const handleCreateOrUpdateTopic = async (
     topicData: Partial<Topic>,
-    hasPendingMaterial: boolean,
+    hasPendingMaterial: boolean
   ): Promise<Topic> => {
     try {
       if (formContext.topic?.id) {
         const updatedTopic = await topicService.updateTopic(formContext.topic.id, topicData);
-        setCourses(courses.map(c => {
-          if (c.units) {
-            return {
-              ...c,
-              units: c.units.map(u => {
-                if (u.topics) {
-                  return {
-                    ...u,
-                    topics: u.topics.map(t => t.id === updatedTopic.id ? updatedTopic : t),
-                  };
-                }
-                return u;
-              }),
-            };
-          }
-          return c;
-        }));
+        setCourses(
+          courses.map(c => {
+            if (c.units) {
+              return {
+                ...c,
+                units: c.units.map(u => {
+                  if (u.topics) {
+                    return {
+                      ...u,
+                      topics: u.topics.map(t => (t.id === updatedTopic.id ? updatedTopic : t)),
+                    };
+                  }
+                  return u;
+                }),
+              };
+            }
+            return c;
+          })
+        );
         setSuccessMessage('Topic updated successfully');
-        setFormContext(hasPendingMaterial
-          ? { ...formContext, topic: updatedTopic }
-          : { mode: 'none' });
+        setFormContext(
+          hasPendingMaterial ? { ...formContext, topic: updatedTopic } : { mode: 'none' }
+        );
         return updatedTopic;
       } else {
         const newTopic = await topicService.createTopic(formContext.unit?.id || '', topicData);
-        setCourses(courses.map(c => {
-          if (c.units) {
-            return {
-              ...c,
-              units: c.units.map(u => {
-                if (u.id === formContext.unit?.id) {
-                  return {
-                    ...u,
-                    topics: [...(u.topics || []), newTopic],
-                  };
-                }
-                return u;
-              }),
-            };
-          }
-          return c;
-        }));
+        setCourses(
+          courses.map(c => {
+            if (c.units) {
+              return {
+                ...c,
+                units: c.units.map(u => {
+                  if (u.id === formContext.unit?.id) {
+                    return {
+                      ...u,
+                      topics: [...(u.topics || []), newTopic],
+                    };
+                  }
+                  return u;
+                }),
+              };
+            }
+            return c;
+          })
+        );
         setSuccessMessage('Topic created successfully');
-        setFormContext(hasPendingMaterial
-          ? { ...formContext, topic: newTopic }
-          : { mode: 'none' });
+        setFormContext(hasPendingMaterial ? { ...formContext, topic: newTopic } : { mode: 'none' });
         return newTopic;
       }
     } catch (err) {
@@ -279,23 +289,25 @@ export default function AdminContentPage() {
     if (confirm(`Are you sure you want to delete "${topic.title}"?`)) {
       try {
         await topicService.deleteTopic(topic.id);
-        setCourses(courses.map(c => {
-          if (c.units) {
-            return {
-              ...c,
-              units: c.units.map(u => {
-                if (u.topics) {
-                  return {
-                    ...u,
-                    topics: u.topics.filter(t => t.id !== topic.id),
-                  };
-                }
-                return u;
-              }),
-            };
-          }
-          return c;
-        }));
+        setCourses(
+          courses.map(c => {
+            if (c.units) {
+              return {
+                ...c,
+                units: c.units.map(u => {
+                  if (u.topics) {
+                    return {
+                      ...u,
+                      topics: u.topics.filter(t => t.id !== topic.id),
+                    };
+                  }
+                  return u;
+                }),
+              };
+            }
+            return c;
+          })
+        );
         setSuccessMessage('Topic deleted successfully');
       } catch (err) {
         setError('Failed to delete topic');
@@ -317,7 +329,10 @@ export default function AdminContentPage() {
         </div>
       )}
       {error && (
-        <div role="alert" className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded flex items-gap-2">
+        <div
+          role="alert"
+          className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded flex items-gap-2"
+        >
           <AlertCircle className="h-5 w-5 mr-2" />
           {error}
         </div>
@@ -361,9 +376,9 @@ export default function AdminContentPage() {
           courses={courses}
           loadingCourseIds={loadingCourseIds}
           onExpandCourse={loadCourseDetails}
-          onEdit={(course) => setFormContext({ mode: 'course', course })}
+          onEdit={course => setFormContext({ mode: 'course', course })}
           onDelete={handleDeleteCourse}
-          onAddUnit={(course) => setFormContext({ mode: 'unit', course })}
+          onAddUnit={course => setFormContext({ mode: 'unit', course })}
           onEditUnit={(unit, courseId) => {
             const course = courses.find(c => c.id === courseId);
             if (course) {

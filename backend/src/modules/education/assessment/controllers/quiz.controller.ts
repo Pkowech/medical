@@ -87,8 +87,11 @@ export class QuizController {
 
   @Get('topic/:topicId')
   @ApiOperation({ summary: 'Get questions for a topic-based quiz' })
-  async getQuestionsByTopic(@Param('topicId') topicId: string) {
-    return this.quizService.getQuestionsByTopic(topicId);
+  async getQuestionsByTopic(
+    @Param('topicId') topicId: string,
+    @Query('attemptId') attemptId?: string,
+  ) {
+    return this.quizService.getQuestionsByTopic(topicId, true, attemptId);
   }
 
   @Get('topic/:topicId/progress')

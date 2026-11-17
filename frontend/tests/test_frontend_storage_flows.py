@@ -305,11 +305,14 @@ def test_quiz_assessment_does_not_complete_reading_progress():
 
 def test_interactive_quiz_hides_per_question_save_notice_and_labels_final_submit():
     quiz_panel = read_frontend("src/features/courses/components/QuizPanel.tsx")
+    backend_proxy = read_frontend("src/app/api/backend/[...path]/route.ts")
 
     assert "Answer saved" not in quiz_panel
     assert "Your answer will be scored when you submit the quiz." not in quiz_panel
     assert 'aria-label="Quiz progress"' in quiz_panel
     assert ": 'Submit Quiz'" in quiz_panel
+    assert "request.headers.get('x-idempotency-key')" in backend_proxy
+    assert "headers.set('x-idempotency-key', idempotencyKey)" in backend_proxy
 
 
 def test_pwa_caches_only_static_assets_and_public_resources():

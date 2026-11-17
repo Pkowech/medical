@@ -48,6 +48,7 @@ export const TopicForm: React.FC<TopicFormProps> = ({
     name: '',
     description: '',
     orderIndex: 0,
+    quizQuestionCount: 10,
     isMandatory: false,
     status: 'active',
   });
@@ -86,6 +87,7 @@ export const TopicForm: React.FC<TopicFormProps> = ({
         name: '',
         description: '',
         orderIndex: 0,
+        quizQuestionCount: 10,
         isMandatory: false,
         status: 'active',
       });
@@ -100,7 +102,11 @@ export const TopicForm: React.FC<TopicFormProps> = ({
     const { id, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [id]: id === 'orderIndex' ? parseFloat(value) : value,
+      [id]: id === 'orderIndex'
+        ? parseFloat(value)
+        : id === 'quizQuestionCount'
+          ? (value === '' ? undefined : Number(value))
+          : value,
     }));
   };
 
@@ -295,6 +301,24 @@ export const TopicForm: React.FC<TopicFormProps> = ({
                 </SelectContent>
               </Select>
             </div>
+          </div>
+          <div>
+            <label htmlFor="quizQuestionCount" className="block text-sm font-medium mb-1">
+              Questions per topic quiz
+            </label>
+            <Input
+              id="quizQuestionCount"
+              type="number"
+              min={1}
+              max={100}
+              step={1}
+              value={formData.quizQuestionCount ?? 10}
+              onChange={handleChange}
+              required
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Learners receive a random set of this many questions per attempt, up to the number available for this topic.
+            </p>
           </div>
           <div className="flex items-center space-x-2">
             <Checkbox
