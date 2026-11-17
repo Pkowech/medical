@@ -1,6 +1,6 @@
 import { apiService } from '@/features/auth/services/apiClient';
 import { PaginatedResult } from '@/shared/types/base-responseInterface';
-import { Course, CourseEnrollment } from '@/shared/types/courseInterface';
+import { Category, Course, CourseEnrollment } from '@/shared/types/courseInterface';
 import { DetailedCourseProgress } from '@/shared/types/progressInterface';
 
 interface CourseStats {
@@ -136,6 +136,36 @@ class CourseService {
       params: cleanedFilters,
     });
     return parseResponse<PaginatedResult<Course>>(response.data);
+  }
+
+  async getManageableCourses(
+    filters: CourseFilter = { page: 1, limit: 20 },
+  ): Promise<PaginatedResult<Course>> {
+    const response = await apiService.get<unknown>('/courses/manageable', {
+      params: this.toManagementFilters(filters),
+    });
+    return parseResponse<PaginatedResult<Course>>(response.data);
+  }
+
+  async getAdminCourses(
+    filters: CourseFilter = { page: 1, limit: 20 },
+  ): Promise<PaginatedResult<Course>> {
+    const response = await apiService.get<unknown>('/admin/courses', {
+      params: this.toManagementFilters(filters),
+    });
+    return parseResponse<PaginatedResult<Course>>(response.data);
+  }
+
+  private toManagementFilters(filters: CourseFilter): Record<string, string | number> {
+    const params: Record<string, string | number> = {
+      page: filters.page || 1,
+      limit: filters.limit || 20,
+    };
+    if (filters.search?.trim()) params.search = filters.search.trim();
+    if (filters.status) params.status = filters.status;
+    if (filters.categoryId) params.categoryId = filters.categoryId;
+    if (filters.difficulty) params.difficulty = filters.difficulty;
+    return params;
   }
 
   /**
@@ -369,8 +399,10 @@ class CourseService {
   /**
    * Gets all course categories for dropdown selection.
    */
-  async getCategories(): Promise<Array<{ id: string; name: string }>> {
-    const response = await apiService.get<unknown>('/course-categories');
+  async getCategories(includeInactive = false): Promise<Category[]> {
+    const response = await apiService.get<unknown>('/course-categories', {
+      params: includeInactive ? { include_inactive: true } : undefined,
+    });
     const payload = response.data;
     const data =
       payload && typeof payload === 'object' && 'data' in payload
@@ -382,6 +414,23 @@ class CourseService {
     }
 
     return data;
+  }
+
+  async createCategory(category: Partial<Category>): Promise<Category> {
+    const response = await apiService.post<Category>('/course-categories', category);
+    return response.data;
+  }
+
+  async updateCategory(id: string, category: Partial<Category>): Promise<Category> {
+    const response = await apiService.patch<Category>(
+      `/course-categories/${encodeURIComponent(id)}`,
+      category,
+    );
+    return response.data;
+  }
+
+  async deleteCategory(id: string): Promise<void> {
+    await apiService.delete<void>(`/course-categories/${encodeURIComponent(id)}`);
   }
 }
 

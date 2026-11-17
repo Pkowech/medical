@@ -31,6 +31,7 @@ interface TopicFormProps {
   unitTitle?: string;
   onSave: (topic: Partial<Topic>, hasPendingMaterial: boolean) => Promise<Topic | void>;
   onCancel: () => void;
+  cancelLabel?: string;
 }
 
 export const TopicForm: React.FC<TopicFormProps> = ({
@@ -41,6 +42,7 @@ export const TopicForm: React.FC<TopicFormProps> = ({
   unitTitle,
   onSave,
   onCancel,
+  cancelLabel = 'Cancel',
 }) => {
   const [formData, setFormData] = useState<Partial<Topic>>({
     name: '',
@@ -458,7 +460,7 @@ export const TopicForm: React.FC<TopicFormProps> = ({
               onClick={onCancel}
               disabled={loading}
             >
-              Cancel
+              {cancelLabel}
             </Button>
             <Button 
               type="submit"

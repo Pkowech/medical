@@ -29,9 +29,14 @@ export default function InstructorContentPage() {
       title: 'Course and topic authoring',
       description: 'Manage your courses, units, topics, and topic-level learning content.',
       actions: (
-        <Button asChild size="sm" variant="outline">
-          <Link href="/instructor/materials">Materials library</Link>
-        </Button>
+        <div className="flex gap-2">
+          <Button asChild size="sm">
+            <Link href="/instructor/content/create">Create course content</Link>
+          </Button>
+          <Button asChild size="sm" variant="outline">
+            <Link href="/instructor/materials">Materials library</Link>
+          </Button>
+        </div>
       ),
     });
     return () => setHeader(null);

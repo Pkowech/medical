@@ -53,7 +53,12 @@ export interface Course extends BaseEntity {
 export interface Category {
   id: string;
   name: string;
+  slug?: string;
   description?: string;
+  parentId?: string | null;
+  isActive?: boolean;
+  parent?: Category | null;
+  children?: Category[];
   color?: string;
 }
 
@@ -95,6 +100,7 @@ export interface Topic {
   order?: number;
   orderIndex?: number;
   estimatedMinutes?: number;
+  quizQuestionCount?: number;
   isMandatory?: boolean;
   masteryUnlocked?: boolean;
   status?: 'active' | 'inactive';

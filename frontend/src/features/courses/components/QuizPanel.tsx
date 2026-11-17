@@ -737,21 +737,19 @@ export const QuizPanel = ({
         )}
       </div>
 
-      {immersive && (
+      <div
+        className="mb-5 h-1.5 overflow-hidden rounded-full bg-muted dark:bg-secondary"
+        role="progressbar"
+        aria-label="Quiz progress"
+        aria-valuemin={0}
+        aria-valuemax={questions.length}
+        aria-valuenow={currentQuestionIndex + 1}
+      >
         <div
-          className="mb-5 h-1.5 overflow-hidden rounded-full bg-muted dark:bg-secondary"
-          role="progressbar"
-          aria-label="Quiz progress"
-          aria-valuemin={0}
-          aria-valuemax={questions.length}
-          aria-valuenow={currentQuestionIndex + 1}
-        >
-          <div
-            className="h-full rounded-full bg-blue-600 transition-[width] duration-300 motion-reduce:transition-none"
-            style={{ width: `${((currentQuestionIndex + 1) / questions.length) * 100}%` }}
-          />
-        </div>
-      )}
+          className="h-full rounded-full bg-blue-600 transition-[width] duration-300 motion-reduce:transition-none"
+          style={{ width: `${((currentQuestionIndex + 1) / questions.length) * 100}%` }}
+        />
+      </div>
 
       <div className="space-y-6">
         <div className="p-6 bg-background/50 dark:bg-card/30 border border-border dark:border-border/50 rounded-xl">
@@ -786,16 +784,6 @@ export const QuizPanel = ({
             })}
           </div>
 
-          {isSubmitted && (
-            <div className="mt-6 p-4 bg-blue-50/50 dark:bg-blue-500/5 border border-blue-100 dark:border-blue-800/30 rounded-xl animate-in fade-in slide-in-from-top-2 duration-300">
-              <p className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-1">
-                Answer saved
-              </p>
-              <p className="text-sm text-muted-foreground dark:text-muted-foreground">
-                Your answer will be scored when you submit the quiz.
-              </p>
-            </div>
-          )}
         </div>
 
         {submissionError && (
@@ -823,10 +811,10 @@ export const QuizPanel = ({
               className="min-h-14 flex-1 bg-slate-900 dark:bg-blue-600 text-white font-bold py-4 rounded-xl hover:opacity-90 transition-all shadow-lg flex items-center justify-center gap-2 active:scale-[0.99] motion-reduce:transition-none"
             >
               {isSubmitting
-                ? 'Saving results...'
+                ? 'Submitting quiz...'
                 : currentQuestionIndex < questions.length - 1
                   ? 'Next Question'
-                  : 'View Results'}
+                  : 'Submit Quiz'}
             </button>
           )}
         </div>

@@ -17,6 +17,7 @@ export interface TopicMutationInput {
   order?: number;
   orderIndex?: number;
   estimatedMinutes?: number;
+  quizQuestionCount?: number;
   isMandatory?: boolean;
   categoryId?: string | null;
 }
@@ -249,6 +250,7 @@ export class TopicsService {
     if (!unitId || !name) {
       throw new BadRequestException('Unit ID and topic title are required');
     }
+    const quizQuestionCount = this.validateQuizQuestionCount(input.quizQuestionCount);
 
     const unit = await this.prisma.unit.findUnique({
       where: { id: unitId },
@@ -287,6 +289,7 @@ export class TopicsService {
           order,
           description: input.description,
           estimatedMinutes: input.estimatedMinutes,
+          quizQuestionCount: quizQuestionCount ?? 10,
           isMandatory: input.isMandatory ?? false,
           categoryId: input.categoryId,
         },
@@ -299,6 +302,7 @@ export class TopicsService {
 
   async update(id: string, input: TopicMutationInput, userId: string): Promise<TopicWithTitle> {
     await this.getTopicForManagement(id, userId);
+    const quizQuestionCount = this.validateQuizQuestionCount(input.quizQuestionCount);
     const name = input.name ?? input.title;
     if (name !== undefined && !name.trim()) {
       throw new BadRequestException('Topic title cannot be empty');
@@ -316,6 +320,7 @@ export class TopicsService {
         description: input.description,
         order,
         estimatedMinutes: input.estimatedMinutes,
+        quizQuestionCount,
         isMandatory: input.isMandatory,
         categoryId: input.categoryId,
       },
@@ -323,6 +328,14 @@ export class TopicsService {
 
     await FtsUtils.updateFtsVector(this.prisma, 'topics', topic.id);
     return this.toResponse(topic);
+  }
+
+  private validateQuizQuestionCount(value?: number): number | undefined {
+    if (value === undefined) return undefined;
+    if (!Number.isInteger(value) || value < 1 || value > 100) {
+      throw new BadRequestException('Quiz question count must be an integer from 1 to 100');
+    }
+    return value;
   }
 
   async remove(id: string, userId: string): Promise<void> {

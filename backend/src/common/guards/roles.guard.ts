@@ -107,7 +107,7 @@ export class RoleGuard implements CanActivate {
         create: [Role.instructor, Role.admin],
         read: [Role.student, Role.moderator, Role.instructor, Role.admin],
         update: [Role.instructor, Role.admin],
-        delete: [Role.admin],
+        delete: [Role.instructor, Role.admin],
         manage: [Role.instructor, Role.admin],
       },
       content: {

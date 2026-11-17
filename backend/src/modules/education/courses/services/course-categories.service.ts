@@ -14,7 +14,7 @@ export class CourseCategoriesService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(createCategoryDto: CreateCategoryDto) {
-    const { name, slug, parentId, isActive = true } = createCategoryDto;
+    const { name, slug, description, parentId, isActive = true } = createCategoryDto;
 
     // Check if slug exists
     const existing = await this.prisma.courseCategory.findUnique({
@@ -28,6 +28,7 @@ export class CourseCategoriesService {
       data: {
         name,
         slug,
+        description,
         isActive,
         parentId,
       },

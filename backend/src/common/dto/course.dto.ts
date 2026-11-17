@@ -531,6 +531,11 @@ export class CreateCategoryDto {
   @IsNotEmpty()
   slug!: string;
 
+  @ApiPropertyOptional({ description: 'Category description' })
+  @IsOptional()
+  @IsString()
+  description?: string;
+
   @ApiPropertyOptional({ description: 'Parent category ID' })
   @IsOptional()
   @IsString()
@@ -552,6 +557,11 @@ export class UpdateCategoryDto {
   @IsOptional()
   @IsString()
   slug?: string;
+
+  @ApiPropertyOptional({ description: 'Category description' })
+  @IsOptional()
+  @IsString()
+  description?: string;
 
   @ApiPropertyOptional({
     description: 'Parent category ID (null to remove parent)',

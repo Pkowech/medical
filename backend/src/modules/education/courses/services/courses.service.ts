@@ -445,6 +445,80 @@ export class CoursesService {
     }
   }
 
+  async findManageable(
+    searchDto: CourseSearchDto,
+    pagination: PaginationDto,
+    userId: string,
+  ) {
+    const roleNames = await this.getRoleNames(userId);
+    const isAdmin = roleNames.includes(Role.admin);
+    if (!isAdmin && !roleNames.includes(Role.instructor)) {
+      throw new ForbiddenException('Only instructors or administrators can manage courses');
+    }
+
+    const whereConditions: Prisma.CourseWhereInput[] = [];
+    if (!isAdmin) {
+      whereConditions.push({
+        OR: [
+          { createdById: userId },
+          { instructors: { some: { userId } } },
+        ],
+      });
+    }
+    if (searchDto.search?.trim()) {
+      const term = searchDto.search.trim();
+      whereConditions.push({
+        OR: [
+          { title: { contains: term, mode: 'insensitive' } },
+          { name: { contains: term, mode: 'insensitive' } },
+          { description: { contains: term, mode: 'insensitive' } },
+          { code: { contains: term, mode: 'insensitive' } },
+        ],
+      });
+    }
+    if (searchDto.categoryId) whereConditions.push({ categoryId: searchDto.categoryId });
+    if (searchDto.status) whereConditions.push({ status: searchDto.status });
+    if (searchDto.difficulty) whereConditions.push({ difficulty: searchDto.difficulty });
+    if (searchDto.isFeatured !== undefined) whereConditions.push({ isFeatured: searchDto.isFeatured });
+    if (searchDto.tags?.length) whereConditions.push({ tags: { hasSome: searchDto.tags } });
+
+    const where: Prisma.CourseWhereInput = whereConditions.length
+      ? { AND: whereConditions }
+      : {};
+    const { page = 1, limit = 20 } = pagination;
+    const skip = (page - 1) * limit;
+    const [data, total] = await Promise.all([
+      this.prisma.course.findMany({
+        where,
+        skip,
+        take: limit,
+        include: {
+          category: { select: { id: true, name: true, slug: true } },
+          createdBy: { select: { id: true, firstName: true, lastName: true } },
+          instructors: {
+            include: {
+              user: { select: { id: true, firstName: true, lastName: true } },
+            },
+          },
+        },
+        orderBy: { updatedAt: 'desc' },
+      }),
+      this.prisma.course.count({ where }),
+    ]);
+
+    return {
+      data,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+        hasNext: page * limit < total,
+        hasPrev: page > 1,
+      },
+    };
+  }
+
   /**
    * Find courses using PostgreSQL full-text search (FTS) for better ranking & performance
    * @param search - Search term
@@ -861,27 +935,13 @@ export class CoursesService {
         throw new NotFoundException(`Course with ID ${id} not found`);
       }
 
-      const user = await this.usersService.findOne(userId);
-      if (!user) {
-        this.logger.warn('User not found for course update', { userId });
-        throw new NotFoundException(`User with ID ${userId} not found`);
-      }
-      const userRoles = user.userRoles.map((userRole) => userRole.role.name);
-      const isAdmin = userRoles.includes(Role.admin);
-      if (!isAdmin && !userRoles.includes(Role.instructor)) {
-        throw new ForbiddenException(
-          'Only instructors or administrators can update courses',
-        );
-      }
-
-      // Only the course creator or an admin can update the course
-      if (existingCourse.createdById !== userId && !isAdmin) {
+      if (!(await this.canManageCourse(userId, id, existingCourse.createdById))) {
         this.logger.warn('Unauthorized course update attempt', {
           courseId: id,
           userId,
         });
         throw new ForbiddenException(
-          'Only the instructor or an admin can update this course',
+          'Only an assigned course instructor or an admin can update this course',
         );
       }
 
@@ -984,22 +1044,13 @@ export class CoursesService {
         throw new NotFoundException(`Course with ID ${id} not found`);
       }
 
-      const user = await this.usersService.findOne(userId);
-      if (!user) {
-        this.logger.warn('User not found for course deletion', { userId });
-        throw new NotFoundException(`User with ID ${userId} not found`);
-      }
-      const userRoles = user.userRoles.map((userRole) => userRole.role.name);
-      const isAdmin = userRoles.includes(Role.admin);
-
-      // Only the course creator or an admin can delete the course
-      if (existingCourse.createdById !== userId && !isAdmin) {
+      if (!(await this.canManageCourse(userId, id, existingCourse.createdById))) {
         this.logger.warn('Unauthorized course deletion attempt', {
           courseId: id,
           userId,
         });
         throw new ForbiddenException(
-          'Only the instructor or an admin can delete this course',
+          'Only an assigned course instructor or an admin can delete this course',
         );
       }
 

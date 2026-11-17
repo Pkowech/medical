@@ -231,6 +231,29 @@ export class CoursesController {
     return await this.coursesService.getUserCourseStats(req.user.id);
   }
 
+  @Get('manageable')
+  @UseGuards(JwtAuthGuard, RoleGuard)
+  @Roles(Role.instructor, Role.admin)
+  @Action('read')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'List courses the current instructor can manage' })
+  async findManageable(
+    @Request() req: ExpressRequest,
+    @Query() filters: CourseSearchDto,
+  ) {
+    if (!this.isUserRequest(req)) {
+      throw new BadRequestException('Invalid user in request');
+    }
+    const pagination = new PaginationDto();
+    pagination.page = this.isValidNumberQuery(filters.page)
+      ? Math.max(1, Math.floor(Number(filters.page)))
+      : 1;
+    pagination.limit = this.isValidNumberQuery(filters.limit)
+      ? Math.min(100, Math.max(1, Math.floor(Number(filters.limit))))
+      : 20;
+    return this.coursesService.findManageable(filters, pagination, req.user.id);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get course by ID' })
   @ApiResponse({
@@ -281,7 +304,7 @@ export class CoursesController {
 
   @Delete(':id')
   @UseGuards(JwtAuthGuard, RoleGuard)
-  @Roles(Role.admin)
+  @Roles(Role.instructor, Role.admin)
   @Action('delete')
   @ApiBearerAuth()
   @HttpCode(HttpStatus.NO_CONTENT)

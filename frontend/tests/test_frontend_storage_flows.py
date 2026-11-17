@@ -303,6 +303,15 @@ def test_quiz_assessment_does_not_complete_reading_progress():
     assert "'X-Idempotency-Key': attemptId" in topic_quiz
 
 
+def test_interactive_quiz_hides_per_question_save_notice_and_labels_final_submit():
+    quiz_panel = read_frontend("src/features/courses/components/QuizPanel.tsx")
+
+    assert "Answer saved" not in quiz_panel
+    assert "Your answer will be scored when you submit the quiz." not in quiz_panel
+    assert 'aria-label="Quiz progress"' in quiz_panel
+    assert ": 'Submit Quiz'" in quiz_panel
+
+
 def test_pwa_caches_only_static_assets_and_public_resources():
     config = read_frontend("next.config.js")
     strategies = config.split("const getPWACacheStrategies = () => [", 1)[1].split(

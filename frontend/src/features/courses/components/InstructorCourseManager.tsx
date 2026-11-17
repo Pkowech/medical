@@ -39,6 +39,8 @@ const getErrorMessage = (error: unknown, fallback: string): string => {
 export function InstructorCourseManager({ instructorId }: { instructorId: string }) {
   const router = useRouter();
   const [courses, setCourses] = useState<Course[]>([]);
+  const [coursePage, setCoursePage] = useState(1);
+  const [courseTotalPages, setCourseTotalPages] = useState(1);
   const [loadingCourseIds, setLoadingCourseIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -50,12 +52,9 @@ export function InstructorCourseManager({ instructorId }: { instructorId: string
     try {
       setLoading(true);
       setError(null);
-      const result = await courseService.getCourses({
-        page: 1,
-        limit: 100,
-        instructorId,
-      });
+      const result = await courseService.getManageableCourses({ page: coursePage, limit: 20 });
       setCourses(result.items || []);
+      setCourseTotalPages(result.totalPages || 1);
     } catch (fetchError) {
       setError(getErrorMessage(fetchError, 'Failed to load your courses.'));
     } finally {
@@ -65,7 +64,7 @@ export function InstructorCourseManager({ instructorId }: { instructorId: string
 
   useEffect(() => {
     void fetchCourses();
-  }, [instructorId]);
+  }, [instructorId, coursePage]);
 
   useEffect(() => {
     if (!successMessage && !error) return;
@@ -238,7 +237,7 @@ export function InstructorCourseManager({ instructorId }: { instructorId: string
             <Button variant="outline" onClick={() => router.push('/instructor/materials')}>
               <Upload className="mr-2 h-4 w-4" /> Upload material
             </Button>
-            <Button onClick={() => setFormContext({ mode: 'course' })}>
+            <Button onClick={() => router.push('/instructor/content/create')}>
               <PlusCircle className="mr-2 h-4 w-4" /> Create course
             </Button>
           </div>
@@ -312,23 +311,49 @@ export function InstructorCourseManager({ instructorId }: { instructorId: string
               onExpandCourse={loadCourseDetails}
               onEdit={course => setFormContext({ mode: 'course', course })}
               onDelete={handleDeleteCourse}
-              canDeleteCourse={false}
-              onAddUnit={course => setFormContext({ mode: 'unit', course })}
+              canDeleteCourse
+              onAddUnit={course => router.push(`/instructor/content/create?courseId=${encodeURIComponent(course.id)}`)}
               onEditUnit={(unit, courseId) => {
                 const course = courses.find(item => item.id === courseId);
                 if (course) setFormContext({ mode: 'unit', course, unit });
               }}
               onDeleteUnit={handleDeleteUnit}
-              onAddTopic={(unit, courseId) => {
-                const course = courses.find(item => item.id === courseId);
-                if (course) setFormContext({ mode: 'topic', course, unit });
-              }}
+              onAddTopic={(unit, courseId) => router.push(
+                `/instructor/content/create?courseId=${encodeURIComponent(courseId)}&unitId=${encodeURIComponent(unit.id)}`,
+              )}
               onEditTopic={(topic, unitId, course) => {
                 const unit = course.units?.find(item => item.id === unitId);
                 if (unit) setFormContext({ mode: 'topic', course, unit, topic });
               }}
               onDeleteTopic={handleDeleteTopic}
             />
+          )}
+          {formContext.mode === 'none' && courseTotalPages > 1 && (
+            <nav aria-label="Course management pages" className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">
+                Page {coursePage} of {courseTotalPages}
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={coursePage <= 1}
+                  onClick={() => setCoursePage(page => Math.max(1, page - 1))}
+                >
+                  Previous
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={coursePage >= courseTotalPages}
+                  onClick={() => setCoursePage(page => Math.min(courseTotalPages, page + 1))}
+                >
+                  Next
+                </Button>
+              </div>
+            </nav>
           )}
         </>
       )}

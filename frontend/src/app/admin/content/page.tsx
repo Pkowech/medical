@@ -40,6 +40,8 @@ interface FormContext {
 export default function AdminContentPage() {
   const { setHeader } = usePageHeader();
   const [courses, setCourses] = useState<Course[]>([]);
+  const [coursePage, setCoursePage] = useState(1);
+  const [courseTotalPages, setCourseTotalPages] = useState(1);
   const [loadingCourseIds, setLoadingCourseIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -70,8 +72,9 @@ export default function AdminContentPage() {
     try {
       setLoading(true);
       setError(null);
-      const result = await courseService.getCourses({ page: 1, limit: 100 });
+      const result = await courseService.getAdminCourses({ page: coursePage, limit: 20 });
       setCourses(result.items || []);
+      setCourseTotalPages(result.totalPages || 1);
     } catch (err) {
       setError('Failed to fetch courses.');
       console.error(err);
@@ -103,7 +106,7 @@ export default function AdminContentPage() {
 
   useEffect(() => {
     fetchCourses();
-  }, []);
+  }, [coursePage]);
 
   // Clear success/error messages after 5 seconds
   useEffect(() => {
@@ -324,6 +327,7 @@ export default function AdminContentPage() {
       {formContext.mode === 'course' && (
         <CourseForm
           course={formContext.course || null}
+          canManageCategories
           onSave={handleCreateOrUpdateCourse}
           onCancel={() => setFormContext({ mode: 'none' })}
         />
@@ -381,6 +385,33 @@ export default function AdminContentPage() {
           }}
           onDeleteTopic={handleDeleteTopic}
         />
+      )}
+      {formContext.mode === 'none' && courseTotalPages > 1 && (
+        <nav aria-label="Course management pages" className="flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">
+            Page {coursePage} of {courseTotalPages}
+          </p>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={coursePage <= 1}
+              onClick={() => setCoursePage(page => Math.max(1, page - 1))}
+            >
+              Previous
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={coursePage >= courseTotalPages}
+              onClick={() => setCoursePage(page => Math.min(courseTotalPages, page + 1))}
+            >
+              Next
+            </Button>
+          </div>
+        </nav>
       )}
     </div>
   );

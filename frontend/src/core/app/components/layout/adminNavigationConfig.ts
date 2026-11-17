@@ -5,6 +5,7 @@ import {
   GraduationCap,
   LayoutDashboard,
   LockKeyhole,
+  FolderTree,
   Settings,
   Shield,
   Users,
@@ -28,6 +29,18 @@ const adminNavigationConfig = [
     label: 'Management',
     icon: Users,
     children: [
+      {
+        id: 'courses',
+        label: 'Courses',
+        href: '/admin/content',
+        icon: GraduationCap,
+      },
+      {
+        id: 'course-categories',
+        label: 'Course Categories',
+        href: '/admin/course-categories',
+        icon: FolderTree,
+      },
       {
         id: 'users',
         label: 'Users',

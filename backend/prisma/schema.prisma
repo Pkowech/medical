@@ -939,6 +939,7 @@ model Topic {
   unitId                  String                   @map("unit_id")
   categoryId              String?                  @map("category_id")
   estimatedMinutes        Int?                     @default(0) @map("estimated_minutes")
+  quizQuestionCount       Int                      @default(10) @map("quiz_question_count")
   learningObjectives      Json?                    @map("learning_objectives")
   contentVersion          Int                      @default(1) @map("content_version")
   status                  AcademicContentStatus    @default(published)

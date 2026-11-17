@@ -1,6 +1,7 @@
 // frontend/src/components/admin/CourseForm.tsx
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { Course } from '@/shared/types/courseInterface';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Input } from '@/shared/components/ui/input';
@@ -17,11 +18,17 @@ import { courseService } from '../services/courseService';
 
 interface CourseFormProps {
   course: Course | null;
+  canManageCategories?: boolean;
   onSave: (course: Partial<Course>) => Promise<void>;
   onCancel: () => void;
 }
 
-export const CourseForm: React.FC<CourseFormProps> = ({ course, onSave, onCancel }) => {
+export const CourseForm: React.FC<CourseFormProps> = ({
+  course,
+  canManageCategories = false,
+  onSave,
+  onCancel,
+}) => {
   const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [categoriesError, setCategoriesError] = useState<string | null>(null);
@@ -183,9 +190,18 @@ export const CourseForm: React.FC<CourseFormProps> = ({ course, onSave, onCancel
                 </SelectContent>
               </Select>
             ) : (
-              <p className="text-sm text-destructive" role="alert">
-                No categories are available. Create a course category before adding a course.
-              </p>
+              <div className="space-y-2" role="alert">
+                <p className="text-sm text-destructive">
+                  No active categories are available. {canManageCategories
+                    ? 'Create a category before adding a course.'
+                    : 'Ask an administrator to create a course category.'}
+                </p>
+                {canManageCategories && (
+                  <Button asChild type="button" size="sm" variant="outline">
+                    <Link href="/admin/course-categories">Manage course categories</Link>
+                  </Button>
+                )}
+              </div>
             )}
           </div>
           <div>

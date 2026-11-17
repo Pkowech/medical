@@ -34,7 +34,8 @@ export class CourseCategoriesController {
   constructor(private readonly categoriesService: CourseCategoriesService) {}
 
   @Post()
-  @Roles(Role.admin, Role.instructor)
+  @UseGuards(JwtAuthGuard, RoleGuard)
+  @Roles(Role.admin)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new course category' })
   @ApiResponse({ status: 201, description: 'Category created successfully' })
@@ -95,7 +96,7 @@ export class CourseCategoriesController {
 
   @Patch(':id')
   @UseGuards(JwtAuthGuard, RoleGuard)
-  @Roles(Role.admin, Role.instructor)
+  @Roles(Role.admin)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update category' })
   @ApiResponse({ status: 200, description: 'Category updated successfully' })
