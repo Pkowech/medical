@@ -305,12 +305,20 @@ def test_quiz_assessment_does_not_complete_reading_progress():
 
 def test_interactive_quiz_hides_per_question_save_notice_and_labels_final_submit():
     quiz_panel = read_frontend("src/features/courses/components/QuizPanel.tsx")
+    readiness_panel = read_frontend(
+        "src/features/courses/components/MasteryReadinessPanel.tsx"
+    )
+    topic_quiz = read_frontend("src/features/courses/components/TopicQuiz.tsx")
     backend_proxy = read_frontend("src/app/api/backend/[...path]/route.ts")
 
     assert "Answer saved" not in quiz_panel
     assert "Your answer will be scored when you submit the quiz." not in quiz_panel
     assert 'aria-label="Quiz progress"' in quiz_panel
     assert ": 'Submit Quiz'" in quiz_panel
+    assert "readinessPending" in quiz_panel
+    assert "quizPassed={finalResult.passed}" in quiz_panel
+    assert "This estimate is separate from your quiz score" in readiness_panel
+    assert "readinessPending" in topic_quiz
     assert "request.headers.get('x-idempotency-key')" in backend_proxy
     assert "headers.set('x-idempotency-key', idempotencyKey)" in backend_proxy
 

@@ -86,21 +86,21 @@ export class QuizSubmissionListener {
       await this.progressService.updateProgress(payload.userId, payload.quizId);
       await this.analyticsService.generateAnalytics(payload.userId, payload.quizId);
 
-      if (payload.topicId) {
-        await this.masteryGateService.onQuizComplete(
-          payload.userId,
-          payload.topicId,
-          payload.attemptId,
-          payload.passingScore,
-        );
-      }
-
       for (const [index, update] of payload.bktUpdates.entries()) {
         await this.analyticsService.updateBktForAssessment(
           payload.userId,
           update.skillId,
           update.isCorrect,
           `quiz-attempt:${payload.attemptId}:bkt:${index}`,
+        );
+      }
+
+      if (payload.topicId) {
+        await this.masteryGateService.onQuizComplete(
+          payload.userId,
+          payload.topicId,
+          payload.attemptId,
+          payload.passingScore,
         );
       }
 

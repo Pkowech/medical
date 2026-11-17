@@ -81,6 +81,7 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
   const [feedback, setFeedback] = useState<string>('');
   const [nextTopicId, setNextTopicId] = useState<string | undefined>();
   const [gateDecision, setGateDecision] = useState<GateDecision | undefined>();
+  const [readinessPending, setReadinessPending] = useState(false);
   const [isOffline, setIsOffline] = useState(false);
   const [isProvisional, setIsProvisional] = useState(false);
   const [attemptId, setAttemptId] = useState(() => uuidv4());
@@ -117,6 +118,7 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
       setFeedback('');
       setNextTopicId(undefined);
       setGateDecision(undefined);
+      setReadinessPending(false);
       setIsProvisional(false);
       setAttemptId(nextAttemptId);
       setIsReportOpen(false);
@@ -362,6 +364,7 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
         nextTopicUnlocked: boolean;
         nextTopicId?: string;
         gateDecision?: GateDecision;
+        readinessPending?: boolean;
       }>(
         `/quizzes/topic/${topicId}/submit`,
         { responses },
@@ -373,6 +376,7 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
       setFeedback(result?.feedback || '');
       setNextTopicId(result?.nextTopicId);
       setGateDecision(result?.gateDecision);
+      setReadinessPending(result?.readinessPending ?? false);
       setQuizCompleted(true);
       try {
         window.localStorage.removeItem(attemptStorageKey);
@@ -504,7 +508,18 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
                 </div>
               )}
 
-              {gateDecision && <MasteryReadinessPanel decision={gateDecision} />}
+              {readinessPending && (
+                <p role="status" className="text-sm text-muted-foreground">
+                  Your quiz result is saved. The separate readiness estimate is still updating; your score remains authoritative.
+                </p>
+              )}
+
+              {gateDecision && (
+                <MasteryReadinessPanel
+                  decision={gateDecision}
+                  quizPassed={score >= TOPIC_MASTERY_PASSING_SCORE}
+                />
+              )}
 
               <div className="flex gap-3">
                 <Button variant="outline" onClick={onClose} className="flex-1">

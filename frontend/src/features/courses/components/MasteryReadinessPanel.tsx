@@ -3,9 +3,13 @@ import type { GateDecision } from '@/shared/types/mastery.types';
 
 interface MasteryReadinessPanelProps {
   decision: GateDecision;
+  quizPassed?: boolean;
 }
 
-export function MasteryReadinessPanel({ decision }: MasteryReadinessPanelProps) {
+export function MasteryReadinessPanel({
+  decision,
+  quizPassed,
+}: MasteryReadinessPanelProps) {
   return (
     <section
       aria-label="Mastery readiness guidance"
@@ -13,11 +17,13 @@ export function MasteryReadinessPanel({ decision }: MasteryReadinessPanelProps) 
     >
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h4 className="font-semibold text-foreground">Knowledge-readiness guidance</h4>
+          <h4 className="font-semibold text-foreground">Readiness estimate</h4>
           <p className="mt-1 text-sm text-muted-foreground">
-            {decision.canProceed
-              ? 'Your estimated knowledge meets the guidance target.'
-              : 'Additional review is recommended based on your estimated knowledge.'}
+            {quizPassed
+              ? 'You passed this quiz. This separate estimate may still recommend optional review.'
+              : decision.canProceed
+                ? 'Your estimated knowledge meets the guidance target.'
+                : 'Additional review is recommended based on your estimated knowledge.'}
           </p>
         </div>
         <span className="rounded-full bg-background px-3 py-1 text-sm font-semibold text-foreground">
@@ -27,7 +33,7 @@ export function MasteryReadinessPanel({ decision }: MasteryReadinessPanelProps) 
 
       <p className="mt-3 text-sm text-muted-foreground">{decision.reason}</p>
       <p className="mt-2 text-xs text-muted-foreground">
-        This estimate is advisory; your quiz result determines topic unlocking.
+        This estimate is separate from your quiz score and advisory; your quiz result determines topic unlocking.
       </p>
 
       {decision.recommendations && decision.recommendations.length > 0 && (

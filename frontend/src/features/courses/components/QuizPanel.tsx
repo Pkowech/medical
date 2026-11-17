@@ -69,6 +69,7 @@ export const QuizPanel = ({
     nextTopicUnlocked?: boolean;
     nextTopicId?: string;
     gateDecision?: GateDecision;
+    readinessPending?: boolean;
     recommendations?: QuizPerformanceRecommendations;
     recommendationsAvailable?: boolean;
     resultsAvailable?: boolean;
@@ -339,6 +340,7 @@ export const QuizPanel = ({
         nextTopicUnlocked?: boolean;
         nextTopicId?: string;
         gateDecision?: GateDecision;
+        readinessPending?: boolean;
         recommendations?: QuizPerformanceRecommendations;
         recommendationsAvailable?: boolean;
         resultsAvailable?: boolean;
@@ -588,8 +590,17 @@ export const QuizPanel = ({
           </div>
         ) : null}
 
+        {showResults && scope === 'topic' && finalResult?.readinessPending && (
+          <p role="status" className="mb-4 text-sm text-muted-foreground">
+            Your quiz result is saved. The separate readiness estimate is still updating; your score remains authoritative.
+          </p>
+        )}
+
         {showResults && scope === 'topic' && finalResult?.gateDecision && (
-          <MasteryReadinessPanel decision={finalResult.gateDecision} />
+          <MasteryReadinessPanel
+            decision={finalResult.gateDecision}
+            quizPassed={finalResult.passed}
+          />
         )}
 
         {showResults && finalResult?.nextTopicUnlocked && (

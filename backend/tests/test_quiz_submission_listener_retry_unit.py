@@ -65,16 +65,27 @@ const assert = require('node:assert/strict');
 const { QuizSubmissionListener } =
   require('./src/modules/education/assessment/services/quiz-submission.listener.ts');
 
-const effects = { bkt: [], mastery: [], reviews: [] };
+const effects = { bkt: [], mastery: [], reviews: [], order: [] };
 const listener = new QuizSubmissionListener(
   { updateProgress: async () => undefined },
   {
     generateAnalytics: async () => undefined,
-    updateBktForAssessment: async (...args) => { effects.bkt.push(args); },
+    updateBktForAssessment: async (...args) => {
+      effects.bkt.push(args);
+      effects.order.push('bkt');
+    },
   },
-  { onQuizComplete: async (...args) => { effects.mastery.push(args); } },
   {
-    recordTopicQuizReviews: async (...args) => { effects.reviews.push(args); },
+    onQuizComplete: async (...args) => {
+      effects.mastery.push(args);
+      effects.order.push('mastery');
+    },
+  },
+  {
+    recordTopicQuizReviews: async (...args) => {
+      effects.reviews.push(args);
+      effects.order.push('reviews');
+    },
   },
 );
 listener.logger = { error: () => undefined, warn: () => undefined, log: () => undefined };
@@ -100,6 +111,10 @@ const event = {
   ]);
   assert.deepEqual(effects.mastery.map(args => args[2]), ['attempt-1', 'attempt-1']);
   assert.deepEqual(effects.reviews.map(args => args[3]), ['attempt-1', 'attempt-1']);
+  assert.deepEqual(effects.order, [
+    'bkt', 'mastery', 'reviews',
+    'bkt', 'mastery', 'reviews',
+  ]);
 })().catch(error => {
   console.error(error);
   process.exitCode = 1;

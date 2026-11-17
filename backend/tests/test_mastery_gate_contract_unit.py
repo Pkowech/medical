@@ -109,15 +109,23 @@ service.recommendationService = {
   recommendForAnswers: async () => ({ topics: [], recommendations: [] }),
 };
 service.flashcardsService = { recordTopicQuizReviews: async () => 0 };
+const bktUpdates = [];
+let bktUpdatesAtMastery = 0;
+service.analyticsService = {
+  updateBktForAssessment: async (...args) => { bktUpdates.push(args); },
+};
 service.masteryGateService = {
-  onQuizComplete: async () => ({
-    topicId: 'topic-1',
-    masteryUnlocked: true,
-    failedAttempts: 0,
-    nextTopicUnlocked: true,
-    message: 'Quiz passed.',
-    gateDecision,
-  }),
+  onQuizComplete: async () => {
+    bktUpdatesAtMastery = bktUpdates.length;
+    return {
+      topicId: 'topic-1',
+      masteryUnlocked: true,
+      failedAttempts: 0,
+      nextTopicUnlocked: true,
+      message: 'Quiz passed.',
+      gateDecision,
+    };
+  },
 };
 
 (async () => {
@@ -128,6 +136,23 @@ service.masteryGateService = {
     [{ questionId: 'question-1', selectedAnswers: ['option-1'] }],
   );
   assert.deepEqual(result.gateDecision, gateDecision);
+  assert.equal(bktUpdatesAtMastery, 1);
+  assert.deepEqual(bktUpdates.map(args => args[3]), [
+    `quiz-attempt:${attemptId}:bkt:0`,
+  ]);
+
+  service.analyticsService.updateBktForAssessment = async () => {
+    throw new Error('analytics unavailable');
+  };
+  const pendingResult = await service.submitTopicQuiz(
+    'user-1',
+    'topic-1',
+    attemptId,
+    [{ questionId: 'question-1', selectedAnswers: ['option-1'] }],
+  );
+  assert.equal(pendingResult.readinessPending, true);
+  assert.equal(pendingResult.gateDecision, undefined);
+
   await assert.rejects(
     service.submitTopicQuiz('user-1', 'topic-1', attemptId, [
       { questionId: 'question-1', selectedAnswers: ['option-1'] },

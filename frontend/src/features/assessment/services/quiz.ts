@@ -11,6 +11,7 @@ export type TopicQuizSubmission =
       nextTopicUnlocked: boolean;
       nextTopicId?: string;
       gateDecision?: GateDecision;
+      readinessPending?: boolean;
       recommendations?: QuizPerformanceRecommendations;
       recommendationsAvailable?: boolean;
       resultsAvailable: true;
