@@ -33,10 +33,12 @@ service.prisma = {{
   }},
   progress: {{
     findMany: async query => {{
+      if (query.where.materialId?.in) return [];
       if (query.where.topicId?.not === null) return fixture.topicProgress;
       return fixture.unitProgress;
     }},
   }},
+  material: {{ findMany: async () => [] }},
 }};
 service.logger = {{ warn: () => {{}} }};
 
@@ -58,6 +60,19 @@ service.logger = {{ warn: () => {{}} }};
       totalUnits: fixture.expected.totalUnits,
     }},
   );
+
+  service.courseAnalyticsService = {{
+    calculateCourseProgress: async () => ({{
+      progressPercentage: 0,
+      completedUnits: 0,
+      totalUnits: fixture.units.length,
+    }}),
+  }};
+  const liveProgress = await service.calculateCourseProgress(
+    fixture.userId,
+    fixture.courseId,
+  );
+  assert.equal(liveProgress.percentage, fixture.expected.percentage);
 
   const enrollments = [0, 1, 100].map(percentage => ({{
     userId: fixture.userId,

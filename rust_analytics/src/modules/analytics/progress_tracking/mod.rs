@@ -25,31 +25,31 @@ pub async fn calculate_user_course_progress(
                 unit.id AS unit_id,
                 COALESCE(unit_state.is_completed, false) AS explicitly_completed,
                 COALESCE(unit_state.progress_percentage, 0)::float8 AS unit_percentage,
-                COUNT(DISTINCT topic.id)::bigint AS total_topics,
-                COUNT(DISTINCT topic.id) FILTER (
-                    WHERE COALESCE(topic_state.is_completed, false)
-                )::bigint AS completed_topics,
-                COALESCE(AVG(
-                    CASE
-                        WHEN topic.id IS NULL THEN NULL
-                        WHEN COALESCE(topic_state.is_completed, false) THEN 100
-                        ELSE 0
-                    END
-                ), 0)::float8 AS topic_percentage
+                CASE
+                    WHEN COUNT(DISTINCT topic.id) > 0
+                        THEN COUNT(DISTINCT topic.id)::bigint
+                    ELSE COALESCE(material_state.total_materials, 0)::bigint
+                END AS total_topics,
+                CASE
+                    WHEN COUNT(DISTINCT topic.id) > 0 THEN
+                        COUNT(DISTINCT topic.id) FILTER (
+                            WHERE COALESCE(topic_state.is_completed, false)
+                        )::bigint
+                    ELSE COALESCE(material_state.completed_materials, 0)::bigint
+                END AS completed_topics,
+                CASE
+                    WHEN COUNT(DISTINCT topic.id) > 0 THEN COALESCE(AVG(
+                        CASE
+                            WHEN COALESCE(topic_state.is_completed, false) THEN 100
+                            ELSE 0
+                        END
+                    ), 0)::float8
+                    ELSE COALESCE(material_state.material_percentage, 0)::float8
+                END AS topic_percentage
             FROM enrolled_courses enrolled
             JOIN units unit ON unit.course_id = enrolled.course_id
             LEFT JOIN topics topic ON topic.unit_id = unit.id
                 AND topic.status::text = 'published'
-                AND (
-                    NOT EXISTS (
-                        SELECT 1
-                        FROM topics mandatory
-                        WHERE mandatory.unit_id = unit.id
-                          AND mandatory.status::text = 'published'
-                          AND mandatory.is_mandatory = true
-                    )
-                    OR topic.is_mandatory = true
-                )
             LEFT JOIN LATERAL (
                 SELECT
                 BOOL_OR(progress.quiz_scores ->> 'masteryUnlocked' = 'true')
@@ -60,6 +60,32 @@ pub async fn calculate_user_course_progress(
                   AND progress.user_id = $1
                   AND progress.material_id IS NULL
             ) topic_state ON true
+            LEFT JOIN LATERAL (
+                SELECT
+                    COUNT(DISTINCT material.id)::bigint AS total_materials,
+                    COUNT(DISTINCT material.id) FILTER (
+                        WHERE COALESCE(material_state.is_completed, false)
+                    )::bigint AS completed_materials,
+                    COALESCE(AVG(
+                        CASE
+                            WHEN material.id IS NULL THEN NULL
+                            WHEN COALESCE(material_state.is_completed, false) THEN 100
+                            ELSE 0
+                        END
+                    ), 0)::float8 AS material_percentage
+                FROM materials material
+                LEFT JOIN LATERAL (
+                    SELECT BOOL_OR(
+                        progress.is_completed = true
+                        OR progress.status::text IN ('completed', 'COMPLETED')
+                        OR progress.progress_percentage >= 100
+                    ) AS is_completed
+                    FROM topic_progress progress
+                    WHERE progress.material_id = material.id
+                      AND progress.user_id = $1
+                ) material_state ON true
+                WHERE material.unit_id = unit.id
+            ) material_state ON true
             LEFT JOIN LATERAL (
                 SELECT
                     BOOL_OR(
@@ -129,31 +155,30 @@ pub async fn calculate_course_progress(
     let unit_progress: Vec<(i64, i64, bool, f64, f64)> = sqlx::query_as(
         r#"
 		SELECT
-			COUNT(DISTINCT t.id),
-			COUNT(DISTINCT t.id) FILTER (
-				WHERE COALESCE(tp.is_completed, false)
-			),
+			CASE
+				WHEN COUNT(DISTINCT t.id) > 0 THEN COUNT(DISTINCT t.id)
+				ELSE COALESCE(material_state.total_materials, 0)
+			END,
+			CASE
+				WHEN COUNT(DISTINCT t.id) > 0 THEN COUNT(DISTINCT t.id) FILTER (
+					WHERE COALESCE(tp.is_completed, false)
+				)
+				ELSE COALESCE(material_state.completed_materials, 0)
+			END,
 			COALESCE(unit_progress.is_completed, false),
-			COALESCE(AVG(
-				CASE
-					WHEN t.id IS NULL THEN NULL
-					WHEN COALESCE(tp.is_completed, false) THEN 100
-					ELSE 0
-				END
-			), 0)::float8,
+			CASE
+				WHEN COUNT(DISTINCT t.id) > 0 THEN COALESCE(AVG(
+					CASE
+					    WHEN COALESCE(tp.is_completed, false) THEN 100
+					    ELSE 0
+					END
+				), 0)::float8
+				ELSE COALESCE(material_state.material_percentage, 0)::float8
+			END,
 			COALESCE(unit_progress.progress_percentage, 0)::float8
 		FROM units u
 		LEFT JOIN topics t ON t.unit_id = u.id
 			AND t.status::text = 'published'
-			AND (
-				NOT EXISTS (
-					SELECT 1 FROM topics mandatory
-					WHERE mandatory.unit_id = u.id
-						AND mandatory.status::text = 'published'
-						AND mandatory.is_mandatory = true
-				)
-				OR t.is_mandatory = true
-			)
 		LEFT JOIN LATERAL (
 			SELECT
 				BOOL_OR(p.quiz_scores ->> 'masteryUnlocked' = 'true') AS is_completed,
@@ -165,6 +190,32 @@ pub async fn calculate_course_progress(
 		) tp ON true
 		LEFT JOIN LATERAL (
 			SELECT
+				COUNT(DISTINCT material.id)::bigint AS total_materials,
+				COUNT(DISTINCT material.id) FILTER (
+					WHERE COALESCE(material_state.is_completed, false)
+				)::bigint AS completed_materials,
+				COALESCE(AVG(
+					CASE
+						WHEN material.id IS NULL THEN NULL
+						WHEN COALESCE(material_state.is_completed, false) THEN 100
+						ELSE 0
+					END
+				), 0)::float8 AS material_percentage
+			FROM materials material
+			LEFT JOIN LATERAL (
+				SELECT BOOL_OR(
+					p.is_completed = true
+					OR p.status::text IN ('completed', 'COMPLETED')
+					OR p.progress_percentage >= 100
+				) AS is_completed
+				FROM topic_progress p
+				WHERE p.material_id = material.id
+					AND p.user_id = $1
+			) material_state ON true
+			WHERE material.unit_id = u.id
+		) material_state ON true
+		LEFT JOIN LATERAL (
+			SELECT
 				BOOL_OR(p.is_completed = true OR p.status::text = 'completed') AS is_completed,
 				MAX(p.progress_percentage) AS progress_percentage
 			FROM topic_progress p
@@ -174,7 +225,13 @@ pub async fn calculate_course_progress(
 				AND p.material_id IS NULL
 		) unit_progress ON true
 		WHERE u.course_id = $2
-		GROUP BY u.id, unit_progress.is_completed, unit_progress.progress_percentage
+		GROUP BY
+			u.id,
+			unit_progress.is_completed,
+			unit_progress.progress_percentage,
+			material_state.total_materials,
+			material_state.completed_materials,
+			material_state.material_percentage
 		"#,
     )
     .bind(user_id)

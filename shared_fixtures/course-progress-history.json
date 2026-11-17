@@ -107,7 +107,7 @@
     }
   ],
   "expected": {
-    "percentage": 46,
+    "percentage": 59,
     "completedUnits": 1,
     "totalUnits": 4,
     "status": "inProgress"

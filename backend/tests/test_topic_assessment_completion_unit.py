@@ -111,6 +111,60 @@ service.logger = { error: () => undefined };
     )
 
 
+def test_course_progress_uses_completed_materials_for_units_without_topics():
+    run_typescript(
+        r"""
+const assert = require('node:assert/strict');
+const { ProgressService } =
+  require('./src/modules/education/courses/services/progress.service.ts');
+const service = Object.create(ProgressService.prototype);
+service.prisma = {
+  unit: {
+    findMany: async () => [
+      { id: 'unit-with-materials', topics: [] },
+      { id: 'empty-unit', topics: [] },
+    ],
+  },
+  progress: {
+    findMany: async query => {
+      if (query.where.materialId?.in) {
+        return [{
+          materialId: 'material-1',
+          progressPercentage: 100,
+          isCompleted: true,
+          status: 'completed',
+        }];
+      }
+      return [];
+    },
+  },
+  material: {
+    findMany: async () => [
+      { id: 'material-1', unitId: 'unit-with-materials' },
+      { id: 'material-2', unitId: 'unit-with-materials' },
+    ],
+  },
+};
+service.logger = { warn: () => undefined };
+
+(async () => {
+  const result = await service.calculateCourseProgressFromDatabase(
+    'student-1',
+    'course-1',
+  );
+  assert.deepEqual(result, {
+    percentage: 25,
+    completedUnits: 0,
+    totalUnits: 2,
+  });
+})().catch(error => {
+  console.error(error);
+  process.exitCode = 1;
+});
+"""
+    )
+
+
 def test_failed_completed_assessment_keeps_completion_and_mastery_separate_with_time_data():
     run_typescript(
         r"""

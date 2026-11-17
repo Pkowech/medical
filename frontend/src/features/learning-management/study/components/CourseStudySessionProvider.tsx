@@ -2,10 +2,7 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
-import { Pause, Play, Square } from 'lucide-react';
 import { toast } from 'sonner';
-import { Button } from '@/shared/components/ui/button';
-import { Textarea } from '@/shared/components/ui/textarea';
 import { useStudy } from '../hooks/useStudy';
 import { useAuthStore } from '@/features/auth/store/useAuthStore';
 import { offlineService } from '@/lib/core/offline/offlineService';
@@ -73,13 +70,6 @@ interface PendingCourseSession {
 function isMeaningfulStudyActivity(type: StudySessionActivity['type']): boolean {
   return type === 'reading' || type === 'material_opened' ||
     type === 'quiz' || type === 'notes';
-}
-
-function formatElapsedTime(totalSeconds: number): string {
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 }
 
 function isNetworkUnavailable(error: unknown): boolean {
@@ -677,6 +667,11 @@ function CourseStudySessionStateProvider({
     }
   }, [activeSession?.courseId, endCourseSession, pathname]);
 
+  useEffect(() => () => {
+    const currentSession = activeSessionRef.current;
+    if (currentSession) void endCourseSession(currentSession.courseId);
+  }, [endCourseSession]);
+
   const activeSessionSummary = useMemo<ActiveCourseSessionSummary | null>(() => activeSession
     ? {
         id: activeSession.id,
@@ -734,96 +729,4 @@ export function useCourseStudySession(): CourseStudySessionContextValue {
     throw new Error('useCourseStudySession must be used inside CourseStudySessionProvider.');
   }
   return context;
-}
-
-export function CourseStudySessionIndicator({
-  canResume = false,
-}: {
-  canResume?: boolean;
-}) {
-  const {
-    activeSession,
-    isEnding,
-    pauseCourseSession,
-    resumeCourseSession,
-    endCourseSession,
-    updateSessionNotes,
-  } = useCourseStudySession();
-  const [elapsedSeconds, setElapsedSeconds] = useState(
-    activeSession?.elapsedSeconds ?? 0,
-  );
-
-  useEffect(() => {
-    if (activeSession) setElapsedSeconds(activeSession.elapsedSeconds);
-  }, [activeSession?.elapsedSeconds, activeSession?.id]);
-
-  useEffect(() => {
-    if (!activeSession?.isActive) return;
-    const timer = window.setInterval(() => {
-      setElapsedSeconds(current => current + 1);
-    }, 1000);
-    return () => window.clearInterval(timer);
-  }, [activeSession?.id, activeSession?.isActive]);
-
-  if (!activeSession) return null;
-
-  return (
-    <details className="relative">
-      <summary
-        className="flex min-h-11 list-none cursor-pointer items-center gap-2 rounded-md border border-border px-2 text-xs font-medium text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-        aria-label={`Study session ${activeSession.isActive ? 'running' : 'paused'}, ${formatElapsedTime(elapsedSeconds)} elapsed. Open session controls.`}
-        title={`${activeSession.isActive ? 'Running' : 'Paused'}: ${activeSession.topicTitle}. Open session controls.`}
-      >
-        <span className={`h-2 w-2 rounded-full ${activeSession.isActive ? 'bg-emerald-500' : 'bg-muted-foreground'}`} />
-        <span className="font-mono tabular-nums" aria-live="off">
-          {formatElapsedTime(elapsedSeconds)}
-        </span>
-      </summary>
-      <div className="absolute right-0 top-full z-[70] mt-2 w-[min(20rem,calc(100vw-1.5rem))] rounded-xl border border-border bg-card p-3 shadow-xl">
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          {activeSession.isActive ? 'Study session' : 'Session paused'}
-        </p>
-        <p className="mt-1 truncate font-semibold text-foreground">{activeSession.topicTitle}</p>
-        {!activeSession.isActive && !canResume && (
-          <p className="mt-2 text-xs text-muted-foreground">
-            Open a topic to resume tracking.
-          </p>
-        )}
-        <label htmlFor="course-session-notes" className="mt-3 block text-xs font-medium text-muted-foreground">
-          Session notes
-        </label>
-        <Textarea
-          id="course-session-notes"
-          value={activeSession.notes}
-          onChange={event => updateSessionNotes(event.target.value)}
-          placeholder="Capture key ideas or questions."
-          className="mt-1 min-h-20 resize-y text-sm"
-        />
-        <p className="mt-1 text-[11px] text-muted-foreground">
-          Notes save on this device and sync with your session.
-        </p>
-        <div className="mt-3 flex gap-2">
-          {activeSession.isActive ? (
-            <Button type="button" variant="outline" size="sm" onClick={() => pauseCourseSession()}>
-              <Pause className="mr-1.5 h-4 w-4" /> Pause
-            </Button>
-          ) : canResume ? (
-            <Button type="button" variant="outline" size="sm" onClick={resumeCourseSession}>
-              <Play className="mr-1.5 h-4 w-4" /> Resume
-            </Button>
-          ) : null}
-          <Button
-            type="button"
-            variant="destructive"
-            size="sm"
-            onClick={() => void endCourseSession()}
-            disabled={isEnding}
-          >
-            <Square className="mr-1.5 h-4 w-4" />
-            {isEnding ? 'Saving…' : 'End session'}
-          </Button>
-        </div>
-      </div>
-    </details>
-  );
 }

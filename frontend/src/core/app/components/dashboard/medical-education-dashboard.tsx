@@ -23,14 +23,6 @@ import { usePageHeader } from '@/core/providers/HeaderContext';
 import { useAuthStore } from '@/features/auth/store/useAuthStore';
 import type { Deadline } from '@/shared/types';
 import { StatCard } from '@/shared/components/ui/StatCard';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/shared/components/ui/dialog';
-import { StudySession } from '@/features/learning-management/study/components/study-session';
 import { useStudy } from '@/features/learning-management/study/hooks/useStudy';
 import { useProgress } from '@/shared/hooks/useProgress';
 import { GoalsProgressWidget } from '@/features/learning-management/components/goals/goals-progress-widget';
@@ -46,9 +38,6 @@ const MedicalEducationDashboard = () => {
     ? `${firstName.charAt(0).toUpperCase()}${firstName.slice(1).toLowerCase()}`
     : 'User';
   const { getResumePoint } = useStudy();
-  const [showStudySession, setShowStudySession] = useState(false);
-  const [studySessionStarted, setStudySessionStarted] = useState(false);
-  const [selectedStudyCourseId, setSelectedStudyCourseId] = useState<string | null>(null);
   const [selectedTrendMetric, setSelectedTrendMetric] = useState<'score' | 'hours'>('score');
 
   // Set page header for dashboard
@@ -204,10 +193,6 @@ const MedicalEducationDashboard = () => {
   const activeCourse = data.courseData?.find(course => course.progressPercentage < 100);
   const firstCourse = data.courseData?.[0];
   const displayCourse = activeCourse ?? firstCourse;
-  const selectedStudyCourse = selectedStudyCourseId === null
-    ? displayCourse
-    : data.courseData?.find(course => course.id === selectedStudyCourseId);
-
   const openCourse = (course: {
     id?: string;
     unitId?: string;
@@ -305,17 +290,6 @@ const MedicalEducationDashboard = () => {
   };
 
   const quickActions = [
-    {
-      label: 'Study session',
-      description: 'Log focused study time.',
-      action: 'Start session',
-      icon: Clock,
-      onClick: () => {
-        setSelectedStudyCourseId(null);
-        setStudySessionStarted(false);
-        setShowStudySession(true);
-      },
-    },
     {
       label: 'Practice quiz',
       description: 'Test what you know.',
@@ -846,64 +820,6 @@ const MedicalEducationDashboard = () => {
         )}
 
       </div>
-      
-      <Dialog
-        open={showStudySession}
-        onOpenChange={open => {
-          if (!open && !studySessionStarted) setShowStudySession(false);
-        }}
-      >
-        <DialogContent
-          className="max-h-[90vh] max-w-2xl overflow-y-auto"
-          showCloseButton={!studySessionStarted}
-        >
-          <DialogHeader>
-            <DialogTitle>Study session</DialogTitle>
-            <DialogDescription>
-              Track active study time. Paused time is excluded from your session duration.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2">
-            <label
-              htmlFor="study-course-context"
-              className="text-sm font-medium text-muted-foreground"
-            >
-              Study context
-            </label>
-            <select
-              id="study-course-context"
-              value={selectedStudyCourse?.id ?? ''}
-              onChange={event => setSelectedStudyCourseId(event.target.value)}
-              disabled={studySessionStarted}
-              className="w-full rounded-xl border border-border bg-card px-3 py-2.5 text-sm text-foreground focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:bg-card"
-            >
-              <option value="">General study (not linked to a course)</option>
-              {(data.courseData ?? []).map(course => (
-                <option key={course.id} value={course.id}>
-                  {course.name}
-                </option>
-              ))}
-            </select>
-            <p className="text-xs text-muted-foreground">
-              Linking a course associates the session with its next incomplete topic.
-            </p>
-          </div>
-          <StudySession
-            context={
-              selectedStudyCourse
-                ? { type: 'course', id: selectedStudyCourse.id }
-                : undefined
-            }
-            contextLabel={selectedStudyCourse?.name}
-            onSessionStarted={() => setStudySessionStarted(true)}
-            onSessionEnd={() => {
-              setStudySessionStarted(false);
-              setShowStudySession(false);
-              handleRefetch();
-            }}
-          />
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };

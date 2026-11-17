@@ -1627,20 +1627,24 @@ export class ProgressService {
   private async calculateCourseProgressFromDatabase(
     userId: string,
     courseId: string,
-    client: Pick<Prisma.TransactionClient, 'unit' | 'progress'> = this.prisma,
+    client: Pick<
+      Prisma.TransactionClient,
+      'unit' | 'progress' | 'material'
+    > = this.prisma,
   ): Promise<
     | { percentage: number; completedUnits: number; totalUnits: number }
     | undefined
   > {
     try {
-      const [units, topicProgressRows, unitProgressRows] = await Promise.all([
+      const [units, topicProgressRows, unitProgressRows, materials] =
+        await Promise.all([
         client.unit.findMany({
           where: { courseId },
           select: {
             id: true,
             topics: {
               where: { status: 'published' },
-              select: { id: true, isMandatory: true },
+              select: { id: true },
             },
           },
         }),
@@ -1666,7 +1670,23 @@ export class ProgressService {
             status: true,
           },
         }),
+        client.material.findMany({
+          where: { unit: { courseId } },
+          select: { id: true, unitId: true },
+        }),
       ]);
+      const materialIds = materials.map((material) => material.id);
+      const materialProgressRows = materialIds.length
+        ? await client.progress.findMany({
+            where: { userId, materialId: { in: materialIds } },
+            select: {
+              materialId: true,
+              progressPercentage: true,
+              isCompleted: true,
+              status: true,
+            },
+          })
+        : [];
 
       const topicProgressById = new Map<string, number>();
       for (const progress of topicProgressRows) {
@@ -1703,26 +1723,47 @@ export class ProgressService {
         });
       }
 
+      const completedMaterialIds = new Set(
+        materialProgressRows
+          .filter(
+            (progress) =>
+              progress.isCompleted ||
+              progress.status === ProgressStatus.completed ||
+              progress.progressPercentage >= 100,
+          )
+          .map((progress) => progress.materialId)
+          .filter((materialId): materialId is string => Boolean(materialId)),
+      );
+
       let totalUnitPercentage = 0;
       let completedUnits = 0;
       for (const unit of units) {
         const unitProgress = unitProgressById.get(unit.id);
-        const mandatoryTopics = unit.topics.filter((topic) => topic.isMandatory);
-        const requiredTopics = mandatoryTopics.length
-          ? mandatoryTopics
-          : unit.topics;
-        const topicPercentages = requiredTopics.map(
+        const topicPercentages = unit.topics.map(
           (topic) => topicProgressById.get(topic.id) ?? 0,
         );
         const topicPercentage = topicPercentages.length
           ? topicPercentages.reduce((sum, percentage) => sum + percentage, 0) /
             topicPercentages.length
           : 0;
+        const unitMaterials = materials.filter(
+          (material) => material.unitId === unit.id,
+        );
+        const completedMaterials = unitMaterials.filter((material) =>
+          completedMaterialIds.has(material.id),
+        ).length;
+        const materialPercentage = unitMaterials.length
+          ? (completedMaterials / unitMaterials.length) * 100
+          : 0;
         const isCompleted = topicPercentages.length
           ? topicPercentages.every((value) => value === 100)
-          : Boolean(unitProgress?.completed);
+          : unitMaterials.length
+            ? completedMaterials === unitMaterials.length
+            : Boolean(unitProgress?.completed);
         const unitPercentage = topicPercentages.length
           ? topicPercentage
+          : unitMaterials.length
+            ? materialPercentage
           : isCompleted
             ? 100
             : (unitProgress?.percentage ?? 0);
@@ -1769,9 +1810,15 @@ export class ProgressService {
       );
     }
 
+    const databaseProgress = await this.calculateCourseProgressFromDatabase(
+      userId,
+      courseId,
+    );
+    if (databaseProgress) return databaseProgress;
+
     try {
-      // Prefer the Rust analytics gRPC service; if it is unavailable, fall back
-      // to the local database so progress endpoints remain usable during outages.
+      // Analytics is a fallback only; saved assessment/material progress is the
+      // source of truth for user-facing course completion.
       const analytics: any =
         await this.courseAnalyticsService.calculateCourseProgress(
           userId,
@@ -1785,18 +1832,13 @@ export class ProgressService {
         };
       }
 
-      this.logger.warn(
-        'Course analytics returned null; falling back to local DB progress',
-        { userId, courseId },
-      );
-
-      return this.calculateCourseProgressFromDatabase(userId, courseId);
+      return undefined;
     } catch (error) {
       this.logger.warn(
-        'Course analytics failed; falling back to local DB progress',
+        'Course progress analytics fallback failed',
         { userId, courseId, error: getErrorMessage(error) },
       );
-      return this.calculateCourseProgressFromDatabase(userId, courseId);
+      return undefined;
     }
   }
 
