@@ -23,6 +23,7 @@ export const useAssessments = () => {
   const [activePaths, setActivePaths] = useState<LearningPathProgress[]>([]);
   const [summary, setSummary] = useState<PerformanceData | null>(null);
   const [history, setHistory] = useState<AssessmentHistory['attempts']>([]);
+  const [assessmentError, setAssessmentError] = useState(false);
   const [historyError, setHistoryError] = useState(false);
   const [contextError, setContextError] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -46,9 +47,11 @@ export const useAssessments = () => {
 
     if (assessmentsResult.status === 'fulfilled') {
       setAssessments(assessmentsResult.value);
+      setAssessmentError(false);
     } else {
       console.error('Failed to load assessments:', assessmentsResult.reason);
       setAssessments([]);
+      setAssessmentError(true);
     }
 
     setSummary(summaryResult.status === 'fulfilled' ? summaryResult.value : null);
@@ -105,6 +108,7 @@ export const useAssessments = () => {
 
   return {
     assessments,
+    assessmentError,
     activeCourses,
     activePaths,
     summary,

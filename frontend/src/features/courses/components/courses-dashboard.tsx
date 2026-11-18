@@ -90,7 +90,9 @@ export const CoursesDashboard = () => {
     }
   }, [user?.id]);
 
-  const { data: progressDashboard } = useQuery({
+  const {
+    data: progressDashboard,
+  } = useQuery({
     queryKey: ['course-progress-dashboard', user?.id],
     queryFn: () => courseService.getProgressDashboard(user!.id),
     enabled: Boolean(user?.id),
@@ -126,7 +128,6 @@ export const CoursesDashboard = () => {
   const courseProgressById = new Map(
     (progressDashboard?.courses ?? []).map(item => [item.courseId, item]),
   );
-
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     setDebouncedSearchTerm(filters.searchTerm.trim());
@@ -425,15 +426,19 @@ export const CoursesDashboard = () => {
             ) : (
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 {[
-                  { label: 'Enrolled', value: courseStats?.totalEnrolled },
-                  { label: 'In progress', value: courseStats?.inProgress },
+                  { label: 'Active courses', value: courseStats?.inProgress },
+                  { label: 'Completed', value: courseStats?.completed },
                   { label: 'Study hours', value: courseStats?.hoursSpent },
                   { label: 'Average score', value: courseStats?.avgScore, suffix: '%' },
                 ].map(({ label, value, suffix }) => (
                   <div key={label} className="rounded-xl border border-border bg-card px-4 py-3">
                     <p className="text-xs font-medium text-muted-foreground">{label}</p>
                     <p className="mt-1 text-xl font-semibold text-foreground" aria-busy={courseStatsLoading}>
-                      {courseStatsLoading ? '—' : typeof value === 'number' ? `${value}${suffix ?? ''}` : '—'}
+                      {courseStatsLoading
+                        ? '—'
+                        : typeof value === 'number'
+                          ? `${value}${suffix ?? ''}`
+                          : '—'}
                     </p>
                   </div>
                 ))}

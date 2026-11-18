@@ -14,6 +14,7 @@ import { learningPathService } from '@/features/learning-management/services/lea
 import { Material } from '@/shared/types/materialInterface';
 import type { Course } from '@/shared/types/courseInterface';
 import type { LearningPathProgress } from '@/shared/types/learningInterface';
+import type { DetailedCourseProgress } from '@/shared/types/progressInterface';
 import type { ScheduleEvent } from '@/shared/types/studyInterface';
 import { MaterialListItem } from './MaterialListItem';
 import { MaterialCard } from './MaterialCard';
@@ -282,6 +283,32 @@ export default function MaterialsDashboard() {
     enabled: courseFilterInitialized && Boolean(selectedCourseId),
     staleTime: 10 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
+    meta: { persist: Boolean(user?.id) },
+  });
+  const {
+    data: selectedCourseProgress,
+    isLoading: courseProgressLoading,
+    isError: courseProgressError,
+    refetch: refetchCourseProgress,
+  } = useQuery<DetailedCourseProgress, Error>({
+    queryKey: ['detailed-course-progress', user?.id, selectedCourseId],
+    queryFn: () => courseService.getDetailedCourseProgress(selectedCourseId!),
+    enabled: Boolean(user?.id && selectedCourseId),
+    staleTime: 0,
+    gcTime: 10 * 60 * 1000,
+    meta: { persist: Boolean(user?.id) },
+  });
+  const {
+    data: recentMaterials = [],
+    isLoading: recentMaterialsLoading,
+    isError: recentMaterialsError,
+    refetch: refetchRecentMaterials,
+  } = useQuery({
+    queryKey: ['recent-materials', user?.id],
+    queryFn: () => materialService.getRecentlyViewedMaterials(),
+    enabled: Boolean(user?.id && !selectedCourseId),
+    staleTime: 0,
+    gcTime: 10 * 60 * 1000,
     meta: { persist: Boolean(user?.id) },
   });
   const {
@@ -647,6 +674,29 @@ export default function MaterialsDashboard() {
     (count, unit) => count + (unit.topics?.length ?? 0),
     0,
   );
+  const topicProgressById = new Map(
+    (selectedCourseProgress?.topicProgress ?? []).map(progress => [
+      progress.topicId,
+      progress,
+    ]),
+  );
+  const unitProgressById = new Map(
+    (selectedCourseProgress?.unitProgress ?? []).map(progress => [
+      progress.id,
+      progress,
+    ]),
+  );
+  const completedRoadmapTopics = courseUnits.reduce(
+    (count, unit) => count + (unit.topics ?? []).filter(topic => {
+      const progress = topicProgressById.get(String(topic.id));
+      return progress?.isCompleted ?? topic.isCompleted ?? false;
+    }).length,
+    0,
+  );
+  const courseProgressPercentage = Math.min(
+    100,
+    Math.max(0, Math.round(selectedCourseProgress?.totalProgress ?? 0)),
+  );
   const getMaterialUnitId = (material: Material) =>
     material.unitId ?? material.unit?.id;
   const getMaterialTopicId = (material: Material) =>
@@ -909,6 +959,72 @@ export default function MaterialsDashboard() {
               </div>
             )}
           </div>
+        </section>
+      )}
+
+      {!selectedCourseId && (
+        <section
+          aria-labelledby="recent-materials-heading"
+          className="rounded-xl border border-border bg-card p-4 shadow-sm dark:border-border dark:bg-card sm:p-5"
+        >
+          <div className="mb-3 flex items-start justify-between gap-3">
+            <div>
+              <h2 id="recent-materials-heading" className="text-base font-semibold text-foreground">
+                Recently viewed
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Pick up where you left off.
+              </p>
+            </div>
+            <Clock aria-hidden="true" className="mt-1 h-4 w-4 shrink-0 text-muted-foreground" />
+          </div>
+          {recentMaterialsLoading ? (
+            <p role="status" className="text-sm text-muted-foreground">Loading recent materials…</p>
+          ) : recentMaterialsError ? (
+            <p role="alert" className="text-sm text-destructive">
+              Recent materials could not be loaded.{' '}
+              <button
+                type="button"
+                className="font-semibold underline"
+                onClick={() => void refetchRecentMaterials()}
+              >
+                Retry
+              </button>
+            </p>
+          ) : recentMaterials.length > 0 ? (
+            <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              {recentMaterials.map(material => {
+                const viewedAt = new Date(material.lastViewedAt);
+                const viewedLabel = Number.isNaN(viewedAt.getTime())
+                  ? 'Recently viewed'
+                  : viewedAt.toLocaleString(undefined, {
+                      month: 'short',
+                      day: 'numeric',
+                      hour: 'numeric',
+                      minute: '2-digit',
+                    });
+                return (
+                  <li key={material.id}>
+                    <Link
+                      href={`/knowledge-vault/${material.id}`}
+                      className="block rounded-lg border border-border bg-background p-3 transition hover:border-blue-300 hover:bg-blue-50/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:bg-background dark:hover:border-blue-800 dark:hover:bg-blue-950/20"
+                    >
+                      <span className="block truncate text-sm font-medium text-foreground">
+                        {material.title}
+                      </span>
+                      <span className="mt-1 block text-xs text-muted-foreground">
+                        {viewedLabel}
+                      </span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Materials you open will appear here.
+            </p>
+          )}
         </section>
       )}
 
@@ -1201,7 +1317,11 @@ export default function MaterialsDashboard() {
                       Learning roadmap
                     </h2>
                     <p className="mt-1 text-sm text-muted-foreground dark:text-muted-foreground">
-                      Work through each unit and open its topics to study or review linked resources.
+                      {courseProgressLoading
+                        ? 'Loading your topic progress…'
+                        : courseProgressError
+                          ? 'Progress is temporarily unavailable; curriculum and study links remain available.'
+                          : `${completedRoadmapTopics} of ${courseTopicCount} topics mastered${selectedCourseProgress ? ` · ${courseProgressPercentage}% course progress` : ''}`}
                     </p>
                   </div>
                   <div className="flex min-w-0 flex-col gap-2 sm:flex-row">
@@ -1232,6 +1352,50 @@ export default function MaterialsDashboard() {
                   </div>
                 </div>
 
+                {selectedCourseProgress && (
+                  <div
+                    className="h-2 overflow-hidden rounded-full bg-muted"
+                    role="progressbar"
+                    aria-label="Course progress"
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={courseProgressPercentage}
+                  >
+                    <div
+                      className="h-full rounded-full bg-blue-600 transition-[width]"
+                      style={{ width: `${courseProgressPercentage}%` }}
+                    />
+                  </div>
+                )}
+                {courseProgressError && (
+                  <p role="alert" className="text-sm text-rose-700 dark:text-rose-300">
+                    Could not load roadmap progress.{' '}
+                    <button type="button" className="underline" onClick={() => void refetchCourseProgress()}>
+                      Retry
+                    </button>
+                  </p>
+                )}
+                {selectedCourse?.prerequisites && selectedCourse.prerequisites.length > 0 && (
+                  <section
+                    aria-label="Course prerequisites"
+                    className="rounded-xl border border-amber-200 bg-amber-50/70 p-4 dark:border-amber-900 dark:bg-amber-950/20"
+                  >
+                    <h3 className="text-sm font-semibold text-foreground">Recommended prerequisites</h3>
+                    <ul className="mt-2 flex flex-wrap gap-2">
+                      {selectedCourse.prerequisites.map(prerequisite => (
+                        <li key={prerequisite.id}>
+                          <Link
+                            href={`/courses/${encodeURIComponent(prerequisite.id)}`}
+                            className="inline-flex rounded-full border border-amber-300 bg-background px-3 py-1 text-xs font-medium text-foreground hover:border-amber-500 dark:border-amber-800"
+                          >
+                            {prerequisite.title || prerequisite.name}
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                )}
+
                 {courseLevelMaterials.length > 0 && (
                   <section className="overflow-hidden rounded-xl border border-border bg-card dark:bg-card">
                     <h3 className="px-4 pt-4 text-sm font-semibold text-foreground dark:text-foreground">
@@ -1257,6 +1421,14 @@ export default function MaterialsDashboard() {
                       const unitOnlyMaterials = unitMaterials.filter(material => !getMaterialTopicId(material));
                       const topics = unit.topics ?? [];
                       const unitResourceCount = unitMaterials.length;
+                      const unitProgress = unitProgressById.get(unitId);
+                      const completedUnitTopics = topics.filter(topic => {
+                        const progress = topicProgressById.get(String(topic.id));
+                        return progress?.isCompleted ?? topic.isCompleted ?? false;
+                      }).length;
+                      const unitProgressPercentage = topics.length > 0
+                        ? Math.round((completedUnitTopics / topics.length) * 100)
+                        : Math.min(100, Math.max(0, unitProgress?.progressPercentage ?? 0));
 
                       return (
                         <details
@@ -1274,6 +1446,7 @@ export default function MaterialsDashboard() {
                               <span className="mt-1 block text-xs text-muted-foreground dark:text-muted-foreground">
                                 {topics.length} {topics.length === 1 ? 'topic' : 'topics'}
                                 {unitResourceCount > 0 && ` · ${unitResourceCount} ${unitResourceCount === 1 ? 'resource' : 'resources'}`}
+                                {` · ${unitProgressPercentage}% complete`}
                               </span>
                             </span>
                             <ChevronDown aria-hidden="true" className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open/roadmap:rotate-180" />
@@ -1283,6 +1456,18 @@ export default function MaterialsDashboard() {
                               <p className="text-sm leading-relaxed text-muted-foreground dark:text-muted-foreground">
                                 {unit.description}
                               </p>
+                            )}
+                            {unit.learningObjectives && unit.learningObjectives.length > 0 && (
+                              <div>
+                                <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                  Learning objectives
+                                </h4>
+                                <ul className="mt-1 list-inside list-disc space-y-1 text-sm text-muted-foreground">
+                                  {unit.learningObjectives.filter(Boolean).map((objective, index) => (
+                                    <li key={`${unitId}-objective-${index}`}>{objective}</li>
+                                  ))}
+                                </ul>
+                              </div>
                             )}
                             <div className="flex flex-wrap items-center justify-between gap-2">
                               <span className="text-xs font-medium text-muted-foreground dark:text-muted-foreground">
@@ -1311,6 +1496,8 @@ export default function MaterialsDashboard() {
                               <ol className="space-y-2" aria-label={`${unit.title || unit.name} topics`}>
                                 {topics.map((topic, topicIndex) => {
                                   const topicId = String(topic.id);
+                                  const topicProgress = topicProgressById.get(topicId);
+                                  const isTopicCompleted = topicProgress?.isCompleted ?? topic.isCompleted ?? false;
                                   const topicMaterials = unitMaterials.filter(
                                     material => String(getMaterialTopicId(material) ?? '') === topicId,
                                   );
@@ -1320,10 +1507,17 @@ export default function MaterialsDashboard() {
                                     <li key={topicId}>
                                       <div className="rounded-lg border border-border px-3 py-3 dark:border-border">
                                         <div className="flex items-center gap-3">
-                                          {topic.isCompleted ? (
+                                          {isTopicCompleted ? (
                                             <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
                                           ) : (
-                                            <span className="h-2 w-2 shrink-0 rounded-full bg-blue-500" aria-hidden="true" />
+                                            <span
+                                              className={`h-2 w-2 shrink-0 rounded-full ${
+                                                (topicProgress?.progressPercentage ?? 0) > 0
+                                                  ? 'bg-amber-500'
+                                                  : 'bg-blue-500'
+                                              }`}
+                                              aria-hidden="true"
+                                            />
                                           )}
                                           <div className="min-w-0 flex-1">
                                             <p className="text-sm font-medium text-foreground dark:text-foreground">
@@ -1332,6 +1526,12 @@ export default function MaterialsDashboard() {
                                             <p className="mt-1 text-xs text-muted-foreground dark:text-muted-foreground">
                                               {topic.estimatedMinutes ? `${topic.estimatedMinutes} min` : 'Topic'}
                                               {topicMaterials.length > 0 && ` · ${topicMaterials.length} ${topicMaterials.length === 1 ? 'resource' : 'resources'}`}
+                                              {topic.quizQuestionCount
+                                                ? ` · ${topic.quizQuestionCount} quiz questions`
+                                                : ''}
+                                              {!isTopicCompleted && topicProgress?.status === 'inProgress'
+                                                ? ' · In progress'
+                                                : ''}
                                             </p>
                                           </div>
                                           <Button
@@ -1341,7 +1541,7 @@ export default function MaterialsDashboard() {
                                             onClick={() => router.push(`/courses/${selectedCourse.id}/units/${encodeURIComponent(unitId)}?topicId=${encodeURIComponent(topicId)}`)}
                                             className="shrink-0 rounded-lg px-2"
                                           >
-                                            Study
+                                            {topic.quizQuestionCount ? 'Study & quiz' : 'Study'}
                                           </Button>
                                           <Button
                                             type="button"
@@ -1357,6 +1557,13 @@ export default function MaterialsDashboard() {
                                             Schedule
                                           </Button>
                                         </div>
+                                        {Array.isArray(topic.learningObjectives) && topic.learningObjectives.length > 0 && (
+                                          <ul className="mt-2 list-inside list-disc border-t border-border pt-2 text-xs text-muted-foreground dark:border-border">
+                                            {topic.learningObjectives.filter(Boolean).map((objective, index) => (
+                                              <li key={`${topicId}-objective-${index}`}>{objective}</li>
+                                            ))}
+                                          </ul>
+                                        )}
                                         {topicMaterials.length > 0 && (
                                           <details className="mt-2 border-t border-border pt-2 dark:border-border">
                                             <summary className="cursor-pointer text-xs font-medium text-blue-700 dark:text-blue-300">

@@ -70,6 +70,14 @@ export interface DriveFolderImportResult {
   }>;
 }
 
+export interface MaterialStats {
+  views: number;
+  downloads: number;
+  uniqueViewers: number;
+}
+
+export type RecentlyViewedMaterial = Material & { lastViewedAt: string };
+
 const materialService = {
   async getMaterials(filters?: { unitId?: string; topicId?: string; type?: string }): Promise<Material[]> {
     const response = await apiService.get<Material[]>('/materials', {
@@ -130,6 +138,16 @@ const materialService = {
   async getMaterialById(id: string): Promise<Material> {
     const response = await apiService.get<Material>(`/materials/${id}`);
     return normalizeMaterial(response.data);
+  },
+
+  async getRecentlyViewedMaterials(): Promise<RecentlyViewedMaterial[]> {
+    const response = await apiService.get<RecentlyViewedMaterial[]>('/materials/recent');
+    return normalizeMaterialList(response.data);
+  },
+
+  async getMaterialStats(id: string): Promise<MaterialStats> {
+    const response = await apiService.get<MaterialStats>(`/materials/${id}/overview`);
+    return response.data;
   },
 
   async getMaterialsByTopicId(topicId: string): Promise<Material[]> {

@@ -59,12 +59,18 @@ export const LearningGoalsWidget = () => {
       await learningGoalsService.completeGoal(goalId);
       setGoals((prev) => prev.filter((g) => g.id !== goalId));
       toast.success('Goal completed! 🎉');
-      // Refresh stats
-      const updatedStats = await learningGoalsService.getGoalsStats();
-      setStats(updatedStats);
     } catch (error) {
       console.error('Error completing goal:', error);
       toast.error('Failed to complete goal');
+      return;
+    }
+
+    try {
+      const updatedStats = await learningGoalsService.getGoalsStats();
+      setStats(updatedStats);
+    } catch (error) {
+      console.error('Goal completed, but statistics could not be refreshed:', error);
+      toast.warning('Goal completed, but its statistics could not be refreshed.');
     }
   };
 

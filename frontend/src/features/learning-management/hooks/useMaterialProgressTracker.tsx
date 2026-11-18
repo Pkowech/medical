@@ -45,6 +45,7 @@ export default function useMaterialProgressTracker(options: Options) {
   const progressRevisionLoadRef = useRef<Promise<void>>(Promise.resolve());
   const progressConflictRef = useRef(false);
   const sendInFlightRef = useRef<Promise<void> | null>(null);
+  const persistedPercentRef = useRef(0);
   const isCompletedRef = useRef(false);
   const isCompletingRef = useRef(false);
   const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
@@ -56,6 +57,7 @@ export default function useMaterialProgressTracker(options: Options) {
     if (!userId || (!materialId && !topicId)) return;
     let active = true;
     progressRevisionRef.current = 0;
+    persistedPercentRef.current = 0;
     progressConflictRef.current = false;
     const revisionLoad = progressService
       .getUserProgress(userId)
@@ -67,11 +69,20 @@ export default function useMaterialProgressTracker(options: Options) {
             progress.unitId === (unitId ?? null) &&
             progress.courseId === (courseId ?? null),
         );
+        const savedPercent =
+          typeof row?.progressPercentage === 'number' &&
+          Number.isFinite(row.progressPercentage)
+            ? Math.max(0, Math.min(100, Math.round(row.progressPercentage)))
+            : 0;
         if (active) {
           progressRevisionRef.current =
             typeof row?.revision === 'number' && Number.isSafeInteger(row.revision)
               ? row.revision
               : 0;
+          persistedPercentRef.current = savedPercent;
+          lastPercentRef.current = Math.max(lastPercentRef.current, savedPercent);
+          isCompletedRef.current = savedPercent >= 100;
+          setCurrentPercent(current => Math.max(current, savedPercent));
         }
       })
       .catch(error => {
@@ -161,6 +172,7 @@ export default function useMaterialProgressTracker(options: Options) {
           }
         }
         if (progressSaved) {
+          persistedPercentRef.current = Math.max(persistedPercentRef.current, percent);
           lastPercentRef.current = percent;
         }
 
@@ -206,22 +218,24 @@ export default function useMaterialProgressTracker(options: Options) {
   );
 
   const computeCurrentPercent = useCallback((): number => {
+    let computedPercent = 0;
     const currentComputePercent = computePercentRef.current;
     if (typeof currentComputePercent === 'function') {
       try {
         const p = currentComputePercent();
-        return Math.max(0, Math.min(100, Math.round(p)));
+        computedPercent = Math.max(0, Math.min(100, Math.round(p)));
       } catch (err) {
         console.warn('computePercent callback failed', err);
       }
     }
-    return 0;
+    return Math.max(persistedPercentRef.current, computedPercent);
   }, []);
 
   const startTracking = useCallback(() => {
     if (isTrackingRef.current) return;
     isTrackingRef.current = true;
-    isCompletedRef.current = false;
+    const initialPercent = computeCurrentPercent();
+    isCompletedRef.current = initialPercent >= 100;
     isCompletingRef.current = false;
     activeElapsedMsRef.current = 0;
     lastTickAtRef.current = document.visibilityState === 'visible'
@@ -229,8 +243,6 @@ export default function useMaterialProgressTracker(options: Options) {
       : null;
     setIsTracking(true);
 
-    // Initial state
-    const initialPercent = computeCurrentPercent();
     setCurrentPercent(initialPercent);
     setElapsedSeconds(0);
     lastPercentRef.current = initialPercent;

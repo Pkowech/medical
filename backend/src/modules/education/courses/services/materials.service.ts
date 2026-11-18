@@ -591,7 +591,7 @@ export class MaterialsService {
     }
   }
 
-  async getMaterialStats(materialId: string): Promise<{
+  async getMaterialStats(materialId: string, userId: string): Promise<{
     views: number;
     downloads: number;
     uniqueViewers: number;
@@ -602,15 +602,81 @@ export class MaterialsService {
         throw new NotFoundException(`Material with ID ${materialId} not found`);
       }
 
-      // For now, return mock stats since we don't have a proper analytics store
-      // In a real implementation, this would query a dedicated analytics store
+      if (material.userId !== userId) {
+        const unit = material.courseId || !material.unitId
+          ? null
+          : await this.prisma.unit.findUnique({
+              where: { id: material.unitId },
+              select: { courseId: true },
+            });
+        const courseId = material.courseId ?? unit?.courseId;
+        if (!courseId) {
+          throw new ForbiddenException(
+            'Only the material owner can view these statistics.',
+          );
+        }
+        await this.assertCanManageCourseMaterials(courseId, userId);
+      }
+
+      const [viewSummary, downloadSummary, uniqueViewers] = await Promise.all([
+        this.prisma.materialEvent.aggregate({
+          where: { materialId, eventType: 'view' },
+          _sum: { viewCount: true },
+        }),
+        this.prisma.materialEvent.aggregate({
+          where: { materialId, eventType: 'download' },
+          _sum: { downloadCount: true },
+        }),
+        this.prisma.materialEvent.count({
+          where: { materialId, eventType: 'view' },
+        }),
+      ]);
+
       return {
-        views: 0,
-        downloads: 0,
-        uniqueViewers: 0,
+        views: viewSummary._sum.viewCount ?? 0,
+        downloads: downloadSummary._sum.downloadCount ?? 0,
+        uniqueViewers,
       };
     } catch (error) {
       handleServiceError(error, this.logger, 'getMaterialStats');
+    }
+  }
+
+  async getRecentlyViewedMaterials(
+    userId: string,
+  ): Promise<Array<Material & { lastViewedAt: Date }>> {
+    try {
+      const events = await this.prisma.materialEvent.findMany({
+        where: { userId, eventType: 'view' },
+        orderBy: { lastOccurredAt: 'desc' },
+        take: 30,
+        include: {
+          material: {
+            include: {
+              unit: { include: { course: true } },
+              user: { select: { id: true, firstName: true, lastName: true } },
+            },
+          },
+        },
+      });
+
+      const recent: Array<Material & { lastViewedAt: Date }> = [];
+      for (const event of events) {
+        try {
+          await this.assertCanReadMaterial(event.material, userId);
+          recent.push({
+            ...event.material,
+            lastViewedAt: event.lastOccurredAt,
+          });
+          if (recent.length === 8) break;
+        } catch (error) {
+          if (error instanceof ForbiddenException) continue;
+          throw error;
+        }
+      }
+      return recent;
+    } catch (error) {
+      handleServiceError(error, this.logger, 'getRecentlyViewedMaterials');
     }
   }
 

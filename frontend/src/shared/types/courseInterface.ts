@@ -97,6 +97,7 @@ export interface Topic {
   title: string;
   name?: string;
   description?: string;
+  learningObjectives?: string[];
   order?: number;
   orderIndex?: number;
   estimatedMinutes?: number;

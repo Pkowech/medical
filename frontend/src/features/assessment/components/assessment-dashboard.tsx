@@ -82,6 +82,7 @@ export function AssessmentDashboard() {
   const { data: session } = useSession();
   const {
     assessments,
+    assessmentError,
     activeCourses,
     activePaths,
     summary,
@@ -393,17 +394,29 @@ export function AssessmentDashboard() {
                 <h3 className="text-lg font-semibold text-foreground">
                   {currentSearchResult?.error
                     ? 'Assessment search unavailable'
-                    : isExplicitSearch
+                    : assessmentError && !isExplicitSearch
+                      ? 'Assessments unavailable'
+                      : isExplicitSearch
                       ? 'No matching assessments found'
                       : 'No matching assessments yet'}
                 </h3>
-                <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                <p
+                  className="text-sm text-muted-foreground max-w-md mx-auto"
+                  role={currentSearchResult?.error || (assessmentError && !isExplicitSearch) ? 'alert' : undefined}
+                >
                   {currentSearchResult?.error
                     ? 'The assessment search could not be completed. Please try again.'
+                    : assessmentError && !isExplicitSearch
+                      ? 'Assessments could not be loaded. Please try again.'
                     : isExplicitSearch
                       ? 'No published assessments match your search and category filters. Try another search or reset the filters.'
                       : 'There are no assessments linked to your active courses or learning paths that match your field yet. Search by topic, course, or specialty to find another assessment.'}
                 </p>
+                {assessmentError && !isExplicitSearch && (
+                  <Button variant="outline" onClick={() => void refreshAssessments()}>
+                    Retry loading assessments
+                  </Button>
+                )}
                 {currentSearchResult?.error && (
                   <Button
                     variant="outline"

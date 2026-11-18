@@ -60,6 +60,8 @@ export const GoalsManagementInterface: React.FC = () => {
   const [goals, setGoals] = useState<LearningGoal[]>([]);
   const [analytics, setAnalytics] = useState<GoalAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
+  const [goalsLoadError, setGoalsLoadError] = useState(false);
+  const [analyticsLoadError, setAnalyticsLoadError] = useState(false);
   const [activeTab, setActiveTab] = useState<'active' | 'completed' | 'all'>('active');
   const [filters, setFilters] = useState({
     category: '',
@@ -113,8 +115,11 @@ export const GoalsManagementInterface: React.FC = () => {
           ? data.filter(goal => ['active', 'inProgress', 'notStarted'].includes(goal.status))
           : data,
       );
+      setGoalsLoadError(false);
     } catch (error) {
       console.error('Error fetching goals:', error);
+      setGoals([]);
+      setGoalsLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -138,21 +143,11 @@ export const GoalsManagementInterface: React.FC = () => {
       };
 
       setAnalytics(enrichedAnalytics);
+      setAnalyticsLoadError(false);
     } catch (error) {
       console.error('Error fetching analytics:', error);
-      // Set default analytics if fetch fails
-      setAnalytics({
-        totalGoals: 0,
-        activeGoals: 0,
-        completedGoals: 0,
-        overdueGoals: 0,
-        completionRate: 0,
-        averageCompletionTimeDays: 0,
-        goalsByCategory: {},
-        goalsByPriority: {},
-        streakData: { currentStreak: 0, longestStreak: 0 },
-        upcomingDeadlines: [],
-      });
+      setAnalytics(null);
+      setAnalyticsLoadError(true);
     }
   };
 
@@ -558,6 +553,22 @@ export const GoalsManagementInterface: React.FC = () => {
       <StudyPreferencesPanel />
 
       {renderAnalyticsCards()}
+      {analyticsLoadError && (
+        <p role="alert" className="mb-6 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-200">
+          Goal analytics could not be loaded.{' '}
+          <button type="button" className="font-semibold underline" onClick={() => void fetchAnalytics()}>
+            Retry
+          </button>
+        </p>
+      )}
+      {goalsLoadError && (
+        <p role="alert" className="mb-6 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-200">
+          Learning goals could not be loaded.{' '}
+          <button type="button" className="font-semibold underline" onClick={() => void fetchGoals()}>
+            Retry
+          </button>
+        </p>
+      )}
 
       <div className="flex items-center space-x-2 bg-muted p-1.5 rounded-2xl mb-10 w-fit border border-border shadow-xs backdrop-blur-md">
         {( [
@@ -603,7 +614,7 @@ export const GoalsManagementInterface: React.FC = () => {
             </div>
           )}
 
-          {goals.length === 0 && !loading && (
+          {goals.length === 0 && !loading && !goalsLoadError && (
             <div className="text-center py-20 bg-card rounded-3xl border border-dashed border-border shadow-xs">
               <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center mx-auto mb-6">
                 <Target className="w-10 h-10 text-muted-foreground/50" />

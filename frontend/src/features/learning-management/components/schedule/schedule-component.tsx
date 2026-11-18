@@ -246,7 +246,13 @@ export default function ScheduleComponent() {
     const sevenDaysFromNow = new Date(startOfToday.getTime() + 7 * 24 * 60 * 60 * 1000);
 
     const upcoming = events
-      .filter(e => e.date >= startOfToday && e.date <= sevenDaysFromNow)
+      .filter(event =>
+        !event.completed &&
+        event.status !== 'cancelled' &&
+        event.date >= startOfToday &&
+        event.date <= sevenDaysFromNow &&
+        (event.allDay || event.endDate > now),
+      )
       .sort((a, b) => a.date.getTime() - b.date.getTime());
 
     return (

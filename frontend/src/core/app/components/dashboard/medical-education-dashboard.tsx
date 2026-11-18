@@ -190,6 +190,11 @@ const MedicalEducationDashboard = () => {
     data.flashcards?.due || data.flashcards?.mastered || data.flashcards?.learning,
   );
   const enrolledCourses = data.courseData?.filter(course => (course.progressPercentage ?? 0) < 100) ?? [];
+  const completedCourseCount = data.courseData?.filter(
+    course => (course.progressPercentage ?? 0) >= 100,
+  ).length ?? 0;
+  const inProgressCourseCount = enrolledCourses.length;
+  const totalCourseCount = data.courseData?.length ?? 0;
   const activeCourse = data.courseData?.find(course => course.progressPercentage < 100);
   const firstCourse = data.courseData?.[0];
   const displayCourse = activeCourse ?? firstCourse;
@@ -421,8 +426,32 @@ const MedicalEducationDashboard = () => {
             </h2>
             <p className="text-sm text-muted-foreground">A quick look at your recent progress.</p>
           </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
-              <StatCard
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-5">
+            <StatCard
+              icon={GraduationCap}
+              title="Courses"
+              value={totalCourseCount}
+              subtitle="Active and completed"
+              colorClass="bg-indigo-600"
+              onClick={() => router.push('/courses')}
+            />
+            <StatCard
+              icon={PlayCircle}
+              title="In progress"
+              value={inProgressCourseCount}
+              subtitle="Ready to continue"
+              colorClass="bg-emerald-600"
+              onClick={() => router.push('/courses')}
+            />
+            <StatCard
+              icon={BookMarked}
+              title="Completed"
+              value={completedCourseCount}
+              subtitle="Courses finished"
+              colorClass="bg-violet-600"
+              onClick={() => router.push('/courses')}
+            />
+            <StatCard
                 icon={ClipboardList}
                 title="Quizzes"
                 value={isPerformanceSummaryLoading

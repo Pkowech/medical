@@ -23,6 +23,7 @@ interface NotesPanelProps {
 
 export const NotesPanel = ({
   topicId,
+  materialId,
   lessonKey = 'general',
   notes: propNotes,
   saveNote,
@@ -31,6 +32,7 @@ export const NotesPanel = ({
 }: NotesPanelProps) => {
   const [noteInput, setNoteInput] = useState('');
   const [noteList, setNoteList] = useState<NoteItem[]>([]);
+  const [saveError, setSaveError] = useState('');
 
   useEffect(() => {
     if (Array.isArray(propNotes)) {
@@ -40,17 +42,26 @@ export const NotesPanel = ({
     }
   }, [propNotes, lessonKey]);
 
+  useEffect(() => {
+    setSaveError('');
+  }, [lessonKey, materialId, topicId]);
+
   const handleSave = async () => {
     if (!noteInput.trim()) return;
 
-    if (onSaveNoteApi) {
-      await onSaveNoteApi(noteInput, 'student');
-      setNoteInput('');
-      onNoteSaved?.();
-    } else if (saveNote) {
-      saveNote(lessonKey, noteInput);
-      setNoteInput('');
-      onNoteSaved?.();
+    try {
+      setSaveError('');
+      if (onSaveNoteApi) {
+        await onSaveNoteApi(noteInput, 'student');
+        setNoteInput('');
+        onNoteSaved?.();
+      } else if (saveNote) {
+        saveNote(lessonKey, noteInput);
+        setNoteInput('');
+        onNoteSaved?.();
+      }
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : 'Could not save this note.');
     }
   };
 
@@ -70,7 +81,7 @@ export const NotesPanel = ({
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold text-foreground">Personal Knowledge & Notes</h3>
         <span className="text-xs font-medium px-2 py-1 bg-muted text-muted-foreground rounded">
-          {topicId ? 'Linked to Topic' : 'General'}
+          {materialId ? 'Linked to Material' : topicId ? 'Linked to Topic' : 'General'}
         </span>
       </div>
 
@@ -92,6 +103,11 @@ export const NotesPanel = ({
             <span>Save Note</span>
           </button>
         </div>
+        {saveError && (
+          <p role="alert" className="mt-2 text-sm text-destructive">
+            {saveError}
+          </p>
+        )}
       </div>
 
       {noteList.length > 0 && (

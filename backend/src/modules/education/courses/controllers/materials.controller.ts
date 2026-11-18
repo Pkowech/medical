@@ -661,6 +661,12 @@ export class MaterialsController {
     return new StreamableFile(content);
   }
 
+  @Get('recent')
+  @ApiOperation({ summary: 'Get recently viewed materials for the current user' })
+  async getRecentlyViewedMaterials(@GetUser() user: PrismaUser) {
+    return this.materialsService.getRecentlyViewedMaterials(user.id);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get material by ID' })
   async findOne(@Param('id') id: string, @GetUser() user: PrismaUser) {
@@ -717,8 +723,11 @@ export class MaterialsController {
 
   @Get(':id/overview')
   @ApiOperation({ summary: 'Get material statistics' })
-  async getMaterialStats(@Param('id') id: string) {
-    return this.materialsService.getMaterialStats(id);
+  async getMaterialStats(
+    @Param('id') id: string,
+    @GetUser() user: PrismaUser,
+  ) {
+    return this.materialsService.getMaterialStats(id, user.id);
   }
 
   @Delete(':id')

@@ -160,10 +160,13 @@ class LearningGoalsService {
         `${this.BASE_URL}/active`
       );
       const data = response.data?.data || response.data;
-      return Array.isArray(data) ? data : [];
+      if (!Array.isArray(data)) {
+        throw new Error('The active learning goals response was invalid.');
+      }
+      return data;
     } catch (error) {
       console.error('Error fetching active goals:', error);
-      return [];
+      throw error;
     }
   }
 
@@ -277,26 +280,43 @@ class LearningGoalsService {
         `${this.BASE_URL}/stats/overview`
       );
       const data = response.data?.data || response.data;
-      return data || {
-        totalGoals: 0,
-        activeGoals: 0,
-        completedGoals: 0,
-        completionRate: 0,
-        averageTimeToComplete: 0,
-        currentStreak: 0,
-        longestStreak: 0,
+      if (!data || typeof data !== 'object') {
+        throw new Error('The learning goals statistics response was invalid.');
+      }
+
+      const payload = data as GoalStats & {
+        averageCompletionTimeDays?: number;
+        streakData?: { currentStreak?: number; longestStreak?: number };
+      };
+      const currentStreak = payload.currentStreak ?? payload.streakData?.currentStreak;
+      const longestStreak = payload.longestStreak ?? payload.streakData?.longestStreak;
+      const averageTimeToComplete =
+        payload.averageTimeToComplete ?? payload.averageCompletionTimeDays;
+      const requiredNumbers = [
+        payload.totalGoals,
+        payload.activeGoals,
+        payload.completedGoals,
+        payload.completionRate,
+        averageTimeToComplete,
+        currentStreak,
+        longestStreak,
+      ];
+      if (!requiredNumbers.every(value => typeof value === 'number' && Number.isFinite(value))) {
+        throw new Error('The learning goals statistics response was incomplete.');
+      }
+
+      return {
+        totalGoals: payload.totalGoals,
+        activeGoals: payload.activeGoals,
+        completedGoals: payload.completedGoals,
+        completionRate: payload.completionRate,
+        averageTimeToComplete,
+        currentStreak,
+        longestStreak,
       };
     } catch (error) {
       console.error('Error fetching goal stats:', error);
-      return {
-        totalGoals: 0,
-        activeGoals: 0,
-        completedGoals: 0,
-        completionRate: 0,
-        averageTimeToComplete: 0,
-        currentStreak: 0,
-        longestStreak: 0,
-      };
+      throw error;
     }
   }
 }

@@ -5,9 +5,11 @@ import Image from 'next/image';
 import { useRouter, useParams } from 'next/navigation';
 import { Card, CardContent } from '@/shared/components/ui/card';
 import { Button } from '@/shared/components/ui/button';
-import { ArrowLeft, File, Share, Trash, Maximize2, Minimize2, Eye, Download } from 'lucide-react';
+import { ArrowLeft, Bookmark, File, Share, Trash, Maximize2, Minimize2, Eye, Download, NotebookPen } from 'lucide-react';
 import materialService from '@/features/courses/services/materialService';
 import useMaterialProgressTracker from '@/features/learning-management/hooks/useMaterialProgressTracker';
+import { useCourseProgressStore } from '@/features/courses/hooks/useCourseProgressStore';
+import { NotesPanel, type NoteItem } from '@/features/courses/components/NotesPanel';
 import PDFViewer from '@/shared/components/pdf/PDFViewer';
 import offlineSync from '@/features/learning-management/services/offlineProgressSync';
 import { isOfflineQueuedError } from '@/lib/core/offline/offlineQueuedError';
@@ -41,6 +43,7 @@ const isUrl = (str: string) => {
 export default function MaterialViewPage() {
   const { isLoading: isAuthLoading, user, session } = useAuth();
   const { setHeader } = usePageHeader();
+  const { toggleBookmark, bookmarks, notes, saveNote } = useCourseProgressStore();
   const router = useRouter();
   const params = useParams();
   const materialId = (params?.id as string) || '';
@@ -55,16 +58,74 @@ export default function MaterialViewPage() {
   const [pdfCurrentPage, setPdfCurrentPage] = useState<number>(1);
   const [pdfNumPages, setPdfNumPages] = useState<number | null>(null);
   const [focusMode, setFocusMode] = useState(false);
+  const [showNotes, setShowNotes] = useState(false);
+  const [materialNotes, setMaterialNotes] = useState<NoteItem[]>([]);
+  const [isLoadingNotes, setIsLoadingNotes] = useState(false);
+  const [notesLoadError, setNotesLoadError] = useState('');
+  const [materialStats, setMaterialStats] = useState<{ views: number; downloads: number; uniqueViewers: number }>();
+  const [isLoadingMaterialStats, setIsLoadingMaterialStats] = useState(false);
+  const [materialStatsError, setMaterialStatsError] = useState(false);
   
   const [localFile, setLocalFile] = useState<File | null>(null);
   
   const lastTrackedPage = useRef<number>(0);
   const trackingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const canDelete = user && (user.role === 'admin' || hasPermission(user.role as never, 'EDIT_COURSES' as Permission));
+  const canViewMaterialStats = material?.userId === user?.id || Boolean(canDelete);
   const materialCourseId = material?.courseId || material?.course?.id || material?.unit?.course?.id;
+  const materialBookmarkKey = `material:${materialId}`;
+  const isBookmarked = bookmarks.includes(materialBookmarkKey);
   const materialsReturnUrl = materialCourseId
     ? `/knowledge-vault?courseId=${encodeURIComponent(materialCourseId)}&scope=enrolled`
     : '/knowledge-vault';
+
+  const loadMaterialNotes = useCallback(async () => {
+    if (!material?.topicId) return;
+    setIsLoadingNotes(true);
+    setNotesLoadError('');
+    try {
+      const response = await api.get<NoteItem[]>('/notes', {
+        params: { topicId: material.topicId, materialId: material.id },
+      });
+      if (!Array.isArray(response.data)) {
+        throw new Error('The saved notes response was invalid.');
+      }
+      setMaterialNotes(response.data);
+    } catch (notesError) {
+      console.error('Could not load notes for this material:', notesError);
+      setNotesLoadError('Saved notes could not be loaded.');
+    } finally {
+      setIsLoadingNotes(false);
+    }
+  }, [material?.id, material?.topicId]);
+
+  const saveMaterialNote = useCallback(async (
+    content: string,
+    type: 'student' | 'ai_generated' = 'student',
+  ) => {
+    if (!material?.topicId) {
+      throw new Error('This material is not linked to a topic.');
+    }
+    const response = await api.post<NoteItem>('/notes', {
+      topicId: material.topicId,
+      materialId: material.id,
+      content,
+      type,
+    });
+    if (!response.data || typeof response.data.id !== 'string') {
+      throw new Error('The saved note response was invalid.');
+    }
+    setMaterialNotes(current => [response.data, ...current]);
+  }, [material?.id, material?.topicId]);
+
+  useEffect(() => {
+    setMaterialNotes([]);
+    setNotesLoadError('');
+  }, [material?.id, material?.topicId]);
+
+  useEffect(() => {
+    if (showNotes && material?.topicId) void loadMaterialNotes();
+  }, [loadMaterialNotes, material?.topicId, showNotes]);
 
   useEffect(() => {
     if (!material) return;
@@ -97,6 +158,9 @@ export default function MaterialViewPage() {
           setPdfContent(await materialService.getMaterialPreviewContent(materialId));
         }
         setMaterial(data);
+        void api.post(`/materials/${materialId}/track/view`).catch(trackError => {
+          console.warn('Could not record this material view:', trackError);
+        });
         
         trackAction(XAPI_VERBS.EXPERIENCED, {
           id: `${URLS.BASE}/materials/${materialId}`,
@@ -115,6 +179,27 @@ export default function MaterialViewPage() {
 
     fetchMaterial();
   }, [materialId, trackAction, XAPI_VERBS]);
+
+  useEffect(() => {
+    if (!material || !canViewMaterialStats) return;
+    let active = true;
+    setIsLoadingMaterialStats(true);
+    setMaterialStatsError(false);
+    materialService.getMaterialStats(material.id)
+      .then(stats => {
+        if (active) setMaterialStats(stats);
+      })
+      .catch(statsError => {
+        console.error('Could not load material usage statistics:', statsError);
+        if (active) setMaterialStatsError(true);
+      })
+      .finally(() => {
+        if (active) setIsLoadingMaterialStats(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [canViewMaterialStats, material]);
 
   // 2. Study Tracking Logic
   const computePercent = useCallback(() => {
@@ -352,6 +437,33 @@ export default function MaterialViewPage() {
                 <span className="hidden sm:inline">{materialCourseId ? 'Course materials' : 'Materials'}</span>
               </Button>
               <div className="flex min-w-0 shrink items-center justify-end gap-1 sm:gap-2">
+                <Button
+                  type="button"
+                  variant={isBookmarked ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => {
+                    toggleBookmark(materialBookmarkKey);
+                    toast.success(isBookmarked ? 'Removed from bookmarks.' : 'Added to bookmarks.');
+                  }}
+                  aria-pressed={isBookmarked}
+                  aria-label={isBookmarked ? 'Remove bookmark' : 'Bookmark material'}
+                  className="h-8 w-8 shrink-0 rounded-lg p-0 sm:h-9 sm:w-auto sm:px-3"
+                >
+                  <Bookmark className={`h-4 w-4 sm:mr-2 ${isBookmarked ? 'fill-current' : ''}`} />
+                  <span className="sr-only sm:not-sr-only">Bookmark</span>
+                </Button>
+                <Button
+                  type="button"
+                  variant={showNotes ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setShowNotes(current => !current)}
+                  aria-pressed={showNotes}
+                  aria-label={showNotes ? 'Hide material notes' : 'Open material notes'}
+                  className="h-8 w-8 shrink-0 rounded-lg p-0 sm:h-9 sm:w-auto sm:px-3"
+                >
+                  <NotebookPen className="h-4 w-4 sm:mr-2" />
+                  <span className="sr-only sm:not-sr-only">Notes</span>
+                </Button>
                 <Button variant="outline" size="sm" onClick={handleShare} aria-label="Share material" title="Share material" className="h-8 w-8 shrink-0 rounded-lg p-0 sm:h-9 sm:w-auto sm:px-3">
                   <Share className="h-4 w-4 sm:mr-2" />
                   <span className="sr-only sm:not-sr-only">Share</span>
@@ -417,6 +529,22 @@ export default function MaterialViewPage() {
                     <p className="font-medium text-foreground dark:text-foreground">{material.title}</p>
                     <p>{material.type || 'Study resource'}</p>
                     {material.description && <p>{material.description}</p>}
+                    {canViewMaterialStats && (
+                      <div className="mt-3 border-t border-border pt-3">
+                        <p className="font-medium text-foreground">Usage</p>
+                        {materialStatsError ? (
+                          <p role="alert" className="mt-1 text-destructive">
+                            Usage statistics are unavailable.
+                          </p>
+                        ) : (
+                          <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
+                            <span>View events: {isLoadingMaterialStats ? '…' : materialStats?.views ?? 0}</span>
+                            <span>Downloads: {isLoadingMaterialStats ? '…' : materialStats?.downloads ?? 0}</span>
+                            <span>Unique viewers: {isLoadingMaterialStats ? '…' : materialStats?.uniqueViewers ?? 0}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </details>
@@ -424,6 +552,32 @@ export default function MaterialViewPage() {
           </div>
         </div>
       </div>
+
+      {!focusMode && showNotes && (
+        <div className="mt-3 max-h-[35vh] shrink-0 overflow-y-auto">
+          {isLoadingNotes && (
+            <p role="status" className="px-2 text-sm text-muted-foreground">
+              Loading saved notes…
+            </p>
+          )}
+          {notesLoadError && (
+            <p role="alert" className="flex items-center justify-between gap-3 px-2 text-sm text-destructive">
+              <span>{notesLoadError}</span>
+              <Button type="button" variant="outline" size="sm" onClick={() => void loadMaterialNotes()}>
+                Retry
+              </Button>
+            </p>
+          )}
+          <NotesPanel
+            topicId={material.topicId ?? undefined}
+            materialId={material.id}
+            lessonKey={`material:${material.id}`}
+            notes={material.topicId ? materialNotes : notes}
+            saveNote={material.topicId ? undefined : saveNote}
+            onSaveNoteApi={material.topicId ? saveMaterialNote : undefined}
+          />
+        </div>
+      )}
 
       <Dialog open={showDeleteConfirm} onOpenChange={open => !isDeleting && setShowDeleteConfirm(open)}>
         <DialogContent className="max-w-md rounded-xl border-border bg-card dark:border-border dark:bg-card">

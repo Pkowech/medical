@@ -1868,33 +1868,32 @@ export class CoursesService {
     streak: number;
   }> {
     try {
-      // Get all user enrollments
+      // Match the active Mine list while retaining completed courses.
       const enrollments = await this.prisma.courseEnrollment.findMany({
-        where: { userId },
+        where: {
+          userId,
+          status: { in: [EnrollmentStatus.active, EnrollmentStatus.completed] },
+        },
         include: { course: true },
       });
 
-      // Get course progress from the unified table
-      const progressRecords = await this.prisma.progress.findMany({
-        where: {
-          userId,
-          courseId: { not: null },
-          materialId: null,
-          topicId: null,
-        },
-      });
-
-      const topicQuizAttempts = await this.prisma.quizAttempt.findMany({
-        where: {
-          userId,
-          completedAt: { not: null },
-        },
-        orderBy: { completedAt: 'desc' },
-        select: {
-          percentage: true,
-          quiz: { select: { topicId: true } },
-        },
-      });
+      const [studyTimeSummary, topicQuizAttempts] = await Promise.all([
+        this.prisma.studySession.aggregate({
+          where: { userId, isValid: true, endTime: { not: null } },
+          _sum: { duration: true },
+        }),
+        this.prisma.quizAttempt.findMany({
+          where: {
+            userId,
+            completedAt: { not: null },
+          },
+          orderBy: { completedAt: 'desc' },
+          select: {
+            percentage: true,
+            quiz: { select: { topicId: true } },
+          },
+        }),
+      ]);
 
       const completed = enrollments.filter(
         (e) => e.status === EnrollmentStatus.completed,
@@ -1919,13 +1918,9 @@ export class CoursesService {
         ? Math.round(quizScores.reduce((sum, score) => sum + score, 0) / quizScores.length)
         : 0;
 
-      // Calculate total hours (sum of timeSpent)
       const hoursSpent = Math.round(
-        progressRecords.reduce(
-          (sum: number, p: any) => sum + (p.timeSpent || 0),
-          0,
-        ) / 60,
-      );
+        ((studyTimeSummary._sum.duration ?? 0) / 60) * 10,
+      ) / 10;
 
       this.logger.log('Course stats retrieved successfully', {
         userId,

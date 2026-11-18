@@ -115,7 +115,7 @@ export class StudyGroupsService {
       userId?: string;
     } = {},
   ): Promise<StudyGroup[]> {
-    const cacheKey = `study_groups:${JSON.stringify(filters)}`;
+    const cacheKey = `study_groups:v2:${JSON.stringify(filters)}`;
     try {
       const cached = await this.redisService.get<string>(cacheKey);
       if (
@@ -151,25 +151,14 @@ export class StudyGroupsService {
         some: { userId: filters.userId, status: MemberStatus.active },
       };
     } else {
-      where.privacy = { not: StudyGroupPrivacy.private };
+      where.privacy = StudyGroupPrivacy.public;
     }
 
     const studyGroups = await this.prisma.studyGroup.findMany({
       where,
       include: {
         members: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                email: true,
-                profileImage: true,
-                username: true,
-              },
-            },
-          },
+          select: { userId: true, role: true, status: true, joinedAt: true },
         },
       },
       orderBy: { updatedAt: 'desc' },

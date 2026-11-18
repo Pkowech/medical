@@ -2,7 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { MessageSquare, Plus, Users } from 'lucide-react';
-import { forumService, Forum, Topic } from '@/features/community/forumService';
+import { forumService, Forum, Post, Topic } from '@/features/community/forumService';
 import { Button } from '@/shared/components/ui/button';
 import {
   Card,
@@ -16,6 +16,7 @@ export default function DiscussionsPage() {
   const [forums, setForums] = useState<Forum[]>([]);
   const [selectedForum, setSelectedForum] = useState<Forum | null>(null);
   const [topics, setTopics] = useState<Topic[]>([]);
+  const [posts, setPosts] = useState<Post[]>([]);
   const [isLoadingForums, setIsLoadingForums] = useState(true);
   const [isLoadingTopics, setIsLoadingTopics] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -25,6 +26,7 @@ export default function DiscussionsPage() {
   const [forumDescription, setForumDescription] = useState('');
   const [topicTitle, setTopicTitle] = useState('');
   const [topicContent, setTopicContent] = useState('');
+  const [replyContent, setReplyContent] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
 
   const loadForums = useCallback(async () => {
@@ -51,16 +53,22 @@ export default function DiscussionsPage() {
   useEffect(() => {
     if (!selectedForum) {
       setTopics([]);
+      setPosts([]);
       return;
     }
 
     let isCurrent = true;
     setIsLoadingTopics(true);
     setError(null);
-    forumService
-      .getTopics(selectedForum.id)
-      .then(nextTopics => {
-        if (isCurrent) setTopics(nextTopics);
+    Promise.all([
+      forumService.getTopics(selectedForum.id),
+      forumService.getPosts(selectedForum.id),
+    ])
+      .then(([nextTopics, nextPosts]) => {
+        if (isCurrent) {
+          setTopics(nextTopics);
+          setPosts(nextPosts);
+        }
       })
       .catch(cause => {
         console.error('Failed to load discussion topics:', cause);
@@ -124,6 +132,39 @@ export default function DiscussionsPage() {
       setIsSaving(false);
     }
   };
+
+  const handleReply = async (
+    event: FormEvent<HTMLFormElement>,
+    topic: Topic,
+  ) => {
+    event.preventDefault();
+    const content = replyContent[topic.id]?.trim();
+    if (!selectedForum || !content) return;
+
+    setIsSaving(true);
+    setError(null);
+    try {
+      const post = await forumService.createPost(selectedForum.id, {
+        content,
+        parentId: topic.id,
+      });
+      setPosts(current => [post, ...current]);
+      setReplyContent(current => ({ ...current, [topic.id]: '' }));
+    } catch (cause) {
+      console.error('Failed to reply to discussion:', cause);
+      setError(cause instanceof Error ? cause.message : 'Unable to post your reply.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const repliesByTopic = new Map<string, Post[]>();
+  for (const post of posts) {
+    if (!post.replyToId) continue;
+    const topicReplies = repliesByTopic.get(post.replyToId) ?? [];
+    topicReplies.push(post);
+    repliesByTopic.set(post.replyToId, topicReplies);
+  }
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
@@ -321,6 +362,37 @@ export default function DiscussionsPage() {
                         <p className="whitespace-pre-wrap text-sm text-muted-foreground">
                           {topic.content}
                         </p>
+                        <div className="mt-4 space-y-3 border-t border-border pt-4">
+                          <h3 className="text-sm font-semibold">
+                            Replies ({repliesByTopic.get(topic.id)?.length ?? 0})
+                          </h3>
+                          {(repliesByTopic.get(topic.id) ?? []).map(post => (
+                            <div key={post.id} className="rounded-md bg-muted/50 p-3">
+                              <p className="whitespace-pre-wrap text-sm">{post.content}</p>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                {new Date(post.createdAt).toLocaleString()}
+                              </p>
+                            </div>
+                          ))}
+                          <form className="flex flex-col gap-2 sm:flex-row" onSubmit={event => void handleReply(event, topic)}>
+                            <label className="sr-only" htmlFor={`reply-${topic.id}`}>Write a reply</label>
+                            <textarea
+                              id={`reply-${topic.id}`}
+                              className="min-h-10 flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                              value={replyContent[topic.id] ?? ''}
+                              onChange={event => setReplyContent(current => ({
+                                ...current,
+                                [topic.id]: event.target.value,
+                              }))}
+                              maxLength={5000}
+                              placeholder="Write a reply…"
+                              required
+                            />
+                            <Button type="submit" variant="outline" disabled={isSaving || !replyContent[topic.id]?.trim()}>
+                              {isSaving ? 'Posting…' : 'Reply'}
+                            </Button>
+                          </form>
+                        </div>
                       </CardContent>
                     </Card>
                   ))}

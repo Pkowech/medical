@@ -57,15 +57,13 @@ class FlashcardsService {
   }
 
   async getHighRiskTopics(userId: string): Promise<HighRiskTopic[]> {
-    try {
-      const response = await apiService.get<HighRiskTopic[]>(
-        `${this.BASE_URL}/high-risk-topics/${userId}`
-      );
-      return Array.isArray(response.data) ? response.data : [];
-    } catch (error) {
-      console.error('Failed to fetch high-risk topics:', error);
-      return [];
+    const response = await apiService.get<HighRiskTopic[]>(
+      `${this.BASE_URL}/high-risk-topics/${userId}`
+    );
+    if (!Array.isArray(response.data)) {
+      throw new Error('The high-risk topics response was invalid.');
     }
+    return response.data;
   }
 
   async syncCards(

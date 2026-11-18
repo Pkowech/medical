@@ -66,6 +66,10 @@ class StudyGroupService {
     await apiService.post(`/study-groups/${id}/join`, { inviteCode });
   }
 
+  async leaveGroup(id: string): Promise<void> {
+    await apiService.delete(`/study-groups/${id}/leave`);
+  }
+
   async updateGroup(
     id: string,
     payload: Partial<{ name: string; description: string; courseId: string | null }>

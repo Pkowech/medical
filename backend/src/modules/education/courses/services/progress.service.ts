@@ -406,77 +406,6 @@ export class ProgressService {
           );
         }
 
-        // Material progress - only if material exists
-        if (materialId) {
-          // Validate material exists
-          const materialExists = await tx.material.findUnique({
-            where: { id: materialId },
-          });
-
-          if (!materialExists) {
-            this.logger.warn(
-              `Material ${materialId} not found, skipping progress creation`,
-            );
-          } else {
-            const isCompleted = status === ProgressStatus.completed;
-            const existing = await tx.progress.findFirst({
-              where: {
-                userId,
-                materialId,
-                topicId: null,
-                unitId: null,
-                courseId: null,
-              },
-            });
-
-            const now = new Date();
-            const currentTimestamp = BigInt(occurredAt.getTime());
-
-            if (existing) {
-              const preserveCompletion =
-                existing.isCompleted && status !== ProgressStatus.notStarted;
-              const materialCompleted = isCompleted || preserveCompletion;
-              const materialProgressPercentage = materialCompleted
-                ? 100
-                : status === ProgressStatus.notStarted
-                  ? 0
-                  : Math.max(existing.progressPercentage, progressValue);
-              await tx.progress.update({
-                where: { id: existing.id },
-                data: {
-                  isCompleted: materialCompleted,
-                  completedAt: materialCompleted
-                    ? (existing.completedAt ?? now)
-                    : null,
-                  status: materialCompleted
-                    ? ProgressStatus.completed
-                    : (status ?? ProgressStatus.inProgress),
-                  progressPercentage: materialProgressPercentage,
-                  completionPercentage: materialProgressPercentage,
-                  lastAccessedAt: now,
-                  lastUpdated: currentTimestamp,
-                  revision: existing.revision + 1,
-                },
-              });
-            } else {
-              await tx.progress.create({
-                data: {
-                  userId,
-                  materialId,
-                  isCompleted,
-                  completedAt: isCompleted ? now : undefined,
-                  status: status ?? ProgressStatus.inProgress,
-                  progressPercentage: isCompleted ? 100 : progressValue,
-                  completionPercentage: isCompleted ? 100 : progressValue,
-                  lastAccessedAt: now,
-                  lastUpdated: currentTimestamp,
-                  revision: 1,
-                },
-              });
-            }
-          }
-        }
-
         // Unit progress - NOT PERSISTED ANYMORE.
         // We will return a mock or derived value if needed, but the plan is to remove the table.
 
@@ -1186,30 +1115,54 @@ export class ProgressService {
 
     try {
       const enrollments = await this.prisma.courseEnrollment.findMany({
-        where: { userId },
+        where: {
+          userId,
+          status: { in: [EnrollmentStatus.active, EnrollmentStatus.completed] },
+        },
         include: {
           course: { select: { id: true, title: true } },
         },
       });
 
-      const stats = await this.calculateUserStats(userId);
+      const progressEnrollments = await Promise.all(
+        enrollments.map(async (e): Promise<UserEnrollment> => {
+          const progress = await this.calculateCourseProgress(
+            userId,
+            e.courseId,
+          );
+          return {
+            courseId: e.courseId,
+            courseTitle: e.course?.title ?? undefined,
+            progressPercentage: Math.round(progress?.percentage ?? 0),
+            lastAccessedAt: e.enrolledAt,
+            isCompleted: (progress?.percentage ?? 0) >= 100,
+          };
+        }),
+      );
+      const baseStats = await this.calculateUserStats(userId);
+      const completedCourses = progressEnrollments.filter(
+        enrollment => enrollment.isCompleted,
+      ).length;
+      const averageCourseProgress = progressEnrollments.length
+        ? Math.round(
+            progressEnrollments.reduce(
+              (total, enrollment) => total + enrollment.progressPercentage,
+              0,
+            ) / progressEnrollments.length,
+          )
+        : 0;
+      const stats = baseStats
+        ? {
+            ...baseStats,
+            totalCourses: progressEnrollments.length,
+            completedCourses,
+            inProgressCourses: progressEnrollments.length - completedCourses,
+            averageCourseProgress,
+          }
+        : undefined;
 
       const result: OverallProgress = {
-        enrollments: await Promise.all(
-          enrollments.map(async (e): Promise<UserEnrollment> => {
-            const progress = await this.calculateCourseProgress(
-              userId,
-              e.courseId,
-            );
-            return {
-              courseId: e.courseId,
-              courseTitle: e.course?.title ?? undefined,
-              progressPercentage: Math.round(progress?.percentage ?? 0),
-              lastAccessedAt: e.enrolledAt,
-              isCompleted: (progress?.percentage ?? 0) >= 100,
-            };
-          }),
-        ),
+        enrollments: progressEnrollments,
         stats,
       };
 
@@ -1225,7 +1178,10 @@ export class ProgressService {
   async getCourseProgress(userId: string): Promise<CourseProgress[]> {
     try {
       const enrollments = await this.prisma.courseEnrollment.findMany({
-        where: { userId },
+        where: {
+          userId,
+          status: { in: [EnrollmentStatus.active, EnrollmentStatus.completed] },
+        },
         include: {
           course: {
             select: {
@@ -1858,9 +1814,14 @@ export class ProgressService {
         recentActivities,
         detailedAnalytics,
       ] = await Promise.all([
-        this.prisma.courseEnrollment.count({ where: { userId } }),
         this.prisma.courseEnrollment.count({
-          where: { userId, progressPercentage: { gte: 100 } },
+          where: {
+            userId,
+            status: { in: [EnrollmentStatus.active, EnrollmentStatus.completed] },
+          },
+        }),
+        this.prisma.courseEnrollment.count({
+          where: { userId, status: EnrollmentStatus.completed },
         }),
         this.getStudyTimeSummary(userId),
         // Fetch activities for the last 30 days to allow streak calculation
