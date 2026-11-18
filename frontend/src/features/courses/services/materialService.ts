@@ -146,16 +146,18 @@ const materialService = {
     }
   },
 
-  async getMaterialWithFileUrl(id: string): Promise<Material & { fileUrl?: string }> {
+  async getMaterialWithFileUrl(id: string, signal?: AbortSignal): Promise<Material & { fileUrl?: string }> {
     const response = await apiService.get<Material & { fileUrl?: string }>(
-      `/materials/${id}/with-url`
+      `/materials/${id}/with-url`,
+      { signal },
     );
     return normalizeMaterial(response.data);
   },
 
-  async getMaterialPreviewContent(id: string): Promise<Uint8Array> {
+  async getMaterialPreviewContent(id: string, signal?: AbortSignal): Promise<Uint8Array> {
     const content = await apiService.get<ArrayBuffer>(`/materials/${id}/preview`, {
       responseType: 'arraybuffer',
+      signal,
     });
     if (content.byteLength === 0) {
       throw new Error(`Material preview ${id} is empty`);

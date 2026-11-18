@@ -99,6 +99,18 @@ export const CoursesDashboard = () => {
     meta: { persist: Boolean(user?.id) },
   });
   const {
+    data: courseStats,
+    isLoading: courseStatsLoading,
+    isError: courseStatsError,
+    refetch: refetchCourseStats,
+  } = useQuery({
+    queryKey: ['course-overview-stats', user?.id],
+    queryFn: () => courseService.getCourseStats(),
+    enabled: Boolean(user?.id),
+    staleTime: 5 * 60 * 1000,
+    meta: { persist: Boolean(user?.id) },
+  });
+  const {
     data: courseCategories = [],
     isLoading: categoriesLoading,
     isError: categoriesError,
@@ -117,23 +129,16 @@ export const CoursesDashboard = () => {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    const searchTerm = filters.searchTerm.trim();
-    setDebouncedSearchTerm(searchTerm);
-    if (searchTerm.length > 0 && activeTab === 'enrolled') {
-      setActiveTab('discover'); // Switch to discover when searching if in enrolled tab
-    }
+    setDebouncedSearchTerm(filters.searchTerm.trim());
   };
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
       const searchTerm = filters.searchTerm.trim();
       setDebouncedSearchTerm(searchTerm);
-      if (searchTerm && activeTab !== 'discover') {
-        setActiveTab('discover');
-      }
     }, 350);
     return () => window.clearTimeout(timer);
-  }, [filters.searchTerm, activeTab]);
+  }, [filters.searchTerm]);
 
   // Set page header
   useEffect(() => {
@@ -173,7 +178,7 @@ export const CoursesDashboard = () => {
       filters.difficulty,
       filters.category,
       filters.status,
-      debouncedSearchTerm,
+      filters.status === 'enrolled' ? '' : debouncedSearchTerm,
     ],
     initialPageParam: 1,
     queryFn: async ({ pageParam }: QueryFunctionContext): Promise<CoursesPageData> => {
@@ -225,6 +230,9 @@ export const CoursesDashboard = () => {
                 ...(itemObj.course as Course),
                 isEnrolled: true,
                 progressPercentage: (typeof itemObj.progressPercentage === 'number' ? itemObj.progressPercentage : 0),
+                lastAccessed: typeof itemObj.lastAccessed === 'string'
+                  ? itemObj.lastAccessed
+                  : (itemObj.course as Course).lastAccessed,
               };
             }
           }
@@ -274,11 +282,18 @@ export const CoursesDashboard = () => {
 
   const loadedCourses = infiniteData?.pages.flatMap(page => page.courses) ?? [];
   const totalCourseCount = infiniteData?.pages[0]?.stats.total ?? loadedCourses.length;
+  const normalizedSearch = debouncedSearchTerm.toLocaleLowerCase();
+  const visibleCourses = activeTab === 'enrolled' && normalizedSearch
+    ? loadedCourses.filter(course =>
+        [course.title, course.name, course.code, course.description, course.category?.name]
+          .some(value => value?.toLocaleLowerCase().includes(normalizedSearch)),
+      )
+    : loadedCourses;
   const suggestedCoursesQuery = useQuery({
     queryKey: ['course-suggestions', user?.id],
     queryFn: () => courseService.getCourses({ page: 1, limit: 3 }),
     enabled: Boolean(user?.id) && activeTab === 'enrolled' && !coursesLoading &&
-      !coursesError && loadedCourses.length === 0,
+      !coursesError && !debouncedSearchTerm && loadedCourses.length === 0,
     staleTime: 5 * 60 * 1000,
   });
   const suggestedCourses = suggestedCoursesQuery.data?.items.slice(0, 3) ?? [];
@@ -299,6 +314,7 @@ export const CoursesDashboard = () => {
         queryClient.invalidateQueries({ queryKey: ['courses'] }),
         queryClient.invalidateQueries({ queryKey: ['active-units'] }),
         queryClient.invalidateQueries({ queryKey: ['course-progress-dashboard'] }),
+        queryClient.invalidateQueries({ queryKey: ['course-overview-stats'] }),
       ]);
       toast.success(`You are unenrolled from ${courseName}. Your progress was kept.`);
       setCourseToUnenroll(null);
@@ -397,6 +413,35 @@ export const CoursesDashboard = () => {
           </div>
         </div>
 
+        {user && (
+          <section aria-label="Course overview" className="space-y-2">
+            {courseStatsError ? (
+              <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-200">
+                Course overview statistics could not be loaded.{' '}
+                <button type="button" className="font-semibold underline" onClick={() => void refetchCourseStats()}>
+                  Retry
+                </button>
+              </p>
+            ) : (
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {[
+                  { label: 'Enrolled', value: courseStats?.totalEnrolled },
+                  { label: 'In progress', value: courseStats?.inProgress },
+                  { label: 'Study hours', value: courseStats?.hoursSpent },
+                  { label: 'Average score', value: courseStats?.avgScore, suffix: '%' },
+                ].map(({ label, value, suffix }) => (
+                  <div key={label} className="rounded-xl border border-border bg-card px-4 py-3">
+                    <p className="text-xs font-medium text-muted-foreground">{label}</p>
+                    <p className="mt-1 text-xl font-semibold text-foreground" aria-busy={courseStatsLoading}>
+                      {courseStatsLoading ? '—' : typeof value === 'number' ? `${value}${suffix ?? ''}` : '—'}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+
         {/* Content Grid */}
         {coursesError ? (
           <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-200">
@@ -436,7 +481,7 @@ export const CoursesDashboard = () => {
                 {activeTab === 'enrolled' ? 'Enrolled classes' : activeTab === 'recommended' ? 'Recommended classes' : 'Explore classes'}
               </h2>
               <span className="shrink-0 text-sm font-medium text-muted-foreground dark:text-muted-foreground" aria-live="polite">
-                {totalCourseCount} {activeTab === 'enrolled' ? 'enrolled' : 'classes'}
+                {activeTab === 'enrolled' && debouncedSearchTerm ? visibleCourses.length : totalCourseCount} {activeTab === 'enrolled' ? 'enrolled' : 'classes'}
               </span>
             </div>
             {!user && (
@@ -444,9 +489,9 @@ export const CoursesDashboard = () => {
                 Browse the course catalog without an account. Sign in to enroll, access lessons, and track your progress.
               </p>
             )}
-            {loadedCourses.length > 0 ? (
+            {visibleCourses.length > 0 ? (
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                {loadedCourses.map(course => (
+                {visibleCourses.map(course => (
                   <CourseCard 
                     key={course.id}
                     course={courseProgressById.has(course.id)
@@ -471,19 +516,25 @@ export const CoursesDashboard = () => {
                 </div>
                 <h3 className="text-center text-xl font-bold text-foreground dark:text-foreground">
                   {activeTab === 'enrolled'
-                    ? "You haven't enrolled in any courses yet."
+                    ? debouncedSearchTerm
+                      ? 'No enrolled classes match your search'
+                      : "You haven't enrolled in any courses yet."
                     : filters.searchTerm || filters.category
                       ? 'No classes match your filters'
                       : 'No classes available yet'}
                 </h3>
                 <p className="text-muted-foreground max-w-xs text-center mt-2">
                   {activeTab === 'enrolled' 
-                    ? 'Explore the catalog to find a class that fits your goals.'
+                    ? debouncedSearchTerm
+                      ? hasNextPage
+                        ? 'Load more enrolled classes to search the rest of your list, or search the course catalog.'
+                        : 'Try a different search or explore the full course catalog.'
+                      : 'Explore the catalog to find a class that fits your goals.'
                     : filters.searchTerm || filters.category
                       ? 'Try another search or clear your filters to see more classes.'
                       : 'Check back soon for new classes in the catalog.'}
                 </p>
-                {activeTab === 'enrolled' && (
+                {activeTab === 'enrolled' && !debouncedSearchTerm && (
                   <button 
                     type="button"
                     onClick={() => {
@@ -494,6 +545,16 @@ export const CoursesDashboard = () => {
                     className="mt-5 inline-flex h-11 items-center gap-2 rounded-xl bg-blue-700 px-5 font-semibold text-white transition-colors hover:bg-blue-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
                   >
                     Explore Catalog
+                    <ChevronRight aria-hidden="true" className="h-4 w-4" />
+                  </button>
+                )}
+                {activeTab === 'enrolled' && debouncedSearchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('discover')}
+                    className="mt-5 inline-flex h-11 items-center gap-2 rounded-xl bg-blue-700 px-5 font-semibold text-white transition-colors hover:bg-blue-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                  >
+                    Search the catalog
                     <ChevronRight aria-hidden="true" className="h-4 w-4" />
                   </button>
                 )}
@@ -512,7 +573,7 @@ export const CoursesDashboard = () => {
               </div>
             )}
 
-            {activeTab === 'enrolled' && loadedCourses.length === 0 && (
+            {activeTab === 'enrolled' && loadedCourses.length === 0 && !debouncedSearchTerm && (
               <section aria-labelledby="suggested-courses-title" className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
                   <h3 id="suggested-courses-title" className="text-base font-semibold text-foreground">
@@ -691,6 +752,11 @@ const CourseCard = ({
   const progress = Math.min(100, Math.max(0, Number(course.progressPercentage) || 0));
   const owner = getInstructorDisplayName(course.instructor ?? course.createdBy);
   const courseName = course.title || course.name;
+  const topicCount = course.units?.reduce((count, unit) => count + (unit.topics?.length ?? 0), 0);
+  const lastAccessedDate = course.lastAccessed ? new Date(course.lastAccessed) : null;
+  const lastAccessedLabel = lastAccessedDate && !Number.isNaN(lastAccessedDate.getTime())
+    ? lastAccessedDate.toLocaleDateString()
+    : null;
   const bannerPalettes = [
     'from-sky-700 via-blue-700 to-indigo-800',
     'from-teal-700 via-cyan-700 to-blue-800',
@@ -777,6 +843,22 @@ const CourseCard = ({
                 {course.description}
               </p>
             )}
+            {(course.units || lastAccessedLabel) && (
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                {course.units && (
+                  <span className="inline-flex items-center gap-1">
+                    <Layers aria-hidden="true" className="h-3.5 w-3.5" />
+                    {course.units.length} units{topicCount !== undefined ? ` · ${topicCount} topics` : ''}
+                  </span>
+                )}
+                {lastAccessedLabel && (
+                  <span className="inline-flex items-center gap-1">
+                    <Clock3 aria-hidden="true" className="h-3.5 w-3.5" />
+                    Last studied {lastAccessedLabel}
+                  </span>
+                )}
+              </div>
+            )}
             <div className="mt-auto space-y-2">
               <div className="flex items-center justify-between text-xs text-muted-foreground dark:text-muted-foreground">
                 <span>Course progress</span>
@@ -835,7 +917,7 @@ const CourseCard = ({
             type="button"
             aria-label={`Open materials for ${courseName}`}
             title="Course materials"
-            onClick={() => router.push(`/study-planner/materials?courseId=${encodeURIComponent(course.id)}&scope=enrolled`)}
+            onClick={() => router.push(`/knowledge-vault?courseId=${encodeURIComponent(course.id)}&scope=enrolled`)}
             className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-background hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-border dark:text-muted-foreground dark:hover:bg-card dark:hover:text-foreground"
           >
             <Layers className="h-4 w-4" />

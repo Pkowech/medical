@@ -63,8 +63,8 @@ export default function MaterialViewPage() {
   const canDelete = user && (user.role === 'admin' || hasPermission(user.role as never, 'EDIT_COURSES' as Permission));
   const materialCourseId = material?.courseId || material?.course?.id || material?.unit?.course?.id;
   const materialsReturnUrl = materialCourseId
-    ? `/study-planner/materials?courseId=${encodeURIComponent(materialCourseId)}&scope=enrolled`
-    : '/study-planner/materials';
+    ? `/knowledge-vault?courseId=${encodeURIComponent(materialCourseId)}&scope=enrolled`
+    : '/knowledge-vault';
 
   useEffect(() => {
     if (!material) return;
@@ -331,7 +331,7 @@ export default function MaterialViewPage() {
     return (
       <div className="container mx-auto py-8 px-4 text-center">
         <p className="text-red-500 mb-4">{error || 'Material not found'}</p>
-        <Button onClick={() => router.push('/study-planner/materials')}>Back to Materials</Button>
+        <Button onClick={() => router.push('/knowledge-vault')}>Back to Materials</Button>
       </div>
     );
   }

@@ -4,6 +4,7 @@ export const navigationPermissions = {
   [Role.admin]: [
     'dashboard',
     'courses',
+    'knowledge-vault',
     'practice',
     'search',
     'learning-paths',
@@ -20,6 +21,7 @@ export const navigationPermissions = {
   [Role.instructor]: [
     'dashboard',
     'courses',
+    'knowledge-vault',
     'practice',
     'search',
     'learning-paths',
@@ -34,6 +36,7 @@ export const navigationPermissions = {
   [Role.student]: [
     'dashboard',
     'courses',
+    'knowledge-vault',
     'practice',
     'search',
     'learning-paths',
@@ -46,6 +49,7 @@ export const navigationPermissions = {
   [Role.moderator]: [
     'dashboard',
     'courses',
+    'knowledge-vault',
     'practice',
     'search',
     'learning-paths',

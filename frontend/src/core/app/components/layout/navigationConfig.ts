@@ -3,6 +3,7 @@ import {
   GraduationCap,
   Route,
   Brain,
+  Library,
   Calendar,
   Target,
   Users,
@@ -30,6 +31,18 @@ const navigationConfig: NavigationItem[] = [
     label: 'Courses',
     href: '/courses',
     icon: GraduationCap,
+  },
+  {
+    id: 'knowledge-vault',
+    label: 'Knowledge Vault',
+    href: '/knowledge-vault',
+    icon: Library,
+  },
+  {
+    id: 'study-planner',
+    label: 'Study Planner',
+    href: '/study-planner',
+    icon: Calendar,
   },
   {
     id: 'practice',
@@ -81,12 +94,6 @@ const navigationConfig: NavigationItem[] = [
     label: 'Learning Paths',
     href: '/learning-paths',
     icon: Route,
-  },
-  {
-    id: 'study-planner',
-    label: 'Study Planner',
-    href: '/study-planner',
-    icon: Calendar,
   },
   {
     id: 'progress-tracking',

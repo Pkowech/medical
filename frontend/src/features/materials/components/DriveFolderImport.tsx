@@ -392,7 +392,7 @@ export default function DriveFolderImport({
         toast.success(
           `${result.linked} linked from Drive; ${result.alreadyLinked} already linked.`
         );
-        router.push('/study-planner/materials');
+        router.push('/knowledge-vault');
       } else {
         toast.error(
           `${result.failed} file${result.failed === 1 ? '' : 's'} could not be linked. Review the results below.`

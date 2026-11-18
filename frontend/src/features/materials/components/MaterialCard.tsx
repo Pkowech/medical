@@ -71,7 +71,7 @@ export const MaterialCard: React.FC<MaterialCardProps> = React.memo(({
           <Button
             type="button"
             variant="outline"
-            onClick={() => router.push(`/study-planner/materials/${material.id}`)}
+            onClick={() => router.push(`/knowledge-vault/${material.id}`)}
             className="h-9 flex-1 rounded-lg"
           >
             View material

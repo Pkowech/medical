@@ -618,7 +618,7 @@ export default function MaterialsDashboard() {
             !sharingMaterialIds.has(material.id)
           }
           onToggleCourseSharing={toggleCourseSharing}
-          onView={(item) => router.push(`/study-planner/materials/${item.id}`)}
+          onView={(item) => router.push(`/knowledge-vault/${item.id}`)}
         />
       ))}
     </div>
@@ -799,7 +799,7 @@ export default function MaterialsDashboard() {
                         setFilterContext(tab.id as 'owned' | 'shared' | 'for_you');
                         if (tab.id !== 'shared') {
                           setSelectedCourseId(undefined);
-                          router.replace('/study-planner/materials');
+                          router.replace('/knowledge-vault');
                         }
                       }}
                       className={`inline-flex min-h-9 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-2.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 sm:min-h-10 sm:gap-2 sm:px-3 sm:text-sm ${
@@ -818,7 +818,7 @@ export default function MaterialsDashboard() {
               <div className="flex min-w-0 items-center gap-1.5 lg:flex-1 lg:justify-end">
                 {filterContext !== 'for_you' && (
                   <Button
-                    onClick={() => router.push('/study-planner/materials/upload')}
+                    onClick={() => router.push('/knowledge-vault/upload')}
                     aria-label="Add material"
                     className="h-10 w-10 shrink-0 gap-2 rounded-lg bg-blue-600 p-0 text-white hover:bg-blue-700 sm:w-auto sm:px-4"
                   >
@@ -919,7 +919,7 @@ export default function MaterialsDashboard() {
             onClick={() => {
               setSelectedCourseId(undefined);
               setFilterContext(requestedScope === 'owned' ? 'owned' : 'shared');
-              router.replace('/study-planner/materials');
+              router.replace('/knowledge-vault');
             }}
             className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-blue-700 dark:hover:text-blue-300"
           >
@@ -1515,7 +1515,7 @@ export default function MaterialsDashboard() {
                   Clear filters
                 </Button>
               ) : filterContext !== 'shared' ? (
-                <Button onClick={() => router.push('/study-planner/materials/upload')} className="rounded-lg bg-blue-600 text-white hover:bg-blue-700">
+                <Button onClick={() => router.push('/knowledge-vault/upload')} className="rounded-lg bg-blue-600 text-white hover:bg-blue-700">
                   Add material
                 </Button>
               ) : null}
@@ -1553,7 +1553,7 @@ export default function MaterialsDashboard() {
                   >
                     <div className="flex items-center gap-3 px-3 py-3.5 transition-colors hover:bg-background dark:hover:bg-card/60 sm:gap-4 sm:px-5">
                       <Link
-                        href={`/study-planner/materials?courseId=${encodeURIComponent(course.id)}&scope=${filterContext === 'owned' ? 'owned' : 'enrolled'}`}
+                        href={`/knowledge-vault?courseId=${encodeURIComponent(course.id)}&scope=${filterContext === 'owned' ? 'owned' : 'enrolled'}`}
                         className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500"
                         aria-label={`Open ${course.title} roadmap`}
                       >
@@ -1675,7 +1675,7 @@ export default function MaterialsDashboard() {
                             material={material}
                             canManageSharing={filterContext === 'owned' && !sharingMaterialIds.has(material.id)}
                             onToggleCourseSharing={toggleCourseSharing}
-                            onView={(item) => router.push(`/study-planner/materials/${item.id}`)}
+                            onView={(item) => router.push(`/knowledge-vault/${item.id}`)}
                           />
                         ))}
                       </div>

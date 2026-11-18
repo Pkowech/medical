@@ -148,81 +148,115 @@ export const MaterialPreviewModal = ({
   );
 
   useEffect(() => {
-    if (isOpen && materialId) {
-      const fetchMaterial = async () => {
-        setIsLoading(true);
+    if (!isOpen || !materialId) {
+      if (!isOpen) {
         setMaterial(null);
-        setPdfContent(null);
-        setPreviewError(null);
-        setPdfCurrentPage(1);
-        setPdfNumPages(null);
-        viewedPdfPagesRef.current = new Set();
-        setPdfPagesViewed(0);
-        setVideoProgressPercent(0);
-        const loadCachedPdf = async () => {
-          if (!userId || !topicId) return false;
-          const cached = await offlineService.getOfflineMaterial(userId, topicId, materialId);
-          if (!cached) return false;
-          const data: Material = fallbackMaterial ?? {
-            id: cached.materialId,
-            materialId: cached.materialId,
-            title: cached.title,
-            description: cached.description || '',
-            contentType: MaterialType.DOCUMENT,
-            content: '',
-            type: 'pdf',
-            topicId,
-            createdAt: new Date(cached.cachedAt).toISOString(),
-            updatedAt: new Date(cached.cachedAt).toISOString(),
-          };
-          const buffer = await cached.content.arrayBuffer();
-          setMaterial(data);
-          setPdfContent(new Uint8Array(buffer));
-          return true;
-        };
-
-        try {
-          if (!navigator.onLine) {
-            if (await loadCachedPdf()) return;
-            setPreviewError('This PDF is not saved on this device for offline use.');
-            return;
-          }
-
-          const data = await materialService.getMaterialWithFileUrl(materialId);
-          setMaterial(data);
-          const isPdf =
-            data.type?.toLowerCase() === 'pdf' ||
-            Boolean(data.previewFileUrl) ||
-            data.fileUrl?.toLowerCase().split('?')[0].endsWith('.pdf');
-          if (isPdf) {
-            setPdfContent(await materialService.getMaterialPreviewContent(materialId));
-          }
-        } catch (error) {
-          console.error('Error fetching material for preview:', error);
-          const status = (error as { status?: number; rawResponse?: { statusCode?: number } })
-            ?.status ?? (error as { rawResponse?: { statusCode?: number } })?.rawResponse?.statusCode;
-          if (status === 403 || status === 404) {
-            if (userId && topicId) {
-              await offlineService.removeOfflineTopicMaterial(userId, topicId, materialId);
-            }
-            setPreviewError(
-              status === 403
-                ? 'Access to this material has been revoked.'
-                : 'This material is no longer available.',
-            );
-          } else if (status === 401) {
-            setPreviewError('Sign in again while online to access this material.');
-          } else if (!(await loadCachedPdf())) {
-            setPreviewError('Unable to load this material preview.');
-          }
-        } finally {
-          setIsLoading(false);
-        }
-      };
-      fetchMaterial();
-    } else if (!isOpen) {
-      setMaterial(null);
+      }
+      return;
     }
+
+    const controller = new AbortController();
+    let isActive = true;
+    let didTimeout = false;
+    const timeoutId = window.setTimeout(() => {
+      didTimeout = true;
+      controller.abort();
+    }, 20_000);
+
+    const fetchMaterial = async () => {
+      setIsLoading(true);
+      setMaterial(null);
+      setPdfContent(null);
+      setPreviewError(null);
+      setPdfCurrentPage(1);
+      setPdfNumPages(null);
+      viewedPdfPagesRef.current = new Set();
+      setPdfPagesViewed(0);
+      setVideoProgressPercent(0);
+      const loadCachedPdf = async () => {
+        if (!userId || !topicId) return false;
+        const cached = await offlineService.getOfflineMaterial(userId, topicId, materialId);
+        if (!cached || !isActive || (controller.signal.aborted && !didTimeout)) return false;
+        const data: Material = fallbackMaterial ?? {
+          id: cached.materialId,
+          materialId: cached.materialId,
+          title: cached.title,
+          description: cached.description || '',
+          contentType: MaterialType.DOCUMENT,
+          content: '',
+          type: 'pdf',
+          topicId,
+          createdAt: new Date(cached.cachedAt).toISOString(),
+          updatedAt: new Date(cached.cachedAt).toISOString(),
+        };
+        const buffer = await cached.content.arrayBuffer();
+        if (!isActive || (controller.signal.aborted && !didTimeout)) return false;
+        setMaterial(data);
+        setPdfContent(new Uint8Array(buffer));
+        return true;
+      };
+
+      try {
+        if (!navigator.onLine) {
+          if (await loadCachedPdf()) return;
+          if (!controller.signal.aborted) {
+            setPreviewError('This PDF is not saved on this device for offline use.');
+          }
+          return;
+        }
+
+        const data = await materialService.getMaterialWithFileUrl(materialId, controller.signal);
+        if (!isActive) return;
+        setMaterial(data);
+        const isPdf =
+          data.type?.toLowerCase() === 'pdf' ||
+          Boolean(data.previewFileUrl) ||
+          data.fileUrl?.toLowerCase().split('?')[0].endsWith('.pdf');
+        if (isPdf) {
+          const content = await materialService.getMaterialPreviewContent(materialId, controller.signal);
+          if (isActive) setPdfContent(content);
+        }
+      } catch (error) {
+        if (!isActive) return;
+        if (controller.signal.aborted && !didTimeout) return;
+        if (didTimeout) {
+          if (!(await loadCachedPdf()) && isActive) {
+            if (fallbackMaterial) setMaterial(fallbackMaterial);
+            setPreviewError('This preview took too long to load. Check your connection and try again.');
+          }
+          return;
+        }
+        console.error('Error fetching material for preview:', error);
+        const status = (error as { status?: number; rawResponse?: { statusCode?: number } })
+          ?.status ?? (error as { rawResponse?: { statusCode?: number } })?.rawResponse?.statusCode;
+        if (status === 403 || status === 404) {
+          if (userId && topicId) {
+            await offlineService.removeOfflineTopicMaterial(userId, topicId, materialId);
+          }
+          if (!isActive) return;
+          setPreviewError(
+            status === 403
+              ? 'Access to this material has been revoked.'
+              : 'This material is no longer available.',
+          );
+        } else if (status === 401) {
+          setPreviewError('Sign in again while online to access this material.');
+        } else if (!(await loadCachedPdf()) && isActive) {
+          if (fallbackMaterial) setMaterial(fallbackMaterial);
+          setPreviewError('Unable to load this material preview.');
+        }
+      } finally {
+        window.clearTimeout(timeoutId);
+        if (isActive) setIsLoading(false);
+      }
+    };
+
+    void fetchMaterial();
+    return () => {
+      isActive = false;
+      window.clearTimeout(timeoutId);
+      controller.abort();
+    };
   }, [isOpen, materialId, topicId, userId, fallbackMaterial, retryAttempt]);
 
   useEffect(() => {

@@ -204,7 +204,10 @@ export function AssessmentDashboard() {
 
   const overallScore = summary?.overallScore ?? null;
   const questionsAttempted = summary?.questionsAttempted ?? (summary?.categoryBreakdown?.reduce((acc, c) => acc + (c.questionsAnswered || 0), 0) || 0);
-  const totalAttempts = summary?.totalAttempts ?? 0;
+  const summaryAttempts = typeof summary?.totalAttempts === 'number' && Number.isFinite(summary.totalAttempts)
+    ? summary.totalAttempts
+    : 0;
+  const totalAttempts = Math.max(summaryAttempts, history.length);
 
   if (isAdaptiveActive) {
     return (
@@ -247,7 +250,7 @@ export function AssessmentDashboard() {
             <CheckCircle2 className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">{loading ? '…' : summary ? totalAttempts : '—'}</div>
+            <div className="text-2xl font-bold text-foreground">{loading ? '…' : summary || !historyError ? totalAttempts : '—'}</div>
             <p className="text-xs text-muted-foreground mt-1">Evaluations submitted to date</p>
           </CardContent>
         </Card>

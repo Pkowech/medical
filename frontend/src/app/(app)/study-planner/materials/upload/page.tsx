@@ -150,11 +150,11 @@ export default function UploadMaterialPage() {
     if (params.get('driveConnected') === '1') {
       setSource('folder');
       toast.success('Personal Google Drive connected.');
-      router.replace('/study-planner/materials/upload', { scroll: false });
+      router.replace('/knowledge-vault/upload', { scroll: false });
     } else if (params.get('driveError')) {
       setSource('folder');
       toast.error('Google Drive connection was not completed.');
-      router.replace('/study-planner/materials/upload', { scroll: false });
+      router.replace('/knowledge-vault/upload', { scroll: false });
     }
   }, [router]);
 
@@ -259,7 +259,7 @@ export default function UploadMaterialPage() {
           shareWithCourse: canManagePlatformLibrary && shareWithCourse,
         });
         toast.success('Drive material linked.');
-        router.push('/study-planner/materials');
+        router.push('/knowledge-vault');
       } catch (err) {
         console.error('Drive material registration failed', err);
         toast.error(err instanceof Error ? err.message : 'Could not link Drive material');
@@ -313,7 +313,7 @@ export default function UploadMaterialPage() {
         },
       });
       toast.success('Material uploaded');
-      router.push('/study-planner/materials');
+      router.push('/knowledge-vault');
     } catch (err) {
       console.error('Upload failed', err);
       toast.error(err instanceof Error ? err.message : 'Failed to upload material');
@@ -351,7 +351,7 @@ export default function UploadMaterialPage() {
     <div className="mx-auto w-full max-w-3xl px-1 py-6 sm:px-2 sm:py-8">
       <button
         type="button"
-        onClick={() => router.push('/study-planner/materials')}
+        onClick={() => router.push('/knowledge-vault')}
         className="mb-5 inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-blue-700 dark:text-muted-foreground dark:hover:text-blue-300"
       >
         <ArrowLeft className="h-4 w-4" />

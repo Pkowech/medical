@@ -5,6 +5,7 @@ import {
   Brain,
   CalendarDays,
   ChevronRight,
+  Clock3,
   Flame,
   GraduationCap,
   Route,
@@ -23,6 +24,8 @@ import { ReviewQueue } from './ReviewQueue';
 import { useAuthStore } from '@/features/auth/store/useAuthStore';
 import { useProgress } from '@/shared/hooks/useProgress';
 import apiService from '@/features/auth/services/apiClient';
+import scheduleService from '@/features/learning-management/study/services/scheduleService';
+import type { ScheduleEvent } from '@/shared/types/studyInterface';
 
 // Minimal local types to avoid using `any` and keep this component focused
 type CourseProgress = { id: string; name: string; progressPercentage: number; lastUpdated?: number };
@@ -56,6 +59,21 @@ export const StudyDashboard: React.FC = () => {
   const queryClient = useQueryClient();
   const userId = useAuthStore(state => state.user?.id);
   const { progressData } = useProgress();
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todayEnd = new Date(todayStart);
+  todayEnd.setHours(23, 59, 59, 999);
+  const todayKey = todayStart.toISOString().slice(0, 10);
+  const {
+    data: todaySchedule,
+    isLoading: todayScheduleLoading,
+  } = useQuery({
+    queryKey: ['today-learning', userId, todayKey],
+    queryFn: () => scheduleService.getSessions(userId, todayStart, todayEnd),
+    enabled: Boolean(userId),
+    staleTime: 60 * 1000,
+    meta: { persist: Boolean(userId) },
+  });
   const {
     data: dashboard,
     isLoading,
@@ -97,6 +115,16 @@ export const StudyDashboard: React.FC = () => {
   const stats = dashboard?.stats;
   const courseProgress = dashboard?.courseProgress ?? [];
   const unitProgress = dashboard?.unitProgress ?? [];
+  const now = new Date();
+  const todayEvents = (todaySchedule?.events ?? [])
+    .filter((event: ScheduleEvent) =>
+      event.date >= todayStart &&
+      event.date <= todayEnd &&
+      !event.completed &&
+      (event.allDay ? event.date >= todayStart : event.endDate > now),
+    )
+    .sort((left: ScheduleEvent, right: ScheduleEvent) => left.date.getTime() - right.date.getTime())
+    .slice(0, 3);
   const peerComparison = progressData?.peerComparison;
   const peerStats: PeerStats | null = peerComparison
     ? {
@@ -190,14 +218,14 @@ export const StudyDashboard: React.FC = () => {
               icon: Target,
             },
             {
-              href: '/study-planner/materials',
-              label: 'Study materials',
+              href: '/knowledge-vault',
+              label: 'Knowledge Vault',
               description: 'Browse your saved study resources.',
               action: 'Browse materials',
               icon: BookOpen,
             },
             {
-              href: '/study-planner/materials/upload',
+              href: '/knowledge-vault/upload',
               label: 'Upload materials',
               description: 'Add notes and files to your library.',
               action: 'Upload a file',
@@ -221,6 +249,52 @@ export const StudyDashboard: React.FC = () => {
             </Link>
           ))}
         </nav>
+      </section>
+
+      <section aria-labelledby="today-learning" className="space-y-3 rounded-xl border border-border bg-card/80 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 id="today-learning" className="text-lg font-semibold text-foreground">
+              Today’s Learning
+            </h2>
+            <p className="text-sm text-muted-foreground">Your next scheduled learning sessions.</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => router.push('/study-planner/schedule')}
+            className="text-sm font-semibold text-blue-700 hover:underline dark:text-blue-300"
+          >
+            View schedule
+          </button>
+        </div>
+        {todayScheduleLoading ? (
+          <div role="status" aria-label="Loading today’s learning" className="h-16 animate-pulse rounded-lg bg-muted" />
+        ) : todayEvents.length > 0 ? (
+          <ul className="space-y-2">
+            {todayEvents.map(event => (
+              <li key={`${event.type ?? 'event'}-${event.id}`} className="flex items-start gap-3 rounded-lg border border-border bg-background/70 p-3">
+                <Clock3 aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-foreground">{event.title}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {event.allDay
+                      ? 'All day'
+                      : event.date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                    {event.location ? ` · ${event.location}` : ''}
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : todaySchedule?.errors.length ? (
+          <p role="status" className="text-sm text-muted-foreground">
+            Some schedule sources could not be loaded. Open the schedule to check your sessions.
+          </p>
+        ) : (
+          <p className="rounded-lg bg-background/70 px-3 py-4 text-sm text-muted-foreground">
+            No upcoming learning sessions today.
+          </p>
+        )}
       </section>
 
       <section aria-labelledby="study-connections" className="space-y-3">

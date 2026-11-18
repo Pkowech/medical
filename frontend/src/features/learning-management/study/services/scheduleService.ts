@@ -211,6 +211,16 @@ const scheduleService = {
             location: safeString(s.location, ''),
             instructor: (typeof s.instructor === 'string' ? s.instructor : null),
             completed: !!s.completed || !!metadata.completed,
+            courseId: typeof s.courseId === 'string'
+              ? s.courseId
+              : typeof metadata.courseId === 'string'
+                ? metadata.courseId
+                : null,
+            topicId: typeof s.topicId === 'string'
+              ? s.topicId
+              : typeof metadata.topicId === 'string'
+                ? metadata.topicId
+                : null,
             goalId: typeof metadata.goalId === 'string' ? metadata.goalId : undefined,
           } as ScheduleEvent;
         })
@@ -250,6 +260,8 @@ const scheduleService = {
             type: 'study',
             location: 'Virtual Classroom',
             completed: !!s.endTime,
+            courseId: typeof s.courseId === 'string' ? s.courseId : null,
+            topicId: typeof s.topicId === 'string' ? s.topicId : null,
           } as ScheduleEvent;
         })
         .filter(Boolean) as ScheduleEvent[];

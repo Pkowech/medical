@@ -314,6 +314,21 @@ export const pageMetadata: RouteMetadata[] = [
     description: 'Set and review your study and learning goals.',
   },
   {
+    path: '/knowledge-vault',
+    title: 'Knowledge Vault',
+    description: 'Browse and organize your study materials and learning resources.',
+  },
+  {
+    path: '/knowledge-vault/upload',
+    title: 'Upload Study Material',
+    description: 'Add a study resource to your Knowledge Vault.',
+  },
+  {
+    path: '/knowledge-vault/:id',
+    title: 'Study Material',
+    description: 'View this study resource and its details.',
+  },
+  {
     path: '/study-planner/materials',
     title: 'Study Materials',
     description: 'Browse and organize your study materials.',

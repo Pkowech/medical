@@ -83,6 +83,10 @@ export class QuizSubmissionListener {
     }
 
     try {
+      await this.analyticsService.invalidatePerformanceAnalyticsCache(
+        payload.userId,
+        payload.quizId,
+      );
       await this.progressService.updateProgress(payload.userId, payload.quizId);
       await this.analyticsService.generateAnalytics(payload.userId, payload.quizId);
 

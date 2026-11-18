@@ -1989,10 +1989,7 @@ export class AssessmentAnalyticsService implements OnModuleInit {
     assessmentId?: string,
   ): Promise<any> {
     await this.assertNoHiddenResults(userId, assessmentId);
-    const cacheKey = `${ANALYTICS_CACHE_CONFIG.ASSESSMENT.PREDICTIONS(
-      userId,
-      assessmentId,
-    )}:v4`;
+    const cacheKey = this.getPerformanceAnalyticsCacheKey(userId, assessmentId);
     const cachedAnalytics =
       await this.redisService.get<PerformanceAnalyticsDto>(cacheKey);
     if (cachedAnalytics !== null) {
@@ -2007,6 +2004,40 @@ export class AssessmentAnalyticsService implements OnModuleInit {
     await this.redisService.set(cacheKey, analytics, 12 * 60 * 60);
 
     return analytics;
+  }
+
+  private getPerformanceAnalyticsCacheKey(
+    userId: string,
+    assessmentId?: string,
+  ): string {
+    return `${ANALYTICS_CACHE_CONFIG.ASSESSMENT.PREDICTIONS(
+      userId,
+      assessmentId,
+    )}:v4`;
+  }
+
+  async invalidatePerformanceAnalyticsCache(
+    userId: string,
+    assessmentId?: string,
+  ): Promise<void> {
+    const cacheKeys = new Set([
+      this.getPerformanceAnalyticsCacheKey(userId),
+      ...(assessmentId
+        ? [this.getPerformanceAnalyticsCacheKey(userId, assessmentId)]
+        : []),
+    ]);
+
+    await Promise.all(
+      [...cacheKeys].map(async (cacheKey) => {
+        try {
+          await this.redisService.del(cacheKey);
+        } catch (error) {
+          this.logger.warn(
+            `Assessment data changed for user ${userId}, but analytics cache ${cacheKey} could not be invalidated: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+      }),
+    );
   }
 
   async getQuizHistory(userId: string) {
