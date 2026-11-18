@@ -183,6 +183,19 @@ export class StudyGroupsService {
   }
 
   async findOne(id: string, userId?: string): Promise<StudyGroupDetails> {
+    const studyGroup = await this.prisma.studyGroup.findUnique({
+      where: { id },
+      include: {
+        members: { include: { user: true } },
+        discussions: true,
+      },
+    });
+
+    if (!studyGroup) {
+      throw new NotFoundException('Study group not found');
+    }
+
+    const membership = await this.assertCanViewGroup(studyGroup, userId);
     const cacheKey = `study_group:${id}:${userId || 'no-user'}`;
     try {
       const cached = await this.redisService.get<string>(cacheKey);
@@ -198,39 +211,11 @@ export class StudyGroupsService {
       console.warn('Redis get failed:', error);
     }
 
-    const studyGroup = await this.prisma.studyGroup.findUnique({
-      where: { id },
-      include: {
-        members: { include: { user: true } },
-        discussions: true,
-      },
-    });
-
-    if (!studyGroup) {
-      throw new NotFoundException('Study group not found');
-    }
-
-    if (studyGroup.privacy === StudyGroupPrivacy.private && userId) {
-      const membership = await this.prisma.studyGroupMember.findFirst({
-        where: { studyGroupId: id, userId, status: MemberStatus.active },
-      });
-      if (!membership) {
-        throw new ForbiddenException('Access denied to private group');
-      }
-    }
-
     const result: StudyGroupDetails = {
       ...studyGroup,
-      userMembership: null,
-      isMember: false,
+      userMembership: membership,
+      isMember: !!membership,
     };
-    if (userId) {
-      const membership = await this.prisma.studyGroupMember.findFirst({
-        where: { studyGroupId: id, userId, status: MemberStatus.active },
-      });
-      result.userMembership = membership;
-      result.isMember = !!membership;
-    }
 
     try {
       await this.redisService.set(
@@ -791,11 +776,43 @@ export class StudyGroupsService {
     await this.invalidateCache('study_groups');
   }
 
-  async getMembers(groupId: string): Promise<StudyGroupMember[]> {
+  async getMembers(groupId: string, userId?: string): Promise<StudyGroupMember[]> {
+    const group = await this.prisma.studyGroup.findUnique({
+      where: { id: groupId },
+      select: { id: true, privacy: true },
+    });
+    if (!group) {
+      throw new NotFoundException('Study group not found');
+    }
+    await this.assertCanViewGroup(group, userId);
+
     return this.prisma.studyGroupMember.findMany({
       where: { studyGroupId: groupId },
       include: { user: true },
     });
+  }
+
+  private async assertCanViewGroup(
+    group: Pick<StudyGroup, 'id' | 'privacy'>,
+    userId?: string,
+  ): Promise<StudyGroupMember | null> {
+    if (!userId) {
+      if (group.privacy !== StudyGroupPrivacy.public) {
+        throw new ForbiddenException('Access denied to this group');
+      }
+      return null;
+    }
+
+    const membership = await this.prisma.studyGroupMember.findFirst({
+      where: { studyGroupId: group.id, userId, status: MemberStatus.active },
+    });
+    if (
+      group.privacy !== StudyGroupPrivacy.public &&
+      !membership
+    ) {
+      throw new ForbiddenException('Access denied to this group');
+    }
+    return membership;
   }
 
   private getLinkedCourseId(metadata: Prisma.JsonValue | null): string | undefined {

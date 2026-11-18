@@ -100,6 +100,8 @@ service.prisma = {
         id: attemptId,
         userId: 'user-1',
         quizId: 'quiz-1',
+        completedAt: new Date('2026-01-01T00:00:00.000Z'),
+        quiz: { topicPracticeForId: 'topic-1' },
         responses: [{ questionId: 'question-1', answer: ['option-1'] }],
       }),
     },

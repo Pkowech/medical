@@ -103,6 +103,17 @@ class QuizService {
     return response.data;
   }
 
+  async startTopicQuizAttempt(
+    topicId: string | number,
+    attemptId: string
+  ): Promise<StartedQuizAttempt> {
+    const response = await apiService.post<StartedQuizAttempt>(
+      `${this.baseUrl}/topic/${topicId}/start`,
+      { attemptId }
+    );
+    return response.data;
+  }
+
   async submitAnswer(
     attemptId: string,
     questionId: string,

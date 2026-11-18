@@ -196,6 +196,21 @@ export class QuizController {
     );
   }
 
+  @Post('topic/:topicId/start')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Start or resume a topic quiz attempt' })
+  async startTopicQuizAttempt(
+    @Request() req: any,
+    @Param('topicId') topicId: string,
+    @Body() body: StartQuizAttemptDto,
+  ) {
+    return this.quizService.startTopicQuizAttempt(
+      req.user.id,
+      topicId,
+      body.attemptId,
+    );
+  }
+
   @Post('topic/:topicId/offline-attempts')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Sync a formative offline topic-practice attempt' })

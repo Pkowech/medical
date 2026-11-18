@@ -1,18 +1,34 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { BookOpen, ChevronRight, Circle, CircleCheck, Clock, PlayCircle, Plus, Sparkles } from 'lucide-react';
+import { BookOpen, CalendarClock, ChevronRight, Circle, CircleCheck, Clock, PlayCircle, Plus, Sparkles, Target } from 'lucide-react';
 import { apiService } from '@/features/auth/services/apiClient';
 import { toast } from 'sonner';
 import { courseService } from '@/features/courses/services/courseService';
+import scheduleService from '@/features/learning-management/study/services/scheduleService';
+import { GoalCreationWizard } from '@/features/learning-management/components/goals/goal-creation-wizard';
 import type { Course } from '@/shared/types/courseInterface';
 import type { TopicProgress } from '@/shared/types/progressInterface';
 import { UnitSelectionModal } from './UnitSelectionModal';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { usePageHeader } from '@/core/providers/HeaderContext';
+import { Button } from '@/shared/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/shared/components/ui/dialog';
+
+const localDateTimeValue = (date: Date) => {
+  const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return localDate.toISOString().slice(0, 16);
+};
 
 type CourseProgress = {
   topicProgress?: Array<TopicProgress & { topicId?: string }>;
@@ -25,6 +41,19 @@ export function CourseOverview() {
   const { user } = useAuth();
   const { setHeader } = usePageHeader();
   const [showEnrollment, setShowEnrollment] = useState(false);
+  const [showGoalWizard, setShowGoalWizard] = useState(false);
+  const [showScheduleDialog, setShowScheduleDialog] = useState(false);
+  const [isScheduling, setIsScheduling] = useState(false);
+  const [scheduledStart, setScheduledStart] = useState(() => {
+    const nextHour = new Date();
+    nextHour.setMinutes(0, 0, 0);
+    nextHour.setHours(nextHour.getHours() + 1);
+    if (nextHour.getHours() >= 22) {
+      nextHour.setDate(nextHour.getDate() + 1);
+      nextHour.setHours(9);
+    }
+    return localDateTimeValue(nextHour);
+  });
 
   const { data: course, isLoading: courseLoading, error: courseError } = useQuery<Course>({
     queryKey: ['course-overview', courseId],
@@ -42,16 +71,24 @@ export function CourseOverview() {
     gcTime: 30 * 60 * 1000,
     meta: { persist: Boolean(user?.id) },
   });
-  const { data: connectedPaths = [] } = useQuery<Array<{ id: string; title: string; specialization?: string; pathType?: string }>>({
+  const {
+    data: connectedPaths = [],
+    isError: connectedPathsError,
+    refetch: refetchConnectedPaths,
+  } = useQuery<Array<{ id: string; title: string; specialization?: string; pathType?: string }>>({
     queryKey: ['course-connected-paths', courseId],
     queryFn: async () => {
-      try {
-        const response = await apiService.get<any>(`/learning-paths/by-course/${courseId}`);
-        const d = response.data?.data || response.data || [];
-        return Array.isArray(d) ? d : [];
-      } catch {
-        return [];
+      const response = await apiService.get<unknown>(`/learning-paths/by-course/${courseId}`);
+      let payload: unknown = response.data;
+      for (let depth = 0; depth < 3; depth += 1) {
+        if (Array.isArray(payload)) return payload as Array<{ id: string; title: string; specialization?: string; pathType?: string }>;
+        if (!payload || typeof payload !== 'object' || !('data' in payload)) break;
+        payload = payload.data;
       }
+      if (!Array.isArray(payload)) {
+        throw new Error('The course learning paths response was invalid.');
+      }
+      return payload as Array<{ id: string; title: string; specialization?: string; pathType?: string }>;
     },
     enabled: Boolean(courseId),
     staleTime: 10 * 60 * 1000,
@@ -116,6 +153,33 @@ export function CourseOverview() {
   const allUnitsEnrolled = Boolean(
     user && units.length > 0 && units.every(unit => enrolledUnitIds.has(String(unit.id))),
   );
+  const scheduleCourseStudy = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const startDate = new Date(scheduledStart);
+    if (Number.isNaN(startDate.getTime()) || startDate <= new Date()) {
+      toast.error('Choose a future date and time for this study session.');
+      return;
+    }
+    setIsScheduling(true);
+    try {
+      await scheduleService.createEvent({
+        title: `Study: ${course.title || course.name}`,
+        description: `Study session for ${course.title || course.name}. [courseId:${course.id}]`,
+        date: startDate,
+        endDate: new Date(startDate.getTime() + 45 * 60 * 1000),
+        type: 'study',
+        location: 'Study Planner',
+      });
+      await queryClient.invalidateQueries({ queryKey: ['course-roadmap-schedule', user?.id, course.id] });
+      toast.success('Study session added to your schedule.');
+      setShowScheduleDialog(false);
+    } catch (error) {
+      console.error('Could not schedule course study session:', error);
+      toast.error(error instanceof Error ? error.message : 'Could not add this session to your schedule.');
+    } finally {
+      setIsScheduling(false);
+    }
+  };
 
   return (
     <main className="min-h-full bg-[#f5f7fa] px-4 py-6 dark:bg-background md:px-8 md:py-9">
@@ -125,7 +189,14 @@ export function CourseOverview() {
             <div className="min-w-0">
               <h1 className="mt-2 text-3xl font-semibold text-foreground dark:text-foreground">{course.title || course.name}</h1>
               {course.description && <p className="mt-2 max-w-3xl text-sm leading-6 text-foreground/75 dark:text-foreground/75">{course.description}</p>}
-              {connectedPaths.length > 0 && (
+              {connectedPathsError ? (
+                <p role="alert" className="mt-3 text-sm text-rose-700 dark:text-rose-300">
+                  Course learning paths could not be loaded.{' '}
+                  <button type="button" className="font-medium underline" onClick={() => void refetchConnectedPaths()}>
+                    Retry
+                  </button>
+                </p>
+              ) : connectedPaths.length > 0 && (
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
                     <Sparkles className="h-3.5 w-3.5 text-blue-500" /> Part of Curricula:
@@ -162,6 +233,27 @@ export function CourseOverview() {
               </Link>
             )}
           </header>
+        )}
+
+        {user && (
+          <section className="flex flex-col gap-4 rounded-xl border border-border bg-card p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">Plan this course</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Set a course-specific learning goal or add focused study time to your planner.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" onClick={() => setShowGoalWizard(true)}>
+                <Target aria-hidden="true" className="mr-2 h-4 w-4" />
+                Set course goal
+              </Button>
+              <Button type="button" onClick={() => setShowScheduleDialog(true)}>
+                <CalendarClock aria-hidden="true" className="mr-2 h-4 w-4" />
+                Schedule study
+              </Button>
+            </div>
+          </section>
         )}
 
         <section className="space-y-5" aria-label="Course units">
@@ -312,6 +404,53 @@ export function CourseOverview() {
           }}
         />
       )}
+      <GoalCreationWizard
+        isOpen={showGoalWizard}
+        onClose={() => setShowGoalWizard(false)}
+        initialData={{ courseId: course.id }}
+        onGoalCreated={() => {
+          setShowGoalWizard(false);
+          void queryClient.invalidateQueries({ queryKey: ['course-roadmap-goals', user?.id, course.id] });
+          toast.success('Course goal created.');
+        }}
+      />
+      <Dialog
+        open={showScheduleDialog}
+        onOpenChange={open => {
+          if (!open && !isScheduling) setShowScheduleDialog(false);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Schedule course study</DialogTitle>
+            <DialogDescription>
+              Add a 45-minute study session for {course.title || course.name}.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={scheduleCourseStudy} className="space-y-4">
+            <label htmlFor="course-study-start" className="block text-sm font-medium text-foreground">
+              Start date and time
+            </label>
+            <input
+              id="course-study-start"
+              type="datetime-local"
+              required
+              min={localDateTimeValue(new Date())}
+              value={scheduledStart}
+              onChange={event => setScheduledStart(event.target.value)}
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            />
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setShowScheduleDialog(false)} disabled={isScheduling}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isScheduling}>
+                {isScheduling ? 'Scheduling…' : 'Add to schedule'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }

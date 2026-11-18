@@ -97,8 +97,8 @@ export class StudyGroupsController {
   @ApiParam({ name: 'id', description: 'Study group ID' })
   @ApiResponse({ status: 200, description: 'Study group found' })
   @ApiResponse({ status: 404, description: 'Study group not found' })
-  async findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.studyGroupsService.findOne(id);
+  async findOne(@Param('id', ParseUUIDPipe) id: string, @Request() req: any) {
+    return this.studyGroupsService.findOne(id, req.user.id);
   }
 
   @Put(':id')
@@ -166,8 +166,8 @@ export class StudyGroupsController {
     status: 200,
     description: 'Members retrieved successfully',
   })
-  async getMembers(@Param('id', ParseUUIDPipe) id: string) {
-    return this.studyGroupsService.getMembers(id);
+  async getMembers(@Param('id', ParseUUIDPipe) id: string, @Request() req: any) {
+    return this.studyGroupsService.getMembers(id, req.user.id);
   }
 
   @Post(':id/discussions')
@@ -196,8 +196,8 @@ export class StudyGroupsController {
     status: 200,
     description: 'Discussions retrieved successfully',
   })
-  async getDiscussions(@Param('id', ParseUUIDPipe) id: string) {
-    return this.studyGroupsService.getDiscussions(id);
+  async getDiscussions(@Param('id', ParseUUIDPipe) id: string, @Request() req: any) {
+    return this.studyGroupsService.getDiscussions(id, req.user.id);
   }
 
   @Post('discussions/:discussionId/messages')
@@ -225,7 +225,8 @@ export class StudyGroupsController {
   })
   async getMessages(
     @Param('discussionId', ParseUUIDPipe) discussionId: string,
+    @Request() req: any,
   ) {
-    return this.studyGroupsService.getMessages(discussionId);
+    return this.studyGroupsService.getMessages(discussionId, req.user.id);
   }
 }
