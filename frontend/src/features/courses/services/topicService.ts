@@ -10,14 +10,19 @@ export interface Material extends SharedMaterial {
 const toTopicWritePayload = ({
   name,
   title,
-  status: _status,
+  description,
   order,
   orderIndex,
-  ...topicData
+  estimatedMinutes,
+  quizQuestionCount,
+  isMandatory,
 }: Partial<Topic>) => ({
-  ...topicData,
-  name: name ?? title,
+  ...((name ?? title) !== undefined ? { name: name ?? title } : {}),
+  ...(description !== undefined ? { description } : {}),
   ...((orderIndex ?? order) !== undefined ? { order: orderIndex ?? order } : {}),
+  ...(estimatedMinutes !== undefined ? { estimatedMinutes } : {}),
+  ...(quizQuestionCount !== undefined ? { quizQuestionCount } : {}),
+  ...(isMandatory !== undefined ? { isMandatory } : {}),
 });
 
 class TopicService {
