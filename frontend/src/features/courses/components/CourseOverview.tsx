@@ -449,7 +449,45 @@ export function CourseOverview() {
           )}
         </header>
 
-        <section className="space-y-5" aria-label="Course units">
+        <section
+          aria-labelledby="course-study-cycle-heading"
+          className="rounded-xl border border-blue-200 bg-blue-50/60 p-5 dark:border-blue-900 dark:bg-blue-950/20"
+        >
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="max-w-3xl">
+              <h2 id="course-study-cycle-heading" className="text-lg font-semibold text-foreground">
+                A study cycle for this course
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Build understanding by moving from reading to retrieval, then revisit material over time.
+              </p>
+              <ol className="mt-4 grid gap-3 text-sm text-muted-foreground sm:grid-cols-2">
+                <li><span className="font-semibold text-foreground">1. Read:</span> Work through a unit’s materials one topic at a time.</li>
+                <li><span className="font-semibold text-foreground">2. Recall:</span> Close the material and write key ideas from memory in Notes.</li>
+                <li><span className="font-semibold text-foreground">3. Assess:</span> Take the unit’s self-paced assessment and review the explanations.</li>
+                <li><span className="font-semibold text-foreground">4. Review:</span> Return to saved and missed-question flashcards when they are due.</li>
+              </ol>
+            </div>
+            <div className="flex shrink-0 flex-wrap gap-2">
+              <Link
+                href="#course-units"
+                className="inline-flex min-h-10 items-center justify-center rounded-md border border-border bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-muted"
+              >
+                Choose a unit
+              </Link>
+              {user && (
+                <Link
+                  href={`/flashcards/all?courseId=${encodeURIComponent(String(course.id))}`}
+                  className="inline-flex min-h-10 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+                >
+                  Review due flashcards
+                </Link>
+              )}
+            </div>
+          </div>
+        </section>
+
+        <section id="course-units" className="space-y-5" aria-label="Course units">
           <div className="flex flex-wrap items-end justify-between gap-2">
             <div>
               <h2 className="text-xl font-semibold text-foreground dark:text-foreground">Learning roadmap</h2>
