@@ -359,7 +359,7 @@ export class GoogleDriveService {
         message.includes('storage quota')
       ) {
         throw new BadRequestException(
-          'Your linked Google Drive is out of storage. Free up space or choose another storage option.',
+          'Your linked Google Drive is out of storage. Free up space or connect a Drive account with available capacity.',
         );
       }
       if (

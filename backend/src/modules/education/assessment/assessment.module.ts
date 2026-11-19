@@ -20,6 +20,9 @@ import { AssessmentProgressController } from './controllers/assessment-progress.
 
 import { QuizService } from './services/quiz.service';
 import { FlashcardsService } from './services/flashcards.service';
+import { FlashcardSchedulingService } from './services/flashcard-scheduling.service';
+import { QuizReviewIngestionService } from './services/quiz-review-ingestion.service';
+import { FlashcardSyncService } from './services/flashcard-sync.service';
 import { AdaptiveQuizService } from './services/adaptive-quiz.service';
 import { FeedbackService } from './services/feedback.service';
 import { QuestionBankService } from './services/question-bank.service';
@@ -55,6 +58,9 @@ import { QuizSubmissionListener } from './services/quiz-submission.listener';
   providers: [
     QuizService,
     FlashcardsService,
+    FlashcardSchedulingService,
+    QuizReviewIngestionService,
+    FlashcardSyncService,
     AdaptiveQuizService,
     FeedbackService,
     QuestionBankService,
@@ -70,6 +76,9 @@ import { QuizSubmissionListener } from './services/quiz-submission.listener';
   exports: [
     QuizService,
     FlashcardsService,
+    FlashcardSchedulingService,
+    QuizReviewIngestionService,
+    FlashcardSyncService,
     AdaptiveQuizService,
     FeedbackService,
     QuestionBankService,

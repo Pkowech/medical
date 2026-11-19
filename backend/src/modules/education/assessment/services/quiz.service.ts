@@ -37,7 +37,7 @@ import {
   QuestionBankFilters,
 } from '#common/dto/question-bank.dto';
 import { QuestionBankService } from './question-bank.service';
-import { FlashcardsService } from './flashcards.service';
+import { QuizReviewIngestionService } from './quiz-review-ingestion.service';
 import {
   AssessmentRecommendationService,
   QuizPerformanceRecommendations,
@@ -389,7 +389,7 @@ export class QuizService {
     private readonly questionBankService: QuestionBankService,
     private readonly searchSync: GlobalSearchSyncService,
     private readonly eventEmitter: EventEmitter2,
-    private readonly flashcardsService: FlashcardsService,
+    private readonly quizReviewIngestionService: QuizReviewIngestionService,
     private readonly recommendationService: AssessmentRecommendationService,
   ) {}
 
@@ -3477,7 +3477,7 @@ export class QuizService {
       let reviewCardsScheduled = 0;
       try {
         reviewCardsScheduled =
-          await this.flashcardsService.recordTopicQuizReviews(
+          await this.quizReviewIngestionService.recordTopicQuizReviews(
             userId,
             topicId,
             reviewAnswers,
@@ -3799,7 +3799,7 @@ export class QuizService {
           );
       }
       try {
-        await this.flashcardsService.recordTopicQuizReviews(
+        await this.quizReviewIngestionService.recordTopicQuizReviews(
           userId,
           topicId,
           graded.responses.map(({ questionId, isCorrect }) => ({

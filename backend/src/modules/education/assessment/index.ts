@@ -4,4 +4,7 @@ export * from './controllers/flashcards.controller';
 export * from './controllers/feedback.controller';
 export * from './services/quiz.service';
 export * from './services/flashcards.service';
+export * from './services/flashcard-scheduling.service';
+export * from './services/quiz-review-ingestion.service';
+export * from './services/flashcard-sync.service';
 export * from './services/feedback.service';

@@ -224,6 +224,8 @@ export const MaterialPreviewModal = ({
           Boolean(data.previewFileUrl) ||
           data.fileUrl?.toLowerCase().split('?')[0].endsWith('.pdf') ||
           Boolean(data.metadata?.drivePreviewFileId) ||
+          driveMimeType === 'application/pdf' ||
+          driveMimeType.startsWith('application/vnd.google-apps.') ||
           isDriveOfficeDocument;
         if (isPdf) {
           const content = await materialService.getMaterialPreviewContent(materialId, controller.signal);

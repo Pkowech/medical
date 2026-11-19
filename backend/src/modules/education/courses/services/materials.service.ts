@@ -790,6 +790,10 @@ export class MaterialsService {
       ) {
         const driveFileId =
           typeof metadata.driveFileId === 'string' ? metadata.driveFileId : '';
+        const driveOwnerId =
+          typeof metadata.driveAuthUserId === 'string'
+            ? metadata.driveAuthUserId
+            : userId;
         const otherReferences = driveFileId
           ? await this.prisma.material.count({
               where: {
@@ -799,11 +803,11 @@ export class MaterialsService {
             })
           : 0;
         if (driveFileId && otherReferences === 0) {
-          await this.googleDrive.deletePersonalMaterial(userId, driveFileId);
+          await this.googleDrive.deletePersonalMaterial(driveOwnerId, driveFileId);
         }
         if (typeof metadata.drivePreviewFileId === 'string') {
           await this.googleDrive.deletePersonalMaterial(
-            userId,
+            driveOwnerId,
             metadata.drivePreviewFileId,
           );
         }

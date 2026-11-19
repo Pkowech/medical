@@ -12,6 +12,8 @@ import {
 } from '@nestjs/common';
 import { User } from '@prisma/client';
 import { FlashcardsService } from '../services/flashcards.service';
+import { FlashcardSchedulingService } from '../services/flashcard-scheduling.service';
+import { FlashcardSyncService } from '../services/flashcard-sync.service';
 import { JwtAuthGuard } from '#modules/auth/guards/jwt-auth.guard';
 import { CurrentUser } from '#common/decorators/current-user.decorator';
 import { Role } from '#modules/auth/constants/role.constants';
@@ -21,7 +23,11 @@ import { CreateFlashcardDto } from '#common/dto';
 @Controller('flashcards')
 @UseGuards(JwtAuthGuard)
 export class FlashcardsController {
-  constructor(private readonly flashcardsService: FlashcardsService) {}
+  constructor(
+    private readonly flashcardsService: FlashcardsService,
+    private readonly schedulingService: FlashcardSchedulingService,
+    private readonly syncService: FlashcardSyncService,
+  ) {}
 
   @Post('create')
   async createFlashcard(
@@ -58,7 +64,7 @@ export class FlashcardsController {
     @CurrentUser() currentUser: User,
   ) {
     this.assertCanAccessUser(currentUser, userId);
-    return this.flashcardsService.getScheduledReviews(
+    return this.schedulingService.getScheduledReviews(
       userId,
       new Date(startDate),
       new Date(endDate),
@@ -99,7 +105,7 @@ export class FlashcardsController {
     @CurrentUser() currentUser: User,
   ) {
     this.assertCanAccessUser(currentUser, userId);
-    return this.flashcardsService.getCardStats(userId, {
+    return this.schedulingService.getCardStats(userId, {
       courseId,
       unitId,
       topicId,
@@ -112,7 +118,7 @@ export class FlashcardsController {
     @CurrentUser() currentUser: User,
   ) {
     this.assertCanAccessUser(currentUser, userId);
-    return this.flashcardsService.getHighRiskTopics(userId);
+    return this.schedulingService.getHighRiskTopics(userId);
   }
 
   @Post('sync/:userId')
@@ -122,7 +128,7 @@ export class FlashcardsController {
     @CurrentUser() currentUser: User,
   ) {
     this.assertCanAccessUser(currentUser, userId);
-    return this.flashcardsService.syncCards(userId, cards);
+    return this.syncService.syncCards(userId, cards);
   }
 
   private assertCanAccessUser(currentUser: User, requestedUserId: string): void {

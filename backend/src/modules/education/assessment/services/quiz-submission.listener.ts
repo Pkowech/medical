@@ -3,7 +3,7 @@ import { OnEvent } from '@nestjs/event-emitter';
 import { AssessmentAnalyticsService } from '#modules/ai-analytics/services/assessment-analytics.service';
 import { MasteryGateService } from '../../courses/services/mastery-gate.service';
 import { AssessmentProgressService } from './assessment-progress.service';
-import { FlashcardsService } from './flashcards.service';
+import { QuizReviewIngestionService } from './quiz-review-ingestion.service';
 
 type QuizSubmittedEvent = {
   userId: string;
@@ -73,7 +73,7 @@ export class QuizSubmissionListener {
     private readonly progressService: AssessmentProgressService,
     private readonly analyticsService: AssessmentAnalyticsService,
     private readonly masteryGateService: MasteryGateService,
-    private readonly flashcardsService: FlashcardsService,
+    private readonly quizReviewIngestionService: QuizReviewIngestionService,
   ) {}
 
   @OnEvent('quiz.submitted', { async: true })
@@ -109,7 +109,7 @@ export class QuizSubmissionListener {
       }
 
       if (payload.reviewAnswers.length > 0) {
-        await this.flashcardsService.recordTopicQuizReviews(
+        await this.quizReviewIngestionService.recordTopicQuizReviews(
           payload.userId,
           payload.topicId,
           payload.reviewAnswers,
