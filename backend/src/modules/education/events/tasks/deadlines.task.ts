@@ -29,6 +29,13 @@ export class DeadlinesTask {
     const oneDayLater = new Date(utcToday + 24 * 60 * 60 * 1000);
     const twoDaysLater = new Date(utcToday + 48 * 60 * 60 * 1000);
 
+    await this.notifyForWindow(
+      new Date(utcToday),
+      'due today',
+      'today',
+      NotificationPriority.high,
+    );
+
     // Send calendar-day reminders for deadlines due tomorrow and in two days.
     await this.notifyForWindow(
       oneDayLater,

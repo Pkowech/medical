@@ -28,15 +28,17 @@ export class FlashcardsService {
 
   private getProgressScopeWhere(filters: {
     courseId?: string;
+    unitId?: string;
     topicId?: string;
   }): Prisma.UserFlashcardProgressWhereInput {
-    if (!filters.courseId && !filters.topicId) return {};
+    if (!filters.courseId && !filters.unitId && !filters.topicId) return {};
 
     return {
       flashcard: {
         question: {
           is: {
             ...(filters.topicId ? { topicIds: { has: filters.topicId } } : {}),
+            ...(filters.unitId ? { unitId: filters.unitId } : {}),
             ...(filters.courseId
               ? {
                   OR: [
@@ -138,7 +140,7 @@ export class FlashcardsService {
   @ApiResponse({ status: 200, description: 'User flashcard statistics' })
   async getCardStats(
     userId: string,
-    filters: { courseId?: string; topicId?: string } = {},
+    filters: { courseId?: string; unitId?: string; topicId?: string } = {},
   ): Promise<{
     totalCards: number;
     dueToday: number;
@@ -159,13 +161,16 @@ export class FlashcardsService {
         easeFactor: true,
         interval: true,
         repetitions: true,
+        correctStreak: true,
         nextReview: true,
       },
     });
     const dueToday = cards.filter(
       (card) => card.nextReview <= new Date(),
     ).length;
-    const mastered = cards.filter((card) => card.repetitions >= 2).length;
+    const mastered = cards.filter(
+      (card) => card.correctStreak >= 2 && card.interval >= 30,
+    ).length;
     const totalInterval = cards.reduce((sum, card) => sum + card.interval, 0);
     const totalEaseFactor = cards.reduce(
       (sum, card) => sum + card.easeFactor,
@@ -200,7 +205,7 @@ export class FlashcardsService {
   })
   async getDueCards(
     userId: string,
-    filters: { courseId?: string; topicId?: string } = {},
+    filters: { courseId?: string; unitId?: string; topicId?: string } = {},
   ): Promise<Array<UserFlashcardProgress & { flashcard: Flashcard }>> {
     return this.prisma.userFlashcardProgress.findMany({
       where: {
@@ -217,6 +222,7 @@ export class FlashcardsService {
     userId: string,
     startDate: Date,
     endDate: Date,
+    filters: { courseId?: string; unitId?: string; topicId?: string } = {},
   ): Promise<
     Array<{
       date: string;
@@ -224,6 +230,7 @@ export class FlashcardsService {
       description: string;
       count: number;
       courseId: string | null;
+      unitId: string | null;
       topicId: string | null;
     }>
   > {
@@ -237,7 +244,11 @@ export class FlashcardsService {
 
     const [progressCards, topics] = await Promise.all([
       this.prisma.userFlashcardProgress.findMany({
-        where: { userId, nextReview: { lte: endDate } },
+        where: {
+          userId,
+          nextReview: { lte: endDate },
+          ...this.getProgressScopeWhere(filters),
+        },
         select: {
           nextReview: true,
           flashcard: {
@@ -273,6 +284,7 @@ export class FlashcardsService {
         description: string;
         count: number;
         courseId: string | null;
+        unitId: string | null;
         topicId: string | null;
       }
     >();
@@ -282,9 +294,10 @@ export class FlashcardsService {
       const topicId = question?.topicIds[0] ?? null;
       const topicName = topicId ? topicNames.get(topicId) : undefined;
       const course = question?.course ?? question?.unit?.course;
+      const unitId = question?.unit?.id ?? null;
       const reviewDay = progress.nextReview.toISOString().slice(0, 10);
       const date = reviewDay < startDay ? startDay : reviewDay;
-      const key = `${date}:${course?.id ?? 'general'}:${topicId ?? 'general'}`;
+      const key = `${date}:${course?.id ?? 'general'}:${unitId ?? 'general'}:${topicId ?? 'general'}`;
       const existing = groups.get(key);
       if (existing) {
         existing.count += 1;
@@ -299,6 +312,7 @@ export class FlashcardsService {
             : 'Spaced repetition review',
           count: 1,
           courseId: course?.id ?? null,
+          unitId,
           topicId,
         });
       }
@@ -465,6 +479,15 @@ export class FlashcardsService {
         let flashcard = await tx.flashcard.findFirst({
           where: { questionId: question.id },
         });
+        const existingProgress = flashcard
+          ? await tx.userFlashcardProgress.findUnique({
+              where: {
+                userId_flashcardId: { userId, flashcardId: flashcard.id },
+              },
+            })
+          : null;
+        if (answer.isCorrect && !existingProgress) continue;
+
         if (!flashcard) {
           const correctAnswers = question.options
             .filter((option) => option.isCorrect)

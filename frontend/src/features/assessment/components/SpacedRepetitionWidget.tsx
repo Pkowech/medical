@@ -180,7 +180,9 @@ export const SpacedRepetitionWidget = () => {
                       variant="ghost"
                       aria-label={`Open flashcards for ${topic.topicName}`}
                       className="flex-shrink-0"
-                      onClick={() => router.push(`/flashcards?topic=${topic.topicId}`)}
+                      onClick={() =>
+                        router.push(`/flashcards/all?topicId=${encodeURIComponent(topic.topicId)}`)
+                      }
                     >
                       <ArrowRight className="w-4 h-4" />
                     </Button>

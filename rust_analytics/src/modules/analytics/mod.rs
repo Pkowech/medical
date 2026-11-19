@@ -11,7 +11,6 @@ pub mod learning;
 pub mod models;
 #[cfg(feature = "ml")]
 pub mod patterns;
-#[cfg(feature = "ml")]
 pub mod performance;
 pub mod progress_tracking;
 pub mod recommendations;

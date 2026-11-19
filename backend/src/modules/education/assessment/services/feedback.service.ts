@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 import { PrismaService } from '#infrastructure/prisma/prisma.service';
 import { RedisService } from '#infrastructure/redis/redis.service';
 import { AssessmentAnalyticsService } from '#modules/ai-analytics/services/assessment-analytics.service';
@@ -34,7 +35,15 @@ export class FeedbackService {
     userAnswer: any,
     responseTime: number,
   ): Promise<DetailedFeedback> {
-    const cacheKey = `feedback:${userId}:${questionId}`;
+    const answerFingerprint = createHash('sha256')
+      .update(
+        JSON.stringify({
+          answer: userAnswer ?? null,
+          responseTime,
+        }),
+      )
+      .digest('hex');
+    const cacheKey = `feedback:${userId}:${questionId}:${answerFingerprint}`;
     const cachedFeedback = await this.redisService.get(cacheKey);
     if (cachedFeedback) {
       return JSON.parse(cachedFeedback);

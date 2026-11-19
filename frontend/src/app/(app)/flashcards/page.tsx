@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/features/auth/store/useAuthStore';
 import { useSpacedRepetition } from '@/features/assessment/hooks/useSpacedRepetition';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/shared/components/ui/card';
@@ -11,8 +11,14 @@ import { Progress } from '@/shared/components/ui/progress';
 
 export default function FlashcardsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user } = useAuthStore();
-  const { stats, isLoading, refreshCards } = useSpacedRepetition(user?.id || '');
+  const filters = {
+    courseId: searchParams.get('courseId') ?? undefined,
+    unitId: searchParams.get('unitId') ?? undefined,
+    topicId: searchParams.get('topicId') ?? undefined,
+  };
+  const { stats, isLoading, refreshCards } = useSpacedRepetition(user?.id || '', filters);
 
   if (isLoading) {
     return (
@@ -50,7 +56,7 @@ export default function FlashcardsPage() {
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Total Mastered</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Long-interval cards</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center">
@@ -88,14 +94,20 @@ export default function FlashcardsPage() {
             </p>
             <div className="space-y-1">
               <div className="flex justify-between text-xs text-muted-foreground mb-1">
-                <span>Mastery Progress</span>
-                <span>{stats?.total ? Math.round(((stats.total - stats.due) / stats.total) * 100) : 0}%</span>
+                <span>Long interval (30+ days)</span>
+                <span>{stats?.total ? Math.round(((stats.mastered || 0) / stats.total) * 100) : 0}%</span>
               </div>
-              <Progress value={stats?.total ? ((stats.total - stats.due) / stats.total) * 100 : 0} className="h-2" />
+              <Progress value={stats?.total ? ((stats.mastered || 0) / stats.total) * 100 : 0} className="h-2" />
             </div>
           </CardContent>
           <CardFooter>
-            <Button className="w-full" onClick={() => router.push('/flashcards/all')}>
+            <Button
+              className="w-full"
+              onClick={() => {
+                const query = searchParams.toString();
+                router.push(`/flashcards/all${query ? `?${query}` : ''}`);
+              }}
+            >
               Study Now
             </Button>
           </CardFooter>

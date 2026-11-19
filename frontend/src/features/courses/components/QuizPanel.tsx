@@ -4,8 +4,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import {
   quizService,
+  type DetailedQuestionFeedback,
   type QuizPerformanceRecommendations,
 } from '@/features/assessment/services/quiz';
+import { QuestionFeedbackReview } from '@/features/assessment/components/QuestionFeedbackReview';
+import { useAuthStore } from '@/features/auth/store/useAuthStore';
 import { useXapi } from '@/lib/xapi/useXapi';
 import { URLS } from '@/lib/urls';
 import { AlertCircle, CheckCircle, Clock3, RefreshCw, Send } from 'lucide-react';
@@ -46,6 +49,7 @@ export const QuizPanel = ({
 }: QuizPanelProps) => {
   const { trackAction, XAPI_VERBS } = useXapi();
   const { activeSession, recordCourseActivity } = useCourseStudySession();
+  const userId = useAuthStore(state => state.user?.id ?? '');
   const [attemptId, setAttemptId] = useState<string | null>(null);
   const [expiresAt, setExpiresAt] = useState<number | null>(null);
   const [timeRemainingSeconds, setTimeRemainingSeconds] = useState<number | null>(null);
@@ -60,6 +64,11 @@ export const QuizPanel = ({
   const [submissionError, setSubmissionError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [resultsAvailable, setResultsAvailable] = useState(true);
+  const [questionFeedback, setQuestionFeedback] = useState<
+    Record<string, DetailedQuestionFeedback>
+  >({});
+  const [isQuestionFeedbackLoading, setIsQuestionFeedbackLoading] = useState(false);
+  const [questionFeedbackError, setQuestionFeedbackError] = useState<string | null>(null);
   const finalizingRef = useRef(false);
   const finalizeRef = useRef<(() => Promise<void>) | null>(null);
   const [finalResult, setFinalResult] = useState<{
@@ -75,6 +84,41 @@ export const QuizPanel = ({
     resultsAvailable?: boolean;
   } | null>(null);
 
+  const loadQuestionFeedback = React.useCallback(
+    async (reviewQuestions: Question[], answers: Record<string, string[]>) => {
+      if (!userId || !lessonId) {
+        setQuestionFeedbackError('Answer explanations are unavailable for this account.');
+        return;
+      }
+
+      setIsQuestionFeedbackLoading(true);
+      setQuestionFeedbackError(null);
+      const results = await Promise.allSettled(
+        reviewQuestions.map(question =>
+          quizService.getDetailedQuestionFeedback(
+            userId,
+            String(lessonId),
+            question.id,
+            answers[question.id] ?? [],
+            question.type,
+          ),
+        ),
+      );
+      const feedback: Record<string, DetailedQuestionFeedback> = {};
+      results.forEach((result, index) => {
+        if (result.status === 'fulfilled') {
+          feedback[reviewQuestions[index].id] = result.value;
+        }
+      });
+      setQuestionFeedback(feedback);
+      if (results.some(result => result.status === 'rejected')) {
+        setQuestionFeedbackError('Some answer explanations could not be loaded.');
+      }
+      setIsQuestionFeedbackLoading(false);
+    },
+    [lessonId, userId],
+  );
+
   const fetchQuestions = React.useCallback(async () => {
     if (!lessonId) {
       setIsLoading(false);
@@ -84,6 +128,8 @@ export const QuizPanel = ({
     setLoadError(null);
     setQuizComplete(false);
     setFinalResult(null);
+    setQuestionFeedback({});
+    setQuestionFeedbackError(null);
     try {
       let data: Question[];
       let startedAttempt: Awaited<ReturnType<typeof quizService.startQuizAttempt>> | null = null;
@@ -244,6 +290,9 @@ export const QuizPanel = ({
           });
           setResultsAvailable(completedResult.resultsAvailable !== false);
           setQuizComplete(true);
+          if (completedResult.resultsAvailable !== false) {
+            void loadQuestionFeedback(questionsToShow, savedAnswers);
+          }
           window.localStorage.removeItem(`quiz-attempt:${scope}:${lessonId}`);
           window.localStorage.removeItem(`quiz-attempt-draft:${startedAttempt.attemptId}`);
       }
@@ -252,7 +301,7 @@ export const QuizPanel = ({
     } finally {
       setIsLoading(false);
     }
-  }, [lessonId, scope]);
+  }, [lessonId, loadQuestionFeedback, scope]);
 
   useEffect(() => {
     void fetchQuestions();
@@ -406,6 +455,9 @@ export const QuizPanel = ({
       setResultsAvailable(result.resultsAvailable !== false);
       setFinalResult(result);
       setQuizComplete(true);
+      if (result.resultsAvailable !== false) {
+        void loadQuestionFeedback(questions, submittedAnswers);
+      }
       try {
         window.localStorage.removeItem(`quiz-attempt:${scope}:${lessonId}`);
         if (attemptId) {
@@ -701,6 +753,27 @@ export const QuizPanel = ({
               ) : null}
             </section>
           ))}
+
+        {showResults && (
+          <QuestionFeedbackReview
+            userId={userId}
+            items={questions.flatMap(question => {
+              const feedback = questionFeedback[question.id];
+              return feedback
+                ? [{
+                    questionId: question.id,
+                    question: question.text,
+                    options: question.options,
+                    selectedOptionIds: submittedAnswers[question.id] ?? [],
+                    feedback,
+                  }]
+                : [];
+            })}
+            isLoading={isQuestionFeedbackLoading}
+            error={questionFeedbackError}
+            onRetry={() => void loadQuestionFeedback(questions, submittedAnswers)}
+          />
+        )}
 
         <button
           onClick={() => {

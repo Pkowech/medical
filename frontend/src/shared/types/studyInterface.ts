@@ -96,6 +96,7 @@ export interface ScheduleEvent {
   category?: string; // academic, social, personal, work
   color?: string; // Hex color for custom styling
   courseId?: string | null;
+  unitId?: string | null;
   topicId?: string | null;
   learningPathId?: string | null;
   goalId?: string;

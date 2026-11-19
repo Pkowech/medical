@@ -147,7 +147,7 @@ impl SpacedRepetitionAnalytics {
             "#,
         )
         .bind(user_id)
-        .bind(now)
+        .bind(now.naive_utc())
         .fetch_one(&self.db)
         .await
         .map_err(|e| SpacedRepetitionError::DatabaseError(e.to_string()))?;
@@ -197,11 +197,11 @@ impl SpacedRepetitionAnalytics {
         .map_err(|e| SpacedRepetitionError::DatabaseError(e.to_string()))?;
 
         // Calculate averages
-        let (avg_ease_factor, avg_interval): (Option<f64>, Option<i32>) = sqlx::query_as(
+        let (avg_ease_factor, avg_interval): (Option<f64>, Option<f64>) = sqlx::query_as(
             r#"
             SELECT 
               AVG(ease_factor),
-              AVG(CAST(interval AS INTEGER))
+              AVG(interval)::DOUBLE PRECISION
             FROM user_flashcard_progress 
             WHERE user_id = $1
             "#,
@@ -223,7 +223,7 @@ impl SpacedRepetitionAnalytics {
             "#,
         )
         .bind(user_id)
-        .bind(seven_days_ago)
+        .bind(seven_days_ago.naive_utc())
         .fetch_one(&self.db)
         .await
         .map_err(|e| SpacedRepetitionError::DatabaseError(e.to_string()))?;
@@ -235,7 +235,7 @@ impl SpacedRepetitionAnalytics {
             learning_cards,
             relearning_cards,
             avg_ease_factor: avg_ease_factor.unwrap_or(2.5),
-            avg_interval_days: avg_interval.unwrap_or(0) as f64,
+            avg_interval_days: avg_interval.unwrap_or(0.0),
             recent_pass_rate: recent_pass_rate.unwrap_or(0.0),
         })
     }
@@ -243,7 +243,7 @@ impl SpacedRepetitionAnalytics {
     /// Get retention rates broken down by interval
     pub async fn get_retention_by_interval(
         &self,
-        _user_id: &str,
+        user_id: &str,
     ) -> Result<Vec<IntervalRetention>, SpacedRepetitionError> {
         let results = sqlx::query_as::<_, (i32, i64, i64)>(
             r#"
@@ -260,12 +260,12 @@ impl SpacedRepetitionAnalytics {
                 CASE 
                   WHEN last_review IS NOT NULL AND 
                        (
-                         (interval <= 1 AND last_review > NOW() - INTERVAL '1 day') OR
-                         (interval <= 6 AND last_review > NOW() - INTERVAL '6 days') OR
-                         (interval <= 14 AND last_review > NOW() - INTERVAL '14 days') OR
-                         (interval <= 30 AND last_review > NOW() - INTERVAL '30 days') OR
-                         (interval <= 90 AND last_review > NOW() - INTERVAL '90 days') OR
-                         (interval > 90 AND last_review > NOW() - INTERVAL '180 days')
+                         (interval <= 1 AND last_review > (NOW() AT TIME ZONE 'UTC') - INTERVAL '1 day') OR
+                         (interval <= 6 AND last_review > (NOW() AT TIME ZONE 'UTC') - INTERVAL '6 days') OR
+                         (interval <= 14 AND last_review > (NOW() AT TIME ZONE 'UTC') - INTERVAL '14 days') OR
+                         (interval <= 30 AND last_review > (NOW() AT TIME ZONE 'UTC') - INTERVAL '30 days') OR
+                         (interval <= 90 AND last_review > (NOW() AT TIME ZONE 'UTC') - INTERVAL '90 days') OR
+                         (interval > 90 AND last_review > (NOW() AT TIME ZONE 'UTC') - INTERVAL '180 days')
                        )
                   THEN 1 
                   ELSE 0 
@@ -282,6 +282,7 @@ impl SpacedRepetitionAnalytics {
             ORDER BY interval_bucket
             "#,
         )
+        .bind(user_id)
         .fetch_all(&self.db)
         .await
         .map_err(|e| SpacedRepetitionError::DatabaseError(e.to_string()))?;
@@ -388,7 +389,7 @@ impl SpacedRepetitionAnalytics {
         let results = sqlx::query_as::<_, (DateTime<Utc>, i64, i64, i64)>(
             r#"
             SELECT 
-              DATE_TRUNC('day', attempted_at) as date,
+              (DATE_TRUNC('day', attempted_at) AT TIME ZONE 'UTC') as date,
               COUNT(DISTINCT flashcard_id) as cards_reviewed,
               SUM(CASE WHEN passed THEN 1 ELSE 0 END) as successful,
               SUM(CASE WHEN NOT passed THEN 1 ELSE 0 END) as failed
@@ -400,7 +401,7 @@ impl SpacedRepetitionAnalytics {
             "#,
         )
         .bind(user_id)
-        .bind(start_date)
+        .bind(start_date.naive_utc())
         .fetch_all(&self.db)
         .await
         .map_err(|e| SpacedRepetitionError::DatabaseError(e.to_string()))?;
@@ -425,7 +426,7 @@ impl SpacedRepetitionAnalytics {
                 "#,
             )
             .bind(user_id)
-            .bind(date)
+            .bind(date.naive_utc())
             .fetch_one(&self.db)
             .await
             .map_err(|e| SpacedRepetitionError::DatabaseError(e.to_string()))?;
@@ -496,12 +497,12 @@ impl SpacedRepetitionAnalytics {
             SELECT
               ufp.id as card_id,
               t.id as topic_id,
-              q.text as question,
+              COALESCE(q.text, f.front) as question,
               ufp.next_review AT TIME ZONE 'UTC' as next_review
             FROM user_flashcard_progress ufp
             INNER JOIN flashcards f ON ufp.flashcard_id = f.id
-            INNER JOIN questions q ON f.question_id = q.id
-            LEFT JOIN topics t ON q.unit_id = t.unit_id
+            LEFT JOIN questions q ON f.question_id = q.id
+            LEFT JOIN topics t ON t.id = q.topic_ids[1]
             WHERE ufp.user_id = $1
             AND ufp.next_review <= (NOW() AT TIME ZONE 'UTC')
             ORDER BY ufp.next_review ASC

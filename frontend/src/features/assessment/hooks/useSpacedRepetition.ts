@@ -7,9 +7,9 @@ import {
 
 export function useSpacedRepetition(
   userId: string,
-  filters: { courseId?: string; topicId?: string } = {},
+  filters: { courseId?: string; unitId?: string; topicId?: string } = {},
 ) {
-  const { courseId, topicId } = filters;
+  const { courseId, unitId, topicId } = filters;
   const [dueCards, setDueCards] = useState<UserFlashcardProgress[]>([]);
   const [currentCard, setCurrentCard] = useState<UserFlashcardProgress | null>(null);
   const [stats, setStats] = useState<CardStats | null>(null);
@@ -34,8 +34,8 @@ export function useSpacedRepetition(
     setError(null);
     try {
       const [cards, cardStats] = await Promise.all([
-        flashcardApi.getDueCards(userId, { courseId, topicId }),
-        flashcardApi.getCardStats(userId, { courseId, topicId }),
+        flashcardApi.getDueCards(userId, { courseId, unitId, topicId }),
+        flashcardApi.getCardStats(userId, { courseId, unitId, topicId }),
       ]);
       setDueCards(cards);
       setCurrentCard(cards[0] ?? null);
@@ -45,7 +45,7 @@ export function useSpacedRepetition(
     } finally {
       setIsLoading(false);
     }
-  }, [courseId, topicId, userId]);
+  }, [courseId, topicId, unitId, userId]);
 
   useEffect(() => {
     void loadDueCards();

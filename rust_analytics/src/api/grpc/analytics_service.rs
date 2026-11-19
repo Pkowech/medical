@@ -620,6 +620,13 @@ impl crate::analytics_proto::analytics_service_server::AnalyticsService for MyAn
         Err(Status::unimplemented("ML feature disabled"))
     }
 
+    async fn get_unified_recommendations(
+        &self,
+        _req: Request<UnifiedRecommendationsRequest>,
+    ) -> Result<Response<UnifiedRecommendationsResponse>, Status> {
+        Err(Status::unimplemented("ML feature disabled"))
+    }
+
     async fn update_attempt_metrics(
         &self,
         _req: Request<AttemptMetricsRequest>,

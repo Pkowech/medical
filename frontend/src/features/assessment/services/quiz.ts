@@ -81,6 +81,15 @@ export interface StartedQuizAttempt {
   showResults: boolean;
 }
 
+export interface DetailedQuestionFeedback {
+  questionId: string;
+  isCorrect: boolean;
+  userAnswer: unknown;
+  correctAnswer: Array<{ id: string; text: string }>;
+  explanation: string;
+  conceptsToReview: string[];
+}
+
 class QuizService {
   private readonly baseUrl = '/quizzes';
 
@@ -157,6 +166,28 @@ class QuizService {
       { responses },
       { headers: { 'X-Idempotency-Key': idempotencyKey } },
     );
+    return response.data;
+  }
+
+  async getDetailedQuestionFeedback(
+    userId: string,
+    assessmentId: string,
+    questionId: string,
+    selectedOptionIds: string[],
+    questionType: string,
+  ): Promise<DetailedQuestionFeedback> {
+    const answerData =
+      questionType === 'multiple_select'
+        ? selectedOptionIds
+        : selectedOptionIds[0] ?? null;
+    const response = await apiService.post<DetailedQuestionFeedback>('/feedback', {
+      userId,
+      assessmentId,
+      questionId,
+      selectedOptionIds,
+      answerData,
+      timeSpentSeconds: 0,
+    });
     return response.data;
   }
 }

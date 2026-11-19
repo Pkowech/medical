@@ -1,17 +1,18 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useSpacedRepetition } from '@/features/assessment/hooks/useSpacedRepetition';
 import { useSession } from 'next-auth/react';
 import { Card } from '@/shared/components/ui/card';
 import { Button } from '@/shared/components/ui/button';
 import { Progress } from '@/shared/components/ui/progress';
 import { Alert, AlertDescription } from '@/shared/components/ui/alert';
-import { ThumbsUp, ThumbsDown, Clock, CheckCircle2 } from 'lucide-react';
+import { ThumbsUp, Clock, CheckCircle2, RotateCcw } from 'lucide-react';
 
 interface SpacedRepetitionReviewProps {
   questionId?: string;
   question?: string;
   answer?: string;
   courseId?: string;
+  unitId?: string;
   topicId?: string;
 }
 
@@ -20,12 +21,13 @@ export function SpacedRepetitionReview({
   question: propQuestion,
   answer: propAnswer,
   courseId,
+  unitId,
   topicId,
 }: SpacedRepetitionReviewProps) {
   const { data: session } = useSession();
   const { currentCard, stats, isLoading, error, rateCard, refreshCards } = useSpacedRepetition(
     session?.user?.id || '',
-    { courseId, topicId },
+    { courseId, unitId, topicId },
   );
 
   const [showAnswer, setShowAnswer] = useState(false);
@@ -34,14 +36,40 @@ export function SpacedRepetitionReview({
   const displayQuestion = propQuestion || currentCard?.flashcard.front || 'Loading card content...';
   const displayAnswer = propAnswer || currentCard?.flashcard.back || 'No answer available.';
 
-  const submitRating = async (quality: number) => {
+  const submitRating = useCallback(async (quality: number) => {
     setIsSubmitting(true);
     try {
       if (await rateCard(quality)) setShowAnswer(false);
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [rateCard]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.altKey || event.ctrlKey || event.metaKey) return;
+      if (!showAnswer && (event.code === 'Space' || event.key === 'Enter')) {
+        event.preventDefault();
+        setShowAnswer(true);
+        return;
+      }
+      if (showAnswer && !isSubmitting) {
+        const qualityByKey: Record<string, number> = {
+          '1': 1,
+          '2': 3,
+          '3': 4,
+          '4': 5,
+        };
+        const quality = qualityByKey[event.key];
+        if (quality) {
+          event.preventDefault();
+          void submitRating(quality);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isSubmitting, showAnswer, submitRating]);
 
   if (isLoading) {
     return (
@@ -82,19 +110,19 @@ export function SpacedRepetitionReview({
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div className="space-y-1">
-          <h3 className="text-sm font-medium text-muted-foreground">Review Progress</h3>
+          <h3 className="text-sm font-medium text-muted-foreground">Due queue</h3>
           <div className="flex items-center space-x-2">
             <Progress
-              value={(stats?.total ? (stats.total - stats.due) / stats.total : 0) * 100}
+              value={(stats?.total ? (stats.due / stats.total) : 0) * 100}
               className="w-32"
             />
             <span className="text-sm text-muted-foreground">
-              {stats?.total ? `${stats.total - stats.due}/${stats.total}` : '0/0'}
+              {stats?.total ? `${stats.due} due / ${stats.total}` : '0/0'}
             </span>
           </div>
         </div>
         <div className="text-right">
-          <div className="text-sm font-medium text-muted-foreground">Next Review</div>
+          <div className="text-sm font-medium text-muted-foreground">Due date</div>
           <div className="flex items-center space-x-1 text-sm text-muted-foreground">
             <Clock className="h-4 w-4" />
             <span>{new Date(currentCard.nextReview).toLocaleDateString()}</span>
@@ -102,7 +130,20 @@ export function SpacedRepetitionReview({
         </div>
       </div>
 
-      <Card className="p-8 min-h-[300px] flex flex-col justify-center items-center text-center cursor-pointer hover:bg-background dark:hover:bg-card/50 transition-colors shadow-inner" onClick={() => !showAnswer && setShowAnswer(true)}>
+      <Card
+        className="p-8 min-h-[300px] flex flex-col justify-center items-center text-center cursor-pointer hover:bg-background dark:hover:bg-card/50 transition-colors shadow-inner"
+        role={showAnswer ? undefined : 'button'}
+        tabIndex={showAnswer ? -1 : 0}
+        aria-expanded={showAnswer}
+        aria-label={showAnswer ? undefined : 'Reveal flashcard answer'}
+        onClick={() => !showAnswer && setShowAnswer(true)}
+        onKeyDown={event => {
+          if (!showAnswer && (event.key === 'Enter' || event.key === ' ')) {
+            event.preventDefault();
+            setShowAnswer(true);
+          }
+        }}
+      >
         <div className="space-y-6 w-full">
           <div className="space-y-4">
             <h2 className="text-2xl font-bold text-foreground dark:text-foreground leading-relaxed">
@@ -125,11 +166,23 @@ export function SpacedRepetitionReview({
                   disabled={isSubmitting}
                   onClick={(e) => {
                     e.stopPropagation();
-                    void submitRating(2);
+                    void submitRating(1);
                   }}
                 >
-                  <ThumbsDown className="h-4 w-4 mr-2" />
-                  Hard (2)
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                  Again (1)
+                </Button>
+                <Button
+                  variant="outline"
+                  className="px-8 border-blue-200 hover:bg-blue-50 hover:text-blue-700 dark:border-blue-900/50 dark:hover:bg-blue-900/20"
+                  disabled={isSubmitting}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void submitRating(3);
+                  }}
+                >
+                  <ThumbsUp className="h-4 w-4 mr-2" />
+                  Hard (3)
                 </Button>
                 <Button
                   variant="outline"

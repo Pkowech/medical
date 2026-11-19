@@ -35,11 +35,16 @@ export class FlashcardsController {
   async getDueCards(
     @Param('userId', ParseUUIDPipe) userId: string,
     @Query('courseId') courseId: string | undefined,
+    @Query('unitId') unitId: string | undefined,
     @Query('topicId') topicId: string | undefined,
     @CurrentUser() currentUser: User,
   ) {
     this.assertCanAccessUser(currentUser, userId);
-    return this.flashcardsService.getDueCards(userId, { courseId, topicId });
+    return this.flashcardsService.getDueCards(userId, {
+      courseId,
+      unitId,
+      topicId,
+    });
   }
 
   @Get('schedule/:userId')
@@ -47,6 +52,9 @@ export class FlashcardsController {
     @Param('userId', ParseUUIDPipe) userId: string,
     @Query('startDate') startDate: string,
     @Query('endDate') endDate: string,
+    @Query('courseId') courseId: string | undefined,
+    @Query('unitId') unitId: string | undefined,
+    @Query('topicId') topicId: string | undefined,
     @CurrentUser() currentUser: User,
   ) {
     this.assertCanAccessUser(currentUser, userId);
@@ -54,6 +62,7 @@ export class FlashcardsController {
       userId,
       new Date(startDate),
       new Date(endDate),
+      { courseId, unitId, topicId },
     );
   }
 
@@ -85,11 +94,16 @@ export class FlashcardsController {
   async getCardStats(
     @Param('userId') userId: string,
     @Query('courseId') courseId: string | undefined,
+    @Query('unitId') unitId: string | undefined,
     @Query('topicId') topicId: string | undefined,
     @CurrentUser() currentUser: User,
   ) {
     this.assertCanAccessUser(currentUser, userId);
-    return this.flashcardsService.getCardStats(userId, { courseId, topicId });
+    return this.flashcardsService.getCardStats(userId, {
+      courseId,
+      unitId,
+      topicId,
+    });
   }
 
   @Get('high-risk-topics/:userId')

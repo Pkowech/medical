@@ -1,7 +1,13 @@
+#[cfg(feature = "ml")]
 pub mod analytics;
 pub mod bkt;
+#[cfg(feature = "ml")]
 pub mod metrics;
+#[cfg(feature = "ml")]
 pub mod prediction;
+#[cfg(feature = "ml")]
 pub mod predictions;
+#[cfg(feature = "ml")]
 pub mod profile;
+#[cfg(feature = "ml")]
 pub mod records;

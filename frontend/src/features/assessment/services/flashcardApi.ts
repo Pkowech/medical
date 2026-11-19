@@ -41,6 +41,7 @@ export interface ScheduledReview {
   description: string;
   count: number;
   courseId: string | null;
+  unitId: string | null;
   topicId: string | null;
 }
 
@@ -70,10 +71,11 @@ class FlashcardApiService {
 
   async getDueCards(
     userId: string,
-    filters: { courseId?: string; topicId?: string } = {},
+    filters: { courseId?: string; unitId?: string; topicId?: string } = {},
   ): Promise<UserFlashcardProgress[]> {
     const params = new URLSearchParams();
     if (filters.courseId) params.set('courseId', filters.courseId);
+    if (filters.unitId) params.set('unitId', filters.unitId);
     if (filters.topicId) params.set('topicId', filters.topicId);
     const query = params.toString();
     const response = await api.get(
@@ -86,11 +88,15 @@ class FlashcardApiService {
     userId: string,
     startDate: Date,
     endDate: Date,
+    filters: { courseId?: string; unitId?: string; topicId?: string } = {},
   ): Promise<ScheduledReview[]> {
     const params = new URLSearchParams({
       startDate: startDate.toISOString(),
       endDate: endDate.toISOString(),
     });
+    if (filters.courseId) params.set('courseId', filters.courseId);
+    if (filters.unitId) params.set('unitId', filters.unitId);
+    if (filters.topicId) params.set('topicId', filters.topicId);
     const response = await api.get(
       `/flashcards/schedule/${userId}?${params.toString()}`,
     );
@@ -114,10 +120,11 @@ class FlashcardApiService {
 
   async getCardStats(
     userId: string,
-    filters: { courseId?: string; topicId?: string } = {},
+    filters: { courseId?: string; unitId?: string; topicId?: string } = {},
   ): Promise<CardStats> {
     const params = new URLSearchParams();
     if (filters.courseId) params.set('courseId', filters.courseId);
+    if (filters.unitId) params.set('unitId', filters.unitId);
     if (filters.topicId) params.set('topicId', filters.topicId);
     const query = params.toString();
     const response = await api.get(

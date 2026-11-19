@@ -521,6 +521,7 @@ export default function ScheduleComponent() {
                     onClick={() => {
                       const params = new URLSearchParams();
                       if (selectedEvent.courseId) params.set('courseId', selectedEvent.courseId);
+                      if (selectedEvent.unitId) params.set('unitId', selectedEvent.unitId);
                       if (selectedEvent.topicId) params.set('topicId', selectedEvent.topicId);
                       const query = params.toString();
                       router.push(`/flashcards/all${query ? `?${query}` : ''}`);

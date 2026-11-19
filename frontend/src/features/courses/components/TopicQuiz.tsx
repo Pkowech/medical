@@ -17,6 +17,11 @@ import { Badge } from '@/shared/components/ui/badge';
 import { Progress } from '@/shared/components/ui/progress';
 import { CheckCircle, Brain, Award, ArrowRight, Flag } from 'lucide-react';
 import { apiService } from '@/features/auth/services/apiClient';
+import { QuestionFeedbackReview } from '@/features/assessment/components/QuestionFeedbackReview';
+import {
+  quizService,
+  type DetailedQuestionFeedback,
+} from '@/features/assessment/services/quiz';
 import { toast } from 'sonner';
 import { Textarea } from '@/shared/components/ui/textarea';
 import { useCourseStudySession } from '@/features/learning-management/study/components/CourseStudySessionProvider';
@@ -79,6 +84,11 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
   const [quizCompleted, setQuizCompleted] = useState(false);
   const [score, setScore] = useState(0);
   const [feedback, setFeedback] = useState<string>('');
+  const [questionFeedback, setQuestionFeedback] = useState<
+    Record<string, DetailedQuestionFeedback>
+  >({});
+  const [isQuestionFeedbackLoading, setIsQuestionFeedbackLoading] = useState(false);
+  const [questionFeedbackError, setQuestionFeedbackError] = useState<string | null>(null);
   const [nextTopicId, setNextTopicId] = useState<string | undefined>();
   const [gateDecision, setGateDecision] = useState<GateDecision | undefined>();
   const [readinessPending, setReadinessPending] = useState(false);
@@ -116,6 +126,8 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
       setQuizCompleted(false);
       setScore(0);
       setFeedback('');
+      setQuestionFeedback({});
+      setQuestionFeedbackError(null);
       setNextTopicId(undefined);
       setGateDecision(undefined);
       setReadinessPending(false);
@@ -251,6 +263,33 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
   const progress = questions.length > 0 ? ((currentQuestionIndex + 1) / questions.length) * 100 : 0;
   const hasCurrentAnswer = Boolean(currentQuestion && selectedAnswers[currentQuestion.id]?.length);
 
+  const loadQuestionFeedback = async () => {
+    setIsQuestionFeedbackLoading(true);
+    setQuestionFeedbackError(null);
+    const results = await Promise.allSettled(
+      questions.map(question =>
+        quizService.getDetailedQuestionFeedback(
+          userId,
+          topicId,
+          question.id,
+          selectedAnswers[question.id] ?? [],
+          question.type,
+        ),
+      ),
+    );
+    const feedbackByQuestion: Record<string, DetailedQuestionFeedback> = {};
+    results.forEach((result, index) => {
+      if (result.status === 'fulfilled') {
+        feedbackByQuestion[questions[index].id] = result.value;
+      }
+    });
+    setQuestionFeedback(feedbackByQuestion);
+    if (results.some(result => result.status === 'rejected')) {
+      setQuestionFeedbackError('Some answer explanations could not be loaded.');
+    }
+    setIsQuestionFeedbackLoading(false);
+  };
+
   React.useEffect(() => {
     setIsReportOpen(false);
     setReportIssue('incorrect');
@@ -378,6 +417,7 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
       setGateDecision(result?.gateDecision);
       setReadinessPending(result?.readinessPending ?? false);
       setQuizCompleted(true);
+      void loadQuestionFeedback();
       try {
         window.localStorage.removeItem(attemptStorageKey);
         window.localStorage.removeItem(draftStorageKey);
@@ -507,6 +547,25 @@ export const TopicQuiz: React.FC<TopicQuizProps> = ({
                   </p>
                 </div>
               )}
+
+              <QuestionFeedbackReview
+                userId={userId}
+                items={questions.flatMap(question => {
+                  const questionFeedbackItem = questionFeedback[question.id];
+                  return questionFeedbackItem
+                    ? [{
+                        questionId: question.id,
+                        question: question.text,
+                        options: question.options,
+                        selectedOptionIds: selectedAnswers[question.id] ?? [],
+                        feedback: questionFeedbackItem,
+                      }]
+                    : [];
+                })}
+                isLoading={isQuestionFeedbackLoading}
+                error={questionFeedbackError}
+                onRetry={() => void loadQuestionFeedback()}
+              />
 
               {readinessPending && (
                 <p role="status" className="text-sm text-muted-foreground">

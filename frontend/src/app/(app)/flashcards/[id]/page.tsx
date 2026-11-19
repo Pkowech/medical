@@ -30,6 +30,7 @@ export default function FlashcardStudyPage() {
         {user?.id ? (
           <SpacedRepetitionReview 
             courseId={searchParams.get('courseId') ?? undefined}
+            unitId={searchParams.get('unitId') ?? undefined}
             topicId={searchParams.get('topicId') ?? undefined}
           />
         ) : (
@@ -40,7 +41,7 @@ export default function FlashcardStudyPage() {
       </div>
 
       <div className="mt-8 text-center text-sm text-muted-foreground">
-        <p>Pro Tip: Press "1" for Hard, "2" for Good, and "3" for Easy.</p>
+        <p>Keyboard: Space to reveal; 1 Again, 2 Hard, 3 Good, 4 Easy.</p>
       </div>
     </div>
   );

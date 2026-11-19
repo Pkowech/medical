@@ -130,6 +130,7 @@ const scheduleService = {
           location: review.courseId ? 'Course review' : 'Spaced repetition',
           allDay: true,
           courseId: review.courseId,
+          unitId: review.unitId,
           topicId: review.topicId,
           completed: false,
         };

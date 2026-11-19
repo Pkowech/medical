@@ -768,6 +768,39 @@ export const TopicViewer: React.FC<TopicViewerProps> = ({ courseId, unitId, topi
         </section>
 
         <section
+          className="rounded-lg border border-blue-200 bg-blue-50/60 p-5 dark:border-blue-900 dark:bg-blue-950/20"
+          aria-labelledby="reading-revision-heading"
+        >
+          <h2 id="reading-revision-heading" className="font-semibold text-foreground">
+            Reading-first revision
+          </h2>
+          <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm text-muted-foreground">
+            <li>Read one section or learning material at a time.</li>
+            <li>Close it and write the key ideas from memory in Notes.</li>
+            <li>Take the topic assessment and review the explanations.</li>
+            <li>Return to missed and saved concepts when their flashcards are due.</li>
+          </ol>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() =>
+                router.push(`/flashcards/all?topicId=${encodeURIComponent(topicId)}`)
+              }
+            >
+              Review this topic
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => router.push('/study-planner/schedule')}
+            >
+              Plan a reading session
+            </Button>
+          </div>
+        </section>
+
+        <section
           className="rounded-lg border border-border bg-card p-5"
           aria-labelledby="topic-assessment-heading"
         >

@@ -64,7 +64,7 @@ export const SpacedRepetitionStats: React.FC = () => {
             <p className="text-3xl font-semibold text-yellow-600 dark:text-yellow-400">
               {stats.mastered}
             </p>
-            <p className="text-sm text-muted-foreground dark:text-muted-foreground">Mastered</p>
+            <p className="text-sm text-muted-foreground dark:text-muted-foreground">30+ day interval</p>
           </div>
           <div className="text-center">
             <p className="text-3xl font-semibold text-green-600 dark:text-green-400">

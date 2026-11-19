@@ -95,6 +95,7 @@ pub struct TrainingDataRequest {
     pub labels: Vec<f64>,
 }
 
+#[cfg(feature = "ml")]
 const BURN_MODEL_FEATURE_NAMES: [&str; 8] = [
     "completed_materials",
     "average_score",
