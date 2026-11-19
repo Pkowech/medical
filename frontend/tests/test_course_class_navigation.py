@@ -39,6 +39,15 @@ def test_class_roadmap_shows_all_unit_statuses_and_opens_units_without_old_topic
     assert "String(unit.courseId) === String(courseId)" in overview
 
 
+def test_course_overview_empty_and_error_states_offer_clear_next_steps():
+    overview = read_frontend("src/features/courses/components/CourseOverview.tsx")
+
+    assert "No learning units available" in overview
+    assert "Browse courses" in overview
+    assert "refetch: refetchCourse" in overview
+    assert "Unable to load this course." in overview
+
+
 def test_topic_completion_is_based_on_assessment_mastery_not_manual_study_status():
     overview = read_frontend("src/features/courses/components/CourseOverview.tsx")
     unit_layout = read_frontend("src/features/courses/components/units/UnitLayout.tsx")
@@ -60,3 +69,32 @@ def test_closing_material_refreshes_progress_before_returning_to_the_topic():
     assert "await refreshLearningCaches();" in close_handler
     assert "await stopTracking();" in material_modal
     assert "await onClose();" in material_modal
+
+
+def test_empty_materials_are_not_reported_as_complete_and_assessment_remains_available():
+    content = read_frontend("src/features/courses/components/CourseContent.tsx")
+
+    assert "materials.length === 0\n                ? 'No materials available'" in content
+    assert "const studyComplete = materials.length === 0 || allMaterialsComplete;" in content
+    assert "nextStep === 'assessment'" in content
+
+
+def test_missing_topic_duration_is_not_rendered_as_zero_minutes():
+    unit_data = read_frontend("src/features/courses/hooks/useUnitData.ts")
+
+    assert "topic.estimatedMinutes && topic.estimatedMinutes > 0" in unit_data
+    assert ": undefined" in unit_data
+    assert "'0m'" not in unit_data
+
+
+def test_topic_authoring_visibility_uses_course_specific_permission():
+    unit_layout = read_frontend("src/features/courses/components/units/UnitLayout.tsx")
+    unit_data = read_frontend("src/features/courses/hooks/useUnitData.ts")
+    backend_service = (
+        FRONTEND_ROOT.parent
+        / "backend/src/modules/education/courses/services/units.service.ts"
+    ).read_text(encoding="utf-8")
+
+    assert "unitData.canManageTopics" in unit_layout
+    assert "canManageTopics: unit.canManageTopics === true" in unit_data
+    assert "canManageTopics: canManage," in backend_service

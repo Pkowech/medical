@@ -17,7 +17,6 @@ import {
 } from 'lucide-react';
 import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/features/auth/hooks/useAuth';
-import { instructorRoles } from '@/shared/enums/role.enum';
 import { useLayoutStore } from '@/core/stores/useLayoutStore';
 import { cn } from '@/lib/utils/cn';
 import { usePageHeader } from '@/core/providers/HeaderContext';
@@ -109,7 +108,6 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
   const selectedMaterialId = searchParams.get('materialId');
   const hasSelectedTopic = Boolean(selectedTopicId);
   const { user } = useAuth();
-  const isAdmin = Boolean(user?.role && instructorRoles.includes(user.role));
 
   const updateRouteQuery = (key: string, value: string | null, replace = false) => {
     if (searchParams.get(key) === value) return;
@@ -602,7 +600,7 @@ export const UnitLayout = ({ unitId: propUnitId, courseId }: UnitLayoutProps) =>
             )}
 
             {/* Admin actions - Add Topic */}
-            {!selectedMaterialId && isAdmin && (
+            {!selectedMaterialId && unitData.canManageTopics && (
               <div className="flex justify-end mt-4">
                 <Button onClick={() => setIsAddTopicOpen(true)}>Add New Topic</Button>
               </div>

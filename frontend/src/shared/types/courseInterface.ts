@@ -148,7 +148,7 @@ export interface Lesson extends Omit<BaseEntity, 'id'> {
   title: string;
   resources?: Resource[];
   type: 'video' | 'interactive' | 'text' | 'quiz' | 'assignment';
-  duration: string;
+  duration?: string;
   content: { video?: string; transcript?: string; interactive?: boolean; text?: string };
   progressRevision?: number;
   isCompleted?: boolean;
@@ -272,6 +272,7 @@ export interface CourseFilter {
 export interface CourseData {
   id: string;
   courseId?: string;
+  canManageTopics?: boolean;
   courseName?: string;
   courseProgressPercentage?: number;
   title: string;
@@ -280,12 +281,12 @@ export interface CourseData {
   chapters?: Array<{
     id: string;
     title: string;
-    duration: string;
+    duration?: string;
     lessons: Array<{
       id: string;
       title: string;
       type: 'text' | 'video' | 'interactive';
-      duration: string;
+      duration?: string;
       content: { text: string };
       isCompleted?: boolean;
       masteryUnlocked?: boolean;

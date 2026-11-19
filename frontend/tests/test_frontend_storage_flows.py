@@ -230,6 +230,19 @@ def test_failed_offline_changes_can_be_cleared_without_retrying_unsafe_requests(
     assert "item.status === 'failed' && isRetryableFailedItem(item)" in service
 
 
+def test_connectivity_status_changes_do_not_restart_queue_initialization_or_polling():
+    hook = read_frontend("src/lib/hooks/useConnectivity.ts")
+    refresh_status = hook.split("const refreshStatus", 1)[1].split(
+        "const intervalId", 1
+    )[0]
+    effect = hook.split("useEffect(() => {", 1)[1].split("return {", 1)[0]
+
+    assert "setIsOnline(status.isOnline);" in refresh_status
+    assert "}, []);" in refresh_status
+    assert "}, [refreshStatus]);" in effect
+    assert "CONNECTIVITY_STATUS_POLL_INTERVAL_MS" in effect
+
+
 def test_local_file_metadata_is_saved_on_device_without_uploading_file_details():
     reader = read_frontend("src/features/student/components/LocalMaterialReader.tsx")
     offline_service = read_frontend("src/lib/core/offline/offlineService.ts")

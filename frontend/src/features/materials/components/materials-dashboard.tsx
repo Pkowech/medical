@@ -275,8 +275,10 @@ export default function MaterialsDashboard() {
   const {
     data: selectedCourse,
     isLoading: isCourseLoading,
+    isFetching: isCourseFetching,
     isError: isCourseError,
     error: courseError,
+    refetch: refetchCourse,
   } = useQuery<Course, Error>({
     queryKey: ['course', selectedCourseId],
     queryFn: () => courseService.getCourseById(selectedCourseId!),
@@ -421,11 +423,14 @@ export default function MaterialsDashboard() {
   const {
     data: materialsData,
     isLoading,
+    isFetching: isMaterialsFetching,
     isError: isMaterialsError,
     error: materialsError,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
+    isFetchNextPageError,
+    refetch: refetchMaterials,
   } = useInfiniteQuery({
     queryKey: ['materials', debouncedSearch, materialTypeFilter, filterContext, selectedCourseId, sortBy, sortOrder],
     queryFn: async ({ pageParam = 1 }) => {
@@ -1046,8 +1051,19 @@ export default function MaterialsDashboard() {
           {isCourseLoading ? (
             <div className="h-48 animate-pulse rounded-2xl bg-muted dark:bg-card" aria-label="Loading course" />
           ) : isCourseError ? (
-            <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-200">
-              Could not load course details: {courseError instanceof Error ? courseError.message : 'Please try again later.'}
+            <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-200">
+              <span>
+                Could not load course details: {courseError instanceof Error ? courseError.message : 'Please try again later.'}
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => void refetchCourse()}
+                disabled={isCourseFetching}
+              >
+                {isCourseFetching ? 'Retrying...' : 'Retry'}
+              </Button>
             </div>
           ) : selectedCourse ? (
             <>
@@ -1593,8 +1609,21 @@ export default function MaterialsDashboard() {
                   </p>
                 )}
                 {isMaterialsError && (
-                  <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-200">
-                    Could not load course resources: {materialsError instanceof Error ? materialsError.message : 'Please try again later.'}
+                  <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-200">
+                    <span>
+                      Could not load course resources: {materialsError instanceof Error ? materialsError.message : 'Please try again later.'}
+                    </span>
+                    {!isFetchNextPageError && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => void refetchMaterials()}
+                        disabled={isMaterialsFetching}
+                      >
+                        {isMaterialsFetching ? 'Retrying...' : 'Retry'}
+                      </Button>
+                    )}
                   </div>
                 )}
                 {hasNextPage && (
@@ -1606,7 +1635,11 @@ export default function MaterialsDashboard() {
                       disabled={isFetchingNextPage}
                       className="rounded-lg"
                     >
-                      {isFetchingNextPage ? 'Loading resources…' : 'Load more resources'}
+                      {isFetchingNextPage
+                        ? 'Loading resources…'
+                        : isFetchNextPageError
+                          ? 'Retry loading resources'
+                          : 'Load more resources'}
                     </Button>
                   </div>
                 )}
@@ -1687,9 +1720,21 @@ export default function MaterialsDashboard() {
             <div className="flex justify-center py-20">
               <div className="animate-spin rounded-full h-12 w-12 border-4 border-border border-t-indigo-500" />
             </div>
-          ) : isMaterialsError ? (
+          ) : isMaterialsError && !allMaterials.length ? (
             <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-200">
-              Could not load materials: {materialsError instanceof Error ? materialsError.message : 'Please try again later.'}
+              <p>
+                Could not load materials: {materialsError instanceof Error ? materialsError.message : 'Please try again later.'}
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="mt-3"
+                onClick={() => void refetchMaterials()}
+                disabled={isMaterialsFetching}
+              >
+                {isMaterialsFetching ? 'Retrying...' : 'Retry'}
+              </Button>
             </div>
           ) : allMaterials.length === 0 ? (
             // Strategic Empty State
@@ -1729,6 +1774,26 @@ export default function MaterialsDashboard() {
             </div>
           ) : (
             <div className="space-y-4">
+              {isMaterialsError && (
+                <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-200">
+                  <span>
+                    {isFetchNextPageError
+                      ? 'Could not load more materials. Your loaded materials are still available.'
+                      : 'Could not refresh materials. Your loaded materials are still available.'}
+                  </span>
+                  {!isFetchNextPageError && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void refetchMaterials()}
+                      disabled={isMaterialsFetching}
+                    >
+                      {isMaterialsFetching ? 'Retrying...' : 'Retry'}
+                    </Button>
+                  )}
+                </div>
+              )}
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3 dark:border-border">
                 <span className="text-sm font-medium text-muted-foreground dark:text-muted-foreground">
                   {totalCount} {totalCount === 1 ? 'resource' : 'resources'}
@@ -1911,7 +1976,11 @@ export default function MaterialsDashboard() {
                     disabled={isFetchingNextPage}
                     className="w-full max-w-xs h-12 rounded-xl font-bold border-border dark:border-border hover:bg-background dark:hover:bg-card transition-all"
                   >
-                    {isFetchingNextPage ? 'Loading more...' : 'Load more resources'}
+                    {isFetchingNextPage
+                      ? 'Loading more...'
+                      : isFetchNextPageError
+                        ? 'Retry loading more resources'
+                        : 'Load more resources'}
                   </Button>
                 </div>
               )}

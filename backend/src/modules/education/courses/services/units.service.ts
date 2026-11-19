@@ -594,6 +594,7 @@ export class UnitsService {
         materialsCount: visibleUnit.materials?.length ?? 0,
         progressPercentage,
         isCompleted,
+        canManageTopics: canManage,
       };
 
       this.logger.log('Unit fetched from database', { unitId: id, userId });

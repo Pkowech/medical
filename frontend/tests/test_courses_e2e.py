@@ -46,6 +46,7 @@ def test_course_preview_is_public_but_enrollment_prompts_for_sign_in():
             assert response is not None
             assert response.status == 200
             page.get_by_role("heading", name="Preview Course").wait_for()
+            page.get_by_role("heading", name="No learning units available").wait_for()
 
             enrollment_link = page.get_by_role("link", name="Sign in to enroll")
             assert enrollment_link.is_visible()

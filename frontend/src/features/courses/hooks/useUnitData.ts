@@ -25,6 +25,7 @@ interface UnitResponse {
   estimatedMinutes?: number;
   learningObjectives?: string | string[] | Record<string, unknown>;
   isPublished?: boolean;
+  canManageTopics?: boolean;
   courseId?: string;
   createdAt?: string;
   updatedAt?: string;
@@ -83,7 +84,9 @@ const normalizeUnitToChapters = (
     return {
       id: topic.id,
       title: topic.name || topic.title || 'Untitled Topic',
-      duration: topic.estimatedMinutes ? `${topic.estimatedMinutes}m` : '0m',
+      duration: topic.estimatedMinutes && topic.estimatedMinutes > 0
+        ? `${topic.estimatedMinutes}m`
+        : undefined,
       // Each chapter has exactly ONE lesson — the topic itself.
       // This keeps useCourseNavigation happy (it iterates chapters[n].lessons[m]).
       lessons: [
@@ -91,7 +94,9 @@ const normalizeUnitToChapters = (
           id: topic.id,
           title: topic.name || topic.title || 'Untitled Topic',
           type: 'text' as const,
-          duration: topic.estimatedMinutes ? `${topic.estimatedMinutes}m` : '0m',
+          duration: topic.estimatedMinutes && topic.estimatedMinutes > 0
+            ? `${topic.estimatedMinutes}m`
+            : undefined,
           content: {
             text: topic.description || '',
           },
@@ -132,6 +137,7 @@ const normalizeUnitToChapters = (
   return {
     id: unit.id,
     courseId: unit.courseId,
+    canManageTopics: unit.canManageTopics === true,
     courseName: courseProgress?.courseName,
     courseProgressPercentage: courseProgress?.totalProgress,
     title: unit.title || unit.name,

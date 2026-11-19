@@ -106,6 +106,16 @@ def test_resource_type_filter_is_compact_and_applied_to_material_query():
     assert "type: materialTypeFilter === 'all' ? undefined : materialTypeFilter" in materials_dashboard
 
 
+def test_course_and_material_load_errors_can_be_retried_without_hiding_loaded_materials():
+    materials_dashboard = read_frontend("src/features/materials/components/materials-dashboard.tsx")
+
+    assert "refetch: refetchCourse" in materials_dashboard
+    assert "refetch: refetchMaterials" in materials_dashboard
+    assert "isFetchNextPageError" in materials_dashboard
+    assert "Retry loading resources" in materials_dashboard
+    assert "Your loaded materials are still available." in materials_dashboard
+
+
 def test_pdf_page_navigation_scrolls_inside_the_document_viewer():
     """Changing PDF pages should not scroll the outer page on touch screens."""
     pdf_viewer = read_frontend("src/shared/components/pdf/PDFViewer.tsx")

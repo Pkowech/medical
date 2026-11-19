@@ -206,8 +206,10 @@ export const CourseContent = ({
           <span className="rounded-full bg-muted px-2.5 py-1 text-[13px] font-medium text-foreground">
             {lesson.masteryUnlocked
               ? 'Mastery confirmed'
-              : allMaterialsComplete
-                ? 'Reading complete'
+              : materials.length === 0
+                ? 'No materials available'
+                : allMaterialsComplete
+                  ? 'Reading complete'
                 : readingProgressPercentage > 0
                   ? `Reading ${readingProgressPercentage}%`
                   : 'Not started'}
@@ -285,11 +287,11 @@ export const CourseContent = ({
           {[
             {
               title: 'Study',
-              detail: allMaterialsComplete
-                ? 'Materials complete'
-                : materials.length > 0
-                  ? `${materials.length} materials`
-                  : 'No materials',
+              detail: materials.length === 0
+                ? 'No materials available'
+                : allMaterialsComplete
+                  ? 'Materials complete'
+                  : `${materials.length} materials`,
             },
             {
               title: 'Assess',

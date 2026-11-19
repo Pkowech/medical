@@ -55,7 +55,13 @@ export function CourseOverview() {
     return localDateTimeValue(nextHour);
   });
 
-  const { data: course, isLoading: courseLoading, error: courseError } = useQuery<Course>({
+  const {
+    data: course,
+    isLoading: courseLoading,
+    isFetching: courseFetching,
+    error: courseError,
+    refetch: refetchCourse,
+  } = useQuery<Course>({
     queryKey: ['course-overview', courseId],
     queryFn: () => courseService.getCourseById(courseId),
     enabled: Boolean(courseId),
@@ -112,13 +118,21 @@ export function CourseOverview() {
   }, [course, setHeader]);
 
   if (courseLoading) {
-    return <div className="flex min-h-screen items-center justify-center text-muted-foreground">Loading course units...</div>;
+    return <div role="status" className="flex min-h-screen items-center justify-center text-muted-foreground">Loading course details...</div>;
   }
 
   if (courseError || !course) {
     return (
-      <main className="flex min-h-screen flex-col items-center justify-center gap-4 text-center text-red-600">
-        <p>Unable to load this course.</p>
+      <main className="flex min-h-screen flex-col items-center justify-center gap-4 text-center">
+        <p role="alert" className="text-red-600">Unable to load this course.</p>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => void refetchCourse()}
+          disabled={!courseId || courseFetching}
+        >
+          {courseFetching ? 'Retrying...' : 'Try again'}
+        </Button>
         <Link href="/courses" className="text-sm font-medium text-blue-700 hover:underline dark:text-blue-300">
           Back to all courses
         </Link>
@@ -263,7 +277,18 @@ export function CourseOverview() {
               <p className="mt-1 text-sm text-muted-foreground dark:text-muted-foreground">{units.length} learning units</p>
             </div>
           </div>
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+          {units.length === 0 ? (
+            <div role="status" className="rounded-xl border border-dashed border-border bg-card px-5 py-10 text-center dark:border-border dark:bg-card">
+              <h3 className="font-semibold text-foreground">No learning units available</h3>
+              <p className="mt-2 text-sm text-muted-foreground">
+                There are no learning units in this course yet. Check back later or browse other courses.
+              </p>
+              <Link href="/courses" className="mt-4 inline-block text-sm font-medium text-blue-700 hover:underline dark:text-blue-300">
+                Browse courses
+              </Link>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
           {units.map((unit, index) => {
             const topics = unit.topics || [];
             const completedTopics = topics.filter(topic => {
@@ -379,6 +404,7 @@ export function CourseOverview() {
             );
           })}
           </div>
+          )}
         </section>
       </div>
       {showEnrollment && (

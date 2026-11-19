@@ -151,6 +151,11 @@ export class UnitResponseDto {
 
   @ApiProperty({ required: false })
   @IsOptional()
+  @IsBoolean()
+  canManageTopics?: boolean;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
   topics?: any[];
 
   @ApiProperty({ required: false })

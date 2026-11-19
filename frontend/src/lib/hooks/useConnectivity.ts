@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { syncService } from '@/lib/core/offline/syncService';
 import { initializeOfflineQueue } from '@/features/learning-management/services/offlineProgressSync';
 
+const CONNECTIVITY_STATUS_POLL_INTERVAL_MS = 30_000;
+
 export function useConnectivity() {
   const [isOnline, setIsOnline] = useState(
     typeof navigator !== 'undefined' ? navigator.onLine : true
@@ -21,13 +23,13 @@ export function useConnectivity() {
     setIsFlushing(status.isFlushing);
     setStatusError(status.statusError);
     setLatestFailure(status.latestFailure);
-    if (status.isOnline !== isOnline) setIsOnline(status.isOnline);
+    setIsOnline(status.isOnline);
     if (status.isOnline && status.readyToSync && !status.isFlushing) {
       void syncService.syncOutbox().catch(error => {
         setStatusError(error instanceof Error ? error.message : String(error));
       });
     }
-  }, [isOnline]);
+  }, []);
 
   useEffect(() => {
     let disposed = false;
@@ -69,7 +71,10 @@ export function useConnectivity() {
 
     // 2. Poll Sync Status (Simple approach since SyncService doesn't emit events)
     // Detailed event-bus integration can be added later if polling proves expensive.
-    const intervalId = setInterval(() => void refreshStatus(), 5000);
+    const intervalId = setInterval(
+      () => void refreshStatus(),
+      CONNECTIVITY_STATUS_POLL_INTERVAL_MS
+    );
 
     return () => {
       disposed = true;
@@ -78,7 +83,7 @@ export function useConnectivity() {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       clearInterval(intervalId);
     };
-  }, [isOnline, refreshStatus]);
+  }, [refreshStatus]);
 
   return {
     isOnline,
