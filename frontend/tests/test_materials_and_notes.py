@@ -116,6 +116,13 @@ def test_course_and_material_load_errors_can_be_retried_without_hiding_loaded_ma
     assert "Your loaded materials are still available." in materials_dashboard
 
 
+def test_empty_recently_viewed_section_does_not_push_materials_down_the_page():
+    materials_dashboard = read_frontend("src/features/materials/components/materials-dashboard.tsx")
+
+    assert "recentMaterialsLoading || recentMaterialsError || recentMaterials.length > 0" in materials_dashboard
+    assert "Materials you open will appear here." not in materials_dashboard
+
+
 def test_pdf_page_navigation_scrolls_inside_the_document_viewer():
     """Changing PDF pages should not scroll the outer page on touch screens."""
     pdf_viewer = read_frontend("src/shared/components/pdf/PDFViewer.tsx")

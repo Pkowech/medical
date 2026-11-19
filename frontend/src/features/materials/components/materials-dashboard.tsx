@@ -967,7 +967,8 @@ export default function MaterialsDashboard() {
         </section>
       )}
 
-      {!selectedCourseId && (
+      {!selectedCourseId
+        && (recentMaterialsLoading || recentMaterialsError || recentMaterials.length > 0) && (
         <section
           aria-labelledby="recent-materials-heading"
           className="rounded-xl border border-border bg-card p-4 shadow-sm dark:border-border dark:bg-card sm:p-5"
@@ -1025,11 +1026,7 @@ export default function MaterialsDashboard() {
                 );
               })}
             </ul>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Materials you open will appear here.
-            </p>
-          )}
+          ) : null}
         </section>
       )}
 

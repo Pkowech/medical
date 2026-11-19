@@ -27,16 +27,16 @@ def test_open_class_always_opens_the_class_roadmap_instead_of_resume_point():
     assert "'Continue learning'" not in dashboard
 
 
-def test_class_roadmap_shows_all_unit_statuses_and_opens_units_without_old_topic_query():
+def test_class_roadmap_shows_unit_statuses_and_resumes_the_next_topic():
     overview = read_frontend("src/features/courses/components/CourseOverview.tsx")
 
     assert "Learning roadmap" in overview
     assert "course.units || []" in overview
     assert "const statusLabel = isCompleted ? 'Completed' : isInProgress ? 'Ongoing' : 'Not enrolled';" in overview
-    assert "<details" in overview
+    assert "<article" in overview
     assert "router.push(" in overview
-    assert "topicId=" not in overview
-    assert "String(unit.courseId) === String(courseId)" in overview
+    assert "const topicQuery = topicId ? `?topicId=${encodeURIComponent(topicId)}` : '';" in overview
+    assert "isActive ? nextTopicByUnitId.get(String(unit.id)) : undefined" in overview
 
 
 def test_course_overview_empty_and_error_states_offer_clear_next_steps():
@@ -46,6 +46,15 @@ def test_course_overview_empty_and_error_states_offer_clear_next_steps():
     assert "Browse courses" in overview
     assert "refetch: refetchCourse" in overview
     assert "Unable to load this course." in overview
+
+
+def test_course_overview_prioritizes_resuming_study_over_planning():
+    overview = read_frontend("src/features/courses/components/CourseOverview.tsx")
+
+    assert "Continue studying" in overview
+    assert "Start studying" in overview
+    assert "nextTopicByUnitId.get(String(continueUnit.id))" in overview
+    assert overview.index('aria-label="Course units"') < overview.index("Plan this course")
 
 
 def test_topic_completion_is_based_on_assessment_mastery_not_manual_study_status():

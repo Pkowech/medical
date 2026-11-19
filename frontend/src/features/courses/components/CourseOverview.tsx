@@ -167,6 +167,17 @@ export function CourseOverview() {
   const allUnitsEnrolled = Boolean(
     user && units.length > 0 && units.every(unit => enrolledUnitIds.has(String(unit.id))),
   );
+  const continueUnit = units.find(unit => activeUnitIds.has(String(unit.id)));
+  const completedUnit = units.find(unit => completedUnitIdSet.has(String(unit.id)));
+  const allUnitsCompleted = units.length > 0
+    && units.every(unit => completedUnitIdSet.has(String(unit.id)));
+  const continueTopicId = continueUnit
+    ? nextTopicByUnitId.get(String(continueUnit.id))
+    : undefined;
+  const openUnit = (unitId: string | number, topicId?: string) => {
+    const topicQuery = topicId ? `?topicId=${encodeURIComponent(topicId)}` : '';
+    router.push(`/courses/${encodeURIComponent(courseId)}/units/${encodeURIComponent(String(unitId))}${topicQuery}`);
+  };
   const scheduleCourseStudy = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const startDate = new Date(scheduledStart);
@@ -198,77 +209,73 @@ export function CourseOverview() {
   return (
     <main className="min-h-full bg-[#f5f7fa] px-4 py-6 dark:bg-background md:px-8 md:py-9">
       <div className="mx-auto max-w-7xl space-y-8">
-        {!allUnitsEnrolled && (
-          <header className="flex flex-col gap-5 border-b border-border pb-6 dark:border-border sm:flex-row sm:items-end sm:justify-between">
-            <div className="min-w-0">
-              <h1 className="mt-2 text-3xl font-semibold text-foreground dark:text-foreground">{course.title || course.name}</h1>
-              {course.description && <p className="mt-2 max-w-3xl text-sm leading-6 text-foreground/75 dark:text-foreground/75">{course.description}</p>}
-              {connectedPathsError ? (
-                <p role="alert" className="mt-3 text-sm text-rose-700 dark:text-rose-300">
-                  Course learning paths could not be loaded.{' '}
-                  <button type="button" className="font-medium underline" onClick={() => void refetchConnectedPaths()}>
-                    Retry
-                  </button>
-                </p>
-              ) : connectedPaths.length > 0 && (
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                    <Sparkles className="h-3.5 w-3.5 text-blue-500" /> Part of Curricula:
-                  </span>
-                  {connectedPaths.map((p) => (
-                    <Link
-                      key={p.id}
-                      href={`/learning-paths/${p.id}`}
-                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/60 transition-colors"
-                    >
-                      <BookOpen className="h-3 w-3" />
-                      <span>{p.title}</span>
-                      <ChevronRight className="h-3 w-3 opacity-60" />
-                    </Link>
-                  ))}
-                </div>
+        <header className="flex flex-col gap-5 border-b border-border pb-6 dark:border-border sm:flex-row sm:items-end sm:justify-between">
+          <div className="min-w-0">
+            <h1 className="mt-2 text-3xl font-semibold text-foreground dark:text-foreground">{course.title || course.name}</h1>
+            {course.description && <p className="mt-2 max-w-3xl text-sm leading-6 text-foreground/75 dark:text-foreground/75">{course.description}</p>}
+            {connectedPathsError ? (
+              <p role="alert" className="mt-3 text-sm text-rose-700 dark:text-rose-300">
+                Course learning paths could not be loaded.{' '}
+                <button type="button" className="font-medium underline" onClick={() => void refetchConnectedPaths()}>
+                  Retry
+                </button>
+              </p>
+            ) : connectedPaths.length > 0 && (
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                  <Sparkles className="h-3.5 w-3.5 text-blue-500" /> Part of Curricula:
+                </span>
+                {connectedPaths.map((p) => (
+                  <Link
+                    key={p.id}
+                    href={`/learning-paths/${p.id}`}
+                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/60 transition-colors"
+                  >
+                    <BookOpen className="h-3 w-3" />
+                    <span>{p.title}</span>
+                    <ChevronRight className="h-3 w-3 opacity-60" />
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+          {units.length > 0 && (
+            <div className="flex shrink-0 flex-wrap gap-2">
+              {user ? (
+                <>
+                  {continueUnit ? (
+                    <Button type="button" onClick={() => openUnit(continueUnit.id, continueTopicId)}>
+                      <PlayCircle aria-hidden="true" className="mr-2 h-4 w-4" />
+                      Continue studying
+                    </Button>
+                  ) : allUnitsCompleted && completedUnit ? (
+                    <Button type="button" onClick={() => openUnit(completedUnit.id)}>
+                      <BookOpen aria-hidden="true" className="mr-2 h-4 w-4" />
+                      Review course
+                    </Button>
+                  ) : (
+                    <Button type="button" onClick={() => setShowEnrollment(true)}>
+                      <PlayCircle aria-hidden="true" className="mr-2 h-4 w-4" />
+                      Start studying
+                    </Button>
+                  )}
+                  <Button type="button" variant="outline" onClick={() => setShowEnrollment(true)}>
+                    <Plus aria-hidden="true" className="mr-2 h-4 w-4" />
+                    {allUnitsEnrolled ? 'Manage units' : 'Choose units'}
+                  </Button>
+                </>
+              ) : (
+                <Link
+                  href={`/login?callbackUrl=${encodeURIComponent(`/courses/${courseId}`)}`}
+                  className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+                >
+                  <PlayCircle aria-hidden="true" className="h-4 w-4" />
+                  Sign in to start learning
+                </Link>
               )}
             </div>
-            {user ? (
-              <button
-                type="button"
-                onClick={() => setShowEnrollment(true)}
-                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
-              >
-                <Plus className="h-4 w-4" />
-                Choose units
-              </button>
-            ) : (
-              <Link
-                href={`/login?callbackUrl=${encodeURIComponent(`/courses/${courseId}`)}`}
-                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
-              >
-                Sign in to enroll
-              </Link>
-            )}
-          </header>
-        )}
-
-        {user && (
-          <section className="flex flex-col gap-4 rounded-xl border border-border bg-card p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-foreground">Plan this course</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Set a course-specific learning goal or add focused study time to your planner.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" onClick={() => setShowGoalWizard(true)}>
-                <Target aria-hidden="true" className="mr-2 h-4 w-4" />
-                Set course goal
-              </Button>
-              <Button type="button" onClick={() => setShowScheduleDialog(true)}>
-                <CalendarClock aria-hidden="true" className="mr-2 h-4 w-4" />
-                Schedule study
-              </Button>
-            </div>
-          </section>
-        )}
+          )}
+        </header>
 
         <section className="space-y-5" aria-label="Course units">
           <div className="flex flex-wrap items-end justify-between gap-2">
@@ -316,7 +323,7 @@ export function CourseOverview() {
               if (!user) {
                 router.push(`/login?callbackUrl=${encodeURIComponent(`/courses/${courseId}`)}`);
               } else if (isEnrolled) {
-                router.push(`/courses/${courseId}/units/${unit.id}`);
+                openUnit(unit.id, isActive ? nextTopicByUnitId.get(String(unit.id)) : undefined);
               } else {
                 setShowEnrollment(true);
               }
@@ -406,6 +413,26 @@ export function CourseOverview() {
           </div>
           )}
         </section>
+        {user && (
+          <section className="flex flex-col gap-4 rounded-xl border border-border bg-card p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">Plan this course</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Set a course-specific learning goal or add focused study time to your planner.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" onClick={() => setShowGoalWizard(true)}>
+                <Target aria-hidden="true" className="mr-2 h-4 w-4" />
+                Set course goal
+              </Button>
+              <Button type="button" onClick={() => setShowScheduleDialog(true)}>
+                <CalendarClock aria-hidden="true" className="mr-2 h-4 w-4" />
+                Schedule study
+              </Button>
+            </div>
+          </section>
+        )}
       </div>
       {showEnrollment && (
         <UnitSelectionModal

@@ -35,7 +35,7 @@ def test_course_preview_is_public_but_enrollment_prompts_for_sign_in():
                 lambda route: route.fulfill(
                     status=200,
                     content_type="application/json",
-                    body='{"success":true,"data":{"id":"course-preview","title":"Preview Course","units":[]}}',
+                    body='{"success":true,"data":{"id":"course-preview","title":"Preview Course","units":[{"id":"unit-preview","title":"Preview Unit","topics":[]}]}}',
                 ),
             )
             response = page.goto(
@@ -46,14 +46,41 @@ def test_course_preview_is_public_but_enrollment_prompts_for_sign_in():
             assert response is not None
             assert response.status == 200
             page.get_by_role("heading", name="Preview Course").wait_for()
-            page.get_by_role("heading", name="No learning units available").wait_for()
 
-            enrollment_link = page.get_by_role("link", name="Sign in to enroll")
+            enrollment_link = page.get_by_role("link", name="Sign in to start learning")
             assert enrollment_link.is_visible()
             enrollment_link.click()
             page.wait_for_url("**/login?callbackUrl=**")
             callback_url = parse_qs(urlparse(page.url).query)["callbackUrl"][0]
             assert callback_url == "/courses/course-preview"
+        finally:
+            browser.close()
+
+
+def test_empty_course_preview_explains_that_no_units_are_available():
+    frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000").rstrip("/")
+
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch()
+        page = browser.new_page()
+        try:
+            page.route(
+                "**/api/backend/courses/course-empty-preview**",
+                lambda route: route.fulfill(
+                    status=200,
+                    content_type="application/json",
+                    body='{"success":true,"data":{"id":"course-empty-preview","title":"Empty Preview Course","units":[]}}',
+                ),
+            )
+            response = page.goto(
+                f"{frontend_url}/courses/course-empty-preview",
+                wait_until="domcontentloaded",
+                timeout=90000,
+            )
+            assert response is not None
+            assert response.status == 200
+            page.get_by_role("heading", name="Empty Preview Course").wait_for()
+            page.get_by_role("heading", name="No learning units available").wait_for()
         finally:
             browser.close()
 
