@@ -1,17 +1,18 @@
 'use client';
 
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { BookOpen, CalendarClock, ChevronRight, Circle, CircleCheck, Clock, PlayCircle, Plus, Sparkles, Target } from 'lucide-react';
+import { AlertCircle, BookOpen, CalendarClock, ChevronRight, Circle, CircleCheck, Clock, PlayCircle, Plus, Sparkles, Target } from 'lucide-react';
 import { apiService } from '@/features/auth/services/apiClient';
 import { toast } from 'sonner';
 import { courseService } from '@/features/courses/services/courseService';
-import scheduleService from '@/features/learning-management/study/services/scheduleService';
+import scheduleService, { type ScheduleFetchResult } from '@/features/learning-management/study/services/scheduleService';
 import { GoalCreationWizard } from '@/features/learning-management/components/goals/goal-creation-wizard';
 import type { Course } from '@/shared/types/courseInterface';
 import type { TopicProgress } from '@/shared/types/progressInterface';
+import type { LearningGoal } from '@/shared/types/learningGoalsInterface';
 import { UnitSelectionModal } from './UnitSelectionModal';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { usePageHeader } from '@/core/providers/HeaderContext';
@@ -30,8 +31,28 @@ const localDateTimeValue = (date: Date) => {
   return localDate.toISOString().slice(0, 16);
 };
 
+const getNextStudyStart = () => {
+  const nextHour = new Date();
+  nextHour.setMinutes(0, 0, 0);
+  nextHour.setHours(nextHour.getHours() + 1);
+  if (nextHour.getHours() >= 22) {
+    nextHour.setDate(nextHour.getDate() + 1);
+    nextHour.setHours(9);
+  }
+  return localDateTimeValue(nextHour);
+};
+
 type CourseProgress = {
   topicProgress?: Array<TopicProgress & { topicId?: string }>;
+};
+
+type CourseGoalSummary = Pick<LearningGoal, 'id' | 'title' | 'status'> & {
+  description?: string;
+  progress?: number;
+  targetDate?: string;
+  courseId?: string;
+  topicId?: string;
+  metadata?: Record<string, unknown>;
 };
 
 export function CourseOverview() {
@@ -44,16 +65,10 @@ export function CourseOverview() {
   const [showGoalWizard, setShowGoalWizard] = useState(false);
   const [showScheduleDialog, setShowScheduleDialog] = useState(false);
   const [isScheduling, setIsScheduling] = useState(false);
-  const [scheduledStart, setScheduledStart] = useState(() => {
-    const nextHour = new Date();
-    nextHour.setMinutes(0, 0, 0);
-    nextHour.setHours(nextHour.getHours() + 1);
-    if (nextHour.getHours() >= 22) {
-      nextHour.setDate(nextHour.getDate() + 1);
-      nextHour.setHours(9);
-    }
-    return localDateTimeValue(nextHour);
-  });
+  const [scheduleDuration, setScheduleDuration] = useState(45);
+  const [scheduleTopicId, setScheduleTopicId] = useState('');
+  const [scheduleError, setScheduleError] = useState('');
+  const [scheduledStart, setScheduledStart] = useState(getNextStudyStart);
 
   const {
     data: course,
@@ -110,6 +125,96 @@ export function CourseOverview() {
     gcTime: 30 * 60 * 1000,
     meta: { persist: Boolean(user?.id) },
   });
+  const {
+    data: scheduleData = { events: [], errors: [] },
+    isLoading: scheduleLoading,
+    isError: scheduleRequestError,
+    refetch: refetchScheduledEvents,
+  } = useQuery<ScheduleFetchResult>({
+    queryKey: ['course-overview-schedule', user?.id],
+    queryFn: () => scheduleService.getSessions(user?.id),
+    enabled: Boolean(user?.id),
+    staleTime: 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    meta: { persist: Boolean(user?.id) },
+  });
+  const scheduledEvents = scheduleData.events;
+  const scheduleQueryError = scheduleRequestError || scheduleData.errors.length > 0;
+  const {
+    data: activeGoals = [],
+    isLoading: goalsLoading,
+    isError: goalsQueryError,
+    refetch: refetchGoals,
+  } = useQuery<CourseGoalSummary[]>({
+    queryKey: ['course-overview-goals', user?.id, courseId],
+    queryFn: async () => {
+      const response = await apiService.get<unknown>('/learning-goals', {
+        params: { status: 'active', limit: 100 },
+      });
+      let payload: unknown = response.data;
+      for (let depth = 0; depth < 4; depth += 1) {
+        if (Array.isArray(payload)) {
+          return payload.map(item => {
+            if (!item || typeof item !== 'object') {
+              throw new Error('The active goals response contained an invalid item.');
+            }
+            const goal = item as Record<string, unknown>;
+            if (typeof goal.id !== 'string' || typeof goal.title !== 'string') {
+              throw new Error('An active goal was missing its ID or title.');
+            }
+            return {
+              id: goal.id,
+              title: goal.title,
+              status: typeof goal.status === 'string' ? goal.status : 'inProgress',
+              description: typeof goal.description === 'string' ? goal.description : undefined,
+              progress: typeof goal.progress === 'number' ? goal.progress : undefined,
+              targetDate: typeof goal.targetDate === 'string' ? goal.targetDate : undefined,
+              courseId: typeof goal.courseId === 'string' ? goal.courseId : undefined,
+              topicId: typeof goal.topicId === 'string' ? goal.topicId : undefined,
+              metadata:
+                goal.metadata && typeof goal.metadata === 'object' && !Array.isArray(goal.metadata)
+                  ? (goal.metadata as Record<string, unknown>)
+                  : undefined,
+            };
+          });
+        }
+        if (!payload || typeof payload !== 'object' || !('data' in payload)) break;
+        payload = (payload as { data: unknown }).data;
+      }
+      throw new Error('The active goals response was invalid.');
+    },
+    enabled: Boolean(courseId && user?.id),
+    staleTime: 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    meta: { persist: Boolean(user?.id) },
+  });
+  const courseGoalInitialData = useMemo(() => ({
+    title: `Complete ${course?.title || course?.name || 'this course'}`,
+    description: `Complete the topics and assessments in ${course?.title || course?.name || 'this course'}.`,
+    type: 'shortTerm',
+    category: 'course_completion',
+    courseId: course?.id || '',
+    targetCriteria: {
+      type: 'percentage',
+      targetValue: 100,
+      currentValue: 0,
+      unit: '%',
+      measurementMethod: 'Course progress',
+    },
+    smartCriteria: {
+      specific: `Complete all topics and assessments in ${course?.title || course?.name || 'this course'}.`,
+      measurable: 'Reach 100% course progress.',
+      achievable: 'Study consistently and complete the course assessments.',
+      relevant: 'Build and verify mastery of this course.',
+      timeBound: 'Complete the course by the selected target date.',
+    },
+    progressTracking: {
+      autoTracking: true,
+      manualUpdates: true,
+      dataSources: ['course_progress'],
+      updateFrequency: 'real_time' as const,
+    },
+  }), [course?.id, course?.name, course?.title]);
 
   useEffect(() => {
     if (!course) return;
@@ -174,6 +279,61 @@ export function CourseOverview() {
   const continueTopicId = continueUnit
     ? nextTopicByUnitId.get(String(continueUnit.id))
     : undefined;
+  const courseTopics = units.flatMap(unit =>
+    (unit.topics || []).map(topic => ({
+      id: String(topic.id),
+      unitId: String(unit.id),
+      title: topic.title || topic.name || 'Untitled topic',
+      unitTitle: unit.title || unit.name || 'Course unit',
+    })),
+  );
+  const topicIds = new Set(courseTopics.map(topic => topic.id));
+  const courseGoals = activeGoals.filter(goal => {
+    const metadata = goal.metadata || {};
+    const associatedCourseId = goal.courseId
+      ?? (typeof metadata.courseId === 'string' ? metadata.courseId : undefined);
+    const associatedTopicId = goal.topicId
+      ?? (typeof metadata.topicId === 'string' ? metadata.topicId : undefined);
+    return associatedCourseId === String(course.id)
+      || Boolean(associatedTopicId && topicIds.has(associatedTopicId));
+  });
+  const now = new Date();
+  const scheduleWindowEnd = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+  const courseScheduleEvents = scheduledEvents
+    .filter(event => {
+      const descriptionCourseId = event.description?.match(/\[courseId:([^\]]+)\]/)?.[1];
+      return (
+        (event.courseId === String(course.id) || descriptionCourseId === String(course.id))
+        && event.type === 'study'
+        && event.date >= now
+        && event.date <= scheduleWindowEnd
+        && !event.completed
+        && event.status !== 'cancelled'
+        && event.status !== 'completed'
+      );
+    })
+    .sort((first, second) => first.date.getTime() - second.date.getTime());
+  const selectedTopic = courseTopics.find(topic => topic.id === scheduleTopicId);
+  const scheduleStartDate = new Date(scheduledStart);
+  const scheduleEndDate = new Date(scheduleStartDate.getTime() + scheduleDuration * 60 * 1000);
+  const openScheduleDialog = () => {
+    setScheduledStart(getNextStudyStart());
+    setScheduleTopicId(
+      courseTopics.some(topic => topic.id === continueTopicId)
+        ? continueTopicId || ''
+        : '',
+    );
+    setScheduleDuration(45);
+    setScheduleError('');
+    setShowScheduleDialog(true);
+  };
+  const scheduleConflict = scheduledEvents.find(event =>
+    !event.completed
+    && event.status !== 'cancelled'
+    && event.status !== 'completed'
+    && event.date < scheduleEndDate
+    && event.endDate > scheduleStartDate,
+  );
   const openUnit = (unitId: string | number, topicId?: string) => {
     const topicQuery = topicId ? `?topicId=${encodeURIComponent(topicId)}` : '';
     router.push(`/courses/${encodeURIComponent(courseId)}/units/${encodeURIComponent(String(unitId))}${topicQuery}`);
@@ -181,20 +341,32 @@ export function CourseOverview() {
   const scheduleCourseStudy = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const startDate = new Date(scheduledStart);
-    if (Number.isNaN(startDate.getTime()) || startDate <= new Date()) {
+    if (Number.isNaN(startDate.getTime()) || startDate <= new Date() || scheduleDuration < 1) {
       toast.error('Choose a future date and time for this study session.');
       return;
     }
+    if (scheduleConflict) {
+      setScheduleError(
+        `This time overlaps with "${scheduleConflict.title}" at ${scheduleConflict.date.toLocaleString()}.`,
+      );
+      return;
+    }
     setIsScheduling(true);
+    setScheduleError('');
     try {
       await scheduleService.createEvent({
-        title: `Study: ${course.title || course.name}`,
-        description: `Study session for ${course.title || course.name}. [courseId:${course.id}]`,
+        title: `Study: ${selectedTopic?.title || course.title || course.name}`,
+        description: selectedTopic
+          ? `Study session for ${selectedTopic.title} in ${selectedTopic.unitTitle}. [courseId:${course.id}]`
+          : `Study session for ${course.title || course.name}. [courseId:${course.id}]`,
         date: startDate,
-        endDate: new Date(startDate.getTime() + 45 * 60 * 1000),
+        endDate: new Date(startDate.getTime() + scheduleDuration * 60 * 1000),
         type: 'study',
         location: 'Study Planner',
+        courseId: String(course.id),
+        topicId: selectedTopic?.id,
       });
+      await queryClient.invalidateQueries({ queryKey: ['course-overview-schedule', user?.id] });
       await queryClient.invalidateQueries({ queryKey: ['course-roadmap-schedule', user?.id, course.id] });
       toast.success('Study session added to your schedule.');
       setShowScheduleDialog(false);
@@ -426,12 +598,134 @@ export function CourseOverview() {
                 <Target aria-hidden="true" className="mr-2 h-4 w-4" />
                 Set course goal
               </Button>
-              <Button type="button" onClick={() => setShowScheduleDialog(true)}>
+              <Button type="button" onClick={openScheduleDialog}>
                 <CalendarClock aria-hidden="true" className="mr-2 h-4 w-4" />
                 Schedule study
               </Button>
             </div>
           </section>
+        )}
+        {user && (
+          <div className="grid gap-5 lg:grid-cols-2">
+            <section className="rounded-xl border border-border bg-card p-5 shadow-sm" aria-labelledby="course-schedule-heading">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h2 id="course-schedule-heading" className="text-lg font-semibold text-foreground">
+                    Upcoming study sessions
+                  </h2>
+                  <p className="mt-1 text-sm text-muted-foreground">The next 30 days for this course</p>
+                </div>
+                <Link href="/study-planner/schedule" className="text-sm font-medium text-primary hover:underline">
+                  Open schedule
+                </Link>
+              </div>
+              {scheduleLoading ? (
+                <p role="status" className="mt-4 text-sm text-muted-foreground">Loading your schedule…</p>
+              ) : courseScheduleEvents.length > 0 ? (
+                <ul className="mt-4 space-y-3">
+                  {courseScheduleEvents.slice(0, 5).map(session => {
+                    const topic = courseTopics.find(item => item.id === session.topicId);
+                    return (
+                      <li key={session.id} className="rounded-lg border border-border p-3">
+                        <p className="text-sm font-medium text-foreground">{session.title}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {session.date.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                          {' · '}
+                          {Math.max(1, Math.round((session.endDate.getTime() - session.date.getTime()) / 60_000))} min
+                        </p>
+                        {topic && (
+                          <Link
+                            href={`/courses/${encodeURIComponent(String(course.id))}/units/${encodeURIComponent(topic.unitId)}?topicId=${encodeURIComponent(topic.id)}`}
+                            className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+                          >
+                            Study {topic.title}
+                            <ChevronRight aria-hidden="true" className="h-4 w-4" />
+                          </Link>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : (
+                <div className="mt-4 rounded-lg border border-dashed border-border p-4">
+                  <p className="text-sm text-muted-foreground">No upcoming study sessions for this course.</p>
+                  <Button type="button" variant="outline" className="mt-3" onClick={openScheduleDialog}>
+                    <CalendarClock aria-hidden="true" className="mr-2 h-4 w-4" />
+                    Schedule your first session
+                  </Button>
+                </div>
+              )}
+              {scheduleQueryError && (
+                <p role="alert" className="mt-3 text-sm text-rose-700 dark:text-rose-300">
+                  Schedule sessions could not be loaded.{' '}
+                  <button type="button" className="font-medium underline" onClick={() => void refetchScheduledEvents()}>
+                    Retry
+                  </button>
+                </p>
+              )}
+            </section>
+
+            <section className="rounded-xl border border-border bg-card p-5 shadow-sm" aria-labelledby="course-goals-heading">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h2 id="course-goals-heading" className="text-lg font-semibold text-foreground">Course goals</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">Track outcomes linked to this course</p>
+                </div>
+                <Button type="button" variant="outline" onClick={() => setShowGoalWizard(true)}>
+                  <Target aria-hidden="true" className="mr-2 h-4 w-4" />
+                  Set goal
+                </Button>
+              </div>
+              {goalsLoading ? (
+                <p role="status" className="mt-4 text-sm text-muted-foreground">Loading course goals…</p>
+              ) : goalsQueryError ? (
+                <p role="alert" className="mt-4 text-sm text-rose-700 dark:text-rose-300">
+                  Course goals could not be loaded.{' '}
+                  <button type="button" className="font-medium underline" onClick={() => void refetchGoals()}>
+                    Retry
+                  </button>
+                </p>
+              ) : courseGoals.length > 0 ? (
+                <ul className="mt-4 space-y-4">
+                  {courseGoals.slice(0, 4).map(goal => {
+                    const percentage = Math.min(100, Math.max(0, Math.round(goal.progress ?? 0)));
+                    return (
+                      <li key={goal.id}>
+                        <div className="flex items-start justify-between gap-3">
+                          <p className="text-sm font-medium text-foreground">{goal.title}</p>
+                          {goal.targetDate && (
+                            <span className="shrink-0 text-xs text-muted-foreground">
+                              Due {new Date(`${goal.targetDate.slice(0, 10)}T00:00:00`).toLocaleDateString()}
+                            </span>
+                          )}
+                        </div>
+                        <div
+                          className="mt-2 h-2 overflow-hidden rounded-full bg-muted"
+                          role="progressbar"
+                          aria-label={`${goal.title} progress`}
+                          aria-valuemin={0}
+                          aria-valuemax={100}
+                          aria-valuenow={percentage}
+                        >
+                          <div className="h-full rounded-full bg-primary" style={{ width: `${percentage}%` }} />
+                        </div>
+                        <p className="mt-1 text-xs text-muted-foreground">{percentage}% complete</p>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : (
+                <div className="mt-4 rounded-lg border border-dashed border-border p-4">
+                  <p className="text-sm text-muted-foreground">
+                    No active goals are linked to this course yet.
+                  </p>
+                  <Button type="button" variant="outline" className="mt-3" onClick={() => setShowGoalWizard(true)}>
+                    Create a course goal
+                  </Button>
+                </div>
+              )}
+            </section>
+          </div>
         )}
       </div>
       {showEnrollment && (
@@ -460,9 +754,10 @@ export function CourseOverview() {
       <GoalCreationWizard
         isOpen={showGoalWizard}
         onClose={() => setShowGoalWizard(false)}
-        initialData={{ courseId: course.id }}
+        initialData={courseGoalInitialData}
         onGoalCreated={() => {
           setShowGoalWizard(false);
+          void queryClient.invalidateQueries({ queryKey: ['course-overview-goals', user?.id, courseId] });
           void queryClient.invalidateQueries({ queryKey: ['course-roadmap-goals', user?.id, course.id] });
           toast.success('Course goal created.');
         }}
@@ -477,27 +772,87 @@ export function CourseOverview() {
           <DialogHeader>
             <DialogTitle>Schedule course study</DialogTitle>
             <DialogDescription>
-              Add a 45-minute study session for {course.title || course.name}.
+              Schedule a focused session for this course or one of its topics.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={scheduleCourseStudy} className="space-y-4">
-            <label htmlFor="course-study-start" className="block text-sm font-medium text-foreground">
-              Start date and time
-            </label>
-            <input
-              id="course-study-start"
-              type="datetime-local"
-              required
-              min={localDateTimeValue(new Date())}
-              value={scheduledStart}
-              onChange={event => setScheduledStart(event.target.value)}
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-            />
+            <div>
+              <label htmlFor="course-study-topic" className="mb-1 block text-sm font-medium text-foreground">
+                Study focus
+              </label>
+              <select
+                id="course-study-topic"
+                value={scheduleTopicId}
+                onChange={event => {
+                  setScheduleTopicId(event.target.value);
+                  setScheduleError('');
+                }}
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+              >
+                <option value="">Entire course</option>
+                {courseTopics.map(topic => (
+                  <option key={topic.id} value={topic.id}>
+                    {topic.unitTitle} — {topic.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label htmlFor="course-study-start" className="mb-1 block text-sm font-medium text-foreground">
+                  Start date and time
+                </label>
+                <input
+                  id="course-study-start"
+                  type="datetime-local"
+                  required
+                  min={localDateTimeValue(new Date())}
+                  value={scheduledStart}
+                  onChange={event => {
+                    setScheduledStart(event.target.value);
+                    setScheduleError('');
+                  }}
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                />
+              </div>
+              <div>
+                <label htmlFor="course-study-duration" className="mb-1 block text-sm font-medium text-foreground">
+                  Duration
+                </label>
+                <select
+                  id="course-study-duration"
+                  value={scheduleDuration}
+                  onChange={event => {
+                    setScheduleDuration(Number(event.target.value));
+                    setScheduleError('');
+                  }}
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+                >
+                  {[25, 45, 60, 90, 120].map(minutes => (
+                    <option key={minutes} value={minutes}>{minutes} minutes</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            {scheduleQueryError && (
+              <p className="text-xs text-amber-700 dark:text-amber-300">
+                The full planner could not be checked. Saved calendar events will still be checked before saving.
+              </p>
+            )}
+            {scheduleConflict && (
+              <p role="alert" className="flex items-start gap-2 text-sm text-rose-700 dark:text-rose-300">
+                <AlertCircle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
+                This time overlaps with “{scheduleConflict.title}” at {scheduleConflict.date.toLocaleString()}.
+              </p>
+            )}
+            {scheduleError && !scheduleConflict && (
+              <p role="alert" className="text-sm text-rose-700 dark:text-rose-300">{scheduleError}</p>
+            )}
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setShowScheduleDialog(false)} disabled={isScheduling}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={isScheduling}>
+              <Button type="submit" disabled={isScheduling || (scheduleLoading && !scheduleQueryError) || Boolean(scheduleConflict)}>
                 {isScheduling ? 'Scheduling…' : 'Add to schedule'}
               </Button>
             </DialogFooter>

@@ -9,6 +9,7 @@ import { AuthModule } from '../../auth/auth.module';
 
 import { DeadlinesTask } from './tasks/deadlines.task';
 import { ScheduleEventRemindersTask } from './tasks/schedule-event-reminders.task';
+import { LearningGoalRemindersTask } from './tasks/learning-goal-reminders.task';
 import { EngagementCommunicationModule } from '../../engagement-communication/engagement-communication.module';
 import { forwardRef } from '@nestjs/common';
 
@@ -24,6 +25,7 @@ import { forwardRef } from '@nestjs/common';
     DeadlinesService,
     DeadlinesTask,
     ScheduleEventRemindersTask,
+    LearningGoalRemindersTask,
   ],
   exports: [EventsService, DeadlinesService],
 })

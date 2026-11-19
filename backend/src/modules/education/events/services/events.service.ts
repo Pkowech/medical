@@ -1,8 +1,17 @@
 // backend/src/modules/education/events/services/events.service.ts
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '#infrastructure/prisma/prisma.service';
 import { CreateEventDto, UpdateEventDto } from '../dto/create-event.dto';
 import { ScheduleEvent } from '@prisma/client';
+import {
+  findOverlappingEvent,
+  isValidEventWindow,
+} from '../utils/event-window';
 
 @Injectable()
 export class EventsService {
@@ -13,13 +22,36 @@ export class EventsService {
   async create(userId: string, data: CreateEventDto): Promise<ScheduleEvent> {
     this.logger.log(`Creating event for user ${userId}: ${data.title}`);
 
+    const date = new Date(data.date);
+    const endDate = new Date(data.endDate);
+    if (!isValidEventWindow(date, endDate)) {
+      throw new BadRequestException('The event end time must be after its start time.');
+    }
+
+    const overlappingEvents = await this.prisma.scheduleEvent.findMany({
+      where: {
+        OR: [{ userId }, { userId: null }],
+        date: { lt: endDate },
+        endDate: { gt: date },
+        completed: false,
+        status: { notIn: ['completed', 'cancelled'] },
+      },
+      select: { title: true, date: true, endDate: true },
+    });
+    const conflict = findOverlappingEvent(overlappingEvents, date, endDate);
+    if (conflict) {
+      throw new BadRequestException(
+        `This session overlaps with "${conflict.title}" scheduled for ${conflict.date.toISOString()}.`,
+      );
+    }
+
     return this.prisma.scheduleEvent.create({
       data: {
         userId,
         title: data.title,
         description: data.description,
-        date: new Date(data.date),
-        endDate: new Date(data.endDate),
+        date,
+        endDate,
         type: data.type,
         location: data.location,
         instructor: data.instructor,

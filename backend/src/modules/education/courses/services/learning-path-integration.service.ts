@@ -27,7 +27,6 @@ import {
   ProgressData,
   ModuleProgressUpdate,
   Phase,
-  TargetCriteriaDto as TargetCriteria,
   PathProgressWithLearningPath,
   PathProgressWithMilestones,
   ModuleProgress,
@@ -40,6 +39,19 @@ import {
 } from '../utils/path-progress-normalizer';
 import { normalizeCareerStage } from '#common/constants/career-stages';
 import { evaluateLearningPathEligibility } from '#common/utils/learning-path-eligibility';
+import {
+  getGoalTargetCriteria,
+  goalAllowsProgressEntry,
+  goalMatchesProgressScope,
+} from '../utils/learning-goal-progress';
+
+const asRecord = (value: unknown): Record<string, unknown> =>
+  value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+
+const stringValue = (value: unknown): string | undefined =>
+  typeof value === 'string' && value.length > 0 ? value : undefined;
 
 @Injectable()
 export class LearningPathIntegrationService {
@@ -1014,39 +1026,68 @@ export class LearningPathIntegrationService {
       const relatedGoals = await this.prisma.learningGoal.findMany({
         where: {
           userId,
-          courseId,
-          status: GoalStatus.active,
+          OR: [{ courseId }, { topic: { unit: { courseId } } }],
+          status: { in: [ProgressStatus.inProgress, ProgressStatus.active] },
         },
       });
 
-      const goalUpdates = relatedGoals.map(async (goal) => {
-        if (
-          goal.category === GoalCategory.course_completion &&
-          progressData.completed
-        ) {
-          return this.goalsService.update(
-            goal.id,
-            {
-              status: GoalStatus.completed,
-              progressPercentage: 100,
-              completedAt: progressData.timestamp || new Date(),
-            },
-            userId,
+      const goalUpdates = relatedGoals.flatMap(goal => {
+        if (!goalAllowsProgressEntry(goal.metadata, ProgressEntryType.automatic)) {
+          return [];
+        }
+
+        if (goal.category === GoalCategory.course_completion) {
+          const targetValue = Number(
+            getGoalTargetCriteria(goal.metadata).targetValue,
           );
-        } else if (
+          const reportedProgress =
+            progressData.progressPercentage ?? progressData.percentage;
+          const progressValue =
+            typeof reportedProgress === 'number' && Number.isFinite(reportedProgress)
+              ? reportedProgress
+              : progressData.completed
+                ? Number.isFinite(targetValue) && targetValue > 0
+                  ? targetValue
+                  : 100
+                : undefined;
+          if (progressValue === undefined) return [];
+          return [
+            this.goalsService
+              .addProgressEntry(goal.id, userId, {
+                entryType: ProgressEntryType.automatic,
+                progressValue,
+                notes: `Course progress update: ${courseId}`,
+                metadata: { source: 'course_progress', courseId },
+              })
+              .then(() => undefined),
+          ];
+        }
+
+        if (
           goal.category === GoalCategory.study_time &&
-          progressData.timeSpentMinutes
+          typeof progressData.timeSpentMinutes === 'number' &&
+          progressData.timeSpentMinutes > 0
         ) {
-          return this.updateStudyTimeGoal(
-            goal,
-            userId,
-            progressData.timeSpentMinutes,
-            courseId,
+          return [
+            this.updateStudyTimeGoal(
+              goal,
+              userId,
+              progressData.timeSpentMinutes,
+              courseId,
+            ),
+          ];
+        }
+        return [];
+      });
+
+      const results = await Promise.allSettled(goalUpdates);
+      results.forEach(result => {
+        if (result.status === 'rejected') {
+          this.logger.error(
+            `Failed to update a course goal: ${getErrorMessage(result.reason)}`,
           );
         }
       });
-
-      await Promise.allSettled(goalUpdates);
     } catch (error) {
       this.logger.error(`Error updating goals from course progress:`, error);
     }
@@ -1059,10 +1100,8 @@ export class LearningPathIntegrationService {
     courseId: string,
   ): Promise<void> {
     try {
-      const targetCriteria = (
-        goal.metadata as unknown as Record<string, TargetCriteria>
-      ).targetCriteria;
-      const currentValue = Number(targetCriteria?.currentValue) || 0;
+      const targetCriteria = getGoalTargetCriteria(goal.metadata);
+      const currentValue = Number(targetCriteria.currentValue) || 0;
       const newValue = currentValue + timeSpentMinutes;
 
       await this.goalsService.addProgressEntry(goal.id, userId, {
@@ -1085,54 +1124,121 @@ export class LearningPathIntegrationService {
     assessmentId: string,
     attemptData: ProgressData,
   ): Promise<void> {
-    if (!attemptData.score && !attemptData.passed) {
+    const score =
+      typeof attemptData.score === 'number' && Number.isFinite(attemptData.score)
+        ? attemptData.score
+        : undefined;
+    if (score === undefined && !attemptData.passed) {
       return;
     }
 
     try {
+      const assessmentScope = await this.getAssessmentProgressScope(
+        assessmentId,
+        attemptData,
+      );
       const relatedGoals = await this.prisma.learningGoal.findMany({
         where: {
           userId,
           category: {
             in: [GoalCategory.assessment_score, GoalCategory.skill_mastery],
           },
-          status: GoalStatus.active,
-        },
-        select: {
-          id: true,
-          userId: true,
-          category: true,
-          status: true,
-          progress: true,
+          status: { in: [ProgressStatus.inProgress, ProgressStatus.active] },
         },
       });
 
-      const goalUpdates = relatedGoals
-        .filter((goal) => {
-          if (goal.category === GoalCategory.assessment_score) {
-            const targetScore = 0;
-            return !!attemptData.score && attemptData.score >= targetScore;
-          }
-          return attemptData.passed;
-        })
-        .map((goal) =>
-          this.goalsService.addProgressEntry(goal.id, userId, {
-            entryType: ProgressEntryType.automatic,
-            progressValue: attemptData.score || (attemptData.passed ? 100 : 0),
-            notes: `Assessment completed: ${assessmentId}`,
-            metadata: {
-              source: 'assessment_result',
-              assessmentId,
-              isPassed: attemptData.passed,
-              score: attemptData.score,
-            },
-          }),
-        );
+      const goalUpdates = relatedGoals.flatMap(goal => {
+        if (
+          !goalAllowsProgressEntry(goal.metadata, ProgressEntryType.automatic) ||
+          !goalMatchesProgressScope(goal, assessmentScope)
+        ) {
+          return [];
+        }
 
-      await Promise.allSettled(goalUpdates);
+        if (goal.category === GoalCategory.assessment_score && score !== undefined) {
+          const currentValue =
+            Number(getGoalTargetCriteria(goal.metadata).currentValue) || 0;
+          return [
+            this.goalsService.addProgressEntry(goal.id, userId, {
+              entryType: ProgressEntryType.automatic,
+              progressValue: Math.max(currentValue, score),
+              notes: `Assessment completed: ${assessmentId}`,
+              metadata: {
+                source: 'assessment_result',
+                assessmentId,
+                courseId: assessmentScope.courseId,
+                topicId: assessmentScope.topicId,
+                isPassed: attemptData.passed,
+                score,
+              },
+            }),
+          ];
+        }
+
+        if (goal.category === GoalCategory.skill_mastery && attemptData.passed) {
+          const targetValue = Number(
+            getGoalTargetCriteria(goal.metadata).targetValue,
+          );
+          return [
+            this.goalsService.addProgressEntry(goal.id, userId, {
+              entryType: ProgressEntryType.automatic,
+              progressValue:
+                Number.isFinite(targetValue) && targetValue > 0 ? targetValue : 100,
+              notes: `Assessment passed: ${assessmentId}`,
+              metadata: {
+                source: 'assessment_result',
+                assessmentId,
+                courseId: assessmentScope.courseId,
+                topicId: assessmentScope.topicId,
+                isPassed: true,
+                score,
+              },
+            }),
+          ];
+        }
+        return [];
+      });
+
+      const results = await Promise.allSettled(goalUpdates);
+      results.forEach(result => {
+        if (result.status === 'rejected') {
+          this.logger.error(
+            `Failed to update an assessment goal: ${getErrorMessage(result.reason)}`,
+          );
+        }
+      });
     } catch (error) {
       this.logger.error(`Error updating goals from assessment results:`, error);
     }
+  }
+
+  private async getAssessmentProgressScope(
+    assessmentId: string,
+    attemptData: ProgressData,
+  ): Promise<{ courseId?: string; topicId?: string }> {
+    const metadata = asRecord(attemptData.metadata);
+    const quiz = await this.prisma.quiz.findUnique({
+      where: { id: assessmentId },
+      select: {
+        topicId: true,
+        unit: { select: { courseId: true } },
+        topic: {
+          select: {
+            id: true,
+            unit: { select: { courseId: true } },
+          },
+        },
+      },
+    });
+
+    return {
+      courseId:
+        quiz?.unit?.courseId ??
+        quiz?.topic?.unit.courseId ??
+        stringValue(metadata.courseId),
+      topicId:
+        quiz?.topic?.id ?? quiz?.topicId ?? stringValue(metadata.topicId),
+    };
   }
 
   private async updateGoalsFromClinicalCaseCompletion(
@@ -1145,39 +1251,58 @@ export class LearningPathIntegrationService {
     }
 
     try {
+      const clinicalCase = await this.prisma.clinicalCase.findUnique({
+        where: { id: caseId },
+        select: { courseId: true, metadata: true },
+      });
+      const caseMetadata = asRecord(clinicalCase?.metadata);
+      const caseScope = {
+        courseId: clinicalCase?.courseId ?? stringValue(caseMetadata.courseId),
+        topicId: stringValue(caseMetadata.topicId),
+      };
       const relatedGoals = await this.prisma.learningGoal.findMany({
         where: {
           userId,
           category: GoalCategory.clinical_cases,
-          status: GoalStatus.active,
-        },
-        select: {
-          id: true,
-          userId: true,
-          category: true,
-          status: true,
-          progress: true,
+          status: { in: [ProgressStatus.inProgress, ProgressStatus.active] },
         },
       });
 
-      const goalUpdates = relatedGoals.map((goal) => {
-        const currentValue = goal.progress || 0;
-        const newValue = currentValue + 1;
+      const goalUpdates = relatedGoals.flatMap(goal => {
+        if (
+          !goalAllowsProgressEntry(goal.metadata, ProgressEntryType.automatic) ||
+          !goalMatchesProgressScope(goal, caseScope)
+        ) {
+          return [];
+        }
 
-        return this.goalsService.addProgressEntry(goal.id, userId, {
-          entryType: ProgressEntryType.automatic,
-          progressValue: newValue,
-          notes: `Clinical case completed: ${caseId}`,
-          metadata: {
-            source: 'clinical_case_completion',
-            caseId,
-            completedAt:
-              attemptData.timestamp?.toISOString() || new Date().toISOString(),
-          },
-        });
+        const currentValue =
+          Number(getGoalTargetCriteria(goal.metadata).currentValue) || 0;
+        return [
+          this.goalsService.addProgressEntry(goal.id, userId, {
+            entryType: ProgressEntryType.automatic,
+            progressValue: currentValue + 1,
+            notes: `Clinical case completed: ${caseId}`,
+            metadata: {
+              source: 'clinical_case_completion',
+              caseId,
+              courseId: caseScope.courseId,
+              topicId: caseScope.topicId,
+              completedAt:
+                attemptData.timestamp?.toISOString() || new Date().toISOString(),
+            },
+          }),
+        ];
       });
 
-      await Promise.allSettled(goalUpdates);
+      const results = await Promise.allSettled(goalUpdates);
+      results.forEach(result => {
+        if (result.status === 'rejected') {
+          this.logger.error(
+            `Failed to update a clinical case goal: ${getErrorMessage(result.reason)}`,
+          );
+        }
+      });
     } catch (error) {
       this.logger.error(
         `Error updating goals from clinical case completion:`,

@@ -32,6 +32,9 @@ export interface LearningGoal {
     enabled: boolean;
     frequency: 'daily' | 'weekly' | 'custom';
     time?: string;
+    timezone?: string;
+    daysOfWeek?: number[];
+    intervalDays?: number;
   };
   progressTracking?: {
     autoTracking: boolean;

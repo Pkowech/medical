@@ -211,6 +211,8 @@ const scheduleService = {
             location: safeString(s.location, ''),
             instructor: (typeof s.instructor === 'string' ? s.instructor : null),
             completed: !!s.completed || !!metadata.completed,
+            status: safeString(s.status, 'pending'),
+            allDay: !!s.allDay,
             courseId: typeof s.courseId === 'string'
               ? s.courseId
               : typeof metadata.courseId === 'string'
@@ -220,6 +222,11 @@ const scheduleService = {
               ? s.topicId
               : typeof metadata.topicId === 'string'
                 ? metadata.topicId
+                : null,
+            learningPathId: typeof s.learningPathId === 'string'
+              ? s.learningPathId
+              : typeof metadata.learningPathId === 'string'
+                ? metadata.learningPathId
                 : null,
             goalId: typeof metadata.goalId === 'string' ? metadata.goalId : undefined,
           } as ScheduleEvent;
@@ -360,6 +367,11 @@ const scheduleService = {
         type: safeString(d.type),
         location: safeString(d.location),
         instructor: (typeof d.instructor === 'string' ? d.instructor : null),
+        courseId: typeof d.courseId === 'string' ? d.courseId : null,
+        topicId: typeof d.topicId === 'string' ? d.topicId : null,
+        learningPathId: typeof d.learningPathId === 'string' ? d.learningPathId : null,
+        status: safeString(d.status, 'pending'),
+        completed: Boolean(d.completed),
       } as ScheduleEvent;
     } catch (error) {
       console.error('Error fetching event by ID:', error);
@@ -376,6 +388,21 @@ const scheduleService = {
         endDate: event.endDate.toISOString(),
         type: event.type || 'study',
         location: event.location || '',
+        instructor: event.instructor,
+        completed: event.completed,
+        allDay: event.allDay,
+        priority: event.priority,
+        status: event.status,
+        category: event.category,
+        color: event.color,
+        isRecurring: event.isRecurring,
+        recurrencePattern: event.recurrencePattern,
+        reminders: event.reminders,
+        attendees: event.attendees,
+        metadata: event.metadata,
+        courseId: event.courseId,
+        topicId: event.topicId,
+        learningPathId: event.learningPathId,
       };
 
       // Debug: log payload before sending to help diagnose server 500s
@@ -401,6 +428,13 @@ const scheduleService = {
         endDate: new Date(safeString(endDateRaw ?? event.endDate ?? (new Date(safeString(dateRaw ?? event.date, String(event.date))).getTime() + 3600000), String(event.endDate))),
         type: safeString(d.type, 'study'),
         location: safeString(d.location, ''),
+        instructor: typeof d.instructor === 'string' ? d.instructor : null,
+        completed: Boolean(d.completed),
+        allDay: Boolean(d.allDay),
+        status: safeString(d.status, 'pending'),
+        courseId: typeof d.courseId === 'string' ? d.courseId : null,
+        topicId: typeof d.topicId === 'string' ? d.topicId : null,
+        learningPathId: typeof d.learningPathId === 'string' ? d.learningPathId : null,
       } as ScheduleEvent;
     } catch (error) {
       // Provide richer debug output when requests fail

@@ -101,6 +101,8 @@ interface RoadmapDueItem {
 }
 
 interface RoadmapTopicSelection {
+  id: string;
+  unitId: string;
   title: string;
   unitTitle: string;
 }
@@ -160,7 +162,11 @@ const getCourseRoadmapEvents = async (courseId: string): Promise<ScheduleEvent[]
     if (!item || typeof item !== 'object') return [];
     const event = item as Record<string, unknown>;
     const description = typeof event.description === 'string' ? event.description : '';
-    if (!description.includes(`[courseId:${courseId}]`)) return [];
+    const descriptionCourseId = description.match(/\[courseId:([^\]]+)\]/)?.[1];
+    const eventCourseId = typeof event.courseId === 'string'
+      ? event.courseId
+      : descriptionCourseId;
+    if (eventCourseId !== courseId) return [];
     const dateValue = event.date ?? event.startDate;
     if (
       typeof dateValue !== 'string'
@@ -184,6 +190,8 @@ const getCourseRoadmapEvents = async (courseId: string): Promise<ScheduleEvent[]
       date,
       endDate: Number.isNaN(endDate.getTime()) ? date : endDate,
       type: typeof event.type === 'string' ? event.type : 'study',
+      courseId: eventCourseId,
+      topicId: typeof event.topicId === 'string' ? event.topicId : null,
     }];
   });
 };
@@ -223,6 +231,7 @@ export default function MaterialsDashboard() {
     }
     return localDateTimeValue(nextHour);
   });
+  const [scheduleDuration, setScheduleDuration] = useState(45);
   const [isScheduling, setIsScheduling] = useState(false);
 
   useEffect(() => {
@@ -781,7 +790,8 @@ export default function MaterialsDashboard() {
     ),
   );
   const courseStudySessions = upcomingStudySessions.filter(event =>
-    event.description?.includes(`[courseId:${selectedCourseId}]`)
+    (event.courseId === selectedCourseId
+      || event.description?.includes(`[courseId:${selectedCourseId}]`))
     && event.date >= now
     && event.date <= new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
   ).sort((first, second) => first.date.getTime() - second.date.getTime());
@@ -801,9 +811,11 @@ export default function MaterialsDashboard() {
         title: `Study: ${selectedCourse.title || selectedCourse.name} — ${topicToSchedule.title}`,
         description: `Study session for ${topicToSchedule.title} in ${topicToSchedule.unitTitle}. [courseId:${selectedCourse.id}]`,
         date: startDate,
-        endDate: new Date(startDate.getTime() + 45 * 60 * 1000),
+        endDate: new Date(startDate.getTime() + scheduleDuration * 60 * 1000),
         type: 'study',
         location: 'Study Planner',
+        courseId: selectedCourse.id,
+        topicId: topicToSchedule.id,
       });
       await queryClient.invalidateQueries({
         queryKey: ['course-roadmap-schedule', user?.id, selectedCourse.id],
@@ -817,7 +829,12 @@ export default function MaterialsDashboard() {
       setIsScheduling(false);
     }
   };
-  const openTopicScheduler = (title: string, unitTitle: string) => {
+  const openTopicScheduler = (
+    id: string,
+    unitId: string,
+    title: string,
+    unitTitle: string,
+  ) => {
     const nextHour = new Date();
     nextHour.setMinutes(0, 0, 0);
     nextHour.setHours(nextHour.getHours() + 1);
@@ -826,7 +843,8 @@ export default function MaterialsDashboard() {
       nextHour.setHours(9);
     }
     setScheduledStart(localDateTimeValue(nextHour));
-    setTopicToSchedule({ title, unitTitle });
+    setScheduleDuration(45);
+    setTopicToSchedule({ id, unitId, title, unitTitle });
   };
 
   return (
@@ -1298,14 +1316,29 @@ export default function MaterialsDashboard() {
                     </p>
                   ) : courseStudySessions.length > 0 ? (
                     <ul className="mt-3 space-y-3">
-                      {courseStudySessions.slice(0, 3).map(session => (
-                        <li key={session.id} className="border-t border-border pt-3 first:border-0 first:pt-0 dark:border-border">
-                          <p className="text-sm font-medium text-foreground dark:text-foreground">{session.title}</p>
-                          <p className="mt-1 text-xs text-muted-foreground dark:text-muted-foreground">
-                            {session.date.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
-                          </p>
-                        </li>
-                      ))}
+                      {courseStudySessions.slice(0, 3).map(session => {
+                        const topic = session.topicId
+                          ? selectedCourse?.units
+                              ?.flatMap(unit => (unit.topics || []).map(courseTopic => ({ unit, topic: courseTopic })))
+                              .find(item => String(item.topic.id) === session.topicId)
+                          : undefined;
+                        return (
+                          <li key={session.id} className="border-t border-border pt-3 first:border-0 first:pt-0 dark:border-border">
+                            <p className="text-sm font-medium text-foreground dark:text-foreground">{session.title}</p>
+                            <p className="mt-1 text-xs text-muted-foreground dark:text-muted-foreground">
+                              {session.date.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                            </p>
+                            {topic && selectedCourse && (
+                              <Link
+                                href={`/courses/${encodeURIComponent(String(selectedCourse.id))}/units/${encodeURIComponent(String(topic.unit.id))}?topicId=${encodeURIComponent(String(topic.topic.id))}`}
+                                className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-blue-700 hover:underline dark:text-blue-300"
+                              >
+                                Study {topic.topic.title || topic.topic.name}
+                              </Link>
+                            )}
+                          </li>
+                        );
+                      })}
                     </ul>
                   ) : (
                     <p className="mt-3 text-sm text-muted-foreground dark:text-muted-foreground">
@@ -1561,6 +1594,8 @@ export default function MaterialsDashboard() {
                                             variant="outline"
                                             size="sm"
                                             onClick={() => openTopicScheduler(
+                                              String(topic.id),
+                                              String(unit.id),
                                               topicTitle,
                                               unit.title || unit.name || `Unit ${unitIndex + 1}`,
                                             )}
@@ -1667,6 +1702,21 @@ export default function MaterialsDashboard() {
                       onChange={event => setScheduledStart(event.target.value)}
                       className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-border"
                     />
+                    <div>
+                      <label htmlFor="roadmap-study-duration" className="mb-1 block text-sm font-medium text-foreground dark:text-foreground">
+                        Duration
+                      </label>
+                      <select
+                        id="roadmap-study-duration"
+                        value={scheduleDuration}
+                        onChange={event => setScheduleDuration(Number(event.target.value))}
+                        className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+                      >
+                        {[25, 45, 60, 90, 120].map(minutes => (
+                          <option key={minutes} value={minutes}>{minutes} minutes</option>
+                        ))}
+                      </select>
+                    </div>
                     <DialogFooter>
                       <Button type="button" variant="outline" onClick={() => setTopicToSchedule(null)} disabled={isScheduling}>
                         Cancel

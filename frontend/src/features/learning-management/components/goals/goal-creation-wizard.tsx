@@ -12,6 +12,7 @@ import {
   Star,
 } from 'lucide-react';
 import { apiService } from '@/features/auth/services/apiClient';
+import { useAuth } from '@/features/auth/hooks/useAuth';
 import { GoalCreationWizardProps, SMARTSuggestions, LearningGoal } from '@/shared/types/learningGoalsInterface';
 import { formatDateOnly } from '@/shared/utils/date-only';
 
@@ -61,6 +62,7 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
   onGoalCreated,
   initialData,
 }) => {
+  const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
   const [goalData, setGoalData] = useState({
     title: '',
@@ -90,6 +92,9 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
       enabled: true,
       frequency: 'daily' as 'daily' | 'weekly' | 'custom',
       time: '09:00',
+      timezone: 'UTC',
+      daysOfWeek: [1, 3, 5],
+      intervalDays: 3,
     },
     progressTracking: {
       autoTracking: false,
@@ -171,6 +176,11 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
         reminderSettings: {
           ...prev.reminderSettings,
           ...(storedReminderSettings || {}),
+          timezone:
+            storedReminderSettings?.timezone ??
+            user?.preferences?.timezone ??
+            Intl.DateTimeFormat().resolvedOptions().timeZone ??
+            'UTC',
         },
         progressTracking: {
           ...prev.progressTracking,
@@ -178,10 +188,21 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
         },
         dependsOnGoalId: initialData.dependsOnGoalId ?? prev.dependsOnGoalId,
       }));
-    } else if (!isOpen) {
+    } else if (isOpen) {
+      setGoalData(prev => ({
+        ...prev,
+        reminderSettings: {
+          ...prev.reminderSettings,
+          timezone:
+            user?.preferences?.timezone ??
+            Intl.DateTimeFormat().resolvedOptions().timeZone ??
+            'UTC',
+        },
+      }));
+    } else {
       resetForm();
     }
-  }, [isOpen, initialData]);
+  }, [isOpen, initialData, user?.preferences?.timezone]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -335,6 +356,25 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
           newErrors.targetDate = 'Target date must be after start date';
         }
         break;
+
+      case 4:
+        if (
+          goalData.reminderSettings.enabled &&
+          goalData.reminderSettings.frequency === 'weekly' &&
+          !goalData.reminderSettings.daysOfWeek?.length
+        ) {
+          newErrors.reminders = 'Select at least one reminder day';
+        }
+        if (
+          goalData.reminderSettings.enabled &&
+          goalData.reminderSettings.frequency === 'custom' &&
+          (!Number.isInteger(goalData.reminderSettings.intervalDays) ||
+            Number(goalData.reminderSettings.intervalDays) < 1 ||
+            Number(goalData.reminderSettings.intervalDays) > 365)
+        ) {
+          newErrors.reminders = 'Choose a reminder interval from 1 to 365 days';
+        }
+        break;
     }
 
     setErrors(newErrors);
@@ -430,6 +470,9 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
         enabled: true,
         frequency: 'daily' as const,
         time: '09:00',
+        timezone: 'UTC',
+        daysOfWeek: [1, 3, 5],
+        intervalDays: 3,
       },
       progressTracking: {
         autoTracking: false,
@@ -1031,6 +1074,11 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
 
       <div>
         <h4 className="text-lg font-medium text-foreground mb-4">Reminders</h4>
+        {errors.reminders && (
+          <p role="alert" className="mb-3 text-sm text-red-600">
+            {errors.reminders}
+          </p>
+        )}
 
         <div className="space-y-4">
           <div className="flex items-center space-x-3">
@@ -1089,7 +1137,77 @@ export const GoalCreationWizard: React.FC<GoalCreationWizardProps> = ({
                   className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   title="Reminder Time"
                 />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Uses {goalData.reminderSettings.timezone || 'UTC'}.
+                </p>
               </div>
+              {goalData.reminderSettings.frequency === 'weekly' && (
+                <fieldset className="md:col-span-2">
+                  <legend className="mb-2 text-sm font-medium text-muted-foreground">
+                    Remind me on
+                  </legend>
+                  <div className="flex flex-wrap gap-3">
+                    {[
+                      ['Sun', 0],
+                      ['Mon', 1],
+                      ['Tue', 2],
+                      ['Wed', 3],
+                      ['Thu', 4],
+                      ['Fri', 5],
+                      ['Sat', 6],
+                    ].map(([label, day]) => (
+                      <label key={day} className="inline-flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={goalData.reminderSettings.daysOfWeek?.includes(Number(day)) ?? false}
+                          onChange={event =>
+                            setGoalData(prev => {
+                              const days = new Set(prev.reminderSettings.daysOfWeek ?? []);
+                              if (event.target.checked) days.add(Number(day));
+                              else days.delete(Number(day));
+                              return {
+                                ...prev,
+                                reminderSettings: {
+                                  ...prev.reminderSettings,
+                                  daysOfWeek: Array.from(days).sort((a, b) => a - b),
+                                },
+                              };
+                            })
+                          }
+                        />
+                        {label}
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+              )}
+              {goalData.reminderSettings.frequency === 'custom' && (
+                <div>
+                  <label className="block text-sm font-medium text-muted-foreground mb-2">
+                    Repeat every
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min={1}
+                      max={365}
+                      required
+                      value={goalData.reminderSettings.intervalDays ?? 3}
+                      onChange={event =>
+                        setGoalData(prev => ({
+                          ...prev,
+                          reminderSettings: {
+                            ...prev.reminderSettings,
+                            intervalDays: Number(event.target.value),
+                          },
+                        }))
+                      }
+                      className="w-24 rounded-lg border border-border px-3 py-2"
+                    />
+                    <span className="text-sm text-muted-foreground">days</span>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

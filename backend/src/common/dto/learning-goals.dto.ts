@@ -8,6 +8,9 @@ import {
   IsDate,
   IsNumber,
   IsBoolean,
+  IsInt,
+  Min,
+  Max,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import {
@@ -157,10 +160,30 @@ export class ReminderSettingsDto {
   @IsEnum(['daily', 'weekly', 'custom'])
   frequency!: 'daily' | 'weekly' | 'custom';
 
+  @ApiPropertyOptional({ description: 'Local reminder time in HH:mm format' })
+  @IsOptional()
+  @IsString()
+  time?: string;
+
+  @ApiPropertyOptional({ description: 'IANA timezone for the local reminder time' })
+  @IsOptional()
+  @IsString()
+  timezone?: string;
+
   @ApiPropertyOptional({ description: 'Days of week for reminders' })
   @IsOptional()
   @IsArray()
+  @IsInt({ each: true })
+  @Min(0, { each: true })
+  @Max(6, { each: true })
   daysOfWeek?: number[];
+
+  @ApiPropertyOptional({ description: 'Repeat custom reminders every N days' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(365)
+  intervalDays?: number;
 
   @ApiPropertyOptional({
     description: 'Custom reminder schedule',

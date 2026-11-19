@@ -97,7 +97,9 @@ export interface ScheduleEvent {
   color?: string; // Hex color for custom styling
   courseId?: string | null;
   topicId?: string | null;
+  learningPathId?: string | null;
   goalId?: string;
+  metadata?: Record<string, unknown>;
   
   // Recurring events
   isRecurring?: boolean;
