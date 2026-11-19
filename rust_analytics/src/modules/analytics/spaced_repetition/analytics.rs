@@ -497,13 +497,13 @@ impl SpacedRepetitionAnalytics {
               ufp.id as card_id,
               t.id as topic_id,
               q.text as question,
-              ufp.next_review
+              ufp.next_review AT TIME ZONE 'UTC' as next_review
             FROM user_flashcard_progress ufp
             INNER JOIN flashcards f ON ufp.flashcard_id = f.id
             INNER JOIN questions q ON f.question_id = q.id
             LEFT JOIN topics t ON q.unit_id = t.unit_id
             WHERE ufp.user_id = $1
-            AND ufp.next_review <= NOW()
+            AND ufp.next_review <= (NOW() AT TIME ZONE 'UTC')
             ORDER BY ufp.next_review ASC
             LIMIT $2
             "#,

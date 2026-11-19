@@ -149,7 +149,7 @@ export function CourseOverview() {
     queryKey: ['course-overview-goals', user?.id, courseId],
     queryFn: async () => {
       const response = await apiService.get<unknown>('/learning-goals', {
-        params: { status: 'active', limit: 100 },
+        params: { status: 'active' },
       });
       let payload: unknown = response.data;
       for (let depth = 0; depth < 4; depth += 1) {

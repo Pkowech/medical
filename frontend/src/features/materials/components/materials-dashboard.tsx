@@ -331,7 +331,7 @@ export default function MaterialsDashboard() {
     queryKey: ['course-roadmap-goals', user?.id, selectedCourseId],
     queryFn: async () => {
       const response = await apiService.get<unknown>('/learning-goals', {
-        params: { status: 'active', limit: 100 },
+        params: { status: 'active' },
       });
       let payload: unknown = response;
       for (let depth = 0; depth < 3; depth += 1) {
