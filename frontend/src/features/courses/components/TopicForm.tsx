@@ -191,6 +191,7 @@ export const TopicForm: React.FC<TopicFormProps> = ({
           materialFormData.append('unitId', unitId);
           materialFormData.append('topicId', targetTopic.id);
           materialFormData.append('shareWithCourse', String(shareWithCourse));
+          materialFormData.append('storageProvider', 'google-drive');
           await materialService.uploadMaterial(materialFormData);
           setInitialMaterialFile(null);
           setInitialMaterialTitle('');
@@ -409,8 +410,16 @@ export const TopicForm: React.FC<TopicFormProps> = ({
                   Initial topic material (optional)
                 </h3>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Choose a file up to 50MB to upload and link to this topic when you save it.
+                  Choose a file up to 50MB. It will be saved in the Google Drive account linked to your profile and linked to this topic.
                 </p>
+                <a
+                  href="/study-planner/materials/upload"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-1 inline-block text-sm text-primary underline-offset-4 hover:underline"
+                >
+                  Connect or update Google Drive permissions
+                </a>
               </div>
               <label htmlFor="initial-topic-material" className="block text-sm font-medium">
                 Choose material file

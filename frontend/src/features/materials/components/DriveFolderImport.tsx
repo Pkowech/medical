@@ -463,10 +463,20 @@ export default function DriveFolderImport({
             {isCheckingConnection
               ? 'Checking Google Drive connection…'
               : driveConnected
-                ? 'Personal Google Drive connected (read-only)'
+                ? 'Personal Google Drive connected.'
                 : 'Connect Google Drive to browse folders shared with your account.'}
           </p>
-          {driveConnected ? (
+          <div className="flex flex-wrap gap-2">
+            {driveConnected && (
+              <button
+                type="button"
+                onClick={handleConnect}
+                className="rounded-md border border-border px-3 py-1.5 text-sm text-muted-foreground hover:bg-card dark:border-border dark:text-muted-foreground dark:hover:bg-card"
+              >
+                Reconnect for file uploads
+              </button>
+            )}
+            {driveConnected ? (
             <button
               type="button"
               onClick={handleDisconnect}
@@ -474,7 +484,7 @@ export default function DriveFolderImport({
             >
               <Unplug className="h-4 w-4" /> Disconnect
             </button>
-          ) : (
+            ) : (
             <button
               type="button"
               onClick={handleConnect}
@@ -483,7 +493,8 @@ export default function DriveFolderImport({
             >
               Connect Google Drive
             </button>
-          )}
+            )}
+          </div>
         </div>
       </div>
 

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useId } from 'react';
+import React, { useEffect, useState, useRef, useId } from 'react';
 import { Button } from '@/shared/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Upload, X, File, Check } from 'lucide-react';
@@ -14,6 +14,7 @@ interface FileUploadProps {
   unitId?: string;
   topicId?: string;
   shareWithCourse?: boolean;
+  storageProvider?: 'app' | 'google-drive';
 }
 
 export default function FileUpload({
@@ -24,8 +25,10 @@ export default function FileUpload({
   unitId,
   topicId,
   shareWithCourse,
+  storageProvider,
 }: FileUploadProps) {
   const inputId = useId();
+  const targetStorage = storageProvider ?? (courseId ? 'google-drive' : 'app');
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -33,7 +36,45 @@ export default function FileUpload({
   const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState('');
   const [uploadComplete, setUploadComplete] = useState(false);
+  const [driveConnected, setDriveConnected] = useState<boolean | null>(
+    targetStorage === 'google-drive' ? null : false,
+  );
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (targetStorage !== 'google-drive') return;
+    let active = true;
+    materialService
+      .getGoogleDriveConnectionStatus()
+      .then(({ connected }) => {
+        if (active) setDriveConnected(connected);
+      })
+      .catch((connectionError) => {
+        if (!active) return;
+        setDriveConnected(false);
+        setError(
+          connectionError instanceof Error
+            ? connectionError.message
+            : 'Could not check the Google Drive connection.',
+        );
+      });
+    return () => {
+      active = false;
+    };
+  }, [targetStorage]);
+
+  const connectGoogleDrive = async () => {
+    try {
+      const authorizationUrl = await materialService.getGoogleDriveAuthorizationUrl();
+      window.location.assign(authorizationUrl);
+    } catch (connectionError) {
+      setError(
+        connectionError instanceof Error
+          ? connectionError.message
+          : 'Could not start Google Drive connection.',
+      );
+    }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -125,6 +166,10 @@ export default function FileUpload({
       setError('Please enter a title for your material');
       return;
     }
+    if (targetStorage === 'google-drive' && !driveConnected) {
+      setError('Connect Google Drive before uploading this course material.');
+      return;
+    }
 
     setIsUploading(true);
     setError('');
@@ -143,29 +188,21 @@ export default function FileUpload({
       if (shareWithCourse !== undefined) {
         formData.append('shareWithCourse', String(shareWithCourse));
       }
+      formData.append('storageProvider', targetStorage);
 
-      // Upload to the real API endpoint
-      try {
-        const data = await materialService.uploadMaterial(formData, {
-          onUploadProgress: (progressEvent: { loaded: number; total?: number }) => {
-            if (progressEvent.total) {
-              const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-              setUploadProgress(progress);
-            }
+      const data = await materialService.uploadMaterial(formData, {
+        onUploadProgress: (progressEvent: { loaded: number; total?: number }) => {
+          if (progressEvent.total) {
+            const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            setUploadProgress(progress);
           }
-        });
-
-        clearInterval(progressInterval);
-        setUploadProgress(100);
-        setUploadComplete(true);
-
-        if (onUploadComplete) {
-          onUploadComplete(data);
         }
-      } catch (apiError) {
-        console.error('Upload failed:', apiError);
-        setError(apiError instanceof Error ? apiError.message : 'Upload failed. Please try again.');
-      }
+      });
+
+      clearInterval(progressInterval);
+      setUploadProgress(100);
+      setUploadComplete(true);
+      onUploadComplete?.(data);
 
       // Reset form after 2 seconds
       setTimeout(() => {
@@ -182,7 +219,7 @@ export default function FileUpload({
     } catch (error) {
       clearInterval(progressInterval);
       console.error('Error uploading file:', error);
-      setError('Failed to upload file. Please try again.');
+      setError(error instanceof Error ? error.message : 'Failed to upload file. Please try again.');
       setIsUploading(false);
       setUploadProgress(0);
     }
@@ -218,6 +255,31 @@ export default function FileUpload({
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
+          {targetStorage === 'google-drive' && (
+            <div className="rounded-md border border-primary/20 bg-primary/5 p-3 text-sm">
+              <p>
+                This course material will be saved in the Google Drive account linked to your profile.
+                MedTrack stores a reference and checks learner access; Google Drive storage limits apply.
+              </p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <span className="text-xs text-muted-foreground">
+                  {driveConnected === null
+                    ? 'Checking Drive connection…'
+                    : driveConnected
+                      ? 'Drive connected.'
+                      : 'Connect Drive before selecting a file.'}
+                </span>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void connectGoogleDrive()}
+                >
+                  {driveConnected ? 'Update Drive permissions' : 'Connect Google Drive'}
+                </Button>
+              </div>
+            </div>
+          )}
           {/* File Drop Area */}
           <div
             className={`border-2 border-dashed rounded-lg p-6 text-center ${
@@ -331,7 +393,12 @@ export default function FileUpload({
               type="button"
               variant="default"
               onClick={handleUpload}
-              disabled={!file || isUploading || !title.trim()}
+              disabled={
+                !file ||
+                isUploading ||
+                !title.trim() ||
+                (targetStorage === 'google-drive' && !driveConnected)
+              }
               isLoading={isUploading}
             >
               {isUploading ? 'Uploading...' : 'Upload Material'}

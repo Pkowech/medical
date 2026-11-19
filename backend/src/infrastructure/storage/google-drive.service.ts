@@ -7,12 +7,15 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createCipheriv, createDecipheriv, createHmac, randomBytes, timingSafeEqual } from 'crypto';
+import { Readable } from 'stream';
 import { google, drive_v3 } from 'googleapis';
 import { PrismaService } from '#infrastructure/prisma/prisma.service';
 
 const MAX_DRIVE_MATERIAL_BYTES = 100 * 1024 * 1024;
 const MAX_FOLDER_IMPORT_FILES = 500;
 const DRIVE_READONLY_SCOPE = 'https://www.googleapis.com/auth/drive.readonly';
+const DRIVE_FILE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+const MEDTRACK_MATERIALS_FOLDER = 'MedTrack Course Materials';
 const OAUTH_STATE_MAX_AGE_MS = 10 * 60 * 1000;
 
 export interface SharedDriveFolderFile {
@@ -68,7 +71,7 @@ export class GoogleDriveService {
     return this.getOAuthClient().generateAuthUrl({
       access_type: 'offline',
       prompt: 'consent',
-      scope: [DRIVE_READONLY_SCOPE],
+      scope: [DRIVE_READONLY_SCOPE, DRIVE_FILE_SCOPE],
       state: `${payload}.${signature}`,
     });
   }
@@ -277,6 +280,7 @@ export class GoogleDriveService {
             : 'The Drive file is no longer available in the configured Shared Drive.',
         );
       }
+
       if (Number(file.data.size || 0) > MAX_DRIVE_MATERIAL_BYTES) {
         throw new BadRequestException('Drive materials must be 100 MB or smaller.');
       }
@@ -313,6 +317,104 @@ export class GoogleDriveService {
       this.logger.error('Could not download Google Drive material', error);
       throw new ServiceUnavailableException('Unable to read this material from Google Drive.');
     }
+  }
+
+  async uploadPersonalMaterial(
+    userId: string,
+    fileName: string,
+    mimeType: string,
+    content: Buffer,
+  ): Promise<drive_v3.Schema$File> {
+    const { drive } = await this.getDriveClient(userId, true);
+    try {
+      const folderId = await this.getOrCreateMaterialsFolder(drive);
+      const response = await drive.files.create({
+        requestBody: {
+          name: fileName,
+          parents: [folderId],
+        },
+        media: {
+          mimeType,
+          body: Readable.from(content),
+        },
+        fields: 'id,name,mimeType,size,driveId,webViewLink',
+      });
+      if (!response.data.id) {
+        throw new ServiceUnavailableException(
+          'Google Drive did not return an ID for the uploaded material.',
+        );
+      }
+      return response.data;
+    } catch (error) {
+      if (
+        error instanceof ServiceUnavailableException ||
+        error instanceof BadRequestException
+      ) {
+        throw error;
+      }
+      this.logger.error('Could not upload course material to Google Drive', error);
+      const message = error instanceof Error ? error.message.toLowerCase() : '';
+      if (
+        message.includes('storagequotaexceeded') ||
+        message.includes('storage quota')
+      ) {
+        throw new BadRequestException(
+          'Your linked Google Drive is out of storage. Free up space or choose another storage option.',
+        );
+      }
+      if (
+        message.includes('insufficient permission') ||
+        message.includes('insufficient authentication scopes')
+      ) {
+        throw new BadRequestException(
+          'Reconnect Google Drive and approve the file-creation permission before uploading.',
+        );
+      }
+      throw new ServiceUnavailableException(
+        'Google Drive could not save this material. Check the linked account and try again.',
+      );
+    }
+  }
+
+  async deletePersonalMaterial(userId: string, fileId: string): Promise<void> {
+    const { drive } = await this.getDriveClient(userId, true);
+    try {
+      await drive.files.delete({ fileId });
+    } catch (error) {
+      const message = error instanceof Error ? error.message.toLowerCase() : '';
+      if (message.includes('not found') || message.includes('404')) return;
+      this.logger.error('Could not delete a MedTrack material from Google Drive', error);
+      throw new ServiceUnavailableException(
+        'Google Drive could not delete this material. Reconnect the Drive account and try again.',
+      );
+    }
+  }
+
+  private async getOrCreateMaterialsFolder(
+    drive: drive_v3.Drive,
+  ): Promise<string> {
+    const existing = await drive.files.list({
+      q: `name = '${MEDTRACK_MATERIALS_FOLDER}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,
+      spaces: 'drive',
+      pageSize: 1,
+      fields: 'files(id)',
+    });
+    const folderId = existing.data.files?.[0]?.id;
+    if (folderId) return folderId;
+
+    const created = await drive.files.create({
+      requestBody: {
+        name: MEDTRACK_MATERIALS_FOLDER,
+        mimeType: 'application/vnd.google-apps.folder',
+      },
+      fields: 'id',
+    });
+    if (!created.data.id) {
+      throw new ServiceUnavailableException(
+        'Google Drive could not create the MedTrack materials folder.',
+      );
+    }
+    return created.data.id;
   }
 
   private async getDriveClient(

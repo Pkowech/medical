@@ -763,7 +763,7 @@ export class MaterialsService {
     try {
       const material = await this.prisma.material.findUnique({
         where: { id },
-        select: { userId: true, fileId: true },
+        select: { userId: true, fileId: true, metadata: true },
       });
 
       if (!material) {
@@ -777,6 +777,37 @@ export class MaterialsService {
         );
       }
       if (material.fileId) await this.assertCanUploadToPlatformLibrary(userId);
+
+      const metadata =
+        material.metadata &&
+        typeof material.metadata === 'object' &&
+        !Array.isArray(material.metadata)
+          ? (material.metadata as Record<string, unknown>)
+          : {};
+      if (
+        metadata.sourceProvider === 'google-drive' &&
+        metadata.driveManagedByApp === true
+      ) {
+        const driveFileId =
+          typeof metadata.driveFileId === 'string' ? metadata.driveFileId : '';
+        const otherReferences = driveFileId
+          ? await this.prisma.material.count({
+              where: {
+                id: { not: id },
+                metadata: { path: ['driveFileId'], equals: driveFileId },
+              },
+            })
+          : 0;
+        if (driveFileId && otherReferences === 0) {
+          await this.googleDrive.deletePersonalMaterial(userId, driveFileId);
+        }
+        if (typeof metadata.drivePreviewFileId === 'string') {
+          await this.googleDrive.deletePersonalMaterial(
+            userId,
+            metadata.drivePreviewFileId,
+          );
+        }
+      }
 
       await this.prisma.material.delete({ where: { id } });
       this.logger.log('Material deleted', { materialId: id, userId });
@@ -798,6 +829,7 @@ export class MaterialsService {
     difficulty?: number,
     tags?: string[],
     shareWithCourse = false,
+    storageProvider: 'app' | 'google-drive' = 'app',
   ): Promise<Material> {
     try {
       courseId = courseId?.trim();
@@ -872,6 +904,35 @@ export class MaterialsService {
         fileHash = await hashBuffer(file.buffer);
       } else {
         fileHash = createHash('sha256').update(Buffer.from('')).digest('hex');
+      }
+
+      if (storageProvider === 'google-drive') {
+        if (!courseId) {
+          throw new BadRequestException(
+            'Choose a course before saving material to Google Drive.',
+          );
+        }
+        if (!(await this.googleDrive.isUserConnected(userId))) {
+          throw new BadRequestException(
+            'Connect Google Drive before uploading this course material.',
+          );
+        }
+        return await this.createDriveBackedMaterial({
+          file,
+          content: Buffer.from(uploadBuffer),
+          mimeType: resolvedMimeType,
+          userId,
+          courseId,
+          unitId,
+          topicId,
+          title,
+          description,
+          type,
+          category,
+          difficulty,
+          tags,
+          shareWithCourse,
+        });
       }
 
       // Check if file already exists
@@ -1061,6 +1122,117 @@ export class MaterialsService {
     } catch (error) {
       handleServiceError(error, this.logger, 'uploadFile');
     }
+  }
+
+  private async createDriveBackedMaterial(input: {
+    file: Express.Multer.File;
+    content: Buffer;
+    mimeType: string;
+    userId: string;
+    courseId: string;
+    unitId?: string;
+    topicId?: string;
+    title?: string;
+    description?: string;
+    type?: MaterialType;
+    category?: string;
+    difficulty?: number;
+    tags?: string[];
+    shareWithCourse: boolean;
+  }): Promise<Material> {
+    const driveFile = await this.googleDrive.uploadPersonalMaterial(
+      input.userId,
+      input.file.originalname,
+      input.mimeType,
+      input.content,
+    );
+    if (!driveFile.id || !driveFile.mimeType) {
+      throw new BadRequestException(
+        'Google Drive did not return the uploaded file details.',
+      );
+    }
+
+    const driveType =
+      input.type ??
+      (input.mimeType === 'application/pdf' ||
+      input.mimeType.startsWith('application/vnd.google-apps.')
+        ? MaterialType.pdf
+        : input.mimeType.startsWith('video/')
+          ? MaterialType.video
+          : input.mimeType.includes('powerpoint') ||
+              input.mimeType.includes('presentation')
+            ? MaterialType.slide
+            : MaterialType.other);
+    const metadata = {
+      ...(input.tags ? { tags: input.tags } : {}),
+      shareWithCourse: input.shareWithCourse,
+      sourceProvider: 'google-drive',
+      driveFileId: driveFile.id,
+      driveFileName: driveFile.name || input.file.originalname,
+      driveMimeType: driveFile.mimeType,
+      driveAuthUserId: input.userId,
+      driveManagedByApp: true,
+    };
+    const eventId = randomUUID();
+    const timestamp = new Date();
+    let material: Material;
+
+    try {
+      material = await this.prisma.$transaction(async (transaction) => {
+        const createdMaterial = await transaction.material.create({
+          data: {
+            title: input.title || input.file.originalname,
+            description: input.description,
+            type: driveType,
+            courseId: input.courseId,
+            unitId: input.unitId || null,
+            topicId: input.topicId || null,
+            userId: input.userId,
+            category: input.category,
+            difficulty: input.difficulty || 0.5,
+            metadata,
+          },
+          include: {
+            file: true,
+            previewFile: true,
+            unit: true,
+            user: { select: { id: true, firstName: true, lastName: true } },
+          },
+        });
+
+        await writeApplicationOutboxEvent(transaction, {
+          eventType: 'material.upload',
+          aggregateId: createdMaterial.id,
+          dedupeKey: `material-upload:${createdMaterial.id}`,
+          payload: {
+            materialId: createdMaterial.id,
+            userId: input.userId,
+            eventId,
+            timestamp: timestamp.toISOString(),
+          },
+        });
+        return createdMaterial;
+      });
+    } catch (error) {
+      try {
+        await this.googleDrive.deletePersonalMaterial(input.userId, driveFile.id);
+      } catch (cleanupError) {
+        this.logger.error(
+          'Failed to remove a Drive upload after its material record could not be created',
+          cleanupError,
+        );
+      }
+      throw error;
+    }
+
+    await FtsUtils.updateFtsVector(this.prisma, 'materials', material.id);
+    await this.searchSync.syncEntity('material', material.id);
+    this.logger.log('Drive-backed course material created', {
+      materialId: material.id,
+      userId: input.userId,
+      driveFileId: driveFile.id,
+    });
+    return material;
   }
 
   /**
@@ -2820,24 +2992,62 @@ export class MaterialsService {
           ? (material.metadata as Record<string, unknown>)
           : {};
       if (metadata.sourceProvider === 'google-drive') {
-        const driveFileId =
-          typeof metadata.driveFileId === 'string' ? metadata.driveFileId : '';
-        const driveMimeType =
-          typeof metadata.driveMimeType === 'string'
-            ? metadata.driveMimeType
-            : '';
         const driveAuthUserId =
           typeof metadata.driveAuthUserId === 'string'
             ? metadata.driveAuthUserId
             : undefined;
-        if (!driveFileId || !driveMimeType)
+        const previewFileId =
+          typeof metadata.drivePreviewFileId === 'string'
+            ? metadata.drivePreviewFileId
+            : '';
+        const driveFileId = previewFileId ||
+          (typeof metadata.driveFileId === 'string' ? metadata.driveFileId : '');
+        const driveMimeType = previewFileId
+          ? 'application/pdf'
+          : typeof metadata.driveMimeType === 'string'
+            ? metadata.driveMimeType
+            : '';
+        if (!driveFileId || !driveMimeType) {
           throw new NotFoundException('Drive material metadata is incomplete.');
+        }
         const content = await this.googleDrive.downloadFile(
           driveFileId,
           driveMimeType,
           driveAuthUserId,
         );
-        const sourceName = material.title.replace(/\.pdf$/i, '');
+        const officeMimeTypes = new Set([
+          'application/msword',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          'application/vnd.ms-powerpoint',
+          'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        ]);
+        if (officeMimeTypes.has(driveMimeType)) {
+          const pdfContent = await this.convertDocumentToPdf(
+            content,
+            typeof metadata.driveFileName === 'string'
+              ? metadata.driveFileName
+              : material.title,
+          );
+          return {
+            content: pdfContent,
+            mimeType: 'application/pdf',
+            fileName: `${material.title.replace(/\.[^.]+$/, '')}.pdf`,
+          };
+        }
+        if (
+          !previewFileId &&
+          ![
+            'application/pdf',
+            'application/vnd.google-apps.document',
+            'application/vnd.google-apps.spreadsheet',
+            'application/vnd.google-apps.presentation',
+          ].includes(driveMimeType)
+        ) {
+          throw new BadRequestException(
+            'This material type does not have a PDF preview. Download the original file instead.',
+          );
+        }
+        const sourceName = material.title.replace(/\.[^.]+$/, '');
         return {
           content,
           mimeType: 'application/pdf',
@@ -2874,6 +3084,87 @@ export class MaterialsService {
     } catch (error) {
       handleServiceError(error, this.logger, 'getMaterialPreviewContent');
     }
+  }
+
+  async getMaterialFileContent(
+    materialId: string,
+    userId: string,
+  ): Promise<{ content: Buffer; mimeType: string; fileName: string }> {
+    const material = await this.findOne(materialId, userId);
+    if (!material) {
+      throw new NotFoundException(`Material with ID ${materialId} not found`);
+    }
+    await this.assertCanReadMaterial(material, userId);
+    const metadata =
+      material.metadata &&
+      typeof material.metadata === 'object' &&
+      !Array.isArray(material.metadata)
+        ? (material.metadata as Record<string, unknown>)
+        : {};
+    if (metadata.sourceProvider !== 'google-drive') {
+      throw new BadRequestException(
+        'Direct content download is only available for Google Drive materials.',
+      );
+    }
+
+    const driveFileId =
+      typeof metadata.driveFileId === 'string' ? metadata.driveFileId : '';
+    const driveMimeType =
+      typeof metadata.driveMimeType === 'string'
+        ? metadata.driveMimeType
+        : '';
+    const driveFileName =
+      typeof metadata.driveFileName === 'string'
+        ? metadata.driveFileName
+        : material.title;
+    const driveAuthUserId =
+      typeof metadata.driveAuthUserId === 'string'
+        ? metadata.driveAuthUserId
+        : undefined;
+    if (!driveFileId || !driveMimeType) {
+      throw new NotFoundException('Drive material metadata is incomplete.');
+    }
+
+    const content = await this.googleDrive.downloadFile(
+      driveFileId,
+      driveMimeType,
+      driveAuthUserId,
+    );
+    const isGoogleDocument = driveMimeType.startsWith('application/vnd.google-apps.');
+    return {
+      content,
+      mimeType: isGoogleDocument ? 'application/pdf' : driveMimeType,
+      fileName: isGoogleDocument
+        ? `${driveFileName.replace(/\.[^.]+$/, '')}.pdf`
+        : driveFileName,
+    };
+  }
+
+  private async convertDocumentToPdf(
+    content: Buffer,
+    fileName: string,
+  ): Promise<Buffer> {
+    const gotenbergUrl = this.configService.get<string>('GOTENBERG_URL');
+    if (!gotenbergUrl) {
+      throw new BadRequestException(
+        'Document preview is unavailable because document conversion is not configured.',
+      );
+    }
+    const formData = new FormData();
+    formData.append('files', new Blob([new Uint8Array(content)]), fileName);
+    const response = await fetch(
+      `${gotenbergUrl}/forms/libreoffice/convert`,
+      { method: 'POST', body: formData },
+    );
+    if (!response.ok) {
+      this.logger.error(
+        `Document preview conversion failed: ${response.status} ${response.statusText}`,
+      );
+      throw new BadRequestException(
+        'This document could not be converted for preview. Download the original file instead.',
+      );
+    }
+    return Buffer.from(await response.arrayBuffer());
   }
 
   private async fetchStoredFile(

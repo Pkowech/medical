@@ -155,6 +155,12 @@ export class MaterialsController {
           description:
             'Share this material with enrolled students in its course. Defaults to false.',
         },
+        storageProvider: {
+          type: 'string',
+          enum: ['app', 'google-drive'],
+          description:
+            'Choose app storage or the signed-in instructor’s connected Google Drive.',
+        },
       },
       required: ['file', 'title', 'courseId'],
     },
@@ -172,9 +178,13 @@ export class MaterialsController {
     @Body('difficulty') difficulty?: number,
     @Body('tags') tags?: string,
     @Body('shareWithCourse') shareWithCourse?: string,
+    @Body('storageProvider') storageProvider?: string,
   ) {
     if (!file) {
       throw new BadRequestException('No file uploaded');
+    }
+    if (storageProvider && !['app', 'google-drive'].includes(storageProvider)) {
+      throw new BadRequestException('Unsupported material storage provider.');
     }
     const tagsArray = tags ? tags.split(',').map((t) => t.trim()) : undefined;
 
@@ -191,6 +201,7 @@ export class MaterialsController {
       difficulty ? Number(difficulty) : undefined,
       tagsArray,
       shareWithCourse === 'true',
+      storageProvider === 'google-drive' ? 'google-drive' : 'app',
     );
   }
 
@@ -248,7 +259,9 @@ export class MaterialsController {
   }
 
   @Get('drive/oauth-url')
-  @ApiOperation({ summary: 'Start read-only Google Drive authorization' })
+  @ApiOperation({
+    summary: 'Connect Google Drive for reading and saving course materials',
+  })
   getDriveAuthorizationUrl(@GetUser() user: PrismaUser) {
     return {
       authorizationUrl: this.materialsService.getGoogleDriveAuthorizationUrl(
@@ -697,6 +710,25 @@ export class MaterialsController {
       'Cache-Control': 'private, no-store',
     });
 
+    return new StreamableFile(content);
+  }
+
+  @Get(':id/content')
+  @ApiOperation({ summary: 'Download a Drive-backed material through MedTrack' })
+  async getMaterialContent(
+    @Param('id') id: string,
+    @GetUser() user: PrismaUser,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const { content, mimeType, fileName } =
+      await this.materialsService.getMaterialFileContent(id, user.id);
+    const safeFileName = fileName.replace(/["\r\n]/g, '_');
+    response.set({
+      'Content-Type': mimeType,
+      'Content-Disposition': `attachment; filename="${safeFileName}"`,
+      'Content-Length': content.length,
+      'Cache-Control': 'private, no-store',
+    });
     return new StreamableFile(content);
   }
 

@@ -33,6 +33,7 @@ import { offlineService } from '@/lib/core/offline/offlineService';
 import { useXapi } from '@/lib/xapi/useXapi';
 import { usePageHeader, type PageHeader } from '@/core/providers/HeaderContext';
 import { getPageMetadata } from '@/core/metadata/pageMetadata';
+import { toast } from 'sonner';
 
 interface MaterialPreviewModalProps {
   materialId: string | null;
@@ -70,6 +71,7 @@ export const MaterialPreviewModal = ({
   const [pdfPagesViewed, setPdfPagesViewed] = useState(0);
   const [videoProgressPercent, setVideoProgressPercent] = useState(0);
   const [pdfContent, setPdfContent] = useState<Uint8Array | null>(null);
+  const [driveFileUrl, setDriveFileUrl] = useState<string | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [retryAttempt, setRetryAttempt] = useState(0);
   const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
@@ -157,6 +159,7 @@ export const MaterialPreviewModal = ({
 
     const controller = new AbortController();
     let isActive = true;
+    let temporaryDriveUrl: string | null = null;
     let didTimeout = false;
     const timeoutId = window.setTimeout(() => {
       didTimeout = true;
@@ -167,6 +170,7 @@ export const MaterialPreviewModal = ({
       setIsLoading(true);
       setMaterial(null);
       setPdfContent(null);
+      setDriveFileUrl(null);
       setPreviewError(null);
       setPdfCurrentPage(1);
       setPdfNumPages(null);
@@ -208,13 +212,39 @@ export const MaterialPreviewModal = ({
         const data = await materialService.getMaterialWithFileUrl(materialId, controller.signal);
         if (!isActive) return;
         setMaterial(data);
+        const driveMimeType = data.metadata?.driveMimeType || '';
+        const isDriveOfficeDocument = [
+          'application/msword',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          'application/vnd.ms-powerpoint',
+          'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        ].includes(driveMimeType);
         const isPdf =
           data.type?.toLowerCase() === 'pdf' ||
           Boolean(data.previewFileUrl) ||
-          data.fileUrl?.toLowerCase().split('?')[0].endsWith('.pdf');
+          data.fileUrl?.toLowerCase().split('?')[0].endsWith('.pdf') ||
+          Boolean(data.metadata?.drivePreviewFileId) ||
+          isDriveOfficeDocument;
         if (isPdf) {
           const content = await materialService.getMaterialPreviewContent(materialId, controller.signal);
           if (isActive) setPdfContent(content);
+        } else if (
+          data.metadata?.sourceProvider === 'google-drive' &&
+          driveMimeType.startsWith('video/')
+        ) {
+          const content = await materialService.getMaterialFileContent(
+            materialId,
+            controller.signal,
+          );
+          if (!isActive) return;
+          const arrayBuffer = content.buffer.slice(
+            content.byteOffset,
+            content.byteOffset + content.byteLength,
+          ) as ArrayBuffer;
+          temporaryDriveUrl = URL.createObjectURL(
+            new Blob([arrayBuffer], { type: driveMimeType }),
+          );
+          setDriveFileUrl(temporaryDriveUrl);
         }
       } catch (error) {
         if (!isActive) return;
@@ -256,6 +286,7 @@ export const MaterialPreviewModal = ({
       isActive = false;
       window.clearTimeout(timeoutId);
       controller.abort();
+      if (temporaryDriveUrl) URL.revokeObjectURL(temporaryDriveUrl);
     };
   }, [isOpen, materialId, topicId, userId, fallbackMaterial, retryAttempt]);
 
@@ -348,9 +379,42 @@ export const MaterialPreviewModal = ({
     }, undefined, xapiContext);
   };
 
-  const downloadOriginal = () => {
-    if (!material?.fileUrl) return;
+  const isDriveBackedMaterial =
+    material?.metadata?.sourceProvider === 'google-drive';
+
+  const downloadOriginal = async () => {
+    if (!material) return;
     trackDownload();
+    if (isDriveBackedMaterial) {
+      try {
+        const content = await materialService.getMaterialFileContent(material.id);
+        const driveMimeType = material.metadata?.driveMimeType || 'application/octet-stream';
+        const isGoogleDocument = driveMimeType.startsWith('application/vnd.google-apps.');
+        const arrayBuffer = content.buffer.slice(
+          content.byteOffset,
+          content.byteOffset + content.byteLength,
+        ) as ArrayBuffer;
+        const objectUrl = URL.createObjectURL(
+          new Blob([arrayBuffer], {
+            type: isGoogleDocument ? 'application/pdf' : driveMimeType,
+          }),
+        );
+        const link = document.createElement('a');
+        link.href = objectUrl;
+        link.download =
+          isGoogleDocument
+            ? `${(material.metadata?.driveFileName || material.title).replace(/\.[^.]+$/, '')}.pdf`
+            : material.metadata?.driveFileName || material.title;
+        document.body.append(link);
+        link.click();
+        link.remove();
+        window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Could not download this material.');
+      }
+      return;
+    }
+    if (!material.fileUrl) return;
     const safeUrl = material.fileUrl.startsWith('/') ? `${window.location.origin}${material.fileUrl}` : material.fileUrl;
     window.open(safeUrl, '_blank', 'noopener,noreferrer');
   };
@@ -387,10 +451,10 @@ export const MaterialPreviewModal = ({
       );
     }
 
-    if (previewError && !material) return renderPreviewError();
+    if (previewError && !pdfContent && !driveFileUrl) return renderPreviewError();
     if (!material) return null;
 
-    const effectiveUrl = material.previewFileUrl || material.fileUrl || material.url || material.content;
+    const effectiveUrl = driveFileUrl || material.previewFileUrl || material.fileUrl || material.url || material.content;
     const resolvedEffectiveUrl = effectiveUrl?.startsWith('/api/materials/')
       ? `${URLS.API_BASE}${effectiveUrl.replace(/^\/api/, '')}`
       : effectiveUrl;
@@ -519,7 +583,7 @@ export const MaterialPreviewModal = ({
                 </Button>
               </>
             )}
-            {material?.fileUrl && (
+            {(material?.fileUrl || isDriveBackedMaterial) && (
               <Button type="button" variant="ghost" size="sm" onClick={downloadOriginal} title="Download">
                 <Download className="h-4 w-4" />
               </Button>
@@ -583,7 +647,7 @@ export const MaterialPreviewModal = ({
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              {material?.fileUrl && (
+              {(material?.fileUrl || isDriveBackedMaterial) && (
                 <Button
                   type="button"
                   variant="ghost"
@@ -667,7 +731,7 @@ export const MaterialPreviewModal = ({
                   </Button>
                 </>
               )}
-              {material?.fileUrl && (
+              {(material?.fileUrl || isDriveBackedMaterial) && (
                 <Button
                   type="button"
                   variant="ghost"

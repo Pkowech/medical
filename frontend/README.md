@@ -108,15 +108,17 @@ and all production values out of source control.
 - [Contributing Guide](../docs/CONTRIBUTING.md)
 ## Progressive Web App and offline behavior
 
-Storage boundary: student-owned materials should remain in the student's Google
-Drive and be linked privately; Drive links store metadata in MedTrack but do not
-copy file bytes to R2. Only instructors and admins can upload files into or
-delete files from the MedTrack-managed library. The Google Drive connection is
-read-only, so users must upload personal files to Google Drive separately before
-linking them. Students may organize their own Drive links under courses in which
-they are enrolled, including units and topics; this assignment is private to the
-student and does not share the file with classmates. Only course instructors
-and admins can share materials with an enrolled class.
+Storage boundary: instructor course-material uploads can be saved in the
+instructor's connected Google Drive under `MedTrack Course Materials`; MedTrack
+stores the Drive reference and applies course-enrollment checks when learners
+open the file. This avoids copying those uploaded files into R2 but uses the
+linked account's available Drive quota. Existing Drive files can also be linked
+without copying or transferring ownership. Student-owned files remain in the
+student's Drive and are linked privately; that does not share them with
+classmates. Drive uploads require the instructor to connect or reauthorize
+Google Drive with file-creation permission. App-managed material deletion removes
+the Drive file only when no other material references it. Only course
+instructors and admins can share materials with an enrolled class.
 
 The production service worker caches versioned Next.js static assets and selected
 same-origin public image, icon, and font files. API routes, App Router documents,

@@ -90,8 +90,12 @@ export interface Material extends MaterialBase {
     source: string;
     sourceProvider?: 'google-drive' | 'r2' | 'local';
     driveFileId?: string;
+    driveFileName?: string;
     driveId?: string;
     driveMimeType?: string;
+    driveAuthUserId?: string;
+    drivePreviewFileId?: string;
+    driveManagedByApp?: boolean;
     learningObjectives?: string[];
     prerequisites?: string[];
     estimatedTime?: number;

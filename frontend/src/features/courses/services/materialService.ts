@@ -183,6 +183,17 @@ const materialService = {
     return new Uint8Array(content);
   },
 
+  async getMaterialFileContent(id: string, signal?: AbortSignal): Promise<Uint8Array> {
+    const content = await apiService.get<ArrayBuffer>(`/materials/${id}/content`, {
+      responseType: 'arraybuffer',
+      signal,
+    });
+    if (content.byteLength === 0) {
+      throw new Error(`Material file ${id} is empty`);
+    }
+    return new Uint8Array(content);
+  },
+
   async uploadMaterial(
     formData: FormData,
     options?: { onUploadProgress?: (progressEvent: ProgressEvent | import('axios').AxiosProgressEvent) => void }

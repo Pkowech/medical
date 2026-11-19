@@ -3,10 +3,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader } from '@/shared/components/ui/card';
 import { Button } from '@/shared/components/ui/button';
-import { ScrollArea } from '@/shared/components/ui/scroll-area';
-import { Separator } from '@/shared/components/ui/separator';
-import { AlertCircle, Play, RefreshCw } from 'lucide-react';
-import { flashcardApi, type UserFlashcardProgress } from '@/features/assessment/services/flashcardApi';
+import { AlertCircle, BookOpenCheck, CheckCircle2, Clock3, Play, RefreshCw } from 'lucide-react';
+import {
+  flashcardApi,
+  type UserFlashcardProgress,
+} from '@/features/assessment/services/flashcardApi';
 import { useAuthStore } from '@/features/auth/store/useAuthStore';
 import { useRouter } from 'next/navigation';
 
@@ -46,84 +47,117 @@ export const ReviewQueue: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex min-h-24 items-center justify-center" role="status" aria-live="polite">
-        <p className="text-muted-foreground">Loading review queue...</p>
-      </div>
+      <Card className="overflow-hidden border-border/80 shadow-sm" role="status" aria-live="polite">
+        <CardHeader className="border-b border-border/70 bg-muted/20 px-5 py-4">
+          <div className="h-5 w-40 animate-pulse rounded bg-muted" />
+          <div className="mt-2 h-4 w-64 max-w-full animate-pulse rounded bg-muted" />
+        </CardHeader>
+        <CardContent className="p-5">
+          <div className="h-16 animate-pulse rounded-lg bg-muted/60" />
+        </CardContent>
+      </Card>
     );
   }
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <div>
-          <h3 className="text-lg font-semibold">Course review queue</h3>
-          <p className="text-sm text-muted-foreground">
-            {error
-              ? 'Due cards unavailable'
-              : `${dueCards.length} ${dueCards.length === 1 ? 'card' : 'cards'} due`}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={() => void fetchDueCards()}
-            aria-label="Refresh review queue"
-            className="h-8 w-8"
-          >
-            <RefreshCw className="h-4 w-4" />
-          </Button>
-          {!error && dueCards.length > 0 && (
+    <Card className="overflow-hidden border-border/80 shadow-sm">
+      <CardHeader className="border-b border-border/70 bg-muted/20 px-5 py-4">
+        <div className="flex flex-row items-start justify-between gap-4">
+          <div className="flex min-w-0 items-start gap-3">
+            <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-primary/15 bg-primary/10 text-primary">
+              <BookOpenCheck className="h-4 w-4" aria-hidden="true" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="text-base font-semibold text-foreground">Course review queue</h3>
+                {!error && dueCards.length > 0 && (
+                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
+                    {dueCards.length} due
+                  </span>
+                )}
+              </div>
+              <p className="mt-0.5 text-sm text-muted-foreground">
+                {error ? 'Due cards unavailable' : 'Spaced-repetition cards ready to practise'}
+              </p>
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
             <Button
               type="button"
-              onClick={handleStartReview}
-              className="flex items-center gap-2"
+              variant="ghost"
+              size="icon"
+              onClick={() => void fetchDueCards()}
+              aria-label="Refresh review queue"
+              className="h-9 w-9"
             >
-              <Play className="h-4 w-4" />
-              Start review
+              <RefreshCw className="h-4 w-4" />
             </Button>
-          )}
+            {!error && dueCards.length > 0 && (
+              <Button type="button" onClick={handleStartReview} className="gap-2">
+                <Play className="h-4 w-4" fill="currentColor" />
+                Start review
+              </Button>
+            )}
+          </div>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-0">
         {error ? (
-          <div role="alert" className="flex items-center justify-between gap-3 text-sm text-destructive">
+          <div
+            role="alert"
+            className="m-4 flex items-center justify-between gap-3 rounded-lg border border-destructive/20 bg-destructive/5 p-4 text-sm text-destructive"
+          >
             <span className="flex items-center gap-2">
               <AlertCircle className="h-4 w-4 shrink-0" />
               {error}
             </span>
           </div>
         ) : dueCards.length === 0 ? (
-          <p className="text-center text-sm text-muted-foreground">
-            You’re all caught up. Reviews from studied topics and quizzes will appear here.
-          </p>
-        ) : (
-          <ScrollArea className="h-[300px] pr-4">
-            <div className="space-y-4">
-              {dueCards.map(card => (
-                <div key={card.id} className="space-y-3">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0">
-                      <p className="line-clamp-2 font-medium">
-                        {card.flashcard.front || 'Course review card'}
-                      </p>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        {card.lastReview
-                          ? `Last reviewed ${new Date(card.lastReview).toLocaleDateString()}`
-                          : 'New card'}
-                      </p>
-                    </div>
-                    <div className="flex shrink-0 flex-col items-end gap-1 text-xs text-muted-foreground">
-                      <span>{card.correctStreak} correct in a row</span>
-                      <span>{card.interval} day interval</span>
-                    </div>
-                  </div>
-                  <Separator />
-                </div>
-              ))}
+          <div className="flex min-h-36 flex-col items-center justify-center px-6 py-8 text-center">
+            <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+              <CheckCircle2 className="h-5 w-5" aria-hidden="true" />
             </div>
-          </ScrollArea>
+            <p className="font-medium text-foreground">You’re all caught up</p>
+            <p className="mt-1 max-w-md text-sm text-muted-foreground">
+              Studied topics and quiz questions will appear here when they are ready for review.
+            </p>
+          </div>
+        ) : (
+          <div className={dueCards.length > 4 ? 'max-h-[300px] overflow-y-auto' : ''}>
+            {dueCards.map((card, index) => (
+              <div
+                key={card.id}
+                className="grid gap-3 border-b border-border/60 px-5 py-4 last:border-b-0 sm:grid-cols-[minmax(0,1fr)_auto]"
+              >
+                <div className="min-w-0">
+                  <p className="line-clamp-2 text-sm font-semibold leading-5 text-foreground">
+                    {card.flashcard.front || 'Course review card'}
+                  </p>
+                  <p className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Clock3 className="h-3.5 w-3.5" aria-hidden="true" />
+                    {card.lastReview
+                      ? `Last reviewed ${new Date(card.lastReview).toLocaleDateString()}`
+                      : 'New card'}
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                  {card.correctStreak > 0 && (
+                    <span className="rounded-md border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                      {card.correctStreak} correct in a row
+                    </span>
+                  )}
+                  <span className="rounded-md border border-border bg-muted/40 px-2 py-1 text-xs text-muted-foreground">
+                    {card.interval === 0 ? 'Due now' : `${card.interval} day interval`}
+                  </span>
+                  {index === 0 && (
+                    <span className="rounded-md bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
+                      Next
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
         )}
       </CardContent>
     </Card>

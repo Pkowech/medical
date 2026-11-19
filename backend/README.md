@@ -258,11 +258,13 @@ To enable Drive-backed materials:
 
 Only files in the configured Shared Drive are accepted. PDFs and native Google Docs, Sheets, and Slides are supported; Google-native documents are exported to PDF for the in-app reader. Existing R2 files are unchanged and should not be deleted as part of enabling this integration.
 
-### Personal Google Drive links
+### Personal Google Drive course materials and links
 
-Users can also connect their own Google account with the read-only Drive scope to link files shared with them, including folders under **Shared with me**. These links do not copy file contents into MedTrack storage. The user's encrypted refresh token is stored in `google_drive_connections`, and Drive files are read through that account when opened. Configure the shared `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`, `GOOGLE_DRIVE_OAUTH_REDIRECT_URI` (the backend callback URL, including `/v1/materials/drive/oauth/callback`), `GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY` (base64-encoded 32-byte key), and `FRONTEND_URL`. Add both the NextAuth callback URL and the exact Drive callback URL to the Google OAuth client's authorized redirect URIs, and enable the Google Drive API. Run the new migration before deploying the OAuth flow.
+Instructors can choose Google Drive when uploading course materials. MedTrack saves those files in a `MedTrack Course Materials` folder in the instructor's connected personal Drive, stores the Drive file ID and course placement in MedTrack, and streams content through authenticated material endpoints. This avoids copying those uploaded files into R2. Course sharing still follows the material's `shareWithCourse` setting and MedTrack enrollment checks. Deleting a MedTrack-created material also deletes its Drive file when no other material references it.
 
-Drive-backed materials can be linked at course level (for example, a textbook), unit level, or topic level. Class sharing remains disabled unless explicitly enabled.
+Users can also link existing personal Drive files or folders without copying them. Linked files are not managed or deleted by MedTrack. Both upload and link flows use the connected account's Drive access; the OAuth request includes `drive.readonly` and `drive.file` so the app can browse files and manage files it creates. Existing users with an earlier read-only connection must reconnect and grant the file-creation permission before uploading.
+
+Configure the shared `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`, `GOOGLE_DRIVE_OAUTH_REDIRECT_URI` (the backend callback URL, including `/v1/materials/drive/oauth/callback`), `GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY` (base64-encoded 32-byte key), and `FRONTEND_URL`. Add both the NextAuth callback URL and the exact Drive callback URL to the Google OAuth client's authorized redirect URIs, and enable the Google Drive API. Run the migration that creates `google_drive_connections` before deploying the OAuth flow. Drive uploads use the linked account's available quota and remain subject to Google's limits.
 
 ### Password recovery
 

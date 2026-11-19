@@ -3,14 +3,12 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Button } from '@/shared/components/ui/button';
+import { BookMarked, TrendingDown, Calendar, ArrowRight, Clock } from 'lucide-react';
 import {
-  BookMarked,
-  TrendingDown,
-  Calendar,
-  ArrowRight,
-  Clock,
-} from 'lucide-react';
-import { flashcardsService, CardStats, HighRiskTopic } from '@/features/assessment/services/flashcardsService';
+  flashcardApi,
+  type CardStats,
+  type HighRiskTopic,
+} from '@/features/assessment/services/flashcardApi';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 
@@ -31,8 +29,8 @@ export const SpacedRepetitionWidget = () => {
         setError(null);
 
         const [stats, risks] = await Promise.all([
-          flashcardsService.getCardStats(session.user.id),
-          flashcardsService.getHighRiskTopics(session.user.id),
+          flashcardApi.getCardStats(session.user.id),
+          flashcardApi.getHighRiskTopics(session.user.id),
         ]);
 
         setCardStats(stats);
@@ -59,7 +57,7 @@ export const SpacedRepetitionWidget = () => {
         </CardHeader>
         <CardContent>
           <div className="animate-pulse space-y-3">
-            {[1, 2].map((i) => (
+            {[1, 2].map(i => (
               <div key={i} className="h-16 bg-orange-200 dark:bg-orange-800 rounded-lg" />
             ))}
           </div>
@@ -157,7 +155,7 @@ export const SpacedRepetitionWidget = () => {
                 High Risk Topics
               </div>
               <div className="space-y-2">
-                {highRiskTopics.slice(0, 3).map((topic) => (
+                {highRiskTopics.slice(0, 3).map(topic => (
                   <div
                     key={topic.topicId}
                     className="flex items-start justify-between p-3 bg-card dark:bg-card rounded-lg border border-red-200 dark:border-red-900"
@@ -167,9 +165,7 @@ export const SpacedRepetitionWidget = () => {
                         {topic.topicName}
                       </p>
                       <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground dark:text-muted-foreground">
-                        <span>
-                          Mastery: {Math.round(topic.masteryLevel * 100)}%
-                        </span>
+                        <span>Mastery: {Math.round(topic.masteryLevel * 100)}%</span>
                         <span className="text-orange-600 dark:text-orange-400 font-semibold">
                           {topic.dueCards} due
                         </span>
@@ -207,7 +203,9 @@ export const SpacedRepetitionWidget = () => {
           {dueCards === 0 && totalCards > 0 && (
             <div className="text-center py-4 text-muted-foreground dark:text-muted-foreground">
               <div className="text-sm">✓ All caught up! Great work!</div>
-              <div className="text-xs mt-1">Next reviews in {cardStats?.averageInterval || 1} days on average</div>
+              <div className="text-xs mt-1">
+                Next reviews in {cardStats?.averageInterval || 1} days on average
+              </div>
             </div>
           )}
 

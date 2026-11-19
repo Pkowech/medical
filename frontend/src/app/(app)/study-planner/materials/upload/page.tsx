@@ -295,6 +295,7 @@ export default function UploadMaterialPage() {
     }
     if (selectedCourseId) {
       formData.append('courseId', selectedCourseId);
+      formData.append('storageProvider', 'google-drive');
     }
     if (topicId) {
       formData.append('topicId', topicId);
@@ -567,6 +568,9 @@ export default function UploadMaterialPage() {
               </span>
             </span>
           </label>
+          <p className="text-sm text-muted-foreground">
+            Course uploads are saved to the Google Drive account linked to your profile. Connect or update Drive permissions in the Google Drive tab before uploading.
+          </p>
           </>}
           {!canManagePlatformLibrary && source === 'drive' && (
             <p className="text-sm leading-relaxed text-muted-foreground dark:text-muted-foreground">

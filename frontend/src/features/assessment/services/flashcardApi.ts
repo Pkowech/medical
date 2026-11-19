@@ -57,10 +57,23 @@ export interface CardStats {
   averageInterval: number;
 }
 
+export interface HighRiskTopic {
+  topicId: string;
+  topicName: string;
+  masteryLevel: number;
+  dueCards: number;
+}
+
 class FlashcardApiService {
   async createFlashcard(
     userId: string,
-    dto: { front?: string; back?: string; questionId?: string; difficulty?: string; tags?: string[] }
+    dto: {
+      front?: string;
+      back?: string;
+      questionId?: string;
+      difficulty?: string;
+      tags?: string[];
+    }
   ): Promise<Flashcard> {
     const response = await api.post('/flashcards/create', {
       userId,
@@ -71,16 +84,14 @@ class FlashcardApiService {
 
   async getDueCards(
     userId: string,
-    filters: { courseId?: string; unitId?: string; topicId?: string } = {},
+    filters: { courseId?: string; unitId?: string; topicId?: string } = {}
   ): Promise<UserFlashcardProgress[]> {
     const params = new URLSearchParams();
     if (filters.courseId) params.set('courseId', filters.courseId);
     if (filters.unitId) params.set('unitId', filters.unitId);
     if (filters.topicId) params.set('topicId', filters.topicId);
     const query = params.toString();
-    const response = await api.get(
-      `/flashcards/due/${userId}${query ? `?${query}` : ''}`,
-    );
+    const response = await api.get(`/flashcards/due/${userId}${query ? `?${query}` : ''}`);
     return response.data as UserFlashcardProgress[];
   }
 
@@ -88,7 +99,7 @@ class FlashcardApiService {
     userId: string,
     startDate: Date,
     endDate: Date,
-    filters: { courseId?: string; unitId?: string; topicId?: string } = {},
+    filters: { courseId?: string; unitId?: string; topicId?: string } = {}
   ): Promise<ScheduledReview[]> {
     const params = new URLSearchParams({
       startDate: startDate.toISOString(),
@@ -97,16 +108,14 @@ class FlashcardApiService {
     if (filters.courseId) params.set('courseId', filters.courseId);
     if (filters.unitId) params.set('unitId', filters.unitId);
     if (filters.topicId) params.set('topicId', filters.topicId);
-    const response = await api.get(
-      `/flashcards/schedule/${userId}?${params.toString()}`,
-    );
+    const response = await api.get(`/flashcards/schedule/${userId}?${params.toString()}`);
     return response.data as ScheduledReview[];
   }
 
   async updateCard(
     cardId: string,
     quality: number,
-    idempotencyKey = crypto.randomUUID(),
+    idempotencyKey = crypto.randomUUID()
   ): Promise<UserFlashcardProgress> {
     if (quality < 1 || quality > 5) {
       throw new Error('Quality must be between 1 and 5');
@@ -120,24 +129,20 @@ class FlashcardApiService {
 
   async getCardStats(
     userId: string,
-    filters: { courseId?: string; unitId?: string; topicId?: string } = {},
+    filters: { courseId?: string; unitId?: string; topicId?: string } = {}
   ): Promise<CardStats> {
     const params = new URLSearchParams();
     if (filters.courseId) params.set('courseId', filters.courseId);
     if (filters.unitId) params.set('unitId', filters.unitId);
     if (filters.topicId) params.set('topicId', filters.topicId);
     const query = params.toString();
-    const response = await api.get(
-      `/flashcards/overview/${userId}${query ? `?${query}` : ''}`,
-    );
+    const response = await api.get(`/flashcards/overview/${userId}${query ? `?${query}` : ''}`);
     return response.data as CardStats;
   }
 
-  async syncCards(userId: string, cards: UserFlashcardProgress[]): Promise<Flashcard[]> {
-    const response = await api.post(`/flashcards/sync/${userId}`, {
-      cards,
-    });
-    return response.data as Flashcard[];
+  async getHighRiskTopics(userId: string): Promise<HighRiskTopic[]> {
+    const response = await api.get(`/flashcards/high-risk-topics/${userId}`);
+    return response.data as HighRiskTopic[];
   }
 }
 
