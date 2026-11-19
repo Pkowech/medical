@@ -282,6 +282,7 @@ class CourseService {
       totalUnits?: number;
     }>;
     enrolledUnits: Array<Record<string, unknown>>;
+    unavailableSections?: string[];
   }> {
     if (!userId || userId === 'undefined') {
       return { courses: [], enrolledUnits: [] };

@@ -7,9 +7,17 @@ export interface Material extends SharedMaterial {
   topicId?: string;
 }
 
-const toTopicWritePayload = ({ name, title, ...topicData }: Partial<Topic>) => ({
+const toTopicWritePayload = ({
+  name,
+  title,
+  status: _status,
+  order,
+  orderIndex,
+  ...topicData
+}: Partial<Topic>) => ({
   ...topicData,
   name: name ?? title,
+  ...((orderIndex ?? order) !== undefined ? { order: orderIndex ?? order } : {}),
 });
 
 class TopicService {

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Topic } from '../services/topicService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import { Badge } from '@/shared/components/ui/badge';
 import { Input } from '@/shared/components/ui/input';
 import { Button } from '@/shared/components/ui/button';
 import { Textarea } from '@/shared/components/ui/textarea';
@@ -10,18 +11,42 @@ import { BulkQuestionImport } from '@/features/assessment/components/BulkQuestio
 import { MaterialLibraryPicker } from '@/features/materials/components/MaterialLibraryPicker';
 import { materialService } from '@/features/courses/services/materialService';
 import type { Material } from '@/shared/types/materialInterface';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/shared/components/ui/select';
 import { Checkbox } from '@/shared/components/ui/checkbox';
 
 const INITIAL_MATERIAL_EXTENSIONS = new Set([
   'pdf', 'doc', 'docx', 'ppt', 'pptx', 'mp4', 'mpg', 'mpeg', 'mov', 'avi', 'webm',
 ]);
+
+const topicStatusLabels: Record<NonNullable<Topic['status']>, string> = {
+  draft: 'Draft',
+  under_review: 'Under review',
+  published: 'Published',
+  archived: 'Archived',
+  withdrawn: 'Withdrawn',
+};
+
+const getSaveErrorMessage = (cause: unknown): string => {
+  if (cause && typeof cause === 'object') {
+    const response = 'response' in cause ? cause.response : undefined;
+    const responseData =
+      response && typeof response === 'object' && 'data' in response
+        ? response.data
+        : undefined;
+    const apiMessage =
+      responseData && typeof responseData === 'object' && 'message' in responseData
+        ? responseData.message
+        : undefined;
+    if (typeof apiMessage === 'string' && apiMessage.trim()) return apiMessage;
+    if (
+      Array.isArray(apiMessage) &&
+      apiMessage.every(message => typeof message === 'string')
+    ) {
+      return apiMessage.join(' ');
+    }
+  }
+  if (cause instanceof Error && cause.message.trim()) return cause.message;
+  return 'The topic could not be saved. Check your connection and try again.';
+};
 
 interface TopicFormProps {
   topic: Topic | null;
@@ -47,10 +72,9 @@ export const TopicForm: React.FC<TopicFormProps> = ({
   const [formData, setFormData] = useState<Partial<Topic>>({
     name: '',
     description: '',
-    orderIndex: 0,
+    orderIndex: undefined,
     quizQuestionCount: 10,
     isMandatory: false,
-    status: 'active',
   });
 
   const [loading, setLoading] = useState(false);
@@ -81,15 +105,18 @@ export const TopicForm: React.FC<TopicFormProps> = ({
   useEffect(() => {
     if (topic) {
       const { title, ...topicData } = topic;
-      setFormData({ ...topicData, name: topicData.name || title });
+      setFormData({
+        ...topicData,
+        name: topicData.name || title,
+        orderIndex: topic.orderIndex ?? topic.order,
+      });
     } else {
       setFormData({
         name: '',
         description: '',
-        orderIndex: 0,
+        orderIndex: undefined,
         quizQuestionCount: 10,
         isMandatory: false,
-        status: 'active',
       });
     }
   }, [topic]);
@@ -102,12 +129,11 @@ export const TopicForm: React.FC<TopicFormProps> = ({
     const { id, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [id]: id === 'orderIndex'
-        ? parseFloat(value)
-        : id === 'quizQuestionCount'
-          ? (value === '' ? undefined : Number(value))
-          : value,
+      [id]: id === 'orderIndex' || id === 'quizQuestionCount'
+        ? (value === '' ? undefined : Number(value))
+        : value,
     }));
+    setErrorMessage(null);
   };
 
   const handleCheckboxChange = (checked: boolean) => {
@@ -115,25 +141,37 @@ export const TopicForm: React.FC<TopicFormProps> = ({
       ...prev,
       isMandatory: checked,
     }));
-  };
-
-  const handleSelectChange = (id: string, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      [id]: value,
-    }));
+    setErrorMessage(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const name = formData.name?.trim() || formData.title?.trim();
+    const order = formData.orderIndex ?? formData.order;
+    const questionCount = formData.quizQuestionCount ?? 10;
+    if (order !== undefined && (!Number.isInteger(order) || order < 1)) {
+      setErrorMessage('Topic order must be a whole number greater than zero.');
+      return;
+    }
+    if (
+      !Number.isInteger(questionCount) ||
+      questionCount < 1 ||
+      questionCount > 100
+    ) {
+      setErrorMessage('Questions per quiz must be a whole number from 1 to 100.');
+      return;
+    }
+
     if (name && unitId) {
       let topicSaved = false;
       try {
         setLoading(true);
         setErrorMessage(null);
-        const { title: _title, ...topicData } = formData;
-        const savedTopic = await onSave({ ...topicData, name }, Boolean(initialMaterialFile));
+        const { title: _title, status: _status, ...topicData } = formData;
+        const savedTopic = await onSave(
+          { ...topicData, orderIndex: order, quizQuestionCount: questionCount, name },
+          Boolean(initialMaterialFile),
+        );
         topicSaved = true;
 
         if (initialMaterialFile) {
@@ -160,9 +198,7 @@ export const TopicForm: React.FC<TopicFormProps> = ({
         }
       } catch (error) {
         console.error('Error saving topic:', error);
-        const message = error instanceof Error && error.message
-          ? error.message
-          : 'Please try again.';
+        const message = getSaveErrorMessage(error);
         setErrorMessage(topicSaved
           ? `Topic saved, but its material could not be uploaded. Save again to retry. ${message}`
           : `Failed to save topic. ${message}`);
@@ -216,6 +252,13 @@ export const TopicForm: React.FC<TopicFormProps> = ({
     });
     setRefreshKey(current => current + 1);
   };
+  const topicStatus = topic?.status;
+  const topicStatusLabel = topicStatus
+    ? topicStatusLabels[topicStatus] ?? 'Unknown status'
+    : topic
+      ? 'Status unavailable'
+      : 'Published on save';
+  const topicSavedButMaterialFailed = errorMessage?.startsWith('Topic saved,') ?? false;
 
   return (
     <Card>
@@ -242,94 +285,122 @@ export const TopicForm: React.FC<TopicFormProps> = ({
             </div>
           </div>
         </div>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-5">
           {errorMessage && (
-            <p role="alert" className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
-              {errorMessage}
-            </p>
+            <div
+              role="alert"
+              aria-live="assertive"
+              className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive"
+            >
+              <p className="font-semibold">
+                {topicSavedButMaterialFailed
+                  ? 'Topic saved; material upload needs attention'
+                  : 'Could not save this topic'}
+              </p>
+              <p className="mt-1">{errorMessage}</p>
+            </div>
           )}
-          <div>
-            <label htmlFor="name" className="block text-sm font-medium mb-1">
-              Name *
-            </label>
-            <Input 
-              id="name"
-              value={formData.name || ''}
-              onChange={handleChange} 
-              placeholder="e.g., Skeletal System"
-              required 
-            />
-          </div>
-          <div>
-            <label htmlFor="description" className="block text-sm font-medium mb-1">
-              Description
-            </label>
-            <Textarea
-              id="description"
-              value={formData.description || ''}
-              onChange={handleChange}
-              placeholder="Brief description of the topic"
-              rows={3}
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
+          <fieldset className="space-y-4 rounded-lg border border-border p-4">
+            <legend className="px-1 text-sm font-semibold">Topic details</legend>
             <div>
-              <label htmlFor="orderIndex" className="block text-sm font-medium mb-1">
-                Order
+              <label htmlFor="name" className="mb-1 block text-sm font-medium">
+                Topic name *
               </label>
               <Input
-                id="orderIndex"
-                type="number"
-                value={formData.orderIndex || 0}
+                id="name"
+                value={formData.name || ''}
                 onChange={handleChange}
+                placeholder="e.g., Skeletal System"
+                required
+                disabled={loading}
               />
             </div>
             <div>
-              <label htmlFor="status" className="block text-sm font-medium mb-1">
-                Status
+              <label htmlFor="description" className="mb-1 block text-sm font-medium">
+                Description
               </label>
-              <Select
-                onValueChange={value => handleSelectChange('status', value)}
-                value={formData.status || 'active'}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
-                </SelectContent>
-              </Select>
+              <Textarea
+                id="description"
+                value={formData.description || ''}
+                onChange={handleChange}
+                placeholder="Briefly describe what learners will study"
+                rows={3}
+                disabled={loading}
+              />
             </div>
-          </div>
-          <div>
-            <label htmlFor="quizQuestionCount" className="block text-sm font-medium mb-1">
-              Questions per topic quiz
-            </label>
-            <Input
-              id="quizQuestionCount"
-              type="number"
-              min={1}
-              max={100}
-              step={1}
-              value={formData.quizQuestionCount ?? 10}
-              onChange={handleChange}
-              required
-            />
-            <p className="mt-1 text-xs text-muted-foreground">
-              Learners receive a random set of this many questions per attempt, up to the number available for this topic.
-            </p>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="isMandatory"
-              checked={formData.isMandatory || false}
-              onCheckedChange={handleCheckboxChange}
-            />
-            <label htmlFor="isMandatory" className="text-sm font-medium cursor-pointer">
-              Mark as Mandatory
-            </label>
-          </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label htmlFor="orderIndex" className="mb-1 block text-sm font-medium">
+                  Position in unit
+                </label>
+                <Input
+                  id="orderIndex"
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={formData.orderIndex ?? ''}
+                  onChange={handleChange}
+                  placeholder="Next available"
+                  disabled={loading}
+                />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {topic ? 'Leave blank to keep its current position.' : 'Leave blank to add this topic at the end.'}
+                </p>
+              </div>
+              <div>
+                <span className="mb-1 block text-sm font-medium">Publication status</span>
+                <div className="flex min-h-10 items-center gap-2">
+                  <Badge variant={topicStatus === 'published' || !topic ? 'default' : 'outline'}>
+                    {topicStatusLabel}
+                  </Badge>
+                  <span className="text-xs text-muted-foreground">
+                    Managed by the publishing workflow.
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  This form does not change publication status.
+                </p>
+              </div>
+            </div>
+          </fieldset>
+          <fieldset className="space-y-4 rounded-lg border border-border p-4">
+            <legend className="px-1 text-sm font-semibold">Assessment settings</legend>
+            <div>
+              <label htmlFor="quizQuestionCount" className="mb-1 block text-sm font-medium">
+                Maximum questions per topic quiz
+              </label>
+              <Input
+                id="quizQuestionCount"
+                type="number"
+                min={1}
+                max={100}
+                step={1}
+                value={formData.quizQuestionCount ?? 10}
+                onChange={handleChange}
+                required
+                disabled={loading}
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Each attempt draws up to this many random questions. If fewer eligible questions are linked, learners receive fewer.
+              </p>
+            </div>
+            <div>
+              <div className="flex items-start gap-2">
+                <Checkbox
+                  id="isMandatory"
+                  checked={formData.isMandatory || false}
+                  onCheckedChange={handleCheckboxChange}
+                  disabled={loading}
+                />
+                <label htmlFor="isMandatory" className="text-sm font-medium leading-5">
+                  Mark as mandatory
+                </label>
+              </div>
+              <p className="ml-6 mt-1 text-xs text-muted-foreground">
+                Shows a mandatory badge to learners and excludes this topic from focus recommendations; it does not block progression.
+              </p>
+            </div>
+          </fieldset>
           {(!topic?.id || initialMaterialFile) && (
             <div className="space-y-3 rounded-lg border border-border p-4">
               <div>
@@ -388,96 +459,103 @@ export const TopicForm: React.FC<TopicFormProps> = ({
             </div>
           )}
           {topic?.id ? (
-            <div className="space-y-4 rounded-lg border border-border p-4">
-              <div>
-                <h3 className="flex items-center gap-2 font-semibold">
+            <details className="rounded-lg border border-border p-4">
+              <summary className="cursor-pointer font-semibold">
+                <span className="inline-flex items-center gap-2">
                   <BookOpen className="h-4 w-4 text-primary" />
-                  Topic assessment
-                </h3>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Import a quiz and associate its questions with this topic. Keep it as a draft until it is ready for learners.
+                  Topic assessment and question bank
+                </span>
+                <span className="mt-1 block pl-6 text-sm font-normal text-muted-foreground">
+                  Import questions and associate them with this topic.
+                </span>
+              </summary>
+              <div className="mt-4">
+                <p className="mb-4 text-sm text-muted-foreground">
+                  Keep imported questions as a draft until they are ready for learners.
                 </p>
+                <BulkQuestionImport
+                  courseId={courseId || topic.courseId}
+                  unitId={unitId}
+                  topicId={topic.id}
+                  onImported={() => setRefreshKey(current => current + 1)}
+                />
               </div>
-              <BulkQuestionImport
-                courseId={courseId || topic.courseId}
-                unitId={unitId}
-                topicId={topic.id}
-                onImported={() => setRefreshKey(current => current + 1)}
-              />
-            </div>
+            </details>
           ) : (
             <p className="rounded-md bg-muted p-3 text-sm text-muted-foreground">
               Save this topic first to add its assessment and learning materials.
             </p>
           )}
           {topic?.id && (
-            <div className="space-y-4 rounded-lg border border-border p-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <h3 className="flex items-center gap-2 font-semibold">
-                    <Paperclip className="h-4 w-4 text-primary" />
-                    Topic materials
-                  </h3>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Upload a new resource or attach an existing library item to this topic.
-                  </p>
+            <details className="rounded-lg border border-border p-4">
+              <summary className="cursor-pointer font-semibold">
+                <span className="inline-flex items-center gap-2">
+                  <Paperclip className="h-4 w-4 text-primary" />
+                  Topic materials{!materialsLoading ? ` (${materials.length})` : ''}
+                </span>
+                <span className="mt-1 block pl-6 text-sm font-normal text-muted-foreground">
+                  Upload a resource or attach an existing library item.
+                </span>
+              </summary>
+              <div className="mt-4 space-y-4">
+                <div className="flex flex-wrap items-start justify-end gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowLibraryPicker(true)}
+                    disabled={!courseId && !topic.courseId}
+                  >
+                    <Library className="mr-2 h-4 w-4" />
+                    Attach from library
+                  </Button>
                 </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setShowLibraryPicker(true)}
-                  disabled={!courseId && !topic.courseId}
-                >
-                  <Library className="mr-2 h-4 w-4" />
-                  Attach from library
-                </Button>
+                {materialsError && <p role="alert" className="text-sm text-destructive">{materialsError}</p>}
+                {materialsLoading ? (
+                  <p role="status" className="text-sm text-muted-foreground">Loading topic materials…</p>
+                ) : materials.length > 0 ? (
+                  <ul className="divide-y divide-border rounded-md border border-border">
+                    {materials.map(material => (
+                      <li key={material.id} className="px-3 py-2">
+                        <p className="text-sm font-medium">{material.title}</p>
+                        <p className="text-xs text-muted-foreground">{material.type || material.contentType}</p>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No materials are linked to this topic yet.</p>
+                )}
+                <div className="flex items-start gap-2">
+                  <Checkbox
+                    id="shareTopicMaterials"
+                    checked={shareWithCourse}
+                    onCheckedChange={checked => setShareWithCourse(checked === true)}
+                  />
+                  <label htmlFor="shareTopicMaterials" className="text-sm leading-5">
+                    Make newly added materials available to enrolled learners
+                    <span className="block text-xs text-muted-foreground">
+                      Unchecked materials remain private to their owner and course staff.
+                    </span>
+                  </label>
+                </div>
+                {courseId || topic.courseId ? (
+                  <FileUpload
+                    courseId={courseId || topic.courseId}
+                    unitId={unitId}
+                    topicId={topic.id}
+                    shareWithCourse={shareWithCourse}
+                    onUploadComplete={() => setRefreshKey(current => current + 1)}
+                    maxFileSizeMB={50}
+                    allowedFileTypes={['.pdf', '.doc', '.docx', '.ppt', '.pptx', '.mp4', '.mpeg', '.mpg', '.mov', '.avi', '.webm']}
+                  />
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Course placement is required before uploading material to this topic.
+                  </p>
+                )}
               </div>
-              {materialsError && <p role="alert" className="text-sm text-destructive">{materialsError}</p>}
-              {materialsLoading ? (
-                <p role="status" className="text-sm text-muted-foreground">Loading topic materials…</p>
-              ) : materials.length > 0 ? (
-                <ul className="divide-y divide-border rounded-md border border-border">
-                  {materials.map(material => (
-                    <li key={material.id} className="px-3 py-2">
-                      <p className="text-sm font-medium">{material.title}</p>
-                      <p className="text-xs text-muted-foreground">{material.type || material.contentType}</p>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-sm text-muted-foreground">No materials are linked to this topic yet.</p>
-              )}
-              <div className="flex items-start gap-2">
-                <Checkbox
-                  id="shareTopicMaterials"
-                  checked={shareWithCourse}
-                  onCheckedChange={checked => setShareWithCourse(checked === true)}
-                />
-                <label htmlFor="shareTopicMaterials" className="text-sm leading-5">
-                  Make newly added materials available to enrolled learners
-                  <span className="block text-xs text-muted-foreground">
-                    Unchecked materials remain private to their owner and course staff.
-                  </span>
-                </label>
-              </div>
-              {courseId || topic.courseId ? (
-                <FileUpload
-                  courseId={courseId || topic.courseId}
-                  unitId={unitId}
-                  topicId={topic.id}
-                  shareWithCourse={shareWithCourse}
-                  onUploadComplete={() => setRefreshKey(current => current + 1)}
-                  maxFileSizeMB={50}
-                  allowedFileTypes={['.pdf', '.doc', '.docx', '.ppt', '.pptx', '.mp4', '.mpeg', '.mpg', '.mov', '.avi', '.webm']}
-                />
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Course placement is required before uploading material to this topic.
-                </p>
-              )}
-            </div>
+            </details>
           )}
-          <div className="flex justify-end space-x-2">
+          <div className="sticky bottom-0 z-10 -mx-6 -mb-6 flex justify-end space-x-2 border-t border-border bg-card/95 px-6 py-4 backdrop-blur">
             <Button 
               type="button" 
               variant="outline" 

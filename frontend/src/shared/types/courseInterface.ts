@@ -104,7 +104,7 @@ export interface Topic {
   quizQuestionCount?: number;
   isMandatory?: boolean;
   masteryUnlocked?: boolean;
-  status?: 'active' | 'inactive';
+  status?: 'draft' | 'under_review' | 'published' | 'archived' | 'withdrawn';
   isCompleted?: boolean;
   materials?: Material[];
   quizzes?: any[];
