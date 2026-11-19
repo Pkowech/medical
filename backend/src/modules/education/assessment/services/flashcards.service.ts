@@ -13,7 +13,6 @@ import {
   Flashcard,
   UserFlashcardProgress,
   QuestionDifficulty,
-  Prisma,
   UserActivityType,
 } from '@prisma/client';
 import { QuestionNotFoundException } from '../../../../common/exceptions/not-found.exception';
@@ -23,33 +22,6 @@ import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 @ApiTags('flashcards')
 export class FlashcardsService {
   private readonly logger = new Logger(FlashcardsService.name);
-
-  private getProgressScopeWhere(filters: {
-    courseId?: string;
-    unitId?: string;
-    topicId?: string;
-  }): Prisma.UserFlashcardProgressWhereInput {
-    if (!filters.courseId && !filters.unitId && !filters.topicId) return {};
-
-    return {
-      flashcard: {
-        question: {
-          is: {
-            ...(filters.topicId ? { topicIds: { has: filters.topicId } } : {}),
-            ...(filters.unitId ? { unitId: filters.unitId } : {}),
-            ...(filters.courseId
-              ? {
-                  OR: [
-                    { courseId: filters.courseId },
-                    { unit: { is: { courseId: filters.courseId } } },
-                  ],
-                }
-              : {}),
-          },
-        },
-      },
-    };
-  }
 
   constructor(
     private readonly prisma: PrismaService,
@@ -132,29 +104,6 @@ export class FlashcardsService {
     // The user-specific progress is handled by userFlashcardProgress
     return flashcard;
   }
-
-
-  @ApiOperation({ summary: 'Get due flashcards for a user' })
-  @ApiResponse({
-    status: 200,
-    description: 'List of due flashcards',
-    type: Array,
-  })
-  async getDueCards(
-    userId: string,
-    filters: { courseId?: string; unitId?: string; topicId?: string } = {},
-  ): Promise<Array<UserFlashcardProgress & { flashcard: Flashcard }>> {
-    return this.prisma.userFlashcardProgress.findMany({
-      where: {
-        userId,
-        nextReview: { lte: new Date() },
-        ...this.getProgressScopeWhere(filters),
-      },
-      include: { flashcard: true },
-      orderBy: { nextReview: 'asc' },
-    });
-  }
-
 
   @ApiOperation({ summary: 'Update a flashcard after review' })
   @ApiResponse({
@@ -280,5 +229,4 @@ export class FlashcardsService {
     );
     return updatedUserProgress;
   }
-
 }

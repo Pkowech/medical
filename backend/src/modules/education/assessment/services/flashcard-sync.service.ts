@@ -134,4 +134,3 @@ export class FlashcardSyncService {
     return syncedFlashcards;
   }
 }
-}

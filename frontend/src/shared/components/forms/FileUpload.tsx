@@ -259,7 +259,8 @@ export default function FileUpload({
             <div className="rounded-md border border-primary/20 bg-primary/5 p-3 text-sm">
               <p>
                 This course material will be saved in the Google Drive account linked to your profile.
-                MedTrack stores a reference and checks learner access; Google Drive storage limits apply.
+                MedTrack stores a reference and checks learner access. Course sharing still follows
+                the sharing option on this form; Google Drive storage limits apply.
               </p>
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <span className="text-xs text-muted-foreground">

@@ -125,5 +125,4 @@ export class QuizReviewIngestionService {
     await this.redisService.del(`due_flashcards:${userId}`);
     return scheduledCount;
   }
-
 }

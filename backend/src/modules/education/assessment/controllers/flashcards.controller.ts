@@ -46,7 +46,7 @@ export class FlashcardsController {
     @CurrentUser() currentUser: User,
   ) {
     this.assertCanAccessUser(currentUser, userId);
-    return this.flashcardsService.getDueCards(userId, {
+    return this.schedulingService.getDueCards(userId, {
       courseId,
       unitId,
       topicId,
@@ -131,8 +131,14 @@ export class FlashcardsController {
     return this.syncService.syncCards(userId, cards);
   }
 
-  private assertCanAccessUser(currentUser: User, requestedUserId: string): void {
-    if (currentUser.id !== requestedUserId && getUserPrimaryRole(currentUser) !== Role.admin) {
+  private assertCanAccessUser(
+    currentUser: User,
+    requestedUserId: string,
+  ): void {
+    if (
+      currentUser.id !== requestedUserId &&
+      getUserPrimaryRole(currentUser) !== Role.admin
+    ) {
       throw new ForbiddenException('You can only access your own flashcards');
     }
   }

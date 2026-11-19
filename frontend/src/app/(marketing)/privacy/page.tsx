@@ -30,6 +30,15 @@ const sections = [
           identifiable information or other sensitive personal data unless a feature explicitly
           requires it and you are authorised to do so.
         </p>
+        <p>
+          When an instructor chooses Google Drive for a course-material upload, the file is saved
+          in that instructor's Drive and MedTrack stores its file reference and course placement.
+          MedTrack retrieves the file to serve it to learners who have access to the course.
+          Uploading requires permission to create files for MedTrack; existing Drive connections
+          may need to be reauthorized. Drive storage quotas apply. MedTrack-created files may be
+          deleted when their material record is deleted and no other material uses them; files
+          that users only link are not changed or deleted.
+        </p>
       </>
     ),
   },

@@ -1,7 +1,8 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Flashcard, Prisma, UserFlashcardProgress } from '@prisma/client';
 import { PrismaService } from '../../../../infrastructure/prisma/prisma.service';
 import { AssessmentAnalyticsService } from '#modules/ai-analytics/services/assessment-analytics.service';
+import { ApiOperation, ApiResponse } from '@nestjs/swagger';
 
 @Injectable()
 export class FlashcardSchedulingService {
@@ -91,13 +92,33 @@ export class FlashcardSchedulingService {
     };
   }
 
+  @ApiOperation({ summary: 'Get due flashcards for a user' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of due flashcards',
+    type: Array,
+  })
+  async getDueCards(
+    userId: string,
+    filters: { courseId?: string; unitId?: string; topicId?: string } = {},
+  ): Promise<Array<UserFlashcardProgress & { flashcard: Flashcard }>> {
+    return this.prisma.userFlashcardProgress.findMany({
+      where: {
+        userId,
+        nextReview: { lte: new Date() },
+        ...this.getProgressScopeWhere(filters),
+      },
+      include: { flashcard: true },
+      orderBy: { nextReview: 'asc' },
+    });
+  }
+
   /**
    * Get high-risk/struggling topic recommendations based on flashcard performance.
    */
   async getHighRiskTopics(userId: string, limit: number = 5) {
     return this.analyticsService.getFocusRecommendations(userId, limit);
   }
-
 
   async getScheduledReviews(
     userId: string,
@@ -203,5 +224,4 @@ export class FlashcardSchedulingService {
       left.date.localeCompare(right.date),
     );
   }
-
 }
